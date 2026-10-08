@@ -19,6 +19,8 @@ import { useMobilePrSidebarController } from '../session/use-mobile-pr-sidebar-c
 import { prSidebarDetailsNeedFetch } from '../session/mobile-pr-sidebar-state'
 import { MobilePrViewPanelBody } from '../components/pr-sidebar/MobilePrViewPanel'
 import { openMobilePrUrl } from '../components/MobilePrComposeSheet'
+import { useMobileReviewSummaryChip } from '../session/use-mobile-review-summary-chip'
+import { buildMobileReviewSummaryRoute } from '../session/mobile-review-summary-chip'
 
 export type MobileSourceControlPanelProps = {
   hostId: string
@@ -306,6 +308,13 @@ export function MobileSourceControlPanel({
   // Git status always reports a conflictOperation enum; 'unknown' means none.
   const hasActiveConflict = conflictOperation != null && conflictOperation !== 'unknown'
   const conflictAborting = isMobileConflictAborting(busyAction, conflictOperation)
+  // Why: not gated on `ready` so git-status reloads never re-probe the summary.
+  const reviewSummaryChip = useMobileReviewSummaryChip({
+    client,
+    connState,
+    worktreeId,
+    enabled: true
+  })
 
   return (
     <View ref={setRootRef} style={styles.container}>
@@ -336,6 +345,10 @@ export function MobileSourceControlPanel({
           onAbortConflict={(operation) => void abortConflictOperation(operation)}
           prChip={prChip}
           onOpenPr={openPrTab}
+          reviewSummaryChip={reviewSummaryChip}
+          onOpenReviewSummary={() =>
+            router.push(buildMobileReviewSummaryRoute({ hostId, worktreeId, name }) as never)
+          }
         />
       ) : null}
 

@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/use-agent-turn-backend-recorder.ts` (mới) + test; `frontend/src/renderer/src/components/review-map/turns/use-review-turn-recorder.ts` (của FE-CV-SOL-060, thêm một lời gọi)
 **Depends on:** FE-CV-TASK-085-01, 089-01..03; FE-CV-SOL-060-review-notes-and-turn-compare; FE-CV-SOL-061-review-entry-points
-**Status:** [~] PARTIAL — hook đã mount trong `ReviewWorkspace` (`shell/use-review-companions.ts`, chỉ chạy khi cờ quality bật; use-agent-turn-backend-recorder.test PASS, ReviewWorkspace.companions.test 8/8); thiếu: chỉ ghi khi tab Review mount; `fileIdentities` vẫn lấy từ git status thay vì `ReviewTurnMarker.files`
+**Status:** [x] DONE (verified 2026-10-08: use-app-agent-turn-recorders.test 1/1, use-agent-turn-backend-recorder.test + turns/ 89/89 PASS)
 
 ## Context
 
@@ -40,3 +40,8 @@ Hook thật (`useAgentTurnBackendRecorder`) lấy mẫu `agentStatusByPaneKey` v
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 Mount cùng chỗ với `useReviewTurnRecorder`; cùng giới hạn "chỉ khi tab Review đang mount".
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- `useAgentTurnBackendRecorder` mount ở mức App qua `turns/use-app-agent-turn-recorders.ts` (chạy cả khi tab Review đóng), không mount lần hai trong workspace.
+- `fileIdentities` lấy từ `ReviewTurnMarker.files` (`buildReviewTurnMarker` → `${p}|${h}`), cùng định danh với marker cục bộ; test App-level khẳng định `filesChangedCount === marker.files.length` và không lộ prompt.

@@ -5,7 +5,7 @@
 **Area:** frontend / test-support
 **File:** `frontend/src/renderer/src/test-support/code-intel-fixtures.ts` (mở rộng; tệp do [FE-CV-TASK-073-02](../../quality-rollout/tasks/FE-CV-TASK-073-02-code-intel-fake-backend.md) sở hữu), test `code-intel-fixtures-review.test.ts` (mới)
 **Depends on:** FE-CV-TASK-073-02, FE-CV-TASK-050-01, FE-CV-TASK-050-03
-**Status:** [~] PARTIAL — fixtures rewritten to the contract types (9 overall, overlays, reading steps, impact w/o edges, symbol detail, module graph, C4, data flow, version-0 ReviewState; split into code-intel-*-fixtures.ts) and used by types/hook tests, but no dedicated code-intel-fixtures-review.test.ts and no fake backend (073-02 owner)
+**Status:** [x] DONE (verified 2026-10-08: code-intel-fixtures-review.test 10/10, code-intel-fake-backend.test PASS)
 
 ## Context
 
@@ -29,3 +29,8 @@
 ## Rủi ro
 
 - Hai nhóm cùng sửa `code-intel-fixtures.ts`: chỉ thêm, không đổi fixture đang có.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- Fake backend duy nhất là `test-support/code-intel-fake-backend.ts` (073-02); không tạo bản thứ hai.
+- Thêm `test-support/code-intel-fixtures-review.test.ts`: 9 `IndexStatus` qua `parseIndexStatus`, các biến thể `ChangeOverlay` qua `normalizeChangeOverlay` (emptyReason/truncated), `DataFlow` partial + `SequenceModel` qua `parseDataFlow`, `ReviewState` version 0, bốn `ERROR_WIRES` qua `classifyCodeIntelError` (timeout+inProgress, conflict, ambiguous, cooldown) và cùng wire tái hiện qua `failNext` của fake backend (một lần), kiểm không có đường dẫn tuyệt đối/secret.

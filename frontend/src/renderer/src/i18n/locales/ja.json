@@ -587,6 +587,9 @@
             "de50bef680": "macOS が Orca の通知をブロックしています"
           }
         }
+      },
+      "workspaceTabPalette": {
+        "reviewTab": "レビュータブ"
       }
     },
     "hooks": {
@@ -13076,7 +13079,10 @@
         },
         "SidebarRequestNavButton": {
           "label": "リクエスト",
-          "badge": "承認待ち"
+          "badge": "承認待ち {{count}} 件"
+        },
+        "RequestSourceBadge": {
+          "opensInNewTab": "{{label}}: {{ref}}（新しいタブで開く）"
         },
         "RequestType": {
           "bug": {
@@ -13198,7 +13204,8 @@
             "pros": "長所",
             "cons": "短所",
             "effort": "工数",
-            "risk": "リスク"
+            "risk": "リスク",
+            "rollback": "ロールバック"
           }
         },
         "SolutionDecisionBar": {
@@ -13297,7 +13304,8 @@
           "returnToBacklog": "バックログに戻す",
           "changeType": "種別を変更",
           "spawnChild": "子リクエストを作成",
-          "cancel": "リクエストをキャンセル"
+          "cancel": "リクエストをキャンセル",
+          "answerClarification": "回答する"
         },
         "RequestDetailPane": {
           "backToList": "一覧に戻る",
@@ -13364,7 +13372,8 @@
         "RequestFilterBar": {
           "chip": {
             "needsMyConfirmation": "確認待ち",
-            "running": "実行中"
+            "running": "実行中",
+            "awaitingInfo": "情報待ち"
           },
           "status": "ステータス",
           "type": "種別",
@@ -13505,7 +13514,8 @@
           },
           "PlanTaskRow": {
             "blocked": "ブロック中",
-            "estimate": "{{hours}}時間"
+            "estimate": "{{hours}}時間",
+            "drifted": "計画から逸脱"
           },
           "PlanTree": {
             "taskSheetDescription": "タスクの詳細",
@@ -14289,7 +14299,9 @@
             "tables": "テーブル {{count}}",
             "contracts": "コントラクト {{count}}",
             "untested": "テスト無し {{count}}",
-            "violations": "違反 {{count}}"
+            "violations": "違反 {{count}}",
+            "findings": "{{count}} 件の検出",
+            "findingsMore": "{{count}}+ 件の検出"
           },
           "risk": {
             "incomplete": "データ不足",
@@ -14579,7 +14591,19 @@
           "changed": "変更あり",
           "untested": "テストなし",
           "unimplemented": "未実装",
-          "steps": "フローのステップ"
+          "steps": "フローのステップ",
+          "trigger": {
+            "http": "HTTP",
+            "grpc": "gRPC",
+            "event": "イベント",
+            "cron": "スケジュール",
+            "ws": "WebSocket"
+          },
+          "triggerFilter": "トリガー",
+          "serviceFilter": "サービス",
+          "allTriggers": "すべてのトリガー",
+          "allServices": "すべてのサービス",
+          "pickShort": "フローを選択"
         },
         "impact": {
           "direction": "方向",

@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/notes/{ReviewNoteButton,ReviewNoteComposerPopover,ReviewNodeNoteBadge,ReviewNotesPanel}.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-060-01; FE-CV-SOL-051-review-workspace-shell; FE-CV-SOL-053-impact-lens-and-symbol-detail (panel chi tiết, nhảy tới neo)
-**Status:** [~] PARTIAL — panel + dock + nút ghi chú đã gắn (ReviewNotesPanel trong dock; ReviewNoteButton trong SymbolDetailPanel và ErdTableDetail; notes/ 7 file 49/49 PASS, ReviewWorkspace.companions.test 8/8, SymbolDetailPanel.test 10/10, erd-components.test PASS); thiếu: `ReviewNodeNoteBadge` chưa gắn vào nút xyflow, phím `n` còn cài cục bộ (prop `hotkey`, bật ở SymbolDetailPanel) chưa qua registry SOL-052
+**Status:** [x] DONE (verified 2026-10-08: ReviewNodeNoteBadge.nodes.test 4/4, notes/ + impact/ + erd/ 129/129 PASS)
 
 ## Context
 
@@ -42,3 +42,9 @@
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 `ReviewNoteButton` gắn vào `impact/SymbolDetailPanel.tsx` (anchor graph-node lens `impact`, `hotkey`) và `erd/ErdTableDetail.tsx` (prop mới `worktreeId`, anchor lens `erd`, file = `lastMigration || firstMigration`; không có file thì nút bị khoá kèm lý do). `ReviewSendMenu` ghi quyết định `send_to_agent` (095-05). Test cũ `SymbolDetailPanel.test`/`ErdLens.test` mock `@/store` một phần nên phải mock `../notes/ReviewNoteButton` (giả định cũ "panel không dùng store-bound child" không còn đúng).
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- `ReviewNodeNoteBadge` gắn lên nút xyflow: `impact/ImpactSymbolNode.tsx` (góc phải trên) và `erd/ErdTableNode.tsx` (header bảng); số đếm lấy từ `notes/use-review-node-note-counts.ts` (chỉ đọc store: `getDiffComments` + `serverState.notes.anchors`, không mount hook persistence), cấp qua `ImpactGraphCanvas`/`ErdCanvas` (prop `worktreeId`).
+- Phím `n`: SOL-052 không có registry phím dùng chung (đã tìm, không tồn tại), nên giữ cài cục bộ qua prop `hotkey` (bỏ qua ở ô nhập) — đúng nhánh "nếu có" của spec.
+- `ErdLens.test` mock thêm `../notes/use-review-node-note-counts` (store giả của test không có `getDiffComments`).

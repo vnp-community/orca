@@ -13,13 +13,33 @@ import type { RequestStatus, RequestType } from '../../../../shared/request-type
 afterEach(cleanup)
 
 const STATUSES: RequestStatus[] = [
-  'submitted', 'classifying', 'awaiting_type_confirmation', 'analyzing', 'awaiting_analysis_approval',
-  'awaiting_information', 'planning', 'awaiting_plan_approval', 'executing', 'completed', 'cancelled',
-  'request_backlog', 'unknown'
+  'submitted',
+  'classifying',
+  'awaiting_type_confirmation',
+  'analyzing',
+  'awaiting_analysis_approval',
+  'awaiting_information',
+  'planning',
+  'awaiting_plan_approval',
+  'executing',
+  'completed',
+  'cancelled',
+  'request_backlog',
+  'unknown'
 ]
 const TYPES: RequestType[] = [
-  'bug', 'task', 'docs', 'question', 'hotfix', 'security', 'ops_request', 'change_request',
-  'refactor', 'spike', 'performance', 'unknown'
+  'bug',
+  'task',
+  'docs',
+  'question',
+  'hotfix',
+  'security',
+  'ops_request',
+  'change_request',
+  'refactor',
+  'spike',
+  'performance',
+  'unknown'
 ]
 
 describe('request badges', () => {
@@ -45,9 +65,12 @@ describe('request badges', () => {
   })
 
   it('RequestSourceBadge links only http(s) urls', () => {
-    const { rerender } = render(<RequestSourceBadge provider="jira" ref="ABC-1" url="https://x.example/ABC-1" />)
+    const { rerender } = render(
+      <RequestSourceBadge provider="jira" sourceRef="ABC-1" url="https://x.example/ABC-1" />
+    )
     expect(screen.getByRole('link')).toHaveAttribute('href', 'https://x.example/ABC-1')
-    rerender(<RequestSourceBadge provider="jira" ref="ABC-1" url="javascript:alert(1)" />)
+    expect(screen.getByRole('link')).toHaveAccessibleName(/ABC-1 \(opens in new tab\)$/)
+    rerender(<RequestSourceBadge provider="jira" sourceRef="ABC-1" url="javascript:alert(1)" />)
     expect(screen.queryByRole('link')).toBeNull()
     expect(screen.getByText('ABC-1')).toBeInTheDocument()
   })

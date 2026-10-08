@@ -1,6 +1,6 @@
 # FE-CV-SOL-062: Mobile: màn tóm tắt Review chỉ đọc (kèm host method desktop `codeIntel.reviewSummary`)
 
-> 🚧 In Progress (rà soát 2026-10-07): 4/6 task DONE (062-01, 02, 05, 06), 2 PARTIAL (062-03 hook chưa test, 062-04 UI chưa typecheck/chạy thiết bị). Priority P2 (đợt 6). Port mặc định `unavailable` tới khi O-4 chốt.
+> 🚧 In Progress (rà soát 2026-10-08): 5/6 task DONE (062-01, 02, 03, 05, 06), 1 PARTIAL (062-04: chip thẻ nhánh, handler mock-server và render test đã xong; còn chạy thiết bị và typecheck `mobile/` đầy đủ khi có phụ thuộc). Priority P2 (đợt 6). Port mặc định `unavailable` tới khi O-4 chốt.
 
 **CR:** [CR-CV-062](../../../../../../docs/crs/v7/review-frontend/CR-CV-062-mobile-review-summary.md)
 **Area:** mobile (`mobile/`) + host runtime desktop (`desktop/src/main/runtime/` — **ngoài `frontend/`, cần chủ sở hữu desktop duyệt**)

@@ -587,6 +587,9 @@
             "de50bef680": "macOS está bloqueando las notificaciones de Orca"
           }
         }
+      },
+      "workspaceTabPalette": {
+        "reviewTab": "Pestaña de revisión"
       }
     },
     "hooks": {
@@ -13076,7 +13079,10 @@
         },
         "SidebarRequestNavButton": {
           "label": "Solicitudes",
-          "badge": "aprobaciones pendientes"
+          "badge": "{{count}} aprobaciones pendientes"
+        },
+        "RequestSourceBadge": {
+          "opensInNewTab": "{{label}}: {{ref}} (se abre en una pestaña nueva)"
         },
         "RequestType": {
           "bug": {
@@ -13198,7 +13204,8 @@
             "pros": "Ventajas",
             "cons": "Desventajas",
             "effort": "Esfuerzo",
-            "risk": "Riesgo"
+            "risk": "Riesgo",
+            "rollback": "Reversión"
           }
         },
         "SolutionDecisionBar": {
@@ -13297,7 +13304,8 @@
           "returnToBacklog": "Devolver al backlog",
           "changeType": "Cambiar tipo",
           "spawnChild": "Crear solicitud hija",
-          "cancel": "Cancelar solicitud"
+          "cancel": "Cancelar solicitud",
+          "answerClarification": "Responder"
         },
         "RequestDetailPane": {
           "backToList": "Volver a la lista",
@@ -13364,7 +13372,8 @@
         "RequestFilterBar": {
           "chip": {
             "needsMyConfirmation": "Requiere mi confirmación",
-            "running": "En curso"
+            "running": "En curso",
+            "awaitingInfo": "Esperando información"
           },
           "status": "Estado",
           "type": "Tipo",
@@ -13505,7 +13514,8 @@
           },
           "PlanTaskRow": {
             "blocked": "Bloqueada",
-            "estimate": "{{hours}} h"
+            "estimate": "{{hours}} h",
+            "drifted": "Desviada"
           },
           "PlanTree": {
             "taskSheetDescription": "Detalles de la tarea",
@@ -14289,7 +14299,9 @@
             "tables": "{{count}} tablas",
             "contracts": "{{count}} contratos",
             "untested": "{{count}} sin pruebas",
-            "violations": "{{count}} infracciones"
+            "violations": "{{count}} infracciones",
+            "findings": "{{count}} hallazgos",
+            "findingsMore": "{{count}}+ hallazgos"
           },
           "risk": {
             "incomplete": "Datos insuficientes",
@@ -14579,7 +14591,19 @@
           "changed": "cambiado",
           "untested": "sin pruebas",
           "unimplemented": "no implementado",
-          "steps": "Pasos del flujo"
+          "steps": "Pasos del flujo",
+          "trigger": {
+            "http": "HTTP",
+            "grpc": "gRPC",
+            "event": "Evento",
+            "cron": "Programado",
+            "ws": "WebSocket"
+          },
+          "triggerFilter": "Disparador",
+          "serviceFilter": "Servicio",
+          "allTriggers": "Todos los disparadores",
+          "allServices": "Todos los servicios",
+          "pickShort": "Elige un flujo"
         },
         "impact": {
           "direction": "Dirección",

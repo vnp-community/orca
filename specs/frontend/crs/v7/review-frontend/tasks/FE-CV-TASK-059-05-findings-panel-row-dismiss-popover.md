@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/findings/{FindingsPanel,FindingsToolbar,FindingsList,FindingRow,FindingDismissPopover}.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-059-02, 059-03; FE-CV-SOL-051-review-workspace-shell (dock đáy, `react-resizable-panels`); `lib/screen-submit-shortcut.ts`, `components/ShortcutKeyCombo.tsx` (đã có)
-**Status:** [~] PARTIAL — component + dock đáy đã gắn (ReviewBottomDock + review-dock-registry; ReviewWorkspace.companions.test 8/8, findings/ 36/36 PASS); thiếu: chip "N phát hiện" ở thanh tóm tắt; phím j/k/Enter/d/r/Esc vẫn xử lý cục bộ trong panel (chưa qua registry SOL-052)
+**Status:** [x] DONE (verified 2026-10-08: ReviewFindingsChip.test 4/4, findings/ PASS, ReviewWorkspace.test 13/13 + companions 9/9 PASS)
 
 ## Context
 
@@ -44,3 +44,10 @@
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 Dock đáy thu gọn được (mặc định đóng, không mount panel khi đóng) trong `shell/ReviewBottomDock.tsx`; nguồn đăng ký ở `shell/review-dock-registry.ts` (`registerReviewDockPanel`, cờ `requiresQuality`) và `shell/review-dock-builtin-panels.tsx` (Finding cấu trúc = `findings`, ghi chú = `notes`). `QualityFinding` của lens quality (W5-A) phải đăng ký panel riêng id khác qua registry — hai nguồn không gộp. Thêm `review_findings_summary` (một lần mỗi lần mount panel, chỉ đếm). Sai lệch: nút dock dùng `aria-pressed`, không dùng role `tab`, để không lẫn với tab lens (test cũ đếm 7 tab).
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- Chip "N phát hiện" ở thanh tóm tắt: `shell/ReviewFindingsChip.tsx` (đếm Finding chưa bỏ qua trong phạm vi `changed`, "N+" khi còn trang; cùng tham số server với lần tải đầu của `FindingsPanel` nên dùng chung cache), gắn qua slot `children` của `ReviewSummaryBar`.
+- Bấm chip mở panel `findings` của dock: `shell/review-dock-focus.ts` (`requestReviewDockPanel`), `ReviewBottomDock` lắng nghe theo worktree.
+- Phím j/k/Enter/d/r/Esc: SOL-052 không có registry phím dùng chung, nên giữ xử lý cục bộ khi tiêu điểm trong dock (nhánh "nếu có").
+- Khoá i18n mới `auto.components.reviewMap.shell.chip.findings|findingsMore` (5 locale).

@@ -1,6 +1,6 @@
 # FE-CV-SOL-059: Lens Hợp đồng và danh sách Phát hiện (Bỏ qua / Đã xử lý)
 
-> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 5/7 task DONE (059-01, 02, 03, 04, 06), 2 PARTIAL (059-05 đã gắn dock đáy (W6), còn thiếu chip "N phát hiện"; 059-07 thiếu e2e vì package không có `tests/e2e`). Viết ngày 2026-10-06.
+> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 6/7 task DONE; PARTIAL 1 (059-07). Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-059](../../../../../../docs/crs/v7/review-frontend/CR-CV-059-contract-lens-and-findings.md)
 **Area:** frontend (`components/review-map/contract/`, `components/review-map/findings/`, hook, selector slice)

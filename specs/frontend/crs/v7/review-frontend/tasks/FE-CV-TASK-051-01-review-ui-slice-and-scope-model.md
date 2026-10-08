@@ -5,7 +5,7 @@
 **Area:** frontend / store + review-map
 **File:** `store/slices/review-ui.ts` (mới), `components/review-map/review-scope-model.ts` (mới), `store/index.ts`, `store/types.ts`, `store-test-helpers.ts`, tests
 **Depends on:** FE-CV-TASK-050-10
-**Status:** [~] PARTIAL — scope model + slice + 3 leak tests pass; NOT done: item 3 (fetch `git.branchCompare` via runtime-git-client when no summary: the shell only reads `gitBranchCompareSummaryByWorktree` or falls back to `worktree.baseRef`)
+**Status:** [x] DONE (verified 2026-10-08: use-review-branch-compare-fetch.test 4/4, review-scope-model.test PASS, ReviewWorkspace.companions.test 9/9 + ReviewWorkspace.test 13/13 PASS)
 
 ## Context
 
@@ -30,3 +30,9 @@
 ## Rủi ro
 
 - O-13 (ngữ nghĩa `head` vắng) và compare tổng hợp cho `range`: ghi chưa kiểm chứng.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- Mục 3: `shell/use-review-branch-compare-fetch.ts` — khi chưa có summary, gọi `getRuntimeGitBranchCompare` (runtime-git-client: IPC local / SSH qua `getConnectionId` / runtime từ xa, định tuyến theo chủ repo `getRepoOwnerRoutedSettings`) rồi `setGitBranchCompareResult`; không thêm lệnh git mới.
+- Base = `worktree.baseRef` rồi `repo.worktreeBaseRef`; không có base thì không gọi. Một lần mỗi (worktree, base) mỗi lần mount.
+- `beginGitBranchCompareRequest(..., { preserveExistingSummary: true })` để không chèn summary `loading` (giữ phạm vi mặc định từ base đã ghim); lỗi không ghi summary `error` (Source Control báo lỗi git).

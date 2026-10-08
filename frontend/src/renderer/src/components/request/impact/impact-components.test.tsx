@@ -4,7 +4,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callRequestRpc = vi.fn()
-vi.mock('../../../runtime/request-rpc-client', () => ({ callRequestRpc: (...a: unknown[]) => callRequestRpc(...a) }))
+vi.mock('../../../runtime/request-rpc-client', () => ({
+  callRequestRpc: (...a: unknown[]) => callRequestRpc(...a)
+}))
 
 import { ImpactFindingList } from './ImpactFindingList'
 import { RiskSummaryCard } from './RiskSummaryCard'
@@ -19,10 +21,24 @@ function route(map: Record<string, unknown>) {
 beforeEach(() => {
   callRequestRpc.mockReset()
 })
-afterEach(() => { cleanup(); vi.useRealTimers() })
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 describe('RiskSummaryCard', () => {
-  const summary = { assessment_id: 'a', digest: 'd', level: 'high', score: 62, top_reasons: ['Touches billing', 'No tests'], assessed_at: '2026-10-07', tool: 'codegraph', mode: 'enforce', status: 'ready', hard_rules: ['migration'] }
+  const summary = {
+    assessment_id: 'a',
+    digest: 'd',
+    level: 'high',
+    score: 62,
+    top_reasons: ['Touches billing', 'No tests'],
+    assessed_at: '2026-10-07',
+    tool: 'codegraph',
+    mode: 'enforce',
+    status: 'ready',
+    hard_rules: ['migration']
+  }
 
   it('shows level, score, reasons, caption and the rule that raised the level', async () => {
     route({ 'impact.get': ok(summary), 'impact.findings': ok({ findings: [] }) })
@@ -35,7 +51,10 @@ describe('RiskSummaryCard', () => {
   })
 
   it('labels shadow mode as advisory and stale assessments', async () => {
-    route({ 'impact.get': ok({ ...summary, mode: 'shadow', stale: true }), 'impact.findings': ok({ findings: [] }) })
+    route({
+      'impact.get': ok({ ...summary, mode: 'shadow', stale: true }),
+      'impact.findings': ok({ findings: [] })
+    })
     render(<RiskSummaryCard subjectType="plan" subjectId="p" />)
     expect(await screen.findByText('Advisory')).toBeInTheDocument()
     expect(screen.getByText(/out of date/)).toBeInTheDocument()
@@ -69,19 +88,27 @@ describe('RiskSummaryCard', () => {
     callRequestRpc.mockReturnValue(new Promise(() => {}))
     const { container } = render(<RiskSummaryCard subjectType="plan" subjectId="c" />)
     expect(container.querySelector('[role="status"]')).toBeNull()
-    await waitFor(() => expect(container.querySelector('[role="status"]')).not.toBeNull(), { timeout: 1500 })
+    await waitFor(() => expect(container.querySelector('[role="status"]')).not.toBeNull(), {
+      timeout: 1500
+    })
   })
 })
 
 describe('SolutionDimensionTable', () => {
-  const options = [{ id: 'a', title: 'Option A' }, { id: 'b', title: 'Option B' }]
+  const options = [
+    { id: 'a', title: 'Option A' },
+    { id: 'b', title: 'Option B' }
+  ]
   it('renders badges, marks the recommended column by text and flags differences', () => {
     render(
       <SolutionDimensionTable
         options={options}
         recommendedId="a"
         comparison={[
-          { optionId: 'a', dimensions: { data: { level: 'high', score: 3, note: 'schema change' } } },
+          {
+            optionId: 'a',
+            dimensions: { data: { level: 'high', score: 3, note: 'schema change' } }
+          },
           { optionId: 'b', dimensions: { data: { level: 'low', score: 1 } } }
         ]}
       />
@@ -92,6 +119,24 @@ describe('SolutionDimensionTable', () => {
     expect(screen.getAllByText('Differs between options').length).toBe(1)
     expect(screen.queryByRole('radio')).toBeNull()
   })
+  it('appends the SOL-020 Effort and Rollback rows under the dimensions', () => {
+    render(
+      <SolutionDimensionTable
+        options={[
+          { id: 'a', title: 'A', effort: 'S', rollback: 'Revert migration' },
+          { id: 'b', title: 'B', effort: 'L' }
+        ]}
+        comparison={[{ optionId: 'a', dimensions: {} }]}
+      />
+    )
+    const effort = screen.getByTestId('dimension-row-effort')
+    expect(effort).toHaveTextContent('Effort')
+    expect(effort).toHaveTextContent('S')
+    expect(effort).toHaveTextContent('L')
+    expect(effort).toHaveTextContent('Differs between options')
+    expect(screen.getByTestId('dimension-row-rollback')).toHaveTextContent('Revert migration')
+    expect(screen.getByTestId('dimension-row-rollback')).toHaveTextContent('No data')
+  })
   it('renders nothing without comparison data', () => {
     const { container } = render(<SolutionDimensionTable options={options} comparison={null} />)
     expect(container).toBeEmptyDOMElement()
@@ -101,7 +146,13 @@ describe('SolutionDimensionTable', () => {
 describe('ImpactFindingList', () => {
   const findings = [
     { id: 'f1', dimension: 'data', level: 'medium' as const, title: 'Index drop' },
-    { id: 'f2', dimension: 'data', level: 'critical' as const, title: 'Column removed', nodeIds: ['n1'] }
+    {
+      id: 'f2',
+      dimension: 'data',
+      level: 'critical' as const,
+      title: 'Column removed',
+      nodeIds: ['n1']
+    }
   ]
   it('sorts by risk within a dimension and offers graph view only with node ids', () => {
     const onView = vi.fn()
@@ -114,7 +165,9 @@ describe('ImpactFindingList', () => {
   })
 
   it('opens evidence as plain text, not HTML', async () => {
-    route({ 'impact.evidence': ok({ evidence: '<img src=x onerror=alert(1)> call path', truncated: true }) })
+    route({
+      'impact.evidence': ok({ evidence: '<img src=x onerror=alert(1)> call path', truncated: true })
+    })
     render(<ImpactFindingList findings={findings} />)
     fireEvent.click(screen.getAllByText('Evidence')[0])
     const pre = await screen.findByTestId('impact-evidence-text')

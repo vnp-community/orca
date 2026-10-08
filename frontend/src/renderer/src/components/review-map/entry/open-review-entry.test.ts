@@ -18,10 +18,13 @@ const ensure = vi.fn((_id: string) => {
 })
 
 vi.mock('@/store', () => ({ useAppStore: { getState: () => state } }))
-vi.mock('@/lib/worktree-activation', () => ({ activateAndRevealWorktree: (id: string) => activate(id) }))
+vi.mock('@/lib/worktree-activation', () => ({
+  activateAndRevealWorktree: (id: string) => activate(id)
+}))
 vi.mock('@/lib/ensure-review-tab', () => ({ ensureReviewTab: (id: string) => ensure(id) }))
 
 import { openReviewFromEntryPoint } from './open-review-entry'
+import { takeReviewOpenSource } from '@/lib/review-open-source'
 
 describe('openReviewFromEntryPoint', () => {
   beforeEach(() => {
@@ -55,5 +58,28 @@ describe('openReviewFromEntryPoint', () => {
   it('returns false when ensureReviewTab refuses', () => {
     ensure.mockReturnValueOnce(null)
     expect(openReviewFromEntryPoint('wt', 'agent-row')).toBe(false)
+  })
+
+  it.each([
+    ['agent-row', 'agent_row'],
+    ['source-control', 'source_control'],
+    ['cmd-k', 'cmd_k'],
+    ['right-sidebar', 'right_sidebar'],
+    ['notification', 'notification']
+  ] as const)('records %s as the telemetry open source before the tab mounts', (entry, source) => {
+    ensure.mockImplementationOnce((id: string) => {
+      // The origin is already pending when the tab is created.
+      expect(takeReviewOpenSource(id).source).toBe(source)
+      return 'tab1'
+    })
+    openReviewFromEntryPoint('wt', entry)
+  })
+
+  it('marks afterAgentTurn from the completion and clears the origin when the tab is refused', () => {
+    openReviewFromEntryPoint('wt', 'notification', { completionId: 'c1' })
+    expect(takeReviewOpenSource('wt')).toEqual({ source: 'notification', afterAgentTurn: true })
+    ensure.mockReturnValueOnce(null)
+    openReviewFromEntryPoint('wt', 'cmd-k')
+    expect(takeReviewOpenSource('wt')).toEqual({ source: 'restore', afterAgentTurn: false })
   })
 })

@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + hooks
 **File:** `hooks/useDataFlows.ts`, `hooks/useDataFlow.ts`, `components/review-map/DataFlowListPane.tsx`, `store/slices/review-ui.ts` (thêm `dataFlowId`), tests
 **Depends on:** FE-CV-TASK-050-13, FE-CV-TASK-056-03, FE-CV-TASK-051-01
-**Status:** [~] PARTIAL — hook/danh sách/phân trang/debounce/công tắc chạm thay đổi xong và test xanh; liên kết "Luồng liên quan" từ SymbolDetailPanel đã hoạt động theo `dataFlowId` (SymbolDetailPanel.test PASS); thiếu: bộ lọc `triggerKind`/`service` trên UI, bản `Select` dưới 720 px
+**Status:** [x] DONE (verified 2026-10-08: DataFlowFilters.test 3/3, dataflow/ 36/36 PASS)
 
 ## Context
 
@@ -37,3 +37,9 @@
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 Liên kết dùng `setReviewDataFlowId(flow.id)` + `setReviewLens("dataflow")` (không cần `query=label`): `DataFlowLens` mở chi tiết theo id, kể cả khi luồng không nằm trong trang danh sách đã tải (`fallbackLabel`).
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- Bộ lọc server `triggerKind`/`service`: `dataflow/DataFlowFilters.tsx` (shadcn `Select`, mục "Tất cả" = không lọc); danh sách dịch vụ lấy từ `entryService` của các luồng đã tải (hợp đồng không có API liệt kê dịch vụ), giữ lựa chọn hiện tại.
+- Dưới 720 px (đo khung lens, không đo cửa sổ — `dataflow/use-pane-width-below.ts`): danh sách thành `Select` trong `DataFlowListPane` (`compact`), bố cục bỏ `md:flex-row`.
+- Khoá i18n `auto.components.reviewMap.dataflow.trigger.*`, `triggerFilter`, `serviceFilter`, `allTriggers`, `allServices`, `pickShort` (5 locale).

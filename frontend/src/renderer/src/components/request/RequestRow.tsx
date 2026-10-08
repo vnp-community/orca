@@ -22,7 +22,11 @@ type Props = {
   onSelect: (id: string) => void
 }
 
-export const RequestRow = React.memo(function RequestRow({ request, selected, onSelect }: Props): React.JSX.Element {
+export const RequestRow = React.memo(function RequestRow({
+  request,
+  selected,
+  onSelect
+}: Props): React.JSX.Element {
   return (
     <button
       type="button"
@@ -51,7 +55,7 @@ export const RequestRow = React.memo(function RequestRow({ request, selected, on
         {request.source && request.source.provider !== 'manual' && (
           <RequestSourceBadge
             provider={request.source.provider}
-            ref={request.source.ref}
+            sourceRef={request.source.ref}
             url={request.source.url}
             size="xs"
           />

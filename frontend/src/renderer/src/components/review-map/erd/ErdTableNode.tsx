@@ -16,6 +16,7 @@ import {
   ERD_CHANGE_TEXT_CLASS
 } from './erd-change-style'
 import { ErdColumnRow } from './ErdColumnRow'
+import { ReviewNodeNoteBadge } from '../notes/ReviewNodeNoteBadge'
 import { ERD_COLLAPSED_COLUMN_LIMIT, ERD_HEADER_HEIGHT, ERD_NODE_WIDTH } from './erd-layout'
 import { selectCollapsedColumns } from './erd-table-filter'
 import type { ErdChangeKind } from './erd-column-changes'
@@ -28,10 +29,20 @@ export type ErdTableNodeData = {
   dimmed: boolean
   onSelect: (key: string) => void
   onToggleExpand: (key: string) => void
+  /** Unsent review notes anchored on this table. */
+  noteCount?: number
 }
 
 export function ErdTableNode({ data, selected }: NodeProps): React.JSX.Element {
-  const { table, expanded, query, dimmed, onSelect, onToggleExpand } = data as ErdTableNodeData
+  const {
+    table,
+    expanded,
+    query,
+    dimmed,
+    onSelect,
+    onToggleExpand,
+    noteCount = 0
+  } = data as ErdTableNodeData
   const { shown, hidden } = selectCollapsedColumns(table.columns, query, expanded)
   const change = table.tableChange
   const changeKind = (
@@ -92,6 +103,9 @@ export function ErdTableNode({ data, selected }: NodeProps): React.JSX.Element {
             {stateLabel}
           </Badge>
         ) : null}
+        <span className={cn('shrink-0 empty:hidden', !stateLabel && 'ml-auto')}>
+          <ReviewNodeNoteBadge count={noteCount} />
+        </span>
       </div>
       {table.dropped ? (
         <p className="px-2 py-1 text-[11px] text-muted-foreground">

@@ -11,7 +11,8 @@ import {
   Server,
   ServerOff,
   Smartphone,
-  SquareTerminal
+  SquareTerminal,
+  ScanSearch
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { openReviewFromEntryPoint } from '@/components/review-map/entry/open-review-entry'
@@ -424,9 +425,9 @@ export default function WorktreeJumpPalette(): React.JSX.Element | null {
   const deferredQuery = useDeferredValue(query)
   const [selectedItemId, setSelectedItemId] = useState('')
   const previousWorktreeIdRef = useRef<string | null>(null)
-  const previousActiveTabTypeRef = useRef<'browser' | 'editor' | 'terminal' | 'simulator' | 'review'>(
-    'terminal'
-  )
+  const previousActiveTabTypeRef = useRef<
+    'browser' | 'editor' | 'terminal' | 'simulator' | 'review'
+  >('terminal')
   const previousBrowserPageIdRef = useRef<string | null>(null)
   const previousBrowserFocusTargetRef = useRef<'webview' | 'address-bar'>('webview')
   const activeGroupSnapshotRef = useRef<CmdJActiveGroupSnapshot | null>(null)
@@ -912,26 +913,26 @@ export default function WorktreeJumpPalette(): React.JSX.Element | null {
       resolveCodeIntelSelector(state, state.activeWorktreeId).state === 'ready'
     const quality = state.codeIntelSupportState?.effective?.qualityGateEnabled === true
     return buildCmdJQuickActionContext({
-        state,
-        activeGroupSnapshot: activeGroupSnapshotRef.current,
-        openNewBrowserTab: openNewBrowserTabInActiveWorkspace,
-        openNewMarkdownFile: openNewMarkdownInActiveWorkspace,
-        openNewTerminalTab: openNewTerminalTabInActiveWorkspace,
-        openCreateWorkspace: openCreateWorkspaceAction,
-        deleteActiveWorkspace: deleteActiveWorkspaceAction,
-        openAddQuickCommand: openAddQuickCommandAction,
-        codeIntelEnabled,
-        reviewLensAvailable: (lens) => isReviewLensReleased(lens, { quality }),
-        openReviewChanges: openReviewChangesAction
-      })
+      state,
+      activeGroupSnapshot: activeGroupSnapshotRef.current,
+      openNewBrowserTab: openNewBrowserTabInActiveWorkspace,
+      openNewMarkdownFile: openNewMarkdownInActiveWorkspace,
+      openNewTerminalTab: openNewTerminalTabInActiveWorkspace,
+      openCreateWorkspace: openCreateWorkspaceAction,
+      deleteActiveWorkspace: deleteActiveWorkspaceAction,
+      openAddQuickCommand: openAddQuickCommandAction,
+      codeIntelEnabled,
+      reviewLensAvailable: (lens) => isReviewLensReleased(lens, { quality }),
+      openReviewChanges: openReviewChangesAction
+    })
   }, [
-      deleteActiveWorkspaceAction,
-      openAddQuickCommandAction,
-      openReviewChangesAction,
-      openCreateWorkspaceAction,
-      openNewBrowserTabInActiveWorkspace,
-      openNewMarkdownInActiveWorkspace,
-      openNewTerminalTabInActiveWorkspace
+    deleteActiveWorkspaceAction,
+    openAddQuickCommandAction,
+    openReviewChangesAction,
+    openCreateWorkspaceAction,
+    openNewBrowserTabInActiveWorkspace,
+    openNewMarkdownInActiveWorkspace,
+    openNewTerminalTabInActiveWorkspace
   ])
 
   const quickActionContext = buildQuickActionContext()
@@ -2076,7 +2077,11 @@ export default function WorktreeJumpPalette(): React.JSX.Element | null {
                 const workspaceTabRepoName = workspaceTabRepo?.displayName ?? result.repoName
                 const workspaceTabHostBadge = getPaletteHostBadge(workspaceTabRepo, hostOptions)
                 const WorkspaceTabIcon =
-                  result.contentType === 'terminal' ? SquareTerminal : FileText
+                  result.contentType === 'terminal'
+                    ? SquareTerminal
+                    : result.contentType === 'review'
+                      ? ScanSearch
+                      : FileText
 
                 return (
                   <CommandItem

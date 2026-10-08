@@ -1,4 +1,5 @@
 import { getEditorDisplayLabel } from '@/components/editor/editor-labels'
+import { translate } from '@/i18n/i18n'
 import type { OpenFile } from '@/store/slices/editor'
 import {
   resolveTerminalTabTitle,
@@ -21,6 +22,7 @@ export type WorkspaceTabContentType =
   | 'diff'
   | 'conflict-review'
   | 'check-details'
+  | 'review'
 
 export type SearchableWorkspaceTab = {
   tab: Tab & { contentType: WorkspaceTabContentType }
@@ -38,12 +40,7 @@ export type SearchableWorkspaceTab = {
   isCurrentWorktree: boolean
 }
 
-type WorkspaceTabPaletteActiveTabType =
-  | 'browser'
-  | 'editor'
-  | 'terminal'
-  | 'simulator'
-  | 'review'
+type WorkspaceTabPaletteActiveTabType = 'browser' | 'editor' | 'terminal' | 'simulator' | 'review'
 
 export type BuildSearchableWorkspaceTabsOptions = WorkspaceTabAgentMetadataState & {
   worktrees: readonly Worktree[]
@@ -84,7 +81,9 @@ function getActiveUnifiedTabId({
     ? (groupsByWorktree[worktreeId] ?? []).find((group) => group.id === activeGroupId)
     : undefined
   const activeUnifiedTabId = activeGroup?.activeTabId ?? null
-  return activeTabType === 'terminal' || activeTabType === 'editor' ? activeUnifiedTabId : null
+  return activeTabType === 'terminal' || activeTabType === 'editor' || activeTabType === 'review'
+    ? activeUnifiedTabId
+    : null
 }
 
 function isCurrentWorkspaceTab({
@@ -113,10 +112,15 @@ function isCurrentWorkspaceTab({
   if (tab.worktreeId !== activeWorktreeId) {
     return false
   }
-  const visibleType = tab.contentType === 'terminal' ? 'terminal' : 'editor'
+  const visibleType =
+    tab.contentType === 'terminal' ? 'terminal' : tab.contentType === 'review' ? 'review' : 'editor'
   const storedType = activeTabTypeByWorktree[tab.worktreeId] ?? activeTabType
   if (storedType !== visibleType || activeUnifiedTabId !== tab.id) {
     return false
+  }
+  if (visibleType === 'review') {
+    // One Review tab per worktree and no backing file: the unified id is enough.
+    return true
   }
   if (visibleType === 'terminal') {
     return (activeTabIdByWorktree[tab.worktreeId] ?? activeTabId) === tab.entityId
@@ -132,7 +136,8 @@ function isWorkspaceTabContentType(
     contentType === 'editor' ||
     contentType === 'diff' ||
     contentType === 'conflict-review' ||
-    contentType === 'check-details'
+    contentType === 'check-details' ||
+    contentType === 'review'
   )
 }
 
@@ -223,6 +228,22 @@ export function buildSearchableWorkspaceTabs({
             retainedAgentsByPaneKey,
             sleepingAgentSessionsByPaneKey
           })
+        })
+        continue
+      }
+
+      if (tab.contentType === 'review') {
+        const title =
+          tab.customLabel || tab.label || translate('auto.lib.ensure.review.tab.title', 'Review')
+        const secondary = translate('auto.lib.workspaceTabPalette.reviewTab', 'Review tab')
+        entries.push({
+          ...baseEntry,
+          title,
+          secondaryText: secondary,
+          titleSearchText: title,
+          // English alias keeps "review" findable in every locale.
+          secondarySearchTexts: [secondary, 'review'],
+          agentMetadata: []
         })
         continue
       }

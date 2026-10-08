@@ -21,7 +21,11 @@ import { applyChangeView, hasChangeAxis } from './graph-before-after'
 import { buildExecutionGraph, buildFlowGraph, buildPlanGraph } from './graph-client-lens-adapters'
 import { GRAPH_LENSES } from './graph-lens-registry'
 import {
-  createGraphPanelState, graphPanelReducer, initialView, lensDisabledReason, shouldOpenSearchOnKey,
+  createGraphPanelState,
+  graphPanelReducer,
+  initialView,
+  lensDisabledReason,
+  shouldOpenSearchOnKey,
   type LensDisabledReason
 } from './graph-panel-state'
 import { useOpenDevServerSettings } from '../request/use-open-dev-server-settings'
@@ -31,7 +35,12 @@ import { GraphSearchPalette } from './GraphSearchPalette'
 import { GraphEmptyState, GraphErrorState, GraphSkeleton, GraphStatusBanner } from './GraphStates'
 import { GraphToolbar } from './GraphToolbar'
 import type { OrcaRequest } from '../../../../shared/request-types'
-import type { GraphLens, GraphNode, GraphPayload, GraphSubjectType } from '../../../../shared/graph-types'
+import type {
+  GraphLens,
+  GraphNode,
+  GraphPayload,
+  GraphSubjectType
+} from '../../../../shared/graph-types'
 
 const GraphCanvas = React.lazy(() => import('./GraphCanvas'))
 
@@ -41,30 +50,57 @@ export type GraphPanelProps = {
   lensInitial?: GraphLens
   /** false = known to have no assessment yet; undefined = unknown (chips stay enabled). */
   impactAssessed?: boolean
+  /** Preselects a node, e.g. "View on graph" from an impact finding. */
+  initialSelectedId?: string
   onNodeOpen?: (node: GraphNode) => void
   className?: string
 }
 
-export function GraphPanel({ request, subject, lensInitial, impactAssessed, onNodeOpen, className }: GraphPanelProps): React.JSX.Element {
+export function GraphPanel({
+  request,
+  subject,
+  lensInitial,
+  impactAssessed,
+  initialSelectedId,
+  onNodeOpen,
+  className
+}: GraphPanelProps): React.JSX.Element {
   const narrow = useRequestNarrowLayout()
   const openDevServerSettings = useOpenDevServerSettings()
   const [state, dispatch] = useReducer(graphPanelReducer, undefined, () =>
-    createGraphPanelState(lensInitial ?? (impactAssessed ? 'impact' : 'flow'), narrow ? 'list' : 'graph')
+    createGraphPanelState(
+      lensInitial ?? (impactAssessed ? 'impact' : 'flow'),
+      narrow ? 'list' : 'graph',
+      initialSelectedId ?? null
+    )
   )
   const isClientLens = (GRAPH_LENSES_CLIENT as readonly string[]).includes(state.lens)
 
   const planTree = usePlanTree(request)
   const tasks = useMemo(
-    () => (planTree.tree ? [...planTree.tree.phases, ...Object.values(planTree.tree.tasksByPhase).flat(), ...planTree.tree.flatTasks] : []),
+    () =>
+      planTree.tree
+        ? [
+            ...planTree.tree.phases,
+            ...Object.values(planTree.tree.tasksByPhase).flat(),
+            ...planTree.tree.flatTasks
+          ]
+        : [],
     [planTree.tree]
   )
   const deps = useTaskDependencyEdges(tasks)
   const heat = usePlanHeatmap(request.planTaskId, state.lens === 'plan')
 
   const clientPayload = useMemo<GraphPayload | null>(() => {
-    if (state.lens === 'flow') {return buildFlowGraph(request, (k) => translate(k, k.split('.').pop() ?? k))}
-    if (state.lens === 'plan') {return buildPlanGraph(planTree.tree, deps.edges, heat.heatmap)}
-    if (state.lens === 'execution') {return buildExecutionGraph(planTree.tree, deps.edges)}
+    if (state.lens === 'flow') {
+      return buildFlowGraph(request, (k) => translate(k, k.split('.').pop() ?? k))
+    }
+    if (state.lens === 'plan') {
+      return buildPlanGraph(planTree.tree, deps.edges, heat.heatmap)
+    }
+    if (state.lens === 'execution') {
+      return buildExecutionGraph(planTree.tree, deps.edges)
+    }
     return null
   }, [state.lens, request, planTree.tree, deps.edges, heat.heatmap])
 
@@ -80,12 +116,15 @@ export function GraphPanel({ request, subject, lensInitial, impactAssessed, onNo
   const status = isClientLens ? 'ready' : backend.status
   const backendUnsupported = backend.error?.kind === 'unsupported'
 
-  // Why: the list is the default for truncated payloads, applied once per panel.
-  const appliedInitialView = useRef(false)
+  // Why: the list is the default for truncated payloads (also after a lens switch) until the user picks a view.
+  const userChoseView = useRef(false)
   useEffect(() => {
-    if (appliedInitialView.current || !payload || status !== 'ready') {return}
-    appliedInitialView.current = true
-    if (initialView({ truncated: payload.truncated, narrow: false }) === 'list') {dispatch({ type: 'view', view: 'list' })}
+    if (userChoseView.current || !payload || status !== 'ready') {
+      return
+    }
+    if (initialView({ truncated: payload.truncated, narrow: false }) === 'list') {
+      dispatch({ type: 'view', view: 'list' })
+    }
   }, [payload, status])
 
   useEffect(() => {
@@ -106,24 +145,49 @@ export function GraphPanel({ request, subject, lensInitial, impactAssessed, onNo
         impactAssessed,
         backendUnsupported,
         hasPlan: Boolean(request.planTaskId),
-        executing: request.status === 'executing' || request.status === 'completed' || (planTree.tree?.phases.length ?? 0) > 0
+        executing:
+          request.status === 'executing' ||
+          request.status === 'completed' ||
+          (planTree.tree?.phases.length ?? 0) > 0
       })
-      if (reason) {out[l.id] = reason}
+      if (reason) {
+        out[l.id] = reason
+      }
     }
     return out
   }, [impactAssessed, backendUnsupported, request.planTaskId, request.status, planTree.tree])
 
   const runAssessment = useCallback(async () => {
-    await callRequestRpc(REQUEST_RPC_METHODS.IMPACT_REQUEST, { subjectType: subject.type, subjectId: subject.id })
+    await callRequestRpc(REQUEST_RPC_METHODS.IMPACT_REQUEST, {
+      subjectType: subject.type,
+      subjectId: subject.id
+    })
     backend.refetch()
   }, [subject.type, subject.id, backend])
 
-  const viewPayload = useMemo(() => (payload ? applyChangeView(payload, state.changeView) : null), [payload, state.changeView])
+  const viewPayload = useMemo(
+    () => (payload ? applyChangeView(payload, state.changeView) : null),
+    [payload, state.changeView]
+  )
   const loading = status === 'loading'
 
   let body: React.ReactNode
   if (!payload || (status === 'idle' && !isClientLens)) {
-    body = backend.showSkeleton || loading ? <GraphSkeleton /> : <GraphEmptyState kind="noAssessment" onRunAssessment={backendUnsupported ? undefined : () => { void runAssessment() }} />
+    body =
+      backend.showSkeleton || loading ? (
+        <GraphSkeleton />
+      ) : (
+        <GraphEmptyState
+          kind="noAssessment"
+          onRunAssessment={
+            backendUnsupported
+              ? undefined
+              : () => {
+                  void runAssessment()
+                }
+          }
+        />
+      )
   } else if (payload.nodes.length === 0) {
     body = <GraphEmptyState kind="empty" />
   } else if (state.view === 'list') {
@@ -164,15 +228,25 @@ export function GraphPanel({ request, subject, lensInitial, impactAssessed, onNo
         disabledReasons={disabledReasons}
         disabled={loading && !payload}
         onLens={(lens) => dispatch({ type: 'lens', lens })}
-        onView={(view) => dispatch({ type: 'view', view })}
+        onView={(view) => {
+          userChoseView.current = true
+          dispatch({ type: 'view', view })
+        }}
         onChangeView={(changeView) => dispatch({ type: 'changeView', changeView })}
         onSearch={() => dispatch({ type: 'search', open: true })}
       />
       {payload ? <GraphStatusBanner payload={payload} /> : null}
       {backend.error && backend.status === 'error' ? (
-        <GraphErrorState error={backend.error} onRetry={backend.refetch} hasStalePayload={payload !== null} onConnectDevServer={openDevServerSettings} />
+        <GraphErrorState
+          error={backend.error}
+          onRetry={backend.refetch}
+          hasStalePayload={payload !== null}
+          onConnectDevServer={openDevServerSettings}
+        />
       ) : null}
-      <div className={loading && payload ? 'min-h-0 flex-1 opacity-60' : 'min-h-0 flex-1'}>{body}</div>
+      <div className={loading && payload ? 'min-h-0 flex-1 opacity-60' : 'min-h-0 flex-1'}>
+        {body}
+      </div>
       {payload ? (
         <>
           <GraphSearchPalette

@@ -14,6 +14,7 @@ import { ApprovalStatusBadge } from '../ApprovalStatusBadge'
 import { computePhaseStats, resolveProgress } from './plan-approval-model'
 import { PlanTaskRow } from './PlanTaskRow'
 import { useTaskReadiness } from '../../../hooks/useTaskReadiness'
+import { usePhaseDrift } from '../../../hooks/usePhaseDrift'
 import { PhaseReadinessSummary } from '../readiness/PhaseReadinessSummary'
 import type { Approval } from '../../../../../shared/request-types'
 import type { OrcaTask } from '../../../../../shared/task-types'
@@ -38,6 +39,12 @@ export function PhaseNode({
   const stats = computePhaseStats(tasks)
   const taskIds = React.useMemo(() => tasks.map((t) => t.id), [tasks])
   const readiness = useTaskReadiness({ phaseId: phase.id, phaseTaskIds: taskIds })
+  // Why: drift only exists once a phase has run; skip the call for phases that have not started.
+  const drifted = usePhaseDrift({
+    requestId: phase.requestId ?? null,
+    phaseId: phase.id,
+    enabled: phase.status === 'in_progress' || phase.status === 'review' || phase.status === 'done'
+  })
   const progress = resolveProgress(phase, tasks)
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
@@ -112,7 +119,15 @@ export function PhaseNode({
             {translate('auto.components.request.plan.PhaseNode.empty', 'No tasks in this phase.')}
           </p>
         ) : (
-          tasks.map((t) => <PlanTaskRow key={t.id} task={t} onOpen={onOpenTask} readiness={readiness.byTaskId[t.id] ?? null} />)
+          tasks.map((t) => (
+            <PlanTaskRow
+              key={t.id}
+              task={t}
+              onOpen={onOpenTask}
+              readiness={readiness.byTaskId[t.id] ?? null}
+              drifted={drifted.has(t.id)}
+            />
+          ))
         )}
       </CollapsibleContent>
     </Collapsible>

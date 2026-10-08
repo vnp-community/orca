@@ -1,19 +1,19 @@
 # Solutions: request-frontend (frontend, v6)
 
-> 🚧 **In Progress.** Rà soát ngày 2026-10-07: SOL-018 ✅ Done, SOL-019 và 020 🚧 In Progress, SOL-021–036 🔴 Not Started. Tiến độ ~22% (12/54 tasks). Soạn ngày 2026-10-06 từ [docs/crs/v6/request-frontend](../../../../../../docs/crs/v6/request-frontend/README.md).
+> 🚧 **In Progress.** Rà soát ngày 2026-10-07: SOL-018 đến 021 ✅ Done (2026-10-08, e2e web SPA + WS giả); 022 trở đi xem các PARTIAL-INDEX. Tiến độ ~22% (12/54 tasks). Soạn ngày 2026-10-06 từ [docs/crs/v6/request-frontend](../../../../../../docs/crs/v6/request-frontend/README.md).
 
 ## Bảng CR → Solution
 
 | CR | Solution | Nội dung | Trạng thái |
 |---|---|---|---|
-| CR-REQ-018 | [FE-REQ-SOL-018](./FE-REQ-SOL-018-request-frontend-foundation.md) | Kiểu, registry luồng, RPC client, hook, store, định tuyến `requests`, badge, sidebar; gỡ `backlog` khỏi `TaskStatus` | 🚧 Mostly done (018-03, 018-05 partial) |
-| CR-REQ-019 | [FE-REQ-SOL-019](./FE-REQ-SOL-019-request-list-detail-classification-ui.md) | Danh sách, chi tiết, xác nhận phân loại, lịch sử, Request con, "Tạo Request" từ Tasks | 🚧 019-01..05 done, 06/07 partial (e2e) |
-| CR-REQ-020 | [FE-REQ-SOL-020](./FE-REQ-SOL-020-solution-review-ui.md) | Xem, so sánh, chọn, duyệt, từ chối Solution (Chẩn đoán, Findings, Answer) | 🚧 In Progress (04/05 done, 05 partial) |
-| CR-REQ-021 | [FE-REQ-SOL-021](./FE-REQ-SOL-021-plan-phase-tree-and-approval-ui.md) | Cây Plan → Phase → Task, duyệt Plan/Phase/`pre_deploy`, lọc khỏi Board | 🚧 In Progress (5/6) |
+| CR-REQ-018 | [FE-REQ-SOL-018](./FE-REQ-SOL-018-request-frontend-foundation.md) | Kiểu, registry luồng, RPC client, hook, store, định tuyến `requests`, badge, sidebar; gỡ `backlog` khỏi `TaskStatus` | ✅ Done (2026-10-08) |
+| CR-REQ-019 | [FE-REQ-SOL-019](./FE-REQ-SOL-019-request-list-detail-classification-ui.md) | Danh sách, chi tiết, xác nhận phân loại, lịch sử, Request con, "Tạo Request" từ Tasks | ✅ Done (2026-10-08, web e2e) |
+| CR-REQ-020 | [FE-REQ-SOL-020](./FE-REQ-SOL-020-solution-review-ui.md) | Xem, so sánh, chọn, duyệt, từ chối Solution (Chẩn đoán, Findings, Answer) | ✅ Done (2026-10-08, web e2e) |
+| CR-REQ-021 | [FE-REQ-SOL-021](./FE-REQ-SOL-021-plan-phase-tree-and-approval-ui.md) | Cây Plan → Phase → Task, duyệt Plan/Phase/`pre_deploy`, lọc khỏi Board | ✅ Done (2026-10-08, web e2e) |
 | CR-REQ-022 | [FE-REQ-SOL-022](./FE-REQ-SOL-022-approval-inbox.md) | Hộp duyệt chờ xử lý | ✅ Done (7/7 tasks, verified 2026-10-07) |
 | CR-REQ-023 | [FE-REQ-SOL-023](./FE-REQ-SOL-023-backlog-screens.md) | Màn Backlog ba view | ✅ Done (7/7 tasks, verified 2026-10-07) |
-| CR-REQ-032 | [FE-REQ-SOL-032](./FE-REQ-SOL-032-graph-canvas-and-lenses.md) | Canvas đồ thị và các lens | 🚧 In Progress (4/8 DONE, 3 PARTIAL, 032-07 BLOCKED) |
-| CR-REQ-036 | [FE-REQ-SOL-036](./FE-REQ-SOL-036-clarification-decision-readiness-impact-ui.md) | Giao diện hỏi lại, quyết định, sẵn sàng, tác động | 🚧 In Progress (3/8 DONE, 5 PARTIAL) |
+| CR-REQ-032 | [FE-REQ-SOL-032](./FE-REQ-SOL-032-graph-canvas-and-lenses.md) | Canvas đồ thị và các lens | 🚧 In Progress (7/8 DONE, 032-07 BLOCKED chờ duyệt `elkjs`) |
+| CR-REQ-036 | [FE-REQ-SOL-036](./FE-REQ-SOL-036-clarification-decision-readiness-impact-ui.md) | Giao diện hỏi lại, quyết định, sẵn sàng, tác động | ✅ Done (8/8 DONE, 2026-10-08) |
 
 Các solution 018 đến 021 để chỗ cắm cho 022 và 023 (`ApprovalInboxTab`, `BacklogTab` trong `RequestPage`, `RejectReasonDialog`, `useApprovals`, `useBacklog` với `backlog.requests|tasks|execute`).
 

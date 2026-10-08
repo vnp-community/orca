@@ -16,10 +16,17 @@ type Props = {
   overlay: ChangeOverlayView
   active: ReviewChipId | null
   onChipClick: (chip: ReviewChipId) => void
+  /** Extra chips owned by other features (e.g. the findings count). */
+  children?: React.ReactNode
 }
 
 /** Seven chips always render (zero ones dimmed) so the bar does not reflow. */
-export function ReviewSummaryBar({ overlay, active, onChipClick }: Props): React.JSX.Element {
+export function ReviewSummaryBar({
+  overlay,
+  active,
+  onChipClick,
+  children
+}: Props): React.JSX.Element {
   return (
     <div
       role="toolbar"
@@ -45,6 +52,7 @@ export function ReviewSummaryBar({ overlay, active, onChipClick }: Props): React
           </button>
         )
       })}
+      {children}
     </div>
   )
 }

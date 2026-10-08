@@ -587,6 +587,9 @@
             "de50bef680": "macOS 正在阻止 Orca 通知"
           }
         }
+      },
+      "workspaceTabPalette": {
+        "reviewTab": "审查标签页"
       }
     },
     "hooks": {
@@ -13076,7 +13079,10 @@
         },
         "SidebarRequestNavButton": {
           "label": "请求",
-          "badge": "待审批"
+          "badge": "{{count}} 个待审批"
+        },
+        "RequestSourceBadge": {
+          "opensInNewTab": "{{label}}: {{ref}}（在新标签页中打开）"
         },
         "RequestType": {
           "bug": {
@@ -13198,7 +13204,8 @@
             "pros": "优点",
             "cons": "缺点",
             "effort": "工作量",
-            "risk": "风险"
+            "risk": "风险",
+            "rollback": "回滚"
           }
         },
         "SolutionDecisionBar": {
@@ -13297,7 +13304,8 @@
           "returnToBacklog": "退回待办",
           "changeType": "更改类型",
           "spawnChild": "创建子请求",
-          "cancel": "取消请求"
+          "cancel": "取消请求",
+          "answerClarification": "回答"
         },
         "RequestDetailPane": {
           "backToList": "返回列表",
@@ -13364,7 +13372,8 @@
         "RequestFilterBar": {
           "chip": {
             "needsMyConfirmation": "待我确认",
-            "running": "进行中"
+            "running": "进行中",
+            "awaitingInfo": "等待补充信息"
           },
           "status": "状态",
           "type": "类型",
@@ -13505,7 +13514,8 @@
           },
           "PlanTaskRow": {
             "blocked": "已阻塞",
-            "estimate": "{{hours}} 小时"
+            "estimate": "{{hours}} 小时",
+            "drifted": "偏离计划"
           },
           "PlanTree": {
             "taskSheetDescription": "任务详情",
@@ -14289,7 +14299,9 @@
             "tables": "{{count}} 张表",
             "contracts": "{{count}} 个契约",
             "untested": "{{count}} 个未测试",
-            "violations": "{{count}} 个违规"
+            "violations": "{{count}} 个违规",
+            "findings": "{{count}} 个发现",
+            "findingsMore": "{{count}}+ 个发现"
           },
           "risk": {
             "incomplete": "数据不足",
@@ -14579,7 +14591,19 @@
           "changed": "已更改",
           "untested": "未测试",
           "unimplemented": "未实现",
-          "steps": "流程步骤"
+          "steps": "流程步骤",
+          "trigger": {
+            "http": "HTTP",
+            "grpc": "gRPC",
+            "event": "事件",
+            "cron": "定时",
+            "ws": "WebSocket"
+          },
+          "triggerFilter": "触发方式",
+          "serviceFilter": "服务",
+          "allTriggers": "全部触发方式",
+          "allServices": "全部服务",
+          "pickShort": "选择流程"
         },
         "impact": {
           "direction": "方向",

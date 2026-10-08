@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import type { MarkdownDocument } from '../../../../shared/types'
 import { useAppStore } from '@/store'
 import { scrollTopCache, cursorPositionCache, setWithLRU } from '@/lib/scroll-cache'
-import '@/lib/monaco-setup'
+import { monaco as qualityMonaco } from '@/lib/monaco-setup'
 import { computeEditorFontSize } from '@/lib/editor-font-zoom'
 import { registerFileSearchSelectedTextProvider } from '@/lib/file-search-selection'
 
@@ -59,6 +59,8 @@ import {
   isMonacoAutoHeightCapped
 } from './monaco-auto-height'
 import { installMonacoE2EProbe } from './monaco-e2e-probe'
+import { useEditorQualityAnnotations } from './quality-annotations/useEditorQualityAnnotations'
+import { QualityAnnotationStrip } from './quality-annotations/QualityAnnotationStrip'
 
 type MonacoEditorProps = {
   fileId: string
@@ -225,6 +227,15 @@ export default function MonacoEditor({
     (comment: DiffComment) => formatMarkdownReviewNotes([comment as MarkdownReviewNote], content),
     [content]
   )
+
+  const qualityAnnotations = useEditorQualityAnnotations({
+    editor: mountedEditor,
+    monacoApi: qualityMonaco,
+    fileId,
+    worktreeId,
+    relativePath,
+    readOnly
+  })
 
   useDiffCommentDecorator({
     editor: shouldShowMarkdownAnnotations ? mountedEditor : null,
@@ -879,6 +890,12 @@ export default function MonacoEditor({
       />
 
       {toastNode}
+      <QualityAnnotationStrip
+        worktreeId={worktreeId}
+        {...qualityAnnotations}
+        // Why: a row above the editor would steal height from the full-height Monaco layout.
+        className="absolute bottom-2 right-4 z-10 flex max-w-[70%] items-center gap-2 rounded-md border border-border bg-popover px-2 py-1 text-xs text-muted-foreground shadow-sm"
+      />
       <MonacoGutterContextMenu
         open={gutterMenuOpen}
         onOpenChange={setGutterMenuOpen}

@@ -25,6 +25,10 @@ type Props = {
   testIdPrefix: string
   /** When set, Approve is locked and this text explains why (CR-REQ-028 decision gate). */
   approveBlockedReason?: string | null
+  /** Risk-gate fields forwarded to `approval.approve` (FE-REQ-TASK-036-06). */
+  approveExtras?: { viewedImpactDigest?: string; acceptedFindingIds?: string[] }
+  /** REQUEST_RISK_APPROVER_NOT_ALLOWED: hide Approve, keep Reject. */
+  hideApprove?: boolean
 }
 
 export function PlanDecisionButtons({
@@ -35,7 +39,9 @@ export function PlanDecisionButtons({
   rejectTitle,
   offerRegenerate = false,
   testIdPrefix,
-  approveBlockedReason = null
+  approveBlockedReason = null,
+  approveExtras,
+  hideApprove = false
 }: Props): React.JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false)
   const approving = decision.isBusy(`approve:${approval.id}`)
@@ -44,20 +50,22 @@ export function PlanDecisionButtons({
 
   return (
     <div className="flex items-center gap-2">
-      <Button
-        size="sm"
-        disabled={locked || approveBlockedReason !== null}
-        title={approveBlockedReason ?? undefined}
-        onClick={() => void decision.approve(approval)}
-        data-testid={`${testIdPrefix}-approve`}
-      >
-        {approving ? (
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-        ) : (
-          <Check className="size-3.5" aria-hidden />
-        )}
-        {approveLabel}
-      </Button>
+      {hideApprove ? null : (
+        <Button
+          size="sm"
+          disabled={locked || approveBlockedReason !== null}
+          title={approveBlockedReason ?? undefined}
+          onClick={() => void decision.approve(approval, undefined, approveExtras)}
+          data-testid={`${testIdPrefix}-approve`}
+        >
+          {approving ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <Check className="size-3.5" aria-hidden />
+          )}
+          {approveLabel}
+        </Button>
+      )}
       <Button
         size="sm"
         variant="outline"

@@ -66,14 +66,18 @@ describe('useMobileReviewSummaryController', () => {
     const input = base()
     const { ref } = await mount(input)
     expect(ref.current?.screenState.kind).toBe('ready')
-    expect((input.client as never as { sendRequest: ReturnType<typeof vi.fn> }).sendRequest).toHaveBeenCalledTimes(1)
+    expect(
+      (input.client as never as { sendRequest: ReturnType<typeof vi.fn> }).sendRequest
+    ).toHaveBeenCalledTimes(1)
   })
 
   it('waits for desktop when not connected and does not request', async () => {
     const input = base({ connState: 'connecting' as ConnectionState })
     const { ref } = await mount(input)
     expect(ref.current?.screenState).toEqual({ kind: 'error', message: 'Waiting for desktop...' })
-    expect((input.client as never as { sendRequest: ReturnType<typeof vi.fn> }).sendRequest).not.toHaveBeenCalled()
+    expect(
+      (input.client as never as { sendRequest: ReturnType<typeof vi.fn> }).sendRequest
+    ).not.toHaveBeenCalled()
   })
 
   it('calls onReconnect automatically once when the link drops', async () => {
@@ -99,7 +103,9 @@ describe('useMobileReviewSummaryController', () => {
     const { ref } = await mount(input)
     await act(async () => ref.current?.refresh())
     expect(ref.current?.refreshing).toBe(false)
-    expect((input.client as never as { sendRequest: ReturnType<typeof vi.fn> }).sendRequest).toHaveBeenCalledTimes(2)
+    expect(
+      (input.client as never as { sendRequest: ReturnType<typeof vi.fn> }).sendRequest
+    ).toHaveBeenCalledTimes(2)
   })
 
   it('stale response from an older request never overwrites a newer one', async () => {

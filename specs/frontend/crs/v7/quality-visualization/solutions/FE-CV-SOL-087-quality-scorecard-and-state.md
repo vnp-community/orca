@@ -1,6 +1,6 @@
 # FE-CV-SOL-087-quality-scorecard-and-state: Kiểu, state, hook, scorecard cổng, chạy kiểm tra, lens `quality`
 
-> Đã triển khai và xác minh 2026-10-07 (tasks 087-01..07 DONE, 087-08 PARTIAL: thiếu spec e2e Playwright). Kiểu/parser đúng hợp đồng §4.7 + D5, slice `codeIntelQualityByWorktree` (push + polling dự phòng), hook, scorecard, chạy kiểm tra, lens `quality` lazy, chip trong Review header. Test: shared 17, slice 27, hook 18, mô hình 33+9, component 29+3+14+8, fake scenarios 18, i18n 17 — tất cả pass.
+> Đã triển khai và xác minh 2026-10-07 (tasks 087-01..07 DONE, 087-08 PARTIAL: chỉ còn spec e2e Playwright (P1); re-verified 2026-10-08). Kiểu/parser đúng hợp đồng §4.7 + D5, slice `codeIntelQualityByWorktree` (push + polling dự phòng), hook, scorecard, chạy kiểm tra, lens `quality` lazy, chip trong Review header. Test: shared 17, slice 27, hook 18, mô hình 33+9, component 29+3+14+8, fake scenarios 18, i18n 17 — tất cả pass.
 
 **CR:** [CR-CV-087](../../../../../../docs/crs/v7/quality-visualization/CR-CV-087-quality-frontend-scorecard-and-annotations.md) (mục 2.1-2.5, 2.9, 2.11)
 **Area:** frontend (`frontend/src/shared`, `frontend/src/renderer/src`)

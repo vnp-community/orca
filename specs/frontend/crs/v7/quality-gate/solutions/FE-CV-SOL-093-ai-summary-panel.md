@@ -1,6 +1,6 @@
 # FE-CV-SOL-093-ai-summary-panel: Thẻ "Tóm tắt do AI suy luận" (mặc định tắt)
 
-> Trạng thái (2026-10-07): 5/6 task DONE, 1 PARTIAL, 0 BLOCKED, 0 TODO. Xem mục "Ghi chú triển khai" của từng task; code thật lệch spec ở các điểm đã ghi.
+> ✅ **Done.** Trạng thái (cập nhật 2026-10-08): 6/6 task DONE. Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-093](../../../../../../docs/crs/v7/quality-gate/CR-CV-093-ai-review-summary.md) (phần frontend; backend `BE-CV-SOL-093-ai-review-summary`). Priority P2, O13.
 **Area:** frontend (`components/review-map/ai-summary/`)

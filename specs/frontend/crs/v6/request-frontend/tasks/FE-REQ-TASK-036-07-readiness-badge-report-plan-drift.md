@@ -5,7 +5,7 @@
 **Area:** frontend / request / readiness
 **File:** `frontend/src/renderer/src/components/request/readiness/{ReadinessBadge,ReadinessReportSheet,PlanDriftBanner,PlanDriftReviewSheet,PhaseReadinessSummary}.tsx`, `readiness-action-rules.ts` (mới); `components/request/plan/PlanTaskRow.tsx`, `PhaseNode.tsx`, `RequestPlanTab.tsx` (sửa, FE-REQ-TASK-021-03/021-05); `components/task/TaskDetail.tsx` (sửa); test cùng tên
 **Depends on:** FE-REQ-TASK-036-01, 036-02, 036-03 (mở `ClarificationPanel`), FE-REQ-TASK-032-06 (`GraphPanel` lens `execution`), FE-REQ-TASK-021-03, 021-05, 021-04
-**Status:** [~] PARTIAL — vitest readiness/readiness-action-rules (5), readiness-components (9) pass — thiếu: test tích hợp TaskDetail, chip "Lệch", điều hướng dev server
+**Status:** [x] DONE (verified 2026-10-08: vitest readiness-components (9), readiness-action-rules (5), TaskDetail-request-artifacts (6 mới), TaskDetail (25), PlanTree (8, +1 chip Lệch), usePhaseDrift (2) pass)
 
 ## Context
 
@@ -72,3 +72,9 @@
 ## Ghi chú triển khai (2026-10-07)
 
 `ReadinessBadge`/`ReadinessReportSheet`/`PhaseReadinessSummary` xong và gắn vào `PlanTaskRow`, `PhaseNode`, `TaskDetail` (badge, nút "Kiểm tra sẵn sàng", khoá Chạy qua `isRunBlockedByReadiness`; chỉ cho task có `requestId`). `PlanDriftSection` (banner + sheet) gắn vào `RequestPlanTab`; hành động chỉ "chấp nhận" (approve) và "trả về" (reject), không "huỷ Phase". Chưa: chip "Lệch" trên `PlanTaskRow`, test render `TaskDetail` với báo cáo readiness, đường dẫn tới màn dev server (nút chỉ hiện khi host truyền `onConnectDevServer`).
+
+## Ghi chú triển khai (2026-10-08)
+
+- Chip "Lệch" trên `PlanTaskRow` (`drifted`, chữ + icon, token `risk-medium`): `hooks/usePhaseDrift.ts` gọi `impact.drift {phaseId}` (tạm) một lần mỗi Phase đã chạy (`in_progress|review|done`), nạp lại khi có `impact.drift_detected`; `unsupported` thì không chip.
+- `TaskDetail` nối `ReadinessReportSheet.onConnectDevServer` → `useOpenDevServerSettings` (Settings > Servers).
+- Test tích hợp `components/task/__tests__/TaskDetail-request-artifacts.test.tsx`: `needs_info` hiện badge và khoá Chạy kèm lý do; `env_defect` mở sheet, chỉ tên biến, "Kết nối dev server" mở Settings > Servers; `ready` không khoá; task ngoài Request không có UI readiness; runtime `unsupported` không khoá Chạy.

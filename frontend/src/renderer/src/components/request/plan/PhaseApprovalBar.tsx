@@ -8,6 +8,7 @@ import React from 'react'
 import { Loader2, Play } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
+import { ApprovalRiskGateSection, useApprovalRiskGate } from '../impact/ApprovalRiskGate'
 import { planDecisionErrorMessage } from './plan-decision-error-message'
 import { PlanDecisionButtons } from './PlanDecisionButtons'
 import type { PlanDecision } from '../../../hooks/usePlanDecision'
@@ -32,6 +33,7 @@ export function PhaseApprovalBar({ phase, approval, decision }: Props): React.JS
   const approved = approval?.status === 'approved'
   const starting = decision.isBusy(`startPhase:${phase.id}`)
   const showStart = !started && (approved || approval?.status === 'pending')
+  const risk = useApprovalRiskGate(approval, failure?.error ?? null)
 
   if (!approval && !showStart) {
     return null
@@ -39,12 +41,23 @@ export function PhaseApprovalBar({ phase, approval, decision }: Props): React.JS
 
   return (
     <div className="flex flex-col gap-1.5" data-testid={`phase-approval-bar-${phase.id}`}>
+      {approval?.status === 'pending' && (
+        <ApprovalRiskGateSection
+          api={risk}
+          approval={approval}
+          gateName="phase"
+          disabled={decision.isBusy(`approve:${approval.id}`)}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {approval?.status === 'pending' && (
           <PlanDecisionButtons
             approval={approval}
             decision={decision}
             testIdPrefix={`phase-${phase.id}`}
+            approveBlockedReason={risk.blockedReason}
+            approveExtras={risk.gate.approveExtras}
+            hideApprove={risk.approverNotAllowed}
             approveLabel={translate(`${P}approve`, 'Approve phase')}
             rejectLabel={translate(`${P}reject`, 'Reject')}
             rejectTitle={translate(`${P}rejectTitle`, 'Reject phase')}

@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + e2e
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `frontend/src/renderer/src/i18n/request-locale-coverage.test.ts` (sửa), `tests/e2e/request-solution-review.spec.ts` (mới), `docs/ui/pages/requests.md` (sửa)
 **Depends on:** FE-REQ-TASK-020-02 đến 020-04
-**Status:** [~] PARTIAL — khoá i18n + test phủ khoá xanh (solution-locale-coverage.test.ts); e2e `tests/e2e/request-solution-review.spec.ts` chỉ là khung `test.skip` CHƯA CHẠY/CHƯA viết thân; `docs/ui/pages/requests.md` chưa tồn tại nên chưa cập nhật
+**Status:** [x] DONE (verified 2026-10-08: web e2e tests/e2e/request-web/request-solution-review.web.e2e.ts 5/5 pass ((a) cards + Compare table, (b) solution.choose then approval.approve with the new digest -> Planning, (c) short reject reason locked / approval.reject comment, (d) ControlOrMeta+Enter submits and plain Enter does not, (e) hotfix has no decision bar); solution-locale-coverage pass; docs/ui/pages/requests.md Analysis section added. Translations still need native review)
 
 ## Context
 

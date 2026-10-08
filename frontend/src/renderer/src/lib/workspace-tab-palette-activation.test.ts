@@ -332,3 +332,52 @@ describe('activateWorkspaceTabPaletteResult', () => {
     })
   })
 })
+
+// FE-CV-TASK-050-18: palette results can open the Review tab (it has no backing open file).
+describe('activateWorkspaceTabPaletteResult review tab', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetStore()
+    mocks.activateAndRevealWorktree.mockReturnValue({ primaryTabId: null })
+    mocks.store.unifiedTabsByWorktree['wt-1'].push({
+      id: 'unified-review-1',
+      entityId: 'wt-1',
+      groupId: 'group-1',
+      worktreeId: 'wt-1',
+      contentType: 'review',
+      label: 'Review',
+      customLabel: null,
+      color: null,
+      sortOrder: 1,
+      createdAt: 1
+    })
+  })
+
+  it('activates the review tab and sets the review tab type without needing an open file', () => {
+    const result = activateWorkspaceTabPaletteResult(
+      makeResult({
+        tabId: 'unified-review-1',
+        entityId: 'wt-1',
+        contentType: 'review',
+        title: 'Review'
+      })
+    )
+    expect(result).toEqual({ status: 'activated' })
+    expect(mocks.store.focusGroup).toHaveBeenCalledWith('wt-1', 'group-1')
+    expect(mocks.store.activateTab).toHaveBeenCalledWith('unified-review-1')
+    expect(mocks.store.setActiveTabType).toHaveBeenCalledWith('review')
+    expect(mocks.store.setActiveFile).not.toHaveBeenCalled()
+    expect(mocks.focusTerminalTabSurface).not.toHaveBeenCalled()
+  })
+
+  it('fails as missing-tab once the review tab was closed', () => {
+    mocks.store.unifiedTabsByWorktree['wt-1'] = mocks.store.unifiedTabsByWorktree['wt-1'].filter(
+      (t) => t.contentType !== 'review'
+    )
+    expect(
+      activateWorkspaceTabPaletteResult(
+        makeResult({ tabId: 'unified-review-1', entityId: 'wt-1', contentType: 'review' })
+      )
+    ).toEqual({ status: 'failed', reason: 'missing-tab' })
+  })
+})

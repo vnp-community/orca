@@ -7,6 +7,7 @@
  */
 
 import React from 'react'
+import { GitCompareArrows } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { TaskStatusBadge } from '../../task/TaskStatusBadge'
 import { ExecutionEngineBadge } from '../../task/ExecutionEngineBadge'
@@ -19,9 +20,16 @@ type Props = {
   onOpen: (task: OrcaTask) => void
   /** Latest readiness report; omitted/null shows no badge. */
   readiness?: TaskReadinessReport | null
+  /** Actual change drifted from the plan (impact.drift); chip only, the banner is PlanDriftSection's. */
+  drifted?: boolean
 }
 
-export function PlanTaskRow({ task, onOpen, readiness = null }: Props): React.JSX.Element {
+export function PlanTaskRow({
+  task,
+  onOpen,
+  readiness = null,
+  drifted = false
+}: Props): React.JSX.Element {
   return (
     <button
       type="button"
@@ -43,6 +51,15 @@ export function PlanTaskRow({ task, onOpen, readiness = null }: Props): React.JS
       {task.status === 'blocked' && (
         <span className="rounded border border-destructive/40 px-1.5 text-xs text-destructive">
           {translate('auto.components.request.plan.PlanTaskRow.blocked', 'Blocked')}
+        </span>
+      )}
+      {drifted && (
+        <span
+          className="inline-flex items-center gap-1 rounded border border-risk-medium-border bg-risk-medium-background px-1.5 text-xs text-risk-medium"
+          data-testid={`plan-task-drift-${task.id}`}
+        >
+          <GitCompareArrows className="size-3" aria-hidden />
+          {translate('auto.components.request.plan.PlanTaskRow.drifted', 'Drifted')}
         </span>
       )}
       <ReadinessBadge report={readiness} compact />

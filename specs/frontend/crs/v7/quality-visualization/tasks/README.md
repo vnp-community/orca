@@ -1,6 +1,6 @@
 # Tasks: quality-visualization (frontend, v7)
 
-> Cập nhật 2026-10-07: 087-01..20 — 18 DONE (verified), 2 PARTIAL (087-08 thiếu spec e2e Playwright; 087-11 chưa gắn `MonacoEditor` thường). 088-01..09 verified.
+> Cập nhật 2026-10-08: 087-01..20 — 19 DONE (verified), 1 PARTIAL (087-08 chỉ còn spec e2e Playwright, P1). 087-11 DONE: đã gắn `MonacoEditor` thường + kiểm Monaco thật trong Chromium headless. 088-01..09 verified.
 
 ## Bảng Task
 
@@ -13,10 +13,10 @@
 | [FE-CV-TASK-087-05](./FE-CV-TASK-087-05-quality-scorecard-steps-provenance-and-ci-comparison.md) | Scorecard cổng, lý do, bước chạy, dòng nguồn, so sánh CI, chip | P0 | FE-CV-TASK-088-03, 088-07; 087-03, 087-04 | [x] DONE (verified 2026-10-07) |
 | [FE-CV-TASK-087-06](./FE-CV-TASK-087-06-quality-run-control-and-progress.md) | `QualityRunControl`, tiến độ, huỷ, lỗi chạy | P0 | 087-03, 087-04 | [x] DONE (verified 2026-10-07) |
 | [FE-CV-TASK-087-07](./FE-CV-TASK-087-07-quality-lens-registration-blocks-and-state-screens.md) | Lens `quality`: đăng ký, khung khối, màn trạng thái | P0 | 087-03..087-06; FE-CV-SOL-051-review-workspace-shell | [x] DONE (verified 2026-10-07) |
-| [FE-CV-TASK-087-08](./FE-CV-TASK-087-08-quality-fake-backend-i18n-and-e2e.md) | Fake backend `quality.*`, phủ khoá i18n, e2e | P1 | 087-01..087-07, 088-09 | [~] PARTIAL (thiếu e2e) |
+| [FE-CV-TASK-087-08](./FE-CV-TASK-087-08-quality-fake-backend-i18n-and-e2e.md) | Fake backend `quality.*`, phủ khoá i18n, e2e | P1 | 087-01..087-07, 088-09 | [~] PARTIAL (chỉ còn e2e, P1) |
 | [FE-CV-TASK-087-09](./FE-CV-TASK-087-09-quality-marker-model-and-annotation-eligibility.md) | Mô hình marker thuần và quy tắc đủ điều kiện theo `DiffSource` | P0 | 087-01 (kiểu `QualityFinding`) | [x] DONE (verified 2026-10-07) |
 | [FE-CV-TASK-087-10](./FE-CV-TASK-087-10-quality-finding-markers-hook-and-lifecycle.md) | Hook `useQualityFindingMarkers` và `useQualityFindingsForFile` | P0 | 087-09, 087-02, 087-03 | [x] DONE (verified 2026-10-07) |
-| [FE-CV-TASK-087-11](./FE-CV-TASK-087-11-quality-annotations-diff-wiring-and-glyph-css.md) | Gắn hook vào `DiffViewer`, `DiffSectionItem`; CSS glyph; công tắc chú thích | P0 | 087-10, FE-CV-TASK-088-01 | [~] PARTIAL (MonacoEditor thường) |
+| [FE-CV-TASK-087-11](./FE-CV-TASK-087-11-quality-annotations-diff-wiring-and-glyph-css.md) | Gắn hook vào `DiffViewer`, `DiffSectionItem`; CSS glyph; công tắc chú thích | P0 | 087-10, FE-CV-TASK-088-01 | [x] DONE (verified 2026-10-08) |
 | [FE-CV-TASK-087-12](./FE-CV-TASK-087-12-quality-findings-list-filter-sort-and-virtualization.md) | Danh sách phát hiện kiểm tra: lọc, sắp, ảo hoá, phân trang | P0 | 087-02, 087-03, FE-CV-TASK-088-03 | [x] DONE (verified 2026-10-07) |
 | [FE-CV-TASK-087-13](./FE-CV-TASK-087-13-quality-findings-dock-source-toggle-and-open-diff.md) | Ô nguồn "Cấu trúc | Kiểm tra" trong dock và liên kết mở diff | P1 | 087-12, 087-07; FE-CV-SOL-059, FE-CV-SOL-053 | [x] DONE (verified 2026-10-07) |
 | [FE-CV-TASK-087-14](./FE-CV-TASK-087-14-quality-waive-and-revoke.md) | `QualityWaivePopover`: miễn trừ có hạn và bỏ miễn trừ | P1 | 087-12, 087-02 | [x] DONE (verified 2026-10-07) |

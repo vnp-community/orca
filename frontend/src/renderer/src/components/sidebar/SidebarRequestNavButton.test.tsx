@@ -5,7 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useAppStore } from '@/store'
 import { SidebarRequestNavButton } from './SidebarRequestNavButton'
 
-beforeEach(() => useAppStore.setState({ requestFlowSupport: 'supported', pendingApprovalCount: 0, activeView: 'terminal' }))
+beforeEach(() =>
+  useAppStore.setState({
+    requestFlowSupport: 'supported',
+    pendingApprovalCount: 0,
+    activeView: 'terminal'
+  })
+)
 afterEach(cleanup)
 
 describe('SidebarRequestNavButton', () => {
@@ -21,6 +27,7 @@ describe('SidebarRequestNavButton', () => {
     useAppStore.setState({ pendingApprovalCount: 7 })
     rerender(<SidebarRequestNavButton />)
     expect(screen.getByText('7')).toBeInTheDocument()
+    expect(screen.getByLabelText('7 pending approvals')).toBeInTheDocument()
     useAppStore.setState({ pendingApprovalCount: 250 })
     rerender(<SidebarRequestNavButton />)
     expect(screen.getByText('99+')).toBeInTheDocument()

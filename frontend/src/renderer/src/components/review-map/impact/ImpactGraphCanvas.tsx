@@ -1,28 +1,32 @@
-import { useMemo } from "react";
-import { Background, Controls, MiniMap, ReactFlow } from "@xyflow/react";
-import type { Edge, Node } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { useDocumentColorMode } from "@/hooks/useDocumentColorMode";
-import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { computeOverlayFlags } from "../review-overlay-model";
-import type { OverlayImpactInput } from "../review-overlay-model";
-import type { ChangeOverlayView } from "../review-wire-types";
-import type { ImpactLayout } from "./impact-column-layout";
-import { ImpactSymbolNode } from "./ImpactSymbolNode";
-import type { ImpactFlowNodeData } from "./ImpactSymbolNode";
-import type { ImpactNodeActions } from "./ImpactNodeCard";
+import { useMemo } from 'react'
+import { Background, Controls, MiniMap, ReactFlow } from '@xyflow/react'
+import type { Edge, Node } from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import { useDocumentColorMode } from '@/hooks/useDocumentColorMode'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import { computeOverlayFlags, turnOverlayLabel } from '../review-overlay-model'
+import type { OverlayImpactInput } from '../review-overlay-model'
+import type { ChangeOverlayView } from '../review-wire-types'
+import type { ImpactLayout } from './impact-column-layout'
+import { useReviewNodeNoteCounts } from '../notes/use-review-node-note-counts'
+import { useReviewTurnOverlay } from '../turns/review-turn-overlay-store'
+import { ImpactSymbolNode } from './ImpactSymbolNode'
+import type { ImpactFlowNodeData } from './ImpactSymbolNode'
+import type { ImpactNodeActions } from './ImpactNodeCard'
 
-export const IMPACT_MINIMAP_AFTER = 80;
-const NODE_TYPES = { impact: ImpactSymbolNode };
+export const IMPACT_MINIMAP_AFTER = 80
+const NODE_TYPES = { impact: ImpactSymbolNode }
 
 type Props = {
-  layout: ImpactLayout;
-  overlay: ChangeOverlayView;
-  impact: OverlayImpactInput;
-  selectedKey: string | null;
-  actions: ImpactNodeActions;
-  onExpandColumn: (column: number) => void;
-};
+  layout: ImpactLayout
+  overlay: ChangeOverlayView
+  impact: OverlayImpactInput
+  selectedKey: string | null
+  actions: ImpactNodeActions
+  onExpandColumn: (column: number) => void
+  /** Owner of the review notes shown as node badges; null hides them. */
+  worktreeId?: string | null
+}
 
 /** Lazy-loaded (default export) so xyflow stays out of the Review tab's first chunk. */
 export default function ImpactGraphCanvas({
@@ -32,46 +36,49 @@ export default function ImpactGraphCanvas({
   selectedKey,
   actions,
   onExpandColumn,
+  worktreeId = null
 }: Props): React.JSX.Element {
-  const colorMode = useDocumentColorMode();
-  const reduceMotion = usePrefersReducedMotion();
+  const colorMode = useDocumentColorMode()
+  const noteCounts = useReviewNodeNoteCounts(worktreeId)
+  const turn = useReviewTurnOverlay(worktreeId)
+  const reduceMotion = usePrefersReducedMotion()
   const { nodes, edges } = useMemo(() => {
     const flowNodes: Node[] = layout.nodes.map((n) => {
-      const symbol = n.type === "more" ? undefined : n.symbol;
+      const symbol = n.type === 'more' ? undefined : n.symbol
       const data: ImpactFlowNodeData = {
         kind: n.type,
         symbol,
         flags: symbol
-          ? computeOverlayFlags(
-              { symbolKey: symbol.key, file: symbol.filePath },
-              overlay,
-              impact,
-            )
+          ? computeOverlayFlags({ symbolKey: symbol.key, file: symbol.filePath }, overlay, impact)
           : new Set(),
         selected: symbol ? selectedKey === symbol.key : false,
-        direct: n.type === "symbol" ? n.direct : undefined,
-        via: n.type === "symbol" ? n.via : undefined,
-        hiddenCount: n.type === "more" ? n.hiddenCount : undefined,
+        direct: n.type === 'symbol' ? n.direct : undefined,
+        via: n.type === 'symbol' ? n.via : undefined,
+        hiddenCount: n.type === 'more' ? n.hiddenCount : undefined,
         column: n.column,
         actions,
         onExpand: onExpandColumn,
-      };
+        noteCount: symbol ? (noteCounts[symbol.key] ?? 0) : 0,
+        turnLabel: symbol
+          ? turnOverlayLabel({ symbolKey: symbol.key, file: symbol.filePath }, turn)
+          : null
+      }
       return {
         id: n.id,
-        type: "impact",
+        type: 'impact',
         position: { x: n.x, y: n.y },
         data,
-        draggable: false,
-      };
-    });
+        draggable: false
+      }
+    })
     const flowEdges: Edge[] = layout.edges.map((e) => ({
       id: e.id,
       source: e.source,
       target: e.target,
-      style: { stroke: "var(--muted-foreground)" },
-    }));
-    return { nodes: flowNodes, edges: flowEdges };
-  }, [layout, overlay, impact, selectedKey, actions, onExpandColumn]);
+      style: { stroke: 'var(--muted-foreground)' }
+    }))
+    return { nodes: flowNodes, edges: flowEdges }
+  }, [layout, overlay, impact, selectedKey, actions, onExpandColumn, noteCounts, turn])
 
   return (
     <div className="h-full min-h-0 w-full" data-testid="impact-canvas">
@@ -95,5 +102,5 @@ export default function ImpactGraphCanvas({
         ) : null}
       </ReactFlow>
     </div>
-  );
+  )
 }

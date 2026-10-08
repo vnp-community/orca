@@ -55,6 +55,7 @@ vi.mock('@xyflow/react', () => ({
 }))
 // The note button is store-bound and covered by notes/; ErdTableDetail tests check its anchor.
 vi.mock('../notes/ReviewNoteButton', () => ({ ReviewNoteButton: () => null }))
+vi.mock('../notes/use-review-node-note-counts', () => ({ useReviewNodeNoteCounts: () => ({}) }))
 vi.mock('../../../hooks/useCodeIntelErd', () => ({ useCodeIntelErd: () => h.erd.current }))
 
 import ErdLens from './ErdLens'

@@ -5,7 +5,7 @@
 **Area:** mobile / UI
 **File:** `mobile/app/h/[hostId]/review-summary/[worktreeId].tsx`, `mobile/src/components/{MobileReviewSummaryScreenView,MobileReviewSummaryHeader,MobileReviewMetricGrid,MobileReviewFindingRow}.tsx`, `mobile-review-summary-styles.ts` (mới); `MobileDiffReviewDrawers.tsx`, `source-control/MobileSourceControlBranchCard.tsx` (sửa nhỏ)
 **Depends on:** FE-CV-TASK-062-03
-**Status:** [~] PARTIAL — route, view, header, metric grid, finding row, styles and the diff-review overflow entry "Review Summary" written, oxlint clean; NOT typechecked or run on device (mobile deps not installed); Source Control branch-card chip and mock-server handler not done
+**Status:** [~] PARTIAL — thiếu: chạy trên thiết bị/giả lập và typecheck `mobile/` đầy đủ với phụ thuộc thật (chưa cài, không được cài). Đã xong + test PASS 2026-10-08: chip thẻ nhánh Source Control, handler giả `codeIntel.reviewSummary` trong mock-server mobile, render test màn hình (mobile-review-summary-chip 4, use-mobile-review-summary-chip 3, mock-scenarios 4, MobileReviewSummaryScreenView.render 8, BranchCard.review-chip 2 — cùng nhóm source-control/review-summary 31 file / 220 test PASS); oxlint sạch; typecheck tạm (stub `declare module '*'` cho gói RN/expo/lucide chưa cài) 0 lỗi thật ở file review-summary (chỉ lỗi `any` ngầm do stub)
 
 ## Context
 
@@ -35,3 +35,10 @@
 ## Ghi chú triển khai (2026-10-07)
 
 - Điểm vào: `onOpenReviewSummary` tuỳ chọn thêm vào `useMobileDiffReviewController` (trả lại nguyên giá trị) + hành động overflow "Review Summary" ở `MobileDiffReviewDrawers.tsx`. Chip ở `MobileSourceControlBranchCard` chưa làm (Q5 mở). Chưa thêm handler giả ở `mobile/scripts/mock-server-rpc-handlers.ts`. Không có banner "loading ≥ 3 s" theo giai đoạn.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Chip: `session/mobile-review-summary-chip.ts` (thuần: `buildMobileReviewSummaryChip` chỉ trả chip khi `ready`, tone theo lỗi/cảnh báo/mức rủi ro, luôn kèm chữ; `buildMobileReviewSummaryRoute` dùng chung cho overflow ở `review/[worktreeId].tsx`), `session/use-mobile-review-summary-chip.ts` (một lần thăm dò mỗi worktree + kết nối, không polling, bộ đếm thế hệ), `source-control/MobileReviewSummaryChipRow.tsx`; `MobileSourceControlBranchCard` thêm 2 prop tuỳ chọn, `MobileSourceControlPanel` thêm 1 lời gọi hook. GitNexus impact: BranchCard LOW; **Panel HIGH** (ảnh hưởng `SessionScreen`) — thay đổi chỉ cộng thêm, chip ẩn khi không khả dụng.
+- Mock-server: `scripts/mock-server-review-summary-data.ts`, chọn trạng thái bằng `MOCK_REVIEW_SUMMARY=ready|stale|truncated|empty|flag_off|no_binding|index_missing|tool_unavailable|unsupported|error`; một dòng `if` trong `mock-server-rpc-handlers.ts`.
+- Render test: `test-support/react-native-static-render-mock.ts` (mock RN thành thẻ DOM, `react-dom/server`), môi trường `node`, không cần thiết bị. Banner "loading ≥ 3 s" theo giai đoạn: không làm vì hợp đồng §8 không có trường giai đoạn.
+- Không chạm `desktop/`.

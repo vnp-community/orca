@@ -1,22 +1,17 @@
 /**
- * E2E for reviewing a Request Solution (FE-REQ-TASK-020-05).
+ * Electron placeholder for reviewing a Request Solution (FE-REQ-TASK-020-05).
  *
- * NOT YET RUN: needs the Electron app plus request-service (CR-REQ-007/008/009)
- * or a mocked request.* WS channel. Skipped until one of those is available.
+ * The real scenarios (a)-(e) run in the web SPA against a mocked gateway WebSocket:
+ * tests/e2e/request-web/request-solution-review.web.e2e.ts (playwright.web.config.ts).
+ * The Electron app has no request-service wiring in the default e2e environment.
  */
 
 import { test } from './helpers/orca-app'
 
-test.describe('Request solution review', () => {
-  test.skip(true, 'Requires request-service backend (CR-REQ-007/008/009) or a mocked WS; not run in CI yet')
-
-  test('change_request with two options shows cards and a comparison table', async () => {})
-
-  test('choose then approve calls solution.choose before approval.approve and moves to planning', async () => {})
-
-  test('reject is blocked for a short reason and sends approval.reject with a valid comment', async () => {})
-
-  test('Mod+Enter submits the reject dialog (Meta on Mac, Control elsewhere)', async () => {})
-
-  test('hotfix shows no decision bar', async () => {})
+test.describe('Request solution review (Electron)', () => {
+  test.skip(
+    true,
+    'Covered by tests/e2e/request-web/request-solution-review.web.e2e.ts; Electron has no request-service here'
+  )
+  test('see request-web/request-solution-review.web.e2e.ts', async () => {})
 })

@@ -5,7 +5,7 @@
 **Area:** frontend / graph (panel)
 **File:** `frontend/src/renderer/src/components/graph/{GraphPanel,GraphToolbar,GraphLensChips,GraphViewToggle,GraphBeforeAfterToggle,GraphSearchButton,GraphLegend,GraphListView,GraphSearchPalette,GraphNodeSheet,GraphEmptyState,GraphErrorState,GraphSkeleton,GraphStatusBanner}.tsx` (mới); `graph-panel-state.ts` (mới, thuần); test cùng tên
 **Depends on:** FE-REQ-TASK-032-03, 032-04, 032-05; FE-REQ-TASK-018-03 (hook), 018-05 (shell)
-**Status:** [~] PARTIAL — vitest GraphPanel (6), graph-panel-state (8), GraphListView (4), GraphSearchPalette (2), GraphNodeSheet (2) pass — thiếu: nút kết nối dev server, cờ trình đọc màn hình
+**Status:** [x] DONE (verified 2026-10-08: vitest GraphPanel (9), graph-panel-state (8), GraphListView (5), GraphSearchPalette (2), GraphNodeSheet (2) pass; e2e request-graph.web.e2e.ts b: list mặc định khi truncated, "/" mở tìm, Enter chọn node)
 
 ## Context
 
@@ -73,3 +73,9 @@
 ## Ghi chú triển khai (2026-10-07)
 
 Chưa có nút "Kết nối dev server" ở trạng thái `noDevServer` (chưa tìm được điều hướng sẵn có); cờ trình đọc màn hình không tồn tại nên `initialView` bỏ qua tham số. Sai lệch: `unsupported` không trả `null` mà hiện trạng thái "chưa đánh giá" (không nút chạy) để vẫn dùng được lens `flow`; lens mặc định = `impact` nếu đã có đánh giá, ngược lại `flow` (không có tóm tắt các lens để `pickDefaultLens`). GraphToolbar gom chip lens, công tắc, tìm, chú giải vào một file.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Nút "Kết nối dev server" ở `REQUEST_IMPACT_NO_CONNECTION`: `GraphErrorState.onConnectDevServer` nối `useOpenDevServerSettings` (`components/request/use-open-dev-server-settings.ts`: `openSettingsTarget({pane:'servers', repoId:null})` + `openSettingsPage()`, cùng điều hướng sidebar đang dùng). Test: GraphPanel "REQUEST_IMPACT_NO_CONNECTION offers Connect dev server".
+- Cờ trình đọc màn hình: app không có cờ này (đã tìm trong store/settings); `initialView` giữ tham số `screenReaderMode` tuỳ chọn, mặc định bỏ qua đúng như spec cho phép; người dùng chuyển bằng công tắc Đồ thị/Danh sách.
+- `initialView` áp cho mọi payload `truncated` (kể cả sau khi đổi lens) cho tới khi người dùng tự chọn view; `GraphListView` cuộn tới hàng được chọn (chọn từ tìm kiếm hoặc "Xem trên đồ thị") kể cả khi danh sách ảo hoá; `GraphPanel.initialSelectedId` chọn sẵn node.

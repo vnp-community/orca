@@ -439,3 +439,46 @@ describe('workspace-tab-palette-search', () => {
     ])
   })
 })
+
+// FE-CV-TASK-050-18: the Review tab is findable from the palette.
+describe('workspace-tab-palette-search review tab', () => {
+  const reviewTab = makeUnifiedTab({
+    id: 'unified-review-1',
+    entityId: 'wt-1',
+    contentType: 'review',
+    label: 'Review',
+    sortOrder: 1
+  })
+
+  it('lists the review tab without a backing file and finds it by "review"', () => {
+    const entries = buildEntries({
+      unifiedTabsByWorktree: { 'wt-1': [makeUnifiedTab(), reviewTab] },
+      openFiles: []
+    })
+    const review = entries.find((e) => e.tab.contentType === 'review')
+    expect(review).toMatchObject({ title: 'Review', secondaryText: 'Review tab' })
+    const results = searchWorkspaceTabs(entries, 'review')
+    expect(results[0]).toMatchObject({ tabId: 'unified-review-1', contentType: 'review' })
+  })
+
+  it('prefers the custom label and marks the tab current only while Review is the active type', () => {
+    const custom = { ...reviewTab, customLabel: 'Review · feat/x' }
+    const groups = {
+      'wt-1': [makeGroup({ activeTabId: 'unified-review-1', tabOrder: ['unified-review-1'] })]
+    }
+    const active = buildEntries({
+      unifiedTabsByWorktree: { 'wt-1': [custom] },
+      groupsByWorktree: groups,
+      activeTabType: 'review',
+      activeTabTypeByWorktree: { 'wt-1': 'review' }
+    })
+    expect(active[0]).toMatchObject({ title: 'Review · feat/x', isCurrentTab: true })
+    const inactive = buildEntries({
+      unifiedTabsByWorktree: { 'wt-1': [custom] },
+      groupsByWorktree: groups,
+      activeTabType: 'terminal',
+      activeTabTypeByWorktree: { 'wt-1': 'terminal' }
+    })
+    expect(inactive[0]?.isCurrentTab).toBe(false)
+  })
+})

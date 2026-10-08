@@ -5,6 +5,7 @@ import {
 } from '../src/vendor-shared/shared/protocol-version'
 import { handleMockFilePreviewRequest } from './mock-server-file-preview-data'
 import { handleMockGitRequest } from './mock-server-git-state'
+import { handleMockReviewSummaryRequest } from './mock-server-review-summary-data'
 import { FAKE_SCROLLBACK, STREAMING_CHUNKS } from './mock-server-terminal-fixtures'
 import { createMockRepos, createMockWorktrees, readScenarioNumber } from './mobile-lag-scenario'
 
@@ -101,6 +102,9 @@ export function handleRequest(
     return
   }
   if (handleMockFilePreviewRequest(request, respond, success, error)) {
+    return
+  }
+  if (handleMockReviewSummaryRequest(request, respond, success, error)) {
     return
   }
 

@@ -8,6 +8,7 @@ import {
 import { normalizeReviewAreaParam } from '../../../../src/session/mobile-diff-review-positioning'
 import { useMobileDiffReviewController } from '../../../../src/session/use-mobile-diff-review-controller'
 import { useForceReconnect, useHostClient } from '../../../../src/transport/client-context'
+import { buildMobileReviewSummaryRoute } from '../../../../src/session/mobile-review-summary-chip'
 
 export default function MobileDiffReviewScreen() {
   const params = useLocalSearchParams<{
@@ -40,10 +41,7 @@ export default function MobileDiffReviewScreen() {
   }, [hostId, name, router, worktreeId])
 
   const openReviewSummary = useCallback(() => {
-    const query = name ? `?${new URLSearchParams({ name }).toString()}` : ''
-    router.push(
-      `/h/${encodeURIComponent(hostId)}/review-summary/${encodeURIComponent(worktreeId)}${query}` as never
-    )
+    router.push(buildMobileReviewSummaryRoute({ hostId, worktreeId, name }) as never)
   }, [hostId, name, router, worktreeId])
 
   const controller = useMobileDiffReviewController({

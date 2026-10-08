@@ -135,7 +135,9 @@ function isRetryableKind(kind: CodeIntelErrorKind): boolean {
 // ---------------------------------------------------------------------------
 
 function checkArgSizeBytes(method: string, params: unknown): void {
-  if (params === undefined || params === null) {return}
+  if (params === undefined || params === null) {
+    return
+  }
   const json = JSON.stringify(params)
   const bytes = new TextEncoder().encode(json).length
   const limit = getMethodMaxArgsBytes(method)
@@ -154,9 +156,13 @@ function checkArgSizeBytes(method: string, params: unknown): void {
 const FORBIDDEN_PARAMS = new Set(['__proto__', 'constructor', 'prototype'])
 
 function hasForbiddenKey(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null) {return false}
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
   for (const key of Object.keys(value as object)) {
-    if (FORBIDDEN_PARAMS.has(key)) {return true}
+    if (FORBIDDEN_PARAMS.has(key)) {
+      return true
+    }
   }
   return Array.isArray(value)
     ? (value as unknown[]).some(hasForbiddenKey)
@@ -204,10 +210,16 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
   ): Promise<CodeIntelRawEnvelope> {
     // Guard: forbidden proto-pollution keys
     if (Array.isArray(params)) {
-      throw new LocalCodeIntelError('validation', `[code-intel] array params are not allowed for ${method}`)
+      throw new LocalCodeIntelError(
+        'validation',
+        `[code-intel] array params are not allowed for ${method}`
+      )
     }
     if (hasForbiddenKey(params)) {
-      throw new LocalCodeIntelError('validation', `[code-intel] forbidden key in params for ${method}`)
+      throw new LocalCodeIntelError(
+        'validation',
+        `[code-intel] forbidden key in params for ${method}`
+      )
     }
 
     let environmentId = opts.environmentId ?? null
@@ -244,10 +256,10 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
       // Trigger connectivity poll via store action
       const store = useAppStore.getState()
       if (typeof store.maybeTriggerConnectivityPollAfterRpcFailure === 'function') {
-        store.maybeTriggerConnectivityPollAfterRpcFailure(
-          new Error(error.message),
-          { kind: 'environment', environmentId }
-        )
+        store.maybeTriggerConnectivityPollAfterRpcFailure(new Error(error.message), {
+          kind: 'environment',
+          environmentId
+        })
       }
     }
   }
@@ -260,7 +272,10 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
 
         if (opts.signal?.aborted) {
           // Signal aborted — drop result
-          return { ok: false, error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false } }
+          return {
+            ok: false,
+            error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false }
+          }
         }
 
         if (!response.ok) {
@@ -272,7 +287,10 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
         return { ok: true, result: response.result as never }
       } catch (err) {
         if (opts.signal?.aborted) {
-          return { ok: false, error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false } }
+          return {
+            ok: false,
+            error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false }
+          }
         }
         const error = classifyCodeIntelError(err)
         triggerConnectivityPollIfOffline(error, opts.environmentId)
@@ -290,7 +308,10 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
         const response = await rawCall(worktreeId, method, params, opts)
 
         if (opts.signal?.aborted) {
-          return { ok: false, error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false } }
+          return {
+            ok: false,
+            error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false }
+          }
         }
 
         if (!response.ok) {
@@ -303,7 +324,10 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
         return { ok: true, envelope }
       } catch (err) {
         if (opts.signal?.aborted) {
-          return { ok: false, error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false } }
+          return {
+            ok: false,
+            error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false }
+          }
         }
         const error = classifyCodeIntelError(err)
         triggerConnectivityPollIfOffline(error, opts.environmentId)
@@ -324,6 +348,15 @@ export function initCodeIntelClient(bridge: CodeIntelBridgeApi): void {
 }
 
 export function getCodeIntelClient(): CodeIntelClient {
+  // Why: no boot path calls initCodeIntelClient, so every Review/flag call threw and the flag
+  // stayed 'unknown'; bind lazily to the preload/web bridge once it exists.
+  const bridge =
+    typeof window === 'undefined'
+      ? undefined
+      : (window as { api?: { codeIntel?: CodeIntelBridgeApi } }).api?.codeIntel
+  if (!_client && bridge) {
+    initCodeIntelClient(bridge)
+  }
   if (!_client) {
     throw new Error('[code-intel] client not initialized — call initCodeIntelClient first')
   }

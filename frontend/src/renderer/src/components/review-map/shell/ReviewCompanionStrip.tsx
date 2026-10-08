@@ -7,6 +7,7 @@
  * @module components/review-map/shell/ReviewCompanionStrip
  */
 
+import { trackAiSummaryFeedback } from '../ai-summary/ai-summary-feedback'
 import { ReviewAiSummaryCard } from '../ai-summary/ReviewAiSummaryCard'
 import { ReviewReportMenu } from '../report/ReviewReportMenu'
 import { ReviewTurnSwitcher } from '../turns/ReviewTurnSwitcher'
@@ -49,7 +50,14 @@ export function ReviewCompanionStrip({
         </div>
       ) : null}
       <div className="basis-full empty:hidden">
-        <ReviewAiSummaryCard ai={c.aiSummary} changedFiles={c.changedFileSet} onOpenFile={onOpenDiff} />
+        <ReviewAiSummaryCard
+          ai={c.aiSummary}
+          changedFiles={c.changedFileSet}
+          onOpenFile={onOpenDiff}
+          onFeedback={(value) => {
+            trackAiSummaryFeedback(c.aiSummary, value)
+          }}
+        />
       </div>
     </>
   )

@@ -5,7 +5,7 @@
 **Area:** frontend / test-support + i18n
 **File:** `frontend/src/renderer/src/test-support/code-intel-fake-backend.ts` (CR-050; sửa: kịch bản quality), `i18n/code-intel-quality-locale-coverage.test.ts` (từ 088-09; thêm khoá), `i18n/locales/{en,es,ja,ko,zh}.json` (khoá `auto.components.reviewQuality.*`, `auto.hooks.codeIntelQuality.*`), `tests/e2e/quality-gate-scorecard.spec.ts` (mới, kế hoạch)
 **Depends on:** 087-01..087-07, 088-09
-**Status:** [~] PARTIAL — fake scenarios, integration test và khoá i18n 5 locale đã xong và pass (code-intel-quality-scenarios.test.ts 18 + quality-scorecard-locale-coverage.test.ts 17); thiếu spec e2e Playwright (`tests/e2e/quality-gate-scorecard.spec.ts`) vì không chạy được trình duyệt ở môi trường này
+**Status:** [~] PARTIAL — chỉ còn e2e (P1): spec Playwright `tests/e2e/quality-gate-scorecard.spec.ts` do nhóm hạ tầng e2e viết; phần còn lại re-verified 2026-10-08 (code-intel-quality-scenarios.test.ts + quality-scorecard-locale-coverage.test.ts: 2 file / 35 test PASS)
 
 ## Context
 

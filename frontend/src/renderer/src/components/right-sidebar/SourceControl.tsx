@@ -615,13 +615,12 @@ function SourceControlInner(): React.JSX.Element {
     worktreeId: activeWorktreeId ?? '',
     projectId: activeWorktree?.projectId ?? null,
     headOid: branchSummary?.status === 'ready' ? (branchSummary.headOid ?? null) : null,
-    base: branchSummary?.status === 'ready' ? (branchSummary.baseRef ?? null) : null,
+    base: branchSummary?.status === 'ready' ? (branchSummary.baseRef ?? null) : null
   })
   // CR-095: one review_decision_made per finished agent turn; no-op while the flags are off
   const { recordDecision: recordReviewDecision } = useReviewDecisionTelemetry({
     gate: qualityGate.verdict,
-    // Gate reasons stand in for open findings until the findings store (087) exists.
-    openFindings: qualityGate.reasonCount
+    openFindings: qualityGate.openFindingCount
   })
   const qualityNoticeNode = qualityGate.viewModel.visible ? (
     <SourceControlQualityGateNotice

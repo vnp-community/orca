@@ -84,6 +84,25 @@ describe('buildStageTimeline — change_request', () => {
     }
   })
 
+  it('awaiting_information uses the clarification resumeStatus step when given', () => {
+    const at = (resumeStatus?: string) =>
+      buildStageTimeline({
+        type: 'change_request',
+        status: 'awaiting_information',
+        size: 'M',
+        resumeStatus
+      }).current
+    expect(at('planning')).toBe('plan')
+    expect(at('executing')).toBe('execution')
+    expect(at('bogus')).toBe('analysis')
+    expect(at(undefined)).toBe('analysis')
+    // resumeStatus is ignored outside awaiting_information
+    expect(
+      buildStageTimeline({ type: 'change_request', status: 'analyzing', resumeStatus: 'executing' })
+        .current
+    ).toBe('analysis')
+  })
+
   it('cancelled marks current step as skipped', () => {
     const result = buildStageTimeline({ type: 'change_request', status: 'cancelled', size: 'M' })
     const current = result.steps.find((s) => s.id === result.current!)

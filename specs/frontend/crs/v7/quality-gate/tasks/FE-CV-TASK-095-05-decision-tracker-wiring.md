@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/SourceControl.tsx` (sửa vài dòng: sau `handleCommit` trả true; trong/sau `handlePullRequestCreated`), điểm gọi ở 060 và 052
 **Depends on:** FE-CV-TASK-095-04
-**Status:** [~] PARTIAL — `send_to_agent` (ReviewNotesSendMenu), `mark_reviewed` (khi mọi bước Thứ tự đọc đã xem) và `create_review` từ ChecksPanel đã nối qua `lib/review-surface-decision.ts` (review-surface-decision.test, ReviewNotesSendMenu.test, ReviewWorkspace.companions.test PASS); `open_findings` vẫn tạm = số lý do của cổng (ở Review luôn 0, gate `unknown`/`none`); điểm gọi ChecksPanel chưa có test riêng (chỉ typecheck + ChecksPanel.* test cũ PASS)
+**Status:** [x] DONE (verified 2026-10-08: checks-panel-review-decision.test 3/3, review-surface-decision.test PASS, use-source-control-quality-gate.test + ChecksPanel.* PASS)
 
 ## Context
 
@@ -36,3 +36,9 @@ Nối `commit` (sau handleCommit thành công) và `create_review` (handlePullRe
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 Không dùng `useReviewDecisionTelemetry` ở Review vì hook đó đăng ký thêm một subscription `registerCompletion` (đăng ký hai lần sẽ báo lượt trước là `abandon`). `mark_reviewed` = chuyển trạng thái "đã xem hết" của Thứ tự đọc. ChecksPanel.tsx sửa tối thiểu 1 chỗ sau `result.ok`.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- `open_findings` chính thức: số lý do cổng đang `fail|warn` (`countOpenGateFindings` trong `lib/review-surface-decision.ts`); Source Control dùng `qualityGate.openFindingCount` (mới trong `use-source-control-quality-gate.ts`), bề mặt Review/Checks đọc cổng đã cache trong store (`codeIntelQualityByWorktree[w].gate`, đọc `verdict` theo hợp đồng, fallback `result`) — không thêm RPC.
+- Điểm gọi ChecksPanel tách ra `components/right-sidebar/checks-panel-review-decision.ts` (`recordChecksPanelReviewCreated`, chỉ ghi khi `result.ok` và có worktree) để test riêng không cần render cả panel.
+- Impact (best effort): `gitnexus impact` báo symbol không có trong index (index cũ); người gọi trực tiếp: SourceControl (1), ChecksPanel (1).

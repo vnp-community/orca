@@ -8,21 +8,28 @@
  */
 
 import React from 'react'
-import {
-  ExternalLink, Github, GitBranch, Layout, Cpu, Pencil, Webhook, Circle
-} from 'lucide-react'
+import { ExternalLink, Github, GitBranch, Layout, Cpu, Pencil, Webhook, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { getSourcePresentation } from './request-status-presentation'
 import type { RequestSourceProvider } from '../../../../shared/request-types'
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  ExternalLink, Github, GitBranch, Layout, Cpu, Pencil, Webhook, Circle
+  ExternalLink,
+  Github,
+  GitBranch,
+  Layout,
+  Cpu,
+  Pencil,
+  Webhook,
+  Circle
 }
 
 /** Sanitise URL: only http/https links are allowed — blocks javascript: and other schemes */
 function sanitizeUrl(url: string | undefined): string | undefined {
-  if (!url) {return undefined}
+  if (!url) {
+    return undefined
+  }
   try {
     const parsed = new URL(url)
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
@@ -36,13 +43,20 @@ function sanitizeUrl(url: string | undefined): string | undefined {
 
 type Props = {
   provider: RequestSourceProvider
-  ref?: string
+  /** Source reference such as `ABC-1`; not React's `ref`. */
+  sourceRef?: string
   url?: string
   size?: 'sm' | 'xs'
   className?: string
 }
 
-export function RequestSourceBadge({ provider, ref: refProp, url, size = 'sm', className }: Props): React.JSX.Element {
+export function RequestSourceBadge({
+  provider,
+  sourceRef: refProp,
+  url,
+  size = 'sm',
+  className
+}: Props): React.JSX.Element {
   const pres = getSourcePresentation(provider)
   const IconComponent = ICONS[pres.iconName] ?? Circle
   const label = translate(pres.labelKey, provider)
@@ -71,7 +85,11 @@ export function RequestSourceBadge({ provider, ref: refProp, url, size = 'sm', c
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex hover:opacity-80 transition-opacity"
-        aria-label={`${label}: ${refProp ?? ''} (opens in new tab)`}
+        aria-label={translate(
+          'auto.components.request.RequestSourceBadge.opensInNewTab',
+          '{{label}}: {{ref}} (opens in new tab)',
+          { label, ref: refProp ?? '' }
+        )}
       >
         {inner}
       </a>

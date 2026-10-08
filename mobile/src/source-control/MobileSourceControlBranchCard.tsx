@@ -5,6 +5,8 @@ import { styles } from './mobile-source-control-styles'
 import { MobileSourceControlPrChip } from './MobileSourceControlPrChip'
 import type { MobilePrChipSummary } from './mobile-pr-chip-summary'
 import { mobileConflictAbortLabel } from './mobile-source-control-conflict-abort'
+import { MobileReviewSummaryChipRow } from './MobileReviewSummaryChipRow'
+import type { MobileReviewSummaryChip } from '../session/mobile-review-summary-chip'
 
 type Props = {
   branchLabel: string
@@ -21,6 +23,9 @@ type Props = {
   // The PR chip is shown only on repos with a hosted-review remote; null hides it.
   prChip: MobilePrChipSummary | null
   onOpenPr: () => void
+  // Shown only once the host reports the summary available; null/absent hides it.
+  reviewSummaryChip?: MobileReviewSummaryChip | null
+  onOpenReviewSummary?: () => void
 }
 
 // Persistent card at the top of every hub segment: branch identity, sync/counts,
@@ -37,7 +42,9 @@ export function MobileSourceControlBranchCard({
   conflictAborting,
   onAbortConflict,
   prChip,
-  onOpenPr
+  onOpenPr,
+  reviewSummaryChip,
+  onOpenReviewSummary
 }: Props) {
   const showConflict = conflictOperation !== null && conflictOperation !== 'unknown'
   return (
@@ -78,6 +85,9 @@ export function MobileSourceControlBranchCard({
         </View>
       ) : null}
       {prChip ? <MobileSourceControlPrChip summary={prChip} onPress={onOpenPr} /> : null}
+      {reviewSummaryChip && onOpenReviewSummary ? (
+        <MobileReviewSummaryChipRow chip={reviewSummaryChip} onPress={onOpenReviewSummary} />
+      ) : null}
     </View>
   )
 }

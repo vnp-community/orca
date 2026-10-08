@@ -5,7 +5,7 @@
 **Area:** desktop (ngoài `frontend/`, cần chủ sở hữu desktop duyệt)
 **File:** `desktop/src/preload/index.ts` (sửa), `desktop/src/preload/api-types.ts` (sửa)
 **Depends on:** FE-CV-TASK-050-04
-**Status:** [~] PARTIAL — desktop/src/preload/index.ts uses createCodeIntelBridge (local=method_not_found, env=runtimeEnvironments:call) but has no test and the subscribeRuntimeEnvironmentFromPreload frame shape was not verified against the new raw-frame callbacks; needs desktop owner review
+**Status:** [x] DONE (verified 2026-10-08: desktop code-intel-preload-transport.test 4/4 + runtime-environment-subscriptions.test 7/7 PASS; tsc desktop không thêm lỗi ở preload)
 
 ## Context
 
@@ -29,3 +29,9 @@
 ## Rủi ro
 
 - Hai bản mã nguồn renderer lệch nhau: Review ở Electron có thể trễ cả giai đoạn.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- Sửa hai lỗi thật của bản nối cũ: (1) `runtimeEnvironments:call` gửi `environmentId` trong khi main đọc `selector`; (2) `subscribeEnvironment` được gán thẳng `subscribeRuntimeEnvironmentFromPreload` (chữ ký `(ipc, args, callbacks)` → Promise) nên khung push không bao giờ tới.
+- Mới: `desktop/src/preload/code-intel-preload-transport.ts` (`createCodeIntelPreloadDeps(ipcRenderer)`): call qua `selector`, IPC reject ⇒ envelope `connection_refused`; subscribe dùng dispatcher thật, bỏ khung ack `null`, khung `ok:true` ⇒ `result` vào `parseCodeIntelPushEvent`, stream bị từ chối ⇒ `onUnsupported` (renderer chuyển sang polling), huỷ trước khi handle về thì vẫn unsubscribe. Local vẫn `method_not_found` ⇒ `unsupported`.
+- Test thật với dispatcher `subscribeRuntimeEnvironmentFromPreload` + `createCodeIntelBridge`. Cần chủ desktop xem lại khi đóng gói.

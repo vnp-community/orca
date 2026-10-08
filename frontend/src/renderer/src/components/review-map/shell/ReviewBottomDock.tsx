@@ -8,13 +8,14 @@
  * @module components/review-map/shell/ReviewBottomDock
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import './review-dock-builtin-panels'
 import { getReviewDockPanels } from './review-dock-registry'
 import type { ReviewDockPanelProps } from './review-dock-registry'
+import { subscribeReviewDockFocus } from './review-dock-focus'
 
 const STORAGE_KEY = 'orca.review.dock'
 
@@ -57,6 +58,16 @@ export function ReviewBottomDock({
       return next
     })
   }, [])
+  const worktreeId = panelProps.worktreeId
+  useEffect(
+    () =>
+      subscribeReviewDockFocus((id, panelId) => {
+        if (id === worktreeId) {
+          update({ open: true, panelId })
+        }
+      }),
+    [worktreeId, update]
+  )
 
   if (panels.length === 0) {
     return null
