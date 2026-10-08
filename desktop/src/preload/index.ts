@@ -6,6 +6,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { glApi } from './gitlab'
 import type { AppIdentity } from '../shared/app-identity'
+import type { RemotePreflightStatus, WindowsTerminalCapabilities } from '../shared/dev-server-types'
 import type { CliInstallStatus } from '../shared/cli-install-types'
 import type { AgentHookInstallStatus } from '../shared/agent-hook-types'
 import type { TerminalPaneSplitSource } from '../shared/feature-education-telemetry'
@@ -214,6 +215,7 @@ import type {
   LocalhostWorktreeLabelRoute
 } from '../shared/localhost-worktree-labels'
 import { createCodeIntelBridge } from '../../../frontend/src/shared/code-intel-bridge'
+import { createCodeIntelPreloadDeps } from './code-intel-preload-transport'
 import type {
   CrashReportBreadcrumbData,
   CrashReportCopyDiagnosticsArgs,
@@ -789,12 +791,9 @@ const api = {
       ipcRenderer.invoke('workspaceCleanup:hasKillableLocalProcesses', args)
   } satisfies PreloadApi['workspaceCleanup'],
 
-  codeIntel: createCodeIntelBridge({
-    callLocal: () => Promise.resolve({ ok: false, error: { code: 'method_not_found', message: 'Not supported' } }),
-    callEnvironment: (environmentId, method, params) =>
-      ipcRenderer.invoke('runtimeEnvironments:call', { environmentId, method, params }),
-    subscribeEnvironment: subscribeRuntimeEnvironmentFromPreload
-  }) satisfies PreloadApi['codeIntel'],
+  codeIntel: createCodeIntelBridge(
+    createCodeIntelPreloadDeps(ipcRenderer)
+  ) satisfies PreloadApi['codeIntel'],
 
   workspaceSpace: {
     analyze: () => ipcRenderer.invoke('workspaceSpace:analyze'),
@@ -2146,7 +2145,9 @@ const api = {
         checklist?: Partial<OnboardingState['checklist']>
       }
     ): Promise<OnboardingState> => ipcRenderer.invoke('onboarding:update', updates),
-    detectAgents: (params: { devServerId: string | null }): Promise<{
+    detectAgents: (params: {
+      devServerId: string | null
+    }): Promise<{
       agents: string[]
       platform: NodeJS.Platform | null
       devServerId: string | null
@@ -2162,7 +2163,7 @@ const api = {
     getPreflightStatus: (params: {
       devServerId: string
       force?: boolean
-    }): Promise<import('../shared/dev-server-types').RemotePreflightStatus> =>
+    }): Promise<RemotePreflightStatus> =>
       ipcRenderer.invoke('onboarding.getPreflightStatus', params),
     setGitIdentity: (params: { devServerId: string; name: string; email: string }): Promise<void> =>
       ipcRenderer.invoke('onboarding.setGitIdentity', params),
@@ -2176,10 +2177,13 @@ const api = {
       ipcRenderer.invoke('onboarding.detectGhosttyConfig', params),
     detectWindowsCapabilities: (params: {
       devServerId: string
-    }): Promise<import('../shared/dev-server-types').WindowsTerminalCapabilities> =>
+    }): Promise<WindowsTerminalCapabilities> =>
       ipcRenderer.invoke('onboarding.detectWindowsCapabilities', params),
-    markChecklistItem: (params: { item: string; devServerId?: string; value?: boolean }): Promise<void> =>
-      ipcRenderer.invoke('onboarding.markChecklistItem', params)
+    markChecklistItem: (params: {
+      item: string
+      devServerId?: string
+      value?: boolean
+    }): Promise<void> => ipcRenderer.invoke('onboarding.markChecklistItem', params)
   },
 
   developerPermissions: {
@@ -4264,13 +4268,10 @@ const api = {
 
     // ── Bulk Provisioning (CR-003) ─────────────────────────────────────────────
 
-    provisionFleetServers: (args: {
-      serverIds: string[]
-      concurrency?: number
-    }): Promise<void> => ipcRenderer.invoke('ssh:provisionFleet', args),
+    provisionFleetServers: (args: { serverIds: string[]; concurrency?: number }): Promise<void> =>
+      ipcRenderer.invoke('ssh:provisionFleet', args),
 
-    cancelProvisioning: (): Promise<void> =>
-      ipcRenderer.invoke('ssh:cancelProvisioning'),
+    cancelProvisioning: (): Promise<void> => ipcRenderer.invoke('ssh:cancelProvisioning'),
 
     onProvisioningProgress: (callback: (event: unknown) => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, evt: unknown) => callback(evt)
@@ -4556,12 +4557,14 @@ const api = {
     resume: (opts: { sessionId: string; traceId?: string }): Promise<{ resumed: boolean }> =>
       ipcRenderer.invoke('agentOrchestration:resume', opts),
 
-    onStatusChanged: (callback: (event: {
-      worktreeId: string
-      sessionId?: string
-      status: 'starting' | 'running' | 'stopped' | 'error'
-      errorMessage?: string
-    }) => void): (() => void) => {
+    onStatusChanged: (
+      callback: (event: {
+        worktreeId: string
+        sessionId?: string
+        status: 'starting' | 'running' | 'stopped' | 'error'
+        errorMessage?: string
+      }) => void
+    ): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, data: unknown): void =>
         callback(data as Parameters<typeof callback>[0])
       ipcRenderer.on('agentOrchestration:statusChanged', listener)
@@ -4584,22 +4587,13 @@ const api = {
       remoteHandle?: string
     }) => ipcRenderer.invoke('terminal.session.save', input),
 
-    get: (key: {
-      worktreeId: string
-      tabId: string
-      leafId?: string
-      runtimeEnvId?: string
-    }) => ipcRenderer.invoke('terminal.session.get', key),
+    get: (key: { worktreeId: string; tabId: string; leafId?: string; runtimeEnvId?: string }) =>
+      ipcRenderer.invoke('terminal.session.get', key),
 
-    list: (worktreeId: string) =>
-      ipcRenderer.invoke('terminal.session.list', worktreeId),
+    list: (worktreeId: string) => ipcRenderer.invoke('terminal.session.list', worktreeId),
 
-    archive: (key: {
-      worktreeId: string
-      tabId: string
-      leafId?: string
-      runtimeEnvId?: string
-    }) => ipcRenderer.invoke('terminal.session.archive', key),
+    archive: (key: { worktreeId: string; tabId: string; leafId?: string; runtimeEnvId?: string }) =>
+      ipcRenderer.invoke('terminal.session.archive', key)
   }
 }
 
