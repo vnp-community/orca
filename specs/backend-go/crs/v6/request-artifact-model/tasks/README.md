@@ -1,27 +1,27 @@
 # Tasks backend: request-artifact-model (v6)
 
-> 📋 Proposed. Mỗi task 0,5 đến 2 ngày. Đường dẫn tương đối tới `backend-go/services/request-service/` (mới) trừ khi ghi khác; task 027-02 và các phần ghi rõ ở `task-service`. Tất cả `Status: [ ] TODO`, chưa chạy test nào.
+> 🚧 Đang triển khai (cập nhật 2026-10-08). Mỗi task 0,5 đến 2 ngày. Đường dẫn tương đối tới `backend-go/services/request-service/` (mới) trừ khi ghi khác; task 027-02 và các phần ghi rõ ở `task-service`. DONE: 027-01 đến 06, 028-01 đến 05, 028-08. Một phần: 027-07, 027-08, 028-06, 028-07 (xem cột ưu tiên).
 
 ## Bảng Solution, Task
 
 | Solution | Task | Nội dung | Ưu tiên |
 |----------|------|----------|---------|
-| [BE-REQ-SOL-027](../solutions/BE-REQ-SOL-027-artifact-schema-ontology-and-task-specs.md) | [TASK-REQ-027-01](./TASK-REQ-027-01-request-artifact-migration.md) | Migration `NNNN_request_artifact_model` (cột Request, Solution, 4 bảng mới), domain `RequestRevision` | P0 |
-| | [TASK-REQ-027-02](./TASK-REQ-027-02-task-service-task-specs.md) | `task-service`: `task_specs`, `SetTaskSpec`, `GetTaskSpecs`, `LockTaskSpecs`, `TASK_SPEC_LOCKED` | P0 |
-| | [TASK-REQ-027-03](./TASK-REQ-027-03-schema-registry-canonical-json-provenance.md) | Registry JSON Schema (spike thư viện), `CanonicalJSON`, digest, `Provenance` | P0 |
-| | [TASK-REQ-027-04](./TASK-REQ-027-04-markdown-yaml-projection.md) | Bản chiếu Markdown/YAML, `RenderArtifact`, `ParseProjection`, export | P1 |
-| | [TASK-REQ-027-05](./TASK-REQ-027-05-request-content-validation-and-revisions.md) | AC, trường theo loại, `ValidateRequestContent`, `AppendRequestRevision`, chốt chặn ghi | P0 |
-| | [TASK-REQ-027-06](./TASK-REQ-027-06-artifact-ids-relations-and-semantic-validation.md) | ID hiển thị, `artifact_index`, quan hệ, bảng phủ, 10 mã ngữ nghĩa | P0 |
-| | [TASK-REQ-027-07](./TASK-REQ-027-07-wire-solution-plan-phase-and-approval.md) | Nối SOL-007, 012, 013, 009: `options`, provenance, bảng phủ, khoá spec | P0 |
-| | [TASK-REQ-027-08](./TASK-REQ-027-08-artifact-proto-grpc-and-integration.md) | `artifact.proto`, gRPC, quyền đọc, tích hợp hai dialect | P0 |
-| [BE-REQ-SOL-028](../solutions/BE-REQ-SOL-028-clarification-decision-and-awaiting-information.md) | [TASK-REQ-028-01](./TASK-REQ-028-01-clarifications-decisions-migration.md) | Migration 12 trạng thái, 5 bảng, chỉ mục duy nhất hai dialect | P0 |
-| | [TASK-REQ-028-02](./TASK-REQ-028-02-domain-and-state-machine-awaiting-information.md) | Domain Clarification, Decision, Readiness; máy trạng thái 12 nhân 18 | P0 |
-| | [TASK-REQ-028-03](./TASK-REQ-028-03-clarification-and-decision-repositories.md) | Repository hai dialect, `ClaimExpired`, `ListPendingForUser`, `ResumeStatus` | P0 |
-| | [TASK-REQ-028-04](./TASK-REQ-028-04-request-clarification-readiness-and-waive.md) | `RequestClarification`, sẵn sàng trong `ConfirmRequestType`, `WaiveReadiness` | P0 |
-| | [TASK-REQ-028-05](./TASK-REQ-028-05-answer-cancel-clarification-and-hooks.md) | `AnswerClarification`, huỷ, hook đổi loại, huỷ Request, backlog | P0 |
-| | [TASK-REQ-028-06](./TASK-REQ-028-06-resume-consumer-expiry-reminder-and-notifications.md) | Consumer kích hoạt lại, hết hạn, nhắc, `notification-service` | P0 |
-| | [TASK-REQ-028-07](./TASK-REQ-028-07-decision-record-confirm-and-approval-gates.md) | `RecordDecision`, `ConfirmDecision`, chặn duyệt | P0 |
-| | [TASK-REQ-028-08](./TASK-REQ-028-08-clarification-decision-proto-grpc-and-integration.md) | Proto, gRPC, `ListPendingClarificationsForUser`, tích hợp đầu cuối | P0 |
+| [BE-REQ-SOL-027](../solutions/BE-REQ-SOL-027-artifact-schema-ontology-and-task-specs.md) | [TASK-REQ-027-01](./TASK-REQ-027-01-request-artifact-migration.md) | Migration `NNNN_request_artifact_model` (cột Request, Solution, 4 bảng mới), domain `RequestRevision` | P0 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-027-02](./TASK-REQ-027-02-task-service-task-specs.md) | `task-service`: `task_specs`, `SetTaskSpec`, `GetTaskSpecs`, `LockTaskSpecs`, `TASK_SPEC_LOCKED` | P0 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-027-03](./TASK-REQ-027-03-schema-registry-canonical-json-provenance.md) | Registry JSON Schema (spike thư viện), `CanonicalJSON`, digest, `Provenance` | P0 · ✅ DONE 2026-10-08 (thư viện: santhosh-tekuri/jsonschema/v6) |
+| | [TASK-REQ-027-04](./TASK-REQ-027-04-markdown-yaml-projection.md) | Bản chiếu Markdown/YAML, `RenderArtifact`, `ParseProjection`, export | P1 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-027-05](./TASK-REQ-027-05-request-content-validation-and-revisions.md) | AC, trường theo loại, `ValidateRequestContent`, `AppendRequestRevision`, chốt chặn ghi | P0 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-027-06](./TASK-REQ-027-06-artifact-ids-relations-and-semantic-validation.md) | ID hiển thị, `artifact_index`, quan hệ, bảng phủ, 10 mã ngữ nghĩa | P0 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-027-07](./TASK-REQ-027-07-wire-solution-plan-phase-and-approval.md) | Nối SOL-007, 012, 013, 009: `options`, provenance, bảng phủ, khoá spec | P0 · 🚧 một phần: phía Solution xong (provenance, `seq` NOT NULL, bao phủ AC, cổng duyệt), phía Plan/Phase/khoá spec chưa (SOL-012 còn là stub) |
+| | [TASK-REQ-027-08](./TASK-REQ-027-08-artifact-proto-grpc-and-integration.md) | `artifact.proto`, gRPC, quyền đọc, tích hợp hai dialect | P0 · 🚧 một phần: 7 RPC, buf, kiểm mẫu trong CI xong; thiếu kịch bản (d) `CommitPlan` |
+| [BE-REQ-SOL-028](../solutions/BE-REQ-SOL-028-clarification-decision-and-awaiting-information.md) | [TASK-REQ-028-01](./TASK-REQ-028-01-clarifications-decisions-migration.md) | Migration 12 trạng thái, 5 bảng, chỉ mục duy nhất hai dialect | P0 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-028-02](./TASK-REQ-028-02-domain-and-state-machine-awaiting-information.md) | Domain Clarification, Decision, Readiness; máy trạng thái 12 nhân 18 | P0 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-028-03](./TASK-REQ-028-03-clarification-and-decision-repositories.md) | Repository hai dialect, `ClaimExpired`, `ListPendingForUser`, `ResumeStatus` | P0 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-028-04](./TASK-REQ-028-04-request-clarification-readiness-and-waive.md) | `RequestClarification`, sẵn sàng trong `ConfirmRequestType`, `WaiveReadiness` | P0 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-028-05](./TASK-REQ-028-05-answer-cancel-clarification-and-hooks.md) | `AnswerClarification`, huỷ, hook đổi loại, huỷ Request, backlog | P0 · ✅ DONE 2026-10-08 |
+| | [TASK-REQ-028-06](./TASK-REQ-028-06-resume-consumer-expiry-reminder-and-notifications.md) | Consumer kích hoạt lại, hết hạn, nhắc, `notification-service` | P0 · 🚧 một phần: tự sinh Solution thật, hết hạn, nhắc, người nhận team/admin xong; thiếu `AdvanceExecution` và metric |
+| | [TASK-REQ-028-07](./TASK-REQ-028-07-decision-record-confirm-and-approval-gates.md) | `RecordDecision`, `ConfirmDecision`, chặn duyệt | P0 · 🚧 một phần: nối `ChooseSolutionOption` + handler Solution xong (Approve thật, hai dialect); thiếu cổng Plan |
+| | [TASK-REQ-028-08](./TASK-REQ-028-08-clarification-decision-proto-grpc-and-integration.md) | Proto, gRPC, `ListPendingClarificationsForUser`, tích hợp đầu cuối | P0 · ✅ DONE 2026-10-08 |
 
 ## Thứ tự phụ thuộc
 

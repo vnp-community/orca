@@ -84,6 +84,18 @@ for how a real cutover would be sequenced.
   stack; gaps and the rollout runbook are in
   [`services/mcp-service/README.md`](./services/mcp-service/README.md).
 
+- **`request-service`** — Request flow (docs: [`docs/guides/request/`](../docs/guides/request/README.md)).
+  Off by default (`REQUEST_FLOW_ENABLED=false` plus a per-tenant setting; both must be on). Real handlers today:
+  `RequestService` — `CreateRequest`, `GetRequest`, `ListRequests`, `ClassifyRequest` (async, returns `run_id`), `ConfirmRequestType`,
+  `ChangeRequestType`, `ListRequestTypeHistory`, `ReturnToBacklog`, `ReopenRequest`, `CancelRequest`, `SpawnChildRequest`, `ListRequestLinks`,
+  `GetRequestFlow`, `LookupRequestBySource` (internal, shared token), `GetRequestFlowSettings`, `SetRequestFlowSettings`;
+  `ApprovalService` — `RequestApproval`, `Approve`, `Reject`, `Cancel`, `GetApproval`, `ListApprovals`, `ListPendingForUser`, `ExtendApproval`;
+  `ApprovalPolicyAdminService` — `ListApprovalPolicies`, `UpsertApprovalPolicy`, `DeleteApprovalPolicy`.
+  **Still `Unimplemented`:** `ListBacklog`, `GenerateSolution`, `ListSolutions`, `ChooseSolutionOption`, `GeneratePlan`, `GetPlanProposal`,
+  `CommitPlan`, `StartPhase`, `ReportTaskOutcome`, the clarification/decision/artifact/impact/readiness/context/compliance RPCs, and
+  `AiBudgetAdminService`. So the flow runs up to type confirmation (`analyzing` or `planning`); only the `request_type` approval gate has a
+  real handler. Not verified against real Jira or a real dev-server agent; the T2 stack-dev e2e has not run on a real stack.
+
 ## What's intentionally stubbed (and why that's honest, not incomplete work hidden)
 
 Every service that depends on another not-yet-real service (most

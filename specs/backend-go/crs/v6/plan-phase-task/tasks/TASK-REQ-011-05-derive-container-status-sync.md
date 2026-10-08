@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/domain/container_status.go` (mới), `internal/usecase/sync_container_status.go` (mới), `internal/usecase/ports.go`, `internal/adapter/postgres/container_status.go` (mới), `internal/adapter/mysql/container_status.go` (mới), `internal/usecase/update_task.go` (struct payload)
 **Depends on:** TASK-REQ-011-02
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test ./internal/domain/... ./internal/usecase/...` và `go test -tags=integration ./internal/adapter/postgres ./internal/adapter/mysql` (PG 16, MySQL 8.0.46 thật))
 
 ---
 
@@ -53,3 +53,9 @@
 - `UpdateTask` ghi lại toàn hàng (kể cả `status`) nên có thể đè trạng thái suy ra khi đua; task 06 thêm đối soát.
 - Hai dialect: `LIMIT`/`IN` khác nhau nhưng truy vấn ở đây đơn giản; chú ý MySQL dùng `?` và CHAR(36).
 - Đặt tên file theo khái niệm (`container_status`), không dùng `helpers`.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `domain/container_status.go`, `usecase/sync_container_status.go` (`Execute`, `SyncOne`), `adapter/{postgres,mysql}/container_status.go` (`ListChildStatuses`, `UpdateContainerStatus` CAS + outbox cùng giao dịch), `taskStatusChangedPayload` thêm `task_type/parent_id/request_id/cause` (`omitempty`).
+- Tiến độ: `RecalculateProgress` chỉ gọi một lần ở container trên cùng sau khi leo hết chuỗi (phủ cả phase và plan), best-effort; container `cancelled` dừng việc leo.
+- Test CAS thật: `TestRepository_UpdateContainerStatus_CAS_8Goroutines` (đúng 1 người thắng, 1 dòng outbox), `_WritesOutboxSameTx` (id outbox trùng thì status không đổi), `_RejectsNonContainerRow`.

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orca.local/schemas/v1/request.schema.json",
+  "title": "Request content snapshot",
+  "type": "object",
+  "required": ["schema_version", "title", "body", "acceptance_criteria", "type_fields"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "body": { "type": "string", "maxLength": 100000 },
+    "type": {
+      "enum": [
+        "",
+        "change_request",
+        "bug",
+        "hotfix",
+        "task",
+        "spike",
+        "question",
+        "refactor",
+        "security",
+        "performance",
+        "docs",
+        "ops_request"
+      ]
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "maxItems": 50,
+      "items": { "$ref": "#/$defs/acceptance_criterion" }
+    },
+    "type_fields": {
+      "type": "object",
+      "properties": { "ac_next": { "type": "integer", "minimum": 1 } }
+    },
+    "meta": { "type": "object" }
+  },
+  "$defs": {
+    "acceptance_criterion": {
+      "type": "object",
+      "required": ["id", "text", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^AC-[1-9][0-9]*$" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "status": { "enum": ["active", "retired"] },
+        "verify_hint": { "enum": ["", "test", "metric", "manual", "review"] }
+      }
+    }
+  }
+}

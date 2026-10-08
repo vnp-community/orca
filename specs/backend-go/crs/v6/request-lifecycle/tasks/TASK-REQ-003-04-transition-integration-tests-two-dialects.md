@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/transition_request_contract.go` (mới), `internal/adapter/postgres/transition_request_integration_test.go`, `internal/adapter/mysql/transition_request_integration_test.go` (mới)
 **Depends on:** TASK-REQ-003-03, TASK-REQ-002-06
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql (Postgres 16 và MySQL 8.0 thật) -run Transition)
 
 ---
 

@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Task readiness gate messages (CR-REQ-029). RPCs live in RequestService.
+// task-service owns SetTaskSpec, GetTaskSpecs, LockTaskSpecs and ListExecutionRecords in its own proto package.
+
+message ReadinessFinding {
+  // structure | semantic | environment
+  string tier = 1;
+  string code = 2;
+  // block | warn
+  string severity = 3;
+  string message = 4;
+  string path = 5;
+}
+
+message TaskReadinessReportMessage {
+  string id = 1;
+  string request_id = 2;
+  string task_id = 3;
+  int32 attempt = 4;
+  // ready | needs_info | spec_defect | env_defect
+  string outcome = 5;
+  string tier = 6;
+  repeated ReadinessFinding findings = 7;
+  string base_sha = 8;
+  string head_sha = 9;
+  string spec_digest = 10;
+  int64 duration_ms = 11;
+  bool dry_run = 12;
+  google.protobuf.Timestamp created_at = 13;
+}
+
+// Dry run: always writes a report, never changes task state.
+message CheckReadinessRequest {
+  string task_id = 1;
+}
+
+message CheckReadinessResponse {
+  TaskReadinessReportMessage report = 1;
+}
+
+message GetReadinessReportRequest {
+  string task_id = 1;
+}
+
+message GetReadinessReportResponse {
+  TaskReadinessReportMessage report = 1;
+}
+
+message ListReadinessRequest {
+  string phase_id = 1;
+}
+
+message ListReadinessResponse {
+  repeated TaskReadinessReportMessage reports = 1;
+}

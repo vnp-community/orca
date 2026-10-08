@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / adapter grpcclient, usecase
 **File:** `internal/adapter/grpcclient/ai_completion_relay.go` (mới), `project_context_resolver.go` (mới), `connection_resolver.go` (mới, nếu chưa có từ CR khác), `internal/usecase/solution_prompt.go` (mới), và `_test.go`
 **Depends on:** TASK-REQ-007-02; CR-REQ-001 (dial client, `withTenantMetadata` bản của service)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/adapter/grpcclient/... ./internal/usecase/... -run "AICompletion|SolutionPrompt|AnalysisConnections|ProjectContext"`; `ai.complete` thật chưa chạy)
 
 ## Context
 
@@ -39,3 +39,11 @@
 
 - Timeout và giới hạn của `ai.complete` thật chưa kiểm chứng.
 - Prompt injection chỉ được giảm thiểu (khối có rào, kiểm schema đầu ra); `ai.complete` không có công cụ nên thiệt hại tối đa là phương án xấu.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Không viết lại relay của life-b: `relayAIComplete` được tách ra từ `RelayClassifier.complete` (hàm riêng của package, hành vi giữ nguyên, test của life-b vẫn PASS) và dùng chung cho `AICompletionRelay` (timeout `REQUEST_AI_COMPLETE_TIMEOUT`, mặc định 120s). Fallback `RelayByDevServer` và lấy `accountId` qua ai-provider đi chung.
+- Không có `connection_resolver.go` riêng: `AIConnection` của life-b được bổ sung `RepoPath` và `WorktreeID` (thêm trường, không đổi chữ ký) và `AnalysisConnections` chuyển sang cổng `usecase.AnalysisConnectionResolver`. Không có dev server thì trả `usecase.ErrNoDevServer`, `GenerateSolution` đổi thành `REQUEST_SOLUTION_NO_CONNECTION` (hoặc `REQUEST_ANALYSIS_NO_CONNECTION` ở chế độ agent) trước khi ghi dòng nào.
+- `ProjectContextResolver` gọi `project-service.GetProjectContext` (đã xác nhận RPC có trong `project.proto`), lỗi thì prompt không có ngữ cảnh dự án. Không gọi git-gateway lấy tech stack (câu hỏi mở 5, giữ như đề xuất).
+- `BuildSolutionPrompt` có rào `<request>`, `<project>`, `<prior_artifacts>`, `<feedback>`; chuỗi đóng thẻ trong nội dung không tin cậy bị vô hiệu (`</request` thành `<\/request`). Golden ở `internal/usecase/testdata/solution_prompt/*.golden` (đặt `UPDATE_GOLDEN=1` để làm mới).
+- Chưa kiểm chứng: thời gian, giới hạn và độ tuân thủ schema của `ai.complete` thật trên dev server (cần môi trường thật, thuộc CR-REQ-025).

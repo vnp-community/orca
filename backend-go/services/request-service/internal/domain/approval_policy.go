@@ -4,13 +4,15 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/stablyai/orca-go/common/apperrors"
 )
 
 var (
-	ErrNoUser                = errors.New("no user found")
-	ErrAgentForbidden        = errors.New("agent forbidden to approve")
-	ErrNotApprover           = errors.New("not an approver")
-	ErrSelfApprovalForbidden = errors.New("self approval forbidden")
+	ErrNoUser                = apperrors.New(apperrors.KindUnauthenticated, "REQUEST_APPROVAL_NO_USER", "a signed-in user is required", nil)
+	ErrAgentForbidden        = apperrors.New(apperrors.KindPermissionDenied, "REQUEST_APPROVAL_AGENT_FORBIDDEN", "automated callers cannot decide approvals", nil)
+	ErrNotApprover           = apperrors.New(apperrors.KindPermissionDenied, "REQUEST_APPROVAL_NOT_APPROVER", "caller is not an approver", nil)
+	ErrSelfApprovalForbidden = apperrors.New(apperrors.KindPermissionDenied, "REQUEST_APPROVAL_SELF_APPROVAL_FORBIDDEN", "the requester cannot approve their own request", nil)
 )
 
 type PrincipalKind string
@@ -32,7 +34,7 @@ func ParsePrincipal(s string) (Principal, error) {
 		return Principal{Kind: PrincipalKindReporter, ID: ""}, nil
 	}
 	parts := strings.SplitN(s, ":", 2)
-	if len(parts) != 2 {
+	if len(parts) != 2 || strings.TrimSpace(parts[1]) == "" {
 		return Principal{}, errors.New("invalid principal format")
 	}
 	switch parts[0] {
@@ -68,7 +70,9 @@ type ApprovalPolicy struct {
 	Priority              int
 	Enabled               bool
 	Version               int64
+	CreatedBy             string
 	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 func (p ApprovalPolicy) Specificity() int {

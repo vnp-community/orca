@@ -5,7 +5,9 @@
 **Service/Area:** `request-service` (mới) / usecase port, adapter grpcclient. Cùng hợp đồng JSON được `task-service` dùng ở TASK-REQ-029-03.
 **File:** `internal/usecase/ports.go` (sửa `AgentPromptInput`, `AgentPromptResult` do TASK-REQ-008-02 tạo), `internal/adapter/grpcclient/agent_prompt_relay.go` (sửa), `internal/adapter/grpcclient/agent_prompt_params.go` (mới), `internal/adapter/grpcclient/agent_prompt_result.go` (mới), `internal/domain/agent_prompt_errors.go` (mới), và các `_test.go`
 **Depends on:** TASK-REQ-008-02 (tạo `AgentPromptRunner` và adapter), TASK-REQ-033-04 (chọn đường)
-**Status:** [x] DONE
+**Status:** [ ] TODO
+
+> Để đợt R2 (2026-10-07): client `agent.execPrompt` nằm ở `request-service`, không phải infra-fleet. Phía infra-fleet không cần đổi: `RelayByDevServer` chuyển nguyên tham số/kết quả của `agent.execPrompt` (`accessMode`, `workspaceKind`, `reportChanges`, `resultBlock`, `applied`, `parsed`, `changes`); stub hằng cứng `"OK"` ở `request-service/.../dev_server_executor.go` phải được thay ở R2.
 
 ---
 
@@ -73,11 +75,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Agent cũ nhận đúng JSON như trước khi có task này khi dùng tham số mặc định (golden so với `simple_executor.go` doc comment).
-- [x] Không có đường mã nào đặt `trustPreset="full"` (test và `grep` trong review).
-- [x] Route `agent_readonly` không gửi `accessMode` tới agent cũ (kiểm bằng `SelectReadonlyRoute`).
-- [x] Mọi mã lỗi agent trong bảng được dịch sang lỗi có kiểu, không còn so chuỗi ở use case.
-- [x] Nonce không xuất hiện trong log hay lỗi.
+- [ ] Agent cũ nhận đúng JSON như trước khi có task này khi dùng tham số mặc định (golden so với `simple_executor.go` doc comment).
+- [ ] Không có đường mã nào đặt `trustPreset="full"` (test và `grep` trong review).
+- [ ] Route `agent_readonly` không gửi `accessMode` tới agent cũ (kiểm bằng `SelectReadonlyRoute`).
+- [ ] Mọi mã lỗi agent trong bảng được dịch sang lỗi có kiểu, không còn so chuỗi ở use case.
+- [ ] Nonce không xuất hiện trong log hay lỗi.
 
 ## Rủi ro và lưu ý
 

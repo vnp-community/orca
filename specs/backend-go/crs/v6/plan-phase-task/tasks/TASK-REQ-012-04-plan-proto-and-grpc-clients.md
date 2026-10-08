@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/proto/orca/request/v1/request_plan.proto` (mới), `backend-go/services/request-service/internal/usecase/ports.go`, `internal/adapter/grpcclient/plan_generator_relay.go` (mới), `internal/adapter/grpcclient/task_plan_writer.go` (mới), `internal/adapter/grpcclient/plan_prompt.go` (mới), `internal/adapter/grpcclient/plan_generator_relay_test.go` (mới)
 **Depends on:** TASK-REQ-012-01 (proto `CreatePlanTree`), TASK-REQ-012-03
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -44,10 +44,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Proto biên dịch, `buf lint` xanh, không phá số trường.
-- [x] `Generate` trả `PlanProposal` hợp lệ từ JSON mẫu, và mã lỗi đúng khi JSON hỏng hoặc không có dev server.
-- [x] `TaskPlanWriter` truyền đủ `request_id`, `project_id`, `creator_id`, nhãn, phụ thuộc.
-- [x] Không có hai client Relay trùng trong `request-service`.
+- [ ] Proto biên dịch, `buf lint` xanh, không phá số trường.
+- [ ] `Generate` trả `PlanProposal` hợp lệ từ JSON mẫu, và mã lỗi đúng khi JSON hỏng hoặc không có dev server.
+- [ ] `TaskPlanWriter` truyền đủ `request_id`, `project_id`, `creator_id`, nhãn, phụ thuộc.
+- [ ] Không có hai client Relay trùng trong `request-service`.
 
 ## Rủi ro và lưu ý
 

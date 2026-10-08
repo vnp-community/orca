@@ -1,6 +1,6 @@
 # BE-REQ-SOL-008: Chẩn đoán, Findings, Answer bằng agent chỉ đọc (`AgentReadonlyRunner`)
 
-> **📋 Proposed** (chưa triển khai). Phần backend của CR-REQ-008. Phần thay đổi ở agent (TypeScript) thuộc CR-REQ-033 và chỉ được ghi ở mục "Giao diện với agent" dưới đây.
+> **✅ Đã triển khai (kiểm chứng 2026-10-08)** ở `request-service`: use case, repository hai DB, worker có lease, handler Approval và gRPC đã nối vào `main.go`. Hai điểm chờ hợp nhất với đợt Approval (mở Approval thật, bộ hợp đồng handler) ghi ở [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md). Phần thay đổi ở agent (TypeScript) thuộc CR-REQ-033.
 
 **CR:** [CR-REQ-008](../../../../../../docs/crs/v6/solution-analysis/CR-REQ-008-diagnosis-findings-answer-analysis.md)
 **Service:** `request-service` (mới) · đọc `git-gateway-service` (RPC có sẵn) và `infra-fleet-service` (Relay)

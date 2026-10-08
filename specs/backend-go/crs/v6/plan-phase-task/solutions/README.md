@@ -1,6 +1,6 @@
 # plan-phase-task: solutions backend (BE-REQ-SOL-011 đến 014)
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Tài liệu ngày 2026-10-06; số dòng và đường dẫn đã đối chiếu với code `backend-go/services/task-service` cùng ngày. `request-service` chưa có thư mục: mọi đường dẫn của nó là "(mới)".
+> **🚧 Đang triển khai.** 011 ✅ (7/7); 012 mới xong phần `task-service` (2/7); 013 ✅ (7/7, kiểm chứng 2026-10-08); 014 🚧 3/7 (03 đến 06 còn nối `PlanPreconditions` vào `GeneratePlan`/`CommitPlan`). Tài liệu ngày 2026-10-06.
 
 Nguồn: [docs/crs/v6/plan-phase-task](../../../../../../docs/crs/v6/plan-phase-task/README.md). README v6 [mục 8](../../../../../../docs/crs/v6/README.md) thắng mục 3 khi mâu thuẫn. Tài liệu thiết kế tham chiếu: [`tdd/README.md`](../../../../tdd/README.md), `architecture/03, 05, 08, 09`, `services/task-service.md`, `services/orchestration-service.md`, `services/project-service.md`, `services/infra-fleet-service.md`.
 
@@ -8,9 +8,9 @@ Nguồn: [docs/crs/v6/plan-phase-task](../../../../../../docs/crs/v6/plan-phase-
 
 | CR | Solution | Service | Task (xem [tasks/README](../tasks/README.md)) |
 |---|---|---|---|
-| CR-REQ-011 type plan/phase, lọc, cascade, không số task, `request_id` | [BE-REQ-SOL-011](./BE-REQ-SOL-011-task-service-plan-phase-task-types.md) | `task-service` | TASK-REQ-011-01 đến 07 |
-| CR-REQ-012 sinh Plan/Phase/Task, `CreatePlanTree` | [BE-REQ-SOL-012](./BE-REQ-SOL-012-plan-phase-task-generation-from-solution.md) | `task-service`, `request-service` | TASK-REQ-012-01 đến 07 |
-| CR-REQ-013 `StartPhase`, sự kiện task, `ReportTaskOutcome`, đối soát | [BE-REQ-SOL-013](./BE-REQ-SOL-013-phase-execution-and-feedback-loop.md) | `task-service`, `request-service` | TASK-REQ-013-01 đến 07 |
+| CR-REQ-011 type plan/phase, lọc, cascade, không số task, `request_id` | ✅ [BE-REQ-SOL-011](./BE-REQ-SOL-011-task-service-plan-phase-task-types.md) | `task-service` | TASK-REQ-011-01 đến 07 |
+| CR-REQ-012 sinh Plan/Phase/Task, `CreatePlanTree` | 🚧 2/7 [BE-REQ-SOL-012](./BE-REQ-SOL-012-plan-phase-task-generation-from-solution.md) | `task-service`, `request-service` | TASK-REQ-012-01 đến 07 |
+| CR-REQ-013 `StartPhase`, sự kiện task, `ReportTaskOutcome`, đối soát | 🚧 2/7 [BE-REQ-SOL-013](./BE-REQ-SOL-013-phase-execution-and-feedback-loop.md) | `task-service`, `request-service` | TASK-REQ-013-01 đến 07 |
 | CR-REQ-014 chính sách theo loại | [BE-REQ-SOL-014](./BE-REQ-SOL-014-type-specific-execution-policies.md) | `request-service` | TASK-REQ-014-01 đến 07 |
 
 ## Thứ tự phụ thuộc

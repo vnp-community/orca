@@ -5,7 +5,7 @@
 **Service:** `request-service`, `backend-go/ci`
 **File:** `backend-go/services/request-service/evals/golden/<step>/*.json` (mới), `.../evals/replay/<step>/*.json` (mới), `.../evals/baseline.json` (mới), `.../evals/metrics.go` (mới), `.../evals/deterministic_test.go` (mới), `.../evals/live_test.go` (mới, build tag `eval_live`), `.../evals/results/.gitkeep` (mới), `.github/workflows/backend-go-request-service.yml` (sửa), `.../evals/README.md` **không tạo** (cấu trúc mô tả ở đây)
 **Depends on:** TASK-REQ-034-03 (registry, script bump), TASK-REQ-034-06 (grounding), BE-REQ-SOL-005, 007, 012 (schema đầu ra và bộ kiểm)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -42,11 +42,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Eval xác định chạy trong PR dưới 2 phút và thất bại khi bộ kiểm schema bị làm hỏng cố ý.
-- [x] `check-prompt-version-bump.sh` và `baseline.json` được CI kiểm khi prompt đổi.
-- [x] Mỗi bước có tối thiểu 30 mẫu (đánh dấu `synthetic` khi chưa từ Request thật).
-- [x] Không bí mật trong `golden`/`replay` (test quét).
-- [x] `eval_live` có trần chi phí, không chạy trong PR.
+- [ ] Eval xác định chạy trong PR dưới 2 phút và thất bại khi bộ kiểm schema bị làm hỏng cố ý.
+- [ ] `check-prompt-version-bump.sh` và `baseline.json` được CI kiểm khi prompt đổi.
+- [ ] Mỗi bước có tối thiểu 30 mẫu (đánh dấu `synthetic` khi chưa từ Request thật).
+- [ ] Không bí mật trong `golden`/`replay` (test quét).
+- [ ] `eval_live` có trần chi phí, không chạy trong PR.
 
 ## Ví dụ tham khảo
 

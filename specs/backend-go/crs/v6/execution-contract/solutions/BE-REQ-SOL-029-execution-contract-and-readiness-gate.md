@@ -1,6 +1,6 @@
 # BE-REQ-SOL-029: Hợp đồng thực thi: `TaskSpec` v2, `ExecutionPacket`, `ReadinessGate`, `ExecutionResult`, `VerifyExecution`, `Failure.class`
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Có hai nửa: nửa `task-service` (bảng `task_execution_records`, `result_nonce`, Engine 1 cho task có spec, phân tích khối kết quả) và nửa `request-service` (mới: `TaskSpecV2`, bộ render packet, cổng sẵn sàng, kiểm chứng, phân loại lỗi). `request-service` chưa có thư mục: mọi đường dẫn của nó là "(mới)".
+> **🚧 Đang triển khai: 3/8 task xong** (029-01, 02, 03: nửa `task-service` kiểm chứng 2026-10-08). Nửa `request-service` (029-04 đến 08) chưa làm. Xem [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md).
 
 **CR:** [CR-REQ-029](../../../../../../docs/crs/v6/execution-contract/CR-REQ-029-execution-contract-and-readiness-gate.md)
 **Service:** `task-service` · `request-service` (mới) · `proto/orca/task/v1`, `proto/orca/request/v1`

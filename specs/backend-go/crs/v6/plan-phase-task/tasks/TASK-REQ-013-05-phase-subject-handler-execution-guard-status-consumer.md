@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/phase_subject_handler.go` (mới), `internal/usecase/execution_guard.go` (mới), `internal/adapter/eventbus/request_status_consumer.go` (mới), `cmd/server/main.go`, `*_test.go` (mới)
 **Depends on:** TASK-REQ-013-04, CR-REQ-009 (`SubjectHandler`), CR-REQ-005 (`ExecutionGuard` port, mặc định `false`), CR-REQ-006 (`ReturnToBacklog`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -47,3 +47,7 @@
 - Tên consumer bền và stream `REQUEST` do CR-REQ-001 quyết; dùng tên theo đó khi viết.
 - Fail closed của `ExecutionGuard` có thể làm kẹt Request khi task-service sập lâu; đối soát (task 07) vẫn chạy khi hồi phục.
 - Payload `status_changed` cần có `type` và `to`; nếu CR-REQ-003 chưa phát `type`, đọc Request từ DB trong handler.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

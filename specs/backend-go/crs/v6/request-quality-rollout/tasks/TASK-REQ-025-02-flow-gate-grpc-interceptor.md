@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/adapter/grpc/flow_gate.go` (mới), `.../internal/adapter/grpc/flow_gate_test.go` (mới), `.../cmd/server/main.go`
 **Depends on:** TASK-REQ-025-01
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... -count=1` trong `services/request-service` (512 test PASS, 0 FAIL) và `services/issue-status-sync` (186 PASS); `go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/grpc/... ./cmd/...` trên `postgres:16-alpine` thật (262 test PASS); e2e `TestE20_*` trên binary thật)
 
 ---
 
@@ -39,3 +39,7 @@
 
 - Hết hạn Approval và consumer outbox không đi qua gRPC; chúng phải gọi `effective` hoặc không phụ thuộc cờ theo bảng (nội bộ chạy bất kể cờ). Ghi rõ trong mã.
 - Mọi lối ghi khác (HTTP, MCP) đi qua cùng RPC nên không cần thêm cổng ở gateway.
+
+## Kết quả triển khai (2026-10-08)
+
+`adapter/grpc/flow_gate.go`: bảng `flowMethodClass` cho mọi RPC của `orca.request.v1` (test quét `RequestService`, `ApprovalService`, `ApprovalPolicyAdminService`, `AiBudgetAdminService`), thêm lớp `classAdmin` (cấu hình, tuân thủ, chính cờ) ngoài bốn lớp của task; chỉ áp cho gói `/orca.request.v1.` (health và reflection đi qua: lỗi này đã bắt được khi chạy test cmd/server). Nối bằng `grpc.ChainUnaryInterceptor/ChainStreamInterceptor` sau trích tenant, trong `wire_rollout.go`. Không sửa `domain/rpc_catalog.go` (của rf-sec): bảng phân loại là map riêng, cần hợp nhất nếu muốn gộp cột. Sweeper hết hạn Approval và consumer outbox không qua gRPC nên không phụ thuộc cờ. `StreamFlowGate` có cho `ExportTenantRequests`.

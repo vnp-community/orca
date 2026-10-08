@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orca.local/schemas/v1/phase.schema.json",
+  "title": "Phase spec",
+  "type": "object",
+  "required": ["schema_version", "goal"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "kind": { "const": "phase" },
+    "goal": { "type": "string", "minLength": 1 },
+    "entry_criteria": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "exit_criteria": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "depends_on_phases": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  }
+}

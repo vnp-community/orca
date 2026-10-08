@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/NNNN_clarifications_decisions.{up,down}.sql`, `migrations/mysql/NNNN_clarifications_decisions.{up,down}.sql`, `internal/adapter/postgres/schema_contract_test.go` và `internal/adapter/mysql/schema_contract_test.go` (sửa, của TASK-REQ-002-06)
 **Depends on:** TASK-REQ-002-01 (bảng `requests`), TASK-REQ-027-01 (số `NNNN` đi sau `NNNN_request_artifact_model`), TASK-REQ-009-01 (mẫu `pending_key`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql` — Migration, SchemaContract, StatusCheck, OneOpen, OneLive, Down0061, RLS)
 
 ---
 
@@ -71,3 +71,11 @@ Chỗ khó: đổi CHECK `requests.status` cần **tên** ràng buộc thật. P
 - MySQL cũ hơn 8.0.16 phân tích rồi bỏ qua CHECK: `awaiting_information` và các CHECK mới không có tác dụng (rủi ro đã nêu ở SOL-002).
 - Hai migration (027-01, 028-01) cùng đổi bảng `requests`; nếu hai nhánh cùng lấy một `NNNN`, hợp nhất một file.
 - `down` làm mất Clarification và Decision (xoá bảng); chấp nhận cho rollback toàn bộ.
+
+## Ghi chú triển khai (rf/art)
+
+- `0061_clarifications_decisions` (hai dialect), sau `0060` của 027-01. CHECK `requests.status` lấy **tên thật** của ràng buộc (Postgres: `pg_constraint` theo `LIKE '%awaiting_type_confirmation%'`; MySQL: `information_schema.CHECK_CONSTRAINTS`, `PREPARE` + `DROP CHECK`) rồi tạo lại `requests_status_check` 12 giá trị. `down` chuyển Request `awaiting_information` về `request_backlog` (stage `task`, category `missing_info`, lý do `rollback_awaiting_information`) rồi khôi phục CHECK 11 giá trị (Postgres tắt `FORCE RLS` đúng cho lệnh `UPDATE` đó, như `0020`).
+- Một `open` mỗi Request: Postgres chỉ mục duy nhất một phần `clarifications_one_open`; MySQL cột sinh `open_key` + `UNIQUE KEY clarifications_one_open (tenant_id, open_key)`. Một Decision sống mỗi chủ thể: `decisions_one_live` / `live_key` (độ dài `VARCHAR(120)`, `subject_id VARCHAR(80)`). `reporter` dùng `principal_id = ''` (khoá chính không nhận NULL); test hai dialect.
+- Postgres thêm policy `relay_scan` (SELECT khi `app.relay='on'`) cho `clarifications` để vòng quét hết hạn/nhắc liệt kê liên tenant; mọi thay đổi sau đó chạy trong giao dịch của đúng tenant. Test RLS kiểm role không bypass: đọc/ghi chéo tenant bị chặn, không tenant thì 0 dòng, relay chỉ đọc được `clarifications`.
+- `TestRequestsStatusCheck_Accepts12Values_Rejects13th` (hai dialect; MySQL chạy bản `mysql:8.0` mới nhất, ≥ 8.0.16 nên CHECK có hiệu lực) và so khớp tập giá trị CHECK với danh sách trạng thái trong test. Chưa chạy Postgres 14 và MySQL đúng 8.0.16.
+- Mở rộng hợp đồng cột bằng `contracttest/expected_columns_artifact.go` (cột sinh bị loại khỏi so sánh MySQL).

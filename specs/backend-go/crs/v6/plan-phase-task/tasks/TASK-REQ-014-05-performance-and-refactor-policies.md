@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/type_policy_performance.go` (mới), `internal/domain/type_policy_refactor.go` (mới), `internal/domain/perf_metrics.go` (mới), `internal/domain/type_policy_performance_test.go`, `type_policy_refactor_test.go` (mới)
 **Depends on:** TASK-REQ-014-03, TASK-REQ-014-02 (schema metrics)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -41,12 +41,18 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `performance`: thiếu `perf_baseline` thì không `GeneratePlan`; `perf_after` đạt thì hoàn tất; một metric chưa đạt thì Request vào backlog với lý do nêu tên metric; baseline 0 không chia cho 0.
-- [x] `refactor`: `tests_after.failed > 0`, `total` giảm hoặc `tests_modified=true` đều không hoàn tất; đạt cả ba thì hoàn tất.
-- [x] Hai policy là hàm thuần, test không cần DB.
+- [ ] `performance`: thiếu `perf_baseline` thì không `GeneratePlan`; `perf_after` đạt thì hoàn tất; một metric chưa đạt thì Request vào backlog với lý do nêu tên metric; baseline 0 không chia cho 0.
+- [ ] `refactor`: `tests_after.failed > 0`, `total` giảm hoặc `tests_modified=true` đều không hoàn tất; đạt cả ba thì hoàn tất.
+- [ ] Hai policy là hàm thuần, test không cần DB.
 
 ## Rủi ro và lưu ý
 
 - Ngưỡng `target_change_percent` do AI/Chẩn đoán đề xuất có thể phi thực tế; người duyệt Plan chịu trách nhiệm.
 - Agent khai sai thì backend không biết; ghi rõ ở tóm tắt cho người xem.
 - Số thực dùng `float64`; so sánh ngưỡng với dung sai tránh lỗi làm tròn (ví dụ `>= target - 1e-9`).
+
+## Tiến độ
+
+Đã làm: `performancePolicy`, `refactorPolicy`, `ImprovementPercent`, kiểm hoàn tất trong `EvaluateExecution` (có test hàm thuần và luồng qua DB). Còn thiếu: lời gọi `PlanPreconditions` từ `GeneratePlan` (CR-REQ-012 chưa có).
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

@@ -5,7 +5,7 @@
 **Service:** `backend-go/ci`
 **File:** `backend-go/ci/check-request-service-wiring.sh` (mới), `backend-go/ci/check-request-service-wiring_test.sh` (mới, hoặc bước test trong workflow), `.github/workflows/backend-go-request-service.yml`
 **Depends on:** CR-REQ-001 (đã đăng ký `request` ở mọi nơi)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `bash backend-go/ci/check-request-service-wiring.sh` thoát 0; `bash backend-go/ci/check-request-service-wiring_test.sh` thoát 0 (1 ca nguyên vẹn + 10 ca âm tính))
 
 ---
 
@@ -36,3 +36,7 @@
 
 - Tên DB ngắn khác nhau giữa `postgres-init-databases.sh` (`request`) và tên service (`request-service`); script phải kiểm theo quy ước từng file.
 - Khi thêm service khác sau này, đừng nhồi vào script này; làm script riêng hoặc tổng quát hoá có chủ ý.
+
+## Kết quả triển khai (2026-10-08)
+
+Script bỏ `sed -i`, `readlink -f`, `grep -P`. Để kiểm (e) phải thêm `REQUEST_SERVICE_ADDR` vào khối `api-gateway` và `issue-status-sync` của `deploy/dev/docker-compose.yml` (trước đó thiếu), cùng `SERVICE_INTERNAL_TOKEN`/`REQUEST_SERVICE_INTERNAL_TOKEN` và các biến `ISSUE_SYNC_*`. Gọi trong job `wiring` của workflow.

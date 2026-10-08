@@ -180,6 +180,15 @@ func run() error {
 	defer func() { _ = taskConn.Close() }()
 	taskClient := taskv1.NewTaskServiceClient(taskConn)
 
+	// request-service (CR-REQ-016): optional like code-intel; nil clients degrade to REQUEST_UNAVAILABLE.
+	requestClient, approvalClient, requestConn, err := buildRequestClients(cfg.OtherServiceAddrs["request-service"], logger)
+	if err != nil {
+		return err
+	}
+	if requestConn != nil {
+		defer func() { _ = requestConn.Close() }()
+	}
+
 	gitConn, err := gatewaygrpc.Dial(cfg.OtherServiceAddrs["git-gateway-service"])
 	if err != nil {
 		return fmt.Errorf("dialing git-gateway-service: %w", err)
@@ -386,8 +395,10 @@ func run() error {
 		WorkspaceEvents:     workspaceEventBus,
 		DeviceSecrets:       authclient.NewDeviceSecretResolver(authClient),
 		TaskActivityEnabled: natsErr == nil, TaskActivityBus: natsConsumer,
-		CodeIntel:           codeIntelClient,
-		QualityGate:         qualityGateClient,
+		CodeIntel:   codeIntelClient,
+		QualityGate: qualityGateClient,
+		Request:     requestClient,
+		Approval:    approvalClient,
 		CodeIntelLimits: wscompat.CodeIntelLimits{
 			MaxResponseBytes: cfg.CodeIntel.MaxResponseBytes,
 			MaxStreams:       cfg.CodeIntel.MaxStreams,
@@ -562,6 +573,8 @@ func run() error {
 		MCP:                 mcpHandler,
 		OAuth:               oauthRoutes,
 		McpTokens:           mcpTokenRoutes,
+		RequestClient:       requestClient,
+		ApprovalClient:      approvalClient,
 	})
 
 	healthSrv := health.New()
@@ -582,6 +595,9 @@ func run() error {
 	healthSrv.Register("workflow-service", grpcConnHealthCheck(workflowConn))
 	if mcpConn != nil {
 		healthSrv.Register("mcp-service", grpcConnHealthCheck(mcpConn))
+	}
+	if requestConn != nil {
+		healthSrv.Register("request-service", grpcConnHealthCheck(requestConn))
 	}
 	if codeIntelConn != nil {
 		healthSrv.Register("code-intel-service", grpcConnHealthCheck(codeIntelConn))

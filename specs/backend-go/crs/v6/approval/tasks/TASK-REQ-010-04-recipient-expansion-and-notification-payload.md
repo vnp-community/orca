@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, adapter, outbox relay
 **File:** `internal/usecase/expand_approval_recipients.go` (mới), `publish_approval_notifications.go` (mới), `internal/adapter/grpcclient/admin_directory_resolver.go` (mới), `internal/config/config.go` (sửa), và `_test.go`
 **Depends on:** TASK-REQ-010-03; CR-REQ-001 (bộ phát outbox)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/usecase/... ./internal/adapter/eventbus/... -run "ApprovalNotification|ApprovalRecipients"`)
 
 ## Context
 
@@ -39,3 +39,9 @@
 
 - Tenant lớn: `ListUsers` phân trang tốn kém; cache và trần là giải pháp tạm.
 - Bước làm giàu nằm trên đường publish; nếu relay chung với sự kiện khác, chỉ áp cho subject `orca.request.approval.*`.
+
+## Kết quả triển khai (2026-10-08)
+- `PublishApprovalNotifications.Enrich` (thay `ProcessAndPublish`, hết ép kiểu không kiểm) làm giàu `approval.requested`/`decided` thành payload khớp golden của notification-service (sao chép vào `internal/usecase/testdata/approval_notification/`, không import chéo): `user_ids`, `title`, `body`, `deep_link` dùng `request_id` thật; xoá `comment` nếu lọt vào. Nhắc dùng `reason:"reminder"`. Id sự kiện giữ nguyên.
+- Nối vào relay qua `adapter/eventbus.ApprovalNotificationStore` (bọc `outbox.Store`, chỉ chạm subject `orca.request.approval.*`): lỗi tra cứu thư mục dừng lô trước dòng đó (giữ thứ tự, relay thử lại), payload hỏng thì phát nguyên.
+- `AdminDirectoryResolver` thật qua `auth-service.ListUsers` (lọc `ROLE_ADMIN` còn hoạt động, phân trang, cache 60 giây, `tenant_id` lấy từ ctx đã xác thực). Đã đọc handler `ListUsers`: server dùng `req.TenantId` do client gửi (tin tưởng gọi nội bộ), nên request-service chỉ gửi tenant của ctx. Chưa chạy với auth-service thật. Trần người nhận cấu hình `REQUEST_APPROVAL_NOTIFY_MAX_RECIPIENTS` (mặc định 50).
+- Producer ghi thêm `reporter_id`, `self_approval_allowed`, `request_number`, `requested_by` vào payload sự kiện gốc để làm giàu không cần đọc DB.

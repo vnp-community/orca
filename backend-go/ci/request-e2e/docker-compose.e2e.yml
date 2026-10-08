@@ -1,0 +1,25 @@
+# Override for deploy/dev/docker-compose.yml used by run-request-e2e.sh (T2, CR-REQ-025).
+# request-service keeps the real database, NATS, gateway and auth; only what it reaches for the AI is replaced:
+# classification asks infra-fleet-service to relay ai.complete to a dev server and project-service for the repo's
+# dev server, and agent-stub answers both deterministically (backend-go/services/request-service/e2e/stubs).
+services:
+  agent-stub:
+    image: gcr.io/distroless/static-debian12:nonroot
+    container_name: orca-go-request-agent-stub
+    entrypoint: ["/app/bin/orca"]
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./bin/agent-stub/orca:/app/bin/orca:ro
+    environment:
+      AGENT_STUB_ADDR: ":9090"
+
+  request-service:
+    environment:
+      REQUEST_FLOW_ENABLED: "true"
+      REQUEST_APPROVAL_ENABLED: "true"
+      INFRA_FLEET_SERVICE_ADDR: agent-stub:9090
+      PROJECT_SERVICE_ADDR: agent-stub:9090
+    depends_on:
+      agent-stub: { condition: service_started }

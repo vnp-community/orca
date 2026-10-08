@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/generate_plan.go` (mới), `commit_plan.go` (mới), `internal/adapter/grpc/server_plan.go` (mới), `internal/usecase/generate_plan_test.go`, `commit_plan_test.go` (mới), `internal/usecase/ports.go`
 **Depends on:** TASK-REQ-012-03, TASK-REQ-012-04, CR-REQ-003 (`TransitionRequest`), CR-REQ-009 (`OpenApproval`), CR-REQ-007 (Solution `approved`), CR-REQ-002 (`requests.plan_task_id`, CAS `version`)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -40,11 +40,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] PROPOSE không ghi gì ở cả hai service.
-- [x] COMMIT hai lần liên tiếp hoặc đồng thời: một Plan, một Approval `pending`, một sự kiện `plan.generated`.
-- [x] Sau COMMIT Request ở `awaiting_plan_approval`; `requests.plan_task_id` đã đặt.
-- [x] `spike`, `question` bị `REQUEST_PLAN_NOT_APPLICABLE`.
-- [x] Replan huỷ Approval cũ và Plan cũ (qua `supersedes_plan_id`).
+- [ ] PROPOSE không ghi gì ở cả hai service.
+- [ ] COMMIT hai lần liên tiếp hoặc đồng thời: một Plan, một Approval `pending`, một sự kiện `plan.generated`.
+- [ ] Sau COMMIT Request ở `awaiting_plan_approval`; `requests.plan_task_id` đã đặt.
+- [ ] `spike`, `question` bị `REQUEST_PLAN_NOT_APPLICABLE`.
+- [ ] Replan huỷ Approval cũ và Plan cũ (qua `supersedes_plan_id`).
 
 ## Rủi ro và lưu ý
 

@@ -100,10 +100,10 @@ type Config struct {
 	SsoGoogleClientID string
 	SsoOidcClientID   string
 
-	// OtherServiceAddrs holds the remaining 14 downstream services'
+	// OtherServiceAddrs holds the remaining 15 downstream services'
 	// addresses (auth, tenant, project, infra-fleet, git-gateway,
 	// scm-integration, issue-tracking, ai-provider, workflow, task,
-	// orchestration, automation, annotation, credential-broker). None of
+	// orchestration, automation, annotation, credential-broker, request). None of
 	// these are dialed yet — every route under their prefix returns a 501
 	// stub (internal/adapter/httpgateway) until each service's gRPC
 	// contract stabilizes. Kept as a map rather than one field per service
@@ -173,6 +173,7 @@ func Load() (Config, error) {
 			"automation-service":        commonconfig.StringEnv("AUTOMATION_SERVICE_ADDR", ""),
 			"annotation-service":        commonconfig.StringEnv("ANNOTATION_SERVICE_ADDR", ""),
 			"credential-broker-service": commonconfig.StringEnv("CREDENTIAL_BROKER_SERVICE_ADDR", ""),
+			"request-service":           commonconfig.StringEnv("REQUEST_SERVICE_ADDR", ""),
 		},
 	}, nil
 }

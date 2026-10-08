@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/mysql/{request_repository.go,request_counter.go,request_type_history_repository.go,solution_repository.go,request_link_repository.go,request_idempotency_repository.go,request_scan.go}` (mới)
 **Depends on:** TASK-REQ-002-01, TASK-REQ-002-02, TASK-REQ-002-03 (song song được với TASK-REQ-002-04)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test -tags integration ./internal/adapter/mysql/... (PASS, MySQL 8.0))
 
 ---
 
@@ -44,3 +44,7 @@ Lệnh: `go test -tags=integration ./services/request-service/internal/adapter/m
 - Không có RLS: một câu thiếu `tenant_id` là rò rỉ dữ liệu; review từng truy vấn và để test `QueriesAlwaysFilterTenant` bao phủ mọi phương thức.
 - `RowsAffected` mặc định tính hàng thật sự đổi; vì `version` luôn tăng nên CAS an toàn mà không cần `clientFoundRows=true`.
 - `INSERT IGNORE` nuốt cả lỗi khác (truncate dữ liệu); kiểm cảnh báo hoặc dùng `ON DUPLICATE KEY UPDATE request_id = request_id` làm phương án, ghi lựa chọn vào PR.
+
+## Ghi chú triển khai
+
+Cùng lệch về struct riêng như 002-04. `NextNumber` dùng upsert rồi đọc lại trong cùng giao dịch (giữ khoá hàng đếm); `Claim` dùng `ON DUPLICATE KEY UPDATE` no-op (không dùng `INSERT IGNORE` vì nuốt cả lỗi CHECK). Test đặc thù phủ bởi bộ chung: `TenantIsolation*`, `NumberingConcurrent20`, `UpdateCASConflict`, `SolutionsCAS` (JSON `[]` và có dữ liệu), `ClaimConcurrent`. Chạy trên MySQL 8.0 thật.

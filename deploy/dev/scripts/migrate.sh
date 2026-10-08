@@ -24,7 +24,7 @@ DEPLOY_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # deployment, causing ISSUETRACKING_GET_STATUS_FAILED: database
 # "issuetracking" does not exist for every issue-tracking RPC. See
 # specs/backend-go/bugs/missing-v2/BUG-014-issuetracking-database-never-migrated.md.
-SERVICES="auth tenant project infra aiprovider workflow task orchestration automation annotation notification usage credential issuetracking scm mcp issuestatussync"
+SERVICES="auth tenant project infra aiprovider workflow task orchestration automation annotation notification usage credential issuetracking scm mcp issuestatussync request"
 
 REMOTE=0
 TARGET=""

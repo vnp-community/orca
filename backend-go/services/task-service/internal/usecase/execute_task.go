@@ -18,6 +18,10 @@ type ExecuteTaskInput struct {
 	// SimpleExecutor.buildExecutePrompt's doc comment for the default it
 	// replaces. Not persisted onto the task.
 	Prompt string
+	// ResultNonce, when set, selects the contract path for a task that has a spec: the agent must
+	// close with an ORCA_RESULT block carrying this nonce. Attempt 0 is derived from RequestID.
+	ResultNonce string
+	Attempt     int
 }
 
 // ExecuteResult replaces the bare execution-ref string Execute used to
@@ -100,6 +104,66 @@ type ExecuteTask struct {
 	leaseOwner     string
 	leaseTTL       time.Duration
 	leaseHeartbeat time.Duration
+
+	// sync re-derives the parent plan/phase whenever this task's status changes.
+	sync *SyncContainerStatus
+
+	// releaser reverts a failed dispatch together with its outbox event; outbox is
+	// the non-atomic fallback for failures before the active link exists.
+	releaser TaskExecutionReleaser
+	outbox   OutboxWriter
+
+	// contract/specs back the spec-task path, see WithContract.
+	contract ContractAgentExecutor
+	specs    TaskSpecLookup
+}
+
+// WithRunEvents lets a failed dispatch revert through the link-guarded release
+// (atomic with its statuschanged event). Without it, request-owned tasks revert
+// silently as before.
+func (uc *ExecuteTask) WithRunEvents(releaser TaskExecutionReleaser, outbox OutboxWriter) *ExecuteTask {
+	uc.releaser = releaser
+	uc.outbox = outbox
+	return uc
+}
+
+// revertDispatch puts a claimed task back to previous after a failed dispatch.
+// With an active link the revert is a CAS that also writes the event in one
+// transaction; before the link exists no CAS key is available, so the event goes
+// out best-effort (reconcile covers a lost one).
+func (uc *ExecuteTask) revertDispatch(ctx context.Context, tenantID string, task domain.Task, linkID string, previous domain.Status, engine domain.ExecutionEngine, cause error) {
+	uc.revertDispatchWithOutcome(ctx, tenantID, task, linkID, previous, engine, cause, runOutcome{})
+}
+
+// revertDispatchWithOutcome is revertDispatch plus the contract run's failure class and record id.
+func (uc *ExecuteTask) revertDispatchWithOutcome(ctx context.Context, tenantID string, task domain.Task, linkID string, previous domain.Status, engine domain.ExecutionEngine, cause error, outcome runOutcome) {
+	events := runEventsWithOutcome(task, domain.StatusInProgress, previous, CauseExecutionFailed, linkID, engine, cause.Error(), uc.clock.Now(), outcome)
+	if linkID != "" && len(events) > 0 && uc.releaser != nil {
+		released, err := uc.releaser.ReleaseExecution(ctx, tenantID, task.ID, linkID, previous, events)
+		if err == nil {
+			// !released: recovery or a newer dispatch already owns the task.
+			if released {
+				syncContainerParent(ctx, uc.sync, task.ID)
+			}
+			return
+		}
+		slog.WarnContext(ctx, "task: link-guarded revert failed, falling back to plain status write",
+			slog.String("task_id", task.ID), slog.Any("error", err))
+	}
+	_ = uc.repo.UpdateStatus(ctx, tenantID, task.ID, previous)
+	syncContainerParent(ctx, uc.sync, task.ID)
+	if len(events) > 0 && uc.outbox != nil {
+		ev := events[0]
+		if err := uc.outbox.InsertOutboxEvent(ctx, ev.ID, tenantID, ev.Subject, ev.PayloadJSON); err != nil {
+			slog.WarnContext(ctx, "task: could not record revert event", slog.String("task_id", task.ID), slog.Any("error", err))
+		}
+	}
+}
+
+// WithContainerSync enables plan/phase status derivation; nil keeps the old behavior.
+func (uc *ExecuteTask) WithContainerSync(s *SyncContainerStatus) *ExecuteTask {
+	uc.sync = s
+	return uc
 }
 
 func NewExecuteTask(repo TaskRepository, edges EdgeRepository, simple SimpleExecutor, complex ComplexExecutor, workflow WorkflowExecutor, resolvePermission *ResolvePermission, worktrees WorktreeProvisioner, resolver ProjectExecutionResolver, clock Clock, links ExecutionLinkRepository) *ExecuteTask {
@@ -131,6 +195,12 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	task, err := uc.repo.Get(ctx, tenantID, in.TaskID)
 	if err != nil {
 		return ExecuteResult{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+	}
+
+	// Plan/phase are derived containers: one worktree and coordinator per phase would contradict
+	// the v6 design, so they are never dispatched (lift this guard only with a phase coordinator).
+	if domain.IsContainerType(task.Type) {
+		return ExecuteResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_CONTAINER_NOT_EXECUTABLE", "plan and phase tasks cannot be executed; execute their tasks instead", nil)
 	}
 
 	// Pre-check 0: reject a re-dispatch while one is already running.
@@ -166,6 +236,9 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 		return ExecuteResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_ALREADY_IN_PROGRESS", "task already has a dispatch in progress", nil)
 	}
 	previousStatus := task.Status
+	if in.ResultNonce != "" && in.Attempt == 0 {
+		in.Attempt = parseAttempt(in.RequestID)
+	}
 
 	engine, err := uc.selectEngine(ctx, tenantID, task) // computed BEFORE any status write, same as the old isComplex was
 	if err != nil {
@@ -224,9 +297,11 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 		}
 	}
 
+	task.WorktreeID = worktreeID // events carry the worktree this run uses
 	if uc.claimer != nil {
 		// Atomic claim: only the Execute call that still sees previousStatus wins.
-		claimed, err := uc.claimer.ClaimForExecution(ctx, tenantID, in.TaskID, previousStatus)
+		claimEvents := runEvents(task, previousStatus, domain.StatusInProgress, CauseExecuteClaim, "", engine, "", uc.clock.Now())
+		claimed, err := uc.claimer.ClaimForExecution(ctx, tenantID, in.TaskID, previousStatus, claimEvents)
 		if err != nil {
 			return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_STATUS_UPDATE_FAILED", "failed to mark task in_progress", err)
 		}
@@ -234,8 +309,10 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 			return ExecuteResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_ALREADY_IN_PROGRESS", "task already has a dispatch in progress", nil)
 		}
 	} else if err := uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, domain.StatusInProgress); err != nil {
+		// No claimer means no shared transaction, so no claim event; production always wires the claimer.
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_STATUS_UPDATE_FAILED", "failed to mark task in_progress", err)
 	}
+	syncContainerParent(ctx, uc.sync, in.TaskID)
 	dispatchStart := uc.clock.Now()
 
 	// One execution_links row per Execute call that reaches dispatch, across
@@ -247,7 +324,7 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	// pre-dispatch failures above.
 	link, linkErr := uc.links.CreateExecutionLink(ctx, tenantID, in.TaskID, engine, "")
 	if linkErr != nil {
-		_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
+		uc.revertDispatch(ctx, tenantID, task, "", previousStatus, engine, linkErr)
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_LINK_CREATE_FAILED", "failed to record execution link", linkErr)
 	}
 	// Record this link as the task's active dispatch BEFORE calling out to
@@ -259,7 +336,7 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	// and would be silently dropped forever.
 	if err := uc.repo.SetActiveExecutionLink(ctx, tenantID, in.TaskID, link.ID); err != nil {
 		_ = uc.links.Complete(ctx, tenantID, link.ID, "failed")
-		_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
+		uc.revertDispatch(ctx, tenantID, task, "", previousStatus, engine, err)
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_ACTIVE_LINK_PERSIST_FAILED", "failed to record active execution link", err)
 	}
 
@@ -313,7 +390,7 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 		// stuck — a dispatch failure must never leave permanently-false
 		// "running" state, since there is no other RPC to clear it.
 		_ = uc.links.Complete(ctx, tenantID, link.ID, "failed") // best-effort, same posture as this codebase's other non-critical bookkeeping writes
-		_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
+		uc.revertDispatch(ctx, tenantID, task, link.ID, previousStatus, engine, err)
 		slog.WarnContext(ctx, "task: execute dispatch failed",
 			slog.String("task_id", in.TaskID), slog.String("project_id", task.ProjectID), slog.String("engine", string(engine)), slog.Any("dispatch_error", err))
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", "execution dispatch failed", err)
@@ -368,12 +445,16 @@ func (uc *ExecuteTask) dispatchDirectAgentAsync(ctx context.Context, tenantID, u
 	uc.runAsync(func() {
 		stopHeartbeat := uc.startHeartbeat(dispatchCtx, tenantID, linkID)
 		defer stopHeartbeat()
+		if in.ResultNonce != "" && uc.contract != nil {
+			uc.runContractAgent(dispatchCtx, tenantID, in, task, worktreePath, linkID, previousStatus, dispatchStart)
+			return
+		}
 		ref, err := uc.simple.Execute(dispatchCtx, tenantID, in.TaskID, in.RequestID, worktreePath, in.Prompt)
 		if err != nil {
 			// Same fix as the orchestration/workflow branch above: revert
 			// the in_progress write instead of leaving the task stuck.
 			_ = uc.links.Complete(dispatchCtx, tenantID, linkID, "failed")
-			_ = uc.repo.UpdateStatus(dispatchCtx, tenantID, in.TaskID, previousStatus)
+			uc.revertDispatch(dispatchCtx, tenantID, task, linkID, previousStatus, domain.EngineDirectAgent, err)
 			slog.WarnContext(dispatchCtx, "task: execute dispatch failed",
 				slog.String("task_id", in.TaskID), slog.String("project_id", task.ProjectID), slog.String("engine", string(domain.EngineDirectAgent)), slog.Any("dispatch_error", err))
 			return
@@ -382,12 +463,14 @@ func (uc *ExecuteTask) dispatchDirectAgentAsync(ctx context.Context, tenantID, u
 			_ = uc.links.SetExternalRef(dispatchCtx, tenantID, linkID, ref)
 		}
 		actualHours := uc.clock.Now().Sub(dispatchStart).Hours()
-		if err := uc.repo.CompleteExecution(dispatchCtx, tenantID, in.TaskID, string(domain.StatusReview), actualHours); err != nil {
+		doneEvents := runEvents(task, domain.StatusInProgress, domain.StatusReview, CauseExecutionCompleted, linkID, domain.EngineDirectAgent, "", uc.clock.Now())
+		if err := uc.repo.CompleteExecution(dispatchCtx, tenantID, in.TaskID, string(domain.StatusReview), actualHours, doneEvents); err != nil {
 			_ = uc.links.Complete(dispatchCtx, tenantID, linkID, "failed")
 			slog.WarnContext(dispatchCtx, "task: execute completion write failed",
 				slog.String("task_id", in.TaskID), slog.Any("completion_error", err))
 			return
 		}
+		syncContainerParent(dispatchCtx, uc.sync, in.TaskID)
 		_ = uc.links.Complete(dispatchCtx, tenantID, linkID, "completed")
 	})
 	return ExecuteResult{Async: true}, nil
@@ -411,6 +494,17 @@ func (uc *ExecuteTask) selectEngine(ctx context.Context, tenantID string, task d
 	}
 	if len(children) > 0 {
 		return domain.EngineOrchestration, nil
+	}
+	// A task with a spec carries a prompt override, which only Engine 1 honors; ordering between
+	// spec tasks is AdvanceExecution's job, so depends_on must not push it to the coordinator.
+	if uc.specs != nil && task.RequestID != "" {
+		has, err := uc.specs.HasSpec(ctx, tenantID, task.ID)
+		if err != nil {
+			return "", err
+		}
+		if has {
+			return domain.EngineDirectAgent, nil
+		}
 	}
 	deps, err := uc.edges.ListFrom(ctx, tenantID, task.ID, domain.EdgeKindDependsOn)
 	if err != nil {

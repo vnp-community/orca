@@ -59,6 +59,9 @@ service TaskService {
   rpc AIApply(AIApplyRequest) returns (AIApplyResponse);
 
   rpc GetSubtree(GetSubtreeRequest) returns (GetSubtreeResponse);
+  // CreatePlanTree creates a Plan with its Phases, tasks and edges in ONE transaction (CR-REQ-012).
+  // Internal to request-service: the gateway must not route it.
+  rpc CreatePlanTree(CreatePlanTreeRequest) returns (CreatePlanTreeResponse);
   rpc RecalculateProgress(RecalculateProgressRequest) returns (RecalculateProgressResponse);
   rpc AddComment(AddCommentRequest) returns (AddCommentResponse);
   rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse);
@@ -100,6 +103,16 @@ service TaskService {
   // ListExecutionStates returns execution status (last engine, link status,
   // blocking tasks) for a list of task IDs.
   rpc ListExecutionStates(ListExecutionStatesRequest) returns (ListExecutionStatesResponse);
+
+  // SetTaskSpec stores the canonical spec of one task (CR-REQ-027). expected_version 0 means
+  // "create"; a locked spec (Plan approved) answers FAILED_PRECONDITION TASK_SPEC_LOCKED.
+  rpc SetTaskSpec(SetTaskSpecRequest) returns (SetTaskSpecResponse);
+  // GetTaskSpecs reads up to 200 specs; tasks without a spec are simply absent from the reply.
+  rpc GetTaskSpecs(GetTaskSpecsRequest) returns (GetTaskSpecsResponse);
+  // LockTaskSpecs locks every spec in a plan/phase subtree; idempotent, reports newly locked rows.
+  rpc LockTaskSpecs(LockTaskSpecsRequest) returns (LockTaskSpecsResponse);
+  // ListExecutionRecords returns the structured outcome of contract runs (CR-REQ-029).
+  rpc ListExecutionRecords(ListExecutionRecordsRequest) returns (ListExecutionRecordsResponse);
 }
 
 message GenerateShareLinkRequest {
@@ -136,7 +149,7 @@ message Task {
   string project_id = 6; // added for Epic C's HasActiveExecutions — see that RPC's doc comment
 
   string description = 7;
-  string task_type = 8;
+  string task_type = 8; // task|bug|feature|epic|plan|phase; plan/phase are containers with derived status and no task_number
   string priority = 9;
   string assignee_id = 10;
   string owner_id = 11; // see SOL-TG-03's owner-intrinsic short-circuit
@@ -177,6 +190,9 @@ message Task {
   // public GetTaskByShareToken RPC returns a dedicated, narrower
   // TaskShareView instead — see that message's own doc comment.
   string share_token = 30;
+  // request_id: Request (request-service) this task belongs to; no FK, immutable after create.
+  // Empty for tasks not created from a Request.
+  string request_id = 31;
 }
 
 message CreateTaskRequest {
@@ -198,6 +214,8 @@ message CreateTaskRequest {
   // Task.owner_id (informational/display-only, never read by
   // ResolvePermission).
   string creator_id = 14;
+  string request_id = 15; // empty = inherit from parent when parent has one
+  repeated string labels = 16;
 }
 
 message CreateTaskResponse {
@@ -328,6 +346,9 @@ message TaskServiceExecuteRequest {
   // task: <title>"). Not persisted — a per-execution input, not a task
   // field. See docs/backlog/BACKLOG-016.
   string prompt = 3;
+  // result_nonce: minted by request-service per attempt so a result block injected through
+  // Request content cannot be mistaken for the agent's. Non-empty selects the contract path.
+  string result_nonce = 4;
 }
 
 message TaskServiceExecuteResponse {
@@ -356,6 +377,10 @@ message ListTasksRequest {
   string project_id = 1; // optional filter, empty = no filter
   string page_token = 2;
   int32 page_size = 3;
+  // Empty task_types = task,bug,feature,epic (plan/phase hidden unless asked for).
+  repeated string task_types = 4;
+  repeated string request_ids = 5; // at most 100
+  string parent_id = 6;            // optional filter, empty = no filter
 }
 message ListTasksResponse {
   repeated Task tasks = 1;
@@ -504,6 +529,44 @@ message ReportTaskExecutionResultRequest {
   string engine = 6; // "orchestration" | "workflow" (NEW, BE-SOL-002) — picks which execution_links row to validate staleness against
 }
 
+// CreatePlanTree (CR-REQ-012). Set phases OR tasks (tasks directly under the Plan), never both.
+message CreatePlanTreeRequest {
+  string request_id = 1;
+  string project_id = 2;
+  string title = 3;
+  string description = 4;
+  string ai_plan_json = 5;
+  repeated PlanTreePhase phases = 6;
+  repeated PlanTreeTask tasks = 7;
+  string creator_id = 8; // gets an owner grant (apply_tree) on the Plan after commit
+  string supersedes_plan_id = 9; // replan: the active Plan to cancel; empty = idempotent create
+}
+
+message PlanTreePhase {
+  string title = 1;
+  string description = 2;
+  repeated PlanTreeTask tasks = 3;
+  repeated int32 depends_on_phase_indices = 4; // indices into CreatePlanTreeRequest.phases
+}
+
+message PlanTreeTask {
+  string title = 1;
+  string description = 2;
+  string task_type = 3;
+  google.protobuf.DoubleValue estimated_hours = 4;
+  string prompt_template = 5;
+  string ai_context = 6;
+  repeated string labels = 7;
+  repeated int32 depends_on_indices = 8; // siblings in the same phase (or plan.tasks)
+}
+
+message CreatePlanTreeResponse {
+  Task plan = 1;
+  repeated Task phases = 2;
+  repeated Task tasks = 3;
+  bool already_exists = 4; // an active Plan already existed for request_id; nothing was written
+}
+
 message ListExecutionStatesRequest {
   repeated string task_ids = 1;
 }
@@ -520,4 +583,66 @@ message ExecutionState {
 
 message ListExecutionStatesResponse {
   repeated ExecutionState states = 1;
+}
+
+message TaskSpec {
+  string task_id = 1;
+  int32 schema_version = 2;
+  string spec_json = 3; // canonical JSON, the exact bytes the digest covers
+  string digest = 4; // lowercase hex SHA-256 of spec_json
+  bool locked = 5;
+  int64 version = 6;
+}
+
+message SetTaskSpecRequest {
+  string task_id = 1;
+  int32 schema_version = 2;
+  string spec_json = 3;
+  int64 expected_version = 4;
+}
+
+message SetTaskSpecResponse {
+  TaskSpec spec = 1;
+}
+
+message GetTaskSpecsRequest {
+  repeated string task_ids = 1;
+}
+
+message GetTaskSpecsResponse {
+  repeated TaskSpec specs = 1;
+}
+
+message LockTaskSpecsRequest {
+  string plan_task_id = 1; // root of the plan or phase subtree to lock
+}
+
+message LockTaskSpecsResponse {
+  int32 locked = 1; // specs newly locked by this call
+}
+
+message ExecutionRecord {
+  string id = 1;
+  string task_id = 2;
+  string execution_link_id = 3;
+  int32 attempt = 4;
+  string spec_digest = 5;
+  string packet_digest = 6;
+  string template_version = 7;
+  string parse_status = 8; // ok | missing | invalid
+  string failure_class = 9; // empty on success
+  string result_json = 10;
+  string changes_json = 11;
+  string stdout_tail = 12;
+  google.protobuf.Timestamp created_at = 13;
+}
+
+message ListExecutionRecordsRequest {
+  repeated string task_ids = 1;
+  bool latest_only = 2;
+  int32 limit = 3;
+}
+
+message ListExecutionRecordsResponse {
+  repeated ExecutionRecord records = 1;
 }

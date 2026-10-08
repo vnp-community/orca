@@ -5,7 +5,7 @@
 **Service/Area:** `task-service` / usecase `ExecuteTask`, adapter `grpcclient.SimpleExecutor`, grpc server, wiring
 **File:** `internal/usecase/contract_executor.go` (mới), `internal/usecase/execute_task.go` (sửa), `internal/usecase/task_run_events.go` (sửa, tạo ở TASK-REQ-013-01/02), `internal/adapter/grpcclient/simple_executor.go` (sửa), `internal/adapter/grpcclient/simple_executor_contract.go` (mới), `internal/adapter/grpc/server.go` (sửa dòng 280), `cmd/server/main.go` (sửa), và các `_test.go`
 **Depends on:** TASK-REQ-029-01, TASK-REQ-029-02, TASK-REQ-011-02 (`domain.Task.RequestID`), TASK-REQ-013-01/02 (cổng sự kiện `statuschanged`), SOL-033 mục 2.I (hợp đồng tham số `agent.execPrompt`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./services/task-service/internal/{usecase,adapter/grpcclient,adapter/grpc}/...)
 
 ---
 
@@ -75,6 +75,8 @@
 - [x] Thiếu hoặc sai khối kết quả: `parse_status` đúng, `failure_class=agent_defect`, task không ở `review`.
 - [x] `trustPreset` không bao giờ `"full"` trên đường hợp đồng khi `request_id` không có tiền tố `req:`.
 - [x] `gitnexus_impact` đã chạy cho `selectEngine`, `dispatchDirectAgentAsync`, `ExecuteTaskInput`, `SimpleExecutor.Execute` và báo cáo trong PR (quy ước repo).
+
+> Ghi chú triển khai: Sau hợp nhất (2026-10-08) sự kiện đi qua cổng cùng giao dịch `task_run_events.go` (`runEventsWithOutcome`), không còn struct/ghi outbox riêng; `failure_class`, `execution_record_id` thêm vào `taskStatusChangedPayload`. `gitnexus_impact` không dùng được cho worktree (chỉ mục là của cây chính): thay bằng grep người gọi (`selectEngine`, `dispatchDirectAgentAsync` chỉ gọi từ `Execute`; `ExecuteTaskInput` dựng ở `server.go` và test; `SimpleExecutor.Execute` qua interface và test). Chưa kiểm chứng `agent.execPrompt` protocol 2 trên dev server thật (relay giả).
 
 ## Rủi ro và lưu ý
 

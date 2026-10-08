@@ -77,7 +77,7 @@ func (uc *AIApply) Execute(ctx context.Context, in AIApplyInput) ([]domain.Task,
 		for i, p := range in.Proposals {
 			task, err := createTask.Execute(ctx, CreateTaskInput{
 				Title: p.Title, Description: p.Description, ParentID: in.TaskID,
-				Type: p.Type, EstimatedHours: p.EstimatedHours, PromptTemplate: p.PromptTemplate,
+				Type: normalizeProposalType(p.Type), EstimatedHours: p.EstimatedHours, PromptTemplate: p.PromptTemplate,
 			})
 			if err != nil {
 				return apperrors.New(apperrors.KindInternal, "TASK_AI_APPLY_FAILED", "failed to create subtask from AI proposal", err)
@@ -121,4 +121,13 @@ func (uc *AIApply) Execute(ctx context.Context, in AIApplyInput) ([]domain.Task,
 		return nil, err
 	}
 	return created, nil
+}
+
+// normalizeProposalType keeps AI output from minting epic/plan/phase containers.
+func normalizeProposalType(t string) string {
+	switch t {
+	case domain.TypeTask, domain.TypeBug, domain.TypeFeature:
+		return t
+	}
+	return domain.TypeTask
 }

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/proto/orca/request/v1/request.proto`, `backend-go/services/request-service/internal/usecase/lookup_request_by_source.go` (mới), `.../internal/adapter/grpc/server.go`, `.../internal/adapter/{postgres,mysql}/request_repository.go` (thêm truy vấn), `.../cmd/server/main.go` (guard)
 **Depends on:** CR-REQ-002 (bảng `requests`, chỉ mục nguồn), CR-REQ-004; BE-REQ-SOL-025 task 01 (đọc cờ)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... -count=1` trong `services/request-service` (512 test PASS, 0 FAIL) và `services/issue-status-sync` (186 PASS); `go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/grpc/... ./cmd/...` trên `postgres:16-alpine` thật (262 test PASS); `go test -tags integration ./internal/adapter/mysql/...` trên `mysql:8.0` thật (PASS, 238 giây); e2e `TestLookupRequestBySource_InternalGuardTenantAndFlag`)
 
 ---
 
@@ -40,3 +40,7 @@
 ## Rủi ro và lưu ý
 
 - Nhiều Request cùng nguồn (CR-REQ-004 cho phép chuỗi "Request theo dõi"): lấy mới nhất còn hoạt động; đủ cho mục đích "bỏ qua đồng bộ PR".
+
+## Kết quả triển khai (2026-10-08)
+
+Proto đã có sẵn từ đợt proto (không sửa `.proto`, nên không chạy `buf breaking`). `NewLookupRequestBySource(..., WithActiveSourceFinder, WithLookupFlagGate)`; truy vấn `FindActiveBySource` ở `adapter/{postgres,mysql}/request_source_lookup.go`; migration `0091` thêm chỉ mục `(tenant_id, source_provider, source_ref)`; guard `internalcaller.Guard(SERVICE_INTERNAL_TOKEN)` trong `cmd/server/wire_rollout.go`; payload `status_changed`/`completed` có `source_*`, `reporter_id`, `version`, `number`, `traceparent`. Phân loại `classInternal` trong `flow_gate.go`. Cần hợp nhất guard này với chuỗi interceptor bảo mật của rf-sec.

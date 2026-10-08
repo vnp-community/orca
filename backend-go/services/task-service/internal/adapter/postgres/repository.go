@@ -60,10 +60,11 @@ func New(pool *pgxpool.Pool) *Repository {
 // AddEdge sub-usecases already call, rather than introducing
 // transaction-specific interfaces.
 func (r *Repository) RunInTx(ctx context.Context, fn func(ctx context.Context, tasks usecase.TaskRepository, edges usecase.EdgeRepository) error) error {
-	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		scoped := &Repository{pool: r.pool, db: tx}
 		return fn(ctx, scoped, scoped)
 	})
+	return markTxConflict(err)
 }
 
 // subtreeColumnNames names subtree.go's recursive CTE's output columns to
@@ -83,7 +84,8 @@ const subtreeColumnNames = `
 	ai_plan_json, visibility, worktree_id, agent_session_id,
 	progress_percent, active_execution_id, last_execution_output,
 	task_number, pr_url, workflow_template_id, active_execution_link_id,
-	labels, reporter_id, workflow_exec_id, done_subtasks, total_subtasks, share_token
+	labels, reporter_id, workflow_exec_id, done_subtasks, total_subtasks, share_token,
+	request_id
 `
 
 // taskColumns is the widened column list every query in this file that
@@ -157,26 +159,25 @@ func prefixedTaskColumns(alias string) string {
 	` + alias + `.progress_percent, COALESCE(` + alias + `.active_execution_id, ''), COALESCE(` + alias + `.last_execution_output, ''),
 	COALESCE(` + alias + `.task_number, 0), COALESCE(` + alias + `.pr_url, ''), COALESCE(` + alias + `.workflow_template_id::text, ''),
 	COALESCE(` + alias + `.active_execution_link_id::text, ''),
-	` + alias + `.labels, COALESCE(` + alias + `.reporter_id::text, ''), ` + alias + `.workflow_exec_id, ` + alias + `.done_subtasks, ` + alias + `.total_subtasks, COALESCE(` + alias + `.share_token, '')
+	` + alias + `.labels, COALESCE(` + alias + `.reporter_id::text, ''), ` + alias + `.workflow_exec_id, ` + alias + `.done_subtasks, ` + alias + `.total_subtasks, COALESCE(` + alias + `.share_token, ''),
+	COALESCE(` + alias + `.request_id::text, '')
 `
 }
 
 // Create inserts a task and assigns its task_number from the shared
 // per-service sequence (nextval('task.task_number_seq')), returning it via
 // RETURNING so the caller's response carries the real assigned value —
-// SOL-PW-04 (TASK-PW-04-03).
-// Create inserts a task and assigns its task_number from the shared
-// per-service sequence (nextval('task.task_number_seq')), returning it via
-// RETURNING so the caller's response carries the real assigned value —
 // SOL-PW-04 (TASK-PW-04-03). labels/reporter_id/workflow_exec_id are
 // TASK-TG-001-02's widened fields (migration 0011); done_subtasks/
 // total_subtasks/share_token are never set at creation (DB defaults/NULL),
-// so they're deliberately not INSERT columns here.
+// so they're deliberately not INSERT columns here. Plan/phase containers get
+// no task_number: they are not addressable as "#TG-N" and must not burn
+// numbers from the shared sequence.
 func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
 	if task.Labels == nil {
 		task.Labels = []string{}
 	}
-	
+
 	if domain.IsContainerType(task.Type) {
 		_, err := r.db.Exec(ctx, `
 			INSERT INTO task.tasks (
@@ -191,7 +192,7 @@ func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task,
 			nullableUUID(task.OwnerID), task.DueDate, task.EstimatedHours, task.PromptTemplate, task.AIContext, orDefault(task.Visibility, "team"),
 			task.Labels, nullableUUID(task.ReporterID), task.WorkflowExecID, nullableUUID(task.RequestID))
 		if err != nil {
-			return domain.Task{}, fmt.Errorf("postgres: insert container: %w", err)
+			return domain.Task{}, wrapActivePlanViolation(fmt.Errorf("postgres: insert container: %w", err))
 		}
 		task.TaskNumber = 0
 		return task, nil
@@ -215,7 +216,6 @@ func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task,
 	}
 	return task, nil
 }
-
 
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Task, error) {
 	row := r.db.QueryRow(ctx, `
@@ -269,7 +269,7 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 				due_date, estimated_hours, actual_hours, prompt_template, ai_context,
 				ai_plan_json, visibility, worktree_id, agent_session_id, progress_percent, active_execution_id, last_execution_output,
 				task_number, pr_url, workflow_template_id, active_execution_link_id,
-				labels, reporter_id, workflow_exec_id, done_subtasks, total_subtasks, share_token, 0 AS depth
+				labels, reporter_id, workflow_exec_id, done_subtasks, total_subtasks, share_token, request_id, 0 AS depth
 			FROM task.tasks
 			WHERE tenant_id = $1 AND id = $2
 
@@ -280,7 +280,7 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 				t.due_date, t.estimated_hours, t.actual_hours, t.prompt_template, t.ai_context,
 				t.ai_plan_json, t.visibility, t.worktree_id, t.agent_session_id, t.progress_percent, t.active_execution_id, t.last_execution_output,
 				t.task_number, t.pr_url, t.workflow_template_id, t.active_execution_link_id,
-				t.labels, t.reporter_id, t.workflow_exec_id, t.done_subtasks, t.total_subtasks, t.share_token, a.depth + 1
+				t.labels, t.reporter_id, t.workflow_exec_id, t.done_subtasks, t.total_subtasks, t.share_token, t.request_id, a.depth + 1
 			FROM task.tasks t
 			JOIN ancestors a ON t.id = a.parent_id
 			WHERE a.depth + 1 < $3
@@ -292,7 +292,8 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 			progress_percent, COALESCE(active_execution_id, ''), COALESCE(last_execution_output, ''),
 			COALESCE(task_number, 0), COALESCE(pr_url, ''), COALESCE(workflow_template_id::text, ''),
 			COALESCE(active_execution_link_id::text, ''),
-			labels, COALESCE(reporter_id::text, ''), workflow_exec_id, done_subtasks, total_subtasks, COALESCE(share_token, '')
+			labels, COALESCE(reporter_id::text, ''), workflow_exec_id, done_subtasks, total_subtasks, COALESCE(share_token, ''),
+			COALESCE(request_id::text, '')
 		FROM ancestors
 		ORDER BY depth
 	`, tenantID, id, maxDepth)
@@ -363,69 +364,32 @@ func (r *Repository) SetActiveExecutionLink(ctx context.Context, tenantID, taskI
 // ReportTaskExecutionResult, the complex path's) terminal write: sets
 // status, actual_hours, and clears agent_session_id in one statement — see
 // usecase.TaskRepository's doc comment.
-func (r *Repository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
-	tag, err := r.db.Exec(ctx, `
-		UPDATE task.tasks SET status = $3, actual_hours = $4, agent_session_id = NULL, updated_at = now()
-		WHERE tenant_id = $1 AND id = $2
-	`, tenantID, id, status, actualHours)
-	if err != nil {
-		return fmt.Errorf("postgres: complete task execution: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: task %s not found", id)
-	}
-	return nil
+func (r *Repository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64, events []domain.OutboxEvent) error {
+	return r.inOptionalTx(ctx, len(events) > 0, func(db dbtx) error {
+		tag, err := db.Exec(ctx, `
+			UPDATE task.tasks SET status = $3, actual_hours = $4, agent_session_id = NULL, updated_at = now()
+			WHERE tenant_id = $1 AND id = $2
+		`, tenantID, id, status, actualHours)
+		if err != nil {
+			return fmt.Errorf("postgres: complete task execution: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return fmt.Errorf("postgres: task %s not found", id)
+		}
+		return insertOutboxEvents(ctx, db, tenantID, events)
+	})
 }
 
 // HasActiveExecutions reports whether tenantID/projectID has any task
 // currently in_progress — see usecase.HasActiveExecutions's doc comment for
 // the one-way-transition caveat this answer is subject to today.
 func (r *Repository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
-	row := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM task.tasks WHERE tenant_id = $1 AND project_id = $2 AND status = 'in_progress')`, tenantID, projectID)
+	row := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM task.tasks WHERE tenant_id = $1 AND project_id = $2 AND status = 'in_progress' AND task_type NOT IN ('plan','phase'))`, tenantID, projectID)
 	var exists bool
 	if err := row.Scan(&exists); err != nil {
 		return false, fmt.Errorf("postgres: query has-active-executions: %w", err)
 	}
 	return exists, nil
-}
-
-// List returns tasks for tenantID, optionally filtered by projectID (empty
-// = no filter), ordered and cursor-paginated by id — same shape as
-// GetAncestors's plain SELECT (no recursive CTE needed here).
-func (r *Repository) List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error) {
-	if pageSize <= 0 {
-		pageSize = 50
-	}
-	rows, err := r.db.Query(ctx, `
-		SELECT `+taskColumns+`
-		FROM task.tasks
-		WHERE tenant_id = $1
-		  AND ($2 = '' OR project_id::text = $2)
-		  AND ($3 = '' OR id::text > $3)
-		ORDER BY id
-		LIMIT $4
-	`, tenantID, projectID, pageToken, pageSize)
-	if err != nil {
-		return nil, "", fmt.Errorf("postgres: query tasks: %w", err)
-	}
-	defer rows.Close()
-
-	var out []domain.Task
-	for rows.Next() {
-		t, err := scanTask(rows)
-		if err != nil {
-			return nil, "", fmt.Errorf("postgres: scan task row: %w", err)
-		}
-		out = append(out, t)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, "", fmt.Errorf("postgres: iterate task rows: %w", err)
-	}
-	nextToken := ""
-	if len(out) == int(pageSize) {
-		nextToken = out[len(out)-1].ID
-	}
-	return out, nextToken, nil
 }
 
 // Update persists a partial (title/status/description/task_type/priority/

@@ -1,15 +1,11 @@
 package domain
 
+// AccessInput is what request.rego decides on (the Rego input document).
 type AccessInput struct {
-	Method      string
-	Entry       Entry
-	ProjectRole string
-	GlobalRole  string
-	IsReporter  bool
-	ActorType   string
-}
-
-type AccessDecision struct {
-	Allowed bool
-	Reason  string
+	Action            Group
+	RPC               string
+	CallerGlobalRole  string
+	CallerProjectRole string
+	IsReporter        bool
+	ActorType         string
 }

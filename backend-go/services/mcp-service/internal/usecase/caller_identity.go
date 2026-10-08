@@ -29,6 +29,18 @@ func userCaller(ctx context.Context) (callerIdentity, error) {
 	return callerIdentity{TenantID: tenantID, UserID: userID, Role: role}, nil
 }
 
+// tenantCaller requires only the tenant: internal service callers
+// (request-service) may act without an end user. UserID is set when forwarded.
+func tenantCaller(ctx context.Context) (callerIdentity, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return callerIdentity{}, domain.ErrNoTenant(err)
+	}
+	userID, _ := tenant.UserID(ctx)
+	role, _ := tenant.Role(ctx)
+	return callerIdentity{TenantID: tenantID, UserID: userID, Role: role}, nil
+}
+
 // requireAdmin mirrors policy/orca-authz/mcp_oauth.rego: only role "admin"
 // passes. An absent or unknown role fails closed.
 func (c callerIdentity) requireAdmin() error {

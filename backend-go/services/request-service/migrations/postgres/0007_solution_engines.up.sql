@@ -31,14 +31,15 @@ CREATE INDEX idx_openspec_changes_sync ON request.openspec_changes (tenant_id, s
 
 ALTER TABLE request.project_engine_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE request.project_engine_settings FORCE ROW LEVEL SECURITY;
-CREATE POLICY tenant_isolation ON request.project_engine_settings USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+CREATE POLICY tenant_isolation ON request.project_engine_settings
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
 
 ALTER TABLE request.openspec_changes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE request.openspec_changes FORCE ROW LEVEL SECURITY;
-CREATE POLICY tenant_isolation ON request.openspec_changes USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+CREATE POLICY tenant_isolation ON request.openspec_changes
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
 
 ALTER TABLE request.requests ADD COLUMN solution_engine TEXT NULL CHECK (solution_engine IN ('native','openspec'));
 ALTER TABLE request.analysis_runs ADD COLUMN engine TEXT NOT NULL DEFAULT 'native';
--- Drop and recreate mode check constraint
-ALTER TABLE request.analysis_runs DROP CONSTRAINT IF EXISTS analysis_runs_mode_check;
-ALTER TABLE request.analysis_runs ADD CONSTRAINT analysis_runs_mode_check CHECK (mode IN ('complete','agent_readonly','agent_proposal'));

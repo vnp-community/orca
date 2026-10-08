@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_extras.go` (mới), `.../channels_request_extras_test.go` (mới), `.../excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-03; CONTRACT mục 9 Q1 đã chốt; RPC `ListRequestLinks` (CR-REQ-006), `GetRequestFlow` (CR-REQ-003), `ListRequestChecks` (CR-REQ-014)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -34,3 +34,7 @@
 ## Rủi ro và lưu ý
 
 - Đừng thêm `RecordRequestCheck` thành kênh WS ở task này (CR-REQ-014 Q1).
+
+## Ghi chú triển khai (2026-10-08)
+
+Đã chuyển CONTRACT mục 2.5 thành kênh thật.

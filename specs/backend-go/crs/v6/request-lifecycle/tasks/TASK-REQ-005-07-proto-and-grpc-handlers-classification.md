@@ -5,7 +5,7 @@
 **Service:** `proto`, `request-service`
 **File:** `proto/orca/request/v1/request.proto` (sửa), `proto/gen/go/orca/request/v1/*` (sinh lại), `internal/adapter/grpc/server.go`, `internal/adapter/grpc/request_mapper.go`, `internal/adapter/grpc/type_change_mapper.go`, `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-005-04, 005-05, 005-06
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run RPC (13+ kịch bản gRPC, máy trạng thái thật); go test ./internal/adapter/grpc; buf lint/breaking --path orca/request/v1/request.proto`)
 
 ---
 
@@ -43,3 +43,9 @@ CR-REQ-005 mục 2.1 định nghĩa message. Proto hiện có `Request` (trườ
 
 - Gateway (CR-REQ-016) chỉ chuyển được các RPC này khi có kênh WS tương ứng; ở đây chỉ làm phía service.
 - Frontend phải biết `expected_version` từ `Request.version`; ghi chú trong proto.
+
+## Ghi chú triển khai
+
+- Bốn handler ở `adapter/grpc/server_classification.go`: `ClassifyRequest` trả `run_id` ngay (quyết định D3, proto đã có `run_id`), `ConfirmRequestType`, `ChangeRequestType`, `ListRequestTypeHistory` (`actor_kind` `agent` hiển thị `ai`). Actor từ metadata (`REQUEST_REPORTER_REQUIRED` khi thiếu), không từ body.
+- Không có `type_change_mapper.go` riêng: `toProtoTypeChange` nằm cùng tệp handler.
+- Kịch bản gRPC: `ClassifyRequest_RunIDAndResult`, `_NotClassifiable`, `ConfirmChange_RoundTripAndHistory`, `ConfirmChange_ActorFromMetadata` (hai dialect).

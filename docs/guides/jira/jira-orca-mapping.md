@@ -52,6 +52,26 @@ Khi tạo/merge PR, `scm-integration-service` rút khoá Jira theo thứ tự: t
 - **Đồng bộ trạng thái đi theo worktree và người tạo.** Service gọi Jira bằng chính kết nối của người đã tạo worktree (sự kiện mang `actor_user_id`). Sự kiện không có người thực hiện thì bị bỏ qua có log.
 - **Xoá worktree không đổi issue.** Chỉ có `worktree.created → In Progress` (khi issue đang `To Do`), PR tạo → "In Review" và PR merge → "Done" (khi issue đang ở nhóm "đang làm").
 
+## 4b. Request sở hữu issue (cập nhật 2026-10-08)
+
+Khi issue Jira có một **Request chưa kết thúc** (nguồn `jira`, chưa `completed`/`cancelled`), `issue-status-sync` đồng bộ theo **Request** và **bỏ qua**
+đồng bộ theo worktree và PR cho issue đó (metric `orca_issuesync_skipped_request_owned_total{source}`, `result=skipped_request_owned`). Lý do: một Request
+có thể có nhiều Phase và nhiều PR, nên PR merge đầu tiên không được đẩy Jira sang "Done".
+
+| Sự kiện Request | Jira |
+|---|---|
+| vào `executing` (hoặc `analyzing` với `spike`/`question`) | "In Progress" |
+| `completed` | "Done" |
+| `request_backlog`, `cancelled` | không đổi |
+
+Chi tiết:
+- Việc tra "issue có Request không" gọi `LookupRequestBySource` của `request-service` (nội bộ, cần token chia sẻ). Lỗi tra cứu thì sự kiện được giao lại tối đa 3 lần rồi bỏ.
+  Chỉ trả "có" khi cờ luồng Request của tenant bật; cờ tắt thì đồng bộ theo worktree/PR chạy như cũ.
+- Cấu hình: `REQUEST_SERVICE_ADDR`, `REQUEST_SERVICE_INTERNAL_TOKEN` (khớp `SERVICE_INTERNAL_TOKEN` của `request-service`),
+  `ISSUE_SYNC_JIRA_STATUS_IN_PROGRESS`, `ISSUE_SYNC_JIRA_STATUS_DONE`, `ISSUE_SYNC_REQUEST_COMMENTS_ENABLED` (mặc định `false`), `ISSUE_SYNC_ORCA_BASE_URL`.
+- **Chưa kiểm chứng trên Jira thật.** Và `executing`/`completed` chưa đạt được bằng luồng thật cho tới khi các giai đoạn thực thi của Request xong
+  ([tài liệu Request](../request/README.md)).
+
 ## 5. Chưa kiểm chứng / điểm yếu đã biết
 
 - **Nhiều site Jira dùng chung tiền tố khoá.** Đồng bộ trạng thái truyền site của liên kết làm `workspace_id` nên chọn đúng kết nối; liên kết cũ không có site vẫn dùng cách chọn theo (tenant, user, provider).

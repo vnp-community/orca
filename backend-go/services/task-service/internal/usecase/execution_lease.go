@@ -111,7 +111,8 @@ func (uc *ExecuteTask) startHeartbeat(ctx context.Context, tenantID, linkID stri
 // only while the given link is still its active one (compare-and-set), so a
 // slow sweeper or a late failure report can never undo a newer dispatch.
 type TaskExecutionReleaser interface {
-	ReleaseExecution(ctx context.Context, tenantID, taskID, linkID string, to domain.Status) (released bool, err error)
+	// events are written to the outbox in the same transaction, only when the CAS matched.
+	ReleaseExecution(ctx context.Context, tenantID, taskID, linkID string, to domain.Status, events []domain.OutboxEvent) (released bool, err error)
 }
 
 // restoreStatus picks where a task goes after an abandoned/failed run: the
@@ -136,6 +137,57 @@ func restoreStatus(previous string) domain.Status {
 // caller and every task change is a compare-and-set on the active link.
 type RecoverInterruptedExecutions struct {
 	leases ExecutionLeaseRepository
+	// reconcile, when set, repairs plan/phase statuses after each sweep: the bulk
+	// releases above change leaf tasks without naming them.
+	reconcile *ReconcileContainerStatuses
+	// tasks, when set, lets a recovery release emit statuschanged for request-owned tasks.
+	tasks taskGetter
+	clock Clock
+}
+
+// taskGetter is the read the recovery sweep needs to know a task's request_id.
+type taskGetter interface {
+	Get(ctx context.Context, tenantID, id string) (domain.Task, error)
+}
+
+// WithRunEvents makes recovery releases of request-owned tasks emit a `recovery` event.
+func (uc *RecoverInterruptedExecutions) WithRunEvents(tasks taskGetter, clock Clock) *RecoverInterruptedExecutions {
+	uc.tasks = tasks
+	uc.clock = clock
+	return uc
+}
+
+func (uc *RecoverInterruptedExecutions) recoveryEvents(ctx context.Context, tenantID, taskID, linkID string, to domain.Status, reason string) []domain.OutboxEvent {
+	if uc.tasks == nil {
+		return nil
+	}
+	t, err := uc.tasks.Get(ctx, tenantID, taskID)
+	if err != nil {
+		slog.WarnContext(ctx, "task: recovery could not load task for its event", slog.String("task_id", taskID), slog.Any("error", err))
+		return nil
+	}
+	now := time.Now()
+	if uc.clock != nil {
+		now = uc.clock.Now()
+	}
+	return runEvents(t, domain.StatusInProgress, to, CauseRecovery, linkID, "", reason, now)
+}
+
+// WithContainerReconcile adds the plan/phase reconcile step to every sweep.
+func (uc *RecoverInterruptedExecutions) WithContainerReconcile(r *ReconcileContainerStatuses) *RecoverInterruptedExecutions {
+	uc.reconcile = r
+	return uc
+}
+
+// Sweep runs one recovery pass and then the container reconcile; a failing step never hides the other.
+func (uc *RecoverInterruptedExecutions) Sweep(ctx context.Context) error {
+	_, err := uc.Execute(ctx)
+	if uc.reconcile != nil {
+		if _, rerr := uc.reconcile.Execute(ctx); rerr != nil {
+			slog.ErrorContext(ctx, "task: container reconcile failed", slog.Any("error", rerr))
+		}
+	}
+	return err
 }
 
 func NewRecoverInterruptedExecutions(leases ExecutionLeaseRepository) *RecoverInterruptedExecutions {
@@ -198,7 +250,7 @@ func (uc *RecoverInterruptedExecutions) releaseClaimed(ctx context.Context, runs
 }
 
 func (uc *RecoverInterruptedExecutions) release(ctx context.Context, tenantID, taskID, linkID string, to domain.Status, reason string) bool {
-	released, err := uc.leases.ReleaseExecution(ctx, tenantID, taskID, linkID, to)
+	released, err := uc.leases.ReleaseExecution(ctx, tenantID, taskID, linkID, to, uc.recoveryEvents(ctx, tenantID, taskID, linkID, to, reason))
 	if err != nil {
 		slog.WarnContext(ctx, "task: recovery could not release task", slog.String("task_id", taskID), slog.Any("error", err))
 		return false
@@ -224,7 +276,7 @@ func (uc *RecoverInterruptedExecutions) RunRecoveryLoop(ctx context.Context, int
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if _, err := uc.Execute(ctx); err != nil {
+			if err := uc.Sweep(ctx); err != nil {
 				slog.ErrorContext(ctx, "task: recovery sweep failed", slog.Any("error", err))
 			}
 		}
@@ -237,7 +289,8 @@ func (uc *RecoverInterruptedExecutions) RunRecoveryLoop(ctx context.Context, int
 // in progress" check; with this exactly one wins.
 type TaskExecutionClaimer interface {
 	// ClaimForExecution returns false when the task's status is no longer from.
-	ClaimForExecution(ctx context.Context, tenantID, taskID string, from domain.Status) (claimed bool, err error)
+	// events are written to the outbox in the same transaction, only when the claim won.
+	ClaimForExecution(ctx context.Context, tenantID, taskID string, from domain.Status, events []domain.OutboxEvent) (claimed bool, err error)
 }
 
 // WithExecutionClaim makes Execute claim the task atomically. nil keeps the

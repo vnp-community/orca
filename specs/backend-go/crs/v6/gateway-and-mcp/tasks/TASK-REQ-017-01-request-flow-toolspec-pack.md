@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/pack_request_flow.go` (mới), `.../all_specs.go`, `.../excluded_channels.yaml`, `.../pack_request_flow_test.go` (mới)
 **Depends on:** BE-REQ-SOL-016 (các kênh đã đăng ký: TASK-REQ-016-03, 04, 05)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -46,3 +46,7 @@
 
 - Số tool tăng làm `tools/list` dài; đo kích thước golden, báo nếu vượt ngưỡng đã bàn ở CR-MCP-008.
 - Đừng đổi tên kênh để "gọn" tên tool; tên theo `ChannelToToolName` là hợp đồng.
+
+## Ghi chú triển khai (2026-10-08)
+
+Golden thêm đúng 20 mục (17 liệt kê + 3 Declared; tổng 260); định dạng JSON giữ nguyên, diff chỉ thêm dòng. Tool danh sách dùng `Post` đưa mảng vào `items`.

@@ -4,13 +4,13 @@
 **Hợp đồng chung:** [docs/crs/v6/README.md](../../../../../../docs/crs/v6/README.md) (mục 8 thắng mục 3)
 **TDD tham chiếu:** [`arch/03`](../../../../tdd/architecture/03-clean-architecture-guidelines.md), [`arch/05`](../../../../tdd/architecture/05-data-architecture.md), [`arch/06`](../../../../tdd/architecture/06-secrets-vault-architecture.md), [`arch/07`](../../../../tdd/architecture/07-security-architecture.md), [`arch/08`](../../../../tdd/architecture/08-inter-service-communication.md), [`arch/09`](../../../../tdd/architecture/09-observability-reliability.md), [`api-gateway`](../../../../tdd/services/api-gateway.md), [`auth-service`](../../../../tdd/services/auth-service.md)
 
-> 📋 Proposed. Chưa triển khai, chưa chạy test nào. P0: chặn rollout (CR-REQ-025). `request-service` chưa có trên đĩa; mọi file của nó là "(mới)".
+> 🚧 Đang triển khai: 1/9 task xong (035-01), 035-02 một phần; còn lại chưa làm. P0: chặn rollout (CR-REQ-025). `request-service` chưa có trên đĩa; mọi file của nó là "(mới)".
 
 ## Bảng CR, Solution, Task
 
 | CR | Solution | Service / Area | Effort | Task |
 |----|----------|----------------|--------|------|
-| [CR-REQ-035](../../../../../../docs/crs/v6/security-compliance/CR-REQ-035-security-and-compliance-baseline.md) | [BE-REQ-SOL-035](./BE-REQ-SOL-035-security-and-compliance-baseline.md) | `request-service`, `common` (`secretscan`, `grpcmw`, `tenant`, `auditclient`), `policy/orca-authz`, `api-gateway`, `ci` | Large | `TASK-REQ-035-01` đến `-09` |
+| [CR-REQ-035](../../../../../../docs/crs/v6/security-compliance/CR-REQ-035-security-and-compliance-baseline.md) | [BE-REQ-SOL-035](./BE-REQ-SOL-035-security-and-compliance-baseline.md) | `request-service`, `common` (`secretscan`, `grpcmw`, `tenant`, `auditclient`), `policy/orca-authz`, `api-gateway`, `ci` | Large | `TASK-REQ-035-01` đến `-09` (🚧 7/9 xong, 2 một phần) |
 
 ## Re-verify trước khi thiết kế (đối chiếu CR với mã thật, 2026-10-06)
 

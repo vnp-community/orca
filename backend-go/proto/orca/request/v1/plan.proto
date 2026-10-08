@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Plan, Phase, execution and per-type check messages (CR-REQ-012, 013, 014). RPCs live in RequestService.
+
+message TaskProposal {
+  string title = 1;
+  string description = 2;
+  string task_type = 3;
+  google.protobuf.DoubleValue estimated_hours = 4;
+  string prompt_template = 5;
+  repeated int32 depends_on_indices = 6;
+  repeated string labels = 7;
+  bool irreversible = 8;
+  // 9 onwards reserved for CR-REQ-029 (acceptance criteria, related files).
+}
+
+message PhaseProposal {
+  string title = 1;
+  string description = 2;
+  repeated TaskProposal tasks = 3;
+  repeated int32 depends_on_phase_indices = 4;
+}
+
+message PlanProposal {
+  string title = 1;
+  string summary = 2;
+  repeated PhaseProposal phases = 3;
+  // Tasks directly under the Plan when it has no Phase.
+  repeated TaskProposal tasks = 4;
+  string notes = 5;
+}
+
+// PROPOSE writes nothing in the domain tables; it runs in the background (IMPLEMENTATION-PLAN D3).
+message GeneratePlanRequest {
+  string request_id = 1;
+  string feedback = 2;
+}
+
+message GeneratePlanResponse {
+  // Empty while the run is still going; read it with GetPlanProposal.
+  PlanProposal proposal = 1;
+  string raw_ai_response = 2;
+  string run_id = 3;
+}
+
+// Reads the result of an asynchronous GeneratePlan run (CONTRACT section 9 Q2, option a).
+message GetPlanProposalRequest {
+  string request_id = 1;
+  string run_id = 2;
+}
+
+message GetPlanProposalResponse {
+  string run_id = 1;
+  // running | succeeded | failed
+  string status = 2;
+  string error_code = 3;
+  string error_message = 4;
+  PlanProposal proposal = 5;
+  string raw_ai_response = 6;
+}
+
+message CommitPlanRequest {
+  string request_id = 1;
+  PlanProposal proposal = 2;
+  string raw_ai_response = 3;
+}
+
+message CommitPlanResponse {
+  string plan_task_id = 1;
+  repeated string phase_task_ids = 2;
+  repeated string task_ids = 3;
+  bool already_exists = 4;
+}
+
+// Empty phase_task_id is valid only when the Plan has no Phase.
+message StartPhaseRequest {
+  string request_id = 1;
+  string phase_task_id = 2;
+}
+
+message StartPhaseResponse {
+  string phase_task_id = 1;
+  bool already_started = 2;
+  repeated string dispatched_task_ids = 3;
+}
+
+// Internal only: called by consumers or task-service, never by the gateway.
+message ReportTaskOutcomeRequest {
+  string event_id = 1;
+  string request_id = 2;
+  string task_id = 3;
+  string task_type = 4;
+  string previous_status = 5;
+  string new_status = 6;
+  string cause = 7;
+  string execution_link_id = 8;
+  string error_message = 9;
+  google.protobuf.Timestamp occurred_at = 10;
+}
+
+message ReportTaskOutcomeResponse {}
+
+message RequestCheck {
+  string id = 1;
+  string request_id = 2;
+  string kind = 3;
+  string status = 4;
+  string metrics_json = 5;
+  string summary = 6;
+  // manual | agent | orca_verified
+  string source = 7;
+  string task_id = 8;
+  string recorded_by = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message RecordRequestCheckRequest {
+  string request_id = 1;
+  string kind = 2;
+  string status = 3;
+  string metrics_json = 4;
+  string summary = 5;
+  string task_id = 6;
+}
+
+message RecordRequestCheckResponse {
+  RequestCheck check = 1;
+}
+
+message ListRequestChecksRequest {
+  string request_id = 1;
+  string kind = 2;
+}
+
+message ListRequestChecksResponse {
+  repeated RequestCheck checks = 1;
+}

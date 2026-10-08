@@ -19,6 +19,7 @@ func New(pool *pgxpool.Pool) *Repository {
 }
 
 var _ usecase.TxRunner = (*Repository)(nil)
+var _ usecase.TxScope = (*Repository)(nil)
 var _ usecase.OutboxWriter = (*Repository)(nil)
 var _ outbox.Store = (*Repository)(nil)
 

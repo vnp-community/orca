@@ -1,0 +1,53 @@
+# Prometheus alert rules for the Request flow (BE-REQ-SOL-024, CR-REQ-024 2.11).
+# Proposal only: thresholds are uncalibrated and nothing in this repository
+# loads this file (same as mcp.rules.yaml). orca_request_* series come from
+# request-service, orca_issuesync_* from issue-status-sync.
+groups:
+  - name: orca-request
+    rules:
+      - alert: RequestApprovalBacklog
+        expr: sum(orca_request_approvals_pending) > 50
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 50 approvals are waiting"
+          description: "Look at orca_request_approvals_pending by subject_type; approvers may be missing or notifications may not be arriving."
+      - alert: RequestStuck
+        expr: sum by (status) (orca_request_stuck{status=~"classifying|analyzing|planning"}) > 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "Requests are stuck in {{ $labels.status }}"
+          description: "A background AI run probably died without recovery; check request-service run leases."
+      - alert: RequestAIGenerationFailures
+        expr: |
+          sum(rate(orca_request_ai_generation_seconds_count{outcome="error"}[15m]))
+            / clamp_min(sum(rate(orca_request_ai_generation_seconds_count[15m])), 0.01) > 0.2
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 20% of AI generations fail"
+      - alert: RequestOutboxLag
+        expr: orca_request_outbox_pending > 100
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: "More than 100 request outbox events are unpublished"
+          description: "Jira sync, notifications and audit lag until the outbox relay recovers."
+      - alert: RequestReturnedSpike
+        expr: |
+          sum(rate(orca_request_returned_total[1h]))
+            > 3 * (sum(rate(orca_request_returned_total[1d])) + 0.0001)
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "Requests are returned to the backlog 3x above the daily average"
+      - alert: IssueSyncRequestFailures
+        expr: |
+          sum(rate(orca_issuesync_request_events_total{result="failed"}[15m]))
+            / clamp_min(sum(rate(orca_issuesync_request_events_total[15m])), 0.01) > 0.1
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 10% of request-driven Jira syncs fail"
+          description: "Check Jira credentials, workflow transition names (ISSUE_SYNC_JIRA_STATUS_*) and request-service lookup errors."

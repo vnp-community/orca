@@ -143,46 +143,70 @@ func (r *Repository) ListOrphanedRuns(ctx context.Context, grace time.Duration, 
 
 // ReleaseExecution moves an in_progress task to `to` only while the given link
 // is still its active one. RowsAffected is reliable: status always changes.
-func (r *Repository) ReleaseExecution(ctx context.Context, tenantID, taskID, linkID string, to domain.Status) (bool, error) {
-	res, err := r.db.ExecContext(ctx, `
-		UPDATE tasks SET status = ?, updated_at = NOW(6)
-		WHERE tenant_id = ? AND id = ? AND status = 'in_progress' AND active_execution_link_id = ?
-	`, string(to), tenantID, taskID, linkID)
+func (r *Repository) ReleaseExecution(ctx context.Context, tenantID, taskID, linkID string, to domain.Status, events []domain.OutboxEvent) (bool, error) {
+	released := false
+	err := r.inOptionalTx(ctx, len(events) > 0, func(db dbtx) error {
+		res, err := db.ExecContext(ctx, `
+			UPDATE tasks SET status = ?, updated_at = NOW(6)
+			WHERE tenant_id = ? AND id = ? AND status = 'in_progress' AND active_execution_link_id = ?
+		`, string(to), tenantID, taskID, linkID)
+		if err != nil {
+			return fmt.Errorf("mysql: release task execution: %w", err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("mysql: release task execution rows affected: %w", err)
+		}
+		released = n > 0
+		if !released {
+			return nil // stale link: no outbox row
+		}
+		return insertOutboxEvents(ctx, db, tenantID, events)
+	})
 	if err != nil {
-		return false, fmt.Errorf("mysql: release task execution: %w", err)
+		return false, err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("mysql: release task execution rows affected: %w", err)
-	}
-	return n > 0, nil
+	return released, nil
 }
 
 // ClaimForExecution is a compare-and-set on status. RowsAffected is reliable
 // here: the statement always changes status (from is never in_progress), so a
 // matched row is always a changed row.
-func (r *Repository) ClaimForExecution(ctx context.Context, tenantID, taskID string, from domain.Status) (bool, error) {
-	res, err := r.db.ExecContext(ctx, `
-		UPDATE tasks SET status = 'in_progress', updated_at = NOW(6)
-		WHERE tenant_id = ? AND id = ? AND status = ?
-	`, tenantID, taskID, string(from))
+func (r *Repository) ClaimForExecution(ctx context.Context, tenantID, taskID string, from domain.Status, events []domain.OutboxEvent) (bool, error) {
+	claimed := false
+	err := r.inOptionalTx(ctx, len(events) > 0, func(db dbtx) error {
+		res, err := db.ExecContext(ctx, `
+			UPDATE tasks SET status = 'in_progress', updated_at = NOW(6)
+			WHERE tenant_id = ? AND id = ? AND status = ?
+		`, tenantID, taskID, string(from))
+		if err != nil {
+			return fmt.Errorf("mysql: claim task for execution: %w", err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("mysql: claim task for execution rows affected: %w", err)
+		}
+		claimed = n > 0
+		if !claimed {
+			return nil // lost the race: no outbox row
+		}
+		return insertOutboxEvents(ctx, db, tenantID, events)
+	})
 	if err != nil {
-		return false, fmt.Errorf("mysql: claim task for execution: %w", err)
+		return false, err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("mysql: claim task for execution rows affected: %w", err)
-	}
-	return n > 0, nil
+	return claimed, nil
 }
 
-// ReleaseUnlinkedInProgress is a single guarded UPDATE ... LIMIT. A concurrent
+// ReleaseUnlinkedInProgress skips plan/phase: their in_progress is derived and never has a link.
+// It is a single guarded UPDATE ... LIMIT. A concurrent
 // sweeper blocks on the row lock, then re-evaluates the WHERE against the
 // committed row (status already open), so nothing is released twice.
 func (r *Repository) ReleaseUnlinkedInProgress(ctx context.Context, grace time.Duration, limit int) (int, error) {
 	res, err := r.db.ExecContext(ctx, `
 		UPDATE tasks SET status = 'open', updated_at = NOW(6)
 		WHERE status = 'in_progress' AND active_execution_link_id IS NULL
+		  AND task_type NOT IN ('plan','phase')
 		  AND updated_at < DATE_SUB(NOW(6), INTERVAL ? MICROSECOND)
 		ORDER BY updated_at
 		LIMIT ?

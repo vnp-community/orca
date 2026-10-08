@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/audit_action.go` (mới), `.../internal/usecase/audit_recorder.go` (mới), `.../internal/adapter/audit/auth_audit_recorder.go` (mới), các use case của CR-REQ-004 đến 010 (thêm lời gọi), `.../internal/usecase/audit_test.go` (mới)
 **Depends on:** TASK-REQ-024-01; CR-REQ-004, 005, 006, 007, 009, 010 đã có use case; BE-REQ-SOL-025 task cờ (cho `request.flow.set`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... -count=1` trong `services/request-service` (512 test PASS, 0 FAIL) và `services/issue-status-sync` (186 PASS); audit end-to-end qua binary thật trong `e2e` (`TestAuditTrailOfARealFlow`))
 
 ---
 
@@ -38,3 +38,7 @@
 
 - Gọi đồng bộ có thể thêm độ trễ; dùng timeout ngắn (2 giây) cho `Record`.
 - Audit sau commit có thể mất khi tiến trình chết giữa chừng (best effort, như phần còn lại của repo).
+
+## Kết quả triển khai (2026-10-08)
+
+Audit suy từ sự kiện outbox đã commit (`usecase.AuditTap` + `TappedOutbox` + `CommitHooks`) thay vì gọi trong từng use case, để không sửa use case của agent khác và không ghi audit cho giao dịch bị rollback (test hợp đồng hai dialect `AuditAndMetricsFireOnlyAfterCommit`). `AuditRPC` (adapter/grpc) ghi `denied` cho Approve/Reject/Cancel bị từ chối và `solution.choose`. File thực tế: `domain/audit_action.go`, `usecase/ports_rollout.go`, `usecase/audit_event_tap.go`, `usecase/commit_hooks.go`, `usecase/outbox_tap.go`, `adapter/audit/auth_audit_recorder.go`, `adapter/grpc/audit_interceptor.go`; test `usecase/audit_test.go`, `adapter/audit/*_test.go`, `adapter/grpc/audit_interceptor_test.go`. Chưa kiểm chứng: `solution.choose` end-to-end (RPC `ChooseSolutionOption` còn `Unimplemented` trong nhánh này, chỉ test bằng handler giả); khi `AUTH_SERVICE_ADDR` rỗng thì không audit (có cảnh báo).

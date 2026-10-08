@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
+// CapabilityProfileStore persists dev_server_capability_profiles. MySQL has
+// no RLS, so the tenant_id filter in every statement is the only guard.
 type CapabilityProfileStore struct {
 	db *sql.DB
 }
@@ -18,84 +21,81 @@ func NewCapabilityProfileStore(db *sql.DB) *CapabilityProfileStore {
 	return &CapabilityProfileStore{db: db}
 }
 
-func (r *CapabilityProfileStore) Get(ctx context.Context, tenantID, devServerID string) (domain.CapabilityProfile, bool, error) {
-	query := `
+func (s *CapabilityProfileStore) Get(ctx context.Context, tenantID, devServerID string) (domain.CapabilityProfile, bool, error) {
+	var (
+		p                          domain.CapabilityProfile
+		featuresJSON, profileBytes []byte
+		source                     string
+	)
+	err := s.db.QueryRowContext(ctx, `
 		SELECT source, agent_build_version, protocol_version, features, profile, fingerprint, probed_at
 		FROM dev_server_capability_profiles
-		WHERE dev_server_id = ? AND tenant_id = ?
-	`
-	var p domain.CapabilityProfile
-	p.DevServerID = devServerID
-	p.TenantID = tenantID
-
-	var featuresJSON, profileJSON []byte
-	err := r.db.QueryRowContext(ctx, query, devServerID, tenantID).Scan(
-		&p.Source,
-		&p.AgentBuildVersion,
-		&p.ProtocolVersion,
-		&featuresJSON,
-		&profileJSON,
-		&p.Fingerprint,
-		&p.ProbedAt,
-	)
+		WHERE tenant_id = ? AND dev_server_id = ?
+	`, tenantID, devServerID).Scan(&source, &p.AgentBuildVersion, &p.ProtocolVersion, &featuresJSON, &profileBytes, &p.Fingerprint, &p.ProbedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.CapabilityProfile{}, false, nil
 	}
 	if err != nil {
 		return domain.CapabilityProfile{}, false, fmt.Errorf("mysql: get capability profile: %w", err)
 	}
-
+	p.DevServerID = devServerID
+	p.TenantID = tenantID
+	p.Source = domain.ProfileSource(source)
+	p.ProbedAt = p.ProbedAt.UTC()
+	p.ProfileJSON = profileBytes
 	if err := json.Unmarshal(featuresJSON, &p.Features); err != nil {
-		return domain.CapabilityProfile{}, false, fmt.Errorf("mysql: decode features: %w", err)
+		return domain.CapabilityProfile{}, false, fmt.Errorf("mysql: decode capability features: %w", err)
 	}
-	p.ProfileJSON = profileJSON
-
 	return p, true, nil
 }
 
-func (r *CapabilityProfileStore) Upsert(ctx context.Context, p domain.CapabilityProfile) (string, bool, error) {
-	if len(p.ProfileJSON) > 65535 {
+// Upsert locks the owning dev_servers row first so two concurrent probes are
+// serialized and exactly one sees existed=true; a tenant mismatch or missing
+// dev server returns domain.ErrNotFound.
+func (s *CapabilityProfileStore) Upsert(ctx context.Context, p domain.CapabilityProfile) (string, bool, error) {
+	if len(p.ProfileJSON) > domain.MaxProfileJSONBytes {
 		return "", false, domain.ErrProfileTooLarge
 	}
-
-	featuresJSON, err := json.Marshal(p.Features)
+	featuresJSON, err := json.Marshal(domain.NormalizeFeatures(p.Features))
 	if err != nil {
-		return "", false, fmt.Errorf("encode features: %w", err)
+		return "", false, fmt.Errorf("mysql: encode capability features: %w", err)
 	}
 	profileJSON := p.ProfileJSON
 	if len(profileJSON) == 0 {
 		profileJSON = []byte("{}")
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return "", false, fmt.Errorf("begin tx: %w", err)
+		return "", false, fmt.Errorf("mysql: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
-	var prevFingerprint string
-	err = tx.QueryRowContext(ctx, `
-		SELECT fingerprint FROM dev_server_capability_profiles
-		WHERE dev_server_id = ? AND tenant_id = ?
-		FOR UPDATE
-	`, p.DevServerID, p.TenantID).Scan(&prevFingerprint)
-
-	var existed bool
-	if errors.Is(err, sql.ErrNoRows) {
-		// Does not exist yet.
+	var one int
+	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM dev_servers WHERE id = ? AND tenant_id = ? FOR UPDATE`,
+		p.DevServerID, p.TenantID).Scan(&one); errors.Is(err, sql.ErrNoRows) {
+		return "", false, domain.ErrNotFound
 	} else if err != nil {
-		return "", false, fmt.Errorf("select for update: %w", err)
-	} else {
+		return "", false, fmt.Errorf("mysql: lock dev server: %w", err)
+	}
+
+	var prev string
+	var existed bool
+	switch err := tx.QueryRowContext(ctx, `
+		SELECT fingerprint FROM dev_server_capability_profiles WHERE tenant_id = ? AND dev_server_id = ?
+	`, p.TenantID, p.DevServerID).Scan(&prev); {
+	case errors.Is(err, sql.ErrNoRows):
+	case err != nil:
+		return "", false, fmt.Errorf("mysql: read previous fingerprint: %w", err)
+	default:
 		existed = true
 	}
 
-	res, err := tx.ExecContext(ctx, `
-		INSERT INTO dev_server_capability_profiles (
-			dev_server_id, tenant_id, source, agent_build_version, protocol_version, features, profile, fingerprint, probed_at
-		)
-		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
-		FROM dev_servers
-		WHERE id = ? AND tenant_id = ?
+	// JSON columns reject []byte args (binary charset); pass strings.
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO dev_server_capability_profiles
+			(dev_server_id, tenant_id, source, agent_build_version, protocol_version, features, profile, fingerprint, probed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
 			source = VALUES(source),
 			agent_build_version = VALUES(agent_build_version),
@@ -105,21 +105,25 @@ func (r *CapabilityProfileStore) Upsert(ctx context.Context, p domain.Capability
 			fingerprint = VALUES(fingerprint),
 			probed_at = VALUES(probed_at),
 			updated_at = CURRENT_TIMESTAMP(6)
-	`, p.DevServerID, p.TenantID, p.Source, p.AgentBuildVersion, p.ProtocolVersion, featuresJSON, profileJSON, p.Fingerprint, p.ProbedAt,
-		p.DevServerID, p.TenantID)
-
-	if err != nil {
+	`, p.DevServerID, p.TenantID, string(p.Source), p.AgentBuildVersion, p.ProtocolVersion,
+		string(featuresJSON), string(profileJSON), p.Fingerprint, p.ProbedAt.UTC().Truncate(time.Microsecond)); err != nil {
 		return "", false, fmt.Errorf("mysql: upsert capability profile: %w", err)
 	}
-
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 && !existed {
-		return "", false, domain.ErrNotFound
-	}
-
 	if err := tx.Commit(); err != nil {
-		return "", false, fmt.Errorf("commit tx: %w", err)
+		return "", false, fmt.Errorf("mysql: commit: %w", err)
 	}
+	return prev, existed, nil
+}
 
-	return prevFingerprint, existed, nil
+// TenantIDForDevServer implements usecase.DevServerTenantLookup.
+func (s *CapabilityProfileStore) TenantIDForDevServer(ctx context.Context, devServerID string) (string, bool, error) {
+	var tenantID string
+	err := s.db.QueryRowContext(ctx, `SELECT tenant_id FROM dev_servers WHERE id = ?`, devServerID).Scan(&tenantID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("mysql: lookup dev server tenant: %w", err)
+	}
+	return tenantID, true, nil
 }

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `schemas/v1/{request,solution,diagnosis,findings,answer,plan,phase,task}.schema.json`, `schemas/embed.go`, `internal/domain/artifact_kind.go`, `internal/domain/artifact_schema.go`, `internal/domain/canonical_json_digest.go`, `internal/domain/provenance.go`, `testdata/artifacts/{valid,invalid}/*.json` và test (mới)
 **Depends on:** TASK-REQ-001-01 (module `go.mod`), TASK-REQ-002-02 (domain khung)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain -run 'Schema|Canonical|Provenance|Upgrade|Validate'` và fuzz `FuzzCanonicalJSON` 15s)
 
 ---
 
@@ -78,3 +78,15 @@ Schema của tám `kind` theo CR 2.5: Request (`acceptance_criteria[]`, `type_fi
 - Đo chi phí `Validate` ở kích thước Plan 256 KB chưa làm (chưa kiểm chứng); thêm benchmark `BenchmarkValidatePlan` để người sau có số.
 - Giới hạn kích thước là số đề xuất, không phải số đã đo.
 - `golang.org/x/text` phải thành phụ thuộc trực tiếp của module `request-service`; không dùng `replace`.
+
+## Ghi chú triển khai (rf/art)
+
+**Kết quả spike (bước 1).** Thử `github.com/google/jsonschema-go v0.4.3` với 8 schema thật: hỗ trợ đúng `$defs`, `$ref` nội bộ, `if/then`, `const`, `enum`, `pattern`, `uniqueItems`, `unevaluatedProperties`; **nhưng** (1) chỉ trả **lỗi đầu tiên** (`Validate` dừng ở lỗi đầu), (2) lỗi mô tả đường dẫn **schema** (`/properties/acs/items/...`), không phải JSON Pointer của dữ liệu, (3) không kiểm `format` (`"nope"` qua `date-time`). Trái yêu cầu "không dừng ở lỗi đầu, `Path` là JSON Pointer". Thử `github.com/santhosh-tekuri/jsonschema/v6 v6.0.2` (MIT, Go thuần, có trong module cache, không phải họ `xeipuuv`): trả đủ lỗi với `InstanceLocation`, kiểm `format`, `unevaluatedProperties` đúng. **Chọn santhosh-tekuri v6**; `SchemaRegistry` là cổng mỏng nên đổi thư viện chỉ sửa một file.
+
+- `ValidateArtifact` của task là `SchemaRegistry.Validate(kind, version, raw)` và `ValidateDocument(kind, raw)` (tự đọc `schema_version`); `Violation` dùng chung struct sẵn có ở `plan_proposal.go`, thêm trường `Path` (cộng thêm, không đổi nơi gọi).
+- Kiểm trùng id trong mảng đối tượng (`opt-N`, `AC-n`, `Q-n`, `A-n`, `c-n`) làm sau schema vì JSON Schema không diễn đạt được.
+- `CanonicalJSON` sao đúng thuật toán của task-service (nhánh `rf/task-b`); mẫu vàng `testdata/artifacts/task/canonical_cases.json` **giống từng byte** với bản của task-service (đã so bằng `git show rf/task-b:...`; `scripts/check-artifact-samples.sh` so hai thư mục sau khi hợp nhất). `DigestOptions` (SOL-007) giờ gọi `CanonicalJSON`, nên từ chối khoá trùng và chuẩn hoá NFC (hành vi chặt hơn bản cũ).
+- `ComputeInputDigest` của task trùng tên hàm có sẵn (`context_pack.go`) nên đặt là `ComputeProvenanceInputDigest`. `Provenance.Actor.Kind` dùng bộ từ vựng `ai|user|system` (`RevisionActorKind`) như schema.
+- Không truy cập mạng: `TestSchemaRegistry_NoNetworkNeededToCompile` thay `http.DefaultTransport` bằng bộ chặn và biên dịch 8 schema (không dùng cờ `GOFLAGS=-mod=readonly`).
+- Benchmark `BenchmarkValidatePlan` chạy được (mẫu plan nhỏ: ~16 µs/lần); chi phí ở Plan 256 KB **chưa đo**.
+- Test tên khác task: `TestCanonicalJSON_GoldenAgainstSOL007DigestOptions` thành `TestCanonicalJSON_Golden` + `TestDigestOptions_UsesCanonicalCore`.

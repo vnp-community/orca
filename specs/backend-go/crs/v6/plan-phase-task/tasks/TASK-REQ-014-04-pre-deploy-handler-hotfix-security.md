@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/type_policy_pre_deploy_handler.go` (mới), `internal/domain/type_policy_hotfix.go` (mới), `internal/domain/type_policy_security.go` (mới), `internal/usecase/commit_plan.go` (nhánh mở `pre_deploy`), `cmd/server/main.go`, `*_test.go` (mới)
 **Depends on:** TASK-REQ-014-03, TASK-REQ-012-06 (single_task), CR-REQ-009 (`SubjectHandler`, `OpenApproval`), CR-REQ-010 (người duyệt bắt buộc là người cho hotfix)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -39,13 +39,19 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `hotfix`: Approval `pre_deploy` trên task fix duy nhất kích hoạt `executing`; người không có quyền duyệt không duyệt được; từ chối đi backlog.
-- [x] `security`: Plan được `pre_deploy` duyệt mới chạy; thiếu `security_recheck` `passed` thì Request không `completed`.
-- [x] Service từ chối khởi động nếu thiếu handler `pre_deploy`.
-- [x] Không `switch` theo loại Request trong `CommitPlan`.
+- [ ] `hotfix`: Approval `pre_deploy` trên task fix duy nhất kích hoạt `executing`; người không có quyền duyệt không duyệt được; từ chối đi backlog.
+- [ ] `security`: Plan được `pre_deploy` duyệt mới chạy; thiếu `security_recheck` `passed` thì Request không `completed`.
+- [ ] Service từ chối khởi động nếu thiếu handler `pre_deploy`.
+- [ ] Không `switch` theo loại Request trong `CommitPlan`.
 
 ## Rủi ro và lưu ý
 
 - Q2 của CR: tên "pre_deploy" gợi ý sau khi sửa xong, nhưng cổng nằm trước khi chạy task fix (theo CR-REQ-003). Xác nhận ý nghĩa với chủ CR trước khi làm UI.
 - `pre_deploy` là cổng duyệt; agent vẫn có thể chạy lệnh deploy trong task không nhãn.
 - Plan của `security` không có Approval `plan` (CR-012 Q3): nội dung Plan chỉ được duyệt gián tiếp qua `pre_deploy`.
+
+## Tiến độ
+
+Đã làm: `PreDeployArtifacts` (hotfix/security/ops_request) gắn vào `TransitionSubjectHandler` qua `approvalSubjectArtifacts` (service từ chối khởi động nếu thiếu handler `pre_deploy`), `hotfixPolicy`, `securityPolicy` (có test, gồm OnApproved/OnRejected). Còn thiếu: nhánh mở `pre_deploy` thay `plan` trong `CommitPlan` (CR-REQ-012 chưa có).
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

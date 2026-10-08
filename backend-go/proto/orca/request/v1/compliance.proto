@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Retention, erase and export messages (CR-REQ-035). RPCs live in RequestService, group admin.
+
+message ExternalErasureResult {
+  string system = 1;
+  // erased | unsupported | failed
+  string status = 2;
+}
+
+// Refused while the Request is executing; reason is required (max 500 characters).
+message EraseRequestRequest {
+  string request_id = 1;
+  string reason = 2;
+}
+
+message EraseRequestResponse {
+  google.protobuf.Timestamp erased_at = 1;
+  repeated ExternalErasureResult external_erasure = 2;
+  // Lists copies outside this system (Jira, git, LLM provider, DB backups).
+  string not_covered_note = 3;
+}
+
+message ExportRequestRequest {
+  string request_id = 1;
+}
+
+// Redacted JSON bundle, at most 5 MiB (REQUEST_EXPORT_TOO_LARGE otherwise).
+message ExportRequestResponse {
+  string bundle_json = 1;
+  int64 bytes = 2;
+}
+
+message ExportTenantRequestsRequest {
+  // Optional filter; empty exports every Request of the tenant.
+  string project_id = 1;
+}
+
+// One NDJSON line per chunk, at most 64 KB.
+message ExportTenantRequestsResponse {
+  string ndjson_line = 1;
+  int64 index = 2;
+}

@@ -5,7 +5,7 @@
 **Service/Area:** `infra-fleet-service` / usecase port, adapter `devserveragent`, `agentwsserver`, `sshrelay`
 **File:** `internal/usecase/ports.go` (sửa), `internal/adapter/devserveragent/session.go` (sửa), `internal/adapter/devserveragent/client.go` (sửa), `internal/adapter/agentwsserver/server.go` (sửa), `internal/adapter/sshrelay/provisioner.go` (sửa), và các `_test.go` cạnh chúng
 **Depends on:** không (độc lập với 01; làm song song được)
-**Status:** [x] DONE
+**Status:** [x] DONE (kiểm toán 2026-10-07: đủ code và test đơn vị; đối chiếu tên trường với agent và chạy lại 2026-10-07: `go test ./internal/adapter/devserveragent/ ./internal/adapter/agentwsserver/ ./internal/adapter/sshrelay/` PASS)
 
 ---
 
@@ -68,3 +68,7 @@
 - Sót một đường dựng `HandshakeInfo` thì hồ sơ của dev server kết nối bằng đường đó luôn `handshake_only` mà không báo lỗi. Cách bắt: test bảng "đường kết nối x trường" ở trên, và `grep -rn "HandshakeInfo{" internal` trong review.
 - `usecase.HandshakeInfo` được `UpdateProvisionResult` (repository, `postgres/repository.go:688`, `mysql/repository.go:713`) nhận vào: thêm trường không đổi chữ ký, nhưng nếu có fake dùng struct literal vị trí (không có tên trường) thì biên dịch lỗi; sửa fake.
 - Agent giả mạo `features` để làm backend tin có chế độ chỉ đọc: `features` chỉ là gợi ý để chọn đường; không dùng làm bằng chứng an toàn (xem SOL-033 mục 6).
+
+## Ghi chú đối chiếu (2026-10-07)
+
+Đã khớp từng trường với `agent/src/relay/agent-session-handshake.ts` và `agent-protocol-features.ts`: `protocolVersion`, `buildVersion`, `features` (8 tên, mọi tên qua `SanitizeAgentFeatures`), cộng `agentVersion/platform/arch/nodeVersion/capabilities/tools`. `LastHandshakeInfo` không rơi trường nào (test `TestLastHandshakeInfo_CarriesFeaturesAndProtocol`). Thêm test `TestHandshakeInfo_DecodesAgentHandshakeShape` khoá hình dạng JSON của agent. Không có lỗi phía agent cần sửa.

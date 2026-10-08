@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/0003_request_source_hints.up.sql`, `.down.sql`; `migrations/mysql/0003_request_source_hints.up.sql`, `.down.sql` (mới); `internal/domain/request.go`, `internal/domain/request_source_hints.go` (mới); `internal/adapter/postgres/{request_repository.go,request_scan.go}`, `internal/adapter/mysql/{request_repository.go,request_scan.go}` (sửa)
 **Depends on:** TASK-REQ-002-04, TASK-REQ-002-05
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run "Intake|Classification|Migration|Schema"`)
 
 ---
 
@@ -39,3 +39,10 @@ CR-REQ-004 mục 2.4 thêm cột `requests.source_hints` (JSONB/JSON, NULL đư�
 
 - Cột này chưa có trong README v6 mục 3.5 (Q1 của SOL-004); báo người duyệt cập nhật README.
 - Nếu SOL-005 thêm migration `classification_attempts` trước khi PR này merge, số `0003` có thể bị chiếm; đổi tên theo `ls`.
+
+## Ghi chú triển khai
+
+- Số migration thật là `0025_request_source_hints` (dải `0025`..`0029` của đợt 2), không phải `0003`.
+- `Request.SourceHints` và cột `source_hints` đã thêm vào `requestColumns`, scan, `requestArgs`, INSERT/UPDATE của hai repository. Điểm chạm này cùng tệp với agent lifecycle-a (cột `stage`...): khi hợp nhất phải gộp tay danh sách cột và tham số vị trí.
+- `ExpectedColumns()` thêm `source_hints` (nullable).
+- Đã kiểm chứng: up/down/up Postgres 16 và MySQL 8.0 thật, `TestSchemaContract`, round trip `SourceHints` (kể cả tiếng Việt trong `labels`, zero ghi NULL) trong `createGetRoundTrip` cả hai dialect.

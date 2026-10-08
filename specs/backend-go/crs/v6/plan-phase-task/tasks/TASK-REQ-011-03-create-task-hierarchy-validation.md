@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/create_task.go`, `internal/adapter/grpc/server.go` (dòng 134 đến 147), `internal/adapter/grpc/server_create_task.go` (mới), `internal/usecase/ai_apply.go`, `proto/orca/task/v1/task.proto`
 **Depends on:** TASK-REQ-011-02
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test ./internal/usecase/... ./internal/adapter/grpc/...`)
 
 ---
 
@@ -47,3 +47,10 @@ Thêm vào `usecase/create_task_test.go` (fake ở `fakes_test.go`): `TestCreate
 - Client cũ đang gửi trường sai sẽ bắt đầu bị từ chối hoặc được lưu: thông báo trong PR, kiểm gateway `task.create` (CR-REQ-016) và frontend.
 - `NewCreateTask(repo, nil)` ở `AIApply` truyền `grants=nil`: không đổi.
 - `request_id` do client gRPC tự khai: `request-service` là nơi duy nhất gọi với giá trị này; quyền ghi gateway thuộc CR-REQ-016.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `CreateTask` gọi `domain.ParseTaskType`, `ValidatePriority`, `ValidateVisibility`, rồi `validateTaskHierarchy` (kiểm "container dưới task làm việc" trước, nên phase dưới task báo `TASK_CONTAINER_UNDER_WORK_TASK`). `TASK_PLAN_CANNOT_HAVE_PARENT`, `TASK_PHASE_REQUIRES_PLAN_PARENT`, `TASK_CONTAINER_UNDER_WORK_TASK` là FailedPrecondition; `TASK_PLAN_PROJECT_REQUIRED`, `TASK_INVALID_TYPE`, `TASK_INVALID` là InvalidArgument.
+- `server_create_task.go` (`toCreateTaskInput`) chuyển đủ trường; `AIApply` chuẩn hoá type qua `normalizeProposalType` (epic/plan/phase thành `task`).
+- Gateway hiện chỉ gửi `title/parent_id/project_id/creator_id` (task_routes.go, channels.go, channels_task_source.go): không bị ảnh hưởng. `CreateTaskFromSource` vẫn dùng tập trường cũ.
+- Test: `create_task_hierarchy_test.go`, `TestAIApply_PlanTypeProposalBecomesTask`, `TestServer_CreateTask_ForwardsAllFields`.

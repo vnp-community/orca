@@ -5,7 +5,7 @@
 **Service:** `request-service` · `notification-service`
 **File:** `request-service/internal/adapter/eventbus/clarification_resume_consumer.go`, `request-service/internal/usecase/resume_after_clarification.go`, `request-service/internal/usecase/expire_clarifications.go`, `request-service/internal/usecase/remind_clarifications.go`, `request-service/internal/usecase/clarification_recipients.go`, `request-service/cmd/server/main.go` (sửa), `notification-service/internal/adapter/eventbus/consumer.go` (sửa), `notification-service/internal/domain/notification_event.go` (sửa) và test
 **Depends on:** TASK-REQ-028-03, 028-05, TASK-REQ-007-05 (`GenerateSolution` với `feedback`), TASK-REQ-013-04 (`AdvanceExecution`), TASK-REQ-010-04, 010-05, 010-06 (mở rộng người nhận, hàng thông báo approval, vòng nhắc), TASK-REQ-006-xx (`ReturnToBacklog`)
-**Status:** [x] DONE
+**Status:** [ ] TODO (một phần: notification-service xong 2026-10-07; request-service: consumer resume tự sinh Solution thật, hết hạn, nhắc, người nhận team/admin thật, payload, wiring kiểm chứng 2026-10-08; còn `AdvanceExecution` (executor chưa có) và metric)
 
 ---
 
@@ -72,11 +72,11 @@ CR-REQ-028 mục 2.4 bước 5, 2.7. Ba phần việc nền:
 
 ## Tiêu chí hoàn thành
 
-- [x] `information_provided` về `analyzing` tạo đúng một run sinh Solution dù sự kiện giao lặp.
+- [x] `information_provided` về `analyzing` tạo đúng một run sinh Solution dù sự kiện giao lặp. (`TestResume_RedeliveryNoSecondRun`, `TestResume_DeferredStarterSpawnsOnlyAfterCommit`, `TestGenerateSolution_SystemStartNeedsNoCallerAndDefersTheSpawn`; khoá `clr-<id>` dùng chỉ mục idempotency của `analysis_runs`; chưa chạy với NATS + dev server thật)
 - [x] Quá hạn: Clarification `expired`, Request `request_backlog` (`missing_info`, stage đúng); `ReturnToBacklog` lỗi thì Clarification vẫn `open`.
 - [x] Hai instance quét không xử lý trùng.
-- [x] Thông báo tới đúng người nhận, không chứa nội dung câu hỏi; hai binding và hai luật có test.
-- [x] Hồi quy: binding và luật approval của TASK-REQ-010-05 không đổi.
+- [x] Thông báo tới đúng người nhận, không chứa nội dung câu hỏi; hai binding và hai luật có test. (người nhận team/admin dùng `TeamMembershipResolver`/`AdminDirectoryResolver` của approval, thiếu địa chỉ dịch vụ thì bỏ qua người nhận đó chứ không bỏ Clarification; chưa chạy với tenant-service/auth-service thật)
+- [x] Hồi quy: binding và luật approval của TASK-REQ-010-05 không đổi. (notification-service không bị sửa ở nhánh này; test approval của nó chạy xanh trong lần kiểm cuối)
 
 ## Rủi ro và lưu ý
 
@@ -84,3 +84,28 @@ CR-REQ-028 mục 2.4 bước 5, 2.7. Ba phần việc nền:
 - Người báo cáo từ Jira có thể không có tài khoản Orca: `user_ids` rỗng, Clarification hết hạn không ai thấy; ngoài phạm vi (Q4), nên ghi cảnh báo log.
 - `GenerateSolution` tự chạy tốn một lượt gọi model mỗi lần trả lời; người dùng không kiểm soát. Cờ `REQUEST_CLARIFICATION_AUTO_REGENERATE` (mặc định `true`) cho phép tắt.
 - Nếu `common/eventbus` không cho hai handler trên cùng subject, cần durable riêng; kiểm lúc làm.
+
+## Tiến độ
+
+Một phần (đã kiểm chứng 2026-10-07: `cd backend-go/services/notification-service && go test ./... ; go test -tags integration ./internal/adapter/eventbus/...`):
+- [x] `notification-service`: hai binding `REQUEST` (`orca.request.clarification.requested`, `.expired`, cả hai `Durable` đúng tên task), hai rule, golden payload (kể cả nhắc `reason=reminder`), test `TestSubjects_RequestBindings` (stream, Durable, không trùng), `TestTranslateEvent_RequestSubjects`, hồi quy approval/core, integration NATS cho cả hai subject.
+- [ ] `request-service` (mục 1 đến 5, 7, 8: consumer resume, expire, remind, recipients, wiring, metric): một phần: xem mục "Tiến độ request-service (rf/art)" bên dưới (đã làm ngày 2026-10-08).
+- Lệch so với task: `Type` dùng dạng chấm `request.clarification_requested`/`_expired` (theo CR-REQ-028 và cùng kiểu approval) thay vì `request_clarification_requested`; kênh `expired` chỉ ws, `requested` ws + push (đúng task). Tên test `TestSubjects_HasClarificationBindings` đổi thành `TestSubjects_RequestBindings` (gộp approval + clarification), `TestApprovalBindingsUnchanged` nằm trong đó.
+
+## Tiến độ request-service (rf/art, 2026-10-08)
+
+Đã làm và kiểm chứng (`go test ./internal/usecase -run 'Expire|Remind|Resume|Notices|PrincipalRecipients'`, `go test -tags integration ./internal/adapter/eventbus -run ClarificationResume` với NATS thật, `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql -run ClarificationContract`, `go test -tags integration ./cmd/server -run ArtifactAndClarificationFlow`):
+- `ResumeAfterClarification` + consumer bền `request-service-clarification-resume` (subject `status_changed`, `trigger=information_provided`; không tranh durable với consumer phân loại; khử trùng `processed_events` cùng giao dịch với việc khởi chạy nên lỗi thì được giao lại; `ErrResumeSkipped` không lặp vô hạn; `planning` không tự chạy; `REQUEST_CLARIFICATION_AUTO_REGENERATE` tắt được).
+- `ClarificationSweeper`: `ExpireOnce` (cùng một giao dịch: khoá `SKIP LOCKED` → `expired` → `ReturnRequestToBacklog(stage theo resume_status, missing_info, "clarification_expired", system)` → sự kiện `expired`; lỗi thì Clarification vẫn `open`), `RemindOnce` (một lần ở nửa thời hạn, cùng subject `requested` với `reminder=true`), `RunLoop` 60 giây; stage theo bảng (readiness → classification, analyzing → analysis, planning → plan, executing → task).
+- Payload `clarification.requested|expired|reminder` khớp golden của notification-service (`testdata/notification/*.json`, sao chép; test so từng khoá); không có nội dung câu hỏi/trả lời.
+- Nối thật ở `cmd/server/wire_artifact.go` (goroutine sweeper và consumer, cờ `REQUEST_CLARIFICATION_WORKERS_ENABLED` và `REQUEST_FLOW_ENABLED`).
+
+Còn thiếu: (1) kích hoạt thật: `GenerateSolution`/`AdvanceExecution` chưa tồn tại, `AnalysisStarter`/`ExecutionAdvancer` mặc định ghi log và bỏ qua (cổng sẵn để nhánh Solution/execution nối); (2) mở rộng người nhận `team:` và `role:admin` (`PrincipalRecipients` có chỗ gắn `TeamMembershipResolver`/`AdminDirectoryResolver` nhưng chưa có triển khai thật; dùng lại `RecipientExpander` của 010-04 khi có); (3) metric (`request_clarification_open`, `_expired_total`, `_answer_seconds`): gói `adapter/metrics` chỉ có hằng tên, chưa có registry; (4) hồi quy approval của 010-05 do bản notification-service đã kiểm chứng trước đó.
+
+Lệch so với task: sweeper nằm ở một cấu trúc chung (`ClarificationSweeper`) thay vì ba tệp; `ClaimExpired` thay bằng `ListDueRefs` + `LockOpenDue` (xem 028-03).
+
+## Tiến độ sau hợp nhất (2026-10-08)
+
+Đã nối thêm: `SolutionRegenerator` (AnalysisStarter thật) gọi `GenerateSolution.PrepareForSystem` trong giao dịch đánh dấu `processed_events`, và chỉ khởi chạy worker sau khi giao dịch commit (worker đọc ngay dòng run); không có dev server/kết nối thì `ErrResumeSkipped` (không lặp vô hạn). `AnswerClarification.WithSolutions` dùng `ProposedSolutionSuperseder` thật; người nhận `team:`/`role:admin` và `ClarificationQueries.WithTeams` dùng thư mục thật của approval.
+
+Còn thiếu: `ExecutionAdvancer` (không có executor/`AdvanceExecution`; mặc định ghi log), metric `request_clarification_open|_expired_total|_answer_seconds` (gói `adapter/metrics` chưa có registry).

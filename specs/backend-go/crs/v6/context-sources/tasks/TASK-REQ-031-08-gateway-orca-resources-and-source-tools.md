@@ -5,7 +5,7 @@
 **Service:** `api-gateway`, `request-service` (RPC đọc `GetEvidence`, `GetContextPack`)
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/resources/uri.go` (sửa), `.../resources/plans.go` (sửa), `.../resources/uri_test.go`, `.../resources/provider_test.go` (sửa), `.../tools/pack5_context.go` (mới, tên khớp quy ước `pack*_*.go`), `.../tools/excluded_channels.yaml` (sửa), `.../tools/parity_test.go` (chạy), `.../internal/adapter/wscompat/channels_context.go` (mới), `backend-go/proto/orca/request/v1/request.proto` (sửa: `GetEvidence`, `GetContextPack`, `SearchContextSources`), `request-service/internal/adapter/grpc/server_context_read.go` (mới)
 **Depends on:** TASK-REQ-031-05; BE-REQ-SOL-016 (client `request-service` trong gateway, kênh `request.get`, `solution.get`)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -45,11 +45,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Sáu `Kind` mới đọc được qua `resources/read`; URI sai thành "không tìm thấy".
-- [x] Mọi resource có nội dung từ nguồn ngoài đánh `UntrustedOutput`.
-- [x] `parity_test.go` xanh.
-- [x] `source_*` chỉ tìm trong nguồn đã bật; không có tool ghi mới.
-- [x] Payload WS khớp `CONTRACT-request-ui-api.md` (đã đối chiếu từng trường).
+- [ ] Sáu `Kind` mới đọc được qua `resources/read`; URI sai thành "không tìm thấy".
+- [ ] Mọi resource có nội dung từ nguồn ngoài đánh `UntrustedOutput`.
+- [ ] `parity_test.go` xanh.
+- [ ] `source_*` chỉ tìm trong nguồn đã bật; không có tool ghi mới.
+- [ ] Payload WS khớp `CONTRACT-request-ui-api.md` (đã đối chiếu từng trường).
 
 ## Ví dụ tham khảo
 

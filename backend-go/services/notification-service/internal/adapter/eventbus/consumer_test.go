@@ -52,3 +52,50 @@ func TestSubjects_InfraFleetTerminalClosedIsDurableAndLegacyBindingRemains(t *te
 		t.Fatalf("closed binding ok=%v legacy binding present=%v", closed, legacy)
 	}
 }
+
+func TestSubjects_RequestBindings(t *testing.T) {
+	want := map[string]string{ // subject -> Durable
+		"orca.request.approval.requested":      "notification-service-request-approval-requested",
+		"orca.request.approval.decided":        "",
+		"orca.request.clarification.requested": "notification-service-request-clarification-requested",
+		"orca.request.clarification.expired":   "notification-service-request-clarification-expired",
+	}
+	seen := map[string]int{}
+	durables := map[string]bool{}
+	for _, b := range Subjects {
+		seen[b.Subject]++
+		if b.Durable != "" {
+			if durables[b.Durable] {
+				t.Errorf("durable %q used twice", b.Durable)
+			}
+			durables[b.Durable] = true
+		}
+		if d, ok := want[b.Subject]; ok {
+			if b.StreamName != "REQUEST" || b.Durable != d {
+				t.Errorf("binding %+v, want stream REQUEST durable %q", b, d)
+			}
+			delete(want, b.Subject)
+		}
+	}
+	for s := range want {
+		t.Errorf("missing binding for %s", s)
+	}
+	for s, n := range seen {
+		if n > 1 {
+			t.Errorf("subject %s bound %d times", s, n)
+		}
+	}
+}
+
+// Regression: adding request bindings must not drop the pre-existing ones.
+func TestSubjects_RequestBindingsKeepCoreBindings(t *testing.T) {
+	for _, s := range []string{"orca.task.task.completed", "orca.mcp.approval.requested", "orca.infrafleet.terminal.closed", "orca.tenant.star_nag.visibility_changed"} {
+		found := false
+		for _, b := range Subjects {
+			found = found || b.Subject == s
+		}
+		if !found {
+			t.Errorf("core binding %s missing", s)
+		}
+	}
+}

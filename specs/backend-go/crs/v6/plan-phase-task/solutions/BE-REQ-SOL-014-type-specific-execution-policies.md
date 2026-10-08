@@ -1,6 +1,6 @@
 # BE-REQ-SOL-014: Chính sách thực thi theo loại (`TypePolicy`): hotfix, security, performance, ops_request, refactor
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Chỉ chạm `request-service`; không đổi `task-service`. Móc vào các điểm `TypePolicy` mà SOL-012 và SOL-013 để sẵn nên có thể giao sau mà không đổi đường chuẩn.
+> **🚧 Đang triển khai: 3/7 task xong (014-01, 02, 07); 014-03 đến 06 làm xong phần chính sách và hook thực thi, còn nối `PlanPreconditions` vào `GeneratePlan`/`CommitPlan` (CR-REQ-012).**
 
 **CR:** [CR-REQ-014](../../../../../../docs/crs/v6/plan-phase-task/CR-REQ-014-type-specific-execution-policies.md)
 **Service:** `request-service` (mới) · `proto/orca/request/v1`

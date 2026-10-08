@@ -4,15 +4,15 @@
 **Hợp đồng chung:** [docs/crs/v6/README.md](../../../../../../docs/crs/v6/README.md) (mục 8 thắng mục 3)
 **TDD tham chiếu:** [`arch/03`](../../../../tdd/architecture/03-clean-architecture-guidelines.md), [`arch/05`](../../../../tdd/architecture/05-data-architecture.md), [`arch/08`](../../../../tdd/architecture/08-inter-service-communication.md), [`arch/09`](../../../../tdd/architecture/09-observability-reliability.md), [`services/task-service.md`](../../../../tdd/services/task-service.md), [`services/api-gateway.md`](../../../../tdd/services/api-gateway.md)
 
-> 📋 Proposed. Chưa triển khai, chưa chạy test nào. Nền tảng: [request-service-foundation](../../request-service-foundation/solutions/README.md).
+> ✅ SOL-003 đến SOL-006 đã triển khai (kiểm chứng 2026-10-08, xem từng solution). Nền tảng: [request-service-foundation](../../request-service-foundation/solutions/README.md).
 
 ## Bảng CR, Solution, Task
 
 | CR | Solution | Service / Area | Effort | Task |
 |----|----------|----------------|--------|------|
 | [CR-REQ-003](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-003-request-state-machine-and-flow-registry.md) | [BE-REQ-SOL-003](./BE-REQ-SOL-003-request-state-machine-and-flow-registry.md) | `request-service` (domain, `TransitionRequest`, `GetRequestFlow`) | Large | `TASK-REQ-003-01` đến `-06` |
-| [CR-REQ-004](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-004-request-intake-from-sources.md) | [BE-REQ-SOL-004](./BE-REQ-SOL-004-request-intake-from-sources.md) | `request-service`, `proto`, `api-gateway` (route webhook) | Large | `TASK-REQ-004-01` đến `-08` |
-| [CR-REQ-005](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-005-request-classification-and-type-change.md) | [BE-REQ-SOL-005](./BE-REQ-SOL-005-request-classification-and-type-change.md) | `request-service` (classifier, consumer, confirm, change type), `proto` | Large | `TASK-REQ-005-01` đến `-08` |
+| [CR-REQ-004](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-004-request-intake-from-sources.md) | [BE-REQ-SOL-004](./BE-REQ-SOL-004-request-intake-from-sources.md) | `request-service`, `proto`, `api-gateway` (route webhook) | Large | `TASK-REQ-004-01` đến `-08` (✅ 8/8) |
+| [CR-REQ-005](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-005-request-classification-and-type-change.md) | [BE-REQ-SOL-005](./BE-REQ-SOL-005-request-classification-and-type-change.md) | `request-service` (classifier, consumer, confirm, change type), `proto` | Large | `TASK-REQ-005-01` đến `-08` (✅ 8/8) |
 | [CR-REQ-006](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-006-return-to-backlog-reopen-cancel-child-requests.md) | [BE-REQ-SOL-006](./BE-REQ-SOL-006-return-to-backlog-reopen-cancel-child-requests.md) | `request-service` (return, reopen, cancel, spawn child), `proto` | Medium | `TASK-REQ-006-01` đến `-06` |
 
 ## Re-verify trước khi thiết kế (đối chiếu CR với mã thật, 2026-10-06)
@@ -63,3 +63,15 @@ Số migration kỳ vọng: `0001` init, `0002` request_core (foundation), `0003
 - **Kiểm HMAC webhook ở gateway hay trong service** (SOL-004 Q2).
 - **Khoá idempotency không có `project_id`** (SOL-002 Q2).
 - **Tham chiếu tiến:** CR-REQ-028 (`awaiting_information`, clarification) sẽ mở rộng phân loại, tiếp nhận và trạng thái Request; các solution ở đây không phụ thuộc vào nó.
+
+## Trạng thái (cập nhật 2026-10-08, life-a: CR-REQ-003 và 006)
+
+| Task | Trạng thái |
+|---|---|
+| TASK-REQ-003-01, 02, 03, 04, 06 | DONE (đã kiểm chứng) |
+| TASK-REQ-003-05 | TODO: use case xong, còn nối handler gRPC (chờ proto) |
+| TASK-REQ-006-01, 02, 03, 06 | DONE (đã kiểm chứng; 006-03 còn một tiêu chí chờ cột của CR-REQ-005) |
+| TASK-REQ-006-04 | TODO: logic xong, còn nối `CreateWithinTx` (CR-REQ-004) |
+| TASK-REQ-006-05 | TODO: use case `ListRequestLinks` xong, còn proto và handler gRPC |
+
+Phần CR-REQ-004 và 005 do agent life-b cập nhật. Chi tiết: [IMPLEMENTATION-NOTES.md](../IMPLEMENTATION-NOTES.md).

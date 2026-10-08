@@ -219,7 +219,7 @@ func TestCodeIntelTransport_Integration(t *testing.T) {
 	server := &Server{
 		relayByDevServer:      relayUC,
 		streamCodeIntelEvents: streamUC,
-		getAgentCapabilities: capsUC,
+		getAgentCapabilities:  capsUC,
 	}
 
 	lis := bufconn.Listen(1024 * 1024)

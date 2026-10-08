@@ -5,7 +5,7 @@
 **Service:** `request-service` (mới), `go.work`, `Makefile`
 **File:** `backend-go/services/request-service/go.mod` (mới), `internal/config/config.go` (mới), `internal/config/config_test.go` (mới), `README.md` (mới), `backend-go/go.work`, `backend-go/Makefile`, `backend-go/deploy/postgres-init-databases.sh`
 **Depends on:** Không (task đầu tiên của toàn series)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test ./... trong services/request-service; go build, go vet, gofmt -l sạch)
 
 ---
 
@@ -40,3 +40,7 @@
 
 - `go.work.sum` có thể cần cập nhật (`make tidy-all`); chưa chạy.
 - Tên database `request` có thể vướng từ dành riêng ở MySQL của môi trường nào đó (chưa kiểm chứng). Nếu vướng, đổi thành `requests` ở toàn series (đổi một lần ở đây, `migrate.sh`, compose, CI).
+
+## Ghi chú triển khai
+
+Kiểm tra tên file: không còn `helpers/utils/misc/common` (đã xoá `usecase/utils_for_test.go`, hằng `timeNow` không ai dùng). README có bảng real vs stub cập nhật. Thêm test cấu hình approval (`TestLoad_ApprovalDefaultsClosed`, `TestLoad_ApprovalOverrides`).

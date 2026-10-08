@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_stream.go` (mới), `.../channels_request_stream_test.go` (mới), `.../excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-01, TASK-REQ-016-02; CR-REQ-003 (sự kiện `status_changed`) và outbox của `request-service`
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -47,3 +47,7 @@
 - N consumer mỗi socket (N = 14); đo trước khi bật rộng. Nếu tải lớn, thay bằng một consumer dùng chung có fan-out trong tiến trình (việc riêng).
 - Phát lại lịch sử chưa chạy thử; bước 2 là lưới an toàn, không phải cách sửa gốc.
 - Tên stream `REQUEST` có thể khác khi CR-REQ-001 chốt; đọc từ hằng, một chỗ sửa.
+
+## Ghi chú triển khai (2026-10-08)
+
+Chưa kiểm chứng trên NATS thật: hành vi phát lại lịch sử của ephemeral consumer và tên stream `REQUEST`; test dùng bus giả. Quy tắc xem khi không có `id`: admin hoặc `reporter_id`/`actor_id` = mình (Q3 vẫn mở).

@@ -216,3 +216,19 @@ Bridges desktop and web client WebSocket requests to downstream `code-intel-serv
   - **Privacy & security:** Request arguments (which may include confidential file paths or source code snippets) are never logged in plaintext.
 
 
+
+## Request flow channels, routes and MCP tools (CR-REQ-016, CR-REQ-017)
+
+Bridges the UI, scripts and MCP clients to `request-service` (Request, Solution, Approval, Backlog).
+Contract: `specs/backend-go/crs/v6/gateway-and-mcp/CONTRACT-request-ui-api.md`.
+
+- **Downstream service:** `request-service` (gRPC). **Environment variables:**
+  - `REQUEST_SERVICE_ADDR`: gRPC address. Empty means the client is not dialed; every Request channel answers `REQUEST_UNAVAILABLE` and the HTTP routes are not mounted.
+  - `REQUEST_INTERNAL_CALLER_TOKEN`: shared secret sent as `x-orca-internal-token` on unary and stream calls. With the address set and no token, request-service rejects guarded calls (a warning is logged at start).
+  - `MCP_REQUEST_CREATE_PER_HOUR`: creation budget per (tenant, user, MCP client) shared by `request_create` and `request_spawnChild` (default `20`, `0` disables; per gateway replica).
+  - Writing MCP tools need `MCP_TOOL_PACKS_ENABLED=1,2`.
+- **WS channels (28 + 4):** `request.*` (16, including the `request.subscribe` stream that exists only when NATS is connected), `solution.*` (3), `approval.*` (6), `backlog.*` (3); extra reads `request.links`, `request.flow`, `request.checks` and `request.planProposal`. Identity comes from the session only. Errors are `REQUEST_*: message` (`REQUEST_APPROVAL_*` for approvals); gRPC `Unimplemented` becomes `REQUEST_NOT_IMPLEMENTED`. `request.classify` and `request.generatePlan` use a 24s deadline (below the 25s WS cap).
+- **HTTP routes (5):** `POST|GET /v1/requests`, `GET /v1/requests/{id}`, `GET /v1/approvals/pending`, `POST /v1/approvals/{id}/approve|reject`. They dispatch through the same channel handlers. Approve and reject need `{version, digest, comment}`; a body with only `{version, comment}` is refused with `INVALID_ARGUMENT`.
+- **No OPA step here:** `request-service` checks permissions and the `request_flow_enabled` flag itself.
+- **Source rule:** a client may claim `jira`, `github`, `gitlab` or `linear`; no source is `manual`; MCP calls are always `mcp` with the MCP client name as site (set from the verified session, not from input).
+- **MCP:** 17 listed tools (11 read in pack 1, 6 write in pack 2) and 3 declared (`request_classify`, `request_generatePlan`, `request_startPhase`). Human gates (`request.confirmType`, `solution.choose`, `approval.approve|reject|cancel`, `request.cancel`, `request.flowSet`) are permanently excluded in `tools/excluded_channels.yaml`.

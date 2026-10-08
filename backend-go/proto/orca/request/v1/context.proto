@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Source Registry, Context Pack and Evidence messages (CR-REQ-031). RPCs live in RequestService.
+// There is deliberately no RPC that writes a pack or evidence: only the builder does.
+
+message ContextSource {
+  string id = 1;
+  string key = 2;
+  string kind = 3;
+  // internal | mcp
+  string transport = 4;
+  string adapter = 5;
+  string server_ref = 6;
+  string scopes_json = 7;
+  // high | medium | low
+  string trust = 8;
+  int32 ttl_seconds = 9;
+  int32 max_bytes = 10;
+  string redaction_json = 11;
+  int32 rate_limit_per_minute = 12;
+  string enabled_for_json = 13;
+  // draft | active | disabled
+  string status = 14;
+  string owner_id = 15;
+  int64 version = 16;
+  string created_by = 17;
+  google.protobuf.Timestamp created_at = 18;
+  google.protobuf.Timestamp updated_at = 19;
+}
+
+message ListContextSourcesRequest {
+  string kind = 1;
+  string status = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListContextSourcesResponse {
+  repeated ContextSource sources = 1;
+  string next_page_token = 2;
+}
+
+message UpsertContextSourceRequest {
+  ContextSource source = 1;
+  int64 expected_version = 2;
+}
+
+message UpsertContextSourceResponse {
+  ContextSource source = 1;
+}
+
+message SetContextSourceStatusRequest {
+  string key = 1;
+  string status = 2;
+  int64 expected_version = 3;
+}
+
+message SetContextSourceStatusResponse {
+  ContextSource source = 1;
+}
+
+message ContextPackItem {
+  string evidence_id = 1;
+  int32 rank = 2;
+  int32 tokens = 3;
+  bool truncated = 4;
+  int32 redactions = 5;
+}
+
+message ContextMissingEntry {
+  string source_key = 1;
+  // timeout | not_connected | rate_limited | forbidden | invalid_item | stale | disabled
+  string reason = 2;
+  string detail = 3;
+}
+
+message ContextPackView {
+  string id = 1;
+  string request_id = 2;
+  string stage = 3;
+  string digest = 4;
+  int32 budget_tokens = 5;
+  int32 used_tokens = 6;
+  repeated ContextPackItem items = 7;
+  string body = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+// Dry run: nothing is stored and displayed seq is 0.
+message PreviewContextPackRequest {
+  string request_id = 1;
+  // classify | solution | plan | task | execute | risk
+  string stage = 2;
+}
+
+message PreviewContextPackResponse {
+  ContextPackView pack = 1;
+  repeated ContextMissingEntry missing = 2;
+}
+
+message Evidence {
+  string id = 1;
+  // Displayed as EVD-<seq>.
+  int32 seq = 2;
+  string request_id = 3;
+  string context_pack_id = 4;
+  string source_key = 5;
+  string ref = 6;
+  string title = 7;
+  google.protobuf.Timestamp retrieved_at = 8;
+  // fresh | stale
+  string freshness = 9;
+  string trust = 10;
+  string digest = 11;
+  int32 size = 12;
+  // At most 4 KB, already redacted.
+  string excerpt = 13;
+  string used_by_json = 14;
+}
+
+message GetEvidenceRequest {
+  string id = 1;
+}
+
+message GetEvidenceResponse {
+  Evidence evidence = 1;
+}
+
+message ListEvidenceRequest {
+  string request_id = 1;
+  string stage = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListEvidenceResponse {
+  repeated Evidence evidence = 1;
+  string next_page_token = 2;
+}

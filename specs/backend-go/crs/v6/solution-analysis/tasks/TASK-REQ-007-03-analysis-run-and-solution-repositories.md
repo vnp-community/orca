@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / adapter
 **File:** `internal/adapter/{postgres,mysql}/analysis_run_repository.go` (mới), `solution_repository.go` (mới; hoặc mở rộng nếu CR-REQ-002 đã tạo), `internal/usecase/ports.go` (sửa), và `_integration_test.go`
 **Depends on:** TASK-REQ-007-01, TASK-REQ-007-02
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/mysql/... -run "SolutionContract|AnalysisRuns"` trên Postgres 16 và MySQL 8.0 thật)
 
 ## Context
 
@@ -38,3 +38,11 @@
 
 - MySQL < 8.0.1 không chạy được `SKIP LOCKED`: kiểm bằng `dbcapability` lúc khởi động và fail-fast.
 - `CountRunning` trên MySQL phải trong transaction có khoá (SOL-008 dùng).
+
+## Ghi chú triển khai (2026-10-08)
+
+- Cổng nằm ở `internal/usecase/ports_solution.go` (`AnalysisRunStore`, `SolutionStore`), không ở `ports.go`; hai interface giả cũ `AnalysisRunRepository`/`SolutionRepository` trong `ports.go` (không ai dùng) đã xoá. `SolutionStore` nhúng `SolutionCoreRepository` của R1a nên một struct duy nhất `SolutionRecordRepository` đáp cả hai.
+- Lệch so với task: `InsertRunWithSolution` đổi tên `StartRun` và nhận `StartRunOptions{LeaseTTL, MaxAgentRuns}`; thêm `EnsureProjectGate`; `Complete`/`Fail` gộp thành `FinishOwned(run, owner)` (chỉ ghi khi còn giữ lease, trả `false` khi mất lease). Mọi truy vấn lọc `tenant_id`; ngày giờ lease dùng đồng hồ DB.
+- Hai lỗi chỉ lộ khi chạy MySQL thật và đã sửa: (1) đếm run đồng thời bằng `COUNT(*)` thường dùng snapshot cũ nên cho 8 run qua cổng giới hạn 2, đổi sang `FOR SHARE` (current read); (2) tra cứu run thắng sau khi thua cuộc đua chèn cũng phải là đọc khoá. Tạo hàng khoá `analysis_project_gates` ngoài giao dịch (autocommit) vì hai giao dịch cùng chèn một khoá dễ deadlock gap lock.
+- Cổng đồng thời dùng hàng `analysis_project_gates` + `SELECT ... FOR UPDATE` (cả hai dialect) thay vì khoá tư vấn: cùng một cách chạy trên Postgres và MySQL, kiểm bằng 8 goroutine, đúng 2 qua cổng.
+- MySQL < 8.0.1 không có `SKIP LOCKED`: chưa thêm kiểm `dbcapability` lúc khởi động riêng cho điểm này (kiểm chung của service vẫn như cũ).

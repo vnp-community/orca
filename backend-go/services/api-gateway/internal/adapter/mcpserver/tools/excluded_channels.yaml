@@ -584,3 +584,52 @@
   category: code-intel-v1
   reason: "Code intelligence views carry repository source text, reindex runs analyzers on a dev server and quality runs execute checks; not MCP tools in v1 (README v7 O2, CR-CV-041 may replace this line)."
 
+
+# Request flow (BE-REQ-SOL-016/017): decisions of a person are never agent tools.
+- pattern: "request.confirmType"
+  category: human_gate
+  reason: "Confirming the Request type is a person's gate (mandatory for hotfix and security); an agent must not confirm its own proposal."
+
+- pattern: "solution.choose"
+  category: human_gate
+  reason: "Choosing a Solution option is the approver's decision; an agent must not pick the option it will then execute."
+
+- pattern: "approval.approve"
+  category: human_gate
+  reason: "An agent must not approve, reject or cancel the approval gates of its own work."
+
+- pattern: "approval.reject"
+  category: human_gate
+  reason: "An agent must not approve, reject or cancel the approval gates of its own work."
+
+- pattern: "approval.cancel"
+  category: human_gate
+  reason: "An agent must not approve, reject or cancel the approval gates of its own work."
+
+- pattern: "request.cancel"
+  category: human_gate
+  reason: "Cancelling a Request cannot be undone in the state machine; left to a person. Agents use request_returnToBacklog, which request_reopen undoes."
+
+- pattern: "request.flowSet"
+  category: human_gate
+  reason: "Turning the Request flow on or off is tenant administration done in the UI by an admin."
+
+- pattern: "request.subscribe"
+  category: stream
+  reason: "Push stream of Request events for the UI; MCP clients use resources subscriptions or poll the read tools."
+
+- pattern: "request.links"
+  category: request_flow
+  reason: "Read channel added for the UI (CONTRACT 2.5); no MCP tool decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "request.flow"
+  category: request_flow
+  reason: "Read channel added for the UI (CONTRACT 2.5); no MCP tool decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "request.checks"
+  category: request_flow
+  reason: "Read channel added for the UI (CONTRACT 2.5); no MCP tool decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "request.planProposal"
+  category: request_flow
+  reason: "Reads the result of the asynchronous plan proposal run; waits for request_generatePlan to leave the Declared state."

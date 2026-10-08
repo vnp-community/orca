@@ -49,6 +49,8 @@ type Config struct {
 	ProtocolVersion string
 	// TLSConfig overrides the client TLS config. Tests only.
 	TLSConfig *tls.Config
+	// CallTimeout overrides the package CallTimeout. Tests only.
+	CallTimeout time.Duration
 }
 
 type Prober struct {

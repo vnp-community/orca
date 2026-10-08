@@ -98,3 +98,27 @@ func TestTenantExtractionInterceptor_MissingRoleLeavesItAbsent(t *testing.T) {
 		t.Errorf("want role absent, got (%q, %v)", v, ok)
 	}
 }
+
+// The key is a wire contract between api-gateway and every service: renaming it silently drops the actor.
+func TestMetadataActorTypeKeyIsStable(t *testing.T) {
+	if MetadataActorType != "x-orca-actor-type" {
+		t.Fatalf("MetadataActorType = %q", MetadataActorType)
+	}
+}
+
+// TenantExtractionInterceptor must not read or require the actor key: services that predate it stay unchanged.
+func TestTenantExtractionInterceptor_IgnoresActorTypeMetadata(t *testing.T) {
+	md := metadata.Pairs(MetadataTenantID, "t1", MetadataUserID, "u1", MetadataActorType, "system")
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+	var got context.Context
+	_, err := TenantExtractionInterceptor()(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/x/y"}, func(c context.Context, _ any) (any, error) {
+		got = c
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tenant.ActorType(got) != tenant.ActorUser {
+		t.Fatalf("interceptor must leave actor unset (user), got %q", tenant.ActorType(got))
+	}
+}

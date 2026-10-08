@@ -11,7 +11,7 @@ SERVICES := ai-provider-service annotation-service api-gateway auth-service \
             task-service tenant-service usage-service workflow-service
 
 .PHONY: dev-up dev-down build vet test test-integration lint fmt fmt-check \
-        proto-gen proto-lint migrate-all tidy-all opa-test help
+        proto-gen proto-lint check-agent-capability-golden migrate-all tidy-all opa-test help
 
 help:
 	@echo "make dev-up            - start postgres/vault/nats via docker compose"
@@ -79,6 +79,10 @@ proto-gen:
 
 proto-lint:
 	cd proto && buf lint && buf breaking --against '.git#branch=main' || true
+
+# Separate from proto-lint (whose `|| true` swallows failures): a drifted copy must fail.
+check-agent-capability-golden:
+	bash ci/check-agent-capability-golden.sh
 
 tidy-all:
 	@for m in common proto $(addprefix services/,$(SERVICES)); do \

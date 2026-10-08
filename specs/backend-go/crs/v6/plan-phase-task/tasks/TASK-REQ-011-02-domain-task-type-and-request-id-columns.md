@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/domain/task_type.go` (mới), `internal/domain/task.go`, `internal/adapter/postgres/repository.go`, `internal/adapter/mysql/repository.go`, `proto/orca/task/v1/task.proto`, `internal/adapter/grpc/server.go` (`toProtoTask`)
 **Depends on:** TASK-REQ-011-01
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test ./internal/domain/...` và `go test -tags=integration ./internal/adapter/postgres ./internal/adapter/mysql` (PG 16 và MySQL 8.0.46 thật))
 
 ---
 
@@ -47,3 +47,11 @@
 - Thứ tự cột trong `taskColumns` và `scanTask` phải khớp tuyệt đối; sai thứ tự gây lỗi quét ở mọi truy vấn. Thêm cột ở **cuối**.
 - Hai dialect có hai danh sách cột (có alias): sửa cả hai chỗ mỗi bên.
 - `gitnexus` có thể cũ so với repo (chỉ mục 247k symbol): xác nhận lại bằng grep `scanTask` trước khi sửa.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Sửa so với code kiểm toán: `domain.IsContainerType` chỉ là `plan|phase` (bản cũ tính cả `epic`, làm epic mới mất `task_number`); xoá `domain/task_types.go` (hằng `container/phase/step` không ai dùng, lệch tài liệu); bỏ khai báo trùng `ErrInvalidTaskType`.
+- Postgres `GetAncestors` có danh sách cột riêng, thiếu `request_id` (lỗi quét 33/34 cột, bắt được bởi `TestRepository_Create_PersistsRequestID`); `subtreeColumnNames` và `prefixedTaskColumns` cũng được bổ sung `request_id`. MySQL: `taskColumns`, `prefixedTaskColumns`, holder, `Create` (container không `INSERT INTO task_number_seq`).
+- Proto: `Task.request_id = 31`, đã `buf generate --path orca/task`; `buf breaking` so với HEAD sạch, `buf lint` chỉ còn cảnh báo `Empty` có từ trước.
+- `Update` không ghi `request_id` (`TestRepository_Update_DoesNotChangeRequestID`). 20 tạo đồng thời (5 container xen kẽ) cho số liên tiếp không trùng, không nhảy (`TestRepository_Create_ConcurrentTaskNumbersUnique`).
+- Người gọi đã kiểm: `scanTask`/`taskColumns` (Get, List, GetAncestors, subtree, velocity, share link); `go build`/`vet`/`test` xanh ở api-gateway, orchestration-service, workflow-service, project-service, mcp-service, proto.

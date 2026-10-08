@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/request_routes.go` (mới), `.../request_routes_test.go` (mới), `.../router.go`, `backend-go/services/api-gateway/README.md`, `backend-go/services/api-gateway/internal/usecase/requestsource.go` (mới)
 **Depends on:** TASK-REQ-016-02, TASK-REQ-016-03, TASK-REQ-016-04
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -39,3 +39,7 @@
 
 - Hai bản view (WS và HTTP) dễ lệch; dùng chung một gói là bắt buộc.
 - Route phê duyệt bằng HTTP vẫn cần `digest`; client script cũ theo CR (chỉ `version`) sẽ nhận `INVALID_ARGUMENT`; ghi vào README.
+
+## Ghi chú triển khai (2026-10-08)
+
+HTTP gọi cùng handler kênh (registry riêng chỉ kênh unary) thay vì gói view riêng; vỏ rỗng `adapter/http/request_*.go`, `adapter/websocket/{request_client,lifecycle_channels,solution_channels}.go` đã xoá.

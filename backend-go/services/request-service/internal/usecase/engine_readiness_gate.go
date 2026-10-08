@@ -56,7 +56,7 @@ func (g *EngineReadinessGate) Check(ctx context.Context, projectID string, setti
 		Cwd:       conn.RepoPath,
 		TimeoutMs: 10000,
 	})
-	
+
 	if err != nil || res.ExitCode != 0 {
 		report.OK = false
 		report.Failures = append(report.Failures, PreflightFailure{

@@ -157,7 +157,10 @@ type Server struct {
 
 	// BE-CV-SOL-023: CodeIntel streaming & capabilities
 	streamCodeIntelEvents *usecase.StreamCodeIntelEvents
-	getAgentCapabilities *usecase.GetAgentCapabilities
+	getAgentCapabilities  *usecase.GetAgentCapabilities
+
+	// CR-REQ-033: dev server capability profile (set via WithDevServerCapabilities).
+	getDevServerCapabilities *usecase.GetDevServerCapabilities
 }
 
 func New(

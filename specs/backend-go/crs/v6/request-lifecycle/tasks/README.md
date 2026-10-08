@@ -1,6 +1,6 @@
 # backend-go Tasks: Request Lifecycle (v6)
 
-Task thực thi của bốn solution trong [`../solutions/`](../solutions/README.md). Tất cả `Status: [ ] TODO`, chưa chạy test nào. Mỗi task nêu file, tên test và lệnh; đã đối chiếu code thật ngày 2026-10-06.
+Task thực thi của bốn solution trong [`../solutions/`](../solutions/README.md). Trạng thái từng task ở file task và bảng cuối trang. Mỗi task nêu file, tên test và lệnh; đã đối chiếu code thật ngày 2026-10-06.
 
 ## Bảng Solution, Task
 
@@ -12,22 +12,22 @@ Task thực thi của bốn solution trong [`../solutions/`](../solutions/README
 | | [TASK-REQ-003-04](./TASK-REQ-003-04-transition-integration-tests-two-dialects.md) | Test tích hợp hai dialect | P0 |
 | | [TASK-REQ-003-05](./TASK-REQ-003-05-get-request-flow-rpc.md) | RPC `GetRequestFlow` | P1 |
 | | [TASK-REQ-003-06](./TASK-REQ-003-06-status-write-guard-and-readme-contract-tests.md) | Test `go/parser` và test hợp đồng README | P1 |
-| BE-REQ-SOL-004 | [TASK-REQ-004-01](./TASK-REQ-004-01-migration-0003-source-hints.md) | Migration `source_hints`, domain, repository | P0 |
-| | [TASK-REQ-004-02](./TASK-REQ-004-02-source-normalization-and-idempotency-key.md) | Chuẩn hoá nguồn, khoá idempotency | P0 |
-| | [TASK-REQ-004-03](./TASK-REQ-004-03-proto-create-request-and-source-filters.md) | Proto `CreateRequest`, bộ lọc nguồn | P0 |
-| | [TASK-REQ-004-04](./TASK-REQ-004-04-create-request-usecase.md) | Use case `CreateRequest`, `CreateWithinTx` | P0 |
-| | [TASK-REQ-004-05](./TASK-REQ-004-05-issue-tracking-client.md) | Client `issue-tracking-service` | P1 |
-| | [TASK-REQ-004-06](./TASK-REQ-004-06-grpc-create-request-and-source-filters.md) | Handler gRPC, lọc nguồn | P0 |
-| | [TASK-REQ-004-07](./TASK-REQ-004-07-create-request-integration-tests.md) | Test tích hợp tranh chấp, rollback | P0 |
-| | [TASK-REQ-004-08](./TASK-REQ-004-08-gateway-request-webhook-route.md) | Route webhook ở `api-gateway` | P2 |
-| BE-REQ-SOL-005 | [TASK-REQ-005-01](./TASK-REQ-005-01-domain-classification-and-type-change-rules.md) | Domain, luật xác nhận, đường đổi loại, migration `attempts` | P0 |
-| | [TASK-REQ-005-02](./TASK-REQ-005-02-classifier-port-prompt-and-relay-client.md) | Cổng classifier, prompt, client relay | P0 |
-| | [TASK-REQ-005-03](./TASK-REQ-005-03-processed-events-and-status-changed-consumer.md) | `processed_events`, consumer `status_changed` | P0 |
-| | [TASK-REQ-005-04](./TASK-REQ-005-04-propose-request-classification-usecase.md) | Use case đề xuất phân loại | P0 |
-| | [TASK-REQ-005-05](./TASK-REQ-005-05-confirm-request-type-usecase.md) | `ConfirmRequestType` | P0 |
-| | [TASK-REQ-005-06](./TASK-REQ-005-06-change-request-type-usecase.md) | `ChangeRequestType`, lịch sử | P0 |
-| | [TASK-REQ-005-07](./TASK-REQ-005-07-proto-and-grpc-handlers-classification.md) | Proto, handler gRPC | P0 |
-| | [TASK-REQ-005-08](./TASK-REQ-005-08-classification-integration-tests.md) | Test tích hợp hai dialect | P0 |
+| BE-REQ-SOL-004 | [TASK-REQ-004-01](./TASK-REQ-004-01-migration-0003-source-hints.md) | Migration `source_hints`, domain, repository **[DONE]** | P0 |
+| | [TASK-REQ-004-02](./TASK-REQ-004-02-source-normalization-and-idempotency-key.md) | Chuẩn hoá nguồn, khoá idempotency **[DONE]** | P0 |
+| | [TASK-REQ-004-03](./TASK-REQ-004-03-proto-create-request-and-source-filters.md) | Proto `CreateRequest`, bộ lọc nguồn **[DONE]** | P0 |
+| | [TASK-REQ-004-04](./TASK-REQ-004-04-create-request-usecase.md) | Use case `CreateRequest`, `CreateWithinTx` **[DONE]** | P0 |
+| | [TASK-REQ-004-05](./TASK-REQ-004-05-issue-tracking-client.md) | Client `issue-tracking-service` **[DONE]** | P1 |
+| | [TASK-REQ-004-06](./TASK-REQ-004-06-grpc-create-request-and-source-filters.md) | Handler gRPC, lọc nguồn **[DONE]** | P0 |
+| | [TASK-REQ-004-07](./TASK-REQ-004-07-create-request-integration-tests.md) | Test tích hợp tranh chấp, rollback **[DONE]** | P0 |
+| | [TASK-REQ-004-08](./TASK-REQ-004-08-gateway-request-webhook-route.md) | Route webhook ở `api-gateway` **[DONE (ở request-service)]** | P2 |
+| BE-REQ-SOL-005 | [TASK-REQ-005-01](./TASK-REQ-005-01-domain-classification-and-type-change-rules.md) | Domain, luật xác nhận, đường đổi loại, migration `attempts` **[DONE]** | P0 |
+| | [TASK-REQ-005-02](./TASK-REQ-005-02-classifier-port-prompt-and-relay-client.md) | Cổng classifier, prompt, client relay **[DONE]** | P0 |
+| | [TASK-REQ-005-03](./TASK-REQ-005-03-processed-events-and-status-changed-consumer.md) | `processed_events`, consumer `status_changed` **[DONE]** | P0 |
+| | [TASK-REQ-005-04](./TASK-REQ-005-04-propose-request-classification-usecase.md) | Use case đề xuất phân loại **[DONE]** | P0 |
+| | [TASK-REQ-005-05](./TASK-REQ-005-05-confirm-request-type-usecase.md) | `ConfirmRequestType` **[DONE]** | P0 |
+| | [TASK-REQ-005-06](./TASK-REQ-005-06-change-request-type-usecase.md) | `ChangeRequestType`, lịch sử **[DONE]** | P0 |
+| | [TASK-REQ-005-07](./TASK-REQ-005-07-proto-and-grpc-handlers-classification.md) | Proto, handler gRPC **[DONE]** | P0 |
+| | [TASK-REQ-005-08](./TASK-REQ-005-08-classification-integration-tests.md) | Test tích hợp hai dialect **[DONE]** | P0 |
 | BE-REQ-SOL-006 | [TASK-REQ-006-01](./TASK-REQ-006-01-migration-return-history-and-repositories.md) | Migration return history, repository | P1 |
 | | [TASK-REQ-006-02](./TASK-REQ-006-02-return-to-backlog-usecase-and-transition-category.md) | `Category` trong `TransitionRequest`, `ReturnRequestToBacklog` | P1 |
 | | [TASK-REQ-006-03](./TASK-REQ-006-03-reopen-and-cancel-usecases.md) | `ReopenRequest`, `CancelRequest` | P1 |
@@ -69,3 +69,15 @@ Song song được: 003-04 với 003-05 và 003-06; 004-01, 004-02, 004-03, 004-
 - **Merge cùng đợt:** TASK-REQ-006-01 và 006-02 (CHECK ghép `status`/`returned_category` cần `Category` trong `TransitionRequest`).
 - **Chưa kiểm chứng:** mọi thứ liên quan Jira thật, dev server agent thật (`ai.complete`), bí mật webhook trong `credential-broker-service`, MySQL TiDB.
 - **Tham chiếu tiến:** CR-REQ-028 (`awaiting_information`) và các CR bổ sung 026 đến 036 sẽ mở rộng trạng thái và phân loại; các task ở đây không phụ thuộc vào chúng.
+
+## Trạng thái (cập nhật 2026-10-08, life-a: CR-REQ-003 và 006)
+
+| Task | Trạng thái |
+|---|---|
+| TASK-REQ-003-01, 02, 03, 04, 06 | DONE (đã kiểm chứng) |
+| TASK-REQ-003-05 | DONE (đã kiểm chứng; handler gRPC nối sau hợp nhất rf/proto) |
+| TASK-REQ-006-01, 02, 03, 06 | DONE (đã kiểm chứng; `attempts=0` của 006-03 nối với CR-REQ-005 và kiểm qua gRPC) |
+| TASK-REQ-006-04 | DONE (con tạo qua `CreateWithinTx`, `type_hint` lưu cột) |
+| TASK-REQ-006-05 | DONE (năm RPC thật) |
+
+Phần CR-REQ-004 và 005 (agent life-b): mọi task DONE, trạng thái ở cột nội dung của bảng trên. 003-05, 004-03, 004-06, 005-07, 006-04, 006-05 đóng sau khi hợp nhất `rf/proto` và `rf/life-a`. Chi tiết: [IMPLEMENTATION-NOTES.md](../IMPLEMENTATION-NOTES.md).

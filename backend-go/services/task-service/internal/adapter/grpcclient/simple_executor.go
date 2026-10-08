@@ -108,6 +108,8 @@ type SimpleExecutor struct {
 	relay    infrafleetv1.InfraFleetServiceClient
 	profiles usecase.ProfileResolver        // NEW
 	projects usecase.ProjectContextResolver // NEW
+	// records stores contract-run outcomes; nil disables ExecuteWithContract (see WithExecutionRecords).
+	records usecase.TaskExecutionRecordRepository
 	// outbox/streamer back TASK-AG-FLOWTASK-003's throttled mid-run
 	// republish — see publishThrottledOutput's doc comment. Both are
 	// best-effort: neither ever changes Execute's own success/failure
@@ -268,6 +270,10 @@ type agentExecPromptParams struct {
 	Model        string            `json:"model,omitempty"`       // NEW
 	Env          map[string]string `json:"env,omitempty"`         // NEW / TASK-TG-04-06 — already-supported field, simply never populated before
 	InitFile     string            `json:"initFile,omitempty"`    // NEW — see workflow-service's agent_step_executor.go for the same field-name caveat
+	// Contract-run fields (CR-REQ-029); all omitempty so a plain run sends the same JSON as before.
+	ResultBlock    *resultBlockParam `json:"resultBlock,omitempty"`
+	ReportChanges  bool              `json:"reportChanges,omitempty"`
+	MaxOutputBytes int               `json:"maxOutputBytes,omitempty"`
 }
 
 // agentExecPromptResult mirrors agent-print-mode-exec.ts's real
@@ -278,12 +284,37 @@ type agentExecPromptResult struct {
 	Stderr   string `json:"stderr"`
 	ExitCode *int   `json:"exitCode"`
 	TimedOut bool   `json:"timedOut"`
+	// Contract-run fields from a protocol-2 agent; absent from older agents.
+	Changes   json.RawMessage    `json:"changes,omitempty"`
+	Parsed    *agentParsedResult `json:"parsed,omitempty"`
+	Truncated bool               `json:"truncated,omitempty"`
 }
 
 func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (string, error) {
+	result, err := s.runAgentPrompt(ctx, tenantID, taskID, requestID, worktreePath, prompt, nil)
+	if err != nil {
+		return "", err
+	}
+	if result.TimedOut {
+		return "", apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_TIMED_OUT", "agent.execPrompt timed out before the task finished", nil)
+	}
+	if result.ExitCode == nil || *result.ExitCode != 0 {
+		return "", apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", fmt.Sprintf("agent.execPrompt exited non-zero: %s", result.Stderr), nil)
+	}
+	// TASK-TG-04-07: persist this run's stdout so a LATER run
+	// wave's buildExecutePrompt can resolve `{{outputs.<taskId>.*}}`
+	// against this task once it's a completed dependency — best-effort,
+	// a write failure here must not fail an otherwise-successful run.
+	_ = s.tasks.UpdateLastExecutionOutput(ctx, tenantID, taskID, result.Stdout)
+	return fmt.Sprintf("task-exec:%s:%s", taskID, requestID), nil
+}
+
+// runAgentPrompt prepares and relays one agent.execPrompt call and returns the raw result;
+// Execute and ExecuteWithContract differ only in what they do with it. opts is nil for a plain run.
+func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string, opts *contractRunOptions) (agentExecPromptResult, error) {
 	task, err := s.tasks.Get(ctx, tenantID, taskID)
 	if err != nil {
-		return "", fmt.Errorf("simple_executor: load task: %w", err)
+		return agentExecPromptResult{}, fmt.Errorf("simple_executor: load task: %w", err)
 	}
 
 	// Context preamble inputs (TASK-TG-04-06): parent is ancestors[1] (the
@@ -316,7 +347,7 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	// unchanged from BUG-026's fix.
 	connectionID, _, _, devServerID, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil {
-		return "", fmt.Errorf("simple_executor: resolve connection: %w", err)
+		return agentExecPromptResult{}, fmt.Errorf("simple_executor: resolve connection: %w", err)
 	}
 	if !connected {
 		// Per git-gateway-service.md §8's precedent: a resolve failure or
@@ -324,14 +355,14 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 		// fallback — task-service has no local agent.execPrompt equivalent
 		// of its own (unlike git-gateway-service's §2 step 3, there is no
 		// "this service's own host" case for task execution).
-		return "", apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_CONNECTION", "task's project has no connected dev server", nil)
+		return agentExecPromptResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_CONNECTION", "task's project has no connected dev server", nil)
 	}
 	if worktreePath == "" {
 		// agent.execPrompt requires worktreePath (agent-print-mode-exec.ts:62-73
 		// rejects a missing one with InvalidParams) — a connected connection
 		// with no repo_path recorded is a distinct, real error, not a
 		// silent no-op dispatch.
-		return "", apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_WORKTREE_PATH", "task's connected dev server has no worktree path recorded", nil)
+		return agentExecPromptResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_WORKTREE_PATH", "task's connected dev server has no worktree path recorded", nil)
 	}
 
 	// TASK-TG-04-06's context preamble (parent/completedDeps) and
@@ -397,9 +428,12 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 		}
 	}
 
+	if opts != nil {
+		opts.apply(&params)
+	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
-		return "", fmt.Errorf("simple_executor: marshal params: %w", err)
+		return agentExecPromptResult{}, fmt.Errorf("simple_executor: marshal params: %w", err)
 	}
 
 	// relayCtx carries tenant id on the OUTGOING metadata for both
@@ -414,7 +448,7 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	// earlier fixes were all in project-service call sites, not this one).
 	relayCtx, err := withTenantMetadata(ctx)
 	if err != nil {
-		return "", fmt.Errorf("simple_executor: tenant metadata: %w", err)
+		return agentExecPromptResult{}, fmt.Errorf("simple_executor: tenant metadata: %w", err)
 	}
 
 	// TASK-AG-FLOWTASK-003: subscribe to this run's mid-run output
@@ -456,7 +490,7 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 			DevServerId: devServerID, Method: "agent.execPrompt", ParamsJson: string(paramsJSON),
 		})
 		if err != nil {
-			return "", fmt.Errorf("simple_executor: relayByDevServer agent.execPrompt: %w", err)
+			return agentExecPromptResult{}, &relayError{fmt.Errorf("simple_executor: relayByDevServer agent.execPrompt: %w", err)}
 		}
 		resultJSON = resp.GetResultJson()
 	} else {
@@ -464,26 +498,15 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 			ConnectionId: connectionID, Method: "agent.execPrompt", ParamsJson: string(paramsJSON),
 		})
 		if err != nil {
-			return "", fmt.Errorf("simple_executor: relay agent.execPrompt: %w", err)
+			return agentExecPromptResult{}, &relayError{fmt.Errorf("simple_executor: relay agent.execPrompt: %w", err)}
 		}
 		resultJSON = resp.GetResultJson()
 	}
 	var result agentExecPromptResult
 	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
-		return "", fmt.Errorf("simple_executor: unmarshal agent.execPrompt result: %w", err)
+		return agentExecPromptResult{}, fmt.Errorf("simple_executor: unmarshal agent.execPrompt result: %w", err)
 	}
-	if result.TimedOut {
-		return "", apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_TIMED_OUT", "agent.execPrompt timed out before the task finished", nil)
-	}
-	if result.ExitCode == nil || *result.ExitCode != 0 {
-		return "", apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", fmt.Sprintf("agent.execPrompt exited non-zero: %s", result.Stderr), nil)
-	}
-	// TASK-TG-04-07: persist this run's stdout so a LATER run
-	// wave's buildExecutePrompt can resolve `{{outputs.<taskId>.*}}`
-	// against this task once it's a completed dependency — best-effort,
-	// a write failure here must not fail an otherwise-successful run.
-	_ = s.tasks.UpdateLastExecutionOutput(ctx, tenantID, taskID, result.Stdout)
-	return fmt.Sprintf("task-exec:%s:%s", taskID, requestID), nil
+	return result, nil
 }
 
 // buildExecutePrompt assembles the agent.execPrompt prompt from task,

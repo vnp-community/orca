@@ -1,6 +1,6 @@
 # BE-REQ-SOL-002: Mô hình dữ liệu, migration hai dialect và repository của Request
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Phụ thuộc [BE-REQ-SOL-001](./BE-REQ-SOL-001-scaffold-request-service.md).
+> **✅ Đã triển khai (kiểm chứng 2026-10-07).** 7/7 task xong; test tích hợp chạy thật trên Postgres 16 và MySQL 8.0. Lệch so với solution (struct repository riêng, cổng `SolutionCoreRepository`, cột `reason`) ghi ở [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md). Phụ thuộc [BE-REQ-SOL-001](./BE-REQ-SOL-001-scaffold-request-service.md).
 
 **CR:** [CR-REQ-002](../../../../../../docs/crs/v6/request-service-foundation/CR-REQ-002-request-data-model-and-repositories.md)
 **Service:** `request-service` (`internal/domain`, `internal/usecase/ports.go`, `internal/adapter/{postgres,mysql,grpc}`, `migrations/*`)

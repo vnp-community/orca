@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "kind": "phase",
+  "goal": "Nền tảng",
+  "entry_criteria": ["có IdP"],
+  "exit_criteria": ["test xanh"],
+  "extra": 1
+}

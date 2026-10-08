@@ -12,7 +12,6 @@ CREATE TABLE request.analysis_runs (
     error_code TEXT NULL,
     error_message TEXT NULL,
     raw_output TEXT NULL,
-    engine TEXT NOT NULL DEFAULT 'native',
     started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     finished_at TIMESTAMPTZ NULL
 );
@@ -22,4 +21,7 @@ CREATE UNIQUE INDEX analysis_runs_idem ON request.analysis_runs (tenant_id, requ
 CREATE INDEX analysis_runs_lease_scan ON request.analysis_runs (status, lease_expires_at);
 
 ALTER TABLE request.analysis_runs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY tenant_isolation ON request.analysis_runs USING (tenant_id = current_setting('orca.tenant_id', true)::uuid);
+ALTER TABLE request.analysis_runs FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON request.analysis_runs
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);

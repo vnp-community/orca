@@ -14,6 +14,11 @@ var (
 	ErrProfileTooLarge = errors.New("domain: profile too large")
 )
 
+const (
+	MaxProfileFeatures  = 64
+	MaxProfileJSONBytes = 65535
+)
+
 type ProfileSource string
 
 const (
@@ -47,26 +52,22 @@ func (p CapabilityProfile) HasFeature(name string) bool {
 }
 
 func NormalizeFeatures(features []string) []string {
-	if len(features) == 0 {
-		return []string{}
-	}
-	set := make(map[string]struct{})
-	var result []string
+	set := make(map[string]struct{}, len(features))
+	result := make([]string, 0, len(features))
 	for _, f := range features {
 		if f == "" {
 			continue
 		}
-		if _, ok := set[f]; !ok {
-			set[f] = struct{}{}
-			result = append(result, f)
-			if len(result) >= 64 {
-				break
-			}
+		if _, dup := set[f]; dup {
+			continue
 		}
+		set[f] = struct{}{}
+		result = append(result, f)
 	}
+	// Sort before capping so the kept 64 are deterministic regardless of agent order.
 	sort.Strings(result)
-	if result == nil {
-		result = []string{}
+	if len(result) > MaxProfileFeatures {
+		result = result[:MaxProfileFeatures]
 	}
 	return result
 }

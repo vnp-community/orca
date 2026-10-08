@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/create_request_contract.go` (mới), `internal/adapter/postgres/create_request_integration_test.go`, `internal/adapter/mysql/create_request_integration_test.go` (mới)
 **Depends on:** TASK-REQ-004-06, TASK-REQ-002-06
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run "Intake|Classification|Migration|Schema"`)
 
 ---
 
@@ -44,3 +44,8 @@ Các tiêu chí mục 4 của CR-REQ-004 chỉ chứng minh được trên DB th
 ## Rủi ro và lưu ý
 
 - MySQL có thể báo deadlock khi 12 giao dịch cùng ghi `request_counters`; test cho phép thử lại tối đa 3 lần với lỗi 1213 ở phía gọi (use case không tự thử lại giao dịch ngoài cùng ở feature này). Nếu deadlock xảy ra thường xuyên, báo lại để thêm retry vào `CreateRequest`.
+
+## Ghi chú triển khai
+
+- Kịch bản nằm ở `contracttest/intake_classification_contract.go` (`RunIntakeContract`), dùng `IntakeEnv` (không sửa `Env` chung). Transition dùng `dbTransitioner` trong contracttest (bản thật chưa hợp nhất).
+- `Concurrent12SameKey` chạy với `-race` cả hai dialect, một `created`, số đúng 1, không đốt số.

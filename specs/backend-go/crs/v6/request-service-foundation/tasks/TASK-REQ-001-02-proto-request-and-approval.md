@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/request/v1/request.proto` (mới), `backend-go/proto/orca/request/v1/approval.proto` (mới), `backend-go/proto/gen/go/orca/request/v1/*.pb.go` (sinh)
 **Depends on:** Không (song song được với TASK-REQ-001-01, 001-03)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `cd backend-go/proto && buf lint --path orca/request && buf breaking --against '../../.git#branch=HEAD,subdir=backend-go/proto' --path orca/request && buf generate --path orca/request`)
 
 ---
 
@@ -30,8 +30,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `buf lint` xanh; `buf breaking` xanh (lần đầu thêm package, không có gì để phá).
-- [x] Stub sinh vào `proto/gen/go/orca/request/v1/` và commit cùng PR (kiểm tra repo có commit thư mục `gen` như service khác).
+- [x] `buf lint --path orca/request` sạch (0 lỗi); `buf breaking` so với HEAD sạch (có `ignore_only` RPC_SAME_*_TYPE cho `approval.proto`, xem RPC-CATALOG.md). Đã mở rộng proto-first toàn bộ miền Request (xem RPC-CATALOG.md).
+- [x] (đã kiểm chứng 2026-10-07: `buf generate --path orca/request` cho ra mã trùng, chỉ khác dòng phiên bản protoc-gen-go-grpc) Stub sinh vào `proto/gen/go/orca/request/v1/` và commit cùng PR (kiểm tra repo có commit thư mục `gen` như service khác).
 - [x] Số trường `Request` khớp danh sách ở bước 2.
 - [x] Không có RPC nào không có message thật.
 
@@ -39,3 +39,9 @@
 
 - `repeated` ở `status`, `type` khác CR-REQ-001 (số ít); đây là quyết định của SOL-001 mục F để khỏi phá wire sau này. Báo người duyệt CR khi review.
 - Makefile `proto-lint` bỏ qua lỗi: tự chạy `buf` trực tiếp, đừng tin `make proto-lint` xanh.
+
+## Tiến độ
+
+Đã kiểm chứng 2026-10-07: `request.proto` (`GetRequest`, `ListRequests` với `repeated status/type`, `ListBacklog`) khớp danh sách trường; mã sinh trong `proto/gen/go/orca/request/v1` đồng bộ với `.proto`; `go build ./...` xanh. `approval.proto` hiện có đủ 7 RPC (khác task, vốn muốn service rỗng) do đợt trước thêm vào; nó vi phạm lint STANDARD (xem tiêu chí 1). Việc đổi tên response để hết lỗi lint thay đổi API approval nên để đợt Approval (R2) làm; workflow CI chỉ gate lint trên hai file request cho tới lúc đó.
+
+- 2026-10-08: proto-first toàn bộ `request-service`; `approval.proto` tách response dùng chung; sinh lại mã; `go build/vet/test` xanh ở proto, request-service, api-gateway, mcp-service, orchestration-service.

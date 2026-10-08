@@ -74,7 +74,7 @@ Thuộc tính phụ: `size` ∈ {`S`,`M`,`L`}; `urgency` ∈ {`normal`,`urgent`}
 
 ### 3.3 Trạng thái Request
 
-`new` → `classifying` → `awaiting_type_confirmation` → `analyzing` → `awaiting_analysis_approval` → `planning` → `awaiting_plan_approval` → `executing` → `completed`; ngoài ra `request_backlog` và `cancelled`.
+`new` → `classifying` → `awaiting_type_confirmation` → `analyzing` → `awaiting_analysis_approval` → `planning` → `awaiting_plan_approval` → `executing` → `completed`; ngoài ra `request_backlog`, `cancelled` và `awaiting_information` (chờ trả lời Clarification, CR-REQ-028).
 
 - `analyzing`: Solution, Chẩn đoán, Findings hoặc Answer tuỳ loại.
 - Loại bỏ qua trạng thái nào xem bảng 3.4. Loại luôn đi qua `new → classifying → awaiting_type_confirmation`.

@@ -130,7 +130,7 @@ func TestAppendDetailed_ForwardsAllFields(t *testing.T) {
 	if fake.lastReq == nil {
 		t.Fatal("expected AppendAuditEntry to be called")
 	}
-	
+
 	want := &authv1.AppendAuditEntryRequest{
 		TenantId:     "t1",
 		ActorId:      "a1",
@@ -158,5 +158,28 @@ func TestAppend_SucceedsOnHappyPath(t *testing.T) {
 	c.Append(context.Background(), "t1", "u1", "project.update", "project:p1", "allowed", "")
 	if fake.calls != 1 {
 		t.Fatalf("expected AppendAuditEntry to be called once, got %d", fake.calls)
+	}
+}
+
+func TestAppendDetailedStrict_ReturnsRPCError(t *testing.T) {
+	boom := errors.New("auth down")
+	fake := &fakeAuthServiceClient{err: boom}
+	c := New(fake)
+
+	if err := c.AppendDetailedStrict(context.Background(), Entry{TenantID: "t1", Action: "request.erase"}); !errors.Is(err, boom) {
+		t.Fatalf("strict variant must surface the RPC error, got %v", err)
+	}
+	// The best-effort variant keeps swallowing the same failure.
+	c.AppendDetailed(context.Background(), Entry{TenantID: "t1", Action: "request.erase"})
+	if fake.calls != 2 {
+		t.Fatalf("calls = %d, want 2", fake.calls)
+	}
+
+	ok := &fakeAuthServiceClient{}
+	if err := New(ok).AppendDetailedStrict(context.Background(), Entry{TenantID: "t1", MetadataJSON: "{\"audit_id\":\"a\"}"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok.lastReq.MetadataJson != "{\"audit_id\":\"a\"}" {
+		t.Fatalf("metadata not forwarded: %q", ok.lastReq.MetadataJson)
 	}
 }

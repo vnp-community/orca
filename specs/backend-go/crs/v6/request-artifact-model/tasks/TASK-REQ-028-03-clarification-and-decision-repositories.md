@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/ports.go` (sửa), `internal/adapter/postgres/clarification_repository.go`, `internal/adapter/postgres/decision_repository.go`, `internal/adapter/mysql/clarification_repository.go`, `internal/adapter/mysql/decision_repository.go`, `internal/usecase/transition_request.go` (sửa), `internal/usecase/status_write_guard_test.go` (sửa) và test
 **Depends on:** TASK-REQ-028-01, TASK-REQ-028-02, TASK-REQ-003-03 (`TransitionRequest`), TASK-REQ-001-04 (executor trong ctx), TASK-REQ-002-04/-05 (mẫu repository)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql -run 'ClarificationContract|ArtifactContract'`, `go test ./internal/usecase -run TransitionRequest`)
 
 ---
 
@@ -72,3 +72,11 @@ Hợp đồng hai repository dùng chung một bộ test chạy cho cả hai ada
 - MySQL không có `RETURNING`, nên `ClaimExpired` hai bước; trong transaction REPEATABLE READ phải dùng `SKIP LOCKED` đúng để không đọc snapshot cũ.
 - `ListPendingForUser` với danh sách team dài làm `IN (...)` lớn; giới hạn 100 team và ghi lỗi nếu vượt.
 - Tên chỉ mục trong lỗi trùng khoá phải khớp migration 028-01; test hợp đồng bắt lệch tên.
+
+## Ghi chú triển khai (rf/art)
+
+- Bộ kịch bản `contracttest.RunClarificationContract` chạy trên cả hai adapter: đua hai `RequestClarification` (đúng một thắng), hai bộ quét không xử lý trùng, `ListPendingForUser` cho cùng kết quả (user, team, role, reporter, admin, phân trang keyset, chéo tenant), vòng đời Decision và chỉ mục sống.
+- **Lệch so với task:** `ClaimExpired`/`ClaimNeedingReminder` được tách thành: `ListDueRefs`/`ListRemindableRefs` (đọc liên tenant, không ghi) + `LockOpenDue` (`SELECT ... FOR UPDATE SKIP LOCKED` trong giao dịch của đúng tenant) + `MarkExpired`/`MarkReminded`. Lý do: "đặt expired rồi `ReturnToBacklog`" phải cùng một giao dịch để lỗi thì Clarification vẫn `open` (yêu cầu của 028-06); `ClaimExpired` kiểu một câu lệnh đã commit trước khi biết `ReturnToBacklog` thành công. Quét liên tenant của Postgres dùng policy `app.relay` (cùng cách `classification_runs`).
+- `TransitionInput.ResumeStatus` và trường `resume_status` (thêm, tuỳ chọn) trong payload `status_changed`; test kiến trúc ghi `status` vẫn xanh.
+- Lỗi trùng khoá nhận biết theo tên chỉ mục (`clarifications_one_open`, `clarifications_request_seq`, `decisions_one_live`, `decisions_request_seq`); phiên bản conflict dùng `FailedPrecondition` như `REQUEST_VERSION_CONFLICT` hiện có (`common/apperrors` chưa có `Aborted` ở nhánh này).
+- `ListPendingForUser` giới hạn 100 team/role (MySQL, `IN (...)`).

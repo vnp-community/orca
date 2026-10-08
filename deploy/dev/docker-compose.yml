@@ -432,6 +432,25 @@ services:
       tenant-service: { condition: service_started }
       credential-broker-service: { condition: service_started }
 
+  request-service:
+    <<: *go-defaults
+    container_name: orca-go-request
+    volumes:
+      - ./bin/request-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/request?sslmode=disable
+      # ApprovalService stays closed until the approval wave registers real subject handlers.
+      REQUEST_APPROVAL_ENABLED: ${REQUEST_APPROVAL_ENABLED:-false}
+      # Global switch of the request flow; each tenant is also switched on with SetRequestFlowSettings
+      # (docs/guides/request/admin-enable-request-flow.md). Both must be on for the flow to run.
+      REQUEST_FLOW_ENABLED: ${REQUEST_FLOW_ENABLED:-false}
+      # Shared secret issue-status-sync presents for LookupRequestBySource; empty refuses the call.
+      SERVICE_INTERNAL_TOKEN: ${REQUEST_SERVICE_INTERNAL_TOKEN:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      nats: { condition: service_healthy }
+
   credential-broker-service:
     <<: *go-defaults
     container_name: orca-go-credential-broker
@@ -528,6 +547,13 @@ services:
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/issuestatussync?sslmode=disable
+      # Request ownership check and Jira sync driven by Request status (CR-REQ-024).
+      REQUEST_SERVICE_ADDR: request-service:9090
+      REQUEST_SERVICE_INTERNAL_TOKEN: ${REQUEST_SERVICE_INTERNAL_TOKEN:-}
+      ISSUE_SYNC_JIRA_STATUS_IN_PROGRESS: ${ISSUE_SYNC_JIRA_STATUS_IN_PROGRESS:-In Progress}
+      ISSUE_SYNC_JIRA_STATUS_DONE: ${ISSUE_SYNC_JIRA_STATUS_DONE:-Done}
+      ISSUE_SYNC_REQUEST_COMMENTS_ENABLED: ${ISSUE_SYNC_REQUEST_COMMENTS_ENABLED:-false}
+      ISSUE_SYNC_ORCA_BASE_URL: ${PUBLIC_BASE_URL:-}
     depends_on:
       postgres: { condition: service_healthy }
       issue-tracking-service: { condition: service_started }
@@ -546,6 +572,7 @@ services:
       - ./bin/api-gateway/orca:/app/bin/orca:ro
     environment:
       <<: *go-common-env
+      REQUEST_SERVICE_ADDR: request-service:9090
       PUBLIC_PORT: "8081"
       # CR-LOGIN-001 SSO (internal/adapter/httpgateway/auth_routes.go) —
       # see .env.example's "SSO" section. PUBLIC_BASE_URL is REQUIRED for
@@ -742,6 +769,10 @@ services:
     <<: *migrate-defaults
     volumes: ["./bin/mcp-service/migrations:/migrations:ro"]
     command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/mcp?sslmode=disable", "up"]
+  migrate-request:
+    <<: *migrate-defaults
+    volumes: ["./bin/request-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/request?sslmode=disable", "up"]
   migrate-issuestatussync:
     <<: *migrate-defaults
     volumes: ["./bin/issue-status-sync/migrations:/migrations:ro"]

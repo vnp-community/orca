@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/acceptance_criteria.go`, `internal/domain/request_content.go`, `internal/domain/request_content_validation.go`, `internal/usecase/append_request_revision.go`, `internal/usecase/edit_request_content.go`, `internal/usecase/request_content_write_guard_test.go`, `internal/usecase/ports.go` (sửa), `internal/adapter/{postgres,mysql}/request_revision_repository.go`, `internal/usecase/create_request.go` (sửa, của SOL-004) và test
 **Depends on:** TASK-REQ-027-01 (cột, bảng), TASK-REQ-027-03 (`CanonicalJSON`, `Violation`), TASK-REQ-003-03 (`TransitionRequest`, mẫu CAS và `InTx`), TASK-REQ-004-04 (`CreateRequest`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain ./internal/usecase -run 'AcceptanceCriteria|RequestContent|RequiredFields|AppendRequestRevision|EditRequestContent|ContentWriteGuard|CreateRequest|AC_|Validate'` và `go test -tags integration ./internal/adapter/...`)
 
 ---
 
@@ -91,3 +91,11 @@ Bẫy: AC không được tái dùng số khi bị gỡ (đánh dấu `retired`)
 - Bảng trường bắt buộc là mã Go tĩnh; đổi cho một loại là đổi hợp đồng với CR-REQ-028 và UI form (CR-REQ-019).
 - Quyền ghi mức Request cho `EditRequestContent` chưa chốt (README mục 8): tạm thời reporter hoặc admin, ghi chú trong mã.
 - `type` có thể đổi qua `ChangeRequestType` (SOL-005), nhưng cột `type` không nằm trong phạm vi `UpdateContent` trừ `cause=type_changed`: thống nhất với người giữ SOL-005 khi nối (task 027-07).
+
+## Ghi chú triển khai (rf/art)
+
+- `AppendRequestRevision` (+ `AppendWithinTx`) ở `usecase/append_request_revision.go`; `EditRequestContent` ở `edit_request_content.go`; `RequestRevisionRecorder` (`request_creation_revision_recorder.go`) cắm vào điểm móc `RequestCreationRecorder` của `CreateRequest`: ghi revision 1, sự kiện `revised` và chỉ mục `REQ-n` cùng transaction (test: `CreateFailureLeavesNoRevisionAndNoNumberGap` hai dialect).
+- **Lệch so với task:** (1) `UpdateContent` thuộc cổng `RequestContentWriter` thay vì `RequestRepository`; CAS thêm điều kiện `content_revision = N-1`. (2) `Create` của repository ghi luôn 5 cột nội dung (từ `CreateWithinTx`, khi có AC/`type_fields` ban đầu), nên không cần `SeedContent`. (3) Test kiến trúc chỉ cho **một** file (`append_request_revision.go`) gán cột nội dung, chặt hơn "ba file"; so khớp theo tên trường duy nhất và tên biến Request thường dùng (không có thông tin kiểu). (4) `RequestContent.TypeFields` không chứa `ac_next` trong bộ nhớ; bộ đếm nằm ở `AcceptanceCriteria.Next` và được ghi vào cột `type_fields`/snapshot. (5) Patch AC: danh sách mong muốn đầy đủ; AC vắng mặt bị `retired`, AC `retired` không hồi sinh. (6) `title`/`body` rỗng ở RPC nghĩa là giữ nguyên (proto3 không có presence). (7) `meta` (ví dụ waiver) chỉ nằm trong snapshot, không vào `content_digest`.
+- Quyền ghi tạm: reporter hoặc `role=admin` (Q1 README mục 8, chưa chốt).
+- Revision 1 của Request tạo **trước** migration `0060` (không có) không được backfill (service chưa phát hành, `content_revision` mặc định 1 nhưng chưa có dòng).
+- Test: `ConcurrentCallsOneWins` ở mức use case dùng CAS tuần tự trên fake; tranh chấp thật hai goroutine nằm ở `AppendConcurrentOneWins` (contract, Postgres và MySQL).

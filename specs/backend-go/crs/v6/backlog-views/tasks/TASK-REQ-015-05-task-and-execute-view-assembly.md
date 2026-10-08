@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/list_backlog_tasks.go` (mới), `internal/usecase/ports.go`, `internal/adapter/grpcclient/task_client.go` (thêm `ListExecutionStates`, dùng chung với SOL-013), `internal/adapter/postgres/backlog_approvals.go`, `internal/adapter/mysql/backlog_approvals.go` (mới), `internal/usecase/list_backlog_tasks_test.go` (mới)
 **Depends on:** TASK-REQ-015-01, 02, 03, 04; SOL-011 task 04 (`ListTasks` lọc); SOL-013 task 03 (`task_run_outcomes.LatestFailed`); CR-REQ-009 (`approvals`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -59,3 +59,7 @@
 - Hiệu năng: tối đa 2.000 hàng mỗi lần (20 Request × 100 task) và `IN` lớn; chưa đo.
 - `last_link_status` của Engine 2/3 không phản ánh run xong thật (CR-TG-008); dùng `status` task làm nguồn chính.
 - Task `review` (khi `REQUEST_AUTO_COMPLETE_TASKS` tắt) không thuộc EXECUTE (Q3 của CR); đổi khi chủ CR quyết khác.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

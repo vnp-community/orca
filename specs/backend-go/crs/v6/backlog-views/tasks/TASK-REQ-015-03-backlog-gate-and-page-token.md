@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/backlog_gate.go` (mới), `internal/domain/backlog_page_token.go` (mới), `internal/domain/backlog_gate_test.go`, `backlog_page_token_test.go` (mới)
 **Depends on:** CR-REQ-003 (`FlowFor`, `PhasesFor`, `Size`), CR-REQ-009 (kiểu `Approval`, `subject_type`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -52,3 +52,7 @@
 - Bảng cổng 2.4 là mở rộng của CR (README mục 8 điều 7 chấp nhận nhưng chưa xác nhận từng dòng): xác nhận với chủ CR-REQ-015 trước khi merge.
 - Task lồng sâu hơn một cấp bị bỏ ở bản đầu (Q4 của CR); hàm trả `Skipped` để hiển thị sau.
 - Giả định `approvals` giữ nhiều bản ghi mỗi chủ thể; nếu CR-REQ-009 chỉ giữ một dòng và cập nhật tại chỗ, `ApprovalIndex` vẫn đúng nhưng đơn giản hơn.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

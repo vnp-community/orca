@@ -34,6 +34,7 @@ import (
 	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/health"
+	"github.com/stablyai/orca-go/common/internalcaller"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
@@ -42,12 +43,14 @@ import (
 
 	issuestatussynceventbus "github.com/stablyai/orca-go/services/issue-status-sync/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/issue-status-sync/internal/adapter/grpcclient"
+	issuestatussyncmetrics "github.com/stablyai/orca-go/services/issue-status-sync/internal/adapter/metrics"
 	issuestatussyncmysql "github.com/stablyai/orca-go/services/issue-status-sync/internal/adapter/mysql"
 	issuestatussyncpostgres "github.com/stablyai/orca-go/services/issue-status-sync/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/issue-status-sync/internal/usecase"
 
 	issuetrackingv1 "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 )
 
@@ -101,6 +104,7 @@ func run() error {
 	// adapter at startup, no separate DB_DIALECT env var (see
 	// specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-001.md §1).
 	var processedEvents usecase.ProcessedEventStore
+	var requestSyncState usecase.RequestSyncStateStore
 	switch caps.Dialect {
 	case dbcapability.DialectPostgres:
 		pool, err := pgxpool.New(ctx, dsn)
@@ -109,6 +113,7 @@ func run() error {
 		}
 		defer pool.Close()
 		processedEvents = issuestatussyncpostgres.NewProcessedEventsStore(pool)
+		requestSyncState = issuestatussyncpostgres.NewRequestSyncStateStore(pool)
 		healthSrv.Register("postgres", func() error {
 			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
@@ -125,6 +130,7 @@ func run() error {
 		}
 		defer db.Close()
 		processedEvents = issuestatussyncmysql.New(db)
+		requestSyncState = issuestatussyncmysql.NewRequestSyncStateStore(db)
 		healthSrv.Register("mysql", func() error {
 			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
@@ -158,7 +164,28 @@ func run() error {
 	defer func() { _ = projectConn.Close() }()
 	projectClient := grpcclient.NewProjectClient(projectv1.NewProjectServiceClient(projectConn))
 
-	syncIssueStatusUC := usecase.NewSyncIssueStatus(issueTrackingClient, scmClient, projectClient, processedEvents, logger)
+	metricsSet := issuestatussyncmetrics.New()
+	syncOpts := []usecase.Option{
+		usecase.WithStatusNames(usecase.StatusNames{InProgress: cfg.JiraStatusInProgress, Done: cfg.JiraStatusDone}),
+		usecase.WithRequestSyncState(requestSyncState),
+		usecase.WithObserver(metricsSet),
+	}
+	if cfg.RequestCommentsEnabled {
+		syncOpts = append(syncOpts, usecase.WithIssueComments(issueTrackingClient, cfg.OrcaBaseURL))
+	}
+	if cfg.RequestServiceAddr != "" {
+		if cfg.RequestServiceInternalToken == "" {
+			logger.Warn("REQUEST_SERVICE_INTERNAL_TOKEN is empty: request-service refuses LookupRequestBySource, so worktree/PR events will retry and then be dropped")
+		}
+		requestConn, err := grpc.NewClient(cfg.RequestServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithChainUnaryInterceptor(internalcaller.ClientInterceptor(cfg.RequestServiceInternalToken)))
+		if err != nil {
+			return fmt.Errorf("dialing request-service: %w", err)
+		}
+		defer func() { _ = requestConn.Close() }()
+		syncOpts = append(syncOpts, usecase.WithRequestLookup(grpcclient.NewRequestClient(requestv1.NewRequestServiceClient(requestConn))))
+	}
+	syncIssueStatusUC := usecase.NewSyncIssueStatus(issueTrackingClient, scmClient, projectClient, processedEvents, logger, syncOpts...)
 
 	_, consumer, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
 	if err != nil {
@@ -179,7 +206,7 @@ func run() error {
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
-		Handler: healthSrv.Handler(),
+		Handler: healthAndMetricsMux(healthSrv.Handler(), metricsSet.Handler()),
 	}
 
 	errCh := make(chan error, 2)
@@ -206,6 +233,14 @@ func run() error {
 	consumerWG.Wait()
 
 	return nil
+}
+
+// healthAndMetricsMux keeps /healthz and /readyz as they were and adds /metrics.
+func healthAndMetricsMux(health, metrics http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/", health)
+	mux.Handle("/metrics", metrics)
+	return mux
 }
 
 // toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into

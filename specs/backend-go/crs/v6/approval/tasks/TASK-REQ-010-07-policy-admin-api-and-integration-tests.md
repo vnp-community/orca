@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, grpc, test
 **File:** `internal/usecase/manage_approval_policies.go` (mới), `internal/adapter/grpc/approval_policy_admin_server.go` (mới, chỉ khi được chấp nhận), `proto/orca/request/v1/approval.proto` (sửa, chỉ khi được chấp nhận), `internal/adapter/{postgres,mysql}/approval_policy_flow_integration_test.go` (mới)
 **Depends on:** TASK-REQ-010-03, TASK-REQ-010-06
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql -run "ApprovalFlow|ApprovalPolicy"`; `cmd/server` `TestRun_ServesApprovalServicesWhenEnabled`)
 
 ## Context
 
@@ -35,3 +35,8 @@
 
 - Thêm RPC ngoài README 3.6 cần cập nhật README v6 (người điều phối).
 - Không đặt mặc định chính sách bằng migration dữ liệu.
+
+## Kết quả triển khai (2026-10-08)
+- Câu hỏi mở 2 coi như được chấp nhận (proto `ApprovalPolicyAdminService` 3 RPC đã có từ đợt proto-first): `ManageApprovalPolicies` (chỉ admin người, không agent; Validate; khoá lạc quan `version`; `tenant_id` và `created_by` lấy từ ctx) và `ApprovalPolicyAdminServer` thật. README v6 mục 3.6 vẫn chưa liệt kê RPC này (người điều phối cập nhật).
+- Test toàn luồng với handler giả (`RunApprovalFlowContract`): chính sách team (thành viên duyệt được, người ngoài `NOT_APPROVER`), snapshot không đổi khi sửa chính sách, `pre_deploy` mà admin duy nhất là người yêu cầu thì `NO_ELIGIBLE_APPROVER` và không có dòng, hết hạn đưa Request về backlog, chéo tenant không rò (cả RLS Postgres và lọc MySQL).
+- Chưa làm: kiểm "team tồn tại qua tenant-service" khi lưu chính sách (cần client thêm; chính sách trỏ team không tồn tại thì không ai khớp).

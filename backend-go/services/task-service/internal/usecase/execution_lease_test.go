@@ -119,7 +119,7 @@ func (f *fakeLeaseRepository) ReleaseUnlinkedInProgress(_ context.Context, grace
 		if n >= limit {
 			break
 		}
-		if t.Status != domain.StatusInProgress || t.ActiveExecutionLinkID != "" || f.recentTasks[id] {
+		if t.Status != domain.StatusInProgress || t.ActiveExecutionLinkID != "" || f.recentTasks[id] || domain.IsContainerType(t.Type) {
 			continue
 		}
 		t.Status = domain.StatusOpen
@@ -129,7 +129,7 @@ func (f *fakeLeaseRepository) ReleaseUnlinkedInProgress(_ context.Context, grace
 	return n, nil
 }
 
-func (f *fakeLeaseRepository) ReleaseExecution(_ context.Context, tenantID, taskID, linkID string, to domain.Status) (bool, error) {
+func (f *fakeLeaseRepository) ReleaseExecution(_ context.Context, tenantID, taskID, linkID string, to domain.Status, events []domain.OutboxEvent) (bool, error) {
 	f.tasks.mu.Lock()
 	defer f.tasks.mu.Unlock()
 	t, ok := f.tasks.tasks[taskID]
@@ -138,6 +138,7 @@ func (f *fakeLeaseRepository) ReleaseExecution(_ context.Context, tenantID, task
 	}
 	t.Status = to
 	f.tasks.tasks[taskID] = t
+	f.tasks.execEvents = append(f.tasks.execEvents, events...)
 	return true, nil
 }
 
@@ -429,13 +430,15 @@ func TestExecuteTask_DirectAgent_HeartbeatRenewsWhileRunningThenStops(t *testing
 }
 
 type fakeClaimer struct {
-	claimed bool
-	err     error
-	gotFrom []domain.Status
+	claimed   bool
+	err       error
+	gotFrom   []domain.Status
+	gotEvents [][]domain.OutboxEvent
 }
 
-func (f *fakeClaimer) ClaimForExecution(_ context.Context, _, _ string, from domain.Status) (bool, error) {
+func (f *fakeClaimer) ClaimForExecution(_ context.Context, _, _ string, from domain.Status, events []domain.OutboxEvent) (bool, error) {
 	f.gotFrom = append(f.gotFrom, from)
+	f.gotEvents = append(f.gotEvents, events)
 	return f.claimed, f.err
 }
 

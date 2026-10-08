@@ -7,17 +7,177 @@
     "confidence": "high"
   },
   {
-    "name": "uuid_not_secret",
-    "input": "id=3f2504e0-4f89-11d3-9a0c-0305e82c3301",
-    "want_redacted": "id=3f2504e0-4f89-11d3-9a0c-0305e82c3301",
-    "kinds": [],
-    "confidence": "high",
-    "is_negative": true
+    "name": "github_oauth_token_in_json",
+    "input": "{\"token_value\": \"gho_0123456789abcdefghijABCDEFGH\"}",
+    "want_redacted": "{\"token_value\": \"[REDACTED]\"}",
+    "kinds": ["github_token"],
+    "confidence": "high"
+  },
+  {
+    "name": "github_fine_grained_pat",
+    "input": "export GH=github_pat_11ABCDEFG0abcdefghijkl_mnopqrstuvwxyz0123456789\n",
+    "want_redacted": "export GH=[REDACTED]\n",
+    "kinds": ["github_token"],
+    "confidence": "high"
+  },
+  {
+    "name": "github_server_token_in_url",
+    "input": "https://x-access-token:ghs_0123456789abcdefghijABCDEFGH@github.com/org/repo.git",
+    "want_redacted": "https://x-access-token:[REDACTED]@github.com/org/repo.git",
+    "kinds": ["github_token"],
+    "confidence": "high"
+  },
+  {
+    "name": "aws_akia_in_text",
+    "input": "Khóa truy cập: AKIAIOSFODNN7EXAMPLE đã bị lộ",
+    "want_redacted": "Khóa truy cập: [REDACTED] đã bị lộ",
+    "kinds": ["aws_access_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "aws_asia_temp_key",
+    "input": "key ASIAIOSFODNN7EXAMPLE.",
+    "want_redacted": "key [REDACTED].",
+    "kinds": ["aws_access_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "bearer_header",
+    "input": "curl -H 'X-Trace: 1' Bearer abcdef0123456789' https://api.example.com",
+    "want_redacted": "curl -H 'X-Trace: 1' [REDACTED]' https://api.example.com",
+    "kinds": ["bearer_token"],
+    "confidence": "medium"
+  },
+  {
+    "name": "bearer_lowercase",
+    "input": "header bearer bearer abcdef0123456789xyz end",
+    "want_redacted": "header bearer [REDACTED] end",
+    "kinds": ["bearer_token"],
+    "confidence": "medium"
+  },
+  {
+    "name": "openai_key_in_sentence",
+    "input": "Dùng khóa sk-abcdefghijklmnop1234567890 để gọi API",
+    "want_redacted": "Dùng khóa [REDACTED] để gọi API",
+    "kinds": ["openai_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "openai_project_key_in_json",
+    "input": "{\"k\":\"sk-proj-abcdefghijklmnop1234567890_-xyz\"}",
+    "want_redacted": "{\"k\":\"[REDACTED]\"}",
+    "kinds": ["openai_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "anthropic_key",
+    "input": "ANTHROPIC sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123 ok",
+    "want_redacted": "ANTHROPIC [REDACTED] ok",
+    "kinds": ["anthropic_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "anthropic_key_in_url",
+    "input": "https://x.example.com/?k=sk-ant-abcdefghijklmnopqrstuv&b=2",
+    "want_redacted": "https://x.example.com/?k=[REDACTED]&b=2",
+    "kinds": ["anthropic_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "slack_bot_token",
+    "input": "slack: xoxb-1234567890-abcdefghij thế",
+    "want_redacted": "slack: [REDACTED] thế",
+    "kinds": ["slack_token"],
+    "confidence": "high"
+  },
+  {
+    "name": "slack_user_token_in_json",
+    "input": "{\"t\":\"xoxp-1234567890-1234567890-abcdefghij\"}",
+    "want_redacted": "{\"t\":\"[REDACTED]\"}",
+    "kinds": ["slack_token"],
+    "confidence": "high"
+  },
+  {
+    "name": "jwt_in_text",
+    "input": "phiên: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnop hết hạn",
+    "want_redacted": "phiên: [REDACTED] hết hạn",
+    "kinds": ["jwt"],
+    "confidence": "medium"
+  },
+  {
+    "name": "jwt_in_query",
+    "input": "https://x.example.com/cb?id_token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnop&s=1",
+    "want_redacted": "https://x.example.com/cb?id_token=[REDACTED]&s=1",
+    "kinds": ["jwt"],
+    "confidence": "medium"
+  },
+  {
+    "name": "private_key_pem_block",
+    "input": "khóa:\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0123\nabcdef\n-----END RSA PRIVATE KEY-----\nhết",
+    "want_redacted": "khóa:\n[REDACTED]\nhết",
+    "kinds": ["private_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "private_key_openssh",
+    "input": "k=\n-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----\n",
+    "want_redacted": "k=\n[REDACTED]\n",
+    "kinds": ["private_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "private_key_in_json_escaped_text",
+    "input": "prefix -----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY----- suffix",
+    "want_redacted": "prefix [REDACTED] suffix",
+    "kinds": ["private_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "google_api_key",
+    "input": "maps key=AIzaSyA-1234567890abcdefghijklmnopqrstu&z=1",
+    "want_redacted": "maps key=[REDACTED]&z=1",
+    "kinds": ["google_api_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "google_api_key_in_vietnamese",
+    "input": "Khóa Google: AIzaSyB_1234567890abcdefghijklmnopqrstu.",
+    "want_redacted": "Khóa Google: [REDACTED].",
+    "kinds": ["google_api_key"],
+    "confidence": "high"
+  },
+  {
+    "name": "vault_token",
+    "input": "VAULT_ADDR ok; hvs.CAESIabcdefghijklmnopqrstuvwxyz done",
+    "want_redacted": "VAULT_ADDR ok; [REDACTED] done",
+    "kinds": ["vault_token"],
+    "confidence": "high"
+  },
+  {
+    "name": "vault_token_in_json",
+    "input": "{\"auth\":\"hvs.abcdefghijklmnopqrstuvwxyz012345\"}",
+    "want_redacted": "{\"auth\":\"[REDACTED]\"}",
+    "kinds": ["vault_token"],
+    "confidence": "high"
   },
   {
     "name": "connection_string_with_password",
     "input": "Connecting to postgres://user:SuperSecretPassword123@db.example.com",
     "want_redacted": "Connecting to postgres://user:[REDACTED]@db.example.com",
+    "kinds": ["connection_string"],
+    "confidence": "high"
+  },
+  {
+    "name": "connection_string_mysql_in_url",
+    "input": "dsn=mysql://root:p4ss%21word@10.0.0.5:3306/orca",
+    "want_redacted": "dsn=mysql://root:[REDACTED]@10.0.0.5:3306/orca",
+    "kinds": ["connection_string"],
+    "confidence": "high"
+  },
+  {
+    "name": "connection_string_mongodb_vietnamese",
+    "input": "Chuỗi kết nối mongodb+srv://admin:M0ng0Pass@cluster0.example.net/db là bí mật",
+    "want_redacted": "Chuỗi kết nối mongodb+srv://admin:[REDACTED]@cluster0.example.net/db là bí mật",
     "kinds": ["connection_string"],
     "confidence": "high"
   },
@@ -29,10 +189,173 @@
     "confidence": "medium"
   },
   {
+    "name": "dotenv_token_quoted",
+    "input": "GITHUB_TOKEN=\"abcd1234efgh\"\nOTHER=1",
+    "want_redacted": "GITHUB_TOKEN=\"[REDACTED]\"\nOTHER=1",
+    "kinds": ["dotenv_secret"],
+    "confidence": "medium"
+  },
+  {
+    "name": "dotenv_password_second_line",
+    "input": "A=1\nDB_PASSWORD=hunter2hunter2\nB=2",
+    "want_redacted": "A=1\nDB_PASSWORD=[REDACTED]\nB=2",
+    "kinds": ["dotenv_secret"],
+    "confidence": "medium"
+  },
+  {
     "name": "secret_assignment",
     "input": "const apiKey = \"AABBCCDDEEFF\"",
     "want_redacted": "const apiKey = \"[REDACTED]\"",
     "kinds": ["secret_assignment"],
     "confidence": "medium"
+  },
+  {
+    "name": "secret_assignment_yaml",
+    "input": "password: correct-horse-battery\nuser: bob",
+    "want_redacted": "password: [REDACTED]\nuser: bob",
+    "kinds": ["secret_assignment"],
+    "confidence": "medium"
+  },
+  {
+    "name": "secret_assignment_in_json",
+    "input": "{\"password\": \"hunter2hunter2\"}",
+    "want_redacted": "{\"password\": \"[REDACTED]\"}",
+    "kinds": ["secret_assignment"],
+    "confidence": "medium"
+  },
+  {
+    "name": "secret_assignment_query",
+    "input": "https://x.example.com/?a=1&api_key=ABCDEF123456&b=2",
+    "want_redacted": "https://x.example.com/?a=1&api_key=[REDACTED]&b=2",
+    "kinds": ["secret_assignment"],
+    "confidence": "medium"
+  },
+  {
+    "name": "uuid_not_secret",
+    "input": "id=3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+    "want_redacted": "id=3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "sha1_hex",
+    "input": "commit 2fd4e1c67a2d28fced849ee1bb76e7391b93eb12 merged",
+    "want_redacted": "commit 2fd4e1c67a2d28fced849ee1bb76e7391b93eb12 merged",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "sha256_hex",
+    "input": "hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "want_redacted": "hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "password_policy_sentence",
+    "input": "Chính sách password policy yêu cầu tối thiểu 12 ký tự",
+    "want_redacted": "Chính sách password policy yêu cầu tối thiểu 12 ký tự",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "short_sk_prefix",
+    "input": "sk-short",
+    "want_redacted": "sk-short",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "email",
+    "input": "liên hệ user@example.com để biết thêm",
+    "want_redacted": "liên hệ user@example.com để biết thêm",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "url_without_userinfo",
+    "input": "https://example.com/a?x=1",
+    "want_redacted": "https://example.com/a?x=1",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "go_token_count",
+    "input": "tokenCount := 5",
+    "want_redacted": "tokenCount := 5",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "go_code_snippet",
+    "input": "func f() int {\n\tkeyCount := len(keys)\n\treturn keyCount\n}",
+    "want_redacted": "func f() int {\n\tkeyCount := len(keys)\n\treturn keyCount\n}",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "empty",
+    "input": "",
+    "want_redacted": "",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "vietnamese_plain",
+    "input": "Tiếng Việt có dấu: người dùng đăng nhập thành công",
+    "want_redacted": "Tiếng Việt có dấu: người dùng đăng nhập thành công",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "git_sha_in_url",
+    "input": "https://github.com/org/repo/commit/2fd4e1c67a2d28fced849ee1bb76e7391b93eb12",
+    "want_redacted": "https://github.com/org/repo/commit/2fd4e1c67a2d28fced849ee1bb76e7391b93eb12",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "url_with_port_no_password",
+    "input": "postgres://db.example.com:5432/orca",
+    "want_redacted": "postgres://db.example.com:5432/orca",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "secret_word_alone",
+    "input": "this is a secret plan with no value",
+    "want_redacted": "this is a secret plan with no value",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "aws_lookalike_lowercase",
+    "input": "akiaiosfodnn7example",
+    "want_redacted": "akiaiosfodnn7example",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "bearer_short",
+    "input": "Bearer abc",
+    "want_redacted": "Bearer abc",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
   }
 ]

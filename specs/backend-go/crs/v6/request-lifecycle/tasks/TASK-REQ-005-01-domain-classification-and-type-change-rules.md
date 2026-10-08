@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_classification_proposal.go`, `internal/domain/request_confirmation_rules.go`, `internal/domain/request_type_change_paths.go`, `internal/domain/request_classification_errors.go` và `*_test.go`; `migrations/postgres/0004_request_classification_attempts.{up,down}.sql`, `migrations/mysql/0004_request_classification_attempts.{up,down}.sql` (mới); `internal/domain/request.go`, repository hai dialect (sửa thêm cột)
 **Depends on:** TASK-REQ-003-01, TASK-REQ-004-01
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain/... và go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run "Intake|Classification|Migration|Schema"`)
 
 ---
 
@@ -41,3 +41,10 @@ CR-REQ-005 mục 2.2 đến 2.4. `FlowFor(type).PhaseRule` có từ TASK-REQ-003
 
 - `ParseClassificationProposal` tìm đối tượng JSON trong chuỗi tự do: dùng bộ tách dấu ngoặc cân bằng, không regex tham lam (đầu ra có thể chứa `}` trong chuỗi).
 - Cột mới đẩy migration của SOL-006 thành `0005`.
+
+## Ghi chú triển khai
+
+- Số migration thật: `0026_request_classification_attempts` (hai dialect, CHECK >= 0). Cột nằm trong cùng điểm chạm repository với `source_hints`.
+- `ValidateConfirmation` không dùng `FlowFor().PhaseRule` (registry thuộc lifecycle-a, chưa hợp nhất): `typeRequiresSize` cố định `bug`, `refactor` theo README 3.4; khi registry có thể thay.
+- Thêm `REQUEST_ACTOR_NOT_ALLOWED` và `ErrRequestTypeActionWrongStatus` (mã `REQUEST_TRANSITION_NOT_ALLOWED`) cho use case xác nhận/đổi loại.
+- `ParseClassificationProposal` yêu cầu đủ 5 trường (kể cả `reason`, có thể rỗng).

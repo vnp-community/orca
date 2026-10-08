@@ -58,9 +58,12 @@ func (r *Repository) RunInTx(ctx context.Context, fn func(ctx context.Context, t
 	scoped := &Repository{pool: r.pool, db: tx}
 	if err := fn(ctx, scoped, scoped); err != nil {
 		_ = tx.Rollback()
-		return err
+		return markTxConflict(err)
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return markTxConflict(err)
+	}
+	return nil
 }
 
 // taskColumns is the bare column list every query in this file that reads a
@@ -82,7 +85,8 @@ const taskColumns = `
 	progress_percent, active_execution_id, last_execution_output,
 	task_number, pr_url, workflow_template_id,
 	active_execution_link_id,
-	labels, reporter_id, workflow_exec_id, done_subtasks, total_subtasks, share_token
+	labels, reporter_id, workflow_exec_id, done_subtasks, total_subtasks, share_token,
+	request_id
 `
 
 // rowScanner abstracts over *sql.Row/*sql.Rows — both satisfy
@@ -102,7 +106,7 @@ type taskRowHolder struct {
 	parentID, projectID, description, assigneeID, ownerID             sql.NullString
 	promptTemplate, aiContext, aiPlanJSON, worktreeID, agentSessionID sql.NullString
 	activeExecutionID, lastExecutionOutput, prURL, workflowTemplateID sql.NullString
-	activeExecutionLinkID, reporterID, shareToken                     sql.NullString
+	activeExecutionLinkID, reporterID, shareToken, requestID          sql.NullString
 	dueDate                                                           sql.NullTime
 	estimatedHours, actualHours                                       sql.NullFloat64
 	taskNumber                                                        sql.NullInt64
@@ -120,6 +124,7 @@ func (h *taskRowHolder) dest() []any {
 		&h.taskNumber, &h.prURL, &h.workflowTemplateID,
 		&h.activeExecutionLinkID,
 		&h.labelsJSON, &h.reporterID, &h.t.WorkflowExecID, &h.t.DoneSubtasks, &h.t.TotalSubtasks, &h.shareToken,
+		&h.requestID,
 	}
 }
 
@@ -144,6 +149,7 @@ func (h *taskRowHolder) toTask() (domain.Task, error) {
 	t.ActiveExecutionLinkID = h.activeExecutionLinkID.String
 	t.ReporterID = h.reporterID.String
 	t.ShareToken = h.shareToken.String
+	t.RequestID = h.requestID.String
 	if h.dueDate.Valid {
 		v := h.dueDate.Time
 		t.DueDate = &v
@@ -189,13 +195,18 @@ func scanTask(row rowScanner) (domain.Task, error) {
 // back even if the INSERT INTO tasks below fails, so the two statements
 // don't need to share an explicit transaction for correctness.
 func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
-	res, err := r.db.ExecContext(ctx, `INSERT INTO task_number_seq VALUES (NULL)`)
-	if err != nil {
-		return domain.Task{}, fmt.Errorf("mysql: allocate task_number: %w", err)
-	}
-	taskNumber, err := res.LastInsertId()
-	if err != nil {
-		return domain.Task{}, fmt.Errorf("mysql: read allocated task_number: %w", err)
+	// Plan/phase containers are not addressable as "#TG-N", so they must not consume a number.
+	var taskNumber sql.NullInt64
+	if !domain.IsContainerType(task.Type) {
+		res, err := r.db.ExecContext(ctx, `INSERT INTO task_number_seq VALUES (NULL)`)
+		if err != nil {
+			return domain.Task{}, fmt.Errorf("mysql: allocate task_number: %w", err)
+		}
+		n, err := res.LastInsertId()
+		if err != nil {
+			return domain.Task{}, fmt.Errorf("mysql: read allocated task_number: %w", err)
+		}
+		taskNumber = sql.NullInt64{Int64: n, Valid: true}
 	}
 
 	labelsJSON, err := marshalLabels(task.Labels)
@@ -208,16 +219,16 @@ func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task,
 			id, tenant_id, title, status, parent_id, project_id,
 			description, task_type, priority, assignee_id, owner_id, due_date,
 			estimated_hours, prompt_template, ai_context, visibility, task_number,
-			labels, reporter_id, workflow_exec_id
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+			labels, reporter_id, workflow_exec_id, request_id
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 	`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID), nullableUUID(task.ProjectID),
 		task.Description, orDefault(task.Type, "task"), orDefault(task.Priority, "medium"), nullableUUID(task.AssigneeID),
 		nullableUUID(task.OwnerID), task.DueDate, task.EstimatedHours, task.PromptTemplate, task.AIContext, orDefault(task.Visibility, "team"),
-		taskNumber, labelsJSON, nullableUUID(task.ReporterID), task.WorkflowExecID)
+		taskNumber, labelsJSON, nullableUUID(task.ReporterID), task.WorkflowExecID, nullableUUID(task.RequestID))
 	if err != nil {
-		return domain.Task{}, fmt.Errorf("mysql: insert task: %w", err)
+		return domain.Task{}, wrapActivePlanViolation(fmt.Errorf("mysql: insert task: %w", err))
 	}
-	task.TaskNumber = taskNumber
+	task.TaskNumber = taskNumber.Int64
 	return task, nil
 }
 
@@ -305,7 +316,8 @@ func prefixedTaskColumns(alias string) string {
 	` + alias + `.progress_percent, ` + alias + `.active_execution_id, ` + alias + `.last_execution_output,
 	` + alias + `.task_number, ` + alias + `.pr_url, ` + alias + `.workflow_template_id,
 	` + alias + `.active_execution_link_id,
-	` + alias + `.labels, ` + alias + `.reporter_id, ` + alias + `.workflow_exec_id, ` + alias + `.done_subtasks, ` + alias + `.total_subtasks, ` + alias + `.share_token
+	` + alias + `.labels, ` + alias + `.reporter_id, ` + alias + `.workflow_exec_id, ` + alias + `.done_subtasks, ` + alias + `.total_subtasks, ` + alias + `.share_token,
+	` + alias + `.request_id
 `
 }
 
@@ -357,71 +369,34 @@ func (r *Repository) SetActiveExecutionLink(ctx context.Context, tenantID, taskI
 	return nil
 }
 
-func (r *Repository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
-	res, err := r.db.ExecContext(ctx, `
-		UPDATE tasks SET status = ?, actual_hours = ?, agent_session_id = NULL, updated_at = NOW(6)
-		WHERE tenant_id = ? AND id = ?
-	`, status, actualHours, tenantID, id)
-	if err != nil {
-		return fmt.Errorf("mysql: complete task execution: %w", err)
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("mysql: complete task execution rows affected: %w", err)
-	}
-	if affected == 0 {
-		return fmt.Errorf("mysql: task %s not found", id)
-	}
-	return nil
+func (r *Repository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64, events []domain.OutboxEvent) error {
+	return r.inOptionalTx(ctx, len(events) > 0, func(db dbtx) error {
+		res, err := db.ExecContext(ctx, `
+			UPDATE tasks SET status = ?, actual_hours = ?, agent_session_id = NULL, updated_at = NOW(6)
+			WHERE tenant_id = ? AND id = ?
+		`, status, actualHours, tenantID, id)
+		if err != nil {
+			return fmt.Errorf("mysql: complete task execution: %w", err)
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("mysql: complete task execution rows affected: %w", err)
+		}
+		// A same-status rewrite reports 0 affected rows only when nothing changed; updated_at always moves, so 0 means missing.
+		if affected == 0 {
+			return fmt.Errorf("mysql: task %s not found", id)
+		}
+		return insertOutboxEvents(ctx, db, tenantID, events)
+	})
 }
 
 func (r *Repository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
-	row := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tasks WHERE tenant_id = ? AND project_id = ? AND status = 'in_progress')`, tenantID, projectID)
+	row := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tasks WHERE tenant_id = ? AND project_id = ? AND status = 'in_progress' AND task_type NOT IN ('plan','phase'))`, tenantID, projectID)
 	var exists bool
 	if err := row.Scan(&exists); err != nil {
 		return false, fmt.Errorf("mysql: query has-active-executions: %w", err)
 	}
 	return exists, nil
-}
-
-// List returns tasks for tenantID, optionally filtered by projectID (empty
-// = no filter), cursor-paginated by id. Placeholders repeat per MySQL's '?'
-// style (unlike Postgres's $N, which can reference the same bound param
-// twice) — each `?` is its own positional argument.
-func (r *Repository) List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error) {
-	if pageSize <= 0 {
-		pageSize = 50
-	}
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT `+taskColumns+`
-		FROM tasks
-		WHERE tenant_id = ?
-		  AND (? = '' OR project_id = ?)
-		  AND (? = '' OR id > ?)
-		ORDER BY id
-		LIMIT ?
-	`, tenantID, projectID, projectID, pageToken, pageToken, pageSize)
-	if err != nil {
-		return nil, "", fmt.Errorf("mysql: query tasks: %w", err)
-	}
-	defer rows.Close()
-
-	var out []domain.Task
-	for rows.Next() {
-		t, err := scanTask(rows)
-		if err != nil {
-			return nil, "", fmt.Errorf("mysql: scan task row: %w", err)
-		}
-		out = append(out, t)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, "", fmt.Errorf("mysql: iterate task rows: %w", err)
-	}
-	nextToken := ""
-	if len(out) == int(pageSize) {
-		nextToken = out[len(out)-1].ID
-	}
-	return out, nextToken, nil
 }
 
 // Update persists a partial field update and, when events is non-empty, one

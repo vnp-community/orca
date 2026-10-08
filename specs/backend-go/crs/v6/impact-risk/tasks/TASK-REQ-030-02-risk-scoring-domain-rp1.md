@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / domain thuần, không I/O
 **File:** `internal/domain/impact_assessment.go` (mới), `internal/domain/risk_dimension.go` (mới), `internal/domain/risk_rules_v1.go` (mới), `internal/domain/risk_scoring.go` (mới), `internal/domain/risk_hard_rules.go` (mới), `internal/domain/impact_drift.go` (mới), `internal/domain/risk_acceptance.go` (mới), `internal/domain/risk_policy.go` (mới), `internal/domain/testdata/risk_rp1_golden.json` (mới), và các `_test.go`
 **Depends on:** TASK-REQ-001-01 (module); không phụ thuộc DB, proto hay công cụ
-**Status:** [x] DONE
+**Status:** [ ] TODO
 
 ---
 
@@ -58,12 +58,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `Score` thuần: cùng đầu vào cho cùng `score`, `level`, `digest` qua 1000 lần.
-- [x] Golden `rp/1` có ≥ 6 ca và mỗi luật cứng nâng đúng mức tối thiểu.
-- [x] Đổi một hằng trong `DefaultRulePolicyV1` làm golden đỏ (test guard: băm bảng ngưỡng so với `RulesVersion`).
-- [x] Chiều không đo được không bao giờ dẫn tới `Low`.
-- [x] Domain không import `common`, adapter, `os`, `time.Now`, `math/rand`.
-- [x] Không có `max-lines` disable; tệp bảng ngưỡng tách riêng nếu quá dài.
+- [ ] `Score` thuần: cùng đầu vào cho cùng `score`, `level`, `digest` qua 1000 lần.
+- [ ] Golden `rp/1` có ≥ 6 ca và mỗi luật cứng nâng đúng mức tối thiểu.
+- [ ] Đổi một hằng trong `DefaultRulePolicyV1` làm golden đỏ (test guard: băm bảng ngưỡng so với `RulesVersion`).
+- [ ] Chiều không đo được không bao giờ dẫn tới `Low`.
+- [ ] Domain không import `common`, adapter, `os`, `time.Now`, `math/rand`.
+- [ ] Không có `max-lines` disable; tệp bảng ngưỡng tách riêng nếu quá dài.
 
 ## Rủi ro và lưu ý
 

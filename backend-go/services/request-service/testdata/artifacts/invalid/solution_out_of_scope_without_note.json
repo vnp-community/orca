@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "options": [
+    {
+      "id": "opt-1",
+      "title": "Phương án 1",
+      "summary": "Tóm tắt",
+      "approach": "Cách làm chi tiết",
+      "effort": {
+        "size": "M",
+        "hours_estimate": 8
+      },
+      "risk": {
+        "level": "low",
+        "description": "thấp"
+      },
+      "affected_areas": [
+        {
+          "name": "api-gateway",
+          "description": "route"
+        }
+      ]
+    },
+    {
+      "id": "opt-2",
+      "title": "Phương án 2",
+      "summary": "Tóm tắt",
+      "approach": "Cách làm chi tiết",
+      "effort": {
+        "size": "M",
+        "hours_estimate": 8
+      },
+      "risk": {
+        "level": "low",
+        "description": "thấp"
+      },
+      "affected_areas": [
+        {
+          "name": "api-gateway",
+          "description": "route"
+        }
+      ],
+      "breaking_change": true
+    }
+  ],
+  "recommendation": {
+    "option_id": "opt-1",
+    "reason": "ít rủi ro"
+  },
+  "assumptions": [
+    {
+      "id": "A-1",
+      "text": "IdP đã có",
+      "needs_confirmation": true
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-1",
+      "text": "Có cần MFA?",
+      "blocking": false
+    }
+  ],
+  "requirement_coverage": [
+    {
+      "ac_id": "AC-1",
+      "option_ids": ["opt-1", "opt-2"],
+      "status": "covered"
+    },
+    {
+      "ac_id": "AC-2",
+      "option_ids": [],
+      "status": "out_of_scope"
+    }
+  ],
+  "constraints": ["không đổi DB"],
+  "non_functional": [
+    {
+      "kind": "security",
+      "text": "TLS 1.3"
+    }
+  ],
+  "test_strategy": "e2e",
+  "evidence_refs": ["file:main.go:10"]
+}

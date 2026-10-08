@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -20,123 +21,136 @@ func NewBacklogRequestReader(r *Repository) *BacklogRequestReader {
 var _ usecase.BacklogRequestReader = (*BacklogRequestReader)(nil)
 
 func (r *BacklogRequestReader) ListReturnedRequests(ctx context.Context, tenantID string, f usecase.BacklogRequestFilter) ([]domain.Request, error) {
-	query := `SELECT id, tenant_id, project_id, type, reporter_id, stage, status, returned_category, updated_at FROM requests WHERE tenant_id = ? AND status = 'request_backlog'`
-	args := []any{tenantID}
+	return r.ListByStatus(ctx, tenantID, []domain.RequestStatus{domain.RequestStatusRequestBacklog}, f)
+}
 
+// ListByStatus is one keyset page, newest update first. The cursor is expanded (a < x OR a = x AND id < y) instead of
+// a row comparison so both dialects order and page identically.
+func (r *BacklogRequestReader) ListByStatus(ctx context.Context, tenantID string, statuses []domain.RequestStatus, f usecase.BacklogRequestFilter) ([]domain.Request, error) {
+	args := []any{tenantID}
+	in := func(values []string) string {
+		ph := make([]string, len(values))
+		for i, v := range values {
+			ph[i] = "?"
+			args = append(args, v)
+		}
+		return strings.Join(ph, ", ")
+	}
+	statusNames := make([]string, len(statuses))
+	for i, s := range statuses {
+		statusNames[i] = string(s)
+	}
+	where := "tenant_id = ? AND status IN (" + in(statusNames) + ")"
 	if f.ProjectID != "" {
-		query += " AND project_id = ?"
+		where += " AND project_id = ?"
 		args = append(args, f.ProjectID)
 	}
-
+	if f.RequestID != "" {
+		where += " AND id = ?"
+		args = append(args, f.RequestID)
+	}
+	if len(f.ProjectIDs) > 0 {
+		where += " AND project_id IN (" + in(f.ProjectIDs) + ")"
+	}
 	if len(f.Types) > 0 {
-		var placeholders []string
-		for _, t := range f.Types {
-			placeholders = append(placeholders, "?")
-			args = append(args, t)
-		}
-		query += fmt.Sprintf(" AND type IN (%s)", strings.Join(placeholders, ", "))
+		where += " AND type IN (" + in(f.Types) + ")"
 	}
-
 	if len(f.Categories) > 0 {
-		var placeholders []string
-		for _, c := range f.Categories {
-			placeholders = append(placeholders, "?")
-			args = append(args, c)
-		}
-		query += fmt.Sprintf(" AND returned_category IN (%s)", strings.Join(placeholders, ", "))
+		where += " AND returned_category IN (" + in(f.Categories) + ")"
 	}
-
 	if f.Cursor != nil {
-		query += " AND (updated_at < ? OR (updated_at = ? AND id < ?))"
+		where += " AND (updated_at < ? OR (updated_at = ? AND id < ?))"
 		args = append(args, f.Cursor.UpdatedAt, f.Cursor.UpdatedAt, f.Cursor.ID)
 	}
-
-	query += " ORDER BY updated_at DESC, id DESC LIMIT ?"
 	args = append(args, f.Limit+1)
 
-	rows, err := r.exec(ctx).QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("mysql list backlog: %w", err)
-	}
-	defer rows.Close()
-
 	var list []domain.Request
-	for rows.Next() {
-		var req domain.Request
-		var proj, retCat *string
-		if err := rows.Scan(&req.ID, &req.TenantID, &proj, &req.Type, &req.ReporterID, &req.Stage, &req.Status, &retCat, &req.UpdatedAt); err != nil {
-			return nil, err
+	err := r.scoped(ctx, func(ctx context.Context, ctxTenant string, db dbExecer) error {
+		if ctxTenant != tenantID {
+			return domain.ErrRequestTenantRequired()
 		}
-		if proj != nil {
-			req.ProjectID = *proj
+		rows, err := db.QueryContext(ctx, "SELECT "+requestColumns+" FROM requests WHERE "+where+" ORDER BY updated_at DESC, id DESC LIMIT ?", args...)
+		if err != nil {
+			return fmt.Errorf("mysql list backlog: %w", err)
 		}
-		if retCat != nil {
-			req.ReturnedCategory = *retCat
+		defer rows.Close()
+		for rows.Next() {
+			req, err := scanRequest(rows)
+			if err != nil {
+				return err
+			}
+			list = append(list, req)
 		}
-		list = append(list, req)
-	}
-
-	return list, rows.Err()
+		return rows.Err()
+	})
+	return list, err
 }
 
 func (r *BacklogRequestReader) ParentRequestIDs(ctx context.Context, tenantID string, childIDs []string) (map[string][]string, error) {
-	if len(childIDs) == 0 {
-		return nil, nil
-	}
-	var placeholders []string
-	var args []any
-	args = append(args, tenantID)
-	for _, id := range childIDs {
-		placeholders = append(placeholders, "?")
-		args = append(args, id)
-	}
-	query := fmt.Sprintf(`SELECT child_request_id, parent_request_id FROM request_links WHERE tenant_id = ? AND child_request_id IN (%s)`, strings.Join(placeholders, ","))
-
-	rows, err := r.exec(ctx).QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("mysql request_links: %w", err)
-	}
-	defer rows.Close()
-
 	res := make(map[string][]string)
-	for rows.Next() {
-		var cID, pID string
-		if err := rows.Scan(&cID, &pID); err != nil {
-			return nil, err
-		}
-		res[cID] = append(res[cID], pID)
+	if len(childIDs) == 0 {
+		return res, nil
 	}
-	return res, rows.Err()
+	err := r.scoped(ctx, func(ctx context.Context, ctxTenant string, db dbExecer) error {
+		if ctxTenant != tenantID {
+			return domain.ErrRequestTenantRequired()
+		}
+		args := []any{tenantID}
+		ph := make([]string, len(childIDs))
+		for i, id := range childIDs {
+			ph[i] = "?"
+			args = append(args, id)
+		}
+		rows, err := db.QueryContext(ctx, fmt.Sprintf(`SELECT child_request_id, parent_request_id FROM request_links
+			WHERE tenant_id = ? AND child_request_id IN (%s)`, strings.Join(ph, ",")), args...)
+		if err != nil {
+			return fmt.Errorf("mysql request_links: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var child, parent string
+			if err := rows.Scan(&child, &parent); err != nil {
+				return err
+			}
+			res[child] = append(res[child], parent)
+		}
+		return rows.Err()
+	})
+	return res, err
 }
 
 func (r *BacklogRequestReader) LatestReturns(ctx context.Context, tenantID string, requestIDs []string) (map[string]domain.ReturnEvent, error) {
 	if len(requestIDs) == 0 {
 		return nil, nil
 	}
-	var placeholders []string
-	var args []any
-	args = append(args, tenantID)
-	for _, id := range requestIDs {
-		placeholders = append(placeholders, "?")
-		args = append(args, id)
-	}
-	query := fmt.Sprintf(`SELECT request_id, actor_id, at FROM request_return_history WHERE tenant_id = ? AND action = 'returned' AND request_id IN (%s)`, strings.Join(placeholders, ","))
-
-	rows, err := r.exec(ctx).QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("mysql request_return_history: %w", err)
-	}
-	defer rows.Close()
-
 	res := make(map[string]domain.ReturnEvent)
-	for rows.Next() {
-		var ev domain.ReturnEvent
-		if err := rows.Scan(&ev.RequestID, &ev.ActorID, &ev.At); err != nil {
-			return nil, err
+	err := r.scoped(ctx, func(ctx context.Context, scopedTenant string, db dbExecer) error {
+		if scopedTenant != tenantID {
+			return domain.ErrRequestTenantRequired()
 		}
-		if existing, ok := res[ev.RequestID]; !ok || ev.At.After(existing.At) {
+		ph := make([]string, len(requestIDs))
+		args := []any{tenantID}
+		for i, id := range requestIDs {
+			ph[i] = "?"
+			args = append(args, id)
+		}
+		// Ascending order so the last row per request overwrites earlier returns.
+		rows, err := db.QueryContext(ctx, fmt.Sprintf(`SELECT request_id, actor_id, at FROM request_return_history
+			WHERE tenant_id = ? AND action = 'returned' AND request_id IN (%s) ORDER BY at, id`, strings.Join(ph, ",")), args...)
+		if err != nil {
+			return fmt.Errorf("mysql latest returns: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var ev domain.ReturnEvent
+			var actor sql.NullString
+			if err := rows.Scan(&ev.RequestID, &actor, &ev.At); err != nil {
+				return err
+			}
+			ev.ActorID, ev.At = actor.String, ev.At.UTC()
 			res[ev.RequestID] = ev
 		}
-	}
-	return res, rows.Err()
+		return rows.Err()
+	})
+	return res, err
 }

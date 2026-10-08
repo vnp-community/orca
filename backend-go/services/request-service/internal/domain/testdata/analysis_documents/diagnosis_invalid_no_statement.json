@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "kind": "diagnosis",
+  "summary": "x",
+  "root_cause": { "statement": "", "confidence": 0.5 },
+  "impact": { "severity": "low" }
+}

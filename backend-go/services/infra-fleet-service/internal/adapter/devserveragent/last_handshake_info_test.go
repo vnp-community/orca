@@ -201,4 +201,3 @@ func TestLastHandshakeInfo_LegacyHandshake(t *testing.T) {
 		t.Errorf("expected effective protocol version 1, got %d", got.EffectiveProtocolVersion())
 	}
 }
-

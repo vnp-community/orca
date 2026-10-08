@@ -311,3 +311,23 @@ func TestAIApply_DependencyPassFailure_RollsBackWholeTransaction(t *testing.T) {
 		t.Errorf("expected no edges to remain after rollback, got %+v", edges.edges)
 	}
 }
+
+func TestAIApply_PlanTypeProposalBecomesTask(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1", Title: "Parent"}
+	uc := NewAIApply(newFakeTxRunner(tasks, &fakeEdgeRepository{}))
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	created, err := uc.Execute(ctx, AIApplyInput{TaskID: "parent", Proposals: []domain.SubtaskProposal{
+		{Title: "a", Type: "plan"}, {Title: "b", Type: "phase"}, {Title: "c", Type: "bug"}, {Title: "d", Type: "epic"},
+	}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []string{"task", "task", "bug", "task"}
+	for i, c := range created {
+		if c.Type != want[i] {
+			t.Errorf("proposal %d: type %q, want %q", i, c.Type, want[i])
+		}
+	}
+}

@@ -30,6 +30,13 @@ import (
 
 func setupStore(t *testing.T) *ProcessedEventsStore {
 	t.Helper()
+	store, _ := setupStoreAndDSN(t)
+	return store
+}
+
+// setupStoreAndDSN also returns the golang-migrate DSN so migration tests can run down/up.
+func setupStoreAndDSN(t *testing.T) (*ProcessedEventsStore, string) {
+	t.Helper()
 	// testutil.StartMySQL returns "mysql://root:orca@tcp(host:port)/db" —
 	// valid as-is for golang-migrate's mysql driver CLI (used below), but
 	// go-sql-driver/mysql's database/sql driver expects its OWN DSN format
@@ -55,7 +62,7 @@ func setupStore(t *testing.T) *ProcessedEventsStore {
 		t.Fatalf("pinging mysql: %v", err)
 	}
 
-	return New(db)
+	return New(db), rawDSN
 }
 
 func TestProcessedEventsStore_SeenIsFalseForUnknownEvent(t *testing.T) {

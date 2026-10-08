@@ -1,6 +1,6 @@
 # BE-REQ-SOL-015: API đọc ba view backlog (`ListBacklog`, `ListExecutionStates`)
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. View REQUEST chỉ cần CR-REQ-002 nên giao trước; hai view task cần SOL-011, SOL-013 và Approval.
+> **✅ Đã triển khai (kiểm chứng 2026-10-08, 6/6 task).** Bảng cổng 2.4 vẫn cần chủ CR-REQ-015 xác nhận; quyền xem Request dùng quy tắc tạm của CR-REQ-035 (xem IMPLEMENTATION-NOTES).
 
 **CR:** [CR-REQ-015](../../../../../../docs/crs/v6/backlog-views/CR-REQ-015-backlog-read-views.md)
 **Service:** `request-service` (mới, `ListBacklog`) · `task-service` (`ListExecutionStates`) · `proto/orca/request/v1`, `proto/orca/task/v1`

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/classification_contract.go` (mới), `internal/adapter/postgres/classification_integration_test.go`, `internal/adapter/mysql/classification_integration_test.go` (mới)
 **Depends on:** TASK-REQ-005-07, TASK-REQ-002-06
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run "Intake|Classification|Migration|Schema" và go test -tags integration ./internal/adapter/eventbus`)
 
 ---
 
@@ -37,3 +37,8 @@ Các tiêu chí mục 4 của CR-REQ-005 cần DB thật cho: Confirm đồng th
 
 - Chạy với agent dev server thật và đánh giá chất lượng phân loại chưa nằm trong phạm vi (chưa kiểm chứng).
 - Kịch bản NATS có thể chậm; không bắt buộc trong CI nhanh (gắn nhãn `integration`).
+
+## Ghi chú triển khai
+
+- Kịch bản ở `contracttest/classification_contract.go` (`RunClassificationContract`), thêm `RunnerEndToEnd`, `RunLifecycle`, `RunRecoveryAndClaimLimit`, `ProcessedEvents`.
+- Kịch bản NATS thật nằm ở `adapter/eventbus/classification_consumer_nats_integration_test.go` (container `nats:2.10-alpine`), đã chạy PASS.

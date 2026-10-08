@@ -5,7 +5,7 @@
 **Service:** `request-service` · `proto`
 **File:** `backend-go/proto/orca/request/v1/clarification.proto`, `backend-go/proto/orca/request/v1/decision.proto`, `internal/adapter/grpc/clarification_server.go`, `internal/adapter/grpc/decision_server.go`, `internal/adapter/grpc/clarification_mapper.go`, `internal/usecase/list_pending_clarifications.go`, `internal/usecase/clarification_flow_integration_test.go`, `services/request-service/README.md` (sửa) và test
 **Depends on:** TASK-REQ-028-04, 028-05, 028-06, 028-07, TASK-REQ-001-02 (proto khung), TASK-REQ-001-05 (gRPC server), TASK-REQ-010-03 (`ApprovalAuthorization`, tập principal)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/adapter/grpc`; `go test -tags integration ./cmd/server` (cả `TestRun_ArtifactAndClarificationFlow_Postgres` và `_MySQL`); `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql` (`ClarificationContract`, `SolutionContract/SolutionArtifactsDecisionsAndGates`); `buf lint` + `buf breaking --against main`)
 
 ---
 
@@ -62,10 +62,10 @@ Proto theo CR 2.9: `ClarificationStatus` (`CLARIFICATION_STATUS_UNSPECIFIED=0`, 
 ## Tiêu chí hoàn thành
 
 - [x] 11 RPC mới hoạt động, mỗi RPC có test chéo tenant trả `NOT_FOUND`.
-- [x] Bảy kịch bản tích hợp (a) đến (g) xanh trên Postgres và MySQL.
+- [x] Bảy kịch bản tích hợp (a) đến (g) xanh trên Postgres và MySQL. (a), (b) qua RPC thật trên cả hai dialect (`TestRun_ArtifactAndClarificationFlow_*`); (c), (d), (e), (g) ở mức contract hai dialect; (f) qua `Approve` thật của ApprovalService: câu hỏi `blocking` chưa trả lời chặn bằng `REQUEST_SOLUTION_BLOCKING_QUESTIONS` (cả khi Clarification còn `open`), trả lời xong thì qua (`SolutionContract/SolutionArtifactsDecisionsAndGates`, hai dialect)
 - [x] `RequestClarification` qua RPC công khai không tạo được nguồn `readiness`/`task_blocked`.
 - [x] `answer_json` không lộ cho người không thuộc `assignees`/người hỏi/admin.
-- [x] `buf lint`, `buf breaking` sạch.
+- [x] `buf lint`, `buf breaking` sạch. (`buf lint --path` cho `artifact|clarification|decision|solution.proto` không báo lỗi; `buf breaking --path orca/request --path orca/task --against ../../.git#branch=main,subdir=backend-go/proto` không báo lỗi, 2026-10-08; `.proto` không đổi)
 - [x] README ghi biến môi trường và phần chưa kiểm chứng; mâu thuẫn "README v6 liệt kê 11 trạng thái" được ghi lại.
 
 ## Rủi ro và lưu ý
@@ -74,3 +74,17 @@ Proto theo CR 2.9: `ClarificationStatus` (`CLARIFICATION_STATUS_UNSPECIFIED=0`, 
 - Proto thêm `RequestStatus`/trạng thái làm client cũ thấy giá trị lạ: đảm bảo frontend (CR-REQ-018) xử lý giá trị không biết.
 - Kiểu `file` chỉ nhận văn bản ≤ 64 KB vì backend chưa có kho tải lên (chưa kiểm chứng rằng không có proto upload nào khác: `grep` toàn `backend-go/proto` trước khi chốt).
 - Người trả lời qua MCP: chỉ khi người dùng cấp quyền theo chính sách `mcp-service`; chưa có cơ chế nhận biết nguồn máy.
+
+## Tiến độ (rf/art, 2026-10-08)
+
+Đã làm và kiểm chứng (`go test ./internal/adapter/grpc`, `go test -tags integration ./cmd/server -run ArtifactAndClarificationFlow`):
+- 11 RPC thật ở `adapter/grpc/server_clarification.go` (+ `clarification_mapper.go`), nối ở `wire_artifact.go`; `RequestClarification` qua RPC công khai từ chối `readiness` và `task_blocked`; `answer_json` chỉ trả cho assignee, người hỏi, admin; test `TestClarificationServer_*`, `TestDecisionServer_*`, `TestClarificationMapper_RoundTrip_AllKinds` (không tenant `InvalidArgument`, chéo tenant `NOT_FOUND` từng RPC, bảng ánh xạ lỗi: `NotFound`, `PermissionDenied`, `InvalidArgument`, `FailedPrecondition`; phân trang).
+- Proto: **không sửa** (đã có từ `rf/proto`). Lưu ý: `ChooseSolutionOptionRequest` có `rationale` / phản hồi có `decision_status`, `requires_confirmation` hay không là việc của nhánh Solution; ở nhánh này không có handler `ChooseSolutionOption`.
+- Test hợp đồng trạng thái so README: `TestREADMEListsSameTypesAndStatuses` (sẵn có) nay xanh vì README mục 3.3 đã được cập nhật 12 trạng thái (`docs/crs/v6/README.md`, một câu); không cần cờ `REQUEST_README_STATUS_CHECK`.
+- Tích hợp thật qua dịch vụ đầy đủ (Postgres + NATS): (a) bug thiếu dữ liệu → `awaiting_information` + một Clarification; (b) nháp rồi trả lời đủ → revision 3, `analyzing`; trả lời lặp không tạo revision; consumer resume chạy thật (NATS) và có contract hai dialect cho khử trùng (`ResumeEventRedeliveryOneRun`); (c) vòng 2 rồi backlog sau 3 vòng (contract); (d) hết hạn (đồng hồ giả) → backlog `missing_info` (contract); (e) `type_change` huỷ Clarification (contract); (g) hai `RequestClarification` đồng thời một thắng (contract). README của service có mục "Clarification và Decision" với biến môi trường và phần chưa kiểm chứng.
+
+Chưa làm: (f) "`Approve` bị chặn rồi qua" cần Approve thật (SubjectHandler của nhánh Solution): ở đây kiểm bằng `ApprovalGates.CheckDecision` (điều `Approve` sẽ gọi) trên DB thật hai dialect; kịch bản qua RPC chỉ chạy trên Postgres, MySQL ở mức contract repository/use case; `buf lint`/`buf breaking` không chạy được sạch (lỗi lint sẵn có của repo về `Empty`; `buf breaking` cần `.git` ở `backend-go`), `.proto` không đổi.
+
+## Tiến độ sau hợp nhất (2026-10-08)
+
+Mọi mục đã xong. Kịch bản (f) chạy với `Approve` thật vì nhánh đã có Approval thật và handler `solution`: `ChooseSolutionOption` ghi Decision (`rationale` qua RPC, `decision_status`, `requires_confirmation` trả về), handler chặn bằng `ApprovalGates.CheckSolution`. Chưa kiểm chứng: người trả lời qua MCP (không có cơ chế nhận biết nguồn máy), Plan assumption qua `Approve` (chưa có handler Plan).

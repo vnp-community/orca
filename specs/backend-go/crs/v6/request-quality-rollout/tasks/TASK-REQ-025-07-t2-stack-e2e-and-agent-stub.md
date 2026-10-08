@@ -5,7 +5,7 @@
 **Service:** `tests/request`, `backend-go/ci`, `.github`
 **File:** `tests/request/check_request_flow_types.py` (mới), `tests/request/check_request_jira_sync.py` (mới), `tests/request/request_env_config.py` (mới), `tests/request/stubs/` (mới: stub dev server agent và Jira), `backend-go/ci/request-e2e/run-request-e2e.sh` (mới), `.github/workflows/request-e2e.yml` (mới)
 **Depends on:** BE-REQ-SOL-016 (kênh WS), BE-REQ-SOL-024 (Jira sync), TASK-REQ-025-01; kịch bản MCP: TASK-REQ-017-05
-**Status:** `[x] DONE`
+**Status:** [ ] TODO (một phần, xem Tiến độ 2026-10-08)
 
 ---
 
@@ -31,11 +31,16 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Script chạy được cục bộ, thoát mã khác 0 khi sai.
-- [x] Workflow chạy qua `workflow_dispatch`.
-- [x] E18 xanh với Jira giả.
+- [ ] Script chạy được cục bộ, thoát mã khác 0 khi sai.
+- [ ] Workflow chạy qua `workflow_dispatch`.
+- [ ] E18 xanh với Jira giả.
 
 ## Rủi ro và lưu ý
 
 - Chưa kiểm chứng stack dev chạy trong runner CI (nhiều service, Vault, NATS); nếu không được, chỉ chạy cục bộ và ghi rõ.
 - Task lớn: nếu stub agent quá tốn công, tách thành task riêng và để T2 chỉ chạy các luồng không cần AI.
+
+## Tiến độ (2026-10-08)
+
+Đã làm: stub agent là biên relay của infra-fleet (`e2e/stubs` + binary `e2e/cmd/agent-stub`, quyết định ghi ở IMPLEMENTATION-NOTES; có unit test, và đã được e2e T1 dùng chung code); `backend-go/ci/request-e2e/docker-compose.e2e.yml` (compose merge đã `config` thành công) và `run-request-e2e.sh` (`bash -n` sạch); `tests/request/request_env_config.py` và `check_request_flow_types.py` (biên dịch được); `.github/workflows/request-e2e.yml` (`actionlint` sạch, cron + `workflow_dispatch`, không chặn PR).
+Còn thiếu: chưa chạy lần nào trên stack dev (cần shared Vault, nhiều service); `check_request_jira_sync.py` (E18) và stub Jira chưa viết; E17 thuộc TASK-REQ-017-05; phụ thuộc CR-REQ-007..013 cho các giai đoạn sau xác nhận loại. Không đánh DONE.

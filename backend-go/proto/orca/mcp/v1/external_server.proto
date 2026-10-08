@@ -32,6 +32,12 @@ service McpRegistryService {
   // Internal (infra-fleet at agent spawn). Fail-closed per server, never errors
   // because a single server is unusable (it becomes a warning).
   rpc ResolveAgentMcpConfig(ResolveAgentMcpConfigRequest) returns (ResolveAgentMcpConfigResponse);
+  // Internal (request-service, read-only context sources). One tools/call on an
+  // approved, usable http server; only tools in the approved snapshot run.
+  // Request bodies carry arguments_json: never logged.
+  rpc CallExternalTool(CallExternalToolRequest) returns (CallExternalToolResponse);
+  // Internal. One resources/read on an approved, usable http server.
+  rpc ReadExternalResource(ReadExternalResourceRequest) returns (ReadExternalResourceResponse);
 }
 
 message ExternalSecretRef {
@@ -138,4 +144,33 @@ message ResolveAgentMcpConfigResponse {
   repeated AgentEnvVar env = 3;
   repeated AgentConfigWarning warnings = 4;
   int32 mcp_depth = 5;
+}
+
+// max_bytes 0 = default 65536; capped at 1048576. arguments_json <= 65536 bytes.
+// Error codes: MCP_NOT_FOUND, MCP_SERVER_NOT_USABLE, MCP_TOOL_NOT_APPROVED,
+// MCP_INVALID_ARGUMENT, MCP_RESULT_TOO_LARGE, MCP_SERVER_SSRF_BLOCKED.
+message CallExternalToolRequest {
+  string server_id = 1;
+  string tool = 2;
+  string arguments_json = 3;
+  int32 max_bytes = 4;
+}
+message CallExternalToolResponse {
+  string content_text = 1;
+  bool is_error = 2;     // the external server's own isError, passed through
+  bool truncated = 3;
+  int32 size_bytes = 4;  // bytes of content_text
+  string digest = 5;     // sha256 hex of content_text
+}
+message ReadExternalResourceRequest {
+  string server_id = 1;
+  string uri = 2;
+  int32 max_bytes = 3;
+}
+message ReadExternalResourceResponse {
+  string text = 1;
+  string mime_type = 2;
+  bool truncated = 3;
+  int32 size_bytes = 4;
+  string digest = 5;
 }

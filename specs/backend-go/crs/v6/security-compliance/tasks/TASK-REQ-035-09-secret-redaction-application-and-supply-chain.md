@@ -5,7 +5,7 @@
 **Service:** `request-service`, `backend-go/ci`, `.github/workflows`
 **File:** `backend-go/services/request-service/internal/usecase/{create_request.go (sửa), secret_ingress_guard.go (mới), prompt_redaction.go (mới)}`, `.../internal/domain/agent_env_allowlist.go` (mới), `.../internal/adapter/grpcclient/agent_prompt_relay.go` (sửa: dựng `env`), `.../internal/usecase/analysis_secret_redaction.go` (sửa: CR-008 chuyển sang `secretscan`), `.github/workflows/backend-go-request-service.yml` (sửa: `govulncheck`, Trivy), `backend-go/services/request-service/README.md` (sửa: bảng đối chiếu 2.11), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-035-01 (`secretscan`), 035-04 (interceptor), 035-06 (cột `contains_secret_suspected`, `redact_pii_in_prompts`), BE-REQ-SOL-004 (`CreateRequest`), 005, 007, 008, 012 (điểm dựng prompt và đầu ra), BE-REQ-SOL-034 task 04 (`AIGateway`)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO (một phần: cổng vào, cờ, env, redactor mcp-service xong; còn nối prompt, CI, bảng 2.11)
 
 ---
 
@@ -42,11 +42,15 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `body` chứa khoá riêng PEM được lưu với `[REDACTED:private_key]` và `contains_secret_suspected=true`; prompt dựng ra không chứa chuỗi đó.
-- [x] `env` của `execPrompt` không chứa khoá nào ngoài danh sách cho phép (test trên bộ dựng tham số); không bao giờ gửi `resolvedApiKey`.
+- [ ] `body` chứa khoá riêng PEM được lưu với `[REDACTED:private_key]` và `contains_secret_suspected=true`; prompt dựng ra không chứa chuỗi đó.
+  - chưa: cờ và che ở cổng vào đã có test; phần "prompt dựng ra không chứa chuỗi đó" chưa nối được vì chưa có `PromptRenderer`/`AIGateway` (CR-034) trong cây này.
+- [ ] `env` của `execPrompt` không chứa khoá nào ngoài danh sách cho phép (test trên bộ dựng tham số); không bao giờ gửi `resolvedApiKey`.
+  - chưa: có `domain.BuildAgentEnv`/`EnvWithinAllowlist` (Go) và `agent/src/relay/agent-request-flow-env.ts` (TS) với test, nhưng chưa có call site relay `execPrompt` của request-service để áp.
 - [x] Bộ mẫu che bí mật là **một** (`common/secretscan`); không còn bộ mẫu riêng ở `request-service`.
-- [x] CI có `govulncheck` và quét ảnh; bảng đối chiếu 2.11 được điền trong PR đầu tiên.
-- [x] Log, lỗi, sự kiện không chứa `title`/`body`.
+- [ ] CI có `govulncheck` và quét ảnh; bảng đối chiếu 2.11 được điền trong PR đầu tiên.
+  - chưa: đã thêm bước `opa test` và `govulncheck` (advisory) vào workflow; quét ảnh Trivy và bảng 2.11 chưa làm, chưa chạy CI.
+- [ ] Log, lỗi, sự kiện không chứa `title`/`body`.
+  - chưa: chưa có test chụp log; code mới không log nội dung.
 
 ## Ví dụ tham khảo
 
@@ -72,3 +76,11 @@ Bảng đối chiếu `07-security-architecture.md` (điền trong PR đầu ti�
 - Bước `Trivy` có thể đỏ do lỗ hổng của ảnh nền ngoài tầm sửa của dịch vụ: dùng `ignore-unfixed` và danh sách ngoại lệ có chủ.
 - `protovalidate` chưa chắc có trong repo (chưa kiểm chứng `buf.yaml`): nếu không, kiểm thủ công.
 - Đồng bộ CR 005, 007, 008, 012: họ đang sở hữu điểm dựng prompt; PR của họ phải gọi `PromptRedactor` qua `AIGateway` (xem BE-REQ-SOL-034).
+
+## Ghi chú triển khai (2026-10-08)
+
+## Tiến độ
+
+Đã làm: `SecretIngressGuard` (nối vào `CreateRequest.CreateWithinTx`, nên manual/webhook/MCP/child đều qua; text quá cửa sổ quét bị từ chối `REQUEST_PAYLOAD_TOO_LARGE` vì `Truncated`), cờ `contains_secret_suspected` ghi cùng giao dịch, `PromptRedactor` (secret luôn che; PII theo cài đặt, lỗi đọc cài đặt thì che) có test nhưng chưa có điểm gọi, `domain.RedactSecrets` đã dùng `secretscan` (một bộ mẫu), mcp-service `SecretscanRedactor` (cộng thêm, mặc định cũ giữ nguyên), danh sách env agent.
+
+Còn thiếu: nối `PromptRedactor` vào bộ dựng prompt khi CR-034 có; call site relay dùng `BuildAgentEnv`; Trivy; bảng đối chiếu 2.11; `protovalidate` (không sửa proto); đổi mcp-service mặc định sang `SecretscanRedactor` (chủ sở hữu mcp-service).

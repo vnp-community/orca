@@ -54,3 +54,12 @@ func parseTrackerProvider(provider string) issuetrackingv1.IssueProvider {
 		return issuetrackingv1.IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
 	}
 }
+
+// AddComment implements usecase.IssueCommenter through AddIssueComment.
+func (c *IssueTrackingClient) AddComment(ctx context.Context, tenantID, userID, provider, ref, site, bodyMarkdown string) error {
+	ctx = withIdentityMetadata(ctx, tenantID, userID)
+	_, err := c.client.AddIssueComment(ctx, &issuetrackingv1.AddIssueCommentRequest{
+		Provider: parseTrackerProvider(provider), IssueId: ref, BodyMarkdown: bodyMarkdown, WorkspaceId: site,
+	})
+	return err
+}

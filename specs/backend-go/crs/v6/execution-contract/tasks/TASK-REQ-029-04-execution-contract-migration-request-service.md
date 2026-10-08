@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / migration hai dialect, domain, adapter postgres và mysql
 **File:** `backend-go/services/request-service/migrations/postgres/NNNN_execution_contract.{up,down}.sql` (mới), `migrations/mysql/NNNN_execution_contract.{up,down}.sql` (mới), `internal/domain/task_readiness_report.go` (mới), `internal/domain/execution_packet_record.go` (mới), `internal/usecase/execution_contract_ports.go` (mới), `internal/adapter/postgres/execution_packet_repository.go`, `readiness_report_repository.go` (mới), bản `mysql` tương ứng, và các `_test.go`
 **Depends on:** TASK-REQ-001-04 (`TxRunner`, executor trong ctx), TASK-REQ-013-03 (migration `phase_starts`, `task_run_outcomes`), TASK-REQ-014-01 (`request_checks`)
-**Status:** [x] DONE
+**Status:** [ ] TODO
 
 ---
 
@@ -39,11 +39,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `up`, `down`, `up` sạch trên Postgres 14+ và MySQL 8.0.16+ sau các migration của SOL-013 và SOL-014.
-- [x] Hai `Insert` packet cùng `(task_id, attempt)`: một thành công, một `ErrAlreadyExists`.
-- [x] Báo cáo sẵn sàng append-only; `LatestBaseline` trả đúng bản mới nhất theo `(worktree_id, head_sha)` và theo `notBefore`.
-- [x] Không FK sang `task-service`; mọi bảng có `tenant_id`.
-- [x] Số `NNNN` ghi trong mô tả PR kèm danh sách migration tại thời điểm làm.
+- [ ] `up`, `down`, `up` sạch trên Postgres 14+ và MySQL 8.0.16+ sau các migration của SOL-013 và SOL-014.
+- [ ] Hai `Insert` packet cùng `(task_id, attempt)`: một thành công, một `ErrAlreadyExists`.
+- [ ] Báo cáo sẵn sàng append-only; `LatestBaseline` trả đúng bản mới nhất theo `(worktree_id, head_sha)` và theo `notBefore`.
+- [ ] Không FK sang `task-service`; mọi bảng có `tenant_id`.
+- [ ] Số `NNNN` ghi trong mô tả PR kèm danh sách migration tại thời điểm làm.
 
 ## Thứ tự thực hiện gợi ý
 

@@ -5,7 +5,7 @@
 **Service:** `docs`
 **File:** `docs/guides/request/README.md`, `creating-and-classifying-requests.md`, `approving-requests.md`, `request-and-task-backlogs.md`, `requests-from-agents-mcp.md`, `admin-enable-request-flow.md`, `runbook-request-flow.md` (đều mới); cập nhật `backend-go/README.md`, `backend-go/services/api-gateway/README.md`, `docs/guides/mcp/README.md`, `docs/guides/jira/jira-orca-mapping.md`, cột "Trạng thái" của các CR v6 khi triển khai
 **Depends on:** TASK-REQ-025-01..06; BE-REQ-SOL-024 (tên metric, alert); BE-REQ-SOL-016, 017
-**Status:** `[x] DONE`
+**Status:** [ ] TODO (một phần, xem Tiến độ 2026-10-08)
 
 ---
 
@@ -32,11 +32,16 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] 7 tài liệu có đủ, không mô tả tính năng chưa có như đã có.
-- [x] README các service không ghi "Real" cho RPC `Unimplemented`.
-- [x] Rollback được diễn tập một lần và ghi vào runbook (hoặc ghi rõ chưa).
+- [ ] 7 tài liệu có đủ, không mô tả tính năng chưa có như đã có.
+- [ ] README các service không ghi "Real" cho RPC `Unimplemented`.
+- [ ] Rollback được diễn tập một lần và ghi vào runbook (hoặc ghi rõ chưa).
 
 ## Rủi ro và lưu ý
 
 - Tài liệu dễ lệch code; viết sau khi các task còn lại gần xong và đối chiếu lần cuối trước khi hợp nhất.
 - Số ngày, số Request ở các giai đoạn rollout là đề xuất, chưa có số đo thực.
+
+## Tiến độ (2026-10-08)
+
+Đã làm: 7 tài liệu trong `docs/guides/request/` (chỉ nói điều đã có, chỗ chưa có ghi rõ), cập nhật `backend-go/README.md`, `backend-go/services/request-service/README.md`, `docs/guides/jira/jira-orca-mapping.md`; liên kết tương đối đã kiểm bằng script. Tên metric, mã lỗi, biến môi trường đối chiếu với code.
+Còn thiếu: diễn tập rollback ở dev chưa làm (runbook ghi "chưa diễn tập"); README api-gateway và guides MCP thuộc TASK-REQ-016-07/017-05; người ngoài chưa làm theo `admin-enable-request-flow.md`. Không đánh DONE.

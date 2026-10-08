@@ -5,7 +5,7 @@
 **Service:** `backend-go/policy/orca-authz`, `request-service`, `backend-go/ci`
 **File:** `backend-go/policy/orca-authz/request.rego` (mới), `backend-go/policy/orca-authz/request_test.rego` (mới), `backend-go/services/request-service/internal/adapter/opaclient/request_policy.go` (mới), `.../internal/adapter/opaclient/request_policy_test.go` (mới), `backend-go/services/request-service/deploy/Dockerfile` (sửa/mới: `COPY policy`), `backend-go/ci/check-opa-bundle-in-images.sh` (sửa: thêm `request-service`)
 **Depends on:** BE-REQ-SOL-001 (module, Dockerfile)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `opa test policy/orca-authz` 120/120; `go test ./services/request-service/internal/adapter/opaclient/`)
 
 ---
 
@@ -69,3 +69,10 @@ Bảng kết quả kỳ vọng (viết thành test; `Y` là được, `-` là t�
 - Quyền "member không phân loại, `StartPhase` chỉ owner|admin" là đề xuất chưa chủ sản phẩm xác nhận (Q1); đổi chỉ cần sửa `group_roles` và test.
 - `common/policy.Evaluator` kiểm bundle định kỳ (`SetCheckPeriod`); đổi bundle nóng cần xác nhận không làm đứt các Request đang chạy.
 - Không có vai trò dự án `viewer`: người chỉ đọc phải là `member` (Q3).
+
+## Ghi chú triển khai (2026-10-08)
+
+- `request.rego` viết lại theo solution mục C (bản đợt trước dùng tên RPC không có trong proto). Nhóm `analyze` (không phải `solution`); `agent_rpcs` là bảng nhóm -> RPC.
+- Lệch có chủ ý so với bảng solution: agent được thêm `ChangeRequestType`, `ReturnToBacklog`, `ReopenRequest` (gateway đã phát hành thành tool MCP có thể đảo ngược) và RPC nhóm `authenticated` chỉ đọc (`GetRequestFlow`, `GetRequestFlowSettings`, `ListPendingForUser`). `CancelRequest`, `ConfirmRequestType`, `GeneratePlan`, `CommitPlan`, `StartPhase`, mọi `decide`/`admin` vẫn luôn bị từ chối với agent. Cần chủ sản phẩm xác nhận (câu hỏi mở 1 trong IMPLEMENTATION-NOTES).
+- Test: `request_test.rego` (ma trận nhóm x vai trò, agent, hành động lạ); `opaclient/request_policy_catalog_test.go` đối chiếu từng RPC của `Catalog` với Rego thật theo `testdata/access_matrix.json` và cờ `AgentAllowed`.
+- Dockerfile có `ENV OPA_BUNDLE_PATH=/policy/orca-authz`; `ci/check-opa-bundle-in-images.sh` đã có `request-service`; workflow thêm bước `opa test`. Chưa chạy script Docker build ở đợt này.

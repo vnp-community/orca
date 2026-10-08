@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/report_task_outcome.go` (mới), `internal/domain/task_outcome_class.go` (mới), `internal/adapter/eventbus/task_outcome_consumer.go` (mới), `internal/adapter/grpc/server_task_outcome.go` (mới), `proto/orca/request/v1/request_execution.proto`, `internal/usecase/report_task_outcome_test.go` (mới), `internal/adapter/eventbus/testdata/statuschanged_*.json` (mới)
 **Depends on:** TASK-REQ-013-02 (payload thật), TASK-REQ-013-03, TASK-REQ-013-04, CR-REQ-006 (`ReturnToBacklog`), CR-REQ-003 (`execution_finished`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -51,3 +51,7 @@
 - `UpdateTask(done)` hàng loạt phát `orca.task.task.completed` nên `notification-service` có thể đẩy thông báo hàng loạt; cần quyết định cờ bỏ thông báo (chưa chốt).
 - RPC nội bộ chưa có kiểm danh tính service gọi (cùng vấn đề `ReportTaskExecutionResult`).
 - Thứ tự sự kiện không đảm bảo giữa các task: logic dựa trạng thái hiện thời đọc lại từ task-service, không dựa thứ tự nhận.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

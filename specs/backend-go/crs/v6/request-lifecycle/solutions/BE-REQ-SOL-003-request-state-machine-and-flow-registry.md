@@ -1,6 +1,6 @@
 # BE-REQ-SOL-003: Máy trạng thái Request, registry luồng theo loại và use case `TransitionRequest`
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Phụ thuộc [BE-REQ-SOL-002](../../request-service-foundation/solutions/BE-REQ-SOL-002-request-data-model-and-repositories.md).
+> ✅ Đã triển khai (kiểm chứng 2026-10-08). Ghi chú: [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md).
 
 **CR:** [CR-REQ-003](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-003-request-state-machine-and-flow-registry.md)
 **Service:** `request-service` (`internal/domain`, `internal/usecase`, `internal/adapter/grpc`) · `proto`

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/migrations/{postgres,mysql}/0015_task_type_plan_phase.{up,down}.sql` (mới), `.../0016_task_request_id.{up,down}.sql` (mới)
 **Depends on:** không (task đầu của feature)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test -tags=integration ./internal/adapter/postgres ./internal/adapter/mysql -run Migration` trên postgres:16-alpine và mysql:8.0.46 thật)
 
 ---
 
@@ -56,3 +56,9 @@
 - Generated column `STORED` với `CASE` chưa chạy trên MySQL/TiDB mục tiêu; nếu TiDB không hỗ trợ, đổi sang kiểm ở tầng ứng dụng (khoá `SELECT ... FOR UPDATE` trên `request_id`) và ghi vào Câu hỏi mở của solution.
 - Down mất thông tin loại container; không dùng ở production sau khi đã có plan thật.
 - Số migration có thể va; đổi số chứ không đổi nội dung.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Giữ nguyên 4 cặp file 0015/0016 đã có; kiểm lại bằng cách chạy thật: up, `down 2`, up sạch trên cả hai DB (`TestMigrations_0015_0016_UpDownUp`), chèn plan/phase được, `xyz` bị từ chối (`TestMigration0015_AcceptsPlanPhase_RejectsUnknown`), chỉ mục duy nhất Plan hoạt động (`TestMigration0016_UniqueActivePlanPerRequest`: hai plan chưa huỷ cùng request lỗi, huỷ xong tạo lại được, hai `task` cùng request không lỗi, tenant khác không đụng).
+- Generated column `STORED ... CASE` chạy được trên MySQL 8.0.46. TiDB chưa kiểm chứng.
+- Test nằm ở `internal/adapter/{postgres,mysql}/schema_plan_phase_test.go` (tag `integration`).

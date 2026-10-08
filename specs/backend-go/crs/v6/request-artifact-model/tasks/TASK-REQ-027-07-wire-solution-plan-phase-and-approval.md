@@ -5,7 +5,7 @@
 **Service:** `request-service` · `task-service`
 **File:** `request-service/internal/domain/solution_options.go` (sửa, của SOL-007), `internal/usecase/run_solution_generation.go` (sửa), `internal/usecase/solution_approval_handler.go` (sửa), `internal/domain/plan_proposal.go` (sửa, của SOL-012), `internal/domain/plan_proposal_validation.go` (sửa), `internal/usecase/commit_plan.go` (sửa), `internal/usecase/plan_subject_handler.go` (sửa), `internal/usecase/start_phase.go` (sửa, của SOL-013), `internal/adapter/eventbus/approval_decided_consumer.go` (mới), `task-service/internal/usecase/create_plan_tree.go` (sửa), `task-service/internal/usecase/ports.go` (sửa), `proto/orca/task/v1/task.proto` (sửa) và test
 **Depends on:** TASK-REQ-027-02, 027-05, 027-06, TASK-REQ-007-05/-06, TASK-REQ-012-01/-05/-06, TASK-REQ-013-05
-**Status:** [x] DONE
+**Status:** [ ] TODO (một phần: phía Solution xong và kiểm chứng 2026-10-08; phía Plan/Phase/khoá spec chưa làm vì `GeneratePlan`/`CommitPlan` còn là stub và chưa có handler Plan)
 
 ---
 
@@ -79,12 +79,12 @@ Task này **không sửa tài liệu CR hay solution khác**; nó chỉ sửa m�
 
 ## Tiêu chí hoàn thành
 
-- [x] Solution lưu `provenance`, `seq`, `input_request_revision`, `content_digest`; `provenance` không chứa `credential_ref`, khoá hay `env`.
-- [x] `Approve` Solution bị `AC_UNCOVERED_BY_OPTION` khi phương án chọn chưa trả lời mọi AC `active`.
-- [x] Solution `approved` không sửa `options` được.
-- [x] Commit Plan thiếu `satisfies` hoặc `checks` bị `TASK_NO_AC` hoặc `TASK_NO_CHECK`; `request_coverage` thay nguyên khối cùng transaction.
-- [x] Sau `approval.decided` của Plan, `SetTaskSpec` trả `TASK_SPEC_LOCKED` còn `UpdateTask` đổi `status` vẫn thành công.
-- [x] `RunInTx` cũ không đổi chữ ký; test `AIApply` không đổi.
+- [x] Solution lưu `provenance`, `seq`, `input_request_revision`, `content_digest`; `provenance` không chứa `credential_ref`, khoá hay `env`. (`SolutionContract/SolutionArtifactsDecisionsAndGates`, hai dialect; `ParseProvenance` từ chối trường lạ; `model` chưa có vì `ProjectAICompleter` vẫn trả chuỗi: `model_source=unknown`)
+- [x] `Approve` Solution bị `AC_UNCOVERED_BY_OPTION` khi phương án chọn chưa trả lời mọi AC `active`. (`TestSolutionHandler_ChosenOptionMustAnswerEveryAcceptanceCriterion` qua handler thật; ngoài ra lúc sinh, thiếu `requirement_coverage` cho AC bị coi là đầu ra sai và model được thử lại một lần; chưa qua `Approve` RPC trên DB)
+- [ ] Solution `approved` không sửa `options` được.
+- [ ] Commit Plan thiếu `satisfies` hoặc `checks` bị `TASK_NO_AC` hoặc `TASK_NO_CHECK`; `request_coverage` thay nguyên khối cùng transaction.
+- [ ] Sau `approval.decided` của Plan, `SetTaskSpec` trả `TASK_SPEC_LOCKED` còn `UpdateTask` đổi `status` vẫn thành công.
+- [ ] `RunInTx` cũ không đổi chữ ký; test `AIApply` không đổi.
 
 ## Rủi ro và lưu ý
 
@@ -92,3 +92,18 @@ Task này **không sửa tài liệu CR hay solution khác**; nó chỉ sửa m�
 - Khoá spec bằng consumer có độ trễ: giữa `approved` và khoá có khoảng `SetTaskSpec` vẫn ghi được; chấp nhận (Plan đã duyệt, sửa trong khoảng đó là hiếm) nhưng ghi ở README. Phương án khác (khoá đồng bộ trong `OnApproved`) làm một lỗi mạng chặn cả quyết định duyệt, nên không chọn.
 - `ai.complete` có thể không trả `model` (agent cũ); `model_source=unknown` là hợp lệ.
 - Thay `Complete` thành trả `CompleteResult` đổi cổng dùng bởi SOL-008 (agent_readonly) và SOL-026 (`nativeEngine`): cập nhật cả hai.
+
+## Tiến độ
+
+Phần `task-service` đã làm (2026-10-08, trong 027-02): `RunInTxWithSpecs` ở cả hai adapter (có test rollback chung task và spec trên Postgres và MySQL thật), RPC `LockTaskSpecs` idempotent sẵn cho consumer `approval.decided`. Còn thiếu: `spec_json` trong `CreatePlanTree` (RPC `CreatePlanTree` chưa tồn tại ở task-service), toàn bộ phần `request-service` (bước 1 đến 5, 7, 8). Task giữ `[ ] TODO`.
+
+## Tiến độ (2026-10-08, sau khi hợp nhất `rf/art`)
+
+Đã làm và kiểm chứng (`go test -race ./internal/domain ./internal/usecase`; `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql` gồm migration `0062` và `SolutionContract/SolutionArtifactsDecisionsAndGates`):
+- Bước 1 (Solution): `SolutionOptions` nhận `assumptions` và `open_questions` dạng chuỗi cũ hoặc đối tượng có `id`, và `requirement_coverage` (kiểm id dạng `A-n`, `Q-n`, `AC-n`, trạng thái, phương án tồn tại); prompt liệt kê AC `active` và xin `requirement_coverage`. `schemas/v1/solution.schema.json` chặt hơn bản Go (đòi `risk`, `hours_estimate` nguyên) nên không dùng để chặn đầu ra model: kiểm cấu trúc vẫn là `SolutionOptions.Validate`.
+- Bước 2 (provenance): `SolutionArtifactRecorder.Annotate` đóng dấu `provenance` (generator `native`, tool `ai.complete|agent.execPrompt`, run, lần thử, digest đầu vào, tham chiếu Request@revision, người kích hoạt), `content_digest`, `input_request_revision`, `schema_version` trong cùng giao dịch ghi Solution; repository hai dialect đọc/ghi các cột này.
+- `seq` ở mọi đường ghi: `insertSolutionRow` khoá hàng Request rồi cấp `MAX(seq)+1` (20 lần chèn song song ra 1..20: `Mint20SolutionsConcurrentDistinctSeq`), nên migration `0062_solutions_seq_not_null` đặt `NOT NULL` (up/down chạy trên cả hai dialect). `MintSolutionID` chỉ còn ghi chỉ mục `SOL-n.s` và `SOL-n.s/opt-k` khi Solution `proposed`; `Record` ghi cạnh `derived_from` (Solution → Request) và `supersedes`.
+- Bước 3 (ngữ nghĩa): `CheckCoverage` lúc sinh (AC không rõ hoặc thiếu mục `requirement_coverage` thì model được thử lại một lần kèm lý do), `CheckChosen` lúc duyệt (phương án chọn phải trả lời mọi AC `active`; tài liệu cũ không có `requirement_coverage` thì qua).
+- Bước 6 (phần Solution): handler `solution` chạy `ChosenOptionCoverage` và `ApprovalGates` (xem 028-07).
+
+Chưa làm (cần code chưa có trong nhánh): bước 4 và 5 (`PlanProposal`, `ValidateProposal` trong `GeneratePlan`; hiện `GeneratePlan`/`CommitPlan` là stub trả `nil`), bước 6 phần Plan (`RunInTxWithSpecs` đã có ở task-service nhưng chưa có `CommitPlan` để gọi), bước 7 (`CommitPlan` thay `request_coverage` và cấp `PLN-/PH-/TSK-` bằng `MintPlanIDs`, `ReplaceRequestCoverage`; các hàm đã sẵn), bước 8 (consumer `approval.decided` gọi `LockTaskSpecs`: cần biết `subject_id` của Plan), bước 9 và các tiêu chí Plan, `TASK_SPEC_LOCKED`, `RunInTx`. Tiêu chí "Solution `approved` không sửa `options` được" chưa kiểm riêng (repository `Update` không chặn theo trạng thái).

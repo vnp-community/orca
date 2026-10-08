@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/config/config.go`, `backend-go/services/api-gateway/cmd/server/main.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/register_production.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_unavailable.go` (mới), `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request.go` (mới, khung)
 **Depends on:** CR-REQ-001 (proto `orca.request.v1` đã sinh vào `proto/gen/go/orca/request/v1`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -42,3 +42,7 @@
 
 - Không dial địa chỉ rỗng: tránh lỗi khởi động chưa kiểm chứng của `grpc.NewClient("")`.
 - Không thêm `max-lines` disable; `main.go` đã dài, tách helper `dialRequestService(cfg) (...)` ra file riêng `cmd/server/request_wiring.go` nếu thêm quá 25 dòng.
+
+## Ghi chú triển khai (2026-10-08)
+
+Gateway thật dial khi `REQUEST_SERVICE_ADDR` có giá trị (`cmd/server/request_wiring.go`, `main.go`, health `request-service`); test bufconn `request_wiring_channels_test.go` kiểm token, danh tính, actor-type. Compose dev chưa sửa (ngoài phạm vi).

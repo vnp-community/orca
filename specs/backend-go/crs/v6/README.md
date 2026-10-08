@@ -1,6 +1,6 @@
 # backend-go v6: Request → Solution → Plan → Phase → Task
 
-> **Trạng thái: ✅ Đã hoàn thành (Implemented & Verified).**
+> **Trạng thái: 🚧 Đang triển khai (kiểm toán 2026-10-07: 14/199 task đủ).**
 
 CR nguồn: [`docs/crs/v6/`](../../../../docs/crs/v6/README.md) (hợp đồng chung ở mục 3, **mục 8 là các điều chỉnh và thắng mục 3 khi mâu thuẫn**). Nghiên cứu nền: [`docs/research/receive-request/`](../../../../docs/research/receive-request/README.md).
 
@@ -35,7 +35,7 @@ specs/backend-go/crs/v6/<feature>/{solutions,tasks}/
 | [`context-sources`](./context-sources/solutions/README.md) | 031 | 1 | 8 | Source Registry, Context Pack, MCP ngoài |
 | [`agent-capabilities`](./agent-capabilities/solutions/README.md) | 033 (backend) | 1 | 6 | Hồ sơ năng lực dev server, client `agent.execPrompt` mới |
 | [`ai-governance`](./ai-governance/solutions/README.md) | 034 | 1 | 8 | Ngân sách AI, phiên bản prompt, eval |
-| [`security-compliance`](./security-compliance/solutions/README.md) | 035 | 1 | 9 | Quyền mức Request, RLS thật, secretscan, audit, lưu giữ |
+| [`security-compliance`](./security-compliance/solutions/README.md) | 035 | 1 | 9 | Quyền mức Request, RLS thật, secretscan, audit, lưu giữ (🚧 035-01 xong, 035-02 một phần) |
 | **Tổng** | 33 CR | **28** | **199** | |
 
 CR-REQ-018 đến 023, 032, 036 chỉ có ở frontend; CR-REQ-033 có thêm phần ở [agent](../../../agent/crs/v6/agent-capabilities/solutions/README.md).

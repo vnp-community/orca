@@ -33,7 +33,7 @@ func ParsePlanRegion(md string, wantRequest string) (PlanProposal, []Violation) 
 	}
 
 	lines := strings.Split(md, "\n")
-	
+
 	startIdx := -1
 	endIdx := -1
 	requestID := ""
@@ -70,9 +70,9 @@ func ParsePlanRegion(md string, wantRequest string) (PlanProposal, []Violation) 
 	hasTasksRegion := false
 
 	type taskRef struct {
-		prop   *TaskProposal
-		deps   []string
-		line   int
+		prop *TaskProposal
+		deps []string
+		line int
 	}
 	var allTasks []*taskRef
 	idMap := make(map[string]int)
@@ -117,7 +117,7 @@ func ParsePlanRegion(md string, wantRequest string) (PlanProposal, []Violation) 
 			if done {
 				violations = append(violations, Violation{Line: i + 1, Code: "TASKSMD_PREDONE_TASK", Message: "task is already done"})
 			}
-			
+
 			pId := matches[2]
 			qId := matches[3]
 			title := strings.TrimSpace(matches[4])
@@ -130,7 +130,7 @@ func ParsePlanRegion(md string, wantRequest string) (PlanProposal, []Violation) 
 				Title: title,
 				Done:  done,
 			}
-			
+
 			deps := []string{}
 
 			attrs := matches[5]

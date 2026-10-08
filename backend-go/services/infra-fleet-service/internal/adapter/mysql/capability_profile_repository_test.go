@@ -4,58 +4,68 @@ package mysql
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
+
+func hexFingerprint(c string) string { return strings.Repeat(c, 64) }
+
+func seedDevServer(t *testing.T, db *sql.DB, tenantID string) string {
+	t.Helper()
+	id := uuid.NewString()
+	if _, err := db.Exec("INSERT INTO dev_servers (id, tenant_id, host, connection_mode) VALUES (?, ?, 'localhost', 'direct-websocket')", id, tenantID); err != nil {
+		t.Fatalf("insert dev_server: %v", err)
+	}
+	return id
+}
+
+func sampleProfile(tenantID, devServerID, fp string) domain.CapabilityProfile {
+	return domain.CapabilityProfile{
+		DevServerID:       devServerID,
+		TenantID:          tenantID,
+		Source:            domain.ProfileSourceProbe,
+		AgentBuildVersion: "2.2.0",
+		ProtocolVersion:   2,
+		Features:          []string{"agent.execPrompt", "agent.capabilities"},
+		ProfileJSON:       []byte(`{"schemaVersion":1}`),
+		Fingerprint:       fp,
+		ProbedAt:          time.Now().UTC().Truncate(time.Microsecond),
+	}
+}
 
 func TestCapabilityProfileRepository_UpsertGet(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 	store := NewCapabilityProfileStore(db)
-
 	tenantID := uuid.NewString()
-	devServerID := uuid.NewString()
-	_, err := db.ExecContext(ctx, "INSERT INTO dev_servers (id, tenant_id, host, connection_mode) VALUES (?, ?, 'localhost', 'direct-websocket')", devServerID, tenantID)
-	if err != nil {
-		t.Fatalf("insert dev_server: %v", err)
-	}
+	dsID := seedDevServer(t, db, tenantID)
 
-	p := domain.CapabilityProfile{
-		DevServerID:       devServerID,
-		TenantID:          tenantID,
-		Source:            domain.ProfileSourceProbe,
-		AgentBuildVersion: "1.0.0",
-		ProtocolVersion:   2,
-		Features:          []string{"feature1", "feature2"},
-		ProfileJSON:       []byte(`{"a":1}`),
-		Fingerprint:       "fingerprint1",
-		ProbedAt:          time.Now().Truncate(time.Microsecond),
-	}
-
+	p := sampleProfile(tenantID, dsID, hexFingerprint("a"))
 	prev, existed, err := store.Upsert(ctx, p)
 	if err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
-	if existed {
-		t.Errorf("expected existed=false")
+	if existed || prev != "" {
+		t.Fatalf("first upsert: existed=%v prev=%q", existed, prev)
 	}
-	if prev != "" {
-		t.Errorf("expected empty prev")
+	got, found, err := store.Get(ctx, tenantID, dsID)
+	if err != nil || !found {
+		t.Fatalf("Get: found=%v err=%v", found, err)
 	}
-
-	got, found, err := store.Get(ctx, tenantID, devServerID)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	if !found {
-		t.Fatalf("expected found=true")
-	}
-	if got.AgentBuildVersion != "1.0.0" || got.ProtocolVersion != 2 || got.Fingerprint != "fingerprint1" {
+	if got.AgentBuildVersion != "2.2.0" || got.ProtocolVersion != 2 || got.Fingerprint != p.Fingerprint ||
+		got.Source != domain.ProfileSourceProbe || !got.ProbedAt.Equal(p.ProbedAt) {
 		t.Errorf("unexpected profile: %+v", got)
+	}
+	if len(got.Features) != 2 || got.Features[0] != "agent.capabilities" {
+		t.Errorf("features not normalized: %v", got.Features)
 	}
 }
 
@@ -63,38 +73,50 @@ func TestCapabilityProfileRepository_UpsertReturnsPreviousFingerprint(t *testing
 	db := setupDB(t)
 	ctx := context.Background()
 	store := NewCapabilityProfileStore(db)
-
 	tenantID := uuid.NewString()
-	devServerID := uuid.NewString()
-	db.ExecContext(ctx, "INSERT INTO dev_servers (id, tenant_id, host, connection_mode) VALUES (?, ?, 'localhost', 'direct-websocket')", devServerID, tenantID)
+	dsID := seedDevServer(t, db, tenantID)
 
-	p := domain.CapabilityProfile{
-		DevServerID:       devServerID,
-		TenantID:          tenantID,
-		Source:            domain.ProfileSourceHandshakeOnly,
-		AgentBuildVersion: "1.0.0",
-		ProtocolVersion:   1,
-		Features:          []string{},
-		ProfileJSON:       []byte(`{}`),
-		Fingerprint:       "fingerprint-1",
-		ProbedAt:          time.Now().Truncate(time.Microsecond),
-	}
-
-	_, _, err := store.Upsert(ctx, p)
-	if err != nil {
+	if _, _, err := store.Upsert(ctx, sampleProfile(tenantID, dsID, hexFingerprint("1"))); err != nil {
 		t.Fatalf("Upsert 1: %v", err)
 	}
-
-	p.Fingerprint = "fingerprint-2"
-	prev, existed, err := store.Upsert(ctx, p)
+	prev, existed, err := store.Upsert(ctx, sampleProfile(tenantID, dsID, hexFingerprint("2")))
 	if err != nil {
 		t.Fatalf("Upsert 2: %v", err)
 	}
-	if !existed {
-		t.Errorf("expected existed=true")
+	if !existed || prev != hexFingerprint("1") {
+		t.Errorf("existed=%v prev=%q", existed, prev)
 	}
-	if prev != "fingerprint-1" {
-		t.Errorf("expected prev=fingerprint-1, got %q", prev)
+}
+
+func TestCapabilityProfileRepository_ConcurrentUpsertsSerialize(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+	store := NewCapabilityProfileStore(db)
+	tenantID := uuid.NewString()
+	dsID := seedDevServer(t, db, tenantID)
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	existedCount := 0
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, existed, err := store.Upsert(ctx, sampleProfile(tenantID, dsID, hexFingerprint(string(rune('a'+i)))))
+			if err != nil {
+				t.Errorf("Upsert: %v", err)
+				return
+			}
+			if existed {
+				mu.Lock()
+				existedCount++
+				mu.Unlock()
+			}
+		}(i)
+	}
+	wg.Wait()
+	if existedCount != 1 {
+		t.Errorf("exactly one of two concurrent upserts must see existed=true, got %d", existedCount)
 	}
 }
 
@@ -102,43 +124,17 @@ func TestCapabilityProfileRepository_TenantIsolation(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 	store := NewCapabilityProfileStore(db)
+	tenantA, tenantB := uuid.NewString(), uuid.NewString()
+	dsID := seedDevServer(t, db, tenantA)
 
-	tenantA := uuid.NewString()
-	tenantB := uuid.NewString()
-	devServerID := uuid.NewString()
-	db.ExecContext(ctx, "INSERT INTO dev_servers (id, tenant_id, host, connection_mode) VALUES (?, ?, 'localhost', 'direct-websocket')", devServerID, tenantA)
-
-	p := domain.CapabilityProfile{
-		DevServerID:       devServerID,
-		TenantID:          tenantA,
-		Source:            domain.ProfileSourceProbe,
-		AgentBuildVersion: "1.0.0",
-		ProtocolVersion:   1,
-		Features:          []string{},
-		ProfileJSON:       []byte(`{}`),
-		Fingerprint:       "fingerprint",
-		ProbedAt:          time.Now().Truncate(time.Microsecond),
-	}
-
-	_, _, err := store.Upsert(ctx, p)
-	if err != nil {
+	if _, _, err := store.Upsert(ctx, sampleProfile(tenantA, dsID, hexFingerprint("a"))); err != nil {
 		t.Fatalf("Upsert A: %v", err)
 	}
-
-	// tenantB trying to upsert to A's dev_server
-	pB := p
-	pB.TenantID = tenantB
-	_, _, err = store.Upsert(ctx, pB)
-	if err == nil || !strings.Contains(err.Error(), domain.ErrNotFound.Error()) {
-		t.Errorf("expected ErrNotFound for tenant mismatch on Upsert, got: %v", err)
+	if _, _, err := store.Upsert(ctx, sampleProfile(tenantB, dsID, hexFingerprint("b"))); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("tenant B upserting onto A's dev server: want ErrNotFound, got %v", err)
 	}
-
-	_, found, err := store.Get(ctx, tenantB, devServerID)
-	if err != nil {
-		t.Fatalf("Get B: %v", err)
-	}
-	if found {
-		t.Errorf("expected found=false for wrong tenant")
+	if _, found, err := store.Get(ctx, tenantB, dsID); err != nil || found {
+		t.Errorf("tenant B must not see A's profile: found=%v err=%v", found, err)
 	}
 }
 
@@ -146,29 +142,16 @@ func TestCapabilityProfileRepository_CascadeOnDevServerDelete(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 	store := NewCapabilityProfileStore(db)
-
 	tenantID := uuid.NewString()
-	devServerID := uuid.NewString()
-	db.ExecContext(ctx, "INSERT INTO dev_servers (id, tenant_id, host, connection_mode) VALUES (?, ?, 'localhost', 'direct-websocket')", devServerID, tenantID)
-
-	p := domain.CapabilityProfile{
-		DevServerID:       devServerID,
-		TenantID:          tenantID,
-		Source:            domain.ProfileSourceProbe,
-		AgentBuildVersion: "1.0.0",
-		ProtocolVersion:   1,
-		Features:          []string{},
-		ProfileJSON:       []byte(`{}`),
-		Fingerprint:       "fingerprint",
-		ProbedAt:          time.Now().Truncate(time.Microsecond),
+	dsID := seedDevServer(t, db, tenantID)
+	if _, _, err := store.Upsert(ctx, sampleProfile(tenantID, dsID, hexFingerprint("a"))); err != nil {
+		t.Fatalf("Upsert: %v", err)
 	}
-	store.Upsert(ctx, p)
-
-	db.ExecContext(ctx, "DELETE FROM dev_servers WHERE id = ?", devServerID)
-
-	_, found, _ := store.Get(ctx, tenantID, devServerID)
-	if found {
-		t.Errorf("expected capability profile to cascade delete")
+	if _, err := db.Exec("DELETE FROM dev_servers WHERE id = ?", dsID); err != nil {
+		t.Fatalf("delete dev server: %v", err)
+	}
+	if _, found, _ := store.Get(ctx, tenantID, dsID); found {
+		t.Errorf("profile must be deleted with its dev server")
 	}
 }
 
@@ -176,32 +159,28 @@ func TestCapabilityProfileRepository_UnicodeInProfile(t *testing.T) {
 	db := setupDB(t)
 	ctx := context.Background()
 	store := NewCapabilityProfileStore(db)
-
 	tenantID := uuid.NewString()
-	devServerID := uuid.NewString()
-	db.ExecContext(ctx, "INSERT INTO dev_servers (id, tenant_id, host, connection_mode) VALUES (?, ?, 'localhost', 'direct-websocket')", devServerID, tenantID)
+	dsID := seedDevServer(t, db, tenantID)
 
-	p := domain.CapabilityProfile{
-		DevServerID:       devServerID,
-		TenantID:          tenantID,
-		Source:            domain.ProfileSourceProbe,
-		AgentBuildVersion: "1.0.0",
-		ProtocolVersion:   1,
-		Features:          []string{},
-		ProfileJSON:       []byte(`{"msg":"chào thế giới"}`),
-		Fingerprint:       "fingerprint",
-		ProbedAt:          time.Now().Truncate(time.Microsecond),
-	}
-
-	_, _, err := store.Upsert(ctx, p)
-	if err != nil {
+	p := sampleProfile(tenantID, dsID, hexFingerprint("a"))
+	p.ProfileJSON = []byte(`{"ghiChu":"máy chủ phát triển Việt Nam"}`)
+	if _, _, err := store.Upsert(ctx, p); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
+	got, _, _ := store.Get(ctx, tenantID, dsID)
+	if !strings.Contains(string(got.ProfileJSON), "máy chủ phát triển Việt Nam") {
+		t.Errorf("unicode lost: %s", got.ProfileJSON)
+	}
+}
 
-	got, _, _ := store.Get(ctx, tenantID, devServerID)
-	if string(got.ProfileJSON) != `{"msg":"chào thế giới"}` && string(got.ProfileJSON) != `{"msg": "chào thế giới"}` {
-		if !strings.Contains(string(got.ProfileJSON), "chào thế giới") {
-			t.Errorf("expected unicode string preserved, got %s", got.ProfileJSON)
-		}
+func TestCapabilityProfileRepository_SourceCheckRejectsUnknown(t *testing.T) {
+	db := setupDB(t)
+	store := NewCapabilityProfileStore(db)
+	tenantID := uuid.NewString()
+	dsID := seedDevServer(t, db, tenantID)
+	p := sampleProfile(tenantID, dsID, hexFingerprint("a"))
+	p.Source = "bogus"
+	if _, _, err := store.Upsert(context.Background(), p); err == nil {
+		t.Error("CHECK constraint must reject an unknown source")
 	}
 }

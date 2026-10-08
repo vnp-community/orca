@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/stablyai/orca-go/common/policy"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
 const requestDecisionQuery = "data.orca.authz.request.allow"
@@ -46,4 +47,16 @@ func (p *RequestPolicy) Decision(ctx context.Context, in RequestPolicyInput) (bo
 		"actor_type":          in.ActorType,
 	}
 	return p.evaluator.Decision(ctx, requestDecisionQuery, input)
+}
+
+// Allow adapts domain.AccessInput to the Rego input; an evaluation error is never an allow.
+func (p *RequestPolicy) Allow(ctx context.Context, in domain.AccessInput) (bool, error) {
+	ok, err := p.Decision(ctx, RequestPolicyInput{
+		Action: string(in.Action), RPC: in.RPC, CallerGlobalRole: in.CallerGlobalRole,
+		CallerProjectRole: in.CallerProjectRole, IsReporter: in.IsReporter, ActorType: in.ActorType,
+	})
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
 }

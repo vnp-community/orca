@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/secrets"
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/infra-fleet-service/internal/config"
@@ -166,6 +168,11 @@ func run() error {
 	// infraeventbus.New's local rateLimitedOutboxEnqueuer interface needs
 	// from AgentRateLimitedOutboxStore, distinct from outbox.Store's
 	// FetchUnpublished/MarkPublished.
+	type capabilityProfileStoreAll interface {
+		usecase.CapabilityProfileStore
+		usecase.DevServerTenantLookup
+	}
+
 	type rateLimitedOutboxStore interface {
 		outbox.Store
 		Enqueue(ctx context.Context, rec outbox.Record) error
@@ -187,6 +194,7 @@ func run() error {
 		devServerAccessRequestStore usecase.DevServerAccessRequestRepository
 		portForwardStore            usecase.PortForwardRepository
 		ephemeralVmSshTargetStore   usecase.EphemeralVmSshTargetRepository
+		capabilityProfileStore      capabilityProfileStoreAll
 	)
 	switch caps.Dialect {
 	case dbcapability.DialectPostgres:
@@ -211,6 +219,7 @@ func run() error {
 		devServerAccessRequestStore = infrapostgres.NewDevServerAccessRequestStore(pool)
 		portForwardStore = infrapostgres.NewPortForwardStore(pool)
 		ephemeralVmSshTargetStore = infrapostgres.NewEphemeralVmSshTargetStore(pool)
+		capabilityProfileStore = infrapostgres.NewCapabilityProfileStore(pool)
 		healthSrv.Register("postgres", func() error {
 			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
@@ -242,6 +251,7 @@ func run() error {
 		devServerAccessRequestStore = infrafleetmysql.NewDevServerAccessRequestStore(db)
 		portForwardStore = infrafleetmysql.NewPortForwardStore(db)
 		ephemeralVmSshTargetStore = infrafleetmysql.NewEphemeralVmSshTargetStore(db)
+		capabilityProfileStore = infrafleetmysql.NewCapabilityProfileStore(db)
 		healthSrv.Register("mysql", func() error {
 			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
@@ -313,8 +323,25 @@ func run() error {
 	// token fresh on every dial (never cached across process restarts) — see
 	// TASK-AWS-01-03/SOL-AWS-01, replacing the former single deployment-wide
 	// ORCA_AGENT_TOKEN.
+	// capabilityRefresh is built after agentClient (it needs the client), but
+	// the attach hook must be registered before the client exists.
+	var capabilityRefresh atomic.Pointer[usecase.RefreshDevServerCapabilities]
 	agentOpts := []infradevserveragent.Option{
 		infradevserveragent.WithAgentTokens(agentTokenSource{tokens: agentTokenStore, broker: credentialBrokerClient}),
+		infradevserveragent.WithOnSessionAttached(func(devServerID string) {
+			uc := capabilityRefresh.Load()
+			if uc == nil {
+				return
+			}
+			probeCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			tenantID, found, err := capabilityProfileStore.TenantIDForDevServer(probeCtx, devServerID)
+			if err != nil || !found {
+				return
+			}
+			// Failures only log inside the use case; a later GetDevServerCapabilities retries.
+			_, _ = uc.Execute(tenant.WithTenantID(probeCtx, tenantID), tenantID, devServerID, false)
+		}),
 	}
 	vaultClient, err := secrets.NewClient()
 	if err != nil {
@@ -454,6 +481,15 @@ func run() error {
 	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
 	emulatorRelayUC := usecase.NewEmulatorRelay(repo, agentClient)
 	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
+
+	// --- Dev server capability profile (CR-REQ-033) ---
+	refreshCapabilitiesUC := usecase.NewRefreshDevServerCapabilities(
+		repo, agentClient, capabilityProfileStore, repo, usecase.RealClock{}, cfg.CapabilityRefreshMinInterval,
+	).WithLogger(logger)
+	capabilityRefresh.Store(refreshCapabilitiesUC)
+	getDevServerCapabilitiesUC := usecase.NewGetDevServerCapabilities(
+		repo, repo, capabilityProfileStore, refreshCapabilitiesUC, agentClient, cfg.CapabilityProfileTTL, usecase.RealClock{},
+	)
 
 	// --- Terminal scrollback persistence (SOL-TM-03) ---
 	saveTerminalScrollbackSnapshotUC := usecase.NewSaveTerminalScrollbackSnapshot(scrollbackStore, usecase.RealClock{})
@@ -759,6 +795,7 @@ func run() error {
 		pickByTagUC,
 	)
 	infraServer.WithCodeIntel(streamCodeIntelEventsUC, getAgentCapabilitiesUC)
+	infraServer.WithDevServerCapabilities(getDevServerCapabilitiesUC)
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, withAgentSessionList(infraServer, agentSessionStore))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

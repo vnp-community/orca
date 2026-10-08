@@ -2,36 +2,42 @@ package usecase
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
+// ListPendingApprovalsForUser is the approver inbox: pending approvals whose snapshot names the caller
+// (directly, by team, by role, or as reporter), minus those blocked by separation of duties.
 type ListPendingApprovalsForUser struct {
-	Repo ApprovalRepository
+	Repo  ApprovalRepository
+	Teams TeamMembershipResolver
+	Log   *slog.Logger
 }
 
-func (uc *ListPendingApprovalsForUser) Execute(ctx context.Context, pageSize int, pageToken string) ([]domain.Approval, string, error) {
+func (uc *ListPendingApprovalsForUser) Execute(ctx context.Context, st domain.SubjectType, pageSize int, pageToken string) ([]PendingApproval, string, error) {
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
 		return nil, "", err
 	}
+	userID, _ := tenant.UserID(ctx)
+	if userID == "" {
+		return nil, "", domain.ErrNoUser
+	}
 	role, _ := tenant.Role(ctx)
-
-	f := ApprovalListFilter{
-		Status:    domain.ApprovalStatusPending,
-		PageSize:  pageSize,
-		PageToken: pageToken,
+	f := PendingForUserFilter{UserID: userID, Role: role, SubjectType: st, PageSize: clampApprovalPageSize(pageSize), PageToken: pageToken}
+	if role != "admin" && uc.Teams != nil {
+		teams, err := uc.Teams.TeamsForUser(ctx, userID)
+		if err != nil {
+			// Degrade to user/role/reporter matches rather than an empty inbox when tenant-service is down.
+			log := uc.Log
+			if log == nil {
+				log = slog.Default()
+			}
+			log.Warn("team lookup failed; inbox omits team approvals", slog.Any("error", err))
+		}
+		f.TeamIDs = teams
 	}
-
-	if role != "admin" {
-		// Temporary hack: we don't have a way to filter by reporter_id in approvals table directly
-		// as requested by task without joining requests. The task says:
-		// "lọc tạm: admin thấy tất cả pending, người khác thấy của Request có reporter_id là mình"
-		// In a real implementation this would need a join in the repository.
-		// For now we'll just leave it and maybe filter in memory or assume list returns all and filter.
-		// Actually, let's just return empty for non-admins as a stub.
-	}
-
-	return uc.Repo.List(ctx, tenantID, f)
+	return uc.Repo.ListPendingForUser(ctx, tenantID, f)
 }

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/record_decision.go`, `internal/usecase/confirm_decision.go`, `internal/usecase/decision_gate.go`, `internal/usecase/choose_solution_option.go` (sửa, của SOL-007), `internal/usecase/solution_approval_handler.go` (sửa), `internal/usecase/plan_subject_handler.go` (sửa, của SOL-012), `internal/usecase/ports.go` (sửa) và test
 **Depends on:** TASK-REQ-028-02, 028-03, TASK-REQ-007-06 (`ChooseSolutionOption`, handler), TASK-REQ-012-06 (handler `plan`/`task_list`), TASK-REQ-027-07 (`OpenQuestion`, `Assumption` có cấu trúc), TASK-REQ-010-02 (`ApprovalAuthorization.Decide`, nếu đã có)
-**Status:** [x] DONE
+**Status:** [ ] TODO (một phần: phía Solution xong và kiểm chứng 2026-10-08 trên Postgres và MySQL qua `Approve` thật; còn cổng Plan (`CheckPlan`) vì handler Plan chưa tồn tại)
 
 ---
 
@@ -86,12 +86,12 @@ Quyền: người chọn phải qua `ApprovalAuthorizer.CanDecide` của Approva
 
 ## Tiêu chí hoàn thành
 
-- [x] Chọn phương án khác đề xuất mà thiếu `rationale` bị `REQUEST_DECISION_RATIONALE_REQUIRED`, không để lại thay đổi nào.
-- [x] Phương án `breaking_change` ở `chosen` chặn `Approve` bằng `REQUEST_DECISION_NOT_EFFECTIVE` đến khi `ConfirmDecision` đúng tên phương án.
-- [x] Chọn lại khi Approval `pending`: ghi `decision_history`, xoá xác nhận cũ, digest Approval cập nhật.
-- [x] Solution `superseded` kéo theo Decision `superseded`.
-- [x] `open_question.blocking` và `assumption.needs_confirmation` chưa có câu trả lời chặn duyệt với mã đúng.
-- [x] `diagnosis`, `findings`, `answer` duyệt không cần Decision.
+- [x] Chọn phương án khác đề xuất mà thiếu `rationale` bị `REQUEST_DECISION_RATIONALE_REQUIRED`, không để lại thay đổi nào. (use case, ở mức giao dịch DB)
+- [x] Phương án `breaking_change` ở `chosen` chặn `Approve` bằng `REQUEST_DECISION_NOT_EFFECTIVE` đến khi `ConfirmDecision` đúng tên phương án. (`TestSolutionHandler_HighRiskPickBlocksApprovalUntilConfirmed` qua handler thật với kho giả; DB thật hai dialect chỉ ở mức repository/use case, chưa qua `Approve` RPC)
+- [x] Chọn lại khi Approval `pending`: ghi `decision_history`, xoá xác nhận cũ, digest Approval cập nhật. (hai nửa kiểm riêng: `RecordDecision` chọn lại ghi `rechosen`; `TestChooseSolutionOption_RecordsChoiceAndRefreshesTheDigest` + `SolutionFlowGenerateChooseApprove` kiểm digest Approval; chưa có một kịch bản DB liền mạch)
+- [x] Solution `superseded` kéo theo Decision `superseded`. (tạo lại Solution kèm góp ý và Persist: `SolutionContract/SolutionArtifactsDecisionsAndGates` hai dialect; nhánh `type_changed` của handler có mã nhưng chưa có test riêng)
+- [ ] `open_question.blocking` và `assumption.needs_confirmation` chưa có câu trả lời chặn duyệt với mã đúng. (`open_question.blocking` xong: `REQUEST_SOLUTION_BLOCKING_QUESTIONS` qua `Approve` thật hai dialect; `assumption.needs_confirmation` của Plan chưa nối vì chưa có handler Plan)
+- [x] `diagnosis`, `findings`, `answer` duyệt không cần Decision. (`TestSolutionHandler_DiagnosisNeedsNoDecisionEvenWithGatesWired`; findings/answer dùng handler không có cổng)
 
 ## Rủi ro và lưu ý
 
@@ -99,3 +99,17 @@ Quyền: người chọn phải qua `ApprovalAuthorizer.CanDecide` của Approva
 - `subject_digest` của Decision phải được đồng bộ mỗi khi digest Approval đổi (SOL-009 `UpdatePendingDigest`); lệch làm Decision không bao giờ khớp. Test kiểm điểm nối này.
 - Ngưỡng `high` (breaking, severity high, ≥ 3 service) là đề xuất; Q5.
 - Danh tính máy chưa nhận biết được (`IsMachine` luôn false): chốt `REQUEST_DECISION_AGENT_FORBIDDEN` hiện chỉ có tác dụng khi cơ chế nhận biết có; CR-REQ-017 không đăng ký tool `decision_confirm` là biện pháp thật.
+
+## Tiến độ (rf/art, 2026-10-08)
+
+Đã làm và kiểm chứng (`go test ./internal/usecase -run 'RecordDecision|ConfirmDecision|ApprovalGates|DecisionQueries'`, `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql -run ClarificationContract/Decision`):
+- `RecordDecision` (tạo/ghi lựa chọn, rủi ro cao → `chosen`, `rationale` bắt buộc khi khác đề xuất, chọn lại xoá xác nhận và ghi `rechosen`, kiểm tự chọn với cờ `SelfChoiceAllowed`, sự kiện không chứa `rationale`), `ConfirmDecision` (RPC thật, gõ lại tên phương án NFC/không phân biệt hoa thường, chỉ người chọn hoặc admin, máy bị chặn, lặp là no-op, CAS), `ApprovalGates` (`CheckDecision`, `CheckSolution` với câu hỏi `blocking`, `CheckPlan` với giả định `needs_confirmation`; tài liệu `diagnosis|findings|answer` không gọi `CheckSolution`), `DecisionQueries`; nối RPC `ListDecisions`, `GetDecision`, `ConfirmDecision`; `RecordDecision` và `ApprovalGates` dựng sẵn ở `wire_artifact.go` (`artifactWiring.RecordDecision`, `.Gates`).
+- Kiểm trên DB thật hai dialect: chọn rủi ro cao → `chosen` → cổng chặn → xác nhận đúng tên → cổng qua; chọn lại ghi đủ lịch sử; refuse chọn thiếu lý do không để lại dòng nào; chỉ mục "một Decision sống" chặn bản thứ hai.
+
+Chưa làm vì phụ thuộc code chưa có trong nhánh: `ChooseSolutionOption` gọi `RecordDecision` trong giao dịch của nó (và `ApprovalAuthorizer.CanDecide`), `SolutionApprovalHandler.ValidateForRequest` và `plan_subject_handler` gọi `ApprovalGates`, Decision `superseded` khi Solution bị thay (Decision đã `superseded` khi trả lời Clarification), đồng bộ `subject_digest` với `UpdatePendingDigest`. Hai tiêu chí còn mở nên giữ `[ ]`: chặn `Approve` thật và `superseded` theo Solution; tiêu chí "`diagnosis|findings|answer` không cần Decision" chỉ ở mức cổng.
+
+## Tiến độ sau hợp nhất (2026-10-08)
+
+Đã nối (nhánh `feat/request-flow-backend` sau khi hợp nhất `rf/art`): `ChooseSolutionOption.WithDecisions` gọi `RecordDecision` trong giao dịch của nó (nhận `rationale`, chính sách tự chọn theo `self_approval_allowed` của Approval đang chờ), trả `decision_status` và `requires_confirmation`; handler `solution` gọi `ApprovalGates.CheckSolution` và kiểm AC cho phương án đã chọn trước khi duyệt; `GenerateSolution` và `AnalysisResultWriter` đóng Decision của Solution bị thay. Kiểm chứng: `go test -race ./internal/usecase`; `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql -run SolutionContract` (kịch bản `SolutionArtifactsDecisionsAndGates`: từ chối thiếu `rationale` không để lại Decision, chọn đề xuất thì `effective`, `Approve` bị chặn bởi câu hỏi `blocking`, qua sau khi có câu trả lời, tạo lại Solution đóng Decision).
+
+Còn thiếu: `CheckPlan` ở handler Plan (SOL-012 còn là stub `GeneratePlan/CommitPlan`); `ApprovalAuthorizer.CanDecide` cho người chọn (đang dùng `ApproverAwareAuthorizer` sẵn có).

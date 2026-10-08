@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/human_gate_policy.go` (mới), `.../internal/usecase/human_gate_decider.go` (mới), `.../internal/adapter/{postgres,mysql}/ai_gate_decision.go` (task 01 đã khai báo cổng; hiện thực ở đây nếu chưa), `.../internal/domain/human_gate_policy_test.go`, `.../internal/usecase/human_gate_decider_test.go` (mới)
 **Depends on:** TASK-REQ-034-01 (bảng `ai_gate_decisions`, cột `ai_gate_mode`); BE-REQ-SOL-009 (khi tạo Approval); BE-REQ-SOL-003 (loại Request và `subject_type`)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -50,11 +50,11 @@ func Decide(in GateInput) (GateDecision, string) // trả kèm lý do (mã ngắ
 
 ## Tiêu chí hoàn thành
 
-- [x] `HumanGatePolicy` ở chế độ chạy bóng không tạo Approval tự động; ghi đúng "sẽ tự duyệt" vào `ai_gate_decisions`.
-- [x] `hotfix`, `security`, `ops_request`, `pre_deploy`, `size=L`, `risk=unknown` luôn `required` (test bảng).
-- [x] `ai_gate_mode=off` mặc định: không ghi, không đổi hành vi.
-- [x] `enforce` không thể bật ở production v1.
-- [x] Domain chỉ dùng stdlib.
+- [ ] `HumanGatePolicy` ở chế độ chạy bóng không tạo Approval tự động; ghi đúng "sẽ tự duyệt" vào `ai_gate_decisions`.
+- [ ] `hotfix`, `security`, `ops_request`, `pre_deploy`, `size=L`, `risk=unknown` luôn `required` (test bảng).
+- [ ] `ai_gate_mode=off` mặc định: không ghi, không đổi hành vi.
+- [ ] `enforce` không thể bật ở production v1.
+- [ ] Domain chỉ dùng stdlib.
 
 ## Ví dụ tham khảo
 

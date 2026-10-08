@@ -5,7 +5,7 @@
 **Service:** `proto`, `request-service`
 **File:** `proto/orca/request/v1/request.proto` (sửa), `proto/gen/go/orca/request/v1/*` (sinh lại), `internal/usecase/list_request_links.go`, `internal/adapter/grpc/server.go`, `internal/adapter/grpc/request_mapper.go`, `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-006-02, 006-03, 006-04
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run RPC (13+ kịch bản gRPC, máy trạng thái thật); go test ./internal/adapter/grpc; buf lint/breaking --path orca/request/v1/request.proto`)
 
 ---
 
@@ -39,3 +39,8 @@ CR-REQ-006 mục 2.2 định nghĩa message; `ListRequestLinks` do README mục 
 ## Rủi ro và lưu ý
 
 - Không có trường `provider` trong `SpawnChildRequestRequest` (theo CR); `mcp` làm nguồn con cần CR-REQ-017 thêm cách truyền (ví dụ metadata `x-orca-source: mcp`); chưa quyết, ghi vào PR.
+
+## Ghi chú triển khai
+
+- Năm handler ở `adapter/grpc/server_lifecycle.go` (`ReturnToBacklog`, `ReopenRequest`, `CancelRequest`, `SpawnChildRequest`, `ListRequestLinks`), `returned_category` hiện trong `Request`; actor từ metadata. Reopen đặt lại `classification_attempts` (kiểm trong `ReturnReopenCancel`).
+- Kịch bản gRPC chạy trên Postgres và MySQL thật với `TransitionRequest` thật.

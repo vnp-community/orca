@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Decision records (CR-REQ-028 section 2.8). RPCs live in RequestService.
+
+enum DecisionStatus {
+  DECISION_STATUS_UNSPECIFIED = 0;
+  DECISION_STATUS_OPEN = 1;
+  DECISION_STATUS_CHOSEN = 2;
+  DECISION_STATUS_EFFECTIVE = 3;
+  DECISION_STATUS_SUPERSEDED = 4;
+}
+
+message Decision {
+  string id = 1;
+  string display_id = 2;
+  string request_id = 3;
+  // solution_option | plan_assumption | other
+  string subject_kind = 4;
+  string subject_id = 5;
+  string subject_digest = 6;
+  string question = 7;
+  // [{id,label,summary,risk:{level,reasons[]}}]
+  string options_json = 8;
+  string recommended_option_id = 9;
+  string recommendation_reason = 10;
+  string chosen_option_id = 11;
+  string chooser_id = 12;
+  google.protobuf.Timestamp chosen_at = 13;
+  string rationale = 14;
+  // normal | high
+  string risk_level = 15;
+  string confirmed_by = 16;
+  google.protobuf.Timestamp confirmed_at = 17;
+  DecisionStatus status = 18;
+  int64 version = 19;
+  google.protobuf.Timestamp created_at = 20;
+}
+
+message ListDecisionsRequest {
+  string request_id = 1;
+  DecisionStatus status = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListDecisionsResponse {
+  repeated Decision decisions = 1;
+  string next_page_token = 2;
+}
+
+message GetDecisionRequest {
+  string id = 1;
+}
+
+message GetDecisionResponse {
+  Decision decision = 1;
+}
+
+// Human only; there is no MCP tool for this RPC.
+message ConfirmDecisionRequest {
+  string decision_id = 1;
+  // Must match the chosen option title (NFC, trimmed, case-insensitive).
+  string confirmation_text = 2;
+  int64 expected_version = 3;
+}
+
+message ConfirmDecisionResponse {
+  Decision decision = 1;
+}

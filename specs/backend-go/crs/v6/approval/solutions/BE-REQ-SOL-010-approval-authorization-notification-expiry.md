@@ -1,6 +1,6 @@
 # BE-REQ-SOL-010: Chính sách quyền duyệt, thông báo và hết hạn của Approval
 
-> **📋 Proposed** (chưa triển khai). Thiết kế thực thi cho CR-REQ-010: `request-service` (mới) và sửa nhỏ `notification-service`.
+> **✅ Đã triển khai (kiểm chứng 2026-10-08; 7/7 task)**: chính sách, người duyệt, thông báo, hết hạn/nhắc, API quản trị trong `request-service`; `notification-service` xong 2026-10-07. Chưa kiểm chứng với tenant-service và auth-service thật (xem IMPLEMENTATION-NOTES). Thiết kế thực thi cho CR-REQ-010.
 
 **CR:** [CR-REQ-010](../../../../../../docs/crs/v6/approval/CR-REQ-010-approval-authorization-notification-expiry.md)
 **Service:** `request-service` (mới) · `notification-service` (sửa `consumer.go`, `notification_event.go`) · gọi `tenant-service`, `auth-service`

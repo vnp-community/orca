@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/request_webhook_routes.go`, `request_webhook_routes_test.go` (mới); `router.go`, `backend-go/services/api-gateway/cmd/server/main.go`, `backend-go/services/api-gateway/internal/config/config.go` (sửa)
 **Depends on:** TASK-REQ-004-06 (`CreateRequest` thật); CR-REQ-016 chưa cần (route HTTP riêng, không đi qua `wscompat`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/adapter/httpwebhook/...`)
 
 ---
 
@@ -45,3 +45,10 @@
 - Bí mật HMAC và tenant header: ai biết tenant id nhưng không có bí mật không tạo được Request; kẻ có bí mật là chủ nguồn. Không đưa `X-Orca-Tenant-Id` vào phần được ký thì kẻ trung gian đổi tenant cũng chỉ làm sai chữ ký (bí mật theo tenant), chấp nhận.
 - Cấu hình `REQUEST_WEBHOOK_SOURCES` là giải pháp tạm; thay bằng cài đặt theo tenant ở CR-REQ-025.
 - Chưa kiểm chứng gateway có quyền gọi `credential-broker-service` (guard nội bộ).
+
+## Ghi chú triển khai
+
+- LỆCH có chủ ý: route `POST /v1/request-webhooks/{source_name}` đặt ở `request-service` (HTTP port), không ở `api-gateway`; kiểm HMAC-SHA256 tại đây (phương án thay thế mà task mục 5 nêu). Tenant qua header `X-Orca-Tenant-Id`.
+- Bí mật và reporter lấy từ `REQUEST_WEBHOOK_SOURCES` (JSON danh sách `{tenant_id, source, reporter_id, secret_env|secret_file}`); không dùng credential-broker. Rỗng thì route không được mount.
+- `api-gateway` chưa chuyển tiếp lưu lượng công khai tới cổng HTTP này (cấu hình triển khai, không làm ở đây).
+- Mọi lỗi xác thực cùng thân `{"error":"invalid signature"}`; HMAC luôn được tính một lần kể cả nguồn không tồn tại.

@@ -25,8 +25,12 @@ func Scan(text string) []Finding {
 	}
 	scanText := text[:limit]
 
-	var allFindings []Finding
-	for _, p := range secretPatterns {
+	type candidate struct {
+		Finding
+		prio int
+	}
+	var allFindings []candidate
+	for prio, p := range secretPatterns {
 		matches := p.re.FindAllStringSubmatchIndex(scanText, -1)
 		for _, m := range matches {
 			start, end := m[0], m[1]
@@ -37,12 +41,16 @@ func Scan(text string) []Finding {
 			if start == -1 || end == -1 {
 				continue // Optional group didn't match
 			}
-			allFindings = append(allFindings, Finding{
+			// Already-redacted values must not be re-flagged, otherwise Redact is not idempotent.
+			if strings.HasPrefix(scanText[start:end], "[REDACTED") {
+				continue
+			}
+			allFindings = append(allFindings, candidate{Finding: Finding{
 				Kind:       p.kind,
 				Confidence: p.confidence,
 				Start:      start,
 				End:        end,
-			})
+			}, prio: prio})
 		}
 	}
 
@@ -50,24 +58,37 @@ func Scan(text string) []Finding {
 		return nil
 	}
 
-	// Sort findings by Start, then by length (longest first)
+	// Specific token shapes claim their span first; the generic key=value
+	// patterns only fill what is left, so "token: ghp_x@host" keeps the host visible.
 	sort.Slice(allFindings, func(i, j int) bool {
+		gi, gj := isGenericKind(allFindings[i].Kind), isGenericKind(allFindings[j].Kind)
+		if gi != gj {
+			return !gi
+		}
 		if allFindings[i].Start == allFindings[j].Start {
 			lenI := allFindings[i].End - allFindings[i].Start
 			lenJ := allFindings[j].End - allFindings[j].Start
-			return lenI > lenJ
+			if lenI != lenJ {
+				return lenI > lenJ
+			}
+			return allFindings[i].prio < allFindings[j].prio
 		}
 		return allFindings[i].Start < allFindings[j].Start
 	})
 
-	// Remove overlaps
+	// final stays sorted by Start with disjoint spans, so overlap needs only the two neighbours.
 	var final []Finding
-	lastEnd := -1
-	for _, f := range allFindings {
-		if f.Start >= lastEnd {
-			final = append(final, f)
-			lastEnd = f.End
+	for _, c := range allFindings {
+		i := sort.Search(len(final), func(k int) bool { return final[k].Start >= c.Start })
+		if i > 0 && final[i-1].End > c.Start {
+			continue
 		}
+		if i < len(final) && final[i].Start < c.End {
+			continue
+		}
+		final = append(final, Finding{})
+		copy(final[i+1:], final[i:])
+		final[i] = c.Finding
 	}
 
 	return final
@@ -125,13 +146,11 @@ func RedactKinds(text string, minConfidence Confidence) Result {
 		sb.WriteString("[REDACTED:" + string(f.Kind) + "]")
 		lastEnd = f.End
 	}
-	
-	if truncated {
-		sb.WriteString(text[lastEnd:maxScanBytes])
-		sb.WriteString(text[maxScanBytes:])
-	} else {
-		sb.WriteString(text[lastEnd:])
-	}
+
+	// Bytes past the scan window are appended unchanged; Truncated tells the caller.
+	sb.WriteString(text[lastEnd:])
 
 	return Result{Text: sb.String(), Kinds: kinds, Truncated: truncated}
 }
+
+func isGenericKind(k Kind) bool { return k == KindDotenvSecret || k == KindSecretAssignment }

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_solution.go` (mới), `.../channels_approval.go` (mới), `.../channels_solution_test.go`, `.../channels_approval_test.go` (mới), `.../excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-02; RPC `ListSolutions`, `GenerateSolution`, `ChooseSolutionOption` (CR-REQ-007), `ApprovalService` (CR-REQ-009)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -41,3 +41,7 @@
 
 - Nếu `ListPendingForUserResponse` sau này mang thêm tiêu đề Request (CONTRACT Q3), thêm trường vào view dạng additive, không đổi kênh.
 - `solutionView.Options` có thể tới 64 KB; không cắt.
+
+## Ghi chú triển khai (2026-10-08)
+
+9 kênh solution/approval thật; `approval.approve|reject` bắt buộc `expectedVersion`+`expectedDigest` ở gateway. Lưu ý: danh mục RPC của request-service (`rpc_catalog.go`) đánh `AgentAllowed:false` cho `GenerateSolution`, nên tool MCP `solution_generate` sẽ nhận từ chối quyền cho tới khi CR-035 đổi.

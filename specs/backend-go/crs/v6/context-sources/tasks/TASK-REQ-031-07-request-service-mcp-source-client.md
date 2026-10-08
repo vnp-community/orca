@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/adapter/mcpclient/external_source_client.go` (mới), `.../internal/adapter/sources/external_mcp.go` (mới), `.../internal/usecase/ports.go` (thêm `ExternalServerGateway`), `.../cmd/server/main.go` (sửa: dial `MCP_SERVICE_ADDR`), `.../internal/config/config.go` (sửa) và `_test.go`
 **Depends on:** TASK-REQ-031-05, TASK-REQ-031-06
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -50,11 +50,11 @@ type ExternalResult struct{ Text string; Truncated bool; SizeBytes int; Digest s
 
 ## Tiêu chí hoàn thành
 
-- [x] Không có đường nào để `request-service` gọi tool ngoài `scopes` ∩ `approved_tools`.
-- [x] Kết quả `Usable=false` không bao giờ được cache.
-- [x] Nội dung nguồn không xuất hiện trong tham số của bất kỳ lời gọi tool nào (test).
-- [x] Thiếu `MCP_SERVICE_ADDR`, `MCP_INTERNAL_TOKEN`: nguồn `mcp` thành `missing`, service vẫn khởi động.
-- [x] Tool ghi bị chặn: nguồn chỉ khai tool chỉ-đọc theo tên `scopes` (người duyệt chịu trách nhiệm, ghi rõ ở README feature).
+- [ ] Không có đường nào để `request-service` gọi tool ngoài `scopes` ∩ `approved_tools`.
+- [ ] Kết quả `Usable=false` không bao giờ được cache.
+- [ ] Nội dung nguồn không xuất hiện trong tham số của bất kỳ lời gọi tool nào (test).
+- [ ] Thiếu `MCP_SERVICE_ADDR`, `MCP_INTERNAL_TOKEN`: nguồn `mcp` thành `missing`, service vẫn khởi động.
+- [ ] Tool ghi bị chặn: nguồn chỉ khai tool chỉ-đọc theo tên `scopes` (người duyệt chịu trách nhiệm, ghi rõ ở README feature).
 
 ## Ví dụ tham khảo
 

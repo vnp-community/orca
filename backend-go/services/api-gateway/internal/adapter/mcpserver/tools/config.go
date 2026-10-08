@@ -19,6 +19,9 @@ type Config struct {
 	// linear, hostedReview) so agents cannot exhaust the user's API quota.
 	// 0 = default 30, negative = disabled.
 	SCMRatePerMin int
+	// RequestCreatePerHour caps request_create and request_spawnChild per
+	// (tenant, user, MCP client). 0 = default 20, negative = disabled.
+	RequestCreatePerHour int
 	// PIIMask: "off", "directory" (tools flagged PII; default) or "all".
 	PIIMask string
 	// SensitivePathExtra widens the secret-path deny list of the files tools.
@@ -33,7 +36,7 @@ const (
 	defaultSCMRatePerMin = 30
 )
 
-// ApplyEnv reads MCP_SCM_RATE_PER_MIN, MCP_PII_MASK and MCP_SENSITIVE_PATH_EXTRA.
+// ApplyEnv reads MCP_SCM_RATE_PER_MIN, MCP_REQUEST_CREATE_PER_HOUR, MCP_PII_MASK and MCP_SENSITIVE_PATH_EXTRA.
 func (c Config) ApplyEnv(getenv func(string) string) (Config, error) {
 	if v := strings.TrimSpace(getenv("MCP_SCM_RATE_PER_MIN")); v != "" {
 		n, err := strconv.Atoi(v)
@@ -44,6 +47,16 @@ func (c Config) ApplyEnv(getenv func(string) string) (Config, error) {
 			n = -1 // explicit 0 disables the limiter
 		}
 		c.SCMRatePerMin = n
+	}
+	if v := strings.TrimSpace(getenv("MCP_REQUEST_CREATE_PER_HOUR")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return c, fmt.Errorf("MCP_REQUEST_CREATE_PER_HOUR: %q is not a non-negative integer", v)
+		}
+		if n == 0 {
+			n = -1 // explicit 0 disables the limiter
+		}
+		c.RequestCreatePerHour = n
 	}
 	if v := strings.ToLower(strings.TrimSpace(getenv("MCP_PII_MASK"))); v != "" {
 		switch v {
@@ -93,6 +106,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.SCMRatePerMin == 0 {
 		c.SCMRatePerMin = defaultSCMRatePerMin
+	}
+	if c.RequestCreatePerHour == 0 {
+		c.RequestCreatePerHour = defaultRequestCreatePerHour
 	}
 	if c.PIIMask == "" {
 		c.PIIMask = PIIMaskDirectory

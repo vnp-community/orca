@@ -21,28 +21,32 @@ func NewProjectEngineSettingsRepository(r *Repository) *ProjectEngineSettingsRep
 }
 
 func (r *ProjectEngineSettingsRepository) Get(ctx context.Context, projectID string) (domain.ProjectEngineSettings, bool, error) {
-	query := `
-		SELECT tenant_id, project_id, solution_engine, openspec_min_version, updated_by, updated_at, version
-		FROM project_engine_settings
-		WHERE project_id = ?
-	`
 	var s domain.ProjectEngineSettings
-	var engine string
-	var minVer sql.NullString
-	err := r.exec(ctx).QueryRowContext(ctx, query, projectID).Scan(
-		&s.TenantID, &s.ProjectID, &engine, &minVer, &s.UpdatedBy, &s.UpdatedAt, &s.Version,
-	)
-	if err != nil {
+	found := false
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		var engine string
+		var minVer sql.NullString
+		// MySQL has no RLS: without the tenant bound another tenant's project would be readable.
+		err := db.QueryRowContext(ctx, `
+			SELECT tenant_id, project_id, solution_engine, openspec_min_version, updated_by, updated_at, version
+			FROM project_engine_settings
+			WHERE tenant_id = ? AND project_id = ?`, tenantID, projectID).Scan(
+			&s.TenantID, &s.ProjectID, &engine, &minVer, &s.UpdatedBy, &s.UpdatedAt, &s.Version,
+		)
 		if errors.Is(err, sql.ErrNoRows) {
-			return s, false, nil
+			return nil
 		}
-		return s, false, fmt.Errorf("mysql get engine settings: %w", err)
-	}
-	s.Engine = domain.EngineName(engine)
-	if minVer.Valid {
-		s.MinVersion = minVer.String
-	}
-	return s, true, nil
+		if err != nil {
+			return fmt.Errorf("mysql get engine settings: %w", err)
+		}
+		s.Engine = domain.EngineName(engine)
+		if minVer.Valid {
+			s.MinVersion = minVer.String
+		}
+		found = true
+		return nil
+	})
+	return s, found, err
 }
 
 func (r *ProjectEngineSettingsRepository) Upsert(ctx context.Context, s domain.ProjectEngineSettings, expectedVersion int64) (domain.ProjectEngineSettings, error) {

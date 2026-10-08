@@ -17,6 +17,7 @@ func New(db *sql.DB) *Repository {
 }
 
 var _ usecase.TxRunner = (*Repository)(nil)
+var _ usecase.TxScope = (*Repository)(nil)
 var _ usecase.OutboxWriter = (*Repository)(nil)
 var _ outbox.Store = (*Repository)(nil)
 

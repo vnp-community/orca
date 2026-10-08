@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / migrations, domain
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_analysis_runs.{up,down}.sql` (mới), `internal/domain/analysis_run.go` (mới), `internal/domain/analysis_run_test.go` (mới)
 **Depends on:** CR-REQ-002 (`requests`, `solutions` đã có)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08, kiểm lại sau đánh số lại R1a: `go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/mysql/... -run "Migration|SolutionContract"` và `go test ./internal/domain/... -run "AnalysisRun|TruncateRaw"`)
 
 ## Context
 
@@ -37,3 +37,9 @@
 
 - MySQL thiếu partial index: hành vi NULL của khoá duy nhất là chỗ phải test thật, không chỉ đọc tài liệu.
 - `attempt` tối đa 2 là quy ước của solution (gọi lại một lần khi JSON sai).
+
+## Ghi chú triển khai (2026-10-08)
+
+- Bảng `analysis_runs` nằm ở `0006_analysis_runs` (đã đánh số lại ở R1a). Migration `0030_solution_analysis` (cả hai dialect) thêm các cột còn thiếu: `solutions.kind/status/content_ref/generation_run_id`, `analysis_runs.solution_id/project_id/actor_id/feedback/enforcement/repo_check`, bảng khoá `analysis_project_gates` (RLS), chính sách `relay_scan/relay_claim` cho quét lease xuyên tenant.
+- Chỉ mục "một run `running`" được kiểm bằng SQL thật ở cả Postgres 16 và MySQL 8.0 (`RunUniqueIndexes`): hai run `running` cùng `(request, kind)` bị từ chối, khác `kind` được nhận, sau khi run kết thúc được chèn run mới, `idempotency_key` NULL lặp không va chạm, khoá trùng bị từ chối.
+- Up/down/up kiểm bằng `TestPostgres_Migration_UpDownUp` và `TestMySQL_Migration_UpDownUp` (đã gồm `0030`).

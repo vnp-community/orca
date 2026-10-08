@@ -5,7 +5,9 @@
 **Service/Area:** `request-service` (mới) / usecase port, domain, adapter grpcclient
 **File:** `internal/domain/dev_server_capability.go` (mới), `internal/usecase/capability_ports.go` (mới), `internal/adapter/grpcclient/infra_capability_client.go` (mới), `internal/domain/agent_route_selection.go` (mới), và các `_test.go`; config `INFRA_FLEET_SERVICE_ADDR` (đã thêm ở TASK-REQ-005-02, kiểm lại)
 **Depends on:** TASK-REQ-033-03 (RPC có thật), TASK-REQ-001-01 (module `request-service`), TASK-REQ-001-05 (main, config), TASK-REQ-007-04 (`connection_resolver.go`, `withTenantMetadata`)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
+
+> Để đợt R2 (2026-10-07): task nằm ở `request-service`, ngoài phạm vi đợt I1. Phía server đã sẵn: `GetDevServerCapabilities` phục vụ thật; `profile_json` có `schemaVersion`, `agent{buildVersion,protocolVersion}`, `host`, `tools[]`, `claude{auth,flags}`, `env[{name,present}]`, `partial` (đúng tên trường của agent), `features` là cột riêng, `degraded` cho hồ sơ `handshake_only`. Client cần gắn metadata tenant (infra-fleet đọc tenant từ context gRPC).
 
 ---
 
@@ -61,11 +63,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Hồ sơ `handshake_only` không bao giờ sinh `missing` (chỉ `unverified`).
-- [x] `SelectReadonlyRoute` chọn đúng bốn đường của bảng ở solution 2.H.
-- [x] Client gửi `tenant_id` trong metadata; không mở kết nối thứ hai tới `infra-fleet-service`.
-- [x] Không import chéo `internal/` của service khác; không file tên `helpers`/`utils`/`common`/`misc`.
-- [x] Không log giá trị nào ngoài tên biến và `present`.
+- [ ] Hồ sơ `handshake_only` không bao giờ sinh `missing` (chỉ `unverified`).
+- [ ] `SelectReadonlyRoute` chọn đúng bốn đường của bảng ở solution 2.H.
+- [ ] Client gửi `tenant_id` trong metadata; không mở kết nối thứ hai tới `infra-fleet-service`.
+- [ ] Không import chéo `internal/` của service khác; không file tên `helpers`/`utils`/`common`/`misc`.
+- [ ] Không log giá trị nào ngoài tên biến và `present`.
 
 ## Rủi ro và lưu ý
 

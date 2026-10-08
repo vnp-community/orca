@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase
 **File:** `internal/usecase/generate_solution.go` (mới), `run_solution_generation.go` (mới), `recover_interrupted_analysis_runs.go` (mới), `list_solutions.go` (mới), `internal/config/config.go` (sửa), `cmd/server/main.go` (sửa: khởi chạy vòng phục hồi), và `_test.go`
 **Depends on:** TASK-REQ-007-03, TASK-REQ-007-04; CR-REQ-003 (`FlowFor`, `TransitionRequest`); TASK-REQ-009-04 (`OpenApproval`, `CancelPendingApprovalsForRequest`; dùng cổng no-op nếu chưa có)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/usecase/... -run "GenerateSolution|RunSolutionGeneration|Persist|Recover"`; phục hồi và luồng đầy đủ trên hai DB: `go test -tags integration ./internal/adapter/... -run SolutionContract`)
 
 ## Context
 
@@ -41,3 +41,12 @@
 
 - Quyền ghi mức Request chưa chốt (câu hỏi mở 4); dùng `RequestWriteAuthorizer` giả lập reporter hoặc admin.
 - Tiến trình chết khiến agent chạy tiếp ngoài tầm kiểm soát (chấp nhận ở v1).
+
+## Ghi chú triển khai (2026-10-08)
+
+- Cách chia file: `generate_solution.go`, `analysis_runner.go` (spawn, heartbeat, đóng), `run_solution_generation.go`, `analysis_result_writer.go` (giao dịch kết quả dùng chung với nhánh agent), `recover_interrupted_analysis_runs.go`, `list_solutions.go`, `analysis_settings.go`. Cấu hình: `REQUEST_AI_COMPLETE_TIMEOUT`, `REQUEST_ANALYSIS_LEASE_TTL`, `REQUEST_ANALYSIS_HEARTBEAT`, `REQUEST_ANALYSIS_RECOVERY_INTERVAL` (giá trị Go duration, mặc định 120s/90s/30s/30s).
+- Worker chạy dưới context riêng (khôi phục tenant và người dùng từ dòng run), không theo context RPC: kiểm bằng test huỷ RPC context ngay sau khi trả về. `GenerateSolution` trả trong < 1 giây khi AI giả bị chặn.
+- Mất lease (heartbeat thấy `RenewLease=false` hoặc `FinishOwned=false` trong giao dịch kết quả) thì worker không ghi gì. Request rời `analyzing` trong lúc chạy (huỷ, đổi loại) thì kết quả bị bỏ, run `failed` `REQUEST_SOLUTION_REQUEST_MOVED`.
+- Quyền ghi tạm: `ReporterOrAdminAuthorizer` (người báo cáo, hoặc vai trò `admin`/`lead`/`owner`). Người duyệt không thuộc nhóm đó chưa chọn/sinh lại được cho tới khi nối snapshot người duyệt của CR-REQ-009 (xem IMPLEMENTATION-NOTES).
+- Sau hợp nhất: `OpenApprovalOpener` (bọc `OpenApproval` thật) được nối qua `solution.bindApprovals(approval.SolutionOpener())`; Approval mở sau `analysis_ready` trong cùng giao dịch (Stage = `awaiting_analysis_approval`). Khi `REQUEST_APPROVAL_ENABLED=false` opener chỉ ghi cảnh báo.
+- Chạy phục hồi không "chạy tiếp" run bị bỏ dở: đánh `failed` `REQUEST_SOLUTION_RUN_INTERRUPTED` và xoá `draft`, đúng thiết kế (agent có thể còn chạy ngoài tầm kiểm soát, chấp nhận ở v1).

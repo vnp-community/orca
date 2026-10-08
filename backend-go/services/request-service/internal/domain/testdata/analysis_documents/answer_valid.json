@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "kind": "answer",
+  "answer_markdown": "Dịch vụ đọc cấu hình từ biến môi trường `REQUEST_FLOW_ENABLED`.",
+  "confidence": 0.9,
+  "citations": [{ "ref": "internal/config/config.go:60", "excerpt": "REQUEST_FLOW_ENABLED" }],
+  "limitations": [],
+  "suggested_follow_up": { "type": "task", "title": "Viết tài liệu cấu hình" }
+}

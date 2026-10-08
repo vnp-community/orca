@@ -69,6 +69,7 @@ func (s *ToolSpec) idempotent() *ToolSpec {
 	return s
 }
 func (s *ToolSpec) cached() *ToolSpec   { s.CacheTTL = 30; return s }
+func (s *ToolSpec) keepKeys() *ToolSpec { s.KeepKeys = true; return s }
 func (s *ToolSpec) declared() *ToolSpec { s.Declared = true; return s }
 func (s *ToolSpec) consts(m map[string]any) *ToolSpec {
 	s.Consts = m

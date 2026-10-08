@@ -5,7 +5,7 @@
 **Service:** `request-service`, `proto`
 **File:** `backend-go/services/request-service/internal/domain/{erasable_columns.go,retention_policy.go}` (mới), `.../internal/usecase/{run_request_retention.go,erase_request.go,export_request.go}` (mới), `.../internal/adapter/{postgres,mysql}/retention.go` (mới), `.../internal/adapter/grpcclient/task_content_eraser.go` (mới, bản `NotSupported`), `.../internal/adapter/grpc/server_compliance.go` (mới), `.../cmd/server/main.go` (sửa: job hằng ngày), `.../internal/config/config.go` (sửa: `REQUEST_ERASE_HMAC_KEY`), `backend-go/proto/orca/request/v1/compliance.proto` (mới), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-035-01 (`Redact` cho xuất), 035-04 (nhóm `admin`, stream), 035-06 (bảng, `RecordDurable`, cột `erased_at`), BE-REQ-SOL-002 (`requests`), BE-REQ-SOL-007 (`solutions`, `analysis_runs`), 009 (`approvals`), CR 031 (`context_packs`, `evidence`), CR 034 (`ai_trace_blobs`, `ai_usage_ledger`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `cd backend-go && opa test policy/orca-authz && go test ./services/request-service/... && go test -tags integration ./services/request-service/...`)
 
 ---
 
@@ -71,3 +71,11 @@ Gói `ExportRequest` (cấu trúc, mọi chuỗi đã qua `Redact`):
 - Mặc định 730/400/30 ngày chưa có yêu cầu pháp lý; đổi bằng `tenant_settings`, không cần migration.
 - `reporter_id` đổi sang UUID dẫn xuất làm người báo cáo mất quyền `reporter` trên Request đã xoá: chủ ý.
 - Lô `Anonymize` dài giữ khoá lâu: giới hạn lô 200 và giao dịch ngắn; đo trên dữ liệu thật chưa có.
+
+## Ghi chú triển khai (2026-10-08)
+
+- `EraseRequest`, `ExportRequest`, `ExportTenantRequests` là handler gRPC thật (`server_compliance.go`, nối trong `main.go`), quyền admin kiểm hai lần (interceptor và use case, agent bị từ chối).
+- `ErasableColumns` 18 cột/9 bảng + `ExemptTextColumns` (kèm lý do) + test quét `information_schema` hai dialect. Xoá cả `title` trong payload outbox: CHƯA (payload `request.created` có `title`; ghi trong IMPLEMENTATION-NOTES).
+- Chưa làm: xoá `ai_trace_blobs`/`ai_usage_ledger` (bảng của CR-034 chưa có trong cây này; cột phải đăng ký vào `ErasableColumns`, test sẽ đỏ cho tới khi đăng ký); `TaskContentEraser` bản `Unsupported` (task-service chưa có RPC), kết quả báo `external_erasure: unsupported`.
+- Xuất tenant: stream NDJSON, phân phần thân dài để mỗi dòng không quá 64 KB, một luồng mỗi tenant, hủy ngữ cảnh dừng sớm và vẫn ghi audit `complete=false`. `ledger_summary` và `provenance` chưa có trong gói (bảng chưa tồn tại).
+- Job lưu giữ: hằng ngày theo `REQUEST_RETENTION_RUN_AT` (UTC) và 30 giây sau khi khởi động; cần `REQUEST_ERASE_HMAC_KEY`, thiếu thì từ chối.

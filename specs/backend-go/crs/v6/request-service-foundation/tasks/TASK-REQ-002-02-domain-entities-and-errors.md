@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/{request.go,request_type.go,request_status.go,request_size_urgency.go,request_source.go,request_type_change.go,solution.go,request_link.go,request_errors.go}` và `*_test.go` (mới)
 **Depends on:** TASK-REQ-001-01
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test ./internal/domain/... (TestParseRequestType_All, TestParseRequestStatus_All, TestParseSizeUrgencyProvider_All, TestNewRequest_Validation, TestRequestStatus_IsTerminal, TestNewRequestLink_SelfRejected, TestErrorsMapToGRPC))
 
 ---
 
@@ -46,3 +46,7 @@ Mẫu domain thuần stdlib: `task-service/internal/domain/task.go` (kiểu `Sta
 
 - `Type` rỗng thay vì con trỏ: repository phải ánh xạ `NULL` sang rỗng; viết chung một hàm quét nullable ở mỗi adapter.
 - CR-REQ-003 sẽ thêm trigger, bảng chuyển và `FlowFor`; đừng đặt chúng vào `request_status.go`.
+
+## Ghi chú triển khai
+
+`NewRequest` nay từ chối `reporter_id` rỗng (mã `REQUEST_REPORTER_REQUIRED`) và `source_provider` rỗng/lạ, bỏ các khối `if` rỗng và comment nháp; thời gian cắt về micro giây. `ActorKindAI` đổi thành `ActorKindAgent = "agent"` cho khớp CHECK `actor_kind`. Tiêu chí 'domain chỉ import stdlib, uuid, apperrors, tenant' đúng cho các file của task này (request*.go); package `domain` còn file của feature khác import `grpc` (`rpc_catalog.go`) và `x/text`.

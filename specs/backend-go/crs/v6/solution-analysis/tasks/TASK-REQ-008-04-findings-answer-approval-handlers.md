@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, cmd
 **File:** `internal/usecase/findings_approval_handler.go` (mới), `answer_approval_handler.go` (mới), `solution_approval_handler.go` (sửa: bộ kiểm hợp lệ cho `diagnosis`), `cmd/server/main.go` (sửa: đăng ký), và `_test.go`
 **Depends on:** TASK-REQ-008-03, TASK-REQ-007-06, TASK-REQ-009-06
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08, sau hợp nhất với Approval thật: `go test -race ./internal/usecase/... -run "SolutionHandler|FindingsAndAnswer|FindingsHandler"`; `go test -tags integration ./internal/adapter/... -run SolutionContract` gồm `SubjectHandlerContract` thật và luồng `question` qua `ApprovalServer.Approve` → `completed`)
 
 ## Context
 
@@ -37,3 +37,10 @@
 ## Rủi ro và lưu ý
 
 - `answer` chấp nhận bởi chính người báo cáo trùng ý "tách nhiệm vụ" mặc định tắt cho `answer` (SOL-010 mục 2.5).
+
+## Ghi chú triển khai (2026-10-08)
+
+- Ba handler dùng chung thân `analysisApprovalHandler` (`solution_approval_handler.go`); `findings_approval_handler.go` và `answer_approval_handler.go` là hàm dựng. `diagnosis` không đòi `chosen_option` (chọn theo `Solution.Kind`, không theo handler). `answer`/`findings` được duyệt thì Request `completed` nhờ `CompletesAfterAnalysis`, không đụng Plan hay Task (kiểm trên DB thật cho `question`).
+- Đăng ký trong `wireSolution` qua map `handlers` truyền vào `buildApprovalRegistry`: `TestWireSolution_RegistersRealHandlersAndStartsTheSweeper` chứng minh registry ba subject này nhận handler thật mà không cần `REQUEST_ALLOW_NOOP_APPROVAL_HANDLERS`. `MustCoverAll` của cả 8 subject còn phụ thuộc đợt Approval cho 5 subject còn lại.
+- `suggest_escalate_to_change_request` và `follow_ups` chỉ là dữ liệu: có test khẳng định `requests.type` không đổi và không có đường mã nào tạo Request con.
+- Sau hợp nhất: `wireApproval` nhận map handler của chủ sở hữu và đăng ký ba handler này thay `TransitionSubjectHandler` (bỏ phần trùng); `RunSubjectHandlerContract` thật chạy cho cả ba trên Postgres và MySQL.

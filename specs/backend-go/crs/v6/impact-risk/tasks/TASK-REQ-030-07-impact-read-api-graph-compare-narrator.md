@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / domain đồ thị, usecase đọc, proto, grpc handler
 **File:** `internal/domain/impact_graph.go` (mới), `internal/domain/impact_graph_lenses.go` (mới), `internal/usecase/get_impact_assessment.go` (mới), `internal/usecase/get_impact_graph.go` (mới), `internal/usecase/compare_impact.go` (mới), `internal/usecase/plan_risk_heatmap.go` (mới), `internal/usecase/list_impact_findings.go` (mới), `internal/usecase/impact_narrator.go` (mới), `internal/adapter/grpc/server_impact.go` (mới), `backend-go/proto/orca/request/v1/request.proto` (sửa), `backend-go/services/request-service/testdata/contract/impact_graph.schema.json` (mới), và các `_test.go`
 **Depends on:** TASK-REQ-030-05 (bản đánh giá `ready`), TASK-REQ-030-03 (repository), CR-REQ-032 (`GraphPayload`, `graph-types.ts`), CR-REQ-036 (tên kênh), CR-REQ-034 hoặc SOL-007 (`AICompleter`), TASK-REQ-001-05 (server gRPC)
-**Status:** [x] DONE
+**Status:** [ ] TODO
 
 ---
 
@@ -71,12 +71,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `GetImpactGraph` mọi lens trả đúng hợp đồng node, cạnh; `id` ổn định giữa hai lần gọi; vượt `max_nodes` thì `truncated=true` và `totalNodes` đúng.
-- [x] `risk=unknown` cho chiều không đo được hoặc index lỗi thời, không bao giờ `low`.
-- [x] Narrative chứa `score` hoặc `level` bị loại; lỗi AI không làm bản đánh giá `failed`; `narrative` không nằm trong `digest`.
-- [x] `GetImpactEvidence` không trả bí mật (quét trước khi trả).
-- [x] Danh sách kênh WS cần thêm ghi trong PR (`impact.*`, `risk.*`), kèm đề nghị `ToolSpec` hoặc dòng loại trừ cho gateway.
-- [x] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable (tách `impact_graph_lenses.go` theo lens nếu dài).
+- [ ] `GetImpactGraph` mọi lens trả đúng hợp đồng node, cạnh; `id` ổn định giữa hai lần gọi; vượt `max_nodes` thì `truncated=true` và `totalNodes` đúng.
+- [ ] `risk=unknown` cho chiều không đo được hoặc index lỗi thời, không bao giờ `low`.
+- [ ] Narrative chứa `score` hoặc `level` bị loại; lỗi AI không làm bản đánh giá `failed`; `narrative` không nằm trong `digest`.
+- [ ] `GetImpactEvidence` không trả bí mật (quét trước khi trả).
+- [ ] Danh sách kênh WS cần thêm ghi trong PR (`impact.*`, `risk.*`), kèm đề nghị `ToolSpec` hoặc dòng loại trừ cho gateway.
+- [ ] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable (tách `impact_graph_lenses.go` theo lens nếu dài).
 
 ## Rủi ro và lưu ý
 

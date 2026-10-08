@@ -1,13 +1,13 @@
 # Solutions backend: solution-analysis (v6)
 
-> 📋 Proposed, chưa triển khai. Phạm vi backend của CR-REQ-007 và CR-REQ-008 trong `request-service` (service mới, chưa có mã lúc soạn). Hợp đồng chung: [README v6](../../../../../../docs/crs/v6/README.md), mục 8 thắng mục 3.
+> ✅ Đã triển khai (kiểm chứng 2026-10-08): 11/11 task xong, ghi chú hợp nhất ở [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md). Phạm vi backend của CR-REQ-007 và CR-REQ-008 trong `request-service` (service mới, chưa có mã lúc soạn). Hợp đồng chung: [README v6](../../../../../../docs/crs/v6/README.md), mục 8 thắng mục 3.
 
 ## Bảng CR, Solution, Task
 
-| CR | Solution | Task | Ghi chú |
-|----|----------|------|---------|
-| [CR-REQ-007](../../../../../../docs/crs/v6/solution-analysis/CR-REQ-007-solution-generation-options-and-selection.md) | [BE-REQ-SOL-007](./BE-REQ-SOL-007-solution-generation-options-and-selection.md) | TASK-REQ-007-01 đến 06 | `analysis_runs`, `GenerateSolution`, `ChooseSolutionOption`, handler `solution` |
-| [CR-REQ-008](../../../../../../docs/crs/v6/solution-analysis/CR-REQ-008-diagnosis-findings-answer-analysis.md) | [BE-REQ-SOL-008](./BE-REQ-SOL-008-diagnosis-findings-answer-analysis.md) | TASK-REQ-008-01 đến 05 | `AgentReadonlyRunner`; phần agent do CR-REQ-033 |
+| CR | Solution | Task | Trạng thái | Ghi chú |
+|----|----------|------|------------|---------|
+| [CR-REQ-007](../../../../../../docs/crs/v6/solution-analysis/CR-REQ-007-solution-generation-options-and-selection.md) | [BE-REQ-SOL-007](./BE-REQ-SOL-007-solution-generation-options-and-selection.md) | TASK-REQ-007-01 đến 06 | ✅ 6/6 | `analysis_runs`, `GenerateSolution`, `ChooseSolutionOption`, handler `solution` |
+| [CR-REQ-008](../../../../../../docs/crs/v6/solution-analysis/CR-REQ-008-diagnosis-findings-answer-analysis.md) | [BE-REQ-SOL-008](./BE-REQ-SOL-008-diagnosis-findings-answer-analysis.md) | TASK-REQ-008-01 đến 05 | ✅ 5/5 | `AgentReadonlyRunner`; phần agent do CR-REQ-033 |
 
 ## Thứ tự phụ thuộc
 
@@ -31,7 +31,7 @@ SOL-007 có thể bắt đầu phần domain, migration, repository, adapter AI 
 
 ## Số migration
 
-`request-service/migrations` chưa tồn tại lúc soạn. Mỗi task migration bắt buộc đọc thư mục thật rồi lấy số kế tiếp, cùng số cho hai dialect. SOL-008 không có migration riêng.
+Bảng `analysis_runs` ở `0006` (R1a, đã đánh số lại). Phần còn thiếu của solution này nằm ở `0030_solution_analysis` (dải `0030`..`0039` cấp cho CR-007/008/026), cùng số hai dialect. SOL-008 không có migration riêng.
 
 ## Mâu thuẫn và điểm chưa kiểm chứng
 

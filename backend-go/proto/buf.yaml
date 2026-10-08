@@ -7,3 +7,10 @@ lint:
 breaking:
   use:
     - FILE
+  ignore_only:
+    # ApprovalService was never deployed; its shared request/response messages had to be split
+    # to satisfy RPC_REQUEST_RESPONSE_UNIQUE. Old messages are kept, field numbers are unchanged.
+    RPC_SAME_REQUEST_TYPE:
+      - orca/request/v1/approval.proto
+    RPC_SAME_RESPONSE_TYPE:
+      - orca/request/v1/approval.proto

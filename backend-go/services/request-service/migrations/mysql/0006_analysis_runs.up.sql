@@ -12,7 +12,6 @@ CREATE TABLE analysis_runs (
     error_code VARCHAR(128) NULL,
     error_message TEXT NULL,
     raw_output MEDIUMTEXT NULL,
-    engine VARCHAR(32) NOT NULL DEFAULT 'native',
     started_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     finished_at TIMESTAMP(6) NULL,
     active_key VARCHAR(80) GENERATED ALWAYS AS (IF(status='running', CONCAT(request_id,':',kind), NULL)) STORED,

@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, proto, adapter grpc, cmd
 **File:** `internal/usecase/choose_solution_option.go` (mới), `solution_approval_handler.go` (mới), `internal/adapter/grpc/solution_server.go` (mới), `proto/orca/request/v1/request.proto` (sửa), `cmd/server/main.go` (sửa), và `_test.go`, `_integration_test.go`
 **Depends on:** TASK-REQ-007-05, TASK-REQ-009-04 (`SubjectHandler`, `UpdatePendingDigest`), TASK-REQ-009-06 (bộ test hợp đồng handler)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08, sau hợp nhất với Approval thật: `go test -race ./internal/usecase/... ./internal/adapter/grpc/...`; `go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/mysql/... -run SolutionContract` gồm luồng generate → choose → `ApprovalServer.Approve` → `planning`, digest sai bị `REQUEST_APPROVAL_DIGEST_MISMATCH`, reject → backlog; `buf breaking` so với `main` sạch)
 
 ## Context
 
@@ -32,11 +32,21 @@
 ## Tiêu chí hoàn thành
 
 - [x] Tiêu chí chấp nhận 9 đến 14 của CR-REQ-007 mục 4 có test.
-- [x] `buf breaking` xanh.
-- [x] Handler qua bộ test hợp đồng.
+- [x] `buf breaking` xanh (`buf breaking --against .git#branch=main,subdir=backend-go/proto`, 2026-10-08; không sửa `.proto`).
+- [x] Handler qua bộ test hợp đồng (`contracttest.RunSubjectHandlerContract` thật, trên DB thật, cho `solution`/`diagnosis`, `findings`, `answer`: `SolutionContract/SubjectHandlerContract`).
 - [x] Payload outbox không chứa `options`.
 
 ## Rủi ro và lưu ý
 
 - Hợp đồng với frontend (CR-REQ-020) dùng `approval_digest`; đổi tên trường là phá vỡ hợp đồng.
 - e2e thật cần dev server có `ai.complete` (chưa kiểm chứng): để cho CR-REQ-025.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Proto đã đầy đủ (`solution.proto`, ba RPC trong `RequestService`), tác vụ này KHÔNG sửa `.proto` nên `buf breaking` không có thay đổi để vi phạm; chưa chạy `buf` (không có `origin/main` chứa package, CI tự bỏ qua).
+- `server_solution.go` (không phải `solution_server.go`) cài `GenerateSolution`, `ListSolutions`, `ChooseSolutionOption` vào `Server` qua `WithSolution`; `engine_override` ngoài `native` bị từ chối; `Get/SetProjectEngineSettings` thuộc CR-REQ-026, không làm ở đây.
+- `NewSolutionApprovalHandler` (cả `kind=solution` lẫn `diagnosis`) dùng chung thân với handler findings/answer. `OnApproved` tự tính lại digest từ nội dung hiện tại và so với `Approval.SubjectDigest`, sai thì `REQUEST_APPROVAL_DIGEST_MISMATCH` (phòng thủ thêm, không phụ thuộc use case Approve). `OnRejected` gọi `ReturnRequestToBacklog` (stage analysis, category rejected) và xoá `chosen_option`.
+- Đăng ký: `wireSolution` trả `handlers` và `main.go` truyền vào `buildApprovalRegistry`. `SupersedeForTypeChange` có sẵn cho CR-REQ-005; đường đổi loại hiện hoạt động qua `OnClosedWithoutDecision(why="type_changed")` khi có Approval pending, còn `ChangeRequestType` chưa gọi hàm này (xem IMPLEMENTATION-NOTES).
+- Đường `Approve`/`Reject` của `ApprovalServer` gRPC thật đã được chạy đầu-cuối trên Postgres và MySQL (`RPCFlow`, `RPCReject`, `SolutionFlowGenerateChooseApprove`). `REQUEST_APPROVAL_DIGEST_MISMATCH` đến từ cả use case Decide (digest cũ) và handler (nội dung bị sửa sau khi mở).
+- Sau hợp nhất: handler `solution`/`findings`/`answer` thay `TransitionSubjectHandler` cho ba subject này (`wireApproval(..., owned)`), nên không cần `SubjectArtifacts` cho chúng; `ValidateForRequest` từ chối request ngoài `awaiting_analysis_approval` và subject lạ theo hợp đồng chung, và cho phép mở khi chưa chọn (digest không-chọn); `OnApproved` mới đòi `chosen_option`.
+- Quyền chọn phương án: `ApproverAwareAuthorizer` (người báo cáo, admin/lead/owner, hoặc người `AuthorizeApprovalDecision` của chính approval pending cho phép quyết định, gồm team/vai trò theo snapshot); kiểm trước giao dịch vì có thể gọi tenant-service.

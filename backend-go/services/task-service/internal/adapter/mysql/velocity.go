@@ -17,7 +17,7 @@ func (r *Repository) RecentCompletedTasks(ctx context.Context, tenantID, project
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT `+taskColumns+`
 		FROM tasks
-		WHERE tenant_id = ? AND project_id = ? AND status = 'done'
+		WHERE tenant_id = ? AND project_id = ? AND status = 'done' AND task_type NOT IN ('plan','phase')
 		ORDER BY updated_at DESC
 		LIMIT ?
 	`, tenantID, projectID, n)

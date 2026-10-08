@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/postgres/00NN_tenant_settings.up.sql`, `.down.sql` (mới), `.../migrations/mysql/00NN_tenant_settings.up.sql`, `.down.sql` (mới), `.../internal/domain/flow_settings.go` (mới), `.../internal/usecase/flow_settings.go` (mới), `.../internal/adapter/{postgres,mysql}/tenant_settings.go` (mới), `.../internal/adapter/grpc/server.go`, `backend-go/proto/orca/request/v1/request.proto`
 **Depends on:** CR-REQ-001, CR-REQ-002 (số migration tiếp theo, mẫu RLS)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... -count=1` trong `services/request-service` (512 test PASS, 0 FAIL) và `services/issue-status-sync` (186 PASS); `go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/grpc/... ./cmd/...` trên `postgres:16-alpine` thật (262 test PASS); `go test -tags integration ./internal/adapter/mysql/...` trên `mysql:8.0` thật (PASS, 238 giây); migration up/down/up trên cả hai; e2e `TestE20_*`)
 
 ---
 
@@ -41,3 +41,7 @@
 
 - Làm task này sớm (CR-016, 017 đã trỏ tới `request.flowStatus`).
 - Không chạm `task-service`: cờ không ẩn `type plan|phase`.
+
+## Kết quả triển khai (2026-10-08)
+
+Migration `0090_tenant_settings` (tenant_id UUID/CHAR(36) theo schema hiện có, không TEXT như task; RLS FORCE trên Postgres, test `TestPostgres_TenantSettingsRLS`). `usecase.FlowSettings` (`Effective` = công tắc tổng AND dòng tenant, lỗi đọc là tắt), RPC nối qua `Server.WithFlowSettings`. `Get` và `Set` trả giá trị hiệu lực; `Get` báo lỗi (không âm thầm false) khi không đọc được. Mã lỗi dùng `REQUEST_FLOW_ADMIN_ONLY`. Không sửa `.proto`.

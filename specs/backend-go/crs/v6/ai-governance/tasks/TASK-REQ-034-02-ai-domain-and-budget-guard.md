@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/{ai_step.go,ai_budget.go,ai_usage_ledger.go,ai_step_policy.go,provenance.go}` (mới), `.../internal/usecase/{budget_guard.go,ai_pricing.go}` (mới), `.../internal/domain/domain_ai_test.go`, `.../internal/usecase/budget_guard_test.go`, `.../internal/usecase/budget_guard_integration_test.go` (mới)
 **Depends on:** TASK-REQ-034-01
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -47,11 +47,11 @@ func (g *BudgetGuard) Settle(ctx context.Context, r Reservation, actual Estimate
 
 ## Tiêu chí hoàn thành
 
-- [x] Hai lời gọi đồng thời cùng làm ngân sách vượt: đúng một qua, một `REQUEST_AI_BUDGET_EXCEEDED`.
-- [x] Vượt `warn_ratio` phát đúng một sự kiện mỗi cửa sổ.
-- [x] Ngân sách chặn thì không bộ đếm nào bị cộng dở.
-- [x] Không id model nào cứng trong mã.
-- [x] Domain chỉ dùng stdlib.
+- [ ] Hai lời gọi đồng thời cùng làm ngân sách vượt: đúng một qua, một `REQUEST_AI_BUDGET_EXCEEDED`.
+- [ ] Vượt `warn_ratio` phát đúng một sự kiện mỗi cửa sổ.
+- [ ] Ngân sách chặn thì không bộ đếm nào bị cộng dở.
+- [ ] Không id model nào cứng trong mã.
+- [ ] Domain chỉ dùng stdlib.
 
 ## Ví dụ tham khảo
 

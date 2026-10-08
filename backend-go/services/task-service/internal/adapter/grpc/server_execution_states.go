@@ -6,6 +6,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -24,15 +26,17 @@ func (s *Server) ListExecutionStates(ctx context.Context, req *taskv1.ListExecut
 		return nil, status.Error(codes.Unimplemented, "method ListExecutionStates not implemented")
 	}
 
-	tenantID := s.auth.TenantIDFromContext(ctx)
-	
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "TASK_NO_TENANT", "no tenant in request context", err))
+	}
 	in := usecase.ListExecutionStatesInput{
 		TaskIDs: req.TaskIds,
 	}
 
 	states, err := s.listExecutionStates.Execute(ctx, tenantID, in)
 	if err != nil {
-		return nil, s.mapError(err)
+		return nil, apperrors.ToGRPCStatus(err)
 	}
 
 	res := &taskv1.ListExecutionStatesResponse{

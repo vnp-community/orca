@@ -1,0 +1,1 @@
+ALTER TABLE solutions MODIFY seq INT NULL;

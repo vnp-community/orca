@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/request_create_limit.go` (mới), `.../request_create_limit_test.go` (mới), `.../config.go`, `.../executor.go`
 **Depends on:** TASK-REQ-017-02
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -40,3 +40,7 @@
 
 - Theo từng replica gateway; N replica cho N lần. Chốt chặn thật là `REQUEST_PENDING_LIMIT` ở `request-service` (CR-REQ-004, cần thêm).
 - Giới hạn tính cả khi RPC sau đó thất bại (đơn giản hơn; ghi rõ trong mô tả tool).
+
+## Ghi chú triển khai (2026-10-08)
+
+Chưa cập nhật `docs/guides/mcp/admin-guide.md` (ngoài phạm vi lần này); biến được ghi trong README api-gateway.

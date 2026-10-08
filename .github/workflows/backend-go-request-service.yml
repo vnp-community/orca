@@ -1,0 +1,101 @@
+name: backend-go / request-service
+
+# request-service supports both dialects (Postgres, MySQL), so integration tests run in a
+# matrix like backend-go-usage-service.yml. Proto lint and breaking run for real because the
+# Makefile's proto-lint target ends in `|| true` and does not gate.
+on:
+  pull_request:
+    paths:
+      - "backend-go/common/**"
+      - "backend-go/proto/orca/request/**"
+      - "backend-go/proto/gen/go/orca/request/**"
+      - "backend-go/services/request-service/**"
+      - "backend-go/services/task-service/testdata/artifacts/**"
+      - "backend-go/go.work"
+      - "backend-go/Makefile"
+      - "backend-go/deploy/postgres-init-databases.sh"
+      - "backend-go/ci/check-request-service-wiring*.sh"
+      - "deploy/dev/docker-compose.yml"
+      - "deploy/dev/scripts/migrate.sh"
+      - ".github/workflows/backend-go-request-service.yml"
+
+jobs:
+  # Registration check: runs once, not per dialect. Removing request from any of the listed places fails the PR.
+  wiring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: request-service is registered everywhere
+        run: bash backend-go/ci/check-request-service-wiring.sh
+      - name: the check itself fails when a registration is missing
+        run: bash backend-go/ci/check-request-service-wiring_test.sh
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        dialect: [postgres, mysql]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - uses: bufbuild/buf-setup-action@v1
+      - name: buf lint (request)
+        working-directory: backend-go/proto
+        # approval.proto still carries STANDARD naming debt (shared response types); it is owned by
+        # the approval wave, so only the request files gate here until that wave reworks it.
+        run: buf lint --path orca/request/v1/request.proto --path orca/request/v1/request_backlog.proto
+      - name: buf breaking (request)
+        working-directory: backend-go/proto
+        # Only gates once the package exists on main; the first PR has nothing to compare with.
+        run: |
+          if git cat-file -e origin/main:backend-go/proto/orca/request/v1/request.proto 2>/dev/null; then
+            buf breaking --path orca/request --against '../../.git#branch=origin/main,subdir=backend-go/proto'
+          fi
+      - name: go build
+        working-directory: backend-go/services/request-service
+        run: go build ./...
+      - name: go vet
+        working-directory: backend-go/services/request-service
+        run: go vet ./... && go vet -tags=integration ./... && go vet -tags=e2e ./...
+      - name: gofmt
+        working-directory: backend-go/services/request-service
+        run: test -z "$(gofmt -l .)"
+      - name: Canonical JSON golden cases match task-service
+        working-directory: backend-go/services/request-service
+        # Both services hash task specs; a drifting copy would make their digests disagree.
+        run: bash scripts/check-artifact-samples.sh
+      - name: Unit tests (no Docker)
+        working-directory: backend-go/services/request-service
+        run: go test ./...
+      - name: Request policy (opa test)
+        run: |
+          command -v opa >/dev/null || { curl -fsSL -o /usr/local/bin/opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static && chmod +x /usr/local/bin/opa; }
+          opa test backend-go/policy/orca-authz
+      - name: govulncheck
+        # Not yet verified in CI; advisory until a clean baseline exists (TASK-REQ-035-09).
+        continue-on-error: true
+        working-directory: backend-go/services/request-service
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+      - name: Integration tests (${{ matrix.dialect }}, testcontainers)
+        working-directory: backend-go/services/request-service
+        run: |
+          if [ "${{ matrix.dialect }}" = "postgres" ]; then
+            go test -tags=integration ./internal/adapter/postgres/... ./internal/adapter/grpc/... ./internal/adapter/eventbus/... ./cmd/... -v
+          else
+            go test -tags=integration ./internal/adapter/mysql/... -v
+          fi
+      # T1 end-to-end (CR-REQ-025): the real binary on a real database, NATS and the stubbed agent boundary.
+      # Blocks the PR; stages that wait on other tasks' RPCs report SKIP with the blocker named, not green-by-omission.
+      - name: E2E tests (${{ matrix.dialect }}, T1)
+        working-directory: backend-go/services/request-service
+        timeout-minutes: 20
+        env:
+          E2E_DIALECT: ${{ matrix.dialect }}
+        run: go test -tags=e2e ./e2e/... -count=1 -timeout 18m -v

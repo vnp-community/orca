@@ -25,8 +25,13 @@ const (
 	prCreatedSubject       = "orca.scm.pull_request.created"
 	prMergedSubject        = "orca.scm.pull_request.merged"
 
+	requestStatusChangedSubject = "orca.request.request.status_changed"
+	requestCompletedSubject     = "orca.request.request.completed"
+
 	projectStream = "PROJECT"
 	scmStream     = "SCM"
+	// requestStream is unverified against request-service's EnsureStream (CR-REQ-001).
+	requestStream = "REQUEST"
 
 	// consumerName is a stable durable-consumer name shared by every
 	// replica of this service — JetStream load-balances each event to
@@ -59,6 +64,27 @@ type prLifecycleWirePayload struct {
 	ActorUserID         string `json:"actor_user_id"`
 }
 
+// requestStatusWirePayload mirrors request-service's status_changed/completed
+// payload. Unknown fields (stage, reason, at, ...) are ignored; body/title are
+// deliberately not mapped so they can never reach the tracker.
+type requestStatusWirePayload struct {
+	RequestID      string `json:"request_id"`
+	ProjectID      string `json:"project_id"`
+	From           string `json:"from"`
+	To             string `json:"to"`
+	Trigger        string `json:"trigger"`
+	Type           string `json:"type"`
+	ActorID        string `json:"actor_id"`
+	ActorKind      string `json:"actor_kind"`
+	SourceProvider string `json:"source_provider"`
+	SourceSite     string `json:"source_site"`
+	SourceRef      string `json:"source_ref"`
+	ReporterID     string `json:"reporter_id"`
+	Number         int64  `json:"number"`
+	Version        int64  `json:"version"`
+	TraceParent    string `json:"traceparent"`
+}
+
 // Subscriber wires common/eventbus.Consumer to usecase.SyncIssueStatus.
 type Subscriber struct {
 	consumer *eventbus.Consumer
@@ -73,11 +99,11 @@ func New(consumer *eventbus.Consumer, sync *usecase.SyncIssueStatus, logger *slo
 	return &Subscriber{consumer: consumer, sync: sync, logger: logger}
 }
 
-// Run starts all four subscriptions and blocks until ctx is cancelled or
+// Run starts all six subscriptions and blocks until ctx is cancelled or
 // one of them returns a fatal (non-context) error. Each subscription runs
 // in its own goroutine — a stall on one subject must not block the others.
 func (s *Subscriber) Run(ctx context.Context) error {
-	errCh := make(chan error, 4)
+	errCh := make(chan error, 6)
 	subs := []struct {
 		stream, subject string
 		handle          eventbus.Handler
@@ -86,6 +112,8 @@ func (s *Subscriber) Run(ctx context.Context) error {
 		{projectStream, worktreeDeletedSubject, s.handleWorktreeEvent(true)},
 		{scmStream, prCreatedSubject, s.handlePullRequestEvent(false)},
 		{scmStream, prMergedSubject, s.handlePullRequestEvent(true)},
+		{requestStream, requestStatusChangedSubject, s.handleRequestEvent(false)},
+		{requestStream, requestCompletedSubject, s.handleRequestEvent(true)},
 	}
 	for _, sub := range subs {
 		stream, subject, handle := sub.stream, sub.subject, sub.handle
@@ -136,6 +164,27 @@ func (s *Subscriber) handlePullRequestEvent(merged bool) eventbus.Handler {
 			Merged: merged, ActorUserID: wire.ActorUserID,
 		}
 		return s.sync.HandlePullRequestLifecycle(ctx, ev)
+	}
+}
+
+func (s *Subscriber) handleRequestEvent(completed bool) eventbus.Handler {
+	return func(ctx context.Context, event eventbus.Event) error {
+		var wire requestStatusWirePayload
+		if err := json.Unmarshal(event.Payload, &wire); err != nil {
+			s.logger.ErrorContext(ctx, "malformed request status event payload", "error", err)
+			return nil
+		}
+		ev := domain.RequestStatusEvent{
+			EventID: event.ID, TenantID: event.TenantID, RequestID: wire.RequestID, ProjectID: wire.ProjectID,
+			From: wire.From, To: wire.To, Trigger: wire.Trigger, Type: wire.Type,
+			ActorID: wire.ActorID, ActorKind: wire.ActorKind,
+			SourceProvider: wire.SourceProvider, SourceSite: wire.SourceSite, SourceRef: wire.SourceRef,
+			ReporterID: wire.ReporterID, Number: wire.Number, Version: wire.Version,
+			Completed: completed, TraceParent: wire.TraceParent,
+		}
+		ctx, span := startLinkedSpan(ctx, ev.TraceParent)
+		defer span.End()
+		return s.sync.HandleRequestStatus(ctx, ev)
 	}
 }
 

@@ -1,6 +1,6 @@
 # execution-contract: solutions backend (BE-REQ-SOL-029)
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Tài liệu ngày 2026-10-06; số dòng và đường dẫn đã đối chiếu với code `backend-go/services/task-service`, `infra-fleet-service` và `agent/src/relay` cùng ngày. `request-service` chưa có thư mục: mọi đường dẫn của nó là "(mới)".
+> **🚧 SOL-029: 3/8 task xong** (nửa `task-service`, 2026-10-08); nửa `request-service` chưa làm. Tài liệu ngày 2026-10-06; số dòng và đường dẫn đã đối chiếu với code `backend-go/services/task-service`, `infra-fleet-service` và `agent/src/relay` cùng ngày. `request-service` chưa có thư mục: mọi đường dẫn của nó là "(mới)".
 
 Nguồn: [docs/crs/v6/execution-contract](../../../../../../docs/crs/v6/execution-contract/README.md). README v6 [mục 8](../../../../../../docs/crs/v6/README.md) thắng mục 3 khi mâu thuẫn. Tài liệu thiết kế tham chiếu: [`tdd/README.md`](../../../../tdd/README.md), `architecture/03, 05, 08, 09`, [`services/task-service.md`](../../../../tdd/services/task-service.md), [`services/infra-fleet-service.md`](../../../../tdd/services/infra-fleet-service.md), [`services/orchestration-service.md`](../../../../tdd/services/orchestration-service.md), [`services/project-service.md`](../../../../tdd/services/project-service.md).
 

@@ -63,12 +63,15 @@ var (
 	// Context note.
 	ErrCannotSetInProgress = errors.New("domain: cannot set status to in_progress via UpdateTask — only ExecuteTask may transition a task into in_progress")
 
-	// Plan & phase related errors
+	// Plan & phase related errors.
 	ErrInvalidTaskType         = errors.New("domain: invalid task type")
 	ErrPlanCannotHaveParent    = errors.New("domain: plan cannot have parent task")
 	ErrPhaseRequiresPlanParent = errors.New("domain: phase requires a plan parent task")
 	ErrContainerUnderWorkTask  = errors.New("domain: container cannot be under a work task")
 	ErrContainerStatusDerived  = errors.New("domain: container status is derived and cannot be updated directly")
+	ErrPlanProjectRequired     = errors.New("domain: plan requires a project_id")
+	ErrInvalidPriority         = errors.New("domain: invalid priority")
+	ErrInvalidVisibility       = errors.New("domain: invalid visibility")
 )
 
 // Task is task-service's central entity — see
@@ -181,8 +184,8 @@ type Task struct {
 	// narrower TaskShareView) — only via authenticated reads of the full
 	// Task (GetTask/ListTasks), so an admin can retrieve/share it.
 	ShareToken string
-	// Integration
-	RequestID string // id Request ở request-service, không FK, bất biến
+	// RequestID is the request-service Request this task belongs to: no FK, immutable after create.
+	RequestID string
 }
 
 func validStatus(s Status) bool {
@@ -250,4 +253,49 @@ func (t Task) SetStatus(status Status) (Task, error) {
 	}
 	t.Status = status
 	return t, nil
+}
+
+// ValidatePriority accepts "" (DB default applies) or a value allowed by the priority CHECK.
+func ValidatePriority(p string) error {
+	switch p {
+	case "", "low", "medium", "high", "urgent":
+		return nil
+	}
+	return ErrInvalidPriority
+}
+
+// ValidateVisibility accepts "" (DB default applies) or a value allowed by the visibility CHECK.
+func ValidateVisibility(v string) error {
+	switch v {
+	case "", "private", "team", "public":
+		return nil
+	}
+	return ErrInvalidVisibility
+}
+
+// ValidateHierarchy enforces where plan/phase may sit. parent is nil for a root task.
+// Work tasks may live under any parent (plan, phase or another work task).
+func ValidateHierarchy(taskType, projectID string, parent *Task) error {
+	switch taskType {
+	case TypePlan:
+		if parent != nil {
+			return ErrPlanCannotHaveParent
+		}
+		if projectID == "" {
+			return ErrPlanProjectRequired
+		}
+	case TypePhase:
+		if parent == nil || parent.Type != TypePlan || parent.ProjectID != projectID {
+			return ErrPhaseRequiresPlanParent
+		}
+	}
+	return nil
+}
+
+// ValidateContainerParent rejects a plan/phase placed under a work task (only meaningful when parent exists).
+func ValidateContainerParent(taskType string, parent *Task) error {
+	if parent != nil && IsContainerType(taskType) && !IsContainerType(parent.Type) {
+		return ErrContainerUnderWorkTask
+	}
+	return nil
 }

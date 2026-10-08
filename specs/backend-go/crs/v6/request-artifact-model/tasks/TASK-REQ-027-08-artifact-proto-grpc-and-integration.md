@@ -5,7 +5,7 @@
 **Service:** `request-service` · `proto`
 **File:** `backend-go/proto/orca/request/v1/artifact.proto`, `backend-go/proto/orca/request/v1/request.proto` (sửa: thêm trường vào `Request`, `Solution`, `CreateRequestRequest`), `internal/adapter/grpc/artifact_server.go`, `internal/adapter/grpc/request_mapper.go` (sửa, của TASK-REQ-002-07), `internal/usecase/artifact_integration_test.go`, `services/request-service/README.md` (sửa) và test (mới trừ file sửa)
 **Depends on:** TASK-REQ-027-04, 027-05, 027-06, 027-07, TASK-REQ-001-02 (proto khung), TASK-REQ-001-05 (gRPC server)
-**Status:** [x] DONE
+**Status:** [ ] TODO (một phần: bảy RPC thật và đã kiểm chứng 2026-10-08, buf sạch, kiểm mẫu nối CI; còn kịch bản (d) `CommitPlan` giả và (c) qua RPC)
 
 ---
 
@@ -61,10 +61,10 @@ Thêm trường vào message có sẵn là cộng thêm (additive), `buf breakin
 
 - [x] Bảy RPC hoạt động, mỗi RPC có test chéo tenant trả `NOT_FOUND`.
 - [x] `ListRequestRevisions` không trả snapshot; `GetRequestRevision` trả đúng AC của revision cũ.
-- [x] `buf lint` và `buf breaking` sạch; không dùng lại số trường.
-- [x] Năm kịch bản tích hợp xanh trên Postgres và MySQL.
+- [x] `buf lint` và `buf breaking` sạch; không dùng lại số trường. (2026-10-08: `buf lint --path` cho `artifact|clarification|decision|solution.proto` và `buf breaking --path orca/request --path orca/task --against ../../.git#branch=main,subdir=backend-go/proto` đều không báo lỗi; `.proto` không đổi)
+- [ ] Năm kịch bản tích hợp xanh trên Postgres và MySQL. (a), (b), (e) qua RPC trên Postgres; (c), (d) chưa làm; MySQL ở mức contract
 - [x] README ghi rõ quy tắc bất biến và phần chưa kiểm chứng.
-- [x] Kiểm CI mẫu dùng chung giữa hai service có mặt.
+- [x] Kiểm CI mẫu dùng chung giữa hai service có mặt. (`scripts/check-artifact-samples.sh` chạy xanh với `task-service/testdata/artifacts/task/canonical_cases.json` giống từng byte; đã thêm bước vào `.github/workflows/backend-go-request-service.yml`)
 
 ## Rủi ro và lưu ý
 
@@ -72,3 +72,16 @@ Thêm trường vào message có sẵn là cộng thêm (additive), `buf breakin
 - Quyền ghi mức Request chưa chốt (README v6 mục 8, cuối): `EditRequestContent` dùng quy tắc tạm; đổi khi CR-REQ-010 chốt.
 - Trường JSON trong proto (`*_json`) tránh nhân đôi schema nhưng làm client phải tự parse; frontend (CR-REQ-018) dùng lại JSON Schema nếu xuất schema qua RPC (Q1 của SOL-027, chưa quyết).
 - Thêm RPC vào `RequestService` làm `MustCoverAll`/bảng loại trừ `parity_test.go` của MCP đỏ nếu có kênh gateway mà thiếu `ToolSpec` (README mục 8 điểm 13); báo người giữ CR-REQ-016/017.
+
+## Tiến độ (rf/art, 2026-10-08)
+
+Đã làm và kiểm chứng (`go test ./internal/adapter/grpc`; `go test -tags integration ./cmd/server -run ArtifactAndClarificationFlow`):
+- 7 RPC thật (`EditRequestContent`, `ListRequestRevisions`, `GetRequestRevision`, `GetRequestCoverage`, `GetArtifactGraph`, `ExportArtifactProjection`, `ResolveArtifactRef`) ở `adapter/grpc/server_artifact.go`, nối ở `cmd/server/wire_artifact.go` (một lời gọi `wireArtifact` trong `main.go`); test `TestArtifactServer_*` (cần tenant, chéo tenant `NOT_FOUND` cho từng RPC, phân trang không snapshot, snapshot, export tên tệp + digest, định dạng lạ `InvalidArgument`, sửa với revision cũ và sau `analyzing`) và `TestRequestMapper_NewFields_RoundTrip`. Chạy thật qua dịch vụ đầy đủ trên Postgres + NATS: tạo Request có AC, sửa hai lần, danh sách revision, đọc revision 1, resolve `REQ-n`, export, bảng phủ, đồ thị, đọc chéo tenant.
+- Proto: **không sửa** `.proto` (đã đủ message, trường và RPC từ nhánh `rf/proto`). Trường mới của `Request` được ánh xạ ở `request_mapper.go` (JSON xuất ra dạng chuẩn tắc); `CreateRequest` nhận `acceptance_criteria_json`/`type_fields_json`.
+- README của service có mục "Mô hình artifact".
+
+Chưa làm: kịch bản tích hợp (c) `GenerateSolution` giả rồi `ResolveArtifactRef(SOL-n.1)` và (d) `CommitPlan` giả rồi bảng phủ + đồ thị với `contains` từ `GetSubtree` giả (cần 027-07; phần đơn vị nằm trong `MintSolutionID`, `GetArtifactGraph` và contract hai dialect nhưng chưa qua RPC); kịch bản (a), (b), (e) mới chạy qua RPC trên Postgres, MySQL chỉ ở mức contract repository (`TestMySQL_ArtifactContract`); `buf lint` báo lỗi có sẵn của repo (tên response `Empty`) và `buf breaking` chưa chạy được ở worktree (không có `.git` trong `backend-go`); kiểm CI mẫu dùng chung: có script `scripts/check-artifact-samples.sh` nhưng chưa nối vào workflow (bản của task-service nằm ở nhánh khác).
+
+## Tiến độ sau hợp nhất (2026-10-08)
+
+(a), (b), (e) chạy qua RPC thật trên cả Postgres và MySQL (`TestRun_ArtifactAndClarificationFlow_Postgres|MySQL`). (c) `GenerateSolution` rồi tra `SOL-n.1`, `SOL-n.1/opt-k`: kiểm ở mức contract hai dialect (`SolutionContract/SolutionArtifactsDecisionsAndGates` gọi `ArtifactIndexRepository.Resolve`); chưa qua RPC `ResolveArtifactRef` vì bộ khởi tạo của contract không dựng `ArtifactServer`. (d) `CommitPlan` giả: chưa làm (SOL-012 còn là stub).

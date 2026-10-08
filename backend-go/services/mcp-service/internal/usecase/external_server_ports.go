@@ -87,6 +87,35 @@ type ToolProber interface {
 	ListTools(ctx context.Context, t ProbeTarget) (ProbeResult, error)
 }
 
+// CallTarget is an already validated http endpoint plus its auth headers.
+type CallTarget struct {
+	URL     string
+	Headers map[string]domain.SecretValue
+}
+
+// CallResult is the text-only view of a tools/call result. Non-text content
+// (image, audio, blob) is dropped; IsError is the external server's own flag.
+type CallResult struct {
+	Text      string
+	IsError   bool
+	Truncated bool
+	SizeBytes int
+}
+
+type ResourceResult struct {
+	Text      string
+	MimeType  string
+	Truncated bool
+	SizeBytes int
+}
+
+// ToolCaller runs one read-only call on a remote MCP server. Implementations
+// must be SSRF-safe and bound time and size. maxBytes caps the returned text.
+type ToolCaller interface {
+	CallTool(ctx context.Context, t CallTarget, tool string, argsJSON []byte, maxBytes int) (CallResult, error)
+	ReadResource(ctx context.Context, t CallTarget, uri string, maxBytes int) (ResourceResult, error)
+}
+
 // ProfileMcpReader returns the mcp.servers[].name entries of the user's
 // resolved profile (tenant-service) and the user's team ids. Everything else
 // in the profile (inline command/args/env) is deliberately not exposed.

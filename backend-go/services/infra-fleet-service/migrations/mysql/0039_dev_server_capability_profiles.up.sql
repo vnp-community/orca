@@ -2,7 +2,7 @@ CREATE TABLE dev_server_capability_profiles (
     dev_server_id       CHAR(36) PRIMARY KEY,
     tenant_id           CHAR(36) NOT NULL,
     source              VARCHAR(16) NOT NULL,
-    agent_build_version TEXT NOT NULL,
+    agent_build_version VARCHAR(128) NOT NULL DEFAULT '',
     protocol_version    INT NOT NULL DEFAULT 1,
     features            JSON NOT NULL,
     profile             JSON NOT NULL,

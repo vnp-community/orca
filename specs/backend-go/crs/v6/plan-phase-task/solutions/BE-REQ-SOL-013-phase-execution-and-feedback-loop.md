@@ -1,6 +1,6 @@
 # BE-REQ-SOL-013: Thực thi theo Phase, sự kiện task, `ReportTaskOutcome` và phản hồi ngược lên Request
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Có hai nửa: nửa `task-service` (phát sự kiện cùng transaction) làm được sớm, song song với SOL-012; nửa `request-service` cần SOL-011, 012 và các solution của CR-REQ-003, 006, 009.
+> **✅ Đã triển khai (kiểm chứng 2026-10-08, 7/7 task).** Phần `request-service` chạy với task-service giả qua bufconn; chưa chạy với task-service thật (xem IMPLEMENTATION-NOTES).
 
 **CR:** [CR-REQ-013](../../../../../../docs/crs/v6/plan-phase-task/CR-REQ-013-phase-execution-and-feedback-loop.md)
 **Service:** `task-service` · `request-service` (mới) · `proto/orca/request/v1`, `proto/orca/task/v1`

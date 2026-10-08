@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "kind": "findings",
+  "question": "Có thể thay thư viện A bằng B không?",
+  "summary": "Có, với hai thay đổi nhỏ.",
+  "findings": [
+    {
+      "id": "f-1",
+      "statement": "B hỗ trợ cùng giao diện",
+      "confidence": 0.7,
+      "evidence": [
+        { "type": "doc", "ref": "docs/libs.md", "excerpt": "B implements the same interface" }
+      ]
+    }
+  ],
+  "recommendation": { "statement": "Chuyển sang B", "reason": "Ít phụ thuộc hơn" },
+  "follow_ups": [
+    {
+      "title": "Chuyển thư viện",
+      "suggested_type": "change_request",
+      "reason": "cần thay đổi mã",
+      "body": "..."
+    }
+  ],
+  "unknowns": ["Hiệu năng trên tải thật"]
+}

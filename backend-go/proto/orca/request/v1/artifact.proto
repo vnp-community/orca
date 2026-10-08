@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Artifact model messages (CR-REQ-027): revisions, coverage, ontology graph, projections.
+// RPCs live in RequestService. EditRequestContent is in request.proto because it returns Request.
+
+message CoverageRow {
+  string ac_id = 1;
+  string task_id = 2;
+  string check_id = 3;
+  string plan_task_id = 4;
+}
+
+message GetRequestCoverageRequest {
+  string request_id = 1;
+}
+
+message GetRequestCoverageResponse {
+  repeated CoverageRow rows = 1;
+  repeated string uncovered_ac_ids = 2;
+}
+
+message ArtifactEdge {
+  string rel = 1;
+  string from_kind = 2;
+  string from_id = 3;
+  string to_kind = 4;
+  string to_id = 5;
+}
+
+message GetArtifactGraphRequest {
+  string request_id = 1;
+}
+
+message GetArtifactGraphResponse {
+  repeated ArtifactEdge edges = 1;
+  // True when task-service was unreachable and the contains edges are missing.
+  bool partial = 2;
+}
+
+message ExportArtifactProjectionRequest {
+  string request_id = 1;
+  // Display id such as SOL-142.2; empty exports the Request itself.
+  string artifact_ref = 2;
+  // Empty or "markdown".
+  string format = 3;
+}
+
+// Maximum 1 MB.
+message ExportArtifactProjectionResponse {
+  string filename = 1;
+  string content = 2;
+  string digest = 3;
+}
+
+message ResolveArtifactRefRequest {
+  // Display id such as SOL-142.1 or AC-3.
+  string ref = 1;
+}
+
+message ResolveArtifactRefResponse {
+  string kind = 1;
+  string artifact_id = 2;
+  string request_id = 3;
+}
+
+message RequestRevisionSummary {
+  int32 revision = 1;
+  // created | edited | clarified | waived
+  string cause = 2;
+  string digest = 3;
+  string actor_id = 4;
+  // ai | user | system
+  string actor_kind = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message ListRequestRevisionsRequest {
+  string request_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+// The list never carries snapshots.
+message ListRequestRevisionsResponse {
+  repeated RequestRevisionSummary revisions = 1;
+  string next_page_token = 2;
+}
+
+message GetRequestRevisionRequest {
+  string request_id = 1;
+  int32 revision = 2;
+}
+
+message GetRequestRevisionResponse {
+  RequestRevisionSummary revision = 1;
+  string snapshot_json = 2;
+}

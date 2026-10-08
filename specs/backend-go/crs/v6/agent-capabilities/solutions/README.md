@@ -1,6 +1,6 @@
 # agent-capabilities: solutions backend (BE-REQ-SOL-033)
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Tài liệu ngày 2026-10-06; số dòng và đường dẫn đã đối chiếu với code `backend-go/services/infra-fleet-service` cùng ngày. `request-service` chưa có thư mục: mọi đường dẫn của nó là "(mới)".
+> **🚧 Đang triển khai: 3/6 task xong** (đợt I1, 2026-10-07; phần `request-service` để R2). Tài liệu ngày 2026-10-06; số dòng và đường dẫn đã đối chiếu với code `backend-go/services/infra-fleet-service` cùng ngày. `request-service` chưa có thư mục: mọi đường dẫn của nó là "(mới)".
 
 Nguồn: [docs/crs/v6/agent-capabilities](../../../../../../docs/crs/v6/agent-capabilities/README.md). README v6 [mục 8](../../../../../../docs/crs/v6/README.md) thắng mục 3 khi mâu thuẫn. Tài liệu thiết kế tham chiếu: [`tdd/README.md`](../../../../tdd/README.md), `architecture/03, 05, 08, 09`, [`services/infra-fleet-service.md`](../../../../tdd/services/infra-fleet-service.md), [`services/task-service.md`](../../../../tdd/services/task-service.md).
 

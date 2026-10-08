@@ -1,6 +1,6 @@
 # BE-REQ-SOL-001: Dựng `request-service`: module Go, proto, DB hai dialect, outbox, wiring, CI
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Điều kiện tiên quyết của toàn bộ series v6. Không phụ thuộc solution nào.
+> **🚧 Đang triển khai: 4/6 task xong (2026-10-07).** Còn TASK-REQ-001-02 (nợ `buf lint` của `approval.proto`) và TASK-REQ-001-06 (chưa chạy compose, `migrate.sh`, CI). Điều kiện tiên quyết của toàn bộ series v6. Xem [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md).
 
 **CR:** [CR-REQ-001](../../../../../../docs/crs/v6/request-service-foundation/CR-REQ-001-scaffold-request-service.md)
 **Service:** `request-service` (mới) · `proto` · `go.work` / `Makefile` / `deploy/*` · `.github/workflows`

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orca.local/schemas/v1/diagnosis.schema.json",
+  "title": "Diagnosis document",
+  "type": "object",
+  "required": ["schema_version", "summary", "root_cause"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "kind": { "const": "diagnosis" },
+    "summary": { "type": "string", "minLength": 1 },
+    "root_cause": {
+      "type": "object",
+      "required": ["statement"],
+      "additionalProperties": false,
+      "properties": {
+        "statement": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "reproduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reproducible": { "enum": ["yes", "no", "unknown"] },
+        "steps": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      }
+    },
+    "impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "severity": { "enum": ["low", "medium", "high", "critical"] },
+        "scope": { "type": "string" },
+        "affected_components": { "type": "array", "items": { "type": "string" } },
+        "user_facing": { "type": "boolean" },
+        "data_risk": { "type": "boolean" }
+      }
+    },
+    "fix_directions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "summary"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "risk": { "enum": ["low", "medium", "high"] }
+        }
+      }
+    },
+    "suggested_size": { "enum": ["S", "M", "L"] },
+    "suggest_escalate_to_change_request": { "type": "boolean" },
+    "escalation_reason": { "type": "string" },
+    "measurements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["metric"],
+        "additionalProperties": false,
+        "properties": {
+          "metric": { "type": "string" },
+          "value": { "type": "number" },
+          "unit": { "type": "string" },
+          "method": { "type": "string" }
+        }
+      }
+    },
+    "open_questions": { "type": "array", "items": { "$ref": "#/$defs/open_question" } }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "required": ["type", "ref"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["file", "log", "command", "commit"] },
+        "ref": { "type": "string", "minLength": 1 },
+        "excerpt": { "type": "string", "maxLength": 600 }
+      }
+    },
+    "open_question": {
+      "type": "object",
+      "required": ["id", "text", "blocking"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^Q-[1-9][0-9]*$" },
+        "text": { "type": "string", "minLength": 1 },
+        "blocking": { "type": "boolean" }
+      }
+    }
+  }
+}

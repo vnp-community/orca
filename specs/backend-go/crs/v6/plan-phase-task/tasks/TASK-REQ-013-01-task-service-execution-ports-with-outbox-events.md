@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/execution_lease.go` (dòng 113, 238), `internal/usecase/ports.go` (dòng 60), `internal/adapter/postgres/execution_leases.go` (dòng 77, 163), `internal/adapter/postgres/repository.go` (dòng 347), `internal/adapter/mysql/execution_leases.go` (dòng 146, 164), `internal/adapter/mysql/repository.go` (dòng 360), `internal/usecase/fakes_test.go`, `internal/usecase/execution_lease_test.go`, `internal/adapter/grpc/server_test.go`
 **Depends on:** TASK-REQ-011-05 (payload `statuschanged` có `cause`, `request_id`, `task_type`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./...` + `go test -tags integration ./internal/adapter/...` (Postgres 16 và MySQL 8) trong task-service)
 
 ---
 
@@ -52,3 +52,9 @@ Không cái nào ghi `task.outbox_events`. Mẫu transaction UPDATE + outbox: `R
 - Mở tx mới trong hàm vốn là một câu UPDATE đơn thêm một round trip khi có events; chỉ áp khi `len(events) > 0`.
 - `ClaimForExecution` MySQL phụ thuộc `RowsAffected` (xem test đồng thời); giữ nguyên ngữ nghĩa.
 - Thứ tự commit: nếu tách PR, merge task này trước 013-02 để không có trạng thái biên dịch lỗi.
+
+## Ghi chú triển khai
+
+- Ba cổng nhận `events []domain.OutboxEvent`; mỗi adapter có `inOptionalTx` (tx chỉ khi có events; trong `RunInTx` thì dùng tx sẵn có, Postgres lồng bằng savepoint) và `insertOutboxEvents` (`execution_events_tx.go`). Outbox chỉ ghi khi CAS khớp.
+- Người gọi đã kiểm: `execute_task.go`, `report_execution_result.go`, `execution_lease.go`, fake ở `usecase`, `adapter/grpc`, `adapter/grpcclient`, test hai adapter; các interface nằm trong `internal`, không module khác gọi.
+- Test integration (cả hai dialect) trong `plan_tree_execution_events_test.go`: đúng 5 tên của task, thêm `TestExecution_RequestTaskLifecycle_TwoOutboxRowsInOrder`. `OutboxFailure` chèn lỗi bằng hai event trùng khoá chính.

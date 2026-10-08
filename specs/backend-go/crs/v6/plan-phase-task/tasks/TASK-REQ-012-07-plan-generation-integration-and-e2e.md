@@ -5,7 +5,7 @@
 **Service:** `request-service`, `task-service`
 **File:** `backend-go/services/request-service/internal/adapter/grpcclient/task_plan_writer_integration_test.go` (mới), `backend-go/services/request-service/internal/usecase/plan_flow_integration_test.go` (mới), `backend-go/services/task-service/internal/adapter/grpc/create_plan_tree_contract_test.go` (mới)
 **Depends on:** TASK-REQ-012-01 đến 06
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -34,10 +34,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Toàn bộ tiêu chí mục 4 của CR-REQ-012 có ít nhất một test tương ứng.
-- [x] Chạy xanh trên Postgres và MySQL (hoặc ghi rõ phần chưa chạy được).
-- [x] Test lỗi giữa chừng không để lại Plan hoặc task mồ côi.
-- [x] Không dữ liệu thật hoặc khoá bí mật trong `testdata/`.
+- [ ] Toàn bộ tiêu chí mục 4 của CR-REQ-012 có ít nhất một test tương ứng.
+- [ ] Chạy xanh trên Postgres và MySQL (hoặc ghi rõ phần chưa chạy được).
+- [ ] Test lỗi giữa chừng không để lại Plan hoặc task mồ côi.
+- [ ] Không dữ liệu thật hoặc khoá bí mật trong `testdata/`.
 
 ## Rủi ro và lưu ý
 

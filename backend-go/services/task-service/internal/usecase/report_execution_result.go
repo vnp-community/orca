@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -33,6 +34,14 @@ type ReportTaskExecutionResult struct {
 	// releaser, when set, puts a failed run's task back to its pre-dispatch
 	// status. nil keeps the old behavior of leaving it at in_progress.
 	releaser TaskExecutionReleaser
+	// sync re-derives the parent plan/phase after the task's status moves.
+	sync *SyncContainerStatus
+}
+
+// WithContainerSync enables plan/phase status derivation; nil keeps the old behavior.
+func (uc *ReportTaskExecutionResult) WithContainerSync(s *SyncContainerStatus) *ReportTaskExecutionResult {
+	uc.sync = s
+	return uc
 }
 
 // WithExecutionRelease enables restoring the task when an async run fails.
@@ -82,7 +91,12 @@ func (uc *ReportTaskExecutionResult) Execute(ctx context.Context, in ReportTaskE
 		if err := uc.links.Complete(ctx, tenantID, link.ID, "completed"); err != nil {
 			return apperrors.New(apperrors.KindInternal, "TASK_EXECUTION_LINK_COMPLETE_FAILED", "failed to complete execution link", err)
 		}
-		return uc.tasks.CompleteExecution(ctx, tenantID, in.TaskID, string(domain.StatusReview), in.ActualHours)
+		events := runEvents(task, domain.StatusInProgress, domain.StatusReview, CauseExecutionCompleted, link.ID, link.Engine, "", time.Now())
+		if err := uc.tasks.CompleteExecution(ctx, tenantID, in.TaskID, string(domain.StatusReview), in.ActualHours, events); err != nil {
+			return err
+		}
+		syncContainerParent(ctx, uc.sync, in.TaskID)
+		return nil
 	}
 
 	// Failed complex/workflow execution. Mark the link failed first so a retried
@@ -97,12 +111,14 @@ func (uc *ReportTaskExecutionResult) Execute(ctx context.Context, in ReportTaskE
 		return nil
 	}
 	to := restoreStatus(link.PreviousStatus)
-	if _, err := uc.releaser.ReleaseExecution(ctx, tenantID, in.TaskID, link.ID, to); err != nil {
+	events := runEvents(task, domain.StatusInProgress, to, CauseExecutionFailed, link.ID, link.Engine, in.ErrorMessage, time.Now())
+	if _, err := uc.releaser.ReleaseExecution(ctx, tenantID, in.TaskID, link.ID, to, events); err != nil {
 		// The periodic recovery sweep picks this task up (failed link + in_progress).
 		slog.WarnContext(ctx, "task: could not restore task after failed run, recovery sweep will retry",
 			slog.String("task_id", in.TaskID), slog.Any("error", err))
 		return nil
 	}
+	syncContainerParent(ctx, uc.sync, in.TaskID)
 	slog.WarnContext(ctx, "task: async execution failed; task restored",
 		slog.String("task_id", in.TaskID), slog.String("engine", in.Engine), slog.String("status", string(to)), slog.String("error_message", in.ErrorMessage))
 	return nil

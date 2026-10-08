@@ -72,12 +72,12 @@ type TokenValidator interface {
 // this is agent→Orca and carries the bearer token plus the agent's
 // self-reported platform/capabilities.
 type inboundHandshakeParams struct {
-	AgentToken   string   `json:"agentToken"`
-	DevServerID  string   `json:"devServerId"`
-	Platform     string   `json:"platform"`
-	Arch         string   `json:"arch"`
-	NodeVersion  string   `json:"nodeVersion"`
-	AgentVersion string   `json:"agentVersion"`
+	AgentToken      string   `json:"agentToken"`
+	DevServerID     string   `json:"devServerId"`
+	Platform        string   `json:"platform"`
+	Arch            string   `json:"arch"`
+	NodeVersion     string   `json:"nodeVersion"`
+	AgentVersion    string   `json:"agentVersion"`
 	Capabilities    []string `json:"capabilities"`
 	Tools           []string `json:"tools"`
 	Features        []string `json:"features"`

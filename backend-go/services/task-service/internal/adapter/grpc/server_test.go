@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -156,14 +157,39 @@ func (f *fakeTaskRepository) ListChildren(ctx context.Context, tenantID, taskID 
 func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
 	return false, nil
 }
-func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error) {
+func (f *fakeTaskRepository) List(ctx context.Context, tenantID string, flt usecase.ListFilter) ([]domain.Task, string, error) {
 	var out []domain.Task
 	for _, t := range f.tasks {
-		if t.TenantID == tenantID && (projectID == "" || t.ProjectID == projectID) {
-			out = append(out, t)
+		if t.TenantID != tenantID || (flt.ProjectID != "" && t.ProjectID != flt.ProjectID) || (flt.ParentID != "" && t.ParentID != flt.ParentID) {
+			continue
 		}
+		if len(flt.TaskTypes) > 0 && !slices.Contains(flt.TaskTypes, orTask(t.Type)) {
+			continue
+		}
+		if len(flt.RequestIDs) > 0 && !slices.Contains(flt.RequestIDs, t.RequestID) {
+			continue
+		}
+		out = append(out, t)
 	}
 	return out, "", nil
+}
+func (f *fakeTaskRepository) ListChildStatuses(ctx context.Context, tenantID, parentID string) ([]domain.Status, error) {
+	var out []domain.Status
+	for _, t := range f.tasks {
+		if t.TenantID == tenantID && t.ParentID == parentID {
+			out = append(out, t.Status)
+		}
+	}
+	return out, nil
+}
+func (f *fakeTaskRepository) UpdateContainerStatus(ctx context.Context, tenantID, id string, from, to domain.Status, events []domain.OutboxEvent) (bool, error) {
+	t, ok := f.tasks[id]
+	if !ok || t.Status != from || !domain.IsContainerType(t.Type) {
+		return false, nil
+	}
+	t.Status = to
+	f.tasks[id] = t
+	return true, nil
 }
 func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task, events []domain.OutboxEvent) error {
 	existing, ok := f.tasks[task.ID]
@@ -280,7 +306,7 @@ func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID s
 	return nil
 }
 
-func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64, events []domain.OutboxEvent) error {
 	t, ok := f.tasks[id]
 	if !ok || t.TenantID != tenantID {
 		return errors.New("not found")
@@ -1052,8 +1078,8 @@ func TestServer_GenerateShareLink_And_GetTaskByShareToken(t *testing.T) {
 
 func TestServer_ListExecutionStates_MapsFields(t *testing.T) {
 	now := time.Now()
-	reader := &usecase.FakeExecutionStateReader{
-		MockListExecutionStates: func(ctx context.Context, tenantID string, taskIDs []string) ([]domain.ExecutionState, error) {
+	reader := &fakeExecutionStateReader{
+		fn: func(ctx context.Context, tenantID string, taskIDs []string) ([]domain.ExecutionState, error) {
 			if tenantID != "tenant-1" {
 				t.Errorf("expected tenant-1, got %q", tenantID)
 			}
@@ -1071,20 +1097,20 @@ func TestServer_ListExecutionStates_MapsFields(t *testing.T) {
 		},
 	}
 	uc := usecase.NewListExecutionStates(reader)
-	
+
 	s := newTestServer(newFakeTaskRepository(), &fakeEdgeRepository{}).WithListExecutionStates(uc)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
-	
+
 	req := &taskv1.ListExecutionStatesRequest{TaskIds: []string{"task-1"}}
 	resp, err := s.ListExecutionStates(ctx, req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	if len(resp.GetStates()) != 1 {
 		t.Fatalf("expected 1 state, got %d", len(resp.GetStates()))
 	}
-	
+
 	state := resp.GetStates()[0]
 	if state.GetTaskId() != "task-1" || len(state.GetBlockedByTaskIds()) != 1 || state.GetBlockedByTaskIds()[0] != "task-2" {
 		t.Errorf("mapped fields mismatch: %v", state)
@@ -1094,5 +1120,86 @@ func TestServer_ListExecutionStates_MapsFields(t *testing.T) {
 	}
 	if state.GetLastStartedAt().AsTime().Unix() != now.Unix() || state.GetLastCompletedAt().AsTime().Unix() != now.Unix() {
 		t.Errorf("mapped time mismatch: %v", state)
+	}
+}
+
+// fakeExecutionStateReader is local because usecase's fakes live in _test files of another package.
+type fakeExecutionStateReader struct {
+	fn func(ctx context.Context, tenantID string, taskIDs []string) ([]domain.ExecutionState, error)
+}
+
+func (f *fakeExecutionStateReader) ListExecutionStates(ctx context.Context, tenantID string, taskIDs []string) ([]domain.ExecutionState, error) {
+	return f.fn(ctx, tenantID, taskIDs)
+}
+
+func orTask(t string) string {
+	if t == "" {
+		return domain.TypeTask
+	}
+	return t
+}
+
+func TestServer_CreateTask_ForwardsAllFields(t *testing.T) {
+	s := newTestServer(newFakeTaskRepository(), &fakeEdgeRepository{})
+	created, err := s.CreateTask(ctxWithTenant(t), &taskv1.CreateTaskRequest{
+		Title: "bug", TaskType: "bug", Description: "details", Priority: "high", AssigneeId: "u-2",
+		EstimatedHours: wrapperspb.Double(3), PromptTemplate: "pt", AiContext: "ctx", Visibility: "private",
+		RequestId: "req-9", Labels: []string{"x", "y"},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	got, err := s.GetTask(ctxWithTenant(t), &taskv1.GetTaskRequest{Id: created.GetTask().GetId()})
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	g := got.GetTask()
+	if g.GetTaskType() != "bug" || g.GetDescription() != "details" || g.GetPriority() != "high" || g.GetAssigneeId() != "u-2" ||
+		g.GetEstimatedHours().GetValue() != 3 || g.GetPromptTemplate() != "pt" || g.GetAiContext() != "ctx" ||
+		g.GetVisibility() != "private" || g.GetRequestId() != "req-9" || len(g.GetLabels()) != 2 {
+		t.Errorf("fields were dropped on the way in: %+v", g)
+	}
+}
+
+func TestServer_CreateTask_PlanHierarchyErrorsMapToGRPCCodes(t *testing.T) {
+	s := newTestServer(newFakeTaskRepository(), &fakeEdgeRepository{})
+	_, err := s.CreateTask(ctxWithTenant(t), &taskv1.CreateTaskRequest{Title: "p", TaskType: "plan"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("plan without project: %v", err)
+	}
+	_, err = s.CreateTask(ctxWithTenant(t), &taskv1.CreateTaskRequest{Title: "p", TaskType: "nope"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("invalid type: %v", err)
+	}
+	_, err = s.CreateTask(ctxWithTenant(t), &taskv1.CreateTaskRequest{Title: "ph", TaskType: "phase", ProjectId: "p1"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("phase without plan: %v", err)
+	}
+}
+
+func TestServer_ListTasks_ForwardsFiltersAndHidesContainersByDefault(t *testing.T) {
+	repo := newFakeTaskRepository()
+	s := newTestServer(repo, &fakeEdgeRepository{})
+	plan, err := s.CreateTask(ctxWithTenant(t), &taskv1.CreateTaskRequest{Title: "plan", TaskType: "plan", ProjectId: "p1", RequestId: "req-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateTask(ctxWithTenant(t), &taskv1.CreateTaskRequest{Title: "work", ParentId: plan.GetTask().GetId(), ProjectId: "p1"}); err != nil {
+		t.Fatal(err)
+	}
+	def, err := s.ListTasks(ctxWithTenant(t), &taskv1.ListTasksRequest{})
+	if err != nil || len(def.GetTasks()) != 1 || def.GetTasks()[0].GetTitle() != "work" {
+		t.Fatalf("default list: %+v, %v", def.GetTasks(), err)
+	}
+	if def.GetTasks()[0].GetRequestId() != "req-1" {
+		t.Errorf("request_id must be inherited and returned: %+v", def.GetTasks()[0])
+	}
+	plans, err := s.ListTasks(ctxWithTenant(t), &taskv1.ListTasksRequest{TaskTypes: []string{"plan"}, RequestIds: []string{"req-1"}})
+	if err != nil || len(plans.GetTasks()) != 1 || plans.GetTasks()[0].GetTaskNumber() != 0 {
+		t.Fatalf("plan list: %+v, %v", plans.GetTasks(), err)
+	}
+	kids, err := s.ListTasks(ctxWithTenant(t), &taskv1.ListTasksRequest{ParentId: plan.GetTask().GetId()})
+	if err != nil || len(kids.GetTasks()) != 1 {
+		t.Fatalf("parent filter: %+v, %v", kids.GetTasks(), err)
 	}
 }

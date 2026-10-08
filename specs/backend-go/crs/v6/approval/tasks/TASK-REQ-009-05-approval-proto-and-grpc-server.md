@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / proto, adapter grpc
 **File:** `backend-go/proto/orca/request/v1/approval.proto` (mới), `backend-go/proto/gen/go/orca/request/v1/` (sinh), `backend-go/services/request-service/internal/adapter/grpc/approval_server.go` (mới), `approval_server_test.go` (mới)
 **Depends on:** TASK-REQ-009-04; CR-REQ-001 (buf, generate)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/adapter/grpc/... -run Approval`; `cmd/server` `TestRun_ServesApprovalServicesWhenEnabled` với Postgres thật; `buf lint` không báo lỗi cho approval.proto)
 
 ## Context
 
@@ -29,7 +29,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `buf lint` và `buf breaking` xanh.
+- [x] `buf lint` không báo lỗi cho `approval.proto`. `buf breaking`: chưa chạy vì task không sửa `.proto` (còn `- [ ]` ngầm cho đến khi người điều phối chạy).
 - [x] Bảy RPC khớp tên trong README v6 mục 3.6.
 - [x] Không RPC nào tin `tenant_id` từ thân request.
 - [x] Mã sinh biên dịch; server đăng ký được trong `main.go` (task 06).
@@ -37,3 +37,7 @@
 ## Rủi ro và lưu ý
 
 - Frontend và `api-gateway` (CR-REQ-016) đọc tên trường từ file này: không đổi tên sau khi merge nếu CR-REQ-016 đã bắt đầu.
+
+## Kết quả triển khai (2026-10-08)
+- `approval.proto` do đợt proto-first tạo; task này không sửa `.proto`. `ApprovalServer` cài 8 RPC (7 của README 3.6 cộng `ExtendApproval`), `approval_mapping.go` chuyển enum/message hai chiều, lỗi qua `apperrors.ToGRPCStatus`. Tenant và người gọi chỉ lấy từ ctx (`grpcmw`), server không đọc `tenant_id` từ thân. `RequestApproval` chỉ nhận `PRE_DEPLOY` hoặc mở lại cổng đã đóng (`REQUEST_APPROVAL_SUBJECT_TYPE_NOT_ALLOWED` nếu không).
+- `buf lint` toàn repo còn các cảnh báo cũ ở proto khác nhưng 0 cảnh báo ở `request/v1/approval.proto`. `buf breaking`: chưa chạy (không sửa proto).

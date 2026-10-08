@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/answer_clarification.go`, `internal/usecase/cancel_clarification.go`, `internal/usecase/clarification_side_effects.go`, `internal/usecase/change_request_type.go` (sửa, của SOL-005), `internal/usecase/cancel_request.go` (sửa, của CR-REQ-006), `internal/usecase/return_to_backlog.go` (sửa, của CR-REQ-006), `internal/usecase/ports.go` (sửa) và test
 **Depends on:** TASK-REQ-028-03, 028-04, TASK-REQ-027-05 (`AppendWithinTx`, `ApplyAnswers` dùng `AcceptanceCriteria`), TASK-REQ-007-05 (Solution `superseded`), TASK-REQ-012-05 (Plan thay thế), TASK-REQ-005-06 (`ChangeRequestType`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/usecase -run 'Answer|CancelClarification|ChangeRequestType|CancelRequest|ReturnToBacklog|AwaitingInformation'` và `go test -tags integration ./internal/adapter/... -run ClarificationContract`)
 
 ---
 
@@ -90,3 +90,11 @@ Người trả lời phải thuộc `clarification_assignees` hoặc `role=admin
 - Quyết định "huỷ thủ công thì về backlog" là suy luận; CR không nói rõ. Cần xác nhận (Q1).
 - `SupersedeByRequest` phải bỏ qua Solution `approved` để giữ bất biến (SOL-027); test kiểm.
 - Sửa ba use case của CR-REQ-005/006 sau khi đã merge: giữ commit nhỏ, chạy lại test của chúng.
+
+## Ghi chú triển khai (rf/art)
+
+- `AnswerClarification`, `CancelClarification`, `OpenClarificationCanceller` (hook `WithClarifications` trên `ReturnRequestToBacklog`, `CancelRequest`, `ChangeRequestType`, gọi **trước** transition để Clarification đóng cùng giao dịch; `typeChangeStatus` nhận thêm `awaiting_information`).
+- Hạn chế: "Solution `proposed` cũ thành `superseded`" đi qua cổng `SolutionSuperseder` (mặc định không làm gì) vì bảng `solutions` ở nhánh này chưa có `status` (thuộc SOL-007); phần Decision `superseded` + `decision_history` đã thật và có test (`SupersedesDecisions_WhenResumingAnalyzing`). Tính năng Solution phải truyền bản cài đặt thật vào `WithSolutions`. `Solution approved giữ nguyên` vì vậy chưa kiểm chứng.
+- Thứ tự khoá: không có khoá hàng tường minh; tranh chấp xử lý bằng CAS (`version` của Request và Clarification, `content_revision`), thua thì `REQUEST_VERSION_CONFLICT`/`REQUEST_CLARIFICATION_VERSION_CONFLICT` hoặc `STATE_STALE`. Test đua: `AnswerRacingExpiryOneWins`, `TwoSweepersNoDoubleProcessing`, `TwoConcurrentRequestsOneOpenWins` (Postgres + MySQL). Không có test `TestLockOrder_*`.
+- Quyết định "huỷ thủ công thì về backlog `missing_info`" theo task (suy luận, Q1). Danh tính máy bị từ chối bằng `tenant.ActorType` (`REQUEST_CLARIFICATION_NOT_ASSIGNEE`).
+- `AnswerClarification` hết hạn lười: `now >= due_at` trả `REQUEST_CLARIFICATION_EXPIRED` (đồng hồ ứng dụng; `due_at` do Go đặt).

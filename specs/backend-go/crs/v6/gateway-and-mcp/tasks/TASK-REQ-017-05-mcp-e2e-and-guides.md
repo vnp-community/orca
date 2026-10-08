@@ -5,7 +5,7 @@
 **Service:** `tests/mcp`, `docs/guides/mcp`
 **File:** `tests/mcp/check_mcp_request_flow.py` (mới), `docs/guides/mcp/task-worktree-tools.md`, `docs/guides/mcp/README.md`
 **Depends on:** TASK-REQ-017-01..03; stack dev có `request-service` (CR-REQ-001) và gateway cấu hình `MCP_TOOL_PACKS_ENABLED=1,2`
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -28,10 +28,14 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Script chạy được trên stack dev khi cờ bật, thoát mã khác 0 khi sai hợp đồng.
-- [x] Tài liệu có mục Request, danh sách việc agent không làm được.
+- [ ] Script chạy được trên stack dev khi cờ bật, thoát mã khác 0 khi sai hợp đồng.
+- [ ] Tài liệu có mục Request, danh sách việc agent không làm được.
 
 ## Rủi ro và lưu ý
 
 - Dữ liệu thử còn lại (không có tool huỷ); dùng project thử riêng.
 - Không đưa token vào repo; theo `.env` như các script hiện có.
+
+## Tiến độ
+
+Chưa làm: script `tests/mcp/check_mcp_request_flow.py` và `docs/guides/mcp` nằm ngoài phạm vi lần triển khai này (chỉ api-gateway, mcp-service, specs) và cần stack dev thật để chạy. Phần tool, `ToolOrigin`, hạn mức đã xong và có test (017-01..04).

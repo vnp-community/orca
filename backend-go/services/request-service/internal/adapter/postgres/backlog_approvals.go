@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 )
@@ -35,27 +34,36 @@ func (r *ApprovalGateReader) ListGateApprovals(ctx context.Context, tenantID str
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, tenant_id, request_id, subject_type, subject_id, stage, status, requested_by, due_at, version, created_at, updated_at, subject_digest, self_approval_allowed
+		SELECT id, tenant_id, request_id, subject_type, subject_id, stage, status, requested_by, decided_by, decided_at, due_at, version, created_at, updated_at, subject_digest, self_approval_allowed
 		FROM request.approvals
 		WHERE tenant_id = $1 AND request_id IN (%s) AND subject_type IN ('plan', 'task_list', 'phase', 'pre_deploy')
 	`, strings.Join(placeholders, ", "))
 
-	rows, err := r.exec(ctx).Query(ctx, query, args...)
+	var list []domain.Approval
+	// scoped: the pool carries no tenant setting, so a bare query would see no rows under FORCE RLS.
+	err := r.scoped(ctx, func(ctx context.Context, ctxTenant string, db dbExecer) error {
+		if ctxTenant != tenantID {
+			return nil
+		}
+		rows, err := db.Query(ctx, query, args...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var a domain.Approval
+			if err := rows.Scan(
+				&a.ID, &a.TenantID, &a.RequestID, &a.SubjectType, &a.SubjectID, &a.Stage, &a.Status, &a.RequestedBy,
+				&a.DecidedBy, &a.DecidedAt, &a.DueAt, &a.Version, &a.CreatedAt, &a.UpdatedAt, &a.SubjectDigest, &a.SelfApprovalAllowed,
+			); err != nil {
+				return err
+			}
+			list = append(list, a)
+		}
+		return rows.Err()
+	})
 	if err != nil {
 		return nil, fmt.Errorf("postgres ListGateApprovals: %w", err)
 	}
-	defer rows.(pgx.Rows).Close()
-
-	var list []domain.Approval
-	for rows.(pgx.Rows).Next() {
-		var a domain.Approval
-		if err := rows.(pgx.Rows).Scan(
-			&a.ID, &a.TenantID, &a.RequestID, &a.SubjectType, &a.SubjectID, &a.Stage, &a.Status, &a.RequestedBy,
-			&a.DueAt, &a.Version, &a.CreatedAt, &a.UpdatedAt, &a.SubjectDigest, &a.SelfApprovalAllowed,
-		); err != nil {
-			return nil, err
-		}
-		list = append(list, a)
-	}
-	return list, rows.(pgx.Rows).Err()
+	return list, nil
 }

@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, adapter
 **File:** `internal/usecase/expire_approvals.go` (mới), `remind_pending_approvals.go` (mới), `internal/adapter/{postgres,mysql}/approval_repository.go` (sửa: `ClaimDue`, `ClaimDueForReminder`), `cmd/server/main.go` (sửa: khởi chạy vòng), và `_test.go`
 **Depends on:** TASK-REQ-010-03, TASK-REQ-010-04; CR-REQ-006 (`ReturnToBacklog`) hoặc `TransitionRequest` của CR-REQ-003
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/usecase/... -run "Approval_Expire|Approval_Remind"`; hợp đồng `RunApprovalFlowContract` trên Postgres và MySQL thật; `cmd/server` chạy bộ quét)
 
 ## Context
 
@@ -39,3 +39,9 @@
 
 - Hạn ngắn đưa Request về backlog gây phiền; số hạn là đề xuất.
 - Chưa có RPC gia hạn (câu hỏi mở 4): người dùng phải mở lại từ backlog.
+
+## Kết quả triển khai (2026-10-08)
+- `ExpireApprovals`: `ClaimDue` quét xuyên tenant; mỗi ứng viên đặt tenant của claim lên ctx rồi mới `InTx` (nợ R1a), khoá Request rồi Approval, so lại `due_at` theo giờ DB, `Expire`, `OnClosedWithoutDecision("expired")`, đưa Request về `request_backlog` (`approval_expired`, danh mục `other`) nếu còn ở đúng giai đoạn, outbox `decision:"expired"`. Lỗi một ứng viên không dừng ứng viên khác. Hết hạn lười trong `DecideApproval` dùng chung `ExpireLocked`.
+- `returned_from_stage` theo `domain.ApprovalReturnStage`: lệch nhỏ so với task: trong `executing`, `pre_deploy`/`phase` trả `phase` chỉ khi flow có Phase (đúng `StageForStatus`), còn lại `task`; `ReturnRequestToBacklog` từ chối `phase` nếu không có Phase.
+- `RemindPendingApprovals`: mốc 75% tính bằng SQL (hai dialect), so-sánh-và-ghi `reminded_at` (không tăng `version`), không khoá Request; hai bộ quét song song chỉ phát một lần (kiểm trên cả hai DB).
+- `runSweeper` trong `wire_approval.go` (mặc định 60 giây, `REQUEST_APPROVAL_SWEEP_INTERVAL`), dừng theo ctx. Chưa làm: metric đếm số hết hạn/nhắc (hiện chỉ log đếm); migration `0040` thêm policy RLS chỉ đọc cho quét xuyên tenant.

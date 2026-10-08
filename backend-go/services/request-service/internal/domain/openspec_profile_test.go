@@ -29,13 +29,18 @@ func TestOpenSpecProfileFor_AllElevenTypes(t *testing.T) {
 }
 
 func TestFlowFor_CarriesOpenSpecProfile(t *testing.T) {
-	f1 := FlowFor(RequestTypeChangeRequest)
+	f1, err := FlowFor(RequestTypeChangeRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if f1.OpenSpecProfile != OpenSpecProfileFull {
 		t.Errorf("expected full, got %v", f1.OpenSpecProfile)
 	}
 
-	f2 := FlowFor("unknown")
-	if f2.OpenSpecProfile != OpenSpecProfileNone {
-		t.Errorf("expected none, got %v", f2.OpenSpecProfile)
+	if _, err := FlowFor("unknown"); err == nil {
+		t.Errorf("unknown type must not have a flow")
+	}
+	if got := OpenSpecProfileFor("unknown"); got != OpenSpecProfileNone {
+		t.Errorf("expected none, got %v", got)
 	}
 }

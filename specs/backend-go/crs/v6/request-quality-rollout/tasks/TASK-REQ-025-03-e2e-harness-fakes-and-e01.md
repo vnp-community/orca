@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/e2e/harness_test.go` (mới), `.../e2e/fakes/` (mới: `classifier.go`, `solution_generator.go`, `plan_generator.go`, `agent_readonly.go`, `task_service.go`), `.../e2e/scenario_table_test.go` (mới), `.../e2e/request_flow_test.go` (mới, E01)
 **Depends on:** CR-REQ-003 đến 013 ở mức chạy được; TASK-REQ-025-01
-**Status:** `[x] DONE`
+**Status:** [ ] TODO (một phần, xem Tiến độ 2026-10-08)
 
 ---
 
@@ -31,11 +31,16 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] E01 xanh trên Postgres và MySQL.
-- [x] Fake thay được mọi cổng AI và `task-service`; không còn lời gọi mạng ra ngoài.
-- [x] Không `Sleep` cố định.
+- [ ] E01 xanh trên Postgres và MySQL.
+- [ ] Fake thay được mọi cổng AI và `task-service`; không còn lời gọi mạng ra ngoài.
+- [ ] Không `Sleep` cố định.
 
 ## Rủi ro và lưu ý
 
 - `task-service` giả có thể che lỗi ở đường nối thật; T2 bù.
 - Thời gian chạy e2e hai dialect; đặt timeout job CI rõ (task 05).
+
+## Tiến độ (2026-10-08)
+
+Đã làm: khung e2e chạy BINARY THẬT (`go build ../cmd/server`) trên DB thật (Postgres với role NOSUPERUSER NOBYPASSRLS, hoặc MySQL 8.0), NATS thật, outbox relay và consumer phân loại thật; chỉ biên gRPC phía sau được stub (`e2e/stubs`: relay `ai.complete`, `ResolveConnection`, `GetFleetHealth`, `ListRepos`, `AppendAuditEntry`, `ListUsers`). Khung kịch bản `Scenario/Stage` (`scenario_table_test.go`); stage có `Needs` tự báo SKIP khi RPC còn `Unimplemented` và tự chạy khi RPC có. E01 chạy thật tới hết xác nhận loại (`analyzing`) trên Postgres và MySQL.
+Còn thiếu: E01 sau xác nhận loại (Solution, chọn phương án, duyệt, Plan, Phase, task chạy, `completed`) vì `GenerateSolution`, `ChooseSolutionOption`, `GeneratePlan`, `CommitPlan`, `ReportTaskOutcome` còn `Unimplemented` (CR-REQ-007/008, 012, 013: rf-sol, rf-exec); `task-service` giả chưa viết vì chưa có RPC để nó phục vụ. Lệch task: stub ở biên gRPC thay cho fake cổng trong tiến trình (trung thực hơn, kiểm cả wiring thật).

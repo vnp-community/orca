@@ -57,14 +57,23 @@ type TaskRepository interface {
 	// ExecuteTask's doc comment). The complex path's equivalent write lands
 	// later via TASK-TG-04-05's ReportTaskExecutionResult, reusing this same
 	// method.
-	CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error
+	CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64, events []domain.OutboxEvent) error
 	// HasActiveExecutions reports whether tenantID/projectID has any task
 	// currently in_progress — see usecase.HasActiveExecutions's doc comment
 	// for the one-way-transition caveat this answer is subject to today.
 	HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error)
-	// List returns tasks for tenantID, optionally filtered by projectID
-	// (empty = no filter), cursor-paginated by page_size/page_token.
-	List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error)
+	// List returns tasks for tenantID narrowed by f, cursor-paginated by
+	// f.PageSize/f.PageToken. Empty filter fields mean "no filter"; the
+	// default task-type set is applied by the usecase, not the adapter.
+	List(ctx context.Context, tenantID string, f ListFilter) ([]domain.Task, string, error)
+	// ListChildStatuses returns the status of every direct child (by
+	// parent_id) of parentID, feeding domain.DeriveContainerStatus.
+	ListChildStatuses(ctx context.Context, tenantID, parentID string) ([]domain.Status, error)
+	// UpdateContainerStatus is a compare-and-set of a plan/phase status
+	// from -> to plus its outbox events in one transaction. changed=false
+	// (no error) means the row was not a plan/phase or its status was no
+	// longer `from`.
+	UpdateContainerStatus(ctx context.Context, tenantID, id string, from, to domain.Status, events []domain.OutboxEvent) (changed bool, err error)
 	// Update persists a partial field update (title/status/worktree_id/
 	// pr_url) and, when events is non-empty, one or more outbox rows — in
 	// the SAME transaction, so a status transition and its published
@@ -119,6 +128,16 @@ type TaskRepository interface {
 	// entirely"). SECURITY REVIEW REQUIRED before merge — see
 	// GetTaskByShareToken's doc comment.
 	GetByShareToken(ctx context.Context, token string) (domain.Task, error)
+}
+
+// ListFilter narrows TaskRepository.List. Zero values mean "no filter".
+type ListFilter struct {
+	ProjectID  string
+	TaskTypes  []string
+	RequestIDs []string
+	ParentID   string
+	PageToken  string
+	PageSize   int32
 }
 
 // SubtreeProgressNode is one GetSubtreeWithChildPercents result row: the

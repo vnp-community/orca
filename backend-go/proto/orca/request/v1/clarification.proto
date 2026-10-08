@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Clarification and readiness messages (CR-REQ-028). RPCs live in RequestService.
+// Request status is returned as a string so this file does not import request.proto (import cycle).
+
+enum ClarificationStatus {
+  CLARIFICATION_STATUS_UNSPECIFIED = 0;
+  CLARIFICATION_STATUS_OPEN = 1;
+  CLARIFICATION_STATUS_ANSWERED = 2;
+  CLARIFICATION_STATUS_EXPIRED = 3;
+  CLARIFICATION_STATUS_CANCELLED = 4;
+}
+
+enum QuestionKind {
+  QUESTION_KIND_UNSPECIFIED = 0;
+  QUESTION_KIND_TEXT = 1;
+  QUESTION_KIND_SINGLE_CHOICE = 2;
+  QUESTION_KIND_MULTI_CHOICE = 3;
+  QUESTION_KIND_FILE = 4;
+  QUESTION_KIND_BOOLEAN = 5;
+}
+
+message ClarificationQuestion {
+  string id = 1;
+  int32 seq = 2;
+  string question_key = 3;
+  QuestionKind kind = 4;
+  string prompt = 5;
+  string reason = 6;
+  string options_json = 7;
+  string suggested_default_json = 8;
+  bool required = 9;
+  string target_path = 10;
+  // Only returned to assignees, the asker or admins.
+  string answer_json = 11;
+}
+
+message Clarification {
+  string id = 1;
+  string display_id = 2;
+  string request_id = 3;
+  // readiness | solution_open_question | plan_assumption | task_blocked | manual
+  string source = 4;
+  string source_ref = 5;
+  ClarificationStatus status = 6;
+  // analyzing | planning | executing
+  string resume_status = 7;
+  int32 round = 8;
+  repeated ClarificationQuestion questions = 9;
+  google.protobuf.Timestamp due_at = 10;
+  int64 version = 11;
+  google.protobuf.Timestamp created_at = 12;
+}
+
+message AnswerItem {
+  string question_id = 1;
+  string value_json = 2;
+  bool accept_default = 3;
+}
+
+message ReadinessMissing {
+  string path = 1;
+  string rule = 2;
+  bool blocking = 3;
+}
+
+message GetRequestReadinessRequest {
+  string request_id = 1;
+}
+
+message GetRequestReadinessResponse {
+  bool ready = 1;
+  repeated ReadinessMissing missing = 2;
+  int32 content_revision = 3;
+}
+
+// Public callers may use source solution_open_question, plan_assumption or manual only.
+message RequestClarificationRequest {
+  string request_id = 1;
+  string source = 2;
+  string source_ref = 3;
+  repeated ClarificationQuestion questions = 4;
+  string resume_status = 5;
+}
+
+message RequestClarificationResponse {
+  Clarification clarification = 1;
+}
+
+message ListClarificationsRequest {
+  string request_id = 1;
+  ClarificationStatus status = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListClarificationsResponse {
+  repeated Clarification clarifications = 1;
+  string next_page_token = 2;
+}
+
+message GetClarificationRequest {
+  string id = 1;
+}
+
+message GetClarificationResponse {
+  Clarification clarification = 1;
+}
+
+message AnswerClarificationRequest {
+  string clarification_id = 1;
+  repeated AnswerItem answers = 2;
+  // false saves a draft; true completes the round.
+  bool complete = 3;
+  int64 expected_version = 4;
+}
+
+message AnswerClarificationResponse {
+  Clarification clarification = 1;
+  string request_status = 2;
+  int32 request_revision = 3;
+  bool still_missing = 4;
+}
+
+message CancelClarificationRequest {
+  string id = 1;
+  string reason = 2;
+  int64 expected_version = 3;
+}
+
+message CancelClarificationResponse {
+  Clarification clarification = 1;
+}
+
+// Default page size 50, maximum 200.
+message ListPendingClarificationsForUserRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListPendingClarificationsForUserResponse {
+  repeated Clarification clarifications = 1;
+  string next_page_token = 2;
+}
+
+// Admin only; refused for hotfix, security and ops_request.
+message WaiveReadinessRequest {
+  string request_id = 1;
+  string reason = 2;
+  int64 expected_version = 3;
+}
+
+message WaiveReadinessResponse {
+  string request_status = 1;
+  int32 request_revision = 2;
+}

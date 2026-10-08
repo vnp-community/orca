@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/stablyai/orca-go/services/issue-status-sync/internal/domain"
@@ -31,13 +32,56 @@ type SyncIssueStatus struct {
 	projects        ProjectSettingsClient
 	processedEvents ProcessedEventStore
 	logger          *slog.Logger
+
+	// Request-driven sync (all optional; zero values keep the worktree/PR-only behavior).
+	requests    RequestLookupClient
+	syncState   RequestSyncStateStore
+	commenter   IssueCommenter
+	observer    SyncObserver
+	names       StatusNames
+	deliveries  *deliveryCounter
+	orcaBaseURL string
 }
 
-func NewSyncIssueStatus(tracker IssueTrackerClient, scm ScmClient, projects ProjectSettingsClient, processedEvents ProcessedEventStore, logger *slog.Logger) *SyncIssueStatus {
+func NewSyncIssueStatus(tracker IssueTrackerClient, scm ScmClient, projects ProjectSettingsClient, processedEvents ProcessedEventStore, logger *slog.Logger, opts ...Option) *SyncIssueStatus {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &SyncIssueStatus{tracker: tracker, scm: scm, projects: projects, processedEvents: processedEvents, logger: logger}
+	uc := &SyncIssueStatus{
+		tracker: tracker, scm: scm, projects: projects, processedEvents: processedEvents, logger: logger,
+		observer: noopObserver{}, names: DefaultStatusNames(), deliveries: newDeliveryCounter(),
+	}
+	for _, opt := range opts {
+		opt(uc)
+	}
+	return uc
+}
+
+// ownedByRequest implements the single-writer rule: while an open Request owns
+// the issue, worktree/PR events must not move it. A nil client keeps the old
+// behavior. A lookup error is returned for redelivery up to
+// maxTransientDeliveries; after that the event is dropped (fail closed: Jira is
+// left untouched when ownership is unknown).
+func (uc *SyncIssueStatus) ownedByRequest(ctx context.Context, source, eventID, tenantID, provider, site, ref string) (owned bool, err error) {
+	if uc.requests == nil {
+		return false, nil
+	}
+	found, lookupErr := uc.requests.Lookup(ctx, tenantID, provider, site, ref)
+	if lookupErr == nil {
+		uc.deliveries.forget(eventID)
+		if found {
+			uc.observer.ObserveRequestOwnedSkip(source)
+			uc.logger.InfoContext(ctx, "issue status sync skipped: a request owns the issue", "event", eventID, "source", source, "issue", ref)
+		}
+		return found, nil
+	}
+	if uc.deliveries.next(eventID) < maxTransientDeliveries {
+		return false, lookupErr
+	}
+	uc.deliveries.forget(eventID)
+	uc.observer.ObserveRequestEvent(source, "failed")
+	uc.logger.ErrorContext(ctx, "gave up looking up request ownership; leaving issue untouched", "event", eventID, "issue", ref, "error", lookupErr)
+	return true, nil
 }
 
 // HandleWorktreeLifecycle implements BR-PI-08/BR-PI-09. Runs only from the
@@ -60,11 +104,16 @@ func (uc *SyncIssueStatus) HandleWorktreeLifecycle(ctx context.Context, ev domai
 	}
 
 	target := mapWorktreeEventToStatus(ev) // BL-PI-03's mapping table
-	if target == (domain.TargetState{}) {
+	if target.TrackerState == "" && target.GitHubLabelPatch == "" {
 		// worktree.deleted: no mapping — see mapWorktreeEventToStatus.
 		return uc.processedEvents.MarkSeen(ctx, ev.EventID)
 	}
 	if !uc.canSync(ctx, ev.EventID, ev.LinkedIssueProvider, ev.ActorUserID) {
+		return uc.processedEvents.MarkSeen(ctx, ev.EventID)
+	}
+	if owned, err := uc.ownedByRequest(ctx, "worktree", ev.EventID, ev.TenantID, ev.LinkedIssueProvider, ev.LinkedIssueSite, ev.LinkedIssueRef); err != nil {
+		return err
+	} else if owned {
 		return uc.processedEvents.MarkSeen(ctx, ev.EventID)
 	}
 
@@ -117,6 +166,11 @@ func (uc *SyncIssueStatus) HandlePullRequestLifecycle(ctx context.Context, ev do
 	if !uc.canSync(ctx, ev.EventID, ev.LinkedIssueProvider, ev.ActorUserID) {
 		return uc.processedEvents.MarkSeen(ctx, ev.EventID)
 	}
+	if owned, err := uc.ownedByRequest(ctx, "pr", ev.EventID, ev.TenantID, ev.LinkedIssueProvider, ev.LinkedIssueSite, ev.LinkedIssueRef); err != nil {
+		return err
+	} else if owned {
+		return uc.processedEvents.MarkSeen(ctx, ev.EventID)
+	}
 
 	err := doWithRetry(ctx, retryAttempts, func(ctx context.Context) error {
 		return uc.updateIssueStatus(ctx, ev.TenantID, ev.ActorUserID, ev.LinkedIssueProvider, ev.LinkedIssueRef, ev.LinkedIssueSite, target)
@@ -128,27 +182,42 @@ func (uc *SyncIssueStatus) HandlePullRequestLifecycle(ctx context.Context, ev do
 }
 
 func (uc *SyncIssueStatus) updateIssueStatus(ctx context.Context, tenantID, userID, provider, ref, site string, state domain.TargetState) error {
+	_, err := uc.applyIssueStatus(ctx, tenantID, userID, provider, ref, site, state)
+	return err
+}
+
+// applyIssueStatus is updateIssueStatus that also reports whether the tracker
+// was actually written (false: skipped because of the category guard).
+func (uc *SyncIssueStatus) applyIssueStatus(ctx context.Context, tenantID, userID, provider, ref, site string, state domain.TargetState) (transitioned bool, err error) {
 	switch provider {
 	case "linear", "jira":
-		if state.OnlyFromCategory != "" {
+		if len(state.OnlyFromCategories) > 0 || state.OnlyFromCategory != "" {
 			category, err := uc.tracker.IssueStatusCategory(ctx, tenantID, userID, provider, ref, site)
 			if err != nil {
-				return err
+				return false, err
 			}
-			if category != state.OnlyFromCategory {
+			if !categoryAllowed(state, category) {
 				// Already started, finished or of unknown kind: leave it. Moving an
 				// issue backwards is worse than not moving it.
 				uc.logger.InfoContext(ctx, "issue status sync skipped: issue not in the expected category",
-					"issue", ref, "category", category, "expected", state.OnlyFromCategory)
-				return nil
+					"issue", ref, "category", category, "expected", state.OnlyFromCategory, "expected_any", state.OnlyFromCategories)
+				return false, nil
 			}
 		}
-		return uc.tracker.TransitionIssue(ctx, tenantID, userID, provider, ref, site, state.TrackerState)
+		return true, uc.tracker.TransitionIssue(ctx, tenantID, userID, provider, ref, site, state.TrackerState)
 	case "github":
-		return uc.scm.UpdateIssue(ctx, tenantID, provider, ref, state.GitHubLabelPatch)
+		return true, uc.scm.UpdateIssue(ctx, tenantID, provider, ref, state.GitHubLabelPatch)
 	default:
-		return errUnknownProvider // gitlab issue status sync via labels not yet mapped
+		return false, errUnknownProvider // gitlab issue status sync via labels not yet mapped
 	}
+}
+
+// categoryAllowed: the set wins over the legacy single value; no restriction means any category.
+func categoryAllowed(state domain.TargetState, category string) bool {
+	if len(state.OnlyFromCategories) > 0 {
+		return slices.Contains(state.OnlyFromCategories, category)
+	}
+	return state.OnlyFromCategory == "" || category == state.OnlyFromCategory
 }
 
 // mapWorktreeEventToStatus implements BL-PI-03's mapping table, narrowed:

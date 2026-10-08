@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/lifecycle_exit_contract.go` (mới), `internal/adapter/postgres/lifecycle_exit_integration_test.go`, `internal/adapter/mysql/lifecycle_exit_integration_test.go` (mới)
 **Depends on:** TASK-REQ-006-05, TASK-REQ-002-06
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql (Postgres 16 và MySQL 8.0 thật) -run LifecycleExit)
 
 ---
 

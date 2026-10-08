@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/type_policy_ops_request.go` (mới), `internal/domain/runbook_rollback.go` (mới), `internal/domain/type_policy_ops_request_test.go` (mới), `internal/usecase/advance_execution.go` (kiểm thử nối cổng)
 **Depends on:** TASK-REQ-014-03, TASK-REQ-014-04 (handler `pre_deploy`), TASK-REQ-013-04 (`AdvanceExecution`)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -42,14 +42,20 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Task nhãn `gate:pre_deploy` không `Execute` cho đến khi có Approval `approved`; task không nhãn chạy bình thường.
-- [x] Approval được tạo đúng một lần dù `AdvanceExecution` chạy lặp.
-- [x] Đề xuất thiếu rollback hoặc bước không đảo ngược thiếu cổng bị đúng mã lỗi.
-- [x] `ops_result` thiếu thì không hoàn tất.
-- [x] Bước lỗi không tự rollback; lý do backlog nêu task `rollback` liên quan.
+- [ ] Task nhãn `gate:pre_deploy` không `Execute` cho đến khi có Approval `approved`; task không nhãn chạy bình thường.
+- [ ] Approval được tạo đúng một lần dù `AdvanceExecution` chạy lặp.
+- [ ] Đề xuất thiếu rollback hoặc bước không đảo ngược thiếu cổng bị đúng mã lỗi.
+- [ ] `ops_result` thiếu thì không hoàn tất.
+- [ ] Bước lỗi không tự rollback; lý do backlog nêu task `rollback` liên quan.
 
 ## Rủi ro và lưu ý
 
 - Nhãn bị xoá tay làm mất cổng; chưa có khoá nhãn (ghi ở SOL-014 mục 6).
 - Định dạng `rollback_note` là đề xuất của task này, chưa có trong CR: xác nhận với chủ CR-REQ-014 trước khi cố định.
 - `ops_request` cần runbook có rollback do AI sinh; chất lượng chưa đo.
+
+## Tiến độ
+
+Đã làm: `CheckRunbook`, `opsRequestPolicy` (`PreExecutionGate` mở Approval một lần, `CompletionChecks`, `FailureHint` nêu task rollback), test `AdvanceExecution` cổng, lý do backlog. Còn thiếu: lời gọi `PlanPreconditions` từ `GeneratePlan` (CR-REQ-012 chưa có).
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

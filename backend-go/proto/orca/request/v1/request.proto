@@ -5,7 +5,16 @@ package orca.request.v1;
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
 
 import "google/protobuf/timestamp.proto";
+import "orca/request/v1/artifact.proto";
+import "orca/request/v1/clarification.proto";
+import "orca/request/v1/compliance.proto";
+import "orca/request/v1/context.proto";
+import "orca/request/v1/decision.proto";
+import "orca/request/v1/execution_readiness.proto";
+import "orca/request/v1/impact.proto";
+import "orca/request/v1/plan.proto";
 import "orca/request/v1/request_backlog.proto";
+import "orca/request/v1/solution.proto";
 
 message Request {
   string id = 1;
@@ -31,7 +40,30 @@ message Request {
   google.protobuf.Timestamp created_at = 21;
   google.protobuf.Timestamp updated_at = 22;
   int64 version = 23;
-  // 24 onwards reserved for source_hints (CR-REQ-004) and returned_category (CR-REQ-006).
+  SourceHints source_hints = 24;
+  string returned_category = 25;
+  int32 classification_attempts = 26;
+  // 27 to 31: CR-REQ-027 artifact content. JSON is canonical; revision changes only via EditRequestContent.
+  string acceptance_criteria_json = 27;
+  string type_fields_json = 28;
+  int32 content_revision = 29;
+  int32 content_schema_version = 30;
+  string content_digest = 31;
+}
+
+message RequestSource {
+  string provider = 1;
+  string ref = 2;
+  string url = 3;
+  string site = 4;
+}
+
+message SourceHints {
+  string issue_type = 1;
+  repeated string labels = 2;
+  string priority = 3;
+  // Honoured only on the SpawnChildRequest path; CreateRequest ignores it.
+  string type_hint = 4;
 }
 
 message GetRequestRequest {
@@ -48,7 +80,9 @@ message ListRequestsRequest {
   repeated string type = 3;
   int32 page_size = 4;
   string page_token = 5;
-  // 6 to 8 reserved for CR-REQ-004
+  string source_provider = 6;
+  string source_site = 7;
+  string source_ref = 8;
 }
 
 message ListRequestsResponse {
@@ -56,8 +90,296 @@ message ListRequestsResponse {
   string next_page_token = 2;
 }
 
+// reporter_id never travels on the wire; it comes from the session metadata.
+message CreateRequestRequest {
+  string project_id = 1;
+  string title = 2;
+  string body = 3;
+  RequestSource source = 4;
+  SourceHints hints = 5;
+  string client_request_id = 6;
+  // 7 to 8: CR-REQ-027 optional content.
+  string acceptance_criteria_json = 7;
+  string type_fields_json = 8;
+}
+
+message CreateRequestResponse {
+  Request request = 1;
+  bool created = 2;
+}
+
+// Asynchronous (IMPLEMENTATION-PLAN D3): returns at once with the Request in classifying and a run_id.
+message ClassifyRequestRequest {
+  string request_id = 1;
+}
+
+message ClassifyRequestResponse {
+  Request request = 1;
+  string run_id = 2;
+}
+
+// Human command; no AI tool path bypasses it.
+message ConfirmRequestTypeRequest {
+  string request_id = 1;
+  string type = 2;
+  string size = 3;
+  string urgency = 4;
+  string reason = 5;
+  int64 expected_version = 6;
+}
+
+message ConfirmRequestTypeResponse {
+  Request request = 1;
+}
+
+message ChangeRequestTypeRequest {
+  string request_id = 1;
+  string new_type = 2;
+  string size = 3;
+  string urgency = 4;
+  string reason = 5;
+  int64 expected_version = 6;
+}
+
+message ChangeRequestTypeResponse {
+  Request request = 1;
+}
+
+message RequestTypeChange {
+  string from_type = 1;
+  string to_type = 2;
+  string actor_id = 3;
+  // ai | user
+  string actor_kind = 4;
+  string reason = 5;
+  google.protobuf.Timestamp at = 6;
+}
+
+message ListRequestTypeHistoryRequest {
+  string request_id = 1;
+}
+
+message ListRequestTypeHistoryResponse {
+  repeated RequestTypeChange changes = 1;
+}
+
+message ReturnToBacklogRequest {
+  string request_id = 1;
+  // classification | analysis | plan | phase | task
+  string stage = 2;
+  string category = 3;
+  string reason = 4;
+  int64 expected_version = 5;
+}
+
+message ReturnToBacklogResponse {
+  Request request = 1;
+}
+
+message ReopenRequestRequest {
+  string request_id = 1;
+  string note = 2;
+  int64 expected_version = 3;
+}
+
+message ReopenRequestResponse {
+  Request request = 1;
+}
+
+message CancelRequestRequest {
+  string request_id = 1;
+  string reason = 2;
+  int64 expected_version = 3;
+}
+
+message CancelRequestResponse {
+  Request request = 1;
+}
+
+// No provider on the wire: the source of a child is manual unless the gateway marks the call as MCP.
+message SpawnChildRequestRequest {
+  string parent_request_id = 1;
+  // spawned_by_spike | spawned_by_question | followup_hotfix | escalation
+  string link_reason = 2;
+  string title = 3;
+  string body = 4;
+  string type_hint = 5;
+  string client_request_id = 6;
+}
+
+message SpawnChildRequestResponse {
+  Request child = 1;
+  bool created = 2;
+}
+
+message RequestLink {
+  string parent_request_id = 1;
+  string child_request_id = 2;
+  string reason = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message ListRequestLinksRequest {
+  string request_id = 1;
+}
+
+message ListRequestLinksResponse {
+  repeated RequestLink parents = 1;
+  repeated RequestLink children = 2;
+}
+
+// Empty size is treated as "not L".
+message GetRequestFlowRequest {
+  string type = 1;
+  string size = 2;
+}
+
+message GetRequestFlowResponse {
+  string type = 1;
+  bool human_confirm_required = 2;
+  string analysis_kind = 3;
+  string analysis_gate = 4;
+  string plan_kind = 5;
+  bool has_phases = 6;
+  string start_gate = 7;
+  repeated string execution_gates = 8;
+  bool completes_after_analysis = 9;
+  // Canonical happy path only: no backlog return, type change or cancel branches.
+  repeated string status_path = 10;
+}
+
+// Internal (issue-status-sync): never returns title or body.
+message LookupRequestBySourceRequest {
+  string provider = 1;
+  string site = 2;
+  string ref = 3;
+}
+
+message LookupRequestBySourceResponse {
+  bool found = 1;
+  string request_id = 2;
+}
+
+message GetRequestFlowSettingsRequest {}
+
+message GetRequestFlowSettingsResponse {
+  bool enabled = 1;
+}
+
+// Admin only; audited as request.flow.set.
+message SetRequestFlowSettingsRequest {
+  bool enabled = 1;
+}
+
+message SetRequestFlowSettingsResponse {
+  bool enabled = 1;
+}
+
+// Allowed only before analysis (new, classifying, awaiting_type_confirmation, request_backlog).
+message EditRequestContentRequest {
+  string request_id = 1;
+  int32 expected_revision = 2;
+  string title = 3;
+  string body = 4;
+  string acceptance_criteria_json = 5;
+  string type_fields_json = 6;
+}
+
+message EditRequestContentResponse {
+  Request request = 1;
+}
+
+// One service for the whole Request domain so the CR-REQ-035 RPC catalog keeps a single full-name prefix.
+// Each RPC has its own request and response message; implement by filling the handler, never by editing this file.
 service RequestService {
+  // Existing.
   rpc GetRequest(GetRequestRequest) returns (GetRequestResponse);
   rpc ListRequests(ListRequestsRequest) returns (ListRequestsResponse);
   rpc ListBacklog(ListBacklogRequest) returns (ListBacklogResponse);
+
+  // Lifecycle (CR-REQ-003 to 006, 024, 025).
+  rpc CreateRequest(CreateRequestRequest) returns (CreateRequestResponse);
+  rpc ClassifyRequest(ClassifyRequestRequest) returns (ClassifyRequestResponse);
+  rpc ConfirmRequestType(ConfirmRequestTypeRequest) returns (ConfirmRequestTypeResponse);
+  rpc ChangeRequestType(ChangeRequestTypeRequest) returns (ChangeRequestTypeResponse);
+  rpc ListRequestTypeHistory(ListRequestTypeHistoryRequest) returns (ListRequestTypeHistoryResponse);
+  rpc ReturnToBacklog(ReturnToBacklogRequest) returns (ReturnToBacklogResponse);
+  rpc ReopenRequest(ReopenRequestRequest) returns (ReopenRequestResponse);
+  rpc CancelRequest(CancelRequestRequest) returns (CancelRequestResponse);
+  rpc SpawnChildRequest(SpawnChildRequestRequest) returns (SpawnChildRequestResponse);
+  rpc ListRequestLinks(ListRequestLinksRequest) returns (ListRequestLinksResponse);
+  rpc GetRequestFlow(GetRequestFlowRequest) returns (GetRequestFlowResponse);
+  rpc LookupRequestBySource(LookupRequestBySourceRequest) returns (LookupRequestBySourceResponse);
+  rpc GetRequestFlowSettings(GetRequestFlowSettingsRequest) returns (GetRequestFlowSettingsResponse);
+  rpc SetRequestFlowSettings(SetRequestFlowSettingsRequest) returns (SetRequestFlowSettingsResponse);
+
+  // Solution and analysis (CR-REQ-007, 008, 026).
+  rpc GenerateSolution(GenerateSolutionRequest) returns (GenerateSolutionResponse);
+  rpc ListSolutions(ListSolutionsRequest) returns (ListSolutionsResponse);
+  rpc ChooseSolutionOption(ChooseSolutionOptionRequest) returns (ChooseSolutionOptionResponse);
+  rpc GetProjectEngineSettings(GetProjectEngineSettingsRequest) returns (GetProjectEngineSettingsResponse);
+  rpc SetProjectEngineSettings(SetProjectEngineSettingsRequest) returns (SetProjectEngineSettingsResponse);
+
+  // Plan, Phase and execution (CR-REQ-012 to 014). GeneratePlan is the asynchronous PROPOSE step.
+  rpc GeneratePlan(GeneratePlanRequest) returns (GeneratePlanResponse);
+  rpc GetPlanProposal(GetPlanProposalRequest) returns (GetPlanProposalResponse);
+  rpc CommitPlan(CommitPlanRequest) returns (CommitPlanResponse);
+  rpc StartPhase(StartPhaseRequest) returns (StartPhaseResponse);
+  rpc ReportTaskOutcome(ReportTaskOutcomeRequest) returns (ReportTaskOutcomeResponse);
+  rpc RecordRequestCheck(RecordRequestCheckRequest) returns (RecordRequestCheckResponse);
+  rpc ListRequestChecks(ListRequestChecksRequest) returns (ListRequestChecksResponse);
+
+  // Clarification, readiness and decision (CR-REQ-028).
+  rpc GetRequestReadiness(GetRequestReadinessRequest) returns (GetRequestReadinessResponse);
+  rpc RequestClarification(RequestClarificationRequest) returns (RequestClarificationResponse);
+  rpc ListClarifications(ListClarificationsRequest) returns (ListClarificationsResponse);
+  rpc GetClarification(GetClarificationRequest) returns (GetClarificationResponse);
+  rpc AnswerClarification(AnswerClarificationRequest) returns (AnswerClarificationResponse);
+  rpc CancelClarification(CancelClarificationRequest) returns (CancelClarificationResponse);
+  rpc ListPendingClarificationsForUser(ListPendingClarificationsForUserRequest) returns (ListPendingClarificationsForUserResponse);
+  rpc WaiveReadiness(WaiveReadinessRequest) returns (WaiveReadinessResponse);
+  rpc ListDecisions(ListDecisionsRequest) returns (ListDecisionsResponse);
+  rpc GetDecision(GetDecisionRequest) returns (GetDecisionResponse);
+  rpc ConfirmDecision(ConfirmDecisionRequest) returns (ConfirmDecisionResponse);
+
+  // Artifact model (CR-REQ-027).
+  rpc EditRequestContent(EditRequestContentRequest) returns (EditRequestContentResponse);
+  rpc ListRequestRevisions(ListRequestRevisionsRequest) returns (ListRequestRevisionsResponse);
+  rpc GetRequestRevision(GetRequestRevisionRequest) returns (GetRequestRevisionResponse);
+  rpc GetRequestCoverage(GetRequestCoverageRequest) returns (GetRequestCoverageResponse);
+  rpc GetArtifactGraph(GetArtifactGraphRequest) returns (GetArtifactGraphResponse);
+  rpc ExportArtifactProjection(ExportArtifactProjectionRequest) returns (ExportArtifactProjectionResponse);
+  rpc ResolveArtifactRef(ResolveArtifactRefRequest) returns (ResolveArtifactRefResponse);
+
+  // Impact and risk (CR-REQ-030).
+  rpc RequestImpactAssessment(RequestImpactAssessmentRequest) returns (RequestImpactAssessmentResponse);
+  rpc GetImpactAssessment(GetImpactAssessmentRequest) returns (GetImpactAssessmentResponse);
+  rpc GetImpactGraph(GetImpactGraphRequest) returns (GetImpactGraphResponse);
+  rpc CompareImpact(CompareImpactRequest) returns (CompareImpactResponse);
+  rpc ListImpactFindings(ListImpactFindingsRequest) returns (ListImpactFindingsResponse);
+  rpc GetImpactEvidence(GetImpactEvidenceRequest) returns (GetImpactEvidenceResponse);
+  rpc GetPlanRiskHeatmap(GetPlanRiskHeatmapRequest) returns (GetPlanRiskHeatmapResponse);
+  rpc GetImpactDrift(GetImpactDriftRequest) returns (GetImpactDriftResponse);
+  rpc AcceptRisk(AcceptRiskRequest) returns (AcceptRiskResponse);
+  rpc OverrideRiskGate(OverrideRiskGateRequest) returns (OverrideRiskGateResponse);
+  rpc GetRiskPolicy(GetRiskPolicyRequest) returns (GetRiskPolicyResponse);
+  rpc SetRiskPolicy(SetRiskPolicyRequest) returns (SetRiskPolicyResponse);
+
+  // Execution contract (CR-REQ-029).
+  rpc CheckReadiness(CheckReadinessRequest) returns (CheckReadinessResponse);
+  rpc GetReadinessReport(GetReadinessReportRequest) returns (GetReadinessReportResponse);
+  rpc ListReadiness(ListReadinessRequest) returns (ListReadinessResponse);
+
+  // Context sources (CR-REQ-031).
+  rpc ListContextSources(ListContextSourcesRequest) returns (ListContextSourcesResponse);
+  rpc UpsertContextSource(UpsertContextSourceRequest) returns (UpsertContextSourceResponse);
+  rpc SetContextSourceStatus(SetContextSourceStatusRequest) returns (SetContextSourceStatusResponse);
+  rpc PreviewContextPack(PreviewContextPackRequest) returns (PreviewContextPackResponse);
+  rpc GetEvidence(GetEvidenceRequest) returns (GetEvidenceResponse);
+  rpc ListEvidence(ListEvidenceRequest) returns (ListEvidenceResponse);
+
+  // Security and compliance (CR-REQ-035), admin only.
+  rpc EraseRequest(EraseRequestRequest) returns (EraseRequestResponse);
+  rpc ExportRequest(ExportRequestRequest) returns (ExportRequestResponse);
+  rpc ExportTenantRequests(ExportTenantRequestsRequest) returns (stream ExportTenantRequestsResponse);
 }

@@ -1,6 +1,6 @@
 # BE-REQ-SOL-011: `task-service` mở `task_type` plan/phase, lọc `ListTasks`, trạng thái suy ra từ con, không cấp số task
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Là nền của mọi solution còn lại trong feature; chạy được độc lập với `request-service`, nên merge đầu tiên.
+> ✅ Đã triển khai (kiểm chứng 2026-10-07): 7/7 task xong; test đơn vị xanh, test integration chạy thật trên Postgres 16 và MySQL 8.0.46. Chi tiết lệch so với thiết kế: [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md).
 
 **CR:** [CR-REQ-011](../../../../../../docs/crs/v6/plan-phase-task/CR-REQ-011-task-service-plan-phase-task-types.md)
 **Service:** `task-service` · `proto/orca/task/v1/task.proto` · (`api-gateway` chỉ chuyển tiếp tham số mới, thuộc CR-REQ-016)

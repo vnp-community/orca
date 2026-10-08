@@ -5,7 +5,7 @@
 **Service:** `request-service`, `issue-status-sync`, `deploy`
 **File:** `backend-go/deploy/alerts/request.rules.yaml` (mới), `backend-go/services/request-service/internal/adapter/outbox/` (thêm `traceparent` vào payload), `backend-go/services/issue-status-sync/internal/usecase/sync_request_status.go`, `.../internal/usecase/ports.go` (`IssueCommenter`), `.../internal/adapter/grpcclient/issuetracking_client.go`
 **Depends on:** TASK-REQ-024-04, TASK-REQ-024-07
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... -count=1` trong `services/request-service` (512 test PASS, 0 FAIL) và `services/issue-status-sync` (186 PASS); test `TestAlertRulesQueryOnlySeriesThatExist` và `TestTransitionPayloads_*`)
 
 ---
 
@@ -32,10 +32,23 @@
 ## Tiêu chí hoàn thành
 
 - [x] `request.rules.yaml` hợp lệ cú pháp, metric tồn tại trong task 07.
+  Test Go đọc và unmarshal YAML, kiểm 6 tên alert và mọi series nằm trong bảng 2.9. `promtool` không có trong môi trường nên chưa kiểm chứng bằng `promtool check rules`.
 - [x] Bình luận tắt mặc định; khi bật không rò nội dung.
+  Mặc định không có commenter; test khẳng định bình luận chỉ có số, loại, trạng thái, liên kết, không rò `title`/`body` của payload.
 - [x] `traceparent` không phá consumer cũ (trường lạ bị bỏ qua).
+  Consumer bỏ qua trường lạ (có test) và tạo span link khi có `traceparent`; phía `request-service` chưa phát trường này.
 
 ## Rủi ro và lưu ý
 
 - Ngưỡng cảnh báo là giả định.
 - Nếu nhóm quyết định sửa `common/eventbus.Event` thay vì payload (Q của CR), task này đổi thành thêm header; ghi vào mô tả PR.
+
+## Tiến độ (2026-10-07)
+
+Đã làm: `backend-go/deploy/alerts/request.rules.yaml` (nhóm `orca-request`, 6 alert, comment đầu file "đề xuất, chưa hiệu chỉnh, chưa có nơi nạp"); `adapter/eventbus/request_trace_link.go` (span mới có `trace.Link` tới `traceparent` trong payload, không có thì span trơn; test bằng `tracetest.SpanRecorder`); cổng `IssueCommenter`, `IssueTrackingClient.AddComment` (gọi `AddIssueComment`), option `WithIssueComments`, cấu hình `ISSUE_SYNC_REQUEST_COMMENTS_ENABLED` (mặc định false) và `ISSUE_SYNC_ORCA_BASE_URL`. Bình luận gửi sau chuyển Jira thành công và khi `request_backlog`, best effort (lỗi tăng `comment:failed`).
+
+Còn thiếu: `request-service` đặt `traceparent` vào payload `status_changed`/`completed` (outbox của request-service đang do agent khác sửa); `promtool check rules` chưa chạy.
+
+## Kết quả triển khai (2026-10-08)
+
+`traceparent` đặt vào payload `status_changed`/`completed` từ span `request.Transition` (e2e xác nhận có trong outbox). Mọi series trong `request.rules.yaml` đã được đối chiếu với series request-service thật. `promtool check rules` chưa chạy (không có công cụ). Bình luận Jira chưa chạy với Jira thật.

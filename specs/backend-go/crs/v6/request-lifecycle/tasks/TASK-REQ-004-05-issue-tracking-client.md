@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/grpcclient/issue_tracking_client.go`, `internal/adapter/grpcclient/identity_forwarding.go`, `internal/adapter/grpcclient/issue_tracking_client_test.go` (mới); `internal/config/config.go`, `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-004-04
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/adapter/grpcclient/...`)
 
 ---
 
@@ -39,3 +39,8 @@ Tiền lệ: `git-gateway-service/internal/adapter/grpcclient/issuetracking_clie
 
 - `workspace_id = site` chưa kiểm chứng; nếu `issue-tracking-service` chọn workspace theo `ConnectionStatus.active_workspace_id` khi trống thì truyền `site` rỗng khi `site` là URL không khớp workspace id (kiểm khi có Jira thật).
 - Nếu cần gọi lại `GetIssue` cho nhiều Request trong một webhook bùng nổ, cân nhắc giới hạn tốc độ: ngoài phạm vi.
+
+## Ghi chú triển khai
+
+- `ISSUE_TRACKING_SERVICE_ADDR` thêm vào config; thiếu địa chỉ thì dùng `UnavailableIssueFetcher` (log cảnh báo), Jira/Linear không title bị từ chối bằng `REQUEST_SOURCE_NOT_FOUND`.
+- Chưa kiểm chứng với Jira/Linear thật; `workspace_id = site` chưa kiểm.

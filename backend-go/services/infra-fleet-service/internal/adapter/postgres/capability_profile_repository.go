@@ -5,13 +5,26 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
+var (
+	_ usecase.CapabilityProfileStore = (*CapabilityProfileStore)(nil)
+	_ usecase.DevServerTenantLookup  = (*CapabilityProfileStore)(nil)
+	_ usecase.OutboxEnqueuer         = (*Repository)(nil)
+)
+
+// CapabilityProfileStore persists infra.dev_server_capability_profiles.
+// The table has FORCE ROW LEVEL SECURITY, so every query runs in a
+// transaction that sets app.tenant_id; the WHERE tenant_id filters remain as
+// the primary guard.
 type CapabilityProfileStore struct {
 	pool *pgxpool.Pool
 }
@@ -20,127 +33,137 @@ func NewCapabilityProfileStore(pool *pgxpool.Pool) *CapabilityProfileStore {
 	return &CapabilityProfileStore{pool: pool}
 }
 
-func (r *CapabilityProfileStore) Get(ctx context.Context, tenantID, devServerID string) (domain.CapabilityProfile, bool, error) {
-	query := `
-		SELECT source, agent_build_version, protocol_version, features, profile, fingerprint, probed_at
-		FROM infra.dev_server_capability_profiles
-		WHERE dev_server_id = $1 AND tenant_id = $2
-	`
-	var p domain.CapabilityProfile
+func (s *CapabilityProfileStore) inTenantTx(ctx context.Context, tenantID string, fn func(pgx.Tx) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("postgres: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantID); err != nil {
+		return fmt.Errorf("postgres: set tenant: %w", err)
+	}
+	if err := fn(tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("postgres: commit: %w", err)
+	}
+	return nil
+}
+
+func (s *CapabilityProfileStore) Get(ctx context.Context, tenantID, devServerID string) (domain.CapabilityProfile, bool, error) {
+	var (
+		p                          domain.CapabilityProfile
+		found                      bool
+		featuresJSON, profileBytes []byte
+		source, fingerprint        string
+	)
+	err := s.inTenantTx(ctx, tenantID, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `
+			SELECT source, agent_build_version, protocol_version, features, profile, fingerprint, probed_at
+			FROM infra.dev_server_capability_profiles
+			WHERE tenant_id = $1 AND dev_server_id = $2
+		`, tenantID, devServerID).Scan(&source, &p.AgentBuildVersion, &p.ProtocolVersion, &featuresJSON, &profileBytes, &fingerprint, &p.ProbedAt)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("postgres: get capability profile: %w", err)
+		}
+		found = true
+		return nil
+	})
+	if err != nil || !found {
+		return domain.CapabilityProfile{}, false, err
+	}
 	p.DevServerID = devServerID
 	p.TenantID = tenantID
-
-	var featuresJSON, profileJSON []byte
-	err := r.pool.QueryRow(ctx, query, devServerID, tenantID).Scan(
-		&p.Source,
-		&p.AgentBuildVersion,
-		&p.ProtocolVersion,
-		&featuresJSON,
-		&profileJSON,
-		&p.Fingerprint,
-		&p.ProbedAt,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.CapabilityProfile{}, false, nil
-	}
-	if err != nil {
-		return domain.CapabilityProfile{}, false, fmt.Errorf("postgres: get capability profile: %w", err)
-	}
-
+	p.Source = domain.ProfileSource(source)
+	p.Fingerprint = strings.TrimRight(fingerprint, " ")
+	p.ProbedAt = p.ProbedAt.UTC()
+	p.ProfileJSON = profileBytes
 	if err := json.Unmarshal(featuresJSON, &p.Features); err != nil {
-		return domain.CapabilityProfile{}, false, fmt.Errorf("postgres: decode features: %w", err)
+		return domain.CapabilityProfile{}, false, fmt.Errorf("postgres: decode capability features: %w", err)
 	}
-	p.ProfileJSON = profileJSON
-
 	return p, true, nil
 }
 
-func (r *CapabilityProfileStore) Upsert(ctx context.Context, p domain.CapabilityProfile) (string, bool, error) {
-	if len(p.ProfileJSON) > 65535 {
+// Upsert locks the owning dev_servers row first so two concurrent probes are
+// serialized and exactly one sees existed=true; a tenant mismatch or missing
+// dev server returns domain.ErrNotFound.
+func (s *CapabilityProfileStore) Upsert(ctx context.Context, p domain.CapabilityProfile) (string, bool, error) {
+	if len(p.ProfileJSON) > domain.MaxProfileJSONBytes {
 		return "", false, domain.ErrProfileTooLarge
 	}
-
-	featuresJSON, err := json.Marshal(p.Features)
+	featuresJSON, err := json.Marshal(domain.NormalizeFeatures(p.Features))
 	if err != nil {
-		return "", false, fmt.Errorf("encode features: %w", err)
+		return "", false, fmt.Errorf("postgres: encode capability features: %w", err)
 	}
 	profileJSON := p.ProfileJSON
 	if len(profileJSON) == 0 {
 		profileJSON = []byte("{}")
 	}
 
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return "", false, fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	var prevFingerprint string
-	err = tx.QueryRow(ctx, `
-		SELECT fingerprint FROM infra.dev_server_capability_profiles
-		WHERE dev_server_id = $1 AND tenant_id = $2
-		FOR UPDATE
-	`, p.DevServerID, p.TenantID).Scan(&prevFingerprint)
-
+	var prev string
 	var existed bool
-	if errors.Is(err, pgx.ErrNoRows) {
-		// Needs to make sure tenantID matches the dev_server's tenantID
-		// Since we do INSERT ON CONFLICT, if dev_server doesn't exist it fails FK.
-		// If it exists but wrong tenant, it won't be caught by the INSERT ON CONFLICT until maybe a trigger,
-		// wait, ON CONFLICT DO UPDATE WHERE tenant_id = $2. If tenant differs, the UPDATE is skipped?
-		// But let's check dev_server's tenant first to be safe, or let the INSERT happen.
-		// If we insert with wrong tenant, and dev_server belongs to another tenant, should we prevent it?
-		// We could verify dev_server's tenant.
-		// Spec says "chỉ cập nhật khi tenant_id khớp (WHERE ... .tenant_id = EXCLUDED.tenant_id), tenant khác trả lỗi domain.ErrNotFound".
-		// Actually, if we do:
-		// INSERT INTO ... ON CONFLICT (dev_server_id) DO UPDATE SET ... WHERE dev_server_capability_profiles.tenant_id = EXCLUDED.tenant_id
-		// If tenant doesn't match, the UPDATE is skipped and INSERT is skipped, so nothing happens.
-	} else if err != nil {
-		return "", false, fmt.Errorf("select for update: %w", err)
-	} else {
-		existed = true
-	}
+	err = s.inTenantTx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		var one int
+		if err := tx.QueryRow(ctx, `
+			SELECT 1 FROM infra.dev_servers WHERE id = $1 AND tenant_id = $2 FOR NO KEY UPDATE
+		`, p.DevServerID, p.TenantID).Scan(&one); errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrNotFound
+		} else if err != nil {
+			return fmt.Errorf("postgres: lock dev server: %w", err)
+		}
 
-	// But wait, if existed is true, and we UPDATE, it's fine.
-	// If it doesn't exist, how to know if dev_server exists and tenant matches?
-	// The problem is ON CONFLICT DO UPDATE will insert if not exists. If dev_server belongs to tenant A, and we insert for tenant B,
-	// Postgres foreign key doesn't check tenant_id (only dev_server_id).
-	// So we might need to check if dev_server belongs to tenant B before inserting.
-	// We can do:
-	// INSERT INTO ... (dev_server_id, tenant_id, ...)
-	// SELECT id, tenant_id, ... FROM infra.dev_servers WHERE id = $1 AND tenant_id = $2
-	// ON CONFLICT (dev_server_id) DO UPDATE SET ... WHERE dev_server_capability_profiles.tenant_id = EXCLUDED.tenant_id
+		var prevFP string
+		switch err := tx.QueryRow(ctx, `
+			SELECT fingerprint FROM infra.dev_server_capability_profiles
+			WHERE tenant_id = $1 AND dev_server_id = $2
+		`, p.TenantID, p.DevServerID).Scan(&prevFP); {
+		case errors.Is(err, pgx.ErrNoRows):
+		case err != nil:
+			return fmt.Errorf("postgres: read previous fingerprint: %w", err)
+		default:
+			existed = true
+			prev = strings.TrimRight(prevFP, " ")
+		}
 
-	res, err := tx.Exec(ctx, `
-		INSERT INTO infra.dev_server_capability_profiles (
-			dev_server_id, tenant_id, source, agent_build_version, protocol_version, features, profile, fingerprint, probed_at
-		)
-		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9
-		FROM infra.dev_servers
-		WHERE id = $1 AND tenant_id = $2
-		ON CONFLICT (dev_server_id) DO UPDATE SET
-			source = EXCLUDED.source,
-			agent_build_version = EXCLUDED.agent_build_version,
-			protocol_version = EXCLUDED.protocol_version,
-			features = EXCLUDED.features,
-			profile = EXCLUDED.profile,
-			fingerprint = EXCLUDED.fingerprint,
-			probed_at = EXCLUDED.probed_at,
-			updated_at = now()
-		WHERE infra.dev_server_capability_profiles.tenant_id = EXCLUDED.tenant_id
-	`, p.DevServerID, p.TenantID, p.Source, p.AgentBuildVersion, p.ProtocolVersion, featuresJSON, profileJSON, p.Fingerprint, p.ProbedAt)
-
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO infra.dev_server_capability_profiles
+				(dev_server_id, tenant_id, source, agent_build_version, protocol_version, features, profile, fingerprint, probed_at)
+			VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
+			ON CONFLICT (dev_server_id) DO UPDATE SET
+				source = EXCLUDED.source,
+				agent_build_version = EXCLUDED.agent_build_version,
+				protocol_version = EXCLUDED.protocol_version,
+				features = EXCLUDED.features,
+				profile = EXCLUDED.profile,
+				fingerprint = EXCLUDED.fingerprint,
+				probed_at = EXCLUDED.probed_at,
+				updated_at = now()
+			WHERE infra.dev_server_capability_profiles.tenant_id = EXCLUDED.tenant_id
+		`, p.DevServerID, p.TenantID, string(p.Source), p.AgentBuildVersion, p.ProtocolVersion,
+			string(featuresJSON), string(profileJSON), p.Fingerprint, p.ProbedAt.UTC().Truncate(time.Microsecond)); err != nil {
+			return fmt.Errorf("postgres: upsert capability profile: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return "", false, fmt.Errorf("postgres: upsert capability profile: %w", err)
+		return "", false, err
 	}
+	return prev, existed, nil
+}
 
-	if res.RowsAffected() == 0 {
-		return "", false, domain.ErrNotFound // Could mean dev_server not found or tenant mismatched
+// TenantIDForDevServer implements usecase.DevServerTenantLookup.
+func (s *CapabilityProfileStore) TenantIDForDevServer(ctx context.Context, devServerID string) (string, bool, error) {
+	var tenantID string
+	err := s.pool.QueryRow(ctx, `SELECT tenant_id::text FROM infra.dev_servers WHERE id = $1`, devServerID).Scan(&tenantID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
 	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return "", false, fmt.Errorf("commit tx: %w", err)
+	if err != nil {
+		return "", false, fmt.Errorf("postgres: lookup dev server tenant: %w", err)
 	}
-
-	return prevFingerprint, existed, nil
+	return tenantID, true, nil
 }

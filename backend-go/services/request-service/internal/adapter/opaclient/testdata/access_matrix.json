@@ -1,0 +1,15 @@
+{
+  "roles": ["admin", "owner", "member", "reporter", "stranger"],
+  "person_allowed": {
+    "read": ["admin", "owner", "member", "reporter"],
+    "create": ["admin", "owner", "member"],
+    "triage": ["admin", "owner", "reporter"],
+    "analyze": ["admin", "owner", "reporter"],
+    "plan": ["admin", "owner", "reporter"],
+    "execute": ["admin", "owner"],
+    "lifecycle": ["admin", "owner", "reporter"],
+    "admin": ["admin"],
+    "decide": ["admin", "owner", "member", "reporter", "stranger"],
+    "authenticated": ["admin", "owner", "member", "reporter", "stranger"]
+  }
+}

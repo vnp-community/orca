@@ -1,21 +1,21 @@
 # execution-contract: tasks backend (TASK-REQ-029-01 đến 08)
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Mỗi task làm được trong 0,5 đến 2 ngày (task 06 và 08 gần 2 ngày).
+> **🚧 3/8 task xong** (01 đến 03, `task-service`, 2026-10-08); 04 đến 08 (`request-service`) chưa làm. Mỗi task làm được trong 0,5 đến 2 ngày (task 06 và 08 gần 2 ngày).
 
 Solution: [BE-REQ-SOL-029](../solutions/BE-REQ-SOL-029-execution-contract-and-readiness-gate.md). Danh sách solution: [solutions/README](../solutions/README.md).
 
 ## Bảng Solution → Task
 
-| Task | Tên | Priority | Service | Phụ thuộc |
-|---|---|---|---|---|
-| [TASK-REQ-029-01](./TASK-REQ-029-01-task-execution-records-migration-and-repository.md) | Migration `task_execution_records`, domain, repository hai dialect | P0 | `task-service` | TASK-REQ-011-01, migration `task_specs` (CR-REQ-027) để chốt số |
-| [TASK-REQ-029-02](./TASK-REQ-029-02-execution-result-parser-proto-and-list-records.md) | Bộ phân tích `ExecutionResult`, proto `result_nonce = 4`, RPC `ListExecutionRecords` | P0 | `task-service`, `proto` | 01 |
-| [TASK-REQ-029-03](./TASK-REQ-029-03-contract-executor-engine1-and-failure-events.md) | `ExecuteWithContract`, Engine 1 cho task có spec, `failure_class` vào sự kiện | P0 | `task-service` | 01, 02, TASK-REQ-011-02, TASK-REQ-013-01/02, SOL-033 (hợp đồng `execPrompt`) |
-| [TASK-REQ-029-04](./TASK-REQ-029-04-execution-contract-migration-request-service.md) | Migration `execution_contract`, repository packet và báo cáo sẵn sàng | P0 | `request-service` (mới) | TASK-REQ-001-04, 013-03, 014-01 |
-| [TASK-REQ-029-05](./TASK-REQ-029-05-task-spec-v2-and-execution-packet-domain.md) | `TaskSpecV2`, `ScopeMatcher`, `RenderExecutionPacket` (domain thuần) | P0 | `request-service` (mới) | TASK-REQ-001-01, CR-REQ-027 |
-| [TASK-REQ-029-06](./TASK-REQ-029-06-readiness-gate-agent-relay-and-rpcs.md) | `ReadinessGate` ba tầng, `AgentRelay`, RPC `CheckReadiness`/`GetReadinessReport`/`ListReadiness` | P0 | `request-service` (mới), `proto` | 02, 04, 05, TASK-REQ-033-04, CR-REQ-028 |
-| [TASK-REQ-029-07](./TASK-REQ-029-07-verify-execution-and-failure-classification.md) | `VerifyExecution` và `ClassifyFailure` | P0 | `request-service` (mới) | 02, 05, 06, CR-REQ-035, TASK-REQ-014-01/02 |
-| [TASK-REQ-029-08](./TASK-REQ-029-08-advance-execution-wiring-flags-and-e2e.md) | Nối vào `AdvanceExecution`/`ReportTaskOutcome`, cờ, sự kiện, hợp đồng JSON, e2e | P0 | `request-service` (mới) | 03, 04 đến 07, TASK-REQ-013-04/05/06, TASK-REQ-025-07 |
+| Task | Tên | Priority | Service | Phụ thuộc | Trạng thái |
+|---|---|---|---|---|---|
+| [TASK-REQ-029-01](./TASK-REQ-029-01-task-execution-records-migration-and-repository.md) | Migration `task_execution_records`, domain, repository hai dialect | P0 | `task-service` | TASK-REQ-011-01, migration `task_specs` (CR-REQ-027) để chốt số | ✅ DONE 2026-10-08 |
+| [TASK-REQ-029-02](./TASK-REQ-029-02-execution-result-parser-proto-and-list-records.md) | Bộ phân tích `ExecutionResult`, proto `result_nonce = 4`, RPC `ListExecutionRecords` | P0 | `task-service`, `proto` | 01 | ✅ DONE 2026-10-08 |
+| [TASK-REQ-029-03](./TASK-REQ-029-03-contract-executor-engine1-and-failure-events.md) | `ExecuteWithContract`, Engine 1 cho task có spec, `failure_class` vào sự kiện | P0 | `task-service` | 01, 02, TASK-REQ-011-02, TASK-REQ-013-01/02, SOL-033 (hợp đồng `execPrompt`) | ✅ DONE 2026-10-08 |
+| [TASK-REQ-029-04](./TASK-REQ-029-04-execution-contract-migration-request-service.md) | Migration `execution_contract`, repository packet và báo cáo sẵn sàng | P0 | `request-service` (mới) | TASK-REQ-001-04, 013-03, 014-01 | 📋 TODO |
+| [TASK-REQ-029-05](./TASK-REQ-029-05-task-spec-v2-and-execution-packet-domain.md) | `TaskSpecV2`, `ScopeMatcher`, `RenderExecutionPacket` (domain thuần) | P0 | `request-service` (mới) | TASK-REQ-001-01, CR-REQ-027 | 📋 TODO |
+| [TASK-REQ-029-06](./TASK-REQ-029-06-readiness-gate-agent-relay-and-rpcs.md) | `ReadinessGate` ba tầng, `AgentRelay`, RPC `CheckReadiness`/`GetReadinessReport`/`ListReadiness` | P0 | `request-service` (mới), `proto` | 02, 04, 05, TASK-REQ-033-04, CR-REQ-028 | 📋 TODO |
+| [TASK-REQ-029-07](./TASK-REQ-029-07-verify-execution-and-failure-classification.md) | `VerifyExecution` và `ClassifyFailure` | P0 | `request-service` (mới) | 02, 05, 06, CR-REQ-035, TASK-REQ-014-01/02 | 📋 TODO |
+| [TASK-REQ-029-08](./TASK-REQ-029-08-advance-execution-wiring-flags-and-e2e.md) | Nối vào `AdvanceExecution`/`ReportTaskOutcome`, cờ, sự kiện, hợp đồng JSON, e2e | P0 | `request-service` (mới) | 03, 04 đến 07, TASK-REQ-013-04/05/06, TASK-REQ-025-07 | 📋 TODO |
 
 ## Sơ đồ thứ tự
 

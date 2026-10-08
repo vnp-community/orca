@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/transition_request.go`, `internal/usecase/transition_request_events.go`, `internal/usecase/transition_request_test.go`, `internal/usecase/ports.go` (sửa: thêm `InTransaction`), `internal/adapter/postgres/tx.go`, `internal/adapter/mysql/tx.go` (sửa)
 **Depends on:** TASK-REQ-003-02, TASK-REQ-002-04, TASK-REQ-002-05, TASK-REQ-001-04
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./internal/domain ./internal/usecase -run Transition; go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql (Postgres 16 và MySQL 8.0 thật))
 
 ---
 

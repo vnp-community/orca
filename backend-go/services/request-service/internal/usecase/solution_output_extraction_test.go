@@ -36,6 +36,21 @@ func TestExtractJSONObject(t *testing.T) {
 			err:  nil,
 		},
 		{
+			name: "prose before and after",
+			in:   "Đây là kết quả:\n```\n{\"a\": [1, {\"b\": \"x\"}]}\n```\nHy vọng hữu ích.",
+			want: `{"a": [1, {"b": "x"}]}`,
+		},
+		{
+			name: "stray brace in prose is skipped",
+			in:   `Use {braces} carefully: {"ok": true}`,
+			want: `{"ok": true}`,
+		},
+		{
+			name: "only the outermost object is returned",
+			in:   `{"a": {"b": 1}} {"c": 2}`,
+			want: `{"a": {"b": 1}}`,
+		},
+		{
 			name: "no json",
 			in:   `just text`,
 			want: ``,

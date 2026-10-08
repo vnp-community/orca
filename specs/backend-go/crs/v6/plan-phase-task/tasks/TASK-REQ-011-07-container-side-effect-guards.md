@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/add_edge.go`, `internal/usecase/execute_task.go`, `internal/usecase/update_task.go`, `internal/adapter/{postgres,mysql}/execution_leases.go`, `internal/adapter/postgres/repository.go` (`HasActiveExecutions`), `internal/adapter/mysql/repository.go`, `internal/adapter/{postgres,mysql}/velocity.go`, `internal/usecase/create_task.go`
 **Depends on:** TASK-REQ-011-03, TASK-REQ-011-05
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test ./services/task-service/...` và `go test -tags=integration ./internal/adapter/postgres ./internal/adapter/mysql` (PG 16, MySQL 8.0.46 thật))
 
 ---
 
@@ -48,3 +48,9 @@ Các chỗ trong code hiện tại sẽ làm hỏng trạng thái suy ra hoặc 
 - Nếu sau này muốn chạy cả Phase bằng một coordinator, `TASK_EXECUTE_CONTAINER_NOT_EXECUTABLE` phải gỡ; ghi rõ lý do trong comment (một worktree, một coordinator cho cả phase trái README v6).
 - Test `execute_task_test.go` hiện có dùng fake `TaskRepository`: giữ nguyên type mặc định `task` để không vỡ.
 - Không thêm `max-lines` disable; nếu `execute_task.go` vượt ngưỡng, tách hàm sang file mới tên theo khái niệm.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `AddEdge`: không đặt `blocked` khi `FromTaskID` là container (Get thất bại thì giữ hành vi cũ); `ReleaseUnlinkedInProgress`, `HasActiveExecutions`, `RecentCompletedTasks` thêm `task_type NOT IN ('plan','phase')` ở hai dialect; `ExecuteTask` trả `TASK_EXECUTE_CONTAINER_NOT_EXECUTABLE` ngay sau `Get`; `UpdateTask` chặn mọi status ngoài `cancelled` trên container (`TASK_CONTAINER_STATUS_DERIVED`), title vẫn sửa được.
+- Test: unit `TestAddEdge_ContainerFrom_NotBlocked`, `TestAddEdge_WorkTaskFrom_StillBlocked`, `TestExecuteTask_Container_NotExecutable`, `TestUpdateTask_Container*`; integration `TestExecutionLeases_ReleaseUnlinked_SkipsContainers`, `TestHasActiveExecutions_IgnoresContainers`, `TestRecentCompletedTasks_IgnoresContainers` (cả hai DB).
+- Người gọi đã kiểm: `AddEdge` (usecase, `AIApply` qua `addEdgeWithinTx`), `ExecuteTask.Execute` (gRPC `Execute`, batch), `UpdateTask.Execute` (gRPC `UpdateTask`, api-gateway), build và test xanh ở các module phụ thuộc.

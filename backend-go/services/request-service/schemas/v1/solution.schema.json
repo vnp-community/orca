@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orca.local/schemas/v1/solution.schema.json",
+  "title": "Solution options document",
+  "type": "object",
+  "required": ["schema_version", "options", "recommendation"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "kind": { "const": "solution" },
+    "options": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/option" }
+    },
+    "recommendation": {
+      "type": "object",
+      "required": ["option_id", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "option_id": { "type": "string", "pattern": "^opt-[1-9][0-9]*$" },
+        "reason": { "type": "string" }
+      }
+    },
+    "assumptions": { "type": "array", "items": { "$ref": "#/$defs/assumption" } },
+    "open_questions": { "type": "array", "items": { "$ref": "#/$defs/open_question" } },
+    "requirement_coverage": { "type": "array", "items": { "$ref": "#/$defs/coverage_entry" } },
+    "constraints": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "non_functional": { "type": "array", "items": { "$ref": "#/$defs/non_functional" } },
+    "test_strategy": { "type": "string" },
+    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  },
+  "$defs": {
+    "option": {
+      "type": "object",
+      "required": ["id", "title", "summary", "approach", "effort", "risk", "affected_areas"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^opt-[1-9][0-9]*$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 600 },
+        "approach": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "breaking_change": { "type": "boolean" },
+        "effort": {
+          "type": "object",
+          "required": ["size", "hours_estimate"],
+          "additionalProperties": false,
+          "properties": {
+            "size": { "type": "string", "minLength": 1 },
+            "hours_estimate": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "risk": {
+          "type": "object",
+          "required": ["level", "description"],
+          "additionalProperties": false,
+          "properties": {
+            "level": { "enum": ["low", "medium", "high"] },
+            "description": { "type": "string" }
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["severity", "description"],
+            "additionalProperties": false,
+            "properties": {
+              "severity": { "enum": ["low", "medium", "high"] },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "affected_areas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "description": { "type": "string" },
+              "kind": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "required": ["id", "text", "needs_confirmation"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^A-[1-9][0-9]*$" },
+        "text": { "type": "string", "minLength": 1 },
+        "needs_confirmation": { "type": "boolean" }
+      }
+    },
+    "open_question": {
+      "type": "object",
+      "required": ["id", "text", "blocking"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^Q-[1-9][0-9]*$" },
+        "text": { "type": "string", "minLength": 1 },
+        "blocking": { "type": "boolean" }
+      }
+    },
+    "coverage_entry": {
+      "type": "object",
+      "required": ["ac_id", "option_ids", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "ac_id": { "type": "string", "pattern": "^AC-[1-9][0-9]*$" },
+        "option_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^opt-[1-9][0-9]*$" }
+        },
+        "status": { "enum": ["covered", "partial", "out_of_scope"] },
+        "note": { "type": "string" }
+      },
+      "if": { "properties": { "status": { "const": "out_of_scope" } }, "required": ["status"] },
+      "then": { "required": ["note"], "properties": { "note": { "minLength": 1 } } }
+    },
+    "non_functional": {
+      "type": "object",
+      "required": ["kind", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["performance", "security", "availability", "compat", "other"] },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -131,6 +131,9 @@ type subjectRule struct {
 	// Locked ignores payload title/body/deep_link: the text is built here from
 	// whitelisted fields only, since notifications are stored and may be pushed.
 	Locked bool
+	// SameOriginDeepLink drops a payload deep_link that is not an in-app path
+	// ("/..."), so a producer bug cannot make a stored notification link out.
+	SameOriginDeepLink bool
 }
 
 // subjectRules is illustrative, not exhaustive (§3) — a subject missing
@@ -169,16 +172,6 @@ var subjectRules = map[string]subjectRule{
 	"orca.mcp.approval.requested": {
 		Type: "mcp.approval", Title: "Approval needed", Body: "An AI agent is waiting for your approval.",
 		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
-	},
-	// BE-REQ-SOL-010: request-service approvals
-	"orca.request.approval.requested": {
-		Type: "request.approval_requested", Title: "Approval needed", Body: "Approval required.",
-		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
-		DeepLink: "/?section=requests",
-	},
-	"orca.request.approval.decided": {
-		Type: "request.approval_decided", Title: "Approval decided", Body: "Approval decided.",
-		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
 	},
 	// A terminal an AI client opened was stopped for being idle. Locked: the
 	// body names the client at most, never command text or output.
@@ -307,8 +300,13 @@ func TranslateEvent(id, sourceEventID, subject, tenantID string, payload EventPa
 		if b := idleStoppedBodyWithClient(payload.ClientName); b != "" {
 			body = b
 		}
-	} else if deepLink == "" {
-		deepLink = rule.DeepLink
+	} else {
+		if rule.SameOriginDeepLink && !isInAppPath(deepLink) {
+			deepLink = ""
+		}
+		if deepLink == "" {
+			deepLink = rule.DeepLink
+		}
 	}
 
 	return NotificationEvent{

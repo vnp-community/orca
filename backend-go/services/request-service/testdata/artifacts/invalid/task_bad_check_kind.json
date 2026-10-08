@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "kind": "task",
+  "objective": "Thêm route",
+  "satisfies": ["AC-1"],
+  "acceptance": ["200 OK"],
+  "checks": [
+    {
+      "id": "c1",
+      "kind": "shell",
+      "description": "go test"
+    }
+  ],
+  "exempt_from_coverage": false
+}

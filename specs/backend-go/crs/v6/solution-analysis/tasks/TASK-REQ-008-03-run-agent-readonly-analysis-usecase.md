@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase
 **File:** `internal/usecase/run_agent_readonly_analysis.go` (mới), `solution_prompt.go` (sửa, nhánh theo `kind`), `generate_solution.go` (sửa, rẽ nhánh theo registry và `analysis_mode`), `internal/config/config.go` (sửa), và `_test.go`
 **Depends on:** TASK-REQ-008-01, TASK-REQ-008-02, TASK-REQ-007-05
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/usecase/... -run "AgentReadonly|GenerateSolution"` và luồng hai DB `go test -tags integration ./internal/adapter/... -run SolutionContract`)
 
 ## Context
 
@@ -39,3 +39,10 @@
 
 - Chỉ chạy sau khi loại đã được người xác nhận (kể cả hotfix và security): kiểm trạng thái Request, không chỉ loại.
 - `trustPreset=default` có thể chặn công cụ hoặc treo chờ quyền: chưa kiểm chứng, cần chạy thật.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Dùng chung `GenerateSolution`: rẽ nhánh theo `FlowFor(type).AnalysisKind` và `analysis_mode` ngay ở đó (`modeFor`); `solution_prompt.go` nhận `Kind`. Worker là `run_agent_readonly_analysis.go`; giao dịch kết quả dùng `AnalysisResultWriter` chung với nhánh `ai.complete`.
+- Cổng đồng thời: hàng khoá `analysis_project_gates` + `FOR UPDATE` trong cùng giao dịch chèn run (cả hai dialect, cùng một cơ chế), mặc định 2 run `agent_readonly` mỗi `(tenant, project)` (`REQUEST_AGENT_READONLY_MAX_PER_PROJECT`); `BUSY` chặn ở `GenerateSolution` và không để lại dòng nào (kiểm trên Postgres và MySQL thật với 8 goroutine, đúng 2 qua).
+- Ba lớp bảo vệ ghi vào run: `enforcement` (`agent_enforced` khi `SelectReadonlyRoute` chọn `RouteAgentEnforced`, ngược lại `prompt_only`) và `repo_check` (`clean`, `modified`, `skipped` khi không có `worktree_id` hoặc git-gateway lỗi). `REQUEST_REQUIRE_ENFORCED_READONLY=true` thì agent cũ bị từ chối `REQUEST_ANALYSIS_AGENT_TOO_OLD` (CR-REQ-033 bảng 2.7). Kết quả có `READONLY_VIOLATION`, `applied.accessMode` khác `readonly`, `changes` khác rỗng/`headMoved`, hoặc snapshot khác nhau đều bị loại (`REQUEST_ANALYSIS_REPO_MODIFIED`).
+- Thông báo admin khi `REPO_MODIFIED` chưa làm (câu hỏi mở 4): chỉ log cảnh báo; chưa có metric riêng. Chưa kiểm chứng: hành vi `trustPreset=default` / `accessMode=readonly` trên dev server thật.

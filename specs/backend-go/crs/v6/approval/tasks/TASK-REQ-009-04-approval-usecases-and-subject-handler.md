@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase
 **File:** `backend-go/services/request-service/internal/usecase/approval_subject_handler.go` (mới), `approver_policy_ports.go` (mới), `open_approval.go` (mới), `decide_approval.go` (mới), `cancel_approval.go` (mới), `cancel_pending_approvals_for_request.go` (mới), `list_approvals.go` (mới), `list_pending_approvals_for_user.go` (mới) và các `_test.go`
 **Depends on:** TASK-REQ-009-03; CR-REQ-003 (`TransitionRequest`, `FlowFor`, đọc Request có khoá)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/usecase/... -run Approval` + hợp đồng DB `RunApprovalFlowContract` trên Postgres và MySQL thật)
 
 ## Context
 
@@ -40,3 +40,11 @@
 
 - `SubjectHandler` do sáu CR cài: không đổi chữ ký sau khi merge nếu chưa báo các CR đó.
 - `ValidateForRequest` cần `Request`; truyền bản đã khoá để tránh đọc hai lần.
+
+## Kết quả triển khai (2026-10-08)
+- Use case thật: `OpenApproval` (digest chuẩn tắc từ handler, một `pending` mỗi chủ thể kiểm trước khi chèn vì Postgres huỷ giao dịch khi INSERT lỗi, `idempotency_key`, kiểm FlowFor và trạng thái Request, chụp người duyệt, `due_at` theo giờ DB), `DecideApproval` (Approve/Reject, CAS theo `version`, thứ tự khoá Request rồi Approval, hết hạn lười được commit rồi trả `EXPIRED`, thử lại cùng quyết định là no-op), `CancelApproval`, `CancelPendingApprovalsForRequest`, `ExpireApprovals`, `RemindPendingApprovals`, `ExtendApproval`, `ListApprovals`, `GetApproval`, `ListPendingApprovalsForUser`, `RequestApprovalFromAPI`.
+- `SubjectHandler` registry giữ nguyên chữ ký; thêm `WithRequestedSubjectID` (truyền subject_id qua ctx để không đổi chữ ký). Handler thật: `RequestTypeApprovalHandler` (approve gọi `ConfirmRequestType`, reject gọi `ReturnRequestToBacklog`) và `TransitionSubjectHandler` cho 7 chủ thể còn lại (solution, findings, answer, plan, phase, task_list, pre_deploy): approve gọi `RequestTransitioner` (`analysis_approved` hoặc `plan_approved` theo `stage`), reject gọi `ReturnRequestToBacklog`. Phần artifact của Solution/Plan nối qua cổng `SubjectArtifacts` (chưa gắn dịch vụ thật, xem 009-06): chưa gắn thì handler từ chối mở (`REQUEST_APPROVAL_SUBJECT_UNAVAILABLE`), không bao giờ duyệt ngầm.
+- `Approval.Stage` lưu `Request.Status` lúc mở (Request.Stage không được ai điền); `STAGE_MISMATCH` so `Request.Status` với giá trị đó.
+- Bỏ `TemporaryApproverPolicy`/`TemporaryApprovalAuthorizer` và truyền Request giả.
+- Người gọi đã kiểm khi đổi `PendingApprovalCanceller`/`CancelPendingApprovalsForRequest.Execute` (chỉ `wire_request_lifecycle.go` và `ReturnRequestToBacklog`/`CancelRequest` qua cổng `ApprovalCanceller`, chữ ký cổng không đổi).
+- Tiêu chí "không có gRPC outbound trong transaction": tra cứu team/admin của `OpenApproval` và `CanDecide` được làm trước giao dịch rồi phát lại trong giao dịch (test `NoDirectoryCallInsideTransaction`). Ngoại lệ có chủ đích: khi caller đã giữ giao dịch (đề xuất phân loại mở approval `request_type` trong giao dịch của Propose) và chính sách tenant tắt `allow_requester_approve`, tra cứu vẫn nằm trong giao dịch đó; chính sách mặc định (cho phép người báo duyệt) không tra cứu.

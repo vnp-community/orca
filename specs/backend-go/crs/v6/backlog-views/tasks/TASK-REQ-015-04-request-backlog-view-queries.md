@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/ports.go`, `internal/adapter/postgres/backlog_requests.go` (mới), `internal/adapter/mysql/backlog_requests.go` (mới), `internal/usecase/list_backlog_requests.go` (mới), `internal/adapter/postgres/backlog_requests_test.go`, `internal/adapter/mysql/backlog_requests_test.go` (mới, tag `integration`)
 **Depends on:** TASK-REQ-015-03 (page token), CR-REQ-002 (`requests`, `request_links`), CR-REQ-006 (`returned_category`, `request_return_history`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -58,3 +58,7 @@ Integration hai dialect, 1.000 Request với `updated_at` trùng nhau ở nhiề
 - Chưa đo hiệu năng với số Request lớn; nếu `EXPLAIN` cho thấy không dùng chỉ mục, thêm chỉ mục qua migration mới.
 - `IN (...)` tối đa 100 phần tử (kích thước trang), an toàn cho MySQL.
 - CR-REQ-006 chưa merge thì cột `returned_category` chưa có: task chặn, đừng tự thêm cột.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

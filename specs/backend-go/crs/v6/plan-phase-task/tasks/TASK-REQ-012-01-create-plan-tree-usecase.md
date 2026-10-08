@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/create_plan_tree.go` (mới), `internal/usecase/ports.go`, `proto/orca/task/v1/task.proto`, `internal/usecase/create_plan_tree_test.go` (mới), `internal/usecase/fakes_test.go`
 **Depends on:** TASK-REQ-011-01, TASK-REQ-011-03, TASK-REQ-011-07
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./...` + `go test -tags integration ./internal/adapter/...` (Postgres 16 và MySQL 8) trong task-service)
 
 ---
 
@@ -53,3 +53,12 @@ Lệnh: `cd /opt/repos/orca/backend-go && go test ./services/task-service/intern
 - Chưa kiểm chứng `RunInTx` MySQL xử lý nhiều `AddEdge` trong một tx mà không deadlock (`ListByKindForUpdate` khoá rộng); task 02 có test tải.
 - Cây lớn (tối đa 100 task) tạo tới vài trăm câu SQL trong một tx; giữ tx ngắn bằng cách kiểm đầu vào trước.
 - `ActivePlanFinder` có thể là phương thức mới của `TaskRepository` (`FindActivePlanByRequest`) hoặc dùng `List` với `ListFilter{TaskTypes:[plan], RequestIDs:[x]}`: ưu tiên cái sau để không thêm port, nếu SOL-011 task 04 đã xong.
+
+## Ghi chú triển khai
+
+- Test đúng tên trong `create_plan_tree_test.go` (cộng `_InvalidInput_Rejected`, `_MixedChildren_Rejected`, `_Supersede_RetryAfterSuccess_AlreadyExists`, `_TxConflict_RetriesWholeTx`). Cổng đọc Plan hoạt động dùng `TaskRepository.List` (không thêm port). Giới hạn 100 task, 50 phase mỗi cây.
+- Lệch: thêm `ErrTxConflict` (deadlock MySQL 1213/1205, Postgres 40001/40P01 do `RunInTx` gắn nhãn) và retry cả giao dịch tối đa 5 lần; không có thì 8 goroutine cùng `request_id` trên MySQL bị deadlock ở chỉ mục duy nhất. Retry xong thì bước (a) thấy Plan đã commit và trả `already_exists`.
+- Lệch: `UpdateContainerStatus` của hai adapter nay dùng giao dịch của `RunInTx` khi gọi lồng (trước đây mở tx riêng trên pool nên huỷ Plan cũ không rollback cùng cây mới).
+- Lệch: gọi lại với `supersedes_plan_id` đã `cancelled` còn Plan mới đang hoạt động thì trả `already_exists` (retry an toàn sau replan thành công).
+- Phase `done` của cây cũ giữ `done`; Plan cũ luôn thành `cancelled` (để giải phóng chỉ mục duy nhất).
+- Owner grant sau commit best-effort bằng `GrantRepository` ngoài tx.

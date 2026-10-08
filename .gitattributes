@@ -6,3 +6,5 @@
 /config/scripts/run-internal-dev-setup.mjs text eol=lf
 /config/scripts/verify-cli-bin.mjs text eol=lf
 /config/scripts/verify-release-required-assets.mjs text eol=lf
+/agent/src/relay/__fixtures__/agent-capabilities-golden.json text eol=lf
+/backend-go/services/**/testdata/agent_capabilities_v1.golden.json text eol=lf

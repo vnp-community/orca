@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/outbox_event.go`, `internal/domain/outbox_subjects.go`, `internal/usecase/ports.go`, `internal/adapter/postgres/{repository.go,tx.go,outbox.go}`, `internal/adapter/mysql/{repository.go,tx.go,outbox.go}` (tất cả mới); test tích hợp cùng thư mục
 **Depends on:** TASK-REQ-001-01, TASK-REQ-001-03
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test -tags integration ./internal/adapter/postgres/... (PASS); go test -tags integration ./internal/adapter/mysql/... (PASS, MySQL 8.0))
 
 ---
 
@@ -45,3 +45,7 @@ Lệnh: `go test -tags=integration ./services/request-service/internal/adapter/p
 
 - `InTx` lồng nhau: lỗi ở lớp trong không rollback sớm; chỉ lớp ngoài cùng commit hoặc rollback. Use case dùng retry CAS (CR-REQ-003) chỉ được thử lại khi nó là lớp ngoài cùng; cần hàm `txscope.Active(ctx)` hoặc tương đương, thêm ở TASK-REQ-003-04 nếu chưa có.
 - `pgx` thực thi `set_config(..., true)` cục bộ giao dịch; không dùng `SET` thường (rò rỉ tenant giữa kết nối pool).
+
+## Ghi chú triển khai
+
+Test thật ở `postgres|mysql/outbox_integration_test.go` (thay thân rỗng cũ): rollback, lồng, thứ tự (50 vòng), `MarkPublished` rỗng, hai relay đồng thời với NATS thật, RLS xuyên tenant. `FetchUnpublished` nay trả đủ `tenant_id`, `id`, `occurred_at`, `version` (bản cũ chỉ điền payload); MySQL gửi payload dạng string cho cột JSON. `InTx` bắt buộc tenant (không bỏ qua im lặng). Ba assert `var _` biên dịch.

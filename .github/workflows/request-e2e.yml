@@ -1,0 +1,48 @@
+name: request-e2e
+
+# T2 of CR-REQ-025: the Request flow on the dev stack with the stub agent. It does not gate pull requests (the stack
+# is large and was not yet run on a hosted runner); T1 in backend-go-request-service.yml is the gate.
+on:
+  schedule:
+    - cron: "0 19 * * *"
+  workflow_dispatch:
+    inputs:
+      real_ai:
+        description: "T3: use the real AI instead of the stub agent (reports only, does not judge AI quality)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  request-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VAULT_TOKEN: ${{ secrets.ORCA_E2E_VAULT_TOKEN }}
+      POSTGRES_PASSWORD: ${{ secrets.ORCA_E2E_POSTGRES_PASSWORD }}
+      ORCA_ADMIN_EMAIL: ${{ secrets.ORCA_E2E_ADMIN_EMAIL }}
+      ORCA_ADMIN_PASSWORD: ${{ secrets.ORCA_E2E_ADMIN_PASSWORD }}
+      ORCA_REQUEST_PROJECT_ID: ${{ vars.ORCA_E2E_REQUEST_PROJECT_ID }}
+      ORCA_REQUEST_E2E_REAL_AI: ${{ inputs.real_ai && 'true' || 'false' }}
+      REQUEST_E2E_LOG_DIR: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r tests/backend/requirements.txt
+      - name: Request flow, T2
+        run: bash backend-go/ci/request-e2e/run-request-e2e.sh
+      - name: Upload service logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: request-e2e-logs
+          path: request-e2e-logs.txt
+          if-no-files-found: ignore

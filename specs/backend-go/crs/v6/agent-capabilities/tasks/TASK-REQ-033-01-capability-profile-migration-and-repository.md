@@ -5,7 +5,7 @@
 **Service/Area:** `infra-fleet-service` / migration, domain, adapter postgres và mysql
 **File:** `backend-go/services/infra-fleet-service/migrations/postgres/0039_dev_server_capability_profiles.{up,down}.sql` (mới), `migrations/mysql/0039_dev_server_capability_profiles.{up,down}.sql` (mới), `internal/domain/capability_profile.go` (mới), `internal/domain/agent_features.go` (mới), `internal/usecase/capability_ports.go` (mới), `internal/adapter/postgres/capability_profile_repository.go` (mới), `internal/adapter/mysql/capability_profile_repository.go` (mới), và các `_test.go`
 **Depends on:** không (task đầu của solution)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test -tags integration ./internal/adapter/postgres/ -run "Capability|Migration0039"` trên postgres:16-alpine thật; `go test -tags integration ./internal/adapter/mysql/ -run "Capability|Migration0039"` trên MySQL 8 thật; `go test ./...` module infra-fleet-service)
 
 ---
 
@@ -43,11 +43,11 @@ Khác với CR gốc: CR viết `features JSON/JSONB` và `profile JSON/JSONB` k
 
 ## Tiêu chí hoàn thành
 
-- [x] Migration lên, xuống, lên sạch trên Postgres 14+ và MySQL 8.0.16+.
-- [x] `CHECK` từ chối `source` lạ ở cả hai dialect.
+- [x] Migration lên, xuống, lên sạch trên Postgres 14+ và MySQL 8.0.16+. (TestMigration0039_UpDownUp: Postgres 16 và MySQL 8 thật)
+- [x] `CHECK` từ chối `source` lạ ở cả hai dialect. (TestCapabilityProfileRepository_SourceCheckRejectsUnknown hai dialect)
 - [x] Xoá dev server xoá hồ sơ (cascade).
-- [x] `Upsert` trả `previousFingerprint` đúng; hai `Upsert` đồng thời không làm mất sự khác biệt (một trong hai thấy `existed=true`).
-- [x] Không file nào tên `helpers`, `utils`, `common`, `misc`; không thêm `max-lines` disable.
+- [x] `Upsert` trả `previousFingerprint` đúng; hai `Upsert` đồng thời không làm mất sự khác biệt (một trong hai thấy `existed=true`). (TestCapabilityProfileRepository_ConcurrentUpsertsSerialize: khoá hàng dev_servers, đúng một bên thấy existed=true)
+- [x] Không file nào tên `helpers`, `utils`, `common`, `misc`; không thêm `max-lines` disable. (không thêm max-lines disable)
 - [x] `buf` không liên quan (task này không đổi proto).
 
 ## Thứ tự thực hiện gợi ý
@@ -73,3 +73,12 @@ Khác với CR gốc: CR viết `features JSON/JSONB` và `profile JSON/JSONB` k
 - FK sang `dev_servers`: nếu bảng này ở MySQL dùng kiểu id khác thì FK lỗi lúc migrate; kiểm `SHOW CREATE TABLE` trước.
 - Nếu sau này có dev server xoá mềm thay vì xoá cứng thì hồ sơ mồ côi; hiện `dev_servers` xoá cứng (chưa kiểm chứng toàn bộ đường xoá).
 - `profile` có thể lớn (hàng chục công cụ): giới hạn 64 KB ở `Upsert` (từ chối với `domain.ErrProfileTooLarge`) để không phình bảng.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Migration `0039` Postgres dùng `FORCE ROW LEVEL SECURITY`, `NULLIF(current_setting('app.tenant_id', true), '')::uuid` và `WITH CHECK`; store đặt `set_config('app.tenant_id', $1, true)` trong mọi giao dịch (đọc cũng vậy). Test `RLSEnforcedForNonSuperuser` đổi sang role thường để chứng minh RLS thật: tenant khác và thiếu GUC đều thấy 0 hàng.
+- `Upsert` khoá hàng `dev_servers` (Postgres `FOR NO KEY UPDATE`, MySQL `FOR UPDATE`) trước khi đọc fingerprint cũ, thay cho `INSERT ... SELECT` của bản đầu (bản đó cho hai probe đồng thời cùng thấy `existed=false` và nuốt lỗi tenant lạ thành "0 hàng").
+- MySQL: cột JSON phải nhận `string`, không phải `[]byte` (charset binary bị từ chối); `agent_build_version` đổi từ `TEXT NOT NULL` sang `VARCHAR(128) NOT NULL DEFAULT ''`.
+- `NormalizeFeatures` sắp xếp rồi mới cắt 64 phần tử (bản đầu cắt trước, giữ tập khác nhau tuỳ thứ tự agent gửi).
+- Thêm `DevServerTenantLookup` (`TenantIDForDevServer`) trên cùng store, cần cho đường kích hoạt sau handshake (phiên chỉ biết `devServerID`).
+- Cột `fingerprint CHAR(64)` đệm khoảng trắng nếu ngắn hơn 64: store cắt khoảng trắng phải khi đọc; fingerprint thật luôn là SHA-256 hex nên không ảnh hưởng.

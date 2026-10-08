@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/adapter/sources/{repo_files.go,repo_conventions.go,repo_decisions.go,repo_specs.go,repo_contracts.go,repo_schema.go,repo_dependencies.go,ci_config.go,policy_opa.go,git_history.go,code_graph.go}` (mới) và `_test.go`; `.../internal/usecase/ports.go` (thêm `RepoReader`, `CodeGraphRunner`); `.../internal/adapter/grpcclient/relay_repo_reader.go` (mới)
 **Depends on:** TASK-REQ-031-02
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -67,11 +67,11 @@ type CodeGraphRunner interface { Explore(ctx context.Context, symbols []string) 
 
 ## Tiêu chí hoàn thành
 
-- [x] Không có đường đọc repo nào ngoài `RepoReader` (kiểm: không import `os`/`io/fs` trong `adapter/sources`).
-- [x] `SafeRelPath` được gọi trước mọi lời gọi Relay có đường dẫn (test dùng fake ghi lại mọi tham số).
-- [x] Mọi `SourceItem` hợp lệ qua `Validate`; `Ref` là đường dẫn tương đối.
-- [x] Dev server rớt: mọi adapter trả `ErrNotConnected`, Builder (task 05) sinh `missing`.
-- [x] Mỗi nguồn nội bộ nào chưa kiểm chứng trên dev server thật được ghi rõ ở `README` của thư mục `sources/` (mục "đã chạy thật / chưa").
+- [ ] Không có đường đọc repo nào ngoài `RepoReader` (kiểm: không import `os`/`io/fs` trong `adapter/sources`).
+- [ ] `SafeRelPath` được gọi trước mọi lời gọi Relay có đường dẫn (test dùng fake ghi lại mọi tham số).
+- [ ] Mọi `SourceItem` hợp lệ qua `Validate`; `Ref` là đường dẫn tương đối.
+- [ ] Dev server rớt: mọi adapter trả `ErrNotConnected`, Builder (task 05) sinh `missing`.
+- [ ] Mỗi nguồn nội bộ nào chưa kiểm chứng trên dev server thật được ghi rõ ở `README` của thư mục `sources/` (mục "đã chạy thật / chưa").
 
 ## Rủi ro và lưu ý
 

@@ -1,12 +1,12 @@
 # backlog-views: tasks backend (TASK-REQ-015-01 đến 06)
 
-> **📋 Proposed.** Mọi task `[ ] TODO`, chưa triển khai, chưa chạy test. Lệnh chạy từ `/opt/repos/orca/backend-go`; integration cần Docker (tag `integration`). Quy ước: `gitnexus_impact` trước khi sửa symbol có sẵn; không `max-lines` disable; không tên `helpers`/`utils`/`common`/`misc`.
+> **✅ Đã triển khai (6/6 task, kiểm chứng 2026-10-08).** Lệnh chạy từ `/opt/repos/orca/backend-go`; integration cần Docker (tag `integration`). Chi tiết: [IMPLEMENTATION-NOTES](../../plan-phase-task/IMPLEMENTATION-NOTES.md).
 
 ## Bảng Solution → Task
 
 | Solution | Task | Ghi chú |
 |---|---|---|
-| [BE-REQ-SOL-015](../solutions/BE-REQ-SOL-015-backlog-read-views.md) | 015-01 `ListExecutionStates` proto + usecase (task-service) · 015-02 adapter Postgres/MySQL + integration · 015-03 `backlog_gate` + `page_token` (domain thuần) · 015-04 view REQUEST (keyset, links, lịch sử trả) · 015-05 view TASK/EXECUTE lắp ráp · 015-06 RPC `ListBacklog`, lọc quyền, wiring | 01, 02 ở `task-service`; 03 đến 06 ở `request-service` |
+| [BE-REQ-SOL-015](../solutions/BE-REQ-SOL-015-backlog-read-views.md) ✅ 6/6 DONE | 015-01 `ListExecutionStates` proto + usecase (task-service) · 015-02 adapter Postgres/MySQL + integration · 015-03 `backlog_gate` + `page_token` (domain thuần) · 015-04 view REQUEST (keyset, links, lịch sử trả) · 015-05 view TASK/EXECUTE lắp ráp · 015-06 RPC `ListBacklog`, lọc quyền, wiring | 01, 02 ở `task-service`; 03 đến 06 ở `request-service` |
 
 ## Sơ đồ phụ thuộc
 

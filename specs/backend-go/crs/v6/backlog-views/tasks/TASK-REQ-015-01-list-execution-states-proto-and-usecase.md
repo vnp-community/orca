@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`, `internal/usecase/list_execution_states.go` (mới), `internal/usecase/ports.go`, `internal/adapter/grpc/server_execution_states.go` (mới), `internal/usecase/list_execution_states_test.go` (mới), `internal/usecase/fakes_test.go`
 **Depends on:** không (độc lập SOL-011; chỉ đọc dữ liệu có sẵn)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`; task-service `go test ./internal/usecase ./internal/adapter/grpc`)
 
 ---
 
@@ -50,3 +50,7 @@
 - Quyền: RPC không lọc theo grant người gọi; gọi trực tiếp từ client sẽ lộ trạng thái chạy của task người khác trong cùng tenant. Chỉ `request-service` gọi, gateway không định tuyến (CR-REQ-016 cần liệt kê loại trừ).
 - Trần 500 id là đề xuất của CR, chưa đo.
 - Giữ `last_link_status` là chuỗi gốc của `status_mirror`, không ánh xạ lại.
+
+## Ghi chú triển khai
+
+Phần task-service đã có từ đợt trước (agent task-a); kiểm lại ngày 2026-10-08.

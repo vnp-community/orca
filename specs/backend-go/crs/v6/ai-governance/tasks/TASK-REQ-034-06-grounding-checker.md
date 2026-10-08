@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/grounding_report.go` (mới), `.../internal/usecase/grounding_checker.go` (mới), `.../internal/usecase/grounding_extractors.go` (mới: trích tham chiếu từ từng loại sản phẩm), `.../internal/usecase/ports.go` (sửa), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-034-04 (điểm gọi trong `AIGateway.Run`); BE-REQ-SOL-031 task 03 (`RepoReader`, `SafeRelPath`) và task 04 (`DevServerProfileReader`)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -60,11 +60,11 @@ func ComputeRatio(findings []GroundingFinding) float64
 
 ## Tiêu chí hoàn thành
 
-- [x] Đường dẫn không tồn tại vào `missing`; `new:true` không; ratio thấp ⇒ đúng một lần thử lại rồi `needs_review=true`.
-- [x] Không đường dẫn độc nào (tuyệt đối, `..`) tới được Relay.
-- [x] Không dev server: `skipped`, không chặn.
-- [x] Tối đa 100 kiểm tra và 60 giây mỗi sản phẩm.
-- [x] Log và metric không chứa đường dẫn hay lệnh nguyên văn.
+- [ ] Đường dẫn không tồn tại vào `missing`; `new:true` không; ratio thấp ⇒ đúng một lần thử lại rồi `needs_review=true`.
+- [ ] Không đường dẫn độc nào (tuyệt đối, `..`) tới được Relay.
+- [ ] Không dev server: `skipped`, không chặn.
+- [ ] Tối đa 100 kiểm tra và 60 giây mỗi sản phẩm.
+- [ ] Log và metric không chứa đường dẫn hay lệnh nguyên văn.
 
 ## Rủi ro và lưu ý
 

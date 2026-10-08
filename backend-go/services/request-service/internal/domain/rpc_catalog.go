@@ -2,27 +2,30 @@ package domain
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"google.golang.org/grpc"
 )
 
+// Group is the action group of an RPC; request.rego maps (group, caller roles) to allow.
 type Group string
 
 const (
 	GroupRead          Group = "read"
 	GroupCreate        Group = "create"
 	GroupTriage        Group = "triage"
-	GroupSolution      Group = "solution"
-	GroupDecide        Group = "decide"
-	GroupExecute       Group = "execute"
-	GroupAdmin         Group = "admin"
-	GroupLifecycle     Group = "lifecycle"
+	GroupAnalyze       Group = "analyze"
 	GroupPlan          Group = "plan"
+	GroupExecute       Group = "execute"
+	GroupLifecycle     Group = "lifecycle"
+	GroupDecide        Group = "decide"
+	GroupAdmin         Group = "admin"
 	GroupAuthenticated Group = "authenticated"
 	GroupInternal      Group = "internal"
 )
 
+// Locator says how the interceptor finds the Request (and so the project and reporter) an RPC acts on.
 type Locator string
 
 const (
@@ -30,128 +33,210 @@ const (
 	LocRequestID  Locator = "request_id"
 	LocApprovalID Locator = "approval_id"
 	LocProjectID  Locator = "project_id"
+	// LocEntityID is an id of a Request child (clarification, decision, finding...); a resolver per
+	// Entity kind maps it to its Request. Without a resolver a non-admin is refused (fail closed).
+	LocEntityID Locator = "entity_id"
 )
 
+// Entry classifies one RPC.
 type Entry struct {
-	Group        Group
-	Locator      Locator
+	Group   Group
+	Locator Locator
+	// Field is the string field of the request message that carries the id the Locator needs.
+	Field string
+	// Entity names the child kind for LocEntityID.
+	Entity       string
 	RateClass    string
 	AgentAllowed bool
 }
 
-// Catalog defines the access control mapping for every RPC exposed by request-service.
-// It maps the full gRPC method name to its required permission group and locator.
-var Catalog = map[string]Entry{
-	// RequestService - Read
-	"/orca.request.v1.RequestService/GetRequest":          {Group: GroupRead, Locator: LocRequestID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.RequestService/ListRequests":        {Group: GroupRead, Locator: LocProjectID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.RequestService/ListBacklog":         {Group: GroupRead, Locator: LocProjectID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.RequestService/ListRequestTimeline": {Group: GroupRead, Locator: LocRequestID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.RequestService/GetSolution":         {Group: GroupRead, Locator: LocRequestID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.RequestService/ListSolutions":       {Group: GroupRead, Locator: LocRequestID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.RequestService/ListRequestLinks":    {Group: GroupRead, Locator: LocRequestID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.RequestService/CheckSecretScanInfo": {Group: GroupRead, Locator: LocRequestID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.RequestService/ExportTenantRequests":{Group: GroupAdmin, Locator: LocNone, RateClass: "read", AgentAllowed: false},
+const (
+	reqSvc   = "/orca.request.v1.RequestService/"
+	apprSvc  = "/orca.request.v1.ApprovalService/"
+	policSvc = "/orca.request.v1.ApprovalPolicyAdminService/"
+	budgSvc  = "/orca.request.v1.AiBudgetAdminService/"
+)
 
-	// RequestService - Create
-	"/orca.request.v1.RequestService/CreateRequest":     {Group: GroupCreate, Locator: LocProjectID, RateClass: "write", AgentAllowed: true},
-	"/orca.request.v1.RequestService/SpawnChildRequest": {Group: GroupCreate, Locator: LocRequestID, RateClass: "write", AgentAllowed: true},
-
-	// RequestService - Triage
-	"/orca.request.v1.RequestService/ClassifyRequest":    {Group: GroupTriage, Locator: LocRequestID, RateClass: "ai", AgentAllowed: true},
-	"/orca.request.v1.RequestService/ConfirmRequestType": {Group: GroupTriage, Locator: LocRequestID, RateClass: "write", AgentAllowed: false},
-
-	// RequestService - Lifecycle
-	"/orca.request.v1.RequestService/CancelRequest": {Group: GroupLifecycle, Locator: LocRequestID, RateClass: "write", AgentAllowed: false},
-
-	// RequestService - Plan
-	"/orca.request.v1.RequestService/GeneratePlan": {Group: GroupPlan, Locator: LocRequestID, RateClass: "ai", AgentAllowed: false},
-
-	// RequestService - Solution
-	"/orca.request.v1.RequestService/ProposeSolution":      {Group: GroupSolution, Locator: LocRequestID, RateClass: "write", AgentAllowed: true},
-	"/orca.request.v1.RequestService/UpdateSolution":       {Group: GroupSolution, Locator: LocRequestID, RateClass: "write", AgentAllowed: true},
-	"/orca.request.v1.RequestService/MarkSolutionApproved": {Group: GroupSolution, Locator: LocRequestID, RateClass: "write", AgentAllowed: true},
-	"/orca.request.v1.RequestService/GenerateSolution":     {Group: GroupSolution, Locator: LocRequestID, RateClass: "ai", AgentAllowed: false},
-
-	// RequestService - Execute
-	"/orca.request.v1.RequestService/RecordExecutionPlan":   {Group: GroupExecute, Locator: LocRequestID, RateClass: "write", AgentAllowed: true},
-	"/orca.request.v1.RequestService/RecordExecutionResult": {Group: GroupExecute, Locator: LocRequestID, RateClass: "write", AgentAllowed: true},
-	"/orca.request.v1.RequestService/StartPhase":            {Group: GroupExecute, Locator: LocRequestID, RateClass: "ai", AgentAllowed: false},
-
-	// ApprovalService
-	"/orca.request.v1.ApprovalService/Approve":            {Group: GroupDecide, Locator: LocApprovalID, RateClass: "write", AgentAllowed: false},
-	"/orca.request.v1.ApprovalService/Reject":             {Group: GroupDecide, Locator: LocApprovalID, RateClass: "write", AgentAllowed: false},
-	"/orca.request.v1.ApprovalService/Cancel":             {Group: GroupDecide, Locator: LocApprovalID, RateClass: "write", AgentAllowed: false},
-	"/orca.request.v1.ApprovalService/GetApproval":        {Group: GroupRead, Locator: LocApprovalID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.ApprovalService/ListApprovals":      {Group: GroupRead, Locator: LocRequestID, RateClass: "read", AgentAllowed: true},
-	"/orca.request.v1.ApprovalService/ListPendingForUser": {Group: GroupAuthenticated, Locator: LocNone, RateClass: "read", AgentAllowed: false},
-	"/orca.request.v1.ApprovalService/RequestApproval":    {Group: GroupInternal, Locator: LocRequestID, RateClass: "write", AgentAllowed: false},
-
-	// AiBudgetAdminService
-	"/orca.request.v1.AiBudgetAdminService/SetRequestFlowSettings": {Group: GroupAdmin, Locator: LocNone, RateClass: "write", AgentAllowed: false},
+func onRequest(g Group, field, rate string, agent bool) Entry {
+	return Entry{Group: g, Locator: LocRequestID, Field: field, RateClass: rate, AgentAllowed: agent}
 }
 
-// ValidateCatalog ensures all methods in the service descriptions are present in the Catalog,
-// and vice-versa (except maybe unimplemented ones).
+func onProject(g Group, field, rate string, agent bool) Entry {
+	return Entry{Group: g, Locator: LocProjectID, Field: field, RateClass: rate, AgentAllowed: agent}
+}
+
+func onEntity(g Group, entity, field, rate string) Entry {
+	return Entry{Group: g, Locator: LocEntityID, Entity: entity, Field: field, RateClass: rate}
+}
+
+func unlocated(g Group, rate string, agent bool) Entry {
+	return Entry{Group: g, Locator: LocNone, RateClass: rate, AgentAllowed: agent}
+}
+
+// Catalog maps every RPC of request-service to its action group. AgentAllowed must equal
+// request.rego's agent_rpcs (checked by a test against the real policy). Agents (MCP sessions)
+// may read, create and classify; ChangeRequestType, ReturnToBacklog and ReopenRequest are allowed
+// because the gateway ships them as reversible MCP tools; deciding, planning, executing,
+// cancelling, administering and erasing stay human-only.
+var Catalog = map[string]Entry{
+	reqSvc + "GetRequest":                       onRequest(GroupRead, "id", RateRead, true),
+	reqSvc + "ListRequests":                     onProject(GroupRead, "project_id", RateRead, true),
+	reqSvc + "ListBacklog":                      onProject(GroupRead, "project_id", RateRead, true),
+	reqSvc + "CreateRequest":                    onProject(GroupCreate, "project_id", RateWrite, true),
+	reqSvc + "ClassifyRequest":                  onRequest(GroupTriage, "request_id", RateAI, true),
+	reqSvc + "ConfirmRequestType":               onRequest(GroupTriage, "request_id", RateWrite, false),
+	reqSvc + "ChangeRequestType":                onRequest(GroupTriage, "request_id", RateWrite, true),
+	reqSvc + "ListRequestTypeHistory":           onRequest(GroupRead, "request_id", RateRead, true),
+	reqSvc + "ReturnToBacklog":                  onRequest(GroupLifecycle, "request_id", RateWrite, true),
+	reqSvc + "ReopenRequest":                    onRequest(GroupLifecycle, "request_id", RateWrite, true),
+	reqSvc + "CancelRequest":                    onRequest(GroupLifecycle, "request_id", RateWrite, false),
+	reqSvc + "SpawnChildRequest":                onRequest(GroupCreate, "parent_request_id", RateWrite, true),
+	reqSvc + "ListRequestLinks":                 onRequest(GroupRead, "request_id", RateRead, true),
+	reqSvc + "GetRequestFlow":                   unlocated(GroupAuthenticated, RateRead, true),
+	reqSvc + "LookupRequestBySource":            unlocated(GroupInternal, RateNone, false),
+	reqSvc + "GetRequestFlowSettings":           unlocated(GroupAuthenticated, RateRead, true),
+	reqSvc + "SetRequestFlowSettings":           unlocated(GroupAdmin, RateWrite, false),
+	reqSvc + "GenerateSolution":                 onRequest(GroupAnalyze, "request_id", RateAI, true),
+	reqSvc + "ListSolutions":                    onRequest(GroupRead, "request_id", RateRead, true),
+	reqSvc + "ChooseSolutionOption":             onRequest(GroupAnalyze, "request_id", RateWrite, false),
+	reqSvc + "GetProjectEngineSettings":         onProject(GroupRead, "project_id", RateRead, false),
+	reqSvc + "SetProjectEngineSettings":         unlocated(GroupAdmin, RateWrite, false),
+	reqSvc + "GeneratePlan":                     onRequest(GroupPlan, "request_id", RateAI, false),
+	reqSvc + "GetPlanProposal":                  onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "CommitPlan":                       onRequest(GroupPlan, "request_id", RateWrite, false),
+	reqSvc + "StartPhase":                       onRequest(GroupExecute, "request_id", RateAI, false),
+	reqSvc + "ReportTaskOutcome":                unlocated(GroupInternal, RateNone, false),
+	reqSvc + "RecordRequestCheck":               unlocated(GroupInternal, RateNone, false),
+	reqSvc + "ListRequestChecks":                onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "GetRequestReadiness":              onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "RequestClarification":             unlocated(GroupInternal, RateNone, false),
+	reqSvc + "ListClarifications":               onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "GetClarification":                 onEntity(GroupRead, "clarification", "id", RateRead),
+	reqSvc + "AnswerClarification":              onEntity(GroupTriage, "clarification", "clarification_id", RateWrite),
+	reqSvc + "CancelClarification":              onEntity(GroupTriage, "clarification", "id", RateWrite),
+	reqSvc + "ListPendingClarificationsForUser": unlocated(GroupAuthenticated, RateRead, false),
+	reqSvc + "WaiveReadiness":                   onRequest(GroupExecute, "request_id", RateWrite, false),
+	reqSvc + "ListDecisions":                    onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "GetDecision":                      onEntity(GroupRead, "decision", "id", RateRead),
+	reqSvc + "ConfirmDecision":                  onEntity(GroupLifecycle, "decision", "decision_id", RateWrite),
+	reqSvc + "EditRequestContent":               onRequest(GroupLifecycle, "request_id", RateWrite, false),
+	reqSvc + "ListRequestRevisions":             onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "GetRequestRevision":               onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "GetRequestCoverage":               onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "GetArtifactGraph":                 onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "ExportArtifactProjection":         onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "ResolveArtifactRef":               onEntity(GroupRead, "artifact_ref", "ref", RateRead),
+	reqSvc + "RequestImpactAssessment":          onRequest(GroupAnalyze, "request_id", RateAI, false),
+	reqSvc + "GetImpactAssessment":              onEntity(GroupRead, "impact_subject", "subject_id", RateRead),
+	reqSvc + "GetImpactGraph":                   onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "CompareImpact":                    onEntity(GroupRead, "solution", "solution_id", RateRead),
+	reqSvc + "ListImpactFindings":               onEntity(GroupRead, "impact_assessment", "assessment_id", RateRead),
+	reqSvc + "GetImpactEvidence":                onEntity(GroupRead, "impact_finding", "finding_id", RateRead),
+	reqSvc + "GetPlanRiskHeatmap":               onEntity(GroupRead, "plan_task", "plan_task_id", RateRead),
+	reqSvc + "GetImpactDrift":                   onEntity(GroupRead, "phase", "phase_id", RateRead),
+	reqSvc + "AcceptRisk":                       unlocated(GroupDecide, RateWrite, false),
+	reqSvc + "OverrideRiskGate":                 onRequest(GroupDecide, "request_id", RateWrite, false),
+	reqSvc + "GetRiskPolicy":                    unlocated(GroupAuthenticated, RateRead, false),
+	reqSvc + "SetRiskPolicy":                    unlocated(GroupAdmin, RateWrite, false),
+	reqSvc + "CheckReadiness":                   onEntity(GroupExecute, "task", "task_id", RateWrite),
+	reqSvc + "GetReadinessReport":               onEntity(GroupRead, "task", "task_id", RateRead),
+	reqSvc + "ListReadiness":                    onEntity(GroupRead, "phase", "phase_id", RateRead),
+	reqSvc + "ListContextSources":               unlocated(GroupAdmin, RateRead, false),
+	reqSvc + "UpsertContextSource":              unlocated(GroupAdmin, RateWrite, false),
+	reqSvc + "SetContextSourceStatus":           unlocated(GroupAdmin, RateWrite, false),
+	reqSvc + "PreviewContextPack":               unlocated(GroupAdmin, RateRead, false),
+	reqSvc + "GetEvidence":                      onEntity(GroupRead, "evidence", "id", RateRead),
+	reqSvc + "ListEvidence":                     onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "EraseRequest":                     unlocated(GroupAdmin, RateWrite, false),
+	reqSvc + "ExportRequest":                    unlocated(GroupAdmin, RateWrite, false),
+	reqSvc + "ExportTenantRequests":             unlocated(GroupAdmin, RateWrite, false),
+
+	apprSvc + "RequestApproval":    unlocated(GroupInternal, RateNone, false),
+	apprSvc + "Approve":            {Group: GroupDecide, Locator: LocApprovalID, Field: "id", RateClass: RateWrite},
+	apprSvc + "Reject":             {Group: GroupDecide, Locator: LocApprovalID, Field: "id", RateClass: RateWrite},
+	apprSvc + "Cancel":             {Group: GroupDecide, Locator: LocApprovalID, Field: "id", RateClass: RateWrite},
+	apprSvc + "ExtendApproval":     {Group: GroupDecide, Locator: LocApprovalID, Field: "id", RateClass: RateWrite},
+	apprSvc + "GetApproval":        {Group: GroupRead, Locator: LocApprovalID, Field: "id", RateClass: RateRead, AgentAllowed: true},
+	apprSvc + "ListApprovals":      onRequest(GroupRead, "request_id", RateRead, true),
+	apprSvc + "ListPendingForUser": unlocated(GroupAuthenticated, RateRead, true),
+
+	policSvc + "ListApprovalPolicies": unlocated(GroupAdmin, RateRead, false),
+	policSvc + "UpsertApprovalPolicy": unlocated(GroupAdmin, RateWrite, false),
+	policSvc + "DeleteApprovalPolicy": unlocated(GroupAdmin, RateWrite, false),
+
+	budgSvc + "ListAiBudgets":       unlocated(GroupAdmin, RateRead, false),
+	budgSvc + "UpsertAiBudget":      unlocated(GroupAdmin, RateWrite, false),
+	budgSvc + "DeleteAiBudget":      unlocated(GroupAdmin, RateWrite, false),
+	budgSvc + "ListAiStepPolicies":  unlocated(GroupAdmin, RateRead, false),
+	budgSvc + "UpsertAiStepPolicy":  unlocated(GroupAdmin, RateWrite, false),
+	budgSvc + "GetAiTenantSettings": unlocated(GroupAdmin, RateRead, false),
+	budgSvc + "SetAiTenantSettings": unlocated(GroupAdmin, RateWrite, false),
+}
+
+// ValidateCatalog fails when a method of descs has no Entry or an Entry names no method, so a new RPC
+// cannot ship unclassified (and so unprotected).
 func ValidateCatalog(descs ...*grpc.ServiceDesc) error {
-	descMap := make(map[string]bool)
+	have := make(map[string]bool)
 	for _, desc := range descs {
 		for _, m := range desc.Methods {
-			descMap[fmt.Sprintf("/%s/%s", desc.ServiceName, m.MethodName)] = true
+			have[fmt.Sprintf("/%s/%s", desc.ServiceName, m.MethodName)] = true
 		}
 		for _, s := range desc.Streams {
-			descMap[fmt.Sprintf("/%s/%s", desc.ServiceName, s.StreamName)] = true
+			have[fmt.Sprintf("/%s/%s", desc.ServiceName, s.StreamName)] = true
 		}
 	}
-
-	var missing []string
-	for method := range descMap {
-		if _, ok := Catalog[method]; !ok {
-			missing = append(missing, method)
+	var missing, extra []string
+	for m := range have {
+		if _, ok := Catalog[m]; !ok {
+			missing = append(missing, m)
 		}
 	}
-
-	var extra []string
-	for method := range Catalog {
-		if !descMap[method] {
-			extra = append(extra, method)
+	for m := range Catalog {
+		if !have[m] {
+			extra = append(extra, m)
 		}
 	}
-
-	if len(missing) > 0 || len(extra) > 0 {
-		return fmt.Errorf("catalog mismatch: missing=%v, extra=%v", missing, extra)
+	if len(missing) == 0 && len(extra) == 0 {
+		return nil
 	}
-
-	return nil
+	sort.Strings(missing)
+	sort.Strings(extra)
+	return fmt.Errorf("rpc catalog mismatch: unclassified=%v unknown=%v", missing, extra)
 }
 
-// PublicMethods returns all RPCs not marked as GroupInternal.
+// PublicMethods are the RPCs reachable by the gateway token; sorted for stable wiring and tests.
 func PublicMethods() []string {
-	var methods []string
-	for m, e := range Catalog {
-		if e.Group != GroupInternal {
-			methods = append(methods, m)
-		}
-	}
-	return methods
+	return methodsWhere(func(e Entry) bool { return e.Group != GroupInternal })
 }
 
-// InternalMethods returns all RPCs marked as GroupInternal.
+// InternalMethods are the RPCs reserved for sibling services (service token).
 func InternalMethods() []string {
-	var methods []string
-	for m, e := range Catalog {
-		if e.Group == GroupInternal {
-			methods = append(methods, m)
-		}
-	}
-	return methods
+	return methodsWhere(func(e Entry) bool { return e.Group == GroupInternal })
 }
 
-// RPCName extracts the method name from a full gRPC method path.
-func RPCName(fullMethod string) string {
-	idx := strings.LastIndex(fullMethod, "/")
-	if idx == -1 {
-		return fullMethod
+func methodsWhere(keep func(Entry) bool) []string {
+	var out []string
+	for m, e := range Catalog {
+		if keep(e) {
+			out = append(out, m)
+		}
 	}
-	return fullMethod[idx+1:]
+	sort.Strings(out)
+	return out
+}
+
+// RPCName is the method part of a full gRPC method ("/pkg.Svc/Method" -> "Method").
+func RPCName(fullMethod string) string {
+	if i := strings.LastIndex(fullMethod, "/"); i >= 0 {
+		return fullMethod[i+1:]
+	}
+	return fullMethod
+}
+
+// GuardedServicePrefix selects the services the catalog governs. Health and reflection are registered beside
+// them and carry no tenant data; an unknown method under this prefix is refused, not waved through.
+const GuardedServicePrefix = "/orca.request.v1."
+
+func IsGuardedMethod(fullMethod string) bool {
+	return strings.HasPrefix(fullMethod, GuardedServicePrefix)
 }

@@ -56,6 +56,23 @@ type UpdateTaskInput struct {
 type UpdateTask struct {
 	repo  TaskRepository
 	edges EdgeRepository
+	// sync, when set, re-derives the parent plan/phase after a child changes.
+	sync *SyncContainerStatus
+	// specs, when set, freezes the title of tasks whose spec an approved plan locked.
+	specs TaskSpecLockChecker
+}
+
+// WithTaskSpecLock blocks title edits on tasks whose spec is locked; nil keeps the old behavior.
+// Status, labels, PR url and worktree stay editable: progress must continue after approval.
+func (uc *UpdateTask) WithTaskSpecLock(s TaskSpecLockChecker) *UpdateTask {
+	uc.specs = s
+	return uc
+}
+
+// WithContainerSync enables plan/phase status derivation; nil keeps the old behavior.
+func (uc *UpdateTask) WithContainerSync(s *SyncContainerStatus) *UpdateTask {
+	uc.sync = s
+	return uc
 }
 
 func NewUpdateTask(repo TaskRepository, edges EdgeRepository) *UpdateTask {
@@ -76,6 +93,19 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 		return domain.Task{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
 	}
 	previousStatus := current.Status
+	// Container status is derived from children; only cancelling is a user decision.
+	if domain.IsContainerType(current.Type) && in.Status != nil && *in.Status != domain.StatusCancelled {
+		return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_CONTAINER_STATUS_DERIVED", domain.ErrContainerStatusDerived.Error(), domain.ErrContainerStatusDerived)
+	}
+	if in.Title != nil && uc.specs != nil && *in.Title != current.Title {
+		locked, err := uc.specs.IsLocked(ctx, tenantID, in.ID)
+		if err != nil {
+			return domain.Task{}, apperrors.New(apperrors.KindInternal, "TASK_SPEC_LOCK_LOOKUP_FAILED", "failed to check whether the task spec is locked", err)
+		}
+		if locked {
+			return domain.Task{}, specError(domain.ErrTaskSpecLocked)
+		}
+	}
 	if in.Title != nil {
 		current.Title = *in.Title
 	}
@@ -113,6 +143,7 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 		payload, err := json.Marshal(taskStatusChangedPayload{
 			TaskID: current.ID, ProjectID: current.ProjectID, WorktreeID: current.WorktreeID,
 			PreviousStatus: string(previousStatus), NewStatus: string(current.Status),
+			TaskType: current.Type, ParentID: current.ParentID, RequestID: current.RequestID, Cause: causeUserUpdate,
 		})
 		if err != nil {
 			return domain.Task{}, apperrors.New(apperrors.KindInternal, "TASK_MARSHAL_EVENT_FAILED", "failed to marshal status-changed event payload", err)
@@ -156,10 +187,15 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 				}
 			}
 			if allDone {
-				_ = uc.repo.UpdateStatus(ctx, tenantID, dependent.ID, domain.StatusOpen)
+				if err := uc.repo.UpdateStatus(ctx, tenantID, dependent.ID, domain.StatusOpen); err == nil {
+					syncContainerParent(ctx, uc.sync, dependent.ID)
+				}
 			}
 		}
 	}
+
+	// Even a non-terminal change (e.g. blocked -> open) can move the parent's derived status.
+	syncContainerParent(ctx, uc.sync, current.ID)
 
 	// BE-SOL-001: recalculate the parent's done_subtasks/total_subtasks
 	// whenever a child task with a non-empty ParentID reaches a terminal
@@ -184,4 +220,21 @@ type taskStatusChangedPayload struct {
 	WorktreeID     string `json:"worktree_id"`
 	PreviousStatus string `json:"previous_status"`
 	NewStatus      string `json:"new_status"`
+	// Added for plan/phase (all omitempty so existing consumers keep parsing).
+	TaskType  string `json:"task_type,omitempty"`
+	ParentID  string `json:"parent_id,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
+	Cause     string `json:"cause,omitempty"`
+	// Set only on run-driven transitions (see newRunStatusEvent).
+	ExecutionLinkID string `json:"execution_link_id,omitempty"`
+	Engine          string `json:"engine,omitempty"`
+	ErrorMessage    string `json:"error_message,omitempty"`
+	// Set only by contract runs; request-service retries on failure_class.
+	FailureClass      string `json:"failure_class,omitempty"`
+	ExecutionRecordID string `json:"execution_record_id,omitempty"`
 }
+
+const (
+	causeUserUpdate = "user_update"
+	causeDerived    = "derived"
+)

@@ -1,17 +1,15 @@
 package domain
 
 import (
-	"errors"
 	"strings"
 	"time"
 )
 
-var (
-	ErrApprovalNotPending         = errors.New("approval not pending")
-	ErrApprovalCommentRequired    = errors.New("approval comment required")
-	ErrApprovalCommentTooLong     = errors.New("approval comment too long")
-	ErrApprovalSubjectTypeInvalid = errors.New("approval subject type invalid")
-)
+// maxApprovalExtendSeconds caps one extension so a deadline cannot be pushed out indefinitely in a single call.
+const maxApprovalExtendSeconds = 30 * 24 * 3600
+
+// maxApprovalCommentLen is in bytes, matching the column-side limits of both dialects.
+const maxApprovalCommentLen = 2000
 
 type ApprovalStatus string
 
@@ -54,7 +52,16 @@ func ValidateApprovalComment(s string) (string, error) {
 	if c == "" {
 		return "", ErrApprovalCommentRequired
 	}
-	if len(c) > 2000 {
+	if len(c) > maxApprovalCommentLen {
+		return "", ErrApprovalCommentTooLong
+	}
+	return c, nil
+}
+
+// validateOptionalApprovalComment lets approvals carry no comment but still bounds its size.
+func validateOptionalApprovalComment(s string) (string, error) {
+	c := strings.TrimSpace(s)
+	if len(c) > maxApprovalCommentLen {
 		return "", ErrApprovalCommentTooLong
 	}
 	return c, nil
@@ -64,10 +71,14 @@ func (a *Approval) Approve(by, comment string, now time.Time) error {
 	if a.Status != ApprovalStatusPending {
 		return ErrApprovalNotPending
 	}
+	c, err := validateOptionalApprovalComment(comment)
+	if err != nil {
+		return err
+	}
 	a.Status = ApprovalStatusApproved
 	a.DecidedBy = &by
 	a.DecidedAt = &now
-	a.Comment = strings.TrimSpace(comment)
+	a.Comment = RedactSecrets(c)
 	a.Version++
 	a.UpdatedAt = now
 	return nil
@@ -84,7 +95,7 @@ func (a *Approval) Reject(by, comment string, now time.Time) error {
 	a.Status = ApprovalStatusRejected
 	a.DecidedBy = &by
 	a.DecidedAt = &now
-	a.Comment = c
+	a.Comment = RedactSecrets(c)
 	a.Version++
 	a.UpdatedAt = now
 	return nil
@@ -101,7 +112,7 @@ func (a *Approval) Cancel(by, reason string, now time.Time) error {
 	a.Status = ApprovalStatusCancelled
 	a.DecidedBy = &by
 	a.DecidedAt = &now
-	a.Comment = c
+	a.Comment = RedactSecrets(c)
 	a.Version++
 	a.UpdatedAt = now
 	return nil
@@ -123,4 +134,25 @@ func (a Approval) EffectiveStatus(now time.Time) ApprovalStatus {
 		return ApprovalStatusExpired
 	}
 	return a.Status
+}
+
+// Extend moves the deadline of a pending approval out by seconds (from the old deadline, or from now when none)
+// and re-arms the reminder, so a long review is not forced through expire-then-reopen.
+func (a *Approval) Extend(seconds int, now time.Time) error {
+	if a.Status != ApprovalStatusPending {
+		return ErrApprovalNotPending
+	}
+	if seconds <= 0 || seconds > maxApprovalExtendSeconds {
+		return ErrApprovalExtendInvalid
+	}
+	base := now
+	if a.DueAt != nil && a.DueAt.After(now) {
+		base = *a.DueAt
+	}
+	due := base.Add(time.Duration(seconds) * time.Second)
+	a.DueAt = &due
+	a.RemindedAt = nil
+	a.Version++
+	a.UpdatedAt = now
+	return nil
 }

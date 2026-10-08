@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Solution and analysis messages (CR-REQ-007, 008, 026, 027, 028). RPCs live in RequestService (request.proto).
+
+enum SolutionKind {
+  SOLUTION_KIND_UNSPECIFIED = 0;
+  SOLUTION_KIND_SOLUTION = 1;
+  SOLUTION_KIND_DIAGNOSIS = 2;
+  SOLUTION_KIND_FINDINGS = 3;
+  SOLUTION_KIND_ANSWER = 4;
+}
+
+enum SolutionStatus {
+  SOLUTION_STATUS_UNSPECIFIED = 0;
+  SOLUTION_STATUS_DRAFT = 1;
+  SOLUTION_STATUS_PROPOSED = 2;
+  SOLUTION_STATUS_APPROVED = 3;
+  SOLUTION_STATUS_REJECTED = 4;
+  SOLUTION_STATUS_SUPERSEDED = 5;
+}
+
+enum AnalysisMode {
+  // Unspecified means "follow the flow registry".
+  ANALYSIS_MODE_UNSPECIFIED = 0;
+  ANALYSIS_MODE_COMPLETE = 1;
+  ANALYSIS_MODE_AGENT_READONLY = 2;
+}
+
+message Solution {
+  string id = 1;
+  string request_id = 2;
+  SolutionKind kind = 3;
+  SolutionStatus status = 4;
+  // AI-generated JSON, validated server side; keys stay snake_case (CONTRACT C13).
+  string options_json = 5;
+  // 0-based index; -1 means not chosen yet.
+  int32 chosen_option = 6;
+  string content_ref = 7;
+  string generation_run_id = 8;
+  google.protobuf.Timestamp created_at = 9;
+  int64 version = 10;
+  // 11 to 15: CR-REQ-027 artifact fields.
+  string display_id = 11;
+  int32 seq = 12;
+  string provenance_json = 13;
+  int32 input_request_revision = 14;
+  string content_digest = 15;
+  // 16 to 17: CR-REQ-026 engine fields.
+  string engine = 16;
+  string proposal_branch = 17;
+}
+
+message AnalysisRun {
+  string id = 1;
+  SolutionKind kind = 2;
+  // running | succeeded | failed
+  string status = 3;
+  string error_code = 4;
+  string error_message = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp finished_at = 7;
+  string engine = 8;
+  string proposal_branch = 9;
+}
+
+message GenerateSolutionRequest {
+  string request_id = 1;
+  string idempotency_key = 2;
+  // Regenerate hint, at most 2000 characters.
+  string feedback = 3;
+  AnalysisMode analysis_mode = 4;
+  // CR-REQ-026: only "native" is accepted from clients.
+  string engine_override = 5;
+}
+
+message GenerateSolutionResponse {
+  string solution_id = 1;
+  string run_id = 2;
+}
+
+message ListSolutionsRequest {
+  string request_id = 1;
+  SolutionKind kind = 2;
+  SolutionStatus status = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message ListSolutionsResponse {
+  repeated Solution solutions = 1;
+  repeated AnalysisRun runs = 2;
+  string next_page_token = 3;
+}
+
+message ChooseSolutionOptionRequest {
+  string request_id = 1;
+  string solution_id = 2;
+  // "opt-N".
+  string option_id = 3;
+  string comment = 4;
+  // CR-REQ-028: required when the chosen option differs from the recommendation.
+  string rationale = 5;
+}
+
+message ChooseSolutionOptionResponse {
+  Solution solution = 1;
+  // Send back as ApproveRequest.expected_digest.
+  string approval_digest = 2;
+  // 3 to 4: CR-REQ-028 decision state (open | chosen | effective).
+  string decision_status = 3;
+  bool requires_confirmation = 4;
+}
+
+// CR-REQ-026 per-project solution engine settings.
+message ProjectEngineSettings {
+  string project_id = 1;
+  string solution_engine = 2;
+  string openspec_min_version = 3;
+  int64 version = 4;
+}
+
+message GetProjectEngineSettingsRequest {
+  string project_id = 1;
+}
+
+message GetProjectEngineSettingsResponse {
+  ProjectEngineSettings settings = 1;
+}
+
+message SetProjectEngineSettingsRequest {
+  string project_id = 1;
+  string solution_engine = 2;
+  string openspec_min_version = 3;
+  int64 expected_version = 4;
+}
+
+message SetProjectEngineSettingsResponse {
+  ProjectEngineSettings settings = 1;
+}

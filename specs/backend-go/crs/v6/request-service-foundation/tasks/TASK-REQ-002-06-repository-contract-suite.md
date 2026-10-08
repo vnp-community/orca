@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/request_repository_contract.go` (mới, package thường, không phải `_test.go`, để hai adapter import), `internal/adapter/postgres/request_repository_contract_test.go`, `internal/adapter/mysql/request_repository_contract_test.go`, `internal/adapter/postgres/schema_contract_test.go`, `internal/adapter/mysql/schema_contract_test.go` (mới)
 **Depends on:** TASK-REQ-002-04, TASK-REQ-002-05
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test -tags integration ./internal/adapter/postgres/... (PASS); go test -tags integration ./internal/adapter/mysql/... (PASS, MySQL 8.0))
 
 ---
 
@@ -40,3 +40,7 @@ CR-REQ-002 mục 5 yêu cầu một bộ kịch bản chạy cho cả hai dialec
 - Test tích hợp cần Docker; không chạy được trong `go test ./...` thường, đúng ý (build tag).
 - Tránh tên `testutil`/`helpers` cho package mới; `contracttest` đặt theo khái niệm.
 - Chạy 20 giao dịch song song trên container nhỏ có thể chập chờn (deadlock MySQL ở `request_counters`); cho phép thử lại tối đa 3 lần với lỗi 1213 và ghi vào test.
+
+## Ghi chú triển khai
+
+Bộ kịch bản ở `internal/adapter/contracttest` (`RunRequestRepositoryContract`, 19 kịch bản; `RunRequestServiceContract` cho RPC; `ExpectedColumns`; `MigrationScripts`). Đối chứng đã làm: bỏ `tenant_id` khỏi `getBy` của MySQL (không commit) thì `TenantIsolationRead` và `GetByNumber` đỏ, đã hoàn nguyên. Retry deadlock (1213, 40P01) tối đa 3 lần trong `NumberingConcurrent20`. Test RLS trực tiếp nằm ở `postgres/rls_integration_test.go`.

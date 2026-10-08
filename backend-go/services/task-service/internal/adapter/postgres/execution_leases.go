@@ -74,15 +74,26 @@ func (r *Repository) ClaimExpired(ctx context.Context, limit int) ([]domain.Expi
 
 // ClaimForExecution is a compare-and-set on status: one statement, so of two
 // concurrent Execute calls only one matches the WHERE and gets a row.
-func (r *Repository) ClaimForExecution(ctx context.Context, tenantID, taskID string, from domain.Status) (bool, error) {
-	tag, err := r.db.Exec(ctx, `
-		UPDATE task.tasks SET status = 'in_progress', updated_at = now()
-		WHERE tenant_id = $1 AND id = $2 AND status = $3
-	`, tenantID, taskID, string(from))
+func (r *Repository) ClaimForExecution(ctx context.Context, tenantID, taskID string, from domain.Status, events []domain.OutboxEvent) (bool, error) {
+	claimed := false
+	err := r.inOptionalTx(ctx, len(events) > 0, func(db dbtx) error {
+		tag, err := db.Exec(ctx, `
+			UPDATE task.tasks SET status = 'in_progress', updated_at = now()
+			WHERE tenant_id = $1 AND id = $2 AND status = $3
+		`, tenantID, taskID, string(from))
+		if err != nil {
+			return fmt.Errorf("postgres: claim task for execution: %w", err)
+		}
+		claimed = tag.RowsAffected() > 0
+		if !claimed {
+			return nil // lost the race: no outbox row
+		}
+		return insertOutboxEvents(ctx, db, tenantID, events)
+	})
 	if err != nil {
-		return false, fmt.Errorf("postgres: claim task for execution: %w", err)
+		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return claimed, nil
 }
 
 func (r *Repository) SetPreviousStatus(ctx context.Context, tenantID, linkID, status string) error {
@@ -160,18 +171,30 @@ func (r *Repository) ListOrphanedRuns(ctx context.Context, grace time.Duration, 
 
 // ReleaseExecution moves an in_progress task to `to`, but only while the given
 // link is still its active one — so it can never undo a newer dispatch.
-func (r *Repository) ReleaseExecution(ctx context.Context, tenantID, taskID, linkID string, to domain.Status) (bool, error) {
-	tag, err := r.db.Exec(ctx, `
-		UPDATE task.tasks SET status = $4, updated_at = now()
-		WHERE tenant_id = $1 AND id = $2 AND status = 'in_progress' AND active_execution_link_id = $3
-	`, tenantID, taskID, linkID, string(to))
+func (r *Repository) ReleaseExecution(ctx context.Context, tenantID, taskID, linkID string, to domain.Status, events []domain.OutboxEvent) (bool, error) {
+	released := false
+	err := r.inOptionalTx(ctx, len(events) > 0, func(db dbtx) error {
+		tag, err := db.Exec(ctx, `
+			UPDATE task.tasks SET status = $4, updated_at = now()
+			WHERE tenant_id = $1 AND id = $2 AND status = 'in_progress' AND active_execution_link_id = $3
+		`, tenantID, taskID, linkID, string(to))
+		if err != nil {
+			return fmt.Errorf("postgres: release task execution: %w", err)
+		}
+		released = tag.RowsAffected() > 0
+		if !released {
+			return nil // stale link: no outbox row
+		}
+		return insertOutboxEvents(ctx, db, tenantID, events)
+	})
 	if err != nil {
-		return false, fmt.Errorf("postgres: release task execution: %w", err)
+		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return released, nil
 }
 
-// ReleaseUnlinkedInProgress is one guarded UPDATE; the SKIP LOCKED subquery
+// ReleaseUnlinkedInProgress skips plan/phase: their in_progress is derived and never has a link.
+// It is one guarded UPDATE; the SKIP LOCKED subquery
 // lets concurrent sweepers take disjoint rows and the repeated predicates
 // keep it a compare-and-set against a task that was just dispatched.
 func (r *Repository) ReleaseUnlinkedInProgress(ctx context.Context, grace time.Duration, limit int) (int, error) {
@@ -180,12 +203,14 @@ func (r *Repository) ReleaseUnlinkedInProgress(ctx context.Context, grace time.D
 		WHERE id IN (
 			SELECT id FROM task.tasks
 			WHERE status = 'in_progress' AND active_execution_link_id IS NULL
+			  AND task_type NOT IN ('plan','phase')
 			  AND updated_at < now() - make_interval(secs => $1)
 			ORDER BY updated_at
 			LIMIT $2
 			FOR UPDATE SKIP LOCKED
 		)
 		AND status = 'in_progress' AND active_execution_link_id IS NULL
+		AND task_type NOT IN ('plan','phase')
 	`, grace.Seconds(), limit)
 	if err != nil {
 		return 0, fmt.Errorf("postgres: release unlinked in_progress tasks: %w", err)

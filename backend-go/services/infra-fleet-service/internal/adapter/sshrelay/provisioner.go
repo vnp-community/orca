@@ -56,11 +56,11 @@ type Connector interface {
 // arrives over. Not shared as an exported type across packages since it's
 // small and each package's copy documents its own transport's context.
 type inboundHandshakeParams struct {
-	DevServerID  string   `json:"devServerId"`
-	Platform     string   `json:"platform"`
-	Arch         string   `json:"arch"`
-	NodeVersion  string   `json:"nodeVersion"`
-	AgentVersion string   `json:"agentVersion"`
+	DevServerID     string   `json:"devServerId"`
+	Platform        string   `json:"platform"`
+	Arch            string   `json:"arch"`
+	NodeVersion     string   `json:"nodeVersion"`
+	AgentVersion    string   `json:"agentVersion"`
 	Capabilities    []string `json:"capabilities"`
 	Features        []string `json:"features"`
 	ProtocolVersion int      `json:"protocolVersion"`

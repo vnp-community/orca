@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/redaction_test.go`, `.../catalog_test.go`, `.../testdata/tools_list.golden.json`, `.../executor_guards_test.go`
 **Depends on:** TASK-REQ-017-01, TASK-REQ-017-02
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -38,3 +38,7 @@
 ## Rủi ro và lưu ý
 
 - Chưa đọc quy tắc OPA `session.untrusted_read`; test chỉ khẳng định cờ `UntrustedOutput`, không khẳng định hành vi OPA (ghi vào mô tả PR).
+
+## Ghi chú triển khai (2026-10-08)
+
+Chưa kiểm chứng hành vi OPA `session.untrusted_read`; test chỉ khẳng định cờ untrusted/khung dữ liệu. Lỗi `REQUEST_FLOW_DISABLED` đi qua nguyên mã (test với server giả).

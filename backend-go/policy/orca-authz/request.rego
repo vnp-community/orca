@@ -1,102 +1,94 @@
+# Request-level authorization (CR-REQ-035 2.3). Consumed as data.orca.authz.request.allow by
+# request-service through common/policy.Evaluator, same shape as project.rego.
+#
+# input: {action, rpc, caller_global_role, caller_project_role, is_reporter, actor_type}
+#   action              group of the RPC from request-service's rpc_catalog (read, create, ...)
+#   rpc                 short RPC name, used only to bound what an agent may call
+#   caller_project_role "owner" | "member" | "" (project-service membership)
+#   is_reporter         caller is requests.reporter_id of the target Request
+#   actor_type          "user" | "agent" | "system"
+#
+# Boundaries: "decide" and "authenticated" are front doors only (the approver set depends on data
+# and stays in Go, CR-REQ-010); "admin" has no project role, so only a global admin passes;
+# "internal" never reaches this file (internalcaller.Guard handles it).
 package orca.authz.request
 
 import rego.v1
 
-# input shape:
-# {
-#   "action": <string>,             # read, create, triage, solution, decide, execute, admin, lifecycle, plan, authenticated
-#   "rpc": <string>,                # The specific gRPC method name being called
-#   "caller_global_role": <string>, # "admin" or ""
-#   "caller_project_role": <string>,# "owner", "member", or ""
-#   "is_reporter": <boolean>,       # true if the caller is the reporter of the request
-#   "actor_type": <string>          # "user", "agent", "system"
-# }
-# Note: "decide" and "authenticated" actions are just front-doors. Actual approvers
-# are evaluated in Go because they depend on data states. The "admin" action only applies
-# to global admins. "internal" action is never checked here (it's handled by Guard).
-
-# group_roles maps an action to the set of caller_roles allowed to perform it.
+# group -> project roles allowed. "reporter" is the is_reporter flag, not a project role.
 group_roles := {
 	"read": {"owner", "member", "reporter"},
 	"create": {"owner", "member"},
 	"triage": {"owner", "reporter"},
-	"solution": {"owner", "member"},
-	"decide": {"owner"},
-	"execute": {"owner", "member"},
-	"admin": {},
-	"lifecycle": {"owner"},
-	"plan": {"owner", "member"},
-	"authenticated": {"owner", "member", "reporter", "stranger"},
+	"analyze": {"owner", "reporter"},
+	"plan": {"owner", "reporter"},
+	"execute": {"owner"},
+	"lifecycle": {"owner", "reporter"},
 }
 
-# agent_rpcs maps an action to the set of RPCs an agent is allowed to call for that action.
+# group -> RPCs an agent (MCP session) may call. Nothing else is allowed for an agent, even when
+# the user behind it is a global admin: the gates exist so that a person controls the agent.
 agent_rpcs := {
 	"read": {
-		"GetRequest", "ListRequests", "ListRequestTimeline", 
-		"GetSolution", "ListSolutions", "ListRequestLinks", "CheckSecretScanInfo",
+		"GetRequest", "ListRequests", "ListBacklog", "ListRequestTypeHistory", "ListRequestLinks",
+		"ListSolutions", "GetApproval", "ListApprovals",
 	},
-	"create": {
-		"CreateRequest", "SpawnChildRequest",
-	},
-	"triage": {
-		"ClassifyRequest",
-	},
-	"solution": {
-		"ProposeSolution", "UpdateSolution", "MarkSolutionApproved",
-	},
-	"execute": {
-		"RecordExecutionPlan", "RecordExecutionResult",
-	},
+	"create": {"CreateRequest", "SpawnChildRequest"},
+	"triage": {"ClassifyRequest", "ChangeRequestType"},
+	"analyze": {"GenerateSolution"},
+	"lifecycle": {"ReturnToBacklog", "ReopenRequest"},
+	"authenticated": {"GetRequestFlow", "GetRequestFlowSettings", "ListPendingForUser"},
 }
 
-# Build the set of roles the caller holds.
 caller_roles contains role if {
 	role := input.caller_project_role
 	role != ""
 }
 
-caller_roles contains "reporter" if {
-	input.is_reporter == true
-}
-
-caller_roles contains "stranger" if {
-	input.caller_project_role == ""
-	input.is_reporter == false
-}
+caller_roles contains "reporter" if input.is_reporter == true
 
 default allow := false
 
-# Rule 1: Global admin is allowed for all actions EXCEPT when actor_type is agent 
-# and the action forbids agents (decide, execute, admin, lifecycle, plan)
+agent_allowed if input.rpc in agent_rpcs[input.action]
+
+# A missing actor_type counts as a person, like tenant.ActorType on the Go side.
+is_agent if input.actor_type == "agent"
+
+human if not is_agent
+
 allow if {
+	human
 	input.caller_global_role == "admin"
-	input.actor_type != "agent"
 }
 
-# Rule 2: Global admin using agent is restricted to agent_rpcs for the allowed actions.
 allow if {
+	human
+	some role in caller_roles
+	role in group_roles[input.action]
+}
+
+allow if {
+	is_agent
+	agent_allowed
 	input.caller_global_role == "admin"
-	input.actor_type == "agent"
-	agent_allowed(input.action, input.rpc)
 }
 
-# Rule 3: Regular user check against group_roles.
 allow if {
-	input.actor_type != "agent"
-	roles := group_roles[input.action]
-	count(caller_roles & roles) > 0
+	is_agent
+	agent_allowed
+	some role in caller_roles
+	role in group_roles[input.action]
 }
 
-# Rule 4: Agent check against group_roles and agent_rpcs.
+# Front doors: any authenticated person; the Go side decides who may really approve.
 allow if {
-	input.actor_type == "agent"
-	roles := group_roles[input.action]
-	count(caller_roles & roles) > 0
-	agent_allowed(input.action, input.rpc)
+	human
+	input.action in {"decide", "authenticated"}
 }
 
-# Helper to check if agent is allowed to call this RPC for this action.
-agent_allowed(action, rpc) if {
-	allowed_rpcs := agent_rpcs[action]
-	rpc in allowed_rpcs
+# Agents may only reach the read-only "authenticated" RPCs listed in agent_rpcs.
+allow if {
+	is_agent
+	input.action == "authenticated"
+	agent_allowed
 }

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/{rpc_catalog.go,request_access.go}` (mới), `.../internal/usecase/authorize_request_action.go` (mới), `.../internal/adapter/grpc/{interceptors.go,actor_type.go,request_access.go,stream_interceptors.go}` (mới), `.../internal/adapter/grpcclient/project_role_resolver.go` (mới), `.../cmd/server/main.go` (sửa), `.../internal/config/config.go` (sửa: `GATEWAY_INTERNAL_TOKEN`, `SERVICE_INTERNAL_TOKEN`) và `_test.go` tương ứng
 **Depends on:** TASK-REQ-035-02 (`tenant.ActorType`), TASK-REQ-035-03 (`RequestPolicy`), BE-REQ-SOL-001, 002 (`RequestRepository`), TASK-REQ-025-02 (`flow_gate`, cùng danh mục), BE-REQ-SOL-009 (`ApprovalRepository` để định vị theo `approval_id`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `cd backend-go && opa test policy/orca-authz && go test ./services/request-service/... && go test -tags integration ./services/request-service/...`)
 
 ---
 
@@ -71,3 +71,12 @@ Ma trận kỳ vọng dùng chung với task 03: bảng nhóm × vai trò nằm 
 - Gọi `project-service` trong đường nóng của mỗi RPC thêm độ trễ; cache giảm nhưng lần đầu vẫn tốn một RPC (chưa đo).
 - `ListMembers` có thể trả danh sách lớn với dự án đông người; nếu có RPC tra thành viên đơn lẻ (kiểm proto) thì dùng nó.
 - Nhóm của `RecordRequestCheck`, `RequestApproval` là suy luận; xác nhận khi proto CR-014, 009 đã chốt.
+
+## Ghi chú triển khai (2026-10-08)
+
+- `Catalog` viết lại cho 82 RPC thật của 4 service `orca.request.v1` (bản cũ có tên RPC không tồn tại). `ValidateCatalog` gọi ở khởi động (`wire_security.go`); test quét `ServiceDesc` và registry proto để RPC mới không lọt. `Entry` có thêm `Field` (trường proto chứa id) và `Entity` (`LocEntityID`) cho RPC theo id con (clarification, decision, finding...): chưa có resolver nên người không phải admin nhận NOT_FOUND (fail closed) cho tới khi chủ sở hữu thực thể đăng ký `RegisterEntity`.
+- Chuỗi: `adapter/grpc/security_chain.go` (`SecurityChainConfig` có `AfterGuard`, `AfterAuthz` làm điểm cắm). Test bufconn: không token, token sai, token cấu hình rỗng, token gateway không mở RPC nội bộ, agent bị từ chối `Approve`/`StartPhase`/`SetRequestFlowSettings`, stream `ExportTenantRequests`, thứ tự điểm cắm. Test mỗi RPC x `admin|owner|member|reporter|stranger|agent` sinh từ Catalog với Rego thật.
+- Health/reflection không thuộc `Catalog` và đi qua (bắt được khi chạy `cmd/server` tích hợp); mọi phương thức khác dưới `/orca.request.v1.` mà thiếu trong Catalog bị từ chối.
+- Vai trò `reporter` chỉ có nghĩa trên một Request: RPC theo `project_id` coi người báo cáo không phải thành viên như người lạ.
+- `ProjectRoleResolver` cache 30 giây (test đồng hồ giả nhắc rủi ro gỡ thành viên). Lỗi project-service là `Unavailable`; PermissionDenied/NotFound của project-service nghĩa là không phải thành viên. Danh sách (`ListRequests`, `ListBacklog` view request) lọc theo dự án thành viên qua `ProjectScope` (thêm `ListFilter.ProjectIDs`, `BacklogRequestFilter.ProjectIDs`).
+- Người gọi đã kiểm: `grpcmw`, `tenant`, `internalcaller` không sửa (chỉ dùng). Chỉ `gateway` gọi `request-service` (grep client proto). `flowGate` của 025-02 chưa có trong cây này: chèn qua `AfterGuard`.

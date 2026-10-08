@@ -1,6 +1,6 @@
 # BE-REQ-SOL-033: Hồ sơ năng lực dev server ở `infra-fleet-service`, `HandshakeInfo` mang `features`, và client Go của `agent.execPrompt` mới
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Tài liệu ngày 2026-10-06; số dòng và đường dẫn đã đối chiếu với `backend-go/services/infra-fleet-service` cùng ngày. `request-service` chưa có thư mục: mọi đường dẫn của nó là "(mới)". Đây chỉ là **phần backend** của CR-REQ-033; phần trong `agent/` do agent khác soạn (xem mục 2.K).
+> **🚧 Đang triển khai: 3/6 task xong** (033-01, 02, 03 trong `infra-fleet-service`, kiểm chứng 2026-10-07; 033-04, 05 và phần `request-service` của 033-06 để đợt R2). Ghi chú triển khai: [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md). Tài liệu ngày 2026-10-06; số dòng và đường dẫn đã đối chiếu với `backend-go/services/infra-fleet-service` cùng ngày. `request-service` chưa có thư mục: mọi đường dẫn của nó là "(mới)". Đây chỉ là **phần backend** của CR-REQ-033; phần trong `agent/` do agent khác soạn (xem mục 2.K).
 
 **CR:** [CR-REQ-033](../../../../../../docs/crs/v6/agent-capabilities/CR-REQ-033-agent-readonly-worktree-and-capability-report.md)
 **Service:** `infra-fleet-service` (proto, usecase, adapter hai dialect, migration `0039`) · `request-service` (mới, chỉ là người gọi) · `proto/orca/infrafleet/v1`

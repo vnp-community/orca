@@ -24,8 +24,13 @@ import (
 )
 
 // registryInternalMethods are callable only by trusted internal services
-// (infra-fleet at agent spawn), guarded like the gateway-only governance RPCs.
-var registryInternalMethods = []string{"/orca.mcp.v1.McpRegistryService/ResolveAgentMcpConfig"}
+// (infra-fleet at agent spawn, request-service for context sources), guarded
+// like the gateway-only governance RPCs.
+var registryInternalMethods = []string{
+	"/orca.mcp.v1.McpRegistryService/ResolveAgentMcpConfig",
+	"/orca.mcp.v1.McpRegistryService/CallExternalTool",
+	"/orca.mcp.v1.McpRegistryService/ReadExternalResource",
+}
 
 type externalRegistry struct {
 	server *mcpgrpc.RegistryServer
@@ -86,7 +91,7 @@ func buildExternalRegistry(repo *mcppostgres.Repository, defaults usecase.Defaul
 		Enabled: cfg.AgentConfigEnabled, MaxDepth: cfg.MaxAgentDepth, TokenTTL: cfg.AgentTokenTTL, TokenScopes: cfg.AgentTokenScopes,
 		OrcaMcpURL: cfg.OrcaMcpURL, StdioEnabled: cfg.StdioEnabled, StdioAllowUnsandboxed: cfg.StdioAllowUnsandboxed, URLPolicy: policy,
 	}, clock)
-	w.server = mcpgrpc.NewRegistryServer(w.reg, resolve)
+	w.server = mcpgrpc.NewRegistryServer(w.reg, resolve, usecase.NewExternalServerClient(repo, broker, prober, repo, clock))
 	return w, nil
 }
 

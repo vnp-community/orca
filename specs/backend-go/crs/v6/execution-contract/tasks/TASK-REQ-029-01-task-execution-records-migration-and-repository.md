@@ -5,7 +5,7 @@
 **Service/Area:** `task-service` / migration, domain, port, adapter postgres và mysql
 **File:** `backend-go/services/task-service/migrations/postgres/NNNN_task_execution_records.{up,down}.sql` (mới), `migrations/mysql/NNNN_task_execution_records.{up,down}.sql` (mới), `internal/domain/execution_record.go` (mới), `internal/usecase/task_execution_record_ports.go` (mới), `internal/adapter/postgres/task_execution_record_repository.go` (mới), `internal/adapter/mysql/task_execution_record_repository.go` (mới), và các `_test.go`
 **Depends on:** TASK-REQ-011-01 (migration `0015`/`0016`), migration `task_specs` của CR-REQ-027 (chỉ để chốt số `NNNN`; bảng này không FK sang `task_specs`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./services/task-service/... ; go test -tags integration ./internal/adapter/{postgres,mysql} -run 'TaskExecutionRecord|Migration0020' (Postgres 16 và MySQL 8.0 thật))
 
 ---
 
@@ -69,6 +69,8 @@
 - [x] Không có truy vấn nào thiếu `tenant_id`.
 - [x] `TailUTF8` không bao giờ trả chuỗi không hợp lệ UTF-8.
 - [x] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable.
+
+> Ghi chú triển khai: Số migration dùng: `0021`. RLS `FORCE` thật (khác mẫu cũ của task-service). Kiểm trên Postgres 16 và MySQL 8.0; chưa thử Postgres 14 và TiDB.
 
 ## Rủi ro và lưu ý
 

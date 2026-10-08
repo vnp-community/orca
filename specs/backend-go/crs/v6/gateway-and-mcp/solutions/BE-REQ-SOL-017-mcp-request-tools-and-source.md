@@ -1,6 +1,6 @@
 # BE-REQ-SOL-017: Tool MCP `request_*`, `solution_*`, `approval_*`, `backlog_*` và MCP làm nguồn Request
 
-> ✅ **Đã triển khai.** Toàn bộ code đã được implement và verify (xem task list).
+> 🚧 Đang triển khai: 4/5 task xong (017-05 e2e Python và hướng dẫn còn lại). Kiểm chứng 2026-10-08.
 
 **CR:** [CR-REQ-017](../../../../../../docs/crs/v6/gateway-and-mcp/CR-REQ-017-mcp-request-tools-and-source.md)
 **Service:** `api-gateway` (`internal/adapter/mcpserver/tools`), `tests/mcp/`, `docs/guides/mcp/`

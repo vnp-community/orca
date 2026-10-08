@@ -1,6 +1,6 @@
 # BE-REQ-SOL-012: Sinh Plan, Phase và Task từ Solution đã duyệt (`GeneratePlan`, `CreatePlanTree`)
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Cần BE-REQ-SOL-011 (type, `request_id`, chỉ mục một Plan hoạt động) và các solution của CR-REQ-003, 007, 009 ở `request-service`.
+> **🚧 Đang triển khai: 2/7 task xong (012-01, 012-02 ở `task-service`, kiểm chứng 2026-10-08). Còn 012-03 đến 012-07 ở `request-service`.**
 
 **CR:** [CR-REQ-012](../../../../../../docs/crs/v6/plan-phase-task/CR-REQ-012-plan-phase-task-generation-from-solution.md)
 **Service:** `request-service` (mới, dựng ở CR-REQ-001) · `task-service` (RPC `CreatePlanTree`) · `proto/orca/request/v1`, `proto/orca/task/v1`

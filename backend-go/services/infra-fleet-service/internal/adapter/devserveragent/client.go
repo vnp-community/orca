@@ -122,6 +122,10 @@ type Client struct {
 	// was not passed to New), matching sshProvisioner's nil-means-disabled
 	// convention.
 	tokens AgentTokenSource
+
+	// onSessionAttached runs (in its own goroutine) after any session
+	// attaches a transport — see WithOnSessionAttached.
+	onSessionAttached func(devServerID string)
 }
 
 var _ usecase.LiveSessionCloser = (*Client)(nil)
@@ -161,6 +165,15 @@ func WithRelaySSH(provisioner sshReattacherAndProvisioner) Option {
 func WithAgentTokens(tokens AgentTokenSource) Option {
 	return func(c *Client) {
 		c.tokens = tokens
+	}
+}
+
+// WithOnSessionAttached registers a callback fired after a session attaches a
+// transport (every connect path and reconnect). It runs in a new goroutine so
+// a slow callback (e.g. a capability probe) can never delay the handshake.
+func WithOnSessionAttached(fn func(devServerID string)) Option {
+	return func(c *Client) {
+		c.onSessionAttached = fn
 	}
 }
 
@@ -407,7 +420,6 @@ func (c *Client) CancelReconnect(devServerID string) {
 	}
 	sess.cancelReconnect()
 }
-
 
 // Exec dispatches one JSON-RPC method call (e.g. "ports.scan",
 // "preflight.check", "shell.exec") to the Dev Server Agent over devServer's
@@ -1166,5 +1178,10 @@ func (c *Client) Close() {
 func (c *Client) initSession(sess *session, devServerID string) {
 	sess.devServerID = devServerID
 	sess.onCodeIntel = c.routeCodeIntelNotification
-	sess.onAttached = c.emitResync
+	sess.onAttached = func(id string) {
+		c.emitResync(id)
+		if fn := c.onSessionAttached; fn != nil {
+			go fn(id)
+		}
+	}
 }

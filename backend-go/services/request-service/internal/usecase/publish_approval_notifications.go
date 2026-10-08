@@ -3,70 +3,85 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/url"
 
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
+// PublishApprovalNotifications enriches approval events just before the outbox relay publishes them:
+// recipients, title, body and deep link are added so notification-service needs no directory knowledge.
+// The event id is untouched, so notification-service dedupes redeliveries.
 type PublishApprovalNotifications struct {
 	Expander *ExpandApprovalRecipients
-	Publisher func(ctx context.Context, ev domain.OutboxEvent) error // Stub outbox publisher
 }
 
-func (uc *PublishApprovalNotifications) ProcessAndPublish(ctx context.Context, ev domain.OutboxEvent) error {
-	var payload map[string]any
-	if err := json.Unmarshal(ev.Payload, &payload); err != nil {
-		return err // Should log and skip actually in relay
+// ErrNotEnrichable marks a payload that can never be enriched (malformed JSON); the relay publishes it as is
+// instead of blocking the stream behind it.
+var ErrNotEnrichable = fmt.Errorf("approval event payload not enrichable")
+
+func (uc *PublishApprovalNotifications) Handles(subject string) bool {
+	return subject == domain.SubjectApprovalRequested || subject == domain.SubjectApprovalDecided
+}
+
+func str(m map[string]any, k string) string {
+	v, _ := m[k].(string)
+	return v
+}
+
+// Enrich must run under the event's tenant (ctx). Only directory failures return an error (relay retries).
+func (uc *PublishApprovalNotifications) Enrich(ctx context.Context, subject string, payload []byte) ([]byte, error) {
+	var m map[string]any
+	if err := json.Unmarshal(payload, &m); err != nil || m == nil {
+		return nil, ErrNotEnrichable
 	}
+	approvalID, requestID := str(m, "approval_id"), str(m, "request_id")
+	label := domain.ApprovalSubjectLabel(domain.SubjectType(str(m, "subject_type")))
+	ref := ""
+	if n, ok := m["request_number"].(float64); ok && n > 0 {
+		ref = fmt.Sprintf(" for REQ-%d", int64(n))
+	}
+	reporterID, requestedBy := str(m, "reporter_id"), str(m, "requested_by")
 
-	appID, _ := payload["approval_id"].(string)
-	repID, _ := payload["reporter_id"].(string) // Assuming this was included
-	selfAllowed, _ := payload["self_approval_allowed"].(bool) // Assuming included
-
-	switch ev.Subject {
-	case "orca.request.approval.requested":
-		users, err := uc.Expander.Execute(ctx, appID, selfAllowed, repID)
+	switch subject {
+	case domain.SubjectApprovalRequested:
+		selfAllowed, _ := m["self_approval_allowed"].(bool)
+		users, err := uc.Expander.Execute(ctx, approvalID, selfAllowed, reporterID, requestedBy)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if len(users) == 0 {
-			// No notification
-			return nil
+		m["title"], m["body"] = "Approval needed", label+" approval required"+ref
+		if str(m, "reason") == "reminder" {
+			m["title"], m["body"] = "Approval reminder", label+" approval still pending"+ref
 		}
-		payload["user_ids"] = users
-		payload["title"] = "Approval needed"
-		payload["body"] = "Approval required for request"
-		payload["deep_link"] = "/?section=requests&request=req_id&approval=" + appID
-	case "orca.request.approval.decided":
-		// logic for decided
-		decidedBy, _ := payload["decided_by"].(string)
-		requestedBy, _ := payload["requested_by"].(string)
-		
-		users := []string{repID}
-		if requestedBy != "system" {
-			users = append(users, requestedBy)
+		if len(users) > 0 {
+			m["user_ids"] = users
 		}
-
-		var finalUsers []string
-		for _, u := range users {
-			if u != decidedBy && u != "" {
-				finalUsers = append(finalUsers, u)
+	case domain.SubjectApprovalDecided:
+		decision, decidedBy := str(m, "decision"), str(m, "decided_by")
+		users := make([]string, 0, 2)
+		for _, u := range []string{reporterID, requestedBy} {
+			if u != "" && u != systemActor && u != decidedBy && !contains(users, u) {
+				users = append(users, u)
 			}
 		}
-
-		if len(finalUsers) == 0 {
-			return nil
+		m["title"], m["body"] = label+" "+decision, "Decision: "+decision
+		if len(users) > 0 {
+			m["user_ids"] = users
 		}
-
-		payload["user_ids"] = finalUsers
-		payload["title"] = "Approval decided"
-		payload["body"] = "Decision: " + payload["decision"].(string)
-		payload["deep_link"] = "/?section=requests&request=req_id&approval=" + appID
 	default:
-		return uc.Publisher(ctx, ev) // Pass through
+		return payload, nil
 	}
+	m["deep_link"] = "/?section=requests&request=" + url.QueryEscape(requestID) + "&approval=" + url.QueryEscape(approvalID)
+	delete(m, "comment") // defense in depth: a stored notification must never carry decision text
+	return json.Marshal(m)
+}
 
-	newBytes, _ := json.Marshal(payload)
-	ev.Payload = newBytes
-
-	return uc.Publisher(ctx, ev)
+func contains(ss []string, s string) bool {
+	for _, x := range ss {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }

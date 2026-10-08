@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/adapter/grpc/server_plan_tree.go` (mới), `internal/adapter/grpc/server.go` (đăng ký dependency), `internal/adapter/postgres/unique_violation.go` (mới), `internal/adapter/mysql/unique_violation.go` (mới), `internal/adapter/postgres/create_plan_tree_integration_test.go` (mới), `internal/adapter/mysql/create_plan_tree_integration_test.go` (mới), `cmd/server/main.go`
 **Depends on:** TASK-REQ-012-01
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./...` + `go test -tags integration ./internal/adapter/...` (Postgres 16 và MySQL 8) trong task-service)
 
 ---
 
@@ -47,3 +47,10 @@
 - Nếu MySQL deadlock do `ListByKindForUpdate`, giảm bằng cách thêm cạnh theo lô nhỏ hoặc truy vấn khoá theo tập task của cây thay vì toàn bộ cạnh theo loại; ghi kết quả đo vào PR (chưa đo).
 - Nhận diện lỗi theo tên chỉ mục phụ thuộc thông điệp driver; giữ test cho từng dialect để phát hiện đổi phiên bản driver.
 - RPC có thể bị gọi lặp bởi retry: idempotency dựa vào `request_id` và chỉ mục duy nhất, không dựa vào khoá phía client.
+
+## Ghi chú triển khai
+
+- Proto: thêm `rpc CreatePlanTree` và message `CreatePlanTreeRequest` (trường 1-9), `PlanTreePhase`, `PlanTreeTask`, `CreatePlanTreeResponse`. Bỏ `plan_task_type = 10` của solution (không dùng: `single_task` đi qua `CreateTask`). Mã sinh chỉ sinh lại cho task proto trong worktree này; người điều phối hợp nhất `task.proto` và sinh lại.
+- `server_plan_tree.go` dùng `WithCreatePlanTree` (không đổi chữ ký `New`); `server.go` chỉ thêm một field. RPC không qua `ResolvePermission`, gateway không định tuyến (chưa kiểm `parity_test.go` của MCP: chưa chạy).
+- Nhận diện vi phạm duy nhất: `IsUniqueViolation` ở hai adapter, bọc `ErrActivePlanExists` trong nhánh INSERT container (Postgres theo `ConstraintName`, MySQL theo tên chỉ mục trong thông điệp).
+- Test integration: `plan_tree_execution_events_test.go` mỗi dialect (`_FullTree`, `_RollbackLeavesNothing`, `_ConcurrentSameRequest_OnePlan`, `_SupersedeThenRecreate`, `_CreatorInheritsAccessThreeLevels`); unit `server_plan_tree_test.go` (`TestServer_CreatePlanTree_MapsErrors`).

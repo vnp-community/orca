@@ -5,7 +5,7 @@
 **Service:** `request-service` (kèm kiểm thử `task-service`)
 **File:** `backend-go/services/request-service/internal/usecase/reconcile_executing_requests.go` (mới), `internal/adapter/postgres/executing_requests.go`, `internal/adapter/mysql/executing_requests.go` (mới), `cmd/server/main.go`, `internal/config/config.go`, `internal/usecase/execution_flow_integration_test.go` (mới)
 **Depends on:** TASK-REQ-013-04, 05, 06
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`; E2E với task-service giả qua bufconn)
 
 ---
 
@@ -46,3 +46,7 @@
 - Đối soát và consumer có thể đua; thiết kế idempotent (`processed_events`, CAS `TransitionRequest`, `phase_starts`) đã chịu; test đua bắt buộc.
 - E2E cần cả hai service: có thể chậm hoặc không chạy được trên CI hiện tại; ghi rõ phần chưa chạy.
 - Chu kỳ 60 giây và cửa sổ 15 phút là giá trị đề xuất, chưa đo.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

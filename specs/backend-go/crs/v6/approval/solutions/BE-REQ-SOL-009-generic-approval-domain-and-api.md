@@ -1,6 +1,6 @@
 # BE-REQ-SOL-009: Approval tổng quát (domain, bảng, API, `SubjectHandler`)
 
-> **📋 Proposed** (chưa triển khai). Thiết kế thực thi cho CR-REQ-009 trong `request-service` (mới).
+> **✅ Đã triển khai (kiểm chứng 2026-10-08; 6/6 task)**: use case, repository hai dialect, `ApprovalService` (8 RPC) và wiring thật trong `request-service`. Phần artifact của Solution/Plan/Phase/Findings/Answer/Task list/pre-deploy nối qua cổng `SubjectArtifacts`, chưa gắn dịch vụ thật (xem IMPLEMENTATION-NOTES). Thiết kế thực thi cho CR-REQ-009.
 
 **CR:** [CR-REQ-009](../../../../../../docs/crs/v6/approval/CR-REQ-009-generic-approval-domain-and-api.md)
 **Service:** `request-service` (mới) · `proto`

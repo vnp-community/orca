@@ -1,6 +1,6 @@
 # BE-REQ-SOL-024: Đồng bộ trạng thái Jira theo Request, audit và observability
 
-> ✅ **Đã triển khai.** Toàn bộ code đã được implement và verify (xem task list).
+> ✅ Đã triển khai (kiểm chứng 2026-10-08): 8/8 task xong. Chưa kiểm chứng: Jira thật, `promtool`, `solution.choose` end-to-end (RPC `ChooseSolutionOption` còn `Unimplemented`). Chi tiết: `../IMPLEMENTATION-NOTES.md`.
 
 **CR:** [CR-REQ-024](../../../../../../docs/crs/v6/request-quality-rollout/CR-REQ-024-jira-status-sync-audit-observability.md)
 **Service:** `issue-status-sync`, `request-service` (mới, audit, metric, trace, RPC tra cứu), `common/auditclient`, `backend-go/deploy/alerts`

@@ -49,7 +49,27 @@ type AnalysisRun struct {
 	RawOutput      *string
 	StartedAt      time.Time
 	FinishedAt     *time.Time
+	// SolutionID is the draft the run fills; ProjectID and ActorID let a restarted worker rebuild its context.
+	SolutionID string
+	ProjectID  string
+	ActorID    string
+	Feedback   string
+	// Enforcement and RepoCheck are only set by agent_readonly runs.
+	Enforcement string
+	RepoCheck   string
 }
+
+// Run enforcement and repo-check values recorded on agent_readonly runs.
+const (
+	EnforcementAgent      = "agent_enforced"
+	EnforcementPromptOnly = "prompt_only"
+	RepoCheckSkipped      = "skipped"
+	RepoCheckClean        = "clean"
+	RepoCheckModified     = "modified"
+)
+
+// RecentRunsLimit is how many past runs ListSolutions shows so the UI can surface a failure.
+const RecentRunsLimit = 10
 
 // RecordAttempt increments the attempt counter. Fails if exceeding 2.
 func (r *AnalysisRun) RecordAttempt() error {

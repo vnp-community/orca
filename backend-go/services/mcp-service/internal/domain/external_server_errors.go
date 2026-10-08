@@ -10,6 +10,9 @@ const (
 	CodeServerDigestMismatch  = "MCP_SERVER_DIGEST_MISMATCH"
 	CodeServerNameConflict    = "MCP_SERVER_NAME_CONFLICT"
 	CodeServerNotApproved     = "MCP_SERVER_NOT_APPROVED"
+	CodeServerNotUsable       = "MCP_SERVER_NOT_USABLE"
+	CodeToolNotApproved       = "MCP_TOOL_NOT_APPROVED"
+	CodeResultTooLarge        = "MCP_RESULT_TOO_LARGE"
 )
 
 // ErrSSRFBlocked messages are static or derived from the URL shape only; they
@@ -49,3 +52,17 @@ func ErrUnavailable(msg string, cause error) error {
 type ErrProbeFailed struct{ Reason string }
 
 func (e ErrProbeFailed) Error() string { return "probe failed: " + e.Reason }
+
+// ErrServerNotUsable: not approved, disabled, tools changed (rug-pull) or stdio.
+func ErrServerNotUsable(reason string) error {
+	return apperrors.New(apperrors.KindFailedPrecondition, CodeServerNotUsable, "external server is not usable: "+reason, nil)
+}
+
+func ErrToolNotApproved() error {
+	return apperrors.New(apperrors.KindPermissionDenied, CodeToolNotApproved, "tool is not in the approved tool set of this server", nil)
+}
+
+// ErrResultTooLarge is only for callers that forbid truncation.
+func ErrResultTooLarge() error {
+	return apperrors.New(apperrors.KindResourceExhausted, CodeResultTooLarge, "external result exceeds the size limit", nil)
+}

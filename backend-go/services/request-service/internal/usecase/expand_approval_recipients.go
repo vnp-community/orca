@@ -2,31 +2,35 @@ package usecase
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
-type AdminDirectoryResolver interface {
-	ListAdmins(ctx context.Context, tenantID string) ([]string, error)
-}
+// DefaultNotifyMaxRecipients caps one approval's recipients (REQUEST_APPROVAL_NOTIFY_MAX_RECIPIENTS).
+const DefaultNotifyMaxRecipients = 50
 
-type TeamMembershipResolver interface {
-	MembersOfTeam(ctx context.Context, teamID string) ([]string, error)
-}
-
+// ExpandApprovalRecipients turns the approver snapshot into user ids: users stay, the reporter is the Request's
+// reporter, teams and role:admin go through the directories. Lookup errors are returned so the outbox relay retries;
+// they never touch the Approval.
 type ExpandApprovalRecipients struct {
 	ApproverRepo  ApprovalApproverRepository
 	TeamResolver  TeamMembershipResolver
 	AdminResolver AdminDirectoryResolver
+	MaxRecipients int
+	Log           *slog.Logger
 }
 
-func (uc *ExpandApprovalRecipients) Execute(ctx context.Context, approvalID string, selfApprovalAllowed bool, reporterID string) ([]string, error) {
+func (uc *ExpandApprovalRecipients) Execute(ctx context.Context, approvalID string, selfApprovalAllowed bool, reporterID, requestedBy string) ([]string, error) {
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
 		return nil, err
 	}
-
+	log := uc.Log
+	if log == nil {
+		log = slog.Default()
+	}
 	approvers, err := uc.ApproverRepo.ListForApproval(ctx, tenantID, approvalID)
 	if err != nil {
 		return nil, err
@@ -40,39 +44,50 @@ func (uc *ExpandApprovalRecipients) Execute(ctx context.Context, approvalID stri
 		case domain.PrincipalKindReporter:
 			users = append(users, reporterID)
 		case domain.PrincipalKindTeam:
+			if uc.TeamResolver == nil {
+				return nil, domain.ErrApprovalDirectoryUnavailable
+			}
 			members, err := uc.TeamResolver.MembersOfTeam(ctx, p.ID)
 			if err != nil {
-				return nil, err // Let relay retry
+				return nil, err
 			}
 			users = append(users, members...)
 		case domain.PrincipalKindRole:
-			if p.ID == "admin" {
-				admins, err := uc.AdminResolver.ListAdmins(ctx, tenantID)
-				if err != nil {
-					return nil, err // Let relay retry
-				}
-				users = append(users, admins...)
+			if p.ID != "admin" {
+				log.Warn("no directory for role principal; skipping recipients", slog.String("role", p.ID))
+				continue
 			}
+			if uc.AdminResolver == nil {
+				return nil, domain.ErrApprovalDirectoryUnavailable
+			}
+			admins, err := uc.AdminResolver.ListAdmins(ctx, tenantID)
+			if err != nil {
+				return nil, err
+			}
+			users = append(users, admins...)
 		}
 	}
 
-	// Deduplicate
-	seen := make(map[string]bool)
-	var unique []string
+	seen := make(map[string]bool, len(users))
+	var eligible []string
 	for _, u := range users {
-		if !seen[u] {
-			seen[u] = true
-			unique = append(unique, u)
+		if u == "" || seen[u] {
+			continue
 		}
+		seen[u] = true
+		if !selfApprovalAllowed && (u == reporterID || (u == requestedBy && requestedBy != systemActor)) {
+			continue
+		}
+		eligible = append(eligible, u)
 	}
 
-	// Filter
-	eligible := domain.EligibleApprovers(nil, reporterID, selfApprovalAllowed, unique)
-
-	// Truncate at 50
-	if len(eligible) > 50 {
-		eligible = eligible[:50]
+	max := uc.MaxRecipients
+	if max <= 0 {
+		max = DefaultNotifyMaxRecipients
 	}
-
+	if len(eligible) > max {
+		log.Warn("approval recipients truncated", slog.String("approval_id", approvalID), slog.Int("dropped", len(eligible)-max))
+		eligible = eligible[:max]
+	}
 	return eligible, nil
 }

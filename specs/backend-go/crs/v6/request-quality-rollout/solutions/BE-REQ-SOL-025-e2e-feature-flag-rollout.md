@@ -1,6 +1,7 @@
 # BE-REQ-SOL-025: Kiểm thử đầu cuối, cờ `request_flow_enabled`, rollout và tài liệu
 
-> ✅ **Đã triển khai.** Toàn bộ code đã được implement và verify (xem task list).
+> 🚧 Đang triển khai: 4/8 task xong (025-01, 02, 05, 06; kiểm chứng 2026-10-08). 025-03, 04, 07, 08 làm một phần: e2e T1 chạy binary thật trên Postgres và MySQL, các giai đoạn sau xác nhận loại chờ RPC của CR-REQ-007/008/012/013; T2 viết nhưng chưa chạy; diễn tập rollback chưa làm. Chi tiết: `../IMPLEMENTATION-NOTES.md`.
+
 
 **CR:** [CR-REQ-025](../../../../../../docs/crs/v6/request-quality-rollout/CR-REQ-025-e2e-tests-feature-flag-rollout.md)
 **Service:** `request-service` (mới: `e2e/`, cờ, interceptor, migration), `backend-go/ci/`, `.github/workflows/`, `deploy/dev/`, `tests/request/` (mới), `docs/guides/request/` (mới)

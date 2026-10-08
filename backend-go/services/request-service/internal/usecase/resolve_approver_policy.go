@@ -7,8 +7,18 @@ import (
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
+// ResolveApproverPolicy picks the most specific tenant policy for the Request's real project, type, size and urgency,
+// falling back to the built-in default when none matches.
 type ResolveApproverPolicy struct {
 	Repo ApprovalPolicyRepository
+}
+
+func policyContextFor(req domain.Request) domain.PolicyContext {
+	urgency := string(req.Urgency)
+	if urgency == "" {
+		urgency = string(domain.UrgencyNormal)
+	}
+	return domain.PolicyContext{ProjectID: req.ProjectID, RequestType: string(req.Type), Size: string(req.Size), Urgency: urgency}
 }
 
 func (uc *ResolveApproverPolicy) Resolve(ctx context.Context, req domain.Request, subjectType domain.SubjectType) (domain.ApprovalPolicy, error) {
@@ -16,33 +26,13 @@ func (uc *ResolveApproverPolicy) Resolve(ctx context.Context, req domain.Request
 	if err != nil {
 		return domain.ApprovalPolicy{}, err
 	}
-
-	projectIDStr := ""
-	if req.ProjectID != "" {
-		projectIDStr = req.ProjectID
-	}
-	reqTypeStr := string(req.Type)
-	sizeStr := "S" // Stub size
-	urgencyStr := "normal" // Stub urgency
-
-	candidates, err := uc.Repo.ListEnabledCandidates(ctx, tenantID, subjectType, projectIDStr, reqTypeStr, sizeStr, urgencyStr)
+	pCtx := policyContextFor(req)
+	candidates, err := uc.Repo.ListEnabledCandidates(ctx, tenantID, subjectType, pCtx.ProjectID, pCtx.RequestType, pCtx.Size, pCtx.Urgency)
 	if err != nil {
 		return domain.ApprovalPolicy{}, err
 	}
-
-	pCtx := domain.PolicyContext{
-		ProjectID:   projectIDStr,
-		RequestType: reqTypeStr,
-		Size:        sizeStr,
-		Urgency:     urgencyStr,
-	}
-
-	var p domain.ApprovalPolicy
 	if selected, ok := domain.SelectPolicy(candidates, pCtx); ok {
-		p = selected
-	} else {
-		p = domain.DefaultPolicy(subjectType, pCtx)
+		return selected, nil
 	}
-
-	return p, nil
+	return domain.DefaultPolicy(subjectType, pCtx), nil
 }

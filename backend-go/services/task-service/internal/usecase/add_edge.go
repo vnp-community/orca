@@ -85,7 +85,11 @@ func addEdgeWithinTx(ctx context.Context, tenantID string, tasks TaskRepository,
 		if err != nil {
 			return apperrors.New(apperrors.KindInternal, "TASK_EDGE_DEP_LOOKUP_FAILED", "failed to load dependency task", err)
 		}
-		if dep.Status != domain.StatusDone && dep.Status != domain.StatusCancelled {
+		// Plan/phase status is derived from children; blocking one would be overwritten or stick wrongly.
+		// A failed lookup keeps the old behavior (UpdateStatus below reports a missing task).
+		from, fromErr := tasks.Get(ctx, tenantID, edge.FromTaskID)
+		fromIsContainer := fromErr == nil && domain.IsContainerType(from.Type)
+		if !fromIsContainer && dep.Status != domain.StatusDone && dep.Status != domain.StatusCancelled {
 			if err := tasks.UpdateStatus(ctx, tenantID, edge.FromTaskID, domain.StatusBlocked); err != nil {
 				return apperrors.New(apperrors.KindInternal, "TASK_EDGE_AUTO_BLOCK_FAILED", "failed to auto-block dependent task", err)
 			}

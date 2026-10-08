@@ -5,7 +5,7 @@
 **Service:** `request-service`, `proto`
 **File:** `proto/orca/request/v1/request.proto` (sửa), `proto/gen/go/orca/request/v1/*` (sinh lại), `internal/usecase/get_request_flow.go`, `internal/usecase/get_request_flow_test.go`, `internal/adapter/grpc/server.go` (sửa)
 **Depends on:** TASK-REQ-003-02, TASK-REQ-002-07
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run RPC (13+ kịch bản gRPC, máy trạng thái thật); go test ./internal/adapter/grpc; buf lint/breaking --path orca/request/v1/request.proto`)
 
 ---
 
@@ -39,3 +39,8 @@ README v6 mục 8 điểm 12 liệt kê `GetRequestFlow` là RPC thiếu, giao c
 
 - Gateway chỉ định tuyến được RPC này khi CR-REQ-016 thêm kênh; ở đây chỉ làm phía service.
 - `status_path` có thể bị frontend hiểu là mọi đường; ghi chú trong proto: chỉ là đường chuẩn không gồm nhánh trả backlog, đổi loại, huỷ.
+
+## Ghi chú triển khai
+
+- Handler `GetRequestFlow` ở `adapter/grpc/server_lifecycle.go`, không đọc DB; `TestRequestRPC/GetRequestFlow` kiểm cả 11 loại (`status_path` từ `new` tới `completed`), `has_phases` theo size, `human_confirm_required` của hotfix, loại lạ là `InvalidArgument`.
+- `buf lint` và `buf breaking` (so với `main`) chỉ chạy trên `request.proto`; lint toàn module còn lỗi sẵn có ở package khác.

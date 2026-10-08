@@ -1,1 +1,1 @@
-DROP TABLE request.analysis_runs;
+DROP TABLE IF EXISTS request.analysis_runs;

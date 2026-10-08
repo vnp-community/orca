@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/grpc/server.go`, `internal/adapter/grpc/request_mapper.go` (sửa); `internal/adapter/postgres/request_repository.go`, `internal/adapter/mysql/request_repository.go` (sửa `List`); `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-004-03, TASK-REQ-004-04, TASK-REQ-004-05
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run RPC (13+ kịch bản gRPC, máy trạng thái thật); go test ./internal/adapter/grpc; buf lint/breaking --path orca/request/v1/request.proto`)
 
 ---
 
@@ -36,3 +36,8 @@
 ## Rủi ro và lưu ý
 
 - Mọi RPC của `request-service` tự kiểm quyền (README v6 mục 8 điểm 13), nhưng mô hình quyền Request chưa chốt (CR-REQ-010). Tạm thời kiểm tenant, user có mặt.
+
+## Ghi chú triển khai
+
+- Handler `CreateRequest`, `LookupRequestBySource` ở `adapter/grpc/server_intake.go`, lắp qua `Server.WithIntake` trong `cmd/server/main.go`. `type_hint` từ client công khai bị bỏ. Kịch bản gRPC `CreateRequest_Manual`, `_IdempotentByClientRequestID`, `_MissingProjectAndUser`, `_IgnoresTypeHint`, `ListRequests_FilterBySource` (lọc đã chuẩn hoá), `LookupRequestBySource` chạy trên Postgres và MySQL thật.
+- README service cập nhật.

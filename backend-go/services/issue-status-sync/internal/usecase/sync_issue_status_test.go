@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/stablyai/orca-go/services/issue-status-sync/internal/domain"
@@ -22,11 +23,16 @@ type fakeTracker struct {
 	gotSite     string
 	catSite     string
 	catCalls    int
+	// transitionErr, when set, is returned by every transition call.
+	transitionErr error
 }
 
 func (f *fakeTracker) TransitionIssue(_ context.Context, _, userID, _, ref, site, state string) error {
 	f.calls++
 	f.gotUser, f.gotState, f.gotRef, f.gotSite = userID, state, ref, site
+	if f.transitionErr != nil {
+		return f.transitionErr
+	}
 	if f.calls <= f.failN {
 		return errors.New("transient failure")
 	}
@@ -277,7 +283,7 @@ func TestMappingTable(t *testing.T) {
 		t.Errorf("worktree.created -> In Progress only from todo, got %+v", created)
 	}
 	for _, hadOpenPR := range []bool{false, true} {
-		if got := mapWorktreeEventToStatus(domain.WorktreeLifecycleEvent{Deleted: true, HadOpenPR: hadOpenPR}); got != (domain.TargetState{}) {
+		if got := mapWorktreeEventToStatus(domain.WorktreeLifecycleEvent{Deleted: true, HadOpenPR: hadOpenPR}); !reflect.DeepEqual(got, domain.TargetState{}) {
 			t.Errorf("worktree.deleted (had_open_pr=%v) must map to nothing, got %+v", hadOpenPR, got)
 		}
 	}
@@ -292,7 +298,7 @@ func TestMappingTable(t *testing.T) {
 	}
 	for _, tc := range prCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := mapPullRequestEventToStatus(tc.ev); got != tc.want {
+			if got := mapPullRequestEventToStatus(tc.ev); !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("got %+v, want %+v", got, tc.want)
 			}
 		})
@@ -388,5 +394,132 @@ func TestHandleWorktreeLifecycle_EmptySiteKeepsDefaultBehaviour(t *testing.T) {
 	}
 	if h.tracker.calls != 1 || h.tracker.gotSite != "" {
 		t.Errorf("want one transition with empty site, got calls=%d site=%q", h.tracker.calls, h.tracker.gotSite)
+	}
+}
+
+type fakeRequestLookup struct {
+	found bool
+	err   error
+	calls int
+	site  string
+}
+
+func (f *fakeRequestLookup) Lookup(_ context.Context, _, _, site, _ string) (bool, error) {
+	f.calls++
+	f.site = site
+	return f.found, f.err
+}
+
+func harnessWithLookup(l RequestLookupClient) (*syncHarness, *recordingObserver) {
+	h := newHarness()
+	obs := &recordingObserver{}
+	h.uc = NewSyncIssueStatus(h.tracker, h.scm, h.projects, h.processed, nil, WithRequestLookup(l), WithObserver(obs))
+	return h, obs
+}
+
+func jiraPR(id string, merged bool) domain.PullRequestLifecycleEvent {
+	return domain.PullRequestLifecycleEvent{
+		EventID: id, TenantID: "t1", Provider: "github", Repo: "o/r", PRNumber: 1, Merged: merged,
+		LinkedIssueProvider: "jira", LinkedIssueRef: "ENG-1", ActorUserID: "user-7",
+	}
+}
+
+func TestRequestOwnedIssueIsNotTouchedByWorktreeOrPR(t *testing.T) {
+	lookup := &fakeRequestLookup{found: true}
+	h, obs := harnessWithLookup(lookup)
+	h.tracker.category = "in_progress"
+	if err := h.uc.HandleWorktreeLifecycle(context.Background(), jiraCreated("ev-w")); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.uc.HandlePullRequestLifecycle(context.Background(), jiraPR("ev-p", true)); err != nil {
+		t.Fatal(err)
+	}
+	if h.tracker.calls != 0 || h.tracker.catCalls != 0 {
+		t.Errorf("a request-owned issue must not be touched, got %+v", h.tracker)
+	}
+	if !reflect.DeepEqual(obs.owned, []string{"worktree", "pr"}) {
+		t.Errorf("owned skips = %v", obs.owned)
+	}
+	if !h.processed.seen["ev-w"] || !h.processed.seen["ev-p"] {
+		t.Error("skipped events must be acknowledged")
+	}
+}
+
+func TestNoRequestKeepsWorktreeAndPRBehaviour(t *testing.T) {
+	lookup := &fakeRequestLookup{found: false}
+	h, _ := harnessWithLookup(lookup)
+	if err := h.uc.HandleWorktreeLifecycle(context.Background(), jiraCreated("ev-w")); err != nil {
+		t.Fatal(err)
+	}
+	h.tracker.category = "in_progress"
+	if err := h.uc.HandlePullRequestLifecycle(context.Background(), jiraPR("ev-p", true)); err != nil {
+		t.Fatal(err)
+	}
+	if h.tracker.calls != 2 || h.tracker.gotState != "Done" || lookup.calls != 2 {
+		t.Errorf("transitions=%d state=%q lookups=%d", h.tracker.calls, h.tracker.gotState, lookup.calls)
+	}
+}
+
+func TestNilLookupClientKeepsOldBehaviour(t *testing.T) {
+	h := newHarness() // no WithRequestLookup
+	if err := h.uc.HandleWorktreeLifecycle(context.Background(), jiraCreated("ev-w")); err != nil {
+		t.Fatal(err)
+	}
+	if h.tracker.calls != 1 {
+		t.Errorf("transitions = %d, want 1", h.tracker.calls)
+	}
+}
+
+func TestLookupErrorNaksTwiceThenAcknowledgesWithoutTouchingJira(t *testing.T) {
+	for name, handle := range map[string]func(*syncHarness) error{
+		"worktree": func(h *syncHarness) error {
+			return h.uc.HandleWorktreeLifecycle(context.Background(), jiraCreated("ev-1"))
+		},
+		"pr": func(h *syncHarness) error {
+			return h.uc.HandlePullRequestLifecycle(context.Background(), jiraPR("ev-1", true))
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h, obs := harnessWithLookup(&fakeRequestLookup{err: errors.New("unavailable")})
+			h.tracker.category = "in_progress"
+			for i := 1; i <= 2; i++ {
+				if err := handle(h); err == nil {
+					t.Fatalf("delivery %d must return an error (Nak)", i)
+				}
+				if h.processed.seen["ev-1"] {
+					t.Fatalf("delivery %d must not MarkSeen", i)
+				}
+			}
+			if err := handle(h); err != nil {
+				t.Fatalf("third delivery must give up, got %v", err)
+			}
+			if !h.processed.seen["ev-1"] || h.tracker.calls != 0 {
+				t.Errorf("seen=%v transitions=%d", h.processed.seen["ev-1"], h.tracker.calls)
+			}
+			if !reflect.DeepEqual(obs.results, []string{name + ":failed"}) {
+				t.Errorf("results = %v", obs.results)
+			}
+		})
+	}
+}
+
+func TestCategoryAllowed(t *testing.T) {
+	cases := []struct {
+		name     string
+		state    domain.TargetState
+		category string
+		want     bool
+	}{
+		{"legacy single matches", domain.TargetState{OnlyFromCategory: "todo"}, "todo", true},
+		{"legacy single differs", domain.TargetState{OnlyFromCategory: "todo"}, "done", false},
+		{"set matches second", domain.TargetState{OnlyFromCategories: []string{"todo", "in_progress"}}, "in_progress", true},
+		{"set rejects other", domain.TargetState{OnlyFromCategories: []string{"todo", "in_progress"}}, "done", false},
+		{"set wins over legacy", domain.TargetState{OnlyFromCategory: "done", OnlyFromCategories: []string{"todo"}}, "done", false},
+		{"no restriction", domain.TargetState{}, "anything", true},
+	}
+	for _, tc := range cases {
+		if got := categoryAllowed(tc.state, tc.category); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }

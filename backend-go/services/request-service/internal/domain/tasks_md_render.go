@@ -13,7 +13,7 @@ import (
 func RenderPlanRegion(ref string, p PlanProposal, ids map[string]string) string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("<!-- orca:begin plan request=%s schema=1 -->\n", ref))
-	
+
 	if len(p.Phases) > 0 {
 		for i, ph := range p.Phases {
 			b.WriteString(fmt.Sprintf("## PH-%d %s\n", i+1, ph.Title))
@@ -41,9 +41,9 @@ func RenderPlanRegion(ref string, p PlanProposal, ids map[string]string) string 
 			}
 		}
 	}
-	
+
 	b.WriteString("<!-- orca:end plan -->")
-	
+
 	t := transform.Chain(norm.NFC)
 	res, _, _ := transform.String(t, b.String())
 	return res

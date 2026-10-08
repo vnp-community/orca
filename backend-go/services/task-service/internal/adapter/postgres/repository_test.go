@@ -294,7 +294,7 @@ func TestRepository_List_FiltersByTenantAndProject(t *testing.T) {
 		}
 	}
 
-	got, _, err := repo.List(ctx, tenantID, projectID, "", 0)
+	got, _, err := repo.List(ctx, tenantID, usecase.ListFilter{ProjectID: projectID})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -302,7 +302,7 @@ func TestRepository_List_FiltersByTenantAndProject(t *testing.T) {
 		t.Fatalf("expected only task a (tenant+project match), got %+v", got)
 	}
 
-	all, _, err := repo.List(ctx, tenantID, "", "", 0)
+	all, _, err := repo.List(ctx, tenantID, usecase.ListFilter{})
 	if err != nil {
 		t.Fatalf("list (no project filter): %v", err)
 	}

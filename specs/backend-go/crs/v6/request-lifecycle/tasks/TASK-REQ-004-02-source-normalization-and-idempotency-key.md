@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_source_normalization.go`, `internal/domain/request_source_normalization_test.go`, `internal/domain/request_intake_errors.go` (mới)
 **Depends on:** TASK-REQ-002-02
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/domain/...`)
 
 ---
 
@@ -42,3 +42,8 @@ Lệnh: `go test ./services/request-service/internal/domain/... -run "Normaliz|I
 
 - Chuẩn hoá `ref` GitLab nhiều cấp chưa kiểm với dữ liệu thật.
 - `site` Jira có thể là workspace id (không phải URL): đừng ép `url.Parse` thất bại thành lỗi.
+
+## Ghi chú triển khai
+
+- Thêm `REQUEST_SOURCE_SITE_REQUIRED` (webhook thiếu `site`) và giới hạn 255 ký tự cho `ref`/`site`/`client_request_id` vì cột MySQL là `VARCHAR(255)`.
+- GitHub/GitLab: `#012` chuẩn hoá thành `#12`.

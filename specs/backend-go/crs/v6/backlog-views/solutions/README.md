@@ -1,6 +1,6 @@
 # backlog-views: solutions backend (BE-REQ-SOL-015)
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Tài liệu ngày 2026-10-06; đã đối chiếu `task-service` (migration `0010_execution_links`, `task_edges`) cùng ngày.
+> **✅ Đã triển khai (SOL-015 6/6 task, kiểm chứng 2026-10-08).**
 
 Nguồn: [docs/crs/v6/backlog-views](../../../../../../docs/crs/v6/backlog-views/README.md). README v6 [mục 8](../../../../../../docs/crs/v6/README.md) thắng mục 3 khi mâu thuẫn (điều 7: Execute backlog mở rộng theo cổng của task).
 

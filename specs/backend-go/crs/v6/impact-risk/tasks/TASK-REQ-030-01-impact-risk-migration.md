@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / migration
 **File:** `backend-go/services/request-service/migrations/postgres/NNNN_impact_risk.{up,down}.sql` (mới), `backend-go/services/request-service/migrations/mysql/NNNN_impact_risk.{up,down}.sql` (mới), `backend-go/services/request-service/internal/adapter/postgres/migration_impact_risk_test.go` (mới), `internal/adapter/mysql/migration_impact_risk_test.go` (mới)
 **Depends on:** TASK-REQ-002-01 (migration `0002_request_core`, bảng `requests`), TASK-REQ-001-04 (RLS mẫu và `TxRunner`)
-**Status:** [x] DONE
+**Status:** [ ] TODO
 
 ---
 
@@ -67,10 +67,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `up`, `down`, `up` sạch trên Postgres 14+ và MySQL 8.0.16+.
-- [x] CHECK từ chối giá trị lạ ở cả hai dialect; một `collecting` mỗi chủ thể; một `active` và một `shadow` mỗi tenant.
-- [x] Mọi bảng có `tenant_id`; không FK sang service khác; `NNNN` ghi trong PR.
-- [x] Không dùng DEFAULT literal cho cột JSON MySQL.
+- [ ] `up`, `down`, `up` sạch trên Postgres 14+ và MySQL 8.0.16+.
+- [ ] CHECK từ chối giá trị lạ ở cả hai dialect; một `collecting` mỗi chủ thể; một `active` và một `shadow` mỗi tenant.
+- [ ] Mọi bảng có `tenant_id`; không FK sang service khác; `NNNN` ghi trong PR.
+- [ ] Không dùng DEFAULT literal cho cột JSON MySQL.
 
 ## Rủi ro và lưu ý
 

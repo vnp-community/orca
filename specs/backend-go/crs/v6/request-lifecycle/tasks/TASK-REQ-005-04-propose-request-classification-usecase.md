@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/propose_request_classification.go`, `internal/usecase/propose_request_classification_test.go`, `internal/usecase/approval_noop.go`, `internal/usecase/execution_guard_noop.go`, `internal/usecase/ports.go` (sửa: `ApprovalRecorder`, `ApprovalCanceller`, `ExecutionGuard`)
 **Depends on:** TASK-REQ-005-01, 005-02, 005-03, TASK-REQ-003-03
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/domain/... ./internal/usecase/... ./internal/adapter/... và go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run "Intake|Classification|Migration|Schema"`)
 
 ---
 
@@ -43,9 +43,17 @@ Lệnh: `go test ./services/request-service/internal/usecase/... -run Propose`.
 - [x] AI thất bại hai lần: `awaiting_type_confirmation`, `type` rỗng, `failed=true`.
 - [x] Giao lặp: chỉ một đề xuất.
 - [x] Lần AI thứ 6 bị chặn kể cả khi thất bại liên tiếp.
-- [x] Không gán `.Status` ngoài `transition_request.go` (test kiến trúc TASK-REQ-003-06 vẫn xanh).
+- [ ] Không gán `.Status` ngoài `transition_request.go` (test kiến trúc TASK-REQ-003-06 vẫn xanh). (test kiến trúc 003-06 chưa tồn tại ở nhánh này; mã mới không gán `.Status`, chưa có chốt chặn tự động)
 
 ## Rủi ro và lưu ý
 
 - AI chạy ngoài giao dịch nên Request có thể bị sửa giữa chừng (người đổi `reopen` hay `cancel`): bước 3 đọc lại và thoát; kết quả AI bị bỏ (chấp nhận, chi phí đã tiêu).
 - `ClassifyRequest` thủ công và consumer chạy đồng thời: CAS ở `Update` quyết định một bên thắng; bên thua nhận `REQUEST_VERSION_CONFLICT` (RPC) hoặc thoát nhẹ (consumer).
+
+## Ghi chú triển khai
+
+- LỆCH (quyết định D3): AI chạy bất đồng bộ qua `ClassificationRunner` (bảng `classification_runs`, migration `0027`, lease + heartbeat + quét phục hồi, tối đa 3 lần nhận lại). `ClassifyNow` trả `Request` được thay bằng `Enqueue` trả ngay `run_id`; `ClassifyRequestResponse` trong proto phải có `run_id`.
+- Kết quả, `MarkProcessed`, `classification_attempts` và kết thúc run cùng một giao dịch.
+- Lỗi lạ từ classifier được xếp vào lý do "classifier error" (nhánh thất bại), chỉ lỗi DB mới trả lỗi để thử lại.
+- Cổng no-op nằm trong `ports_classification.go` (không tách `approval_noop.go`/`execution_guard_noop.go`).
+- Test kiến trúc 003-06 (không gán `.Status` ngoài `transition_request.go`) chưa tồn tại ở nhánh này; mã mới không gán `.Status`.

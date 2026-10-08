@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/artifact_display_id.go`, `internal/domain/relation_rules.go`, `internal/domain/artifact_semantic_validation.go`, `internal/usecase/mint_artifact_ids.go`, `internal/usecase/replace_request_coverage.go`, `internal/usecase/get_artifact_graph.go`, `internal/usecase/resolve_artifact_ref.go`, `internal/usecase/ports.go` (sửa), `internal/adapter/{postgres,mysql}/{artifact_index,artifact_relation,request_coverage}_repository.go` và test
 **Depends on:** TASK-REQ-027-01 (bảng), TASK-REQ-027-03 (`Violation`, schema), TASK-REQ-027-05 (`AcceptanceCriteria`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain ./internal/usecase -run 'DisplayID|RelationRules|Semantic|Coverage|MintArtifact|MintSolution|MintPlan|ArtifactGraph|Reader'` và `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql -run ArtifactContract`)
 
 ---
 
@@ -86,3 +86,11 @@ Kiểm ngữ nghĩa chạy ở server sau kiểm cấu trúc, mỗi lần sinh v
 - `GetArtifactGraph` phụ thuộc `GetSubtree` của task-service có giới hạn độ sâu; cây lớn có thể chậm (chưa đo).
 - Ngưỡng giới hạn số AC, task, check là số đề xuất.
 - Ranh giới giữa `verifies` ở `request_coverage` và Check chạy được (CR-REQ-029, `request_checks` của CR-REQ-014): task này chỉ lưu liên kết, không lưu kết quả chạy.
+
+## Ghi chú triển khai (rf/art)
+
+- Bảng quan hệ: 14 bộ ba hợp lệ; test tích Descartes dùng 8 quan hệ x 9 loại nút x 9 loại nút (thêm `ac`, `check`, `evidence` vì `verifies` nối Check với AC/Task và `evidenced_by` trỏ Evidence). `StoredInRelationsTable` trả đúng 4 quan hệ (`derived_from`, `implements`, `supersedes`, `evidenced_by`): task viết "năm" nhưng liệt kê `verifies` là quan hệ lưu ở `request_coverage`, mâu thuẫn trong chính task; CHECK của bảng `artifact_relations` vẫn cho cả `verifies` (5 giá trị theo task 027-01) để không phải đổi schema sau này.
+- Mười mã ngữ nghĩa có test; thêm `REQUEST_ARTIFACT_EXEMPT_NOT_ALLOWED` theo task. `ValidateArtifactSemantics` nhận `SolutionCoverageView`/`PlanSpecs` thuần (không phụ thuộc kiểu của tính năng Solution/Plan). Tên `ValidateArtifactSemantics` giữ nguyên.
+- `NextSolutionSeq`/`NextPlanSeq`/`NextSeq` khoá hàng Request (`SELECT ... FOR UPDATE`) rồi đọc `MAX+1`, nên hai người mint cùng Request tuần tự hoá thay vì va chạm UNIQUE; UNIQUE vẫn là chốt chặn cuối và `MintSolutionID` thử lại tối đa 3 lần khi gặp `REQUEST_ARTIFACT_SEQ_CONFLICT`. Test đua thật: 20 `MintSolutionID` đồng thời cho 20 `seq` khác nhau, cả hai dialect.
+- `GetArtifactGraph`: cổng `PlanTreeReader` (adapter gRPC thật `grpcclient.PlanTreeClient` gọi `task.GetSubtree`; nối khi có `TASK_SERVICE_ADDR`); lỗi hay thiếu reader trả `partial=true`. **Chưa kiểm chứng** với task-service thật (chỉ fake `PlanTreeReader` và test contract); hướng cạnh `depends_on` (`from` chờ `to`) là giả định theo tên trường `AddEdgeRequest`.
+- `ResolveArtifactRef`: `REQ-n` và `REQ-n#AC-k` tra theo số Request (không qua chỉ mục); các id khác qua `artifact_index`; id của tenant khác hoặc không đọc được đều `NOT_FOUND`.

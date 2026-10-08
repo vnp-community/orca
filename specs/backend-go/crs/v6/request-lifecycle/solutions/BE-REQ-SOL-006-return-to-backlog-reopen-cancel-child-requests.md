@@ -1,6 +1,6 @@
 # BE-REQ-SOL-006: Trả về Request backlog, mở lại, hủy, Request con
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Phụ thuộc [BE-REQ-SOL-005](./BE-REQ-SOL-005-request-classification-and-type-change.md), [BE-REQ-SOL-004](./BE-REQ-SOL-004-request-intake-from-sources.md), [BE-REQ-SOL-003](./BE-REQ-SOL-003-request-state-machine-and-flow-registry.md).
+> ✅ Đã triển khai (kiểm chứng 2026-10-08). Con được tạo qua `CreateWithinTx` của CR-REQ-004. Ghi chú: [IMPLEMENTATION-NOTES.md](../IMPLEMENTATION-NOTES.md).
 
 **CR:** [CR-REQ-006](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-006-return-to-backlog-reopen-cancel-child-requests.md)
 **Service:** `request-service` (use case, migration, adapter gRPC) · `proto`

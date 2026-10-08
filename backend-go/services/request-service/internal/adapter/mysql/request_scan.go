@@ -1,0 +1,105 @@
+package mysql
+
+import (
+	"database/sql"
+	"encoding/json"
+
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
+)
+
+const requestColumns = `id, tenant_id, project_id, number, title, body, source_provider, source_ref, source_url, source_site,
+	type, type_source, size, urgency, confidence, classification_reason, status, returned_from_stage, return_reason,
+	plan_task_id, reporter_id, created_at, updated_at, version, solution_engine, returned_category, source_hints, classification_attempts,
+	content_schema_version, acceptance_criteria, type_fields, content_revision, content_digest`
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func scanRequest(row rowScanner) (domain.Request, error) {
+	var (
+		r                                                            domain.Request
+		project, typ, typeSource, size, returned, plan, se, category sql.NullString
+		conf                                                         sql.NullFloat64
+		hints                                                        []byte
+		provider, urgency, status                                    string
+	)
+	err := row.Scan(&r.ID, &r.TenantID, &project, &r.Number, &r.Title, &r.Body, &provider, &r.SourceRef, &r.SourceURL, &r.SourceSite,
+		&typ, &typeSource, &size, &urgency, &conf, &r.ClassificationReason, &status, &returned, &r.ReturnReason,
+		&plan, &r.ReporterID, &r.CreatedAt, &r.UpdatedAt, &r.Version, &se, &category, &hints, &r.ClassificationAttempts,
+		&r.ContentSchemaVersion, &r.AcceptanceCriteriaJSON, &r.TypeFieldsJSON, &r.ContentRevision, &r.ContentDigest)
+	if err != nil {
+		return domain.Request{}, err
+	}
+	r.ProjectID = project.String
+	r.SourceProvider = domain.SourceProvider(provider)
+	r.Type = domain.RequestType(typ.String)
+	r.TypeSource = domain.TypeSource(typeSource.String)
+	r.Size = domain.RequestSize(size.String)
+	r.Urgency = domain.Urgency(urgency)
+	r.Status = domain.RequestStatus(status)
+	r.ReturnedFromStage = domain.ReturnStage(returned.String)
+	r.PlanTaskID = plan.String
+	r.ReturnedCategory = domain.ReturnCategory(category.String)
+	if conf.Valid {
+		v := conf.Float64
+		r.Confidence = &v
+	}
+	if se.Valid {
+		name := domain.EngineName(se.String)
+		r.SolutionEngine = &name
+	}
+	if len(hints) > 0 {
+		if err := json.Unmarshal(hints, &r.SourceHints); err != nil {
+			return domain.Request{}, err
+		}
+	}
+	r.CreatedAt = r.CreatedAt.UTC()
+	r.UpdatedAt = r.UpdatedAt.UTC()
+	return r, nil
+}
+
+// requestArgs lists the mutable columns in the order used by INSERT and UPDATE.
+func requestArgs(r domain.Request) []any {
+	var se, conf any
+	if r.SolutionEngine != nil {
+		se = string(*r.SolutionEngine)
+	}
+	if r.Confidence != nil {
+		conf = *r.Confidence
+	}
+	return []any{
+		nullIfEmpty(r.ProjectID), r.Title, r.Body, string(r.SourceProvider), r.SourceRef, r.SourceURL, r.SourceSite,
+		nullIfEmpty(string(r.Type)), nullIfEmpty(string(r.TypeSource)), nullIfEmpty(string(r.Size)), string(r.Urgency),
+		conf, r.ClassificationReason, string(r.Status), nullIfEmpty(string(r.ReturnedFromStage)), r.ReturnReason,
+		nullIfEmpty(r.PlanTaskID), r.ReporterID, se, nullIfEmpty(string(r.ReturnedCategory)), hintsArg(r.SourceHints), r.ClassificationAttempts,
+	}
+}
+
+// hintsArg is a string, not []byte: a binary arg is rejected by MySQL JSON columns.
+func hintsArg(h domain.SourceHints) any {
+	if h.IsZero() {
+		return nil
+	}
+	b, _ := json.Marshal(h)
+	return string(b)
+}
+
+// contentArgs lists the content columns for INSERT; a request built without NewRequest gets the column defaults.
+func contentArgs(r domain.Request) []any {
+	ac, tf := string(r.AcceptanceCriteriaJSON), string(r.TypeFieldsJSON)
+	if ac == "" {
+		ac = "[]"
+	}
+	if tf == "" {
+		tf = "{}"
+	}
+	return []any{max(r.ContentSchemaVersion, 1), ac, tf, max(r.ContentRevision, 1), r.ContentDigest}
+}

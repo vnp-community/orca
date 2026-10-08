@@ -11,8 +11,14 @@ CREATE TABLE infra.dev_server_capability_profiles (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_dev_server_capability_profiles_tenant ON infra.dev_server_capability_profiles (tenant_id, probed_at DESC);
+CREATE INDEX idx_dev_server_capability_profiles_tenant
+    ON infra.dev_server_capability_profiles (tenant_id, probed_at DESC);
 
+-- FORCE + NULLIF: the table owner is bound by the policy too, and a missing
+-- app.tenant_id yields zero rows instead of an invalid-uuid error. The store
+-- sets the GUC in every transaction.
 ALTER TABLE infra.dev_server_capability_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE infra.dev_server_capability_profiles FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON infra.dev_server_capability_profiles
-    USING (tenant_id = current_setting('app.tenant_id', true)::uuid);
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);

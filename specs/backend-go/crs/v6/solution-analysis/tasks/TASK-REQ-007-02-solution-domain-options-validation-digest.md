@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / domain, usecase (hàm thuần)
 **File:** `internal/domain/solution.go` (mới), `solution_options.go` (mới), `canonical_json_digest.go` (mới), `internal/usecase/solution_output_extraction.go` (mới), và `_test.go`
 **Depends on:** TASK-REQ-007-01 (hằng `AnalysisMode`); CR-REQ-002 (kiểu `Solution` nếu đã định nghĩa, nếu có thì mở rộng thay vì tạo lại)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain/... ./internal/usecase/... -run "Solution|Digest|Extract"`; digest qua JSONB/JSON: `go test -tags integration ./internal/adapter/... -run SolutionContract`)
 
 ## Context
 
@@ -37,3 +37,11 @@
 ## Rủi ro và lưu ý
 
 - `min_options` của `refactor` chưa chốt (câu hỏi mở 1); nhận từ registry, không hằng trong domain.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Viết lại hẳn `solution_options.go` theo schema CR 2.3 (có `pros/cons/risks/affected_areas{kind,name}/breaking_change/rollback/recommended`, `hours_estimate` tuỳ chọn): bản cũ thiếu luật "đúng một `recommended`", không kiểm `recommendation`, dùng sai kiểu `hours_estimate`.
+- `ParseSolutionOptions` từ chối khoá trùng và quá 64 KB; `Marshal()` chỉ giữ trường có kiểu nên trường AI tự bịa bị bỏ. `MinOptionsFor(type)` ở domain (`refactor`=1, còn lại 2) thay vì đọc từ registry: registry CR-REQ-003 chưa có `MinOptions`, ghi vào câu hỏi mở.
+- `canonical_json_digest.go` viết lại: bộ phân tích chặt (từ chối khoá trùng, độ sâu > 32, nội dung thừa), chuẩn hoá số (`1`, `1.0`, `1e0` cùng một dạng vì JSONB và MySQL JSON ghi lại số), không escape HTML. Bản cũ dùng `map[string]any` nên khoá trùng bị nuốt.
+- `ExtractJSONObject` thử từng dấu `{` cho tới khi gặp khối cân bằng và hợp lệ, nên dấu `{` lạc trong văn bản dẫn không làm hỏng việc trích.
+- Domain chỉ dùng stdlib. Người gọi đã kiểm: các hàm/kiểu bị thay (`SolutionOptions`, `Option`, `DigestOptions`, `ExtractJSONObject`) chỉ được dùng trong `request-service`; build toàn module PASS.

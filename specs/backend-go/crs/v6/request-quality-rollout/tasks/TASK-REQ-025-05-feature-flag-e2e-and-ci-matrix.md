@@ -5,7 +5,7 @@
 **Service:** `request-service`, `.github`
 **File:** `backend-go/services/request-service/e2e/feature_flag_test.go` (mới), `.github/workflows/backend-go-request-service.yml` (sửa: thêm bước e2e; file do CR-REQ-001 tạo)
 **Depends on:** TASK-REQ-025-02, TASK-REQ-025-04
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `E2E_DIALECT=postgres|mysql go test -tags e2e ./e2e/...` (mỗi dialect 74 PASS, 49 SKIP có lý do, 0 FAIL); `actionlint` sạch cho workflow; E20 mất khoảng 26 giây (Postgres) và 40 giây (MySQL) cho cả bộ e2e)
 
 ---
 
@@ -38,3 +38,7 @@
 
 - Nếu chạy e2e quá chậm trong CI, tách job riêng (`needs: test`) thay vì cắt kịch bản.
 - Không thêm `continue-on-error` cho T1.
+
+## Kết quả triển khai (2026-10-08)
+
+E20 ở `e2e/feature_flag_test.go` (6 test: vòng đời, thoát an toàn, hai tenant, công tắc tổng tắt chạy bằng tiến trình thứ hai, lỗi đọc cờ bằng cách đổi tên bảng). Workflow `backend-go-request-service.yml`: job `wiring`, bước e2e theo ma trận, `go vet -tags=e2e`, `paths` mở rộng. Chưa chạy trên GitHub Actions (chưa kiểm chứng).

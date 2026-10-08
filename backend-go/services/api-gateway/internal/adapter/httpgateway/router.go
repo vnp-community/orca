@@ -20,6 +20,7 @@ import (
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
 	orchestrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
@@ -51,8 +52,12 @@ type Deps struct {
 	// is NOT the same as falling back to the 501 stub: once a prefix is
 	// RouteWired, mountStubRoutes no longer registers anything under it,
 	// so an unmounted RouteWired prefix 404s rather than 501ing.
-	AnnotationClient    annotationv1.AnnotationServiceClient
-	TaskClient          taskv1.TaskServiceClient
+	AnnotationClient annotationv1.AnnotationServiceClient
+	TaskClient       taskv1.TaskServiceClient
+	// RequestClient and ApprovalClient are request-service's; the five Request
+	// routes mount only when both are set (REQUEST_SERVICE_ADDR).
+	RequestClient       requestv1.RequestServiceClient
+	ApprovalClient      requestv1.ApprovalServiceClient
 	GitGatewayClient    gitgatewayv1.GitGatewayServiceClient
 	AutomationClient    automationv1.AutomationServiceClient
 	InfraFleetClient    infrafleetv1.InfraFleetServiceClient
@@ -186,6 +191,9 @@ func NewRouter(deps Deps) http.Handler {
 		}
 		if deps.TaskClient != nil {
 			mountTaskRoutes(authed, deps.TaskClient)
+		}
+		if deps.RequestClient != nil && deps.ApprovalClient != nil {
+			mountRequestRoutes(authed, deps.RequestClient, deps.ApprovalClient)
 		}
 		if deps.GitGatewayClient != nil {
 			mountGitRoutes(authed, deps.GitGatewayClient)

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `proto/orca/task/v1/task.proto`, `internal/usecase/ports.go` (dòng 67), `internal/usecase/list_tasks.go`, `internal/adapter/postgres/task_list_query.go` (mới), `internal/adapter/mysql/task_list_query.go` (mới), `internal/adapter/{postgres,mysql}/repository.go` (xoá `List` cũ), `internal/adapter/grpc/server.go` (dòng 299), `internal/usecase/fakes_test.go`
 **Depends on:** TASK-REQ-011-02
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test ./services/task-service/...` và `go test -tags=integration ./internal/adapter/postgres ./internal/adapter/mysql` (PG 16, MySQL 8.0.46 thật))
 
 ---
 
@@ -37,7 +37,8 @@
 - [x] Không truyền `task_types` thì không trả plan/phase; `task_types=[plan]` kèm `request_ids=[X]` trả đúng Plan của X.
 - [x] 101 `request_ids` bị `TASK_LIST_TOO_MANY_REQUEST_IDS`.
 - [x] Hành vi gọi cũ (chỉ `project_id`, `page_token`, `page_size`) cho kết quả y như trước trên dữ liệu không có plan/phase.
-- [x] `EXPLAIN` truy vấn theo `request_ids` dùng `idx_tasks_request` (ghi nhận kế hoạch trong PR, không bắt buộc test).
+- [ ] `EXPLAIN` truy vấn theo `request_ids` dùng `idx_tasks_request` (ghi nhận kế hoạch trong PR, không bắt buộc test).
+  - Chưa chạy EXPLAIN (tiêu chí ghi "không bắt buộc test"); câu lệnh dùng `request_id = ANY($n::uuid[])` nên dùng được `idx_tasks_request`.
 - [x] Không còn nơi nào gọi chữ ký `List` cũ.
 
 ## Rủi ro và lưu ý
@@ -45,3 +46,9 @@
 - `ListTasks` không kiểm grant người gọi; `request-service` phải tự lọc Request trước khi gọi (BE-REQ-SOL-015).
 - Chưa có trần `page_size`; CR-REQ-015 sẽ gọi trang lớn: để quyết định trong Câu hỏi mở Q3 của CR, không tự thêm trần ở task này.
 - `IN` rất dài ở MySQL: giới hạn 100 id đã chặn.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Port `List(ctx, tenantID, ListFilter)`; xoá `List` cũ ở hai repository; cập nhật 3 fake (`usecase`, `adapter/grpc`, `adapter/grpcclient`) và hai test integration cũ. Người gọi duy nhất: `usecase/list_tasks.go`.
+- Hành vi mới đáng chú ý: so `project_id`/`parent_id`/`request_id`/token bằng kiểu uuid native (Postgres) nên chuỗi không phải UUID giờ báo lỗi DB (`TASK_LIST_FAILED`) thay vì trả danh sách rỗng như so `::text` cũ.
+- Test thuần `TestBuildListQuery` mỗi dialect; integration `_FilterByType/_FilterByRequestIDs/_FilterByParent/_PaginationStable/_TenantIsolation`; unit `TestListTasks_*`; gRPC `TestServer_ListTasks_ForwardsFiltersAndHidesContainersByDefault`.

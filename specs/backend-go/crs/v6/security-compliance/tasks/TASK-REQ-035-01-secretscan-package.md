@@ -5,7 +5,7 @@
 **Service:** `backend-go/common`
 **File:** `backend-go/common/secretscan/{scan.go,patterns.go,kinds.go,scan_test.go}` (mới), `backend-go/common/secretscan/testdata/vectors.json` (mới)
 **Depends on:** None
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `cd backend-go/common && go test -count=1 ./secretscan/...`; fuzz 10s `go test -run=^$ -fuzz=FuzzRedact -fuzztime=10s ./secretscan/` PASS)
 
 ---
 
@@ -48,6 +48,7 @@
 - [x] Không có giá trị bí mật trong `Finding`, lỗi, log.
 - [x] Không regex backtracking; 2 MiB đầu vào xử lý dưới 1 giây.
 - [x] `PatternsVersion` có và có test nhắc cập nhật khi đổi bảng mẫu (so băm bảng với hằng).
+- Ghi chú kiểm chứng: 46 vector (31 dương, 15 âm; mỗi loại >= 2 dương, có tiếng Việt, JSON, URL) trong `testdata/vectors.json`; `TestVectorsCoverage` giữ độ phủ đó. Băm bảng mẫu (`TestPatternsVersionMatchesTable`) buộc tăng `PatternsVersion` khi đổi mẫu. Chưa có test so khớp trực tiếp với `mcp-service` (không import chéo); chỉ vector chung là hợp đồng.
 
 ## Ví dụ tham khảo
 
@@ -74,3 +75,10 @@ Cách gọi ở các điểm dùng: cổng vào `secretscan.RedactKinds(body, se
 - Dương tính giả với mẫu `dotenv_secret` trong tài liệu hướng dẫn; chấp nhận, vì đường prompt ưu tiên an toàn.
 - Hai bản mẫu (`mcp-service` và gói này) có thể lệch theo thời gian; vector chung là biện pháp duy nhất ở v1.
 - Gói thuộc module `common` dùng chung 16 service: chạy `gitnexus_impact` không cần (gói mới), nhưng CI toàn `go.work` phải xanh (`go build ./...`).
+
+## Ghi chú triển khai (2026-10-07)
+
+- `Redact` bỏ qua giá trị đã là `[REDACTED...` để idempotent (mẫu `key=value` cũ sẽ che lại marker và báo `changed`).
+- Khử chồng lấp: mẫu cụ thể (token có tiền tố, khoá riêng, chuỗi kết nối, Bearer, JWT) chiếm vùng trước; hai mẫu chung (`dotenv_secret`, `secret_assignment`) chỉ lấp phần còn lại. Lý do: `token: ghp_x@host` phải gán `github_token` và giữ `@host`; hòa độ dài chọn theo thứ tự bảng (xác định, không phụ thuộc sort không ổn định). Lệch nhỏ so với `mcp-service` ở trường hợp chồng lấp (kết quả che chặt hơn, không bao giờ lộ nhiều hơn).
+- Loại bỏ chỗ ghi đè thừa trong `RedactKinds` khi cắt 1 MiB; phần sau cửa sổ quét giữ nguyên và `Result.Truncated=true`.
+- Người gọi đã kiểm: chưa service nào import `common/secretscan` (áp dụng ở 035-09).

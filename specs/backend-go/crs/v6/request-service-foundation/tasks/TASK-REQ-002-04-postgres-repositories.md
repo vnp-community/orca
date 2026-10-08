@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/postgres/{request_repository.go,request_counter.go,request_type_history_repository.go,solution_repository.go,request_link_repository.go,request_idempotency_repository.go,request_scan.go}` (mới)
 **Depends on:** TASK-REQ-002-01, TASK-REQ-002-02, TASK-REQ-002-03
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test -tags integration ./internal/adapter/postgres/... (PASS))
 
 ---
 
@@ -48,3 +48,7 @@ Lệnh: `go test -tags=integration ./services/request-service/internal/adapter/p
 
 - `status = ANY($n)` với `[]string`: pgx cần kiểu `[]string` tường minh, không phải `[]RequestStatus`; chuyển trước khi truyền.
 - `(created_at, id) < ($a,$b)` cần chỉ mục `(tenant_id, created_at DESC, id DESC)` đã có ở `0002`; kiểm `EXPLAIN` trên dữ liệu thử (chưa kiểm chứng).
+
+## Ghi chú triển khai
+
+Lệch so với task: năm cổng được cài trên struct riêng bọc `*Repository` (`RequestRepository`, `RequestTypeHistoryRepository`, `SolutionRecordRepository`, `RequestLinkRepository`, `RequestIdempotencyRepository`) vì `Repository` đã có `Insert/List` của approvals với chữ ký khác (IMPLEMENTATION-NOTES N1). Các test đặc thù nằm trong bộ chung: `NextNumberOutsideTxRejected`, `UpdateCASConflict` (kiểm version tăng), RLS ở `TestPostgres_RLS_DirectSQLCannotSeeOtherTenant` (role `NOBYPASSRLS`). Mọi method đi qua `scoped()`: bắt buộc tenant, tự mở giao dịch ngắn có `set_config`. Cổng solution là `SolutionCoreRepository` (N2).

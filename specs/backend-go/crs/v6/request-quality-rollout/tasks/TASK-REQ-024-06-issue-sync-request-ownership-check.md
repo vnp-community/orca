@@ -5,7 +5,7 @@
 **Service:** `issue-status-sync`
 **File:** `backend-go/services/issue-status-sync/internal/adapter/grpcclient/request_client.go` (mới), `.../internal/usecase/ports.go`, `.../internal/usecase/sync_issue_status.go`, `.../internal/usecase/request_lookup_retry.go` (mới), `.../internal/usecase/sync_issue_status_test.go`, `.../cmd/server/main.go`
 **Depends on:** TASK-REQ-024-04, TASK-REQ-024-05
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... -count=1` trong `services/request-service` (512 test PASS, 0 FAIL) và `services/issue-status-sync` (186 PASS); `adapter/grpcclient/request_client_test.go` chạy gRPC thật với guard và trích tenant giống request-service; e2e phía server ở 024-05)
 
 ---
 
@@ -32,10 +32,23 @@
 ## Tiêu chí hoàn thành
 
 - [x] Issue có Request chưa kết thúc: worktree created và PR merge không đổi Jira.
+  Logic đúng và có test với fake; chưa chạy qua RPC thật.
 - [x] Lỗi tra cứu không gây giao lại vô hạn.
+  Test: Nak ở lần 1 và 2, lần 3 `MarkSeen` + `failed`, Jira không bị chạm (cả hai handler).
 - [x] Không có Request: test hồi quy xanh.
+  Test hồi quy xanh, kể cả client `nil`.
 
 ## Rủi ro và lưu ý
 
 - Đóng an toàn khi không chắc (lỗi kéo dài): không đổi Jira; chấp nhận mất một chuyển trạng thái, vá bởi sự kiện sau.
 - Bộ đếm theo bộ nhớ không chia sẻ giữa replica; giới hạn thực tế là 3 lần mỗi replica nhận.
+
+## Tiến độ (2026-10-07)
+
+Đã làm: cổng `RequestLookupClient` (`usecase/ports.go`), `deliveryCounter` giới hạn 10000 phần tử và `maxTransientDeliveries = 3` (`usecase/request_lookup_retry.go`), kiểm tra sau `canSync` trong `HandleWorktreeLifecycle` và `HandlePullRequestLifecycle` (`ownedByRequest`), option `WithRequestLookup` (client `nil` giữ hành vi cũ), metric `skipped_request_owned{source}`, test với fake trong `sync_issue_status_test.go`. Tên `source` của lỗi tra cứu là `worktree`/`pr` trong `orca_issuesync_request_events_total{event,result="failed"}`.
+
+Còn thiếu: `adapter/grpcclient/request_client.go` (cần `LookupRequestBySource` trong `request.proto`, thuộc task 024-05, đợt sau); dây `main.go`: hiện `REQUEST_SERVICE_ADDR` có giá trị chỉ ghi cảnh báo và kiểm tra sở hữu tắt. Khi proto có: dựng client với `internalcaller.ClientInterceptor` + `withTenantMetadata`, truyền `usecase.WithRequestLookup(client)` trong `main.go`.
+
+## Kết quả triển khai (2026-10-08)
+
+Thêm `adapter/grpcclient/request_client.go`, `main.go` dial `REQUEST_SERVICE_ADDR` với `internalcaller.ClientInterceptor(REQUEST_SERVICE_INTERNAL_TOKEN)` và truyền `usecase.WithRequestLookup`. Chưa chạy hai tiến trình thật (issue-status-sync + request-service) cùng nhau; Jira thật chưa kiểm chứng.

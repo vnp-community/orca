@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_errors.go` (mới), `.../channels_request_views.go` (mới), `.../channels_request_source.go` (mới), cùng các `*_test.go`
 **Depends on:** TASK-REQ-016-01
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -41,3 +41,7 @@
 
 - Tên field proto chỉ đúng khi CR-REQ-001 đến 009 đã sinh code; nếu lệch, sửa view, không sửa hợp đồng ở đây mà báo ở CONTRACT.
 - `Options` giữ nguyên khoá (CONTRACT C13); đừng chạy `camelize`.
+
+## Ghi chú triển khai (2026-10-08)
+
+Lệch: PermissionDenied không mã thành `REQUEST_FORBIDDEN` (kênh approval: `REQUEST_APPROVAL_FORBIDDEN`); `origin` proto không tồn tại nên nguồn MCP đi qua `source.provider=mcp`/`site`.

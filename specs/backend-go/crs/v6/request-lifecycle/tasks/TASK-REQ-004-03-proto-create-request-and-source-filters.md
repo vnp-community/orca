@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `proto/orca/request/v1/request.proto` (sửa), `proto/gen/go/orca/request/v1/*` (sinh lại)
 **Depends on:** TASK-REQ-001-02
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run RPC (13+ kịch bản gRPC, máy trạng thái thật); go test ./internal/adapter/grpc; buf lint/breaking --path orca/request/v1/request.proto`)
 
 ---
 
@@ -36,3 +36,7 @@ TASK-REQ-001-02 khai báo `Request` (trường 1 đến 23) và `ListRequestsReq
 ## Rủi ro và lưu ý
 
 - `type_hint` ở `SourceHints` do CR-REQ-006 dùng; thêm ngay để khỏi sửa proto lần nữa. Client thông thường (UI, MCP) có được gửi `type_hint` hay không: quyết định ở TASK-REQ-004-04 (chỉ chấp nhận khi `link_reason` có từ `SpawnChildRequest`; `CreateRequest` công khai bỏ qua trường này).
+
+## Ghi chú triển khai
+
+- Proto do `rf/proto` định nghĩa (`CreateRequest`, `RequestSource`, `SourceHints`, `Request.source_hints = 24`, ba bộ lọc 6..8, `LookupRequestBySource`). Phía này: `toProtoRequest` điền `source_hints` (cả `type_hint` để phản hồi `SpawnChildRequest` thấy gợi ý), `filterFromProto` điền ba bộ lọc; test `TestMapper_SourceHintsAndLifecycleFieldsRoundTrip`, `TestFilterFromProto_SourceFields`.

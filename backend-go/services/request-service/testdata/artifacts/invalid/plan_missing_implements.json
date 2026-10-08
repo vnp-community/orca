@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "kind": "plan",
+  "goal": "Triển khai SSO",
+  "risks": ["trễ"],
+  "satisfies_all": true
+}

@@ -1,24 +1,24 @@
 # Tasks backend: approval (v6)
 
-> 📋 Proposed. Mỗi task 0,5 đến 2 ngày. Đường dẫn tương đối tới `backend-go/services/request-service/` (mới) trừ khi ghi khác.
+> ✅ 13/13 task DONE (2026-10-08; 010-05 ở `notification-service` 2026-10-07). Mỗi task 0,5 đến 2 ngày. Đường dẫn tương đối tới `backend-go/services/request-service/` (mới) trừ khi ghi khác.
 
 ## Bảng Solution, Task
 
-| Solution | Task | Nội dung | Ưu tiên |
-|----------|------|----------|---------|
-| [BE-REQ-SOL-009](../solutions/BE-REQ-SOL-009-generic-approval-domain-and-api.md) | [TASK-REQ-009-01](./TASK-REQ-009-01-approvals-migration.md) | Migration `approvals` hai dialect | P0 |
-| | [TASK-REQ-009-02](./TASK-REQ-009-02-approval-domain-state-machine.md) | Domain `Approval`, máy trạng thái | P0 |
-| | [TASK-REQ-009-03](./TASK-REQ-009-03-approval-repository-postgres-mysql.md) | Repository hai dialect | P0 |
-| | [TASK-REQ-009-04](./TASK-REQ-009-04-approval-usecases-and-subject-handler.md) | Use case, `SubjectHandler`, đăng ký | P0 |
-| | [TASK-REQ-009-05](./TASK-REQ-009-05-approval-proto-and-grpc-server.md) | `approval.proto`, gRPC server | P0 |
-| | [TASK-REQ-009-06](./TASK-REQ-009-06-approval-contract-tests-and-wiring.md) | Test hợp đồng handler, wiring `main.go` | P0 |
-| [BE-REQ-SOL-010](../solutions/BE-REQ-SOL-010-approval-authorization-notification-expiry.md) | [TASK-REQ-010-01](./TASK-REQ-010-01-approval-policy-migration.md) | Migration chính sách và người duyệt | P1 |
-| | [TASK-REQ-010-02](./TASK-REQ-010-02-approval-policy-and-authorization-domain.md) | Domain chính sách, `Decide` | P1 |
-| | [TASK-REQ-010-03](./TASK-REQ-010-03-policy-repository-and-resolver.md) | Repository, resolver, thay cài tạm | P1 |
-| | [TASK-REQ-010-04](./TASK-REQ-010-04-recipient-expansion-and-notification-payload.md) | Mở rộng người nhận, payload thông báo | P1 |
-| | [TASK-REQ-010-05](./TASK-REQ-010-05-notification-service-subjects.md) | `notification-service`: hai subject mới | P1 |
-| | [TASK-REQ-010-06](./TASK-REQ-010-06-expire-and-remind-workers.md) | Worker hết hạn và nhắc | P1 |
-| | [TASK-REQ-010-07](./TASK-REQ-010-07-policy-admin-api-and-integration-tests.md) | API quản trị (có điều kiện), test toàn luồng | P2 |
+| Solution | Task | Nội dung | Ưu tiên | Trạng thái |
+|----------|------|----------|---------|--------|
+| [BE-REQ-SOL-009](../solutions/BE-REQ-SOL-009-generic-approval-domain-and-api.md) | [TASK-REQ-009-01](./TASK-REQ-009-01-approvals-migration.md) | Migration `approvals` hai dialect | P0 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-009-02](./TASK-REQ-009-02-approval-domain-state-machine.md) | Domain `Approval`, máy trạng thái | P0 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-009-03](./TASK-REQ-009-03-approval-repository-postgres-mysql.md) | Repository hai dialect | P0 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-009-04](./TASK-REQ-009-04-approval-usecases-and-subject-handler.md) | Use case, `SubjectHandler`, đăng ký | P0 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-009-05](./TASK-REQ-009-05-approval-proto-and-grpc-server.md) | `approval.proto`, gRPC server | P0 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-009-06](./TASK-REQ-009-06-approval-contract-tests-and-wiring.md) | Test hợp đồng handler, wiring `main.go` | P0 | ✅ DONE 2026-10-08 |
+| [BE-REQ-SOL-010](../solutions/BE-REQ-SOL-010-approval-authorization-notification-expiry.md) | [TASK-REQ-010-01](./TASK-REQ-010-01-approval-policy-migration.md) | Migration chính sách và người duyệt | P1 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-010-02](./TASK-REQ-010-02-approval-policy-and-authorization-domain.md) | Domain chính sách, `Decide` | P1 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-010-03](./TASK-REQ-010-03-policy-repository-and-resolver.md) | Repository, resolver, thay cài tạm | P1 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-010-04](./TASK-REQ-010-04-recipient-expansion-and-notification-payload.md) | Mở rộng người nhận, payload thông báo | P1 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-010-05](./TASK-REQ-010-05-notification-service-subjects.md) | `notification-service`: hai subject mới | P1 | ✅ DONE 2026-10-07 |
+| | [TASK-REQ-010-06](./TASK-REQ-010-06-expire-and-remind-workers.md) | Worker hết hạn và nhắc | P1 | ✅ DONE 2026-10-08 |
+| | [TASK-REQ-010-07](./TASK-REQ-010-07-policy-admin-api-and-integration-tests.md) | API quản trị (có điều kiện), test toàn luồng | P2 | ✅ DONE 2026-10-08 |
 
 ## Thứ tự phụ thuộc
 

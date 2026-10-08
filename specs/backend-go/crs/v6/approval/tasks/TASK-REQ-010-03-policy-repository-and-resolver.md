@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / adapter, usecase
 **File:** `internal/adapter/{postgres,mysql}/approval_policy_repository.go` (mới), `approval_approver_repository.go` (mới), `internal/adapter/grpcclient/team_membership_resolver.go` (mới), `internal/usecase/resolve_approver_policy.go` (mới), `authorize_approval_decision.go` (mới), `internal/usecase/open_approval.go` (sửa), `list_pending_approvals_for_user.go` (sửa), `approver_policy_ports.go` (sửa: bỏ cài tạm)
 **Depends on:** TASK-REQ-010-01, TASK-REQ-010-02, TASK-REQ-009-04
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/usecase/... -run Approval`; hợp đồng `RunApprovalPolicyContract` và `RunApprovalFlowContract` trên Postgres và MySQL thật)
 
 ## Context
 
@@ -41,3 +41,9 @@
 
 - Chưa kiểm chứng: `ListTeamMembers` có phân trang không (message chỉ có `team_id`); team lớn có thể trả nhiều người.
 - Nạp principal mỗi lần `Approve` tốn một lời gọi tenant-service; cache 60 giây chấp nhận độ trễ khi người rời team.
+
+## Kết quả triển khai (2026-10-08)
+- Repository chính sách hai dialect thật: `ListEnabledCandidates`, `Get`, `List` (phân trang), `Upsert` (tạo khi version 0, cập nhật có khoá lạc quan), `Delete`, đều `scoped` theo tenant; repository người duyệt chụp/đọc snapshot. `ResolveApproverPolicy` lấy `size`, `urgency`, `project`, `type` thật từ Request (hết hằng `"S"`/`"normal"`).
+- `TeamMembershipResolver` thật (`grpcclient`): `ListTeamsForUser`/`ListTeamMembers`, tenant qua metadata, cache 60 giây theo (tenant, khoá), lỗi thành `REQUEST_APPROVAL_DIRECTORY_UNAVAILABLE` (không cache). Khi chưa cấu hình `TENANT_SERVICE_ADDR` tra cứu từ chối (fail closed), không trả "không ai". Chưa chạy với tenant-service thật (test dùng client giả); chưa kiểm chứng `ListTeamMembers` có phân trang không.
+- Thứ tự ưu tiên trong `CanDecide`: admin hoặc snapshot; team chỉ tra khi có principal team và caller không phải admin/người được nêu tên. `ListPendingForUser` một SQL, giống nhau trên hai DB (`ListPendingForUserMatchesPrincipals`).
+- Không còn cài tạm trong đường chạy production.

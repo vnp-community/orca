@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_trigger.go`, `internal/domain/request_transition.go`, `internal/domain/request_flow_path.go` và `*_test.go` (mới)
 **Depends on:** TASK-REQ-003-01
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./internal/domain ./internal/usecase)
 
 ---
 

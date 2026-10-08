@@ -37,6 +37,9 @@ type CreateTaskInput struct {
 	PromptTemplate string
 	AIContext      string
 	Visibility     string
+	// RequestID links the task to a request-service Request; empty inherits the parent's.
+	RequestID string
+	Labels    []string
 	// CreatorID, when non-empty, mints an owner-level Grant for the caller
 	// after the task is created (TASK-TG-003-02) — follows
 	// ResolvePermissionRequest.UserID's existing convention of passing
@@ -101,7 +104,21 @@ func (uc *CreateTask) Execute(ctx context.Context, in CreateTaskInput) (domain.T
 	// which stays backward compatible per TASK-TG-01-03) — every one of
 	// them is optional, zero-value-valid.
 	task.Description = in.Description
-	task.Type = in.Type
+	taskType, err := domain.ParseTaskType(in.Type)
+	if err != nil {
+		return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID_TYPE", "invalid task type: "+in.Type, err)
+	}
+	if err := domain.ValidatePriority(in.Priority); err != nil {
+		return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID", err.Error(), err)
+	}
+	if err := domain.ValidateVisibility(in.Visibility); err != nil {
+		return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID", err.Error(), err)
+	}
+	task.Type = taskType
+	task.RequestID = in.RequestID
+	if in.Labels != nil {
+		task.Labels = in.Labels
+	}
 	task.Priority = in.Priority
 	task.AssigneeID = in.AssigneeID
 	task.EstimatedHours = in.EstimatedHours
@@ -109,10 +126,19 @@ func (uc *CreateTask) Execute(ctx context.Context, in CreateTaskInput) (domain.T
 	task.AIContext = in.AIContext
 	task.Visibility = in.Visibility
 
+	var parent *domain.Task
 	if task.ParentID != "" {
-		if _, err := uc.repo.Get(ctx, tenantID, task.ParentID); err != nil {
+		p, err := uc.repo.Get(ctx, tenantID, task.ParentID)
+		if err != nil {
 			return domain.Task{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_PARENT_NOT_FOUND", "parent task does not exist", err)
 		}
+		parent = &p
+	}
+	if err := validateTaskHierarchy(task, parent); err != nil {
+		return domain.Task{}, err
+	}
+	if task.RequestID == "" && parent != nil {
+		task.RequestID = parent.RequestID
 	}
 
 	created, err := uc.repo.Create(ctx, task)
@@ -134,4 +160,26 @@ func (uc *CreateTask) Execute(ctx context.Context, in CreateTaskInput) (domain.T
 		}
 	}
 	return created, nil
+}
+
+// validateTaskHierarchy maps the domain placement rules for plan/phase to wire errors.
+// The work-task parent check runs first so a phase under a task reports that, not "needs plan".
+func validateTaskHierarchy(task domain.Task, parent *domain.Task) error {
+	err := domain.ValidateContainerParent(task.Type, parent)
+	if err == nil {
+		err = domain.ValidateHierarchy(task.Type, task.ProjectID, parent)
+	}
+	switch err {
+	case nil:
+		return nil
+	case domain.ErrPlanProjectRequired:
+		return apperrors.New(apperrors.KindInvalidArgument, "TASK_PLAN_PROJECT_REQUIRED", err.Error(), err)
+	case domain.ErrPlanCannotHaveParent:
+		return apperrors.New(apperrors.KindFailedPrecondition, "TASK_PLAN_CANNOT_HAVE_PARENT", err.Error(), err)
+	case domain.ErrPhaseRequiresPlanParent:
+		return apperrors.New(apperrors.KindFailedPrecondition, "TASK_PHASE_REQUIRES_PLAN_PARENT", err.Error(), err)
+	case domain.ErrContainerUnderWorkTask:
+		return apperrors.New(apperrors.KindFailedPrecondition, "TASK_CONTAINER_UNDER_WORK_TASK", err.Error(), err)
+	}
+	return apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID", err.Error(), err)
 }

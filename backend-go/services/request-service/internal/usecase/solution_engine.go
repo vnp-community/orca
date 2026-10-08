@@ -14,8 +14,12 @@ type ProjectRef struct {
 	RepoID    string
 }
 
+// PriorArtifact is an earlier Solution of the same Request, shown to the model so a regenerated answer does not repeat a rejected one.
 type PriorArtifact struct {
-	// Add relevant fields
+	Kind     string
+	Status   string
+	Content  string
+	Feedback string
 }
 
 type AnalysisInput struct {

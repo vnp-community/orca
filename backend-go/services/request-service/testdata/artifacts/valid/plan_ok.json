@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "kind": "plan",
+  "goal": "Triển khai SSO",
+  "implements": {
+    "solution_id": "SOL-1.1",
+    "option_id": "opt-1"
+  },
+  "risks": ["trễ"],
+  "satisfies_all": true
+}

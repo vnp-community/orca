@@ -4,13 +4,13 @@
 **Hợp đồng chung:** [docs/crs/v6/README.md](../../../../../../docs/crs/v6/README.md) (mục 8 thắng mục 3)
 **TDD tham chiếu:** [`arch/03`](../../../../tdd/architecture/03-clean-architecture-guidelines.md), [`arch/05`](../../../../tdd/architecture/05-data-architecture.md), [`arch/06`](../../../../tdd/architecture/06-secrets-vault-architecture.md), [`arch/07`](../../../../tdd/architecture/07-security-architecture.md), [`arch/08`](../../../../tdd/architecture/08-inter-service-communication.md), [`arch/09`](../../../../tdd/architecture/09-observability-reliability.md)
 
-> 📋 Proposed. Chưa triển khai, chưa chạy test nào. `request-service` chưa tồn tại trên đĩa (do series v6 tạo), nên mọi file của nó là "(mới)".
+> 🚧 BE-REQ-SOL-031: 1/8 task xong (031-06, 2026-10-07). `request-service` chưa tồn tại trên đĩa (do series v6 tạo), nên mọi file của nó là "(mới)".
 
 ## Bảng CR, Solution, Task
 
-| CR | Solution | Service / Area | Effort | Task |
+| CR | Solution | Service / Area | Effort | Task | Trạng thái |
 |----|----------|----------------|--------|------|
-| [CR-REQ-031](../../../../../../docs/crs/v6/context-sources/CR-REQ-031-source-registry-and-context-pack.md) | [BE-REQ-SOL-031](./BE-REQ-SOL-031-source-registry-and-context-pack.md) | `request-service`, `mcp-service`, `api-gateway`, `proto` | Large | `TASK-REQ-031-01` đến `-08` |
+| [CR-REQ-031](../../../../../../docs/crs/v6/context-sources/CR-REQ-031-source-registry-and-context-pack.md) | [BE-REQ-SOL-031](./BE-REQ-SOL-031-source-registry-and-context-pack.md) | `request-service`, `mcp-service`, `api-gateway`, `proto` | Large | `TASK-REQ-031-01` đến `-08` | 🚧 1/8 (031-06 xong) |
 
 ## Re-verify trước khi thiết kế (đối chiếu CR với mã thật, 2026-10-06)
 

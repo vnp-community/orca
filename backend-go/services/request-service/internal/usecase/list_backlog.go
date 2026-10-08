@@ -3,19 +3,21 @@ package usecase
 import (
 	"context"
 
-	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
 type ListBacklogInput struct {
-	View       domain.BacklogView
-	ProjectID  string
-	Types      []string
-	Categories []string
-	RequestID  string
-	PageToken  string
-	PageSize   int
+	View        domain.BacklogView
+	ProjectID   string
+	Types       []string
+	Categories  []string
+	RequestID   string
+	PlanTaskID  string
+	PhaseTaskID string
+	AssigneeID  string
+	PageToken   string
+	PageSize    int
 }
 
 type ListBacklogOutput struct {
@@ -25,96 +27,37 @@ type ListBacklogOutput struct {
 	NextPageToken string
 }
 
-type RequestVisibility interface {
-	Filter(ctx context.Context, actor domain.DecisionActor, requests []domain.Request) ([]domain.Request, error)
-}
-
+// ListBacklog is the read-only entry of the three backlog views.
 type ListBacklog struct {
-	Visibility  RequestVisibility
-	ListReqsUC  *ListBacklogRequests
-	ListTasksUC *ListBacklogTasks
+	Requests *ListBacklogRequests
+	Tasks    *ListBacklogTasks
 }
 
 func (uc *ListBacklog) Execute(ctx context.Context, in ListBacklogInput) (ListBacklogOutput, error) {
-	_, err := tenant.RequireTenantID(ctx)
-	if err != nil {
-		return ListBacklogOutput{}, err
+	if _, err := tenant.RequireTenantID(ctx); err != nil {
+		return ListBacklogOutput{}, domain.ErrRequestTenantRequired()
 	}
-
-	if in.View == domain.BacklogViewUnspecified {
-		return ListBacklogOutput{}, apperrors.New(apperrors.KindInvalidArgument, "REQUEST_BACKLOG_INVALID_VIEW", "invalid view", nil)
-	}
-
-	uID, _ := tenant.UserID(ctx)
-	rRole, _ := tenant.Role(ctx)
-	actor := domain.DecisionActor{
-		UserID: uID,
-		Role:   rRole,
-	}
-
-	var out ListBacklogOutput
-
-	if in.View == domain.BacklogViewRequest {
-		reqs, next, err := uc.ListReqsUC.Execute(ctx, ListBacklogRequestsInput{
-			ProjectID:  in.ProjectID,
-			Types:      in.Types,
-			Categories: in.Categories,
-			PageToken:  in.PageToken,
-			PageSize:   in.PageSize,
+	switch in.View {
+	case domain.BacklogViewRequest:
+		rows, next, err := uc.Requests.Execute(ctx, ListBacklogRequestsInput{
+			ProjectID: in.ProjectID, Types: in.Types, Categories: in.Categories, PageToken: in.PageToken, PageSize: in.PageSize,
+		})
+		return ListBacklogOutput{RequestRows: rows, NextPageToken: next}, err
+	case domain.BacklogViewTask, domain.BacklogViewExecute:
+		groups, next, err := uc.Tasks.Execute(ctx, ListBacklogTasksInput{
+			View: in.View, ProjectID: in.ProjectID, RequestTypes: in.Types, RequestID: in.RequestID, PlanTaskID: in.PlanTaskID,
+			PhaseTaskID: in.PhaseTaskID, AssigneeID: in.AssigneeID, PageToken: in.PageToken, PageSize: in.PageSize,
 		})
 		if err != nil {
 			return ListBacklogOutput{}, err
 		}
-
-		// Filter visibility
-		var plainReqs []domain.Request
-		for _, r := range reqs {
-			plainReqs = append(plainReqs, r.Request)
-		}
-		filtered, err := uc.Visibility.Filter(ctx, actor, plainReqs)
-		if err != nil {
-			return ListBacklogOutput{}, err
-		}
-
-		allowedIDs := make(map[string]bool)
-		for _, r := range filtered {
-			allowedIDs[r.ID] = true
-		}
-
-		var finalReqs []domain.BacklogRequestRow
-		for _, r := range reqs {
-			if allowedIDs[r.Request.ID] {
-				finalReqs = append(finalReqs, r)
-			}
-		}
-
-		out.RequestRows = finalReqs
-		out.NextPageToken = next
-	} else {
-		// Task or Execute view
-		// This uses ListBacklogTasks which theoretically filters requests as well
-		// We can just call it and return
-		groups, next, err := uc.ListTasksUC.Execute(ctx, ListBacklogTasksInput{
-			ProjectID:    in.ProjectID,
-			RequestTypes: in.Types,
-			RequestID:    in.RequestID,
-			PageToken:    in.PageToken,
-			PageSize:     in.PageSize,
-		})
-		if err != nil {
-			// Wrap Unavailable if needed (done in adapter/grpc)
-			return ListBacklogOutput{}, err
-		}
-
-		// Filter visibility
-		// We need to fetch the request to filter... for stub we assume groups are filtered in ListTasks or we skip
+		out := ListBacklogOutput{NextPageToken: next}
 		if in.View == domain.BacklogViewTask {
 			out.TaskGroups = groups
 		} else {
 			out.ExecuteGroups = groups
 		}
-		out.NextPageToken = next
+		return out, nil
 	}
-
-	return out, nil
+	return ListBacklogOutput{}, domain.ErrBacklogInvalidView()
 }

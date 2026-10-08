@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/proto/orca/request/v1/request_check.proto` (mới), `internal/usecase/record_request_check.go` (mới), `internal/domain/request_check_metrics.go` (mới), `internal/adapter/grpc/server_request_check.go` (mới), `internal/usecase/record_request_check_test.go`, `internal/domain/request_check_metrics_test.go` (mới)
 **Depends on:** TASK-REQ-014-01, CR-REQ-003 (trạng thái Request), CR-REQ-010 (quyền)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -50,3 +50,7 @@
 - Quyền ghi ở mức Request chưa chốt (CR-REQ-003/010); không bịa quy tắc, dùng cổng và test với fake.
 - Nhận diện `source=agent` phụ thuộc gateway/MCP chưa dựng; ban đầu mọi lời gọi là `manual`.
 - Agent có thể ghi số đo sai hoặc bị lừa: không có cách xác minh, chỉ ghi rõ ở tài liệu người dùng.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

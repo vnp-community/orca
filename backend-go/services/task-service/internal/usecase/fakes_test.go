@@ -27,7 +27,6 @@ func (f *FakeExecutionStateReader) ListExecutionStates(ctx context.Context, tena
 	return nil, nil
 }
 
-
 func withIdentity(ctx context.Context, tenantID, userID string) context.Context {
 	ctx = tenant.WithTenantID(ctx, tenantID)
 	return tenant.WithUserID(ctx, userID)
@@ -64,6 +63,17 @@ type fakeTaskRepository struct {
 	// update enqueues exactly one/two events; a title-only update enqueues
 	// none".
 	lastUpdateEvents []domain.OutboxEvent
+
+	lastListFilter             ListFilter
+	listChildStatusesErr       error
+	updateContainerStatusErr   error
+	updateContainerStatusCalls int
+	loseCASTimes               int
+	containerEvents            []domain.OutboxEvent
+	// execEvents collects outbox events written with Complete/Release/ClaimForExecution.
+	execEvents []domain.OutboxEvent
+	// createHook, when set, can veto a Create (e.g. simulate a unique-index violation).
+	createHook func(domain.Task) error
 }
 
 // completeExecutionCall records one CompleteExecution invocation — used by
@@ -110,6 +120,11 @@ func (f *fakeTaskRepository) Create(ctx context.Context, task domain.Task) (doma
 	defer f.mu.Unlock()
 	if f.createErr != nil {
 		return domain.Task{}, f.createErr
+	}
+	if f.createHook != nil {
+		if err := f.createHook(task); err != nil {
+			return domain.Task{}, err
+		}
 	}
 	f.tasks[task.ID] = task
 	return task, nil
@@ -252,9 +267,10 @@ func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, 
 // ListTasks's filtering without a database. Pagination (pageToken/pageSize)
 // is intentionally not simulated here (no test in this package needs it
 // yet); every match is returned with an empty next-page token.
-func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error) {
+func (f *fakeTaskRepository) List(ctx context.Context, tenantID string, flt ListFilter) ([]domain.Task, string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.lastListFilter = flt
 	if f.listErr != nil {
 		return nil, "", f.listErr
 	}
@@ -263,18 +279,77 @@ func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, page
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
+	contains := func(set []string, v string) bool {
+		if len(set) == 0 {
+			return true
+		}
+		for _, s := range set {
+			if s == v {
+				return true
+			}
+		}
+		return false
+	}
 	var out []domain.Task
 	for _, id := range ids {
 		t := f.tasks[id]
 		if t.TenantID != tenantID {
 			continue
 		}
-		if projectID != "" && t.ProjectID != projectID {
+		if flt.ProjectID != "" && t.ProjectID != flt.ProjectID {
+			continue
+		}
+		if flt.ParentID != "" && t.ParentID != flt.ParentID {
+			continue
+		}
+		typ := t.Type
+		if typ == "" {
+			typ = domain.TypeTask
+		}
+		if !contains(flt.TaskTypes, typ) || !contains(flt.RequestIDs, t.RequestID) {
 			continue
 		}
 		out = append(out, t)
 	}
 	return out, "", nil
+}
+
+func (f *fakeTaskRepository) ListChildStatuses(ctx context.Context, tenantID, parentID string) ([]domain.Status, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.listChildStatusesErr != nil {
+		return nil, f.listChildStatusesErr
+	}
+	var out []domain.Status
+	for _, t := range f.tasks {
+		if t.TenantID == tenantID && t.ParentID == parentID {
+			out = append(out, t.Status)
+		}
+	}
+	return out, nil
+}
+
+// UpdateContainerStatus is a CAS like the real adapters; loseCASTimes forces that many
+// leading calls to report changed=false so retry paths can be exercised.
+func (f *fakeTaskRepository) UpdateContainerStatus(ctx context.Context, tenantID, id string, from, to domain.Status, events []domain.OutboxEvent) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.updateContainerStatusCalls++
+	if f.updateContainerStatusErr != nil {
+		return false, f.updateContainerStatusErr
+	}
+	if f.loseCASTimes > 0 {
+		f.loseCASTimes--
+		return false, nil
+	}
+	t, ok := f.tasks[id]
+	if !ok || t.TenantID != tenantID || t.Status != from || !domain.IsContainerType(t.Type) {
+		return false, nil
+	}
+	t.Status = to
+	f.tasks[id] = t
+	f.containerEvents = append(f.containerEvents, events...)
+	return true, nil
 }
 
 func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task, events []domain.OutboxEvent) error {
@@ -467,7 +542,7 @@ func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID s
 // CompleteExecution mirrors the real repository's terminal write — mutates
 // status/actual_hours/agent_session_id in the fake's map and records the
 // call for TestExecuteTask's inline-completion assertions.
-func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64, events []domain.OutboxEvent) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.completeExecutionCalls = append(f.completeExecutionCalls, completeExecutionCall{tenantID: tenantID, id: id, status: status, actualHours: actualHours})
@@ -482,6 +557,7 @@ func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id
 	t.ActualHours = &actualHours
 	t.AgentSessionID = ""
 	f.tasks[id] = t
+	f.execEvents = append(f.execEvents, events...)
 	return nil
 }
 

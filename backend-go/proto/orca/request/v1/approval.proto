@@ -47,33 +47,82 @@ message Approval {
   google.protobuf.Timestamp reminded_at = 17;
   google.protobuf.Timestamp created_at = 18;
   google.protobuf.Timestamp updated_at = 19;
+  // 20 to 22 are filled only by ListPendingForUser (CONTRACT section 9 Q3) so the inbox needs no N+1 GetRequest.
+  string request_title = 20;
+  string request_type = 21;
+  int64 request_number = 22;
 }
 
 message RequestApprovalRequest {
   string request_id = 1;
   ApprovalSubjectType subject_type = 2;
   string idempotency_key = 3;
+  // CR-REQ-009: PRE_DEPLOY and reopening a closed gate need an explicit subject.
+  string subject_id = 4;
+  string comment = 5;
 }
 
 message ApproveRequest {
   string id = 1;
   string comment = 2;
   string expected_digest = 3;
+  int64 expected_version = 4;
 }
 
 message RejectRequest {
   string id = 1;
   string comment = 2;
   string expected_digest = 3;
+  int64 expected_version = 4;
 }
 
+// Deprecated: kept so buf breaking stays clean; Cancel now uses ApprovalServiceCancelRequest.
 message CancelApprovalRequest {
   string id = 1;
   string reason = 2;
 }
 
+message ApprovalServiceCancelRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message ApprovalServiceCancelResponse {
+  Approval approval = 1;
+}
+
 message GetApprovalRequest {
   string id = 1;
+}
+
+message GetApprovalResponse {
+  Approval approval = 1;
+}
+
+message RequestApprovalResponse {
+  Approval approval = 1;
+}
+
+message ApproveResponse {
+  Approval approval = 1;
+  string request_status = 2;
+}
+
+message RejectResponse {
+  Approval approval = 1;
+  string request_status = 2;
+}
+
+message ExtendApprovalRequest {
+  string id = 1;
+  // New absolute deadline is due_at + extend_seconds; admin or requester only.
+  int32 extend_seconds = 2;
+  string reason = 3;
+  int64 expected_version = 4;
+}
+
+message ExtendApprovalResponse {
+  Approval approval = 1;
 }
 
 message ListApprovalsRequest {
@@ -100,17 +149,75 @@ message ListPendingForUserResponse {
   string next_page_token = 2;
 }
 
+// Deprecated: kept so buf breaking stays clean; Approve and Reject now return ApproveResponse and RejectResponse.
 message DecideApprovalResponse {
   Approval approval = 1;
   string request_status = 2;
 }
 
+// CR-REQ-010 section 2.3. Admin-only CRUD of approver policies; separate service so its catalog group is admin.
+message ApprovalPolicy {
+  string id = 1;
+  string tenant_id = 2;
+  string project_id = 3;
+  ApprovalSubjectType subject_type = 4;
+  string request_type = 5;
+  string size = 6;
+  string urgency = 7;
+  // Principals: "reporter", "user:<id>", "team:<id>", "role:admin".
+  repeated string approvers = 8;
+  bool allow_requester_approve = 9;
+  optional int32 due_after_seconds = 10;
+  int32 priority = 11;
+  bool enabled = 12;
+  int64 version = 13;
+  string created_by = 14;
+  google.protobuf.Timestamp created_at = 15;
+  google.protobuf.Timestamp updated_at = 16;
+}
+
+message ListApprovalPoliciesRequest {
+  string project_id = 1;
+  ApprovalSubjectType subject_type = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListApprovalPoliciesResponse {
+  repeated ApprovalPolicy policies = 1;
+  string next_page_token = 2;
+}
+
+message UpsertApprovalPolicyRequest {
+  ApprovalPolicy policy = 1;
+  int64 expected_version = 2;
+}
+
+message UpsertApprovalPolicyResponse {
+  ApprovalPolicy policy = 1;
+}
+
+message DeleteApprovalPolicyRequest {
+  string id = 1;
+  int64 expected_version = 2;
+}
+
+message DeleteApprovalPolicyResponse {}
+
 service ApprovalService {
-  rpc RequestApproval(RequestApprovalRequest) returns (Approval);
-  rpc Approve(ApproveRequest) returns (DecideApprovalResponse);
-  rpc Reject(RejectRequest) returns (DecideApprovalResponse);
-  rpc Cancel(CancelApprovalRequest) returns (Approval);
-  rpc GetApproval(GetApprovalRequest) returns (Approval);
+  rpc RequestApproval(RequestApprovalRequest) returns (RequestApprovalResponse);
+  rpc Approve(ApproveRequest) returns (ApproveResponse);
+  rpc Reject(RejectRequest) returns (RejectResponse);
+  rpc Cancel(ApprovalServiceCancelRequest) returns (ApprovalServiceCancelResponse);
+  rpc GetApproval(GetApprovalRequest) returns (GetApprovalResponse);
   rpc ListApprovals(ListApprovalsRequest) returns (ListApprovalsResponse);
   rpc ListPendingForUser(ListPendingForUserRequest) returns (ListPendingForUserResponse);
+  // README v6 section 8 row 12 / CR-REQ-010 Q4: extend the deadline instead of expire-then-reopen.
+  rpc ExtendApproval(ExtendApprovalRequest) returns (ExtendApprovalResponse);
+}
+
+service ApprovalPolicyAdminService {
+  rpc ListApprovalPolicies(ListApprovalPoliciesRequest) returns (ListApprovalPoliciesResponse);
+  rpc UpsertApprovalPolicy(UpsertApprovalPolicyRequest) returns (UpsertApprovalPolicyResponse);
+  rpc DeleteApprovalPolicy(DeleteApprovalPolicyRequest) returns (DeleteApprovalPolicyResponse);
 }

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/postgres/NNNN_context_sources.{up,down}.sql` (mới), `.../migrations/mysql/NNNN_context_sources.{up,down}.sql` (mới), `.../internal/usecase/ports.go` (sửa), `.../internal/adapter/postgres/{context_sources,context_packs,evidence}.go` (mới), `.../internal/adapter/mysql/{context_sources,context_packs,evidence}.go` (mới), `.../internal/adapter/{postgres,mysql}/context_repositories_integration_test.go` (mới)
 **Depends on:** BE-REQ-SOL-001 (module, `InTx`, `exec` lấy từ ctx), BE-REQ-SOL-002 (bảng `requests`, `RequestRepository`)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -64,11 +64,11 @@ type EvidenceRepository interface {
 
 ## Tiêu chí hoàn thành
 
-- [x] Hai thư mục migration có cùng số `NNNN`, up/down/up sạch trên Postgres 14+ và MySQL 8.0.16+.
-- [x] RLS Postgres bật `FORCE`; test "quên `set_config`" trả 0 dòng.
-- [x] Không câu SQL MySQL nào thiếu `tenant_id` (sẽ được test quét SQL của BE-REQ-SOL-035 task 05 kiểm).
-- [x] `NextSeq` không trùng dưới đua; `used_by` cập nhật idempotent.
-- [x] Không file tên `helpers`, `utils`, `common`; không `max-lines` disable.
+- [ ] Hai thư mục migration có cùng số `NNNN`, up/down/up sạch trên Postgres 14+ và MySQL 8.0.16+.
+- [ ] RLS Postgres bật `FORCE`; test "quên `set_config`" trả 0 dòng.
+- [ ] Không câu SQL MySQL nào thiếu `tenant_id` (sẽ được test quét SQL của BE-REQ-SOL-035 task 05 kiểm).
+- [ ] `NextSeq` không trùng dưới đua; `used_by` cập nhật idempotent.
+- [ ] Không file tên `helpers`, `utils`, `common`; không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

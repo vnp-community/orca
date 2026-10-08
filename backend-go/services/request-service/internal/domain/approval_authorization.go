@@ -73,7 +73,7 @@ func EligibleApprovers(approvers []Principal, reporterID string, selfAllowed boo
 	if selfAllowed {
 		return expandedUsers
 	}
-	
+
 	var res []string
 	for _, u := range expandedUsers {
 		if u != reporterID {

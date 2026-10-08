@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/change_request_type.go`, `internal/usecase/list_request_type_history.go` và `*_test.go` (mới)
 **Depends on:** TASK-REQ-005-05, TASK-REQ-005-01
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/domain/... ./internal/usecase/... ./internal/adapter/... và go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run "Intake|Classification|Migration|Schema"`)
 
 ---
 
@@ -43,3 +43,8 @@ CR-REQ-005 mục 2.4; bảng đường đổi ở `domain.ChangeTypeAllowed`. T�
 
 - `ExecutionGuard` giả: đổi loại từ `executing` không chặn Task đang chạy cho tới CR-REQ-011; ghi vào README service.
 - Đổi sang loại cần `size` (bug, refactor) rồi xác nhận mà quên `size`: bắt ở `Confirm` (`REQUEST_SIZE_REQUIRED`).
+
+## Ghi chú triển khai
+
+- `ChangeKeepsSolutions` kiểm bằng DB thật (hàng `solutions` còn nguyên, version 1).
+- `ExecutionGuard` vẫn là no-op tới CR-REQ-011.

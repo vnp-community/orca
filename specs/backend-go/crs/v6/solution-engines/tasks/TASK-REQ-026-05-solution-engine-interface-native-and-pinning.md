@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/solution_engine.go`, `internal/usecase/engine_native.go`, `internal/usecase/pin_solution_engine.go`, `internal/usecase/generate_solution.go` (sửa, của SOL-007), `internal/usecase/run_solution_generation.go` (sửa), `internal/usecase/generate_plan.go` (sửa, của SOL-012), `internal/usecase/confirm_request_type.go` (sửa, của SOL-005), `proto/orca/request/v1/request.proto` (sửa)
 **Depends on:** TASK-REQ-026-01, 026-02, 026-04, TASK-REQ-007-05 (GenerateSolution), TASK-REQ-012-05 (GeneratePlan/CommitPlan), TASK-REQ-005-05 (ConfirmRequestType)
-**Status:** [x] DONE
+**Status:** [ ] TODO
 
 ---
 
@@ -70,12 +70,12 @@ Mã nguồn cần đọc lại ngay lúc làm (chưa có trong repo): `run_solut
 
 ## Tiêu chí hoàn thành
 
-- [x] Không có dòng `project_engine_settings` nào: hành vi `GenerateSolution` và `GeneratePlan` giống hệt trước task (toàn bộ test cũ xanh, kỳ vọng không đổi).
-- [x] Mọi lần sinh ghi `analysis_runs.engine`; Request có `solution_engine` sau lần sinh đầu.
-- [x] Đổi cờ project sau khi đã ghim không đổi engine của Request đó (test).
-- [x] `engine_override` từ người không có quyền bị từ chối; hợp lệ có audit.
-- [x] Preflight `openspec` thất bại không để lại run hay Solution `draft`.
-- [x] `buf breaking` không báo thay đổi phá vỡ.
+- [ ] Không có dòng `project_engine_settings` nào: hành vi `GenerateSolution` và `GeneratePlan` giống hệt trước task (toàn bộ test cũ xanh, kỳ vọng không đổi).
+- [ ] Mọi lần sinh ghi `analysis_runs.engine`; Request có `solution_engine` sau lần sinh đầu.
+- [ ] Đổi cờ project sau khi đã ghim không đổi engine của Request đó (test).
+- [ ] `engine_override` từ người không có quyền bị từ chối; hợp lệ có audit.
+- [ ] Preflight `openspec` thất bại không để lại run hay Solution `draft`.
+- [ ] `buf breaking` không báo thay đổi phá vỡ.
 
 ## Rủi ro và lưu ý
 

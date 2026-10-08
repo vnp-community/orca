@@ -1,7 +1,5 @@
 package domain
 
-import "errors"
-
 const (
 	TypeTask    = "task"
 	TypeBug     = "bug"
@@ -10,8 +8,6 @@ const (
 	TypePlan    = "plan"
 	TypePhase   = "phase"
 )
-
-var ErrInvalidTaskType = errors.New("invalid task type")
 
 func ParseTaskType(s string) (string, error) {
 	if s == "" {
@@ -25,6 +21,7 @@ func ParseTaskType(s string) (string, error) {
 	}
 }
 
+// IsContainerType: only plan/phase are containers; epic stays a numbered work task.
 func IsContainerType(s string) bool {
-	return s == TypePlan || s == TypePhase || s == TypeEpic
+	return s == TypePlan || s == TypePhase
 }

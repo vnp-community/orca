@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/update_task.go`, `internal/usecase/execute_task.go`, `internal/usecase/report_execution_result.go`, `internal/usecase/execution_lease.go`, `internal/usecase/reconcile_container_statuses.go` (mới), `internal/adapter/{postgres,mysql}/container_status.go`, `cmd/server/main.go`
 **Depends on:** TASK-REQ-011-05
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test ./internal/usecase/...` và `go test -tags=integration ./internal/adapter/postgres ./internal/adapter/mysql` (PG 16, MySQL 8.0.46 thật))
 
 ---
 
@@ -47,3 +47,11 @@ Các nơi con đổi status (đã đọc, số dòng ngày 2026-10-06):
 - Gọi `Sync` ngoài transaction của lệnh gốc: có cửa sổ ngắn trạng thái container cũ; đối soát là lưới an toàn.
 - Tải: mỗi đổi trạng thái task lá thêm 1 đến 3 truy vấn; chỉ khi parent là container (task thường dừng sớm ở bước 1).
 - BE-REQ-SOL-013 sẽ thêm sự kiện cho chính task lá ở cùng điểm gọi; tránh trùng sửa một khối: ghi chú cho người làm TASK-REQ-013-02.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `WithContainerSync` cho `UpdateTask`, `ExecuteTask`, `ReportTaskExecutionResult`; helper `syncContainerParent` (log, không làm hỏng lệnh gốc). `UpdateTask` còn sync sau khi mở khoá task phụ thuộc. `ExecuteTask`: sau claim, ba nhánh hoàn tác đồng bộ, hoàn tác bất đồng bộ, sau `CompleteExecution` của direct_agent. `ReportTaskExecutionResult`: nhánh thành công và nhánh thất bại sau `ReleaseExecution`.
+- `ReconcileContainerStatuses` + cổng `ContainerReconcileRepository` (`ListStaleContainers`, `TouchContainer`) ở cả hai dialect; `RecoverInterruptedExecutions.Sweep` = `Execute` + đối soát, `RunRecoveryLoop` gọi `Sweep` cùng nhịp 30 giây; `cmd/server/main.go` dựng một `SyncContainerStatus` dùng chung.
+- Integration: `TestContainerLifecycle_LeafDrivesPhaseAndPlan` (open, in_progress, review, done: phase và plan đổi theo, đúng 3 dòng `statuschanged` mỗi container, tất cả `cause=derived` và có `task_type`), `TestReconcile_ReleaseUnlinked_FixesPhase`, `TestReconcile_TouchesUnchangedContainer`.
+- Giới hạn đã biết: container chỉ bị coi là "cũ" khi `updated_at` nhỏ hơn con mới nhất; `UpdateTask` ghi đè `status` container từ bản đọc cũ rồi bump `updated_at` có thể che lỗi này tới lần con đổi kế tiếp. `DeleteTask` một con chưa kích hoạt sync (ngoài phạm vi task).
+- Luồng `ExecuteTask` với repository thật chưa có test integration riêng (test vòng đời dùng repository thật nhưng gọi `UpdateStatus`/`CompleteExecution`/`Sync` trực tiếp); các điểm gọi được kiểm bằng test đơn vị với fake CAS.

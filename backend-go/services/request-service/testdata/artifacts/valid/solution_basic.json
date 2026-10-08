@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "options": [
+    {
+      "id": "opt-1",
+      "title": "Phương án 1",
+      "summary": "Tóm tắt",
+      "approach": "Cách làm chi tiết",
+      "effort": {
+        "size": "M",
+        "hours_estimate": 8
+      },
+      "risk": {
+        "level": "low",
+        "description": "thấp"
+      },
+      "affected_areas": [
+        {
+          "name": "api-gateway",
+          "description": "route"
+        }
+      ]
+    },
+    {
+      "id": "opt-2",
+      "title": "Phương án 2",
+      "summary": "Tóm tắt",
+      "approach": "Cách làm chi tiết",
+      "effort": {
+        "size": "M",
+        "hours_estimate": 8
+      },
+      "risk": {
+        "level": "low",
+        "description": "thấp"
+      },
+      "affected_areas": [
+        {
+          "name": "api-gateway",
+          "description": "route"
+        }
+      ],
+      "breaking_change": true
+    }
+  ],
+  "recommendation": {
+    "option_id": "opt-1",
+    "reason": "ít rủi ro"
+  }
+}

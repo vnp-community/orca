@@ -1,13 +1,13 @@
 # Solutions backend: approval (v6)
 
-> 📋 Proposed, chưa triển khai. Phạm vi backend của CR-REQ-009 và CR-REQ-010; một phần nhỏ ở `notification-service`. Hợp đồng chung: [README v6](../../../../../../docs/crs/v6/README.md), mục 8 thắng mục 3.
+> ✅ Đã triển khai trong `request-service` (kiểm chứng 2026-10-08, 13/13 task; 010-05 ở `notification-service` 2026-10-07). Phạm vi backend của CR-REQ-009 và CR-REQ-010; một phần nhỏ ở `notification-service`. Hợp đồng chung: [README v6](../../../../../../docs/crs/v6/README.md), mục 8 thắng mục 3.
 
 ## Bảng CR, Solution, Task
 
 | CR | Solution | Task | Ghi chú |
 |----|----------|------|---------|
-| [CR-REQ-009](../../../../../../docs/crs/v6/approval/CR-REQ-009-generic-approval-domain-and-api.md) | [BE-REQ-SOL-009](./BE-REQ-SOL-009-generic-approval-domain-and-api.md) | TASK-REQ-009-01 đến 06 | Bảng `approvals`, `ApprovalService`, `SubjectHandler` |
-| [CR-REQ-010](../../../../../../docs/crs/v6/approval/CR-REQ-010-approval-authorization-notification-expiry.md) | [BE-REQ-SOL-010](./BE-REQ-SOL-010-approval-authorization-notification-expiry.md) | TASK-REQ-010-01 đến 07 | Chính sách, thông báo, hết hạn; sửa `notification-service` |
+| [CR-REQ-009](../../../../../../docs/crs/v6/approval/CR-REQ-009-generic-approval-domain-and-api.md) | [BE-REQ-SOL-009](./BE-REQ-SOL-009-generic-approval-domain-and-api.md) | TASK-REQ-009-01 đến 06 | Bảng `approvals`, `ApprovalService`, `SubjectHandler` · ✅ 6/6 (2026-10-08) |
+| [CR-REQ-010](../../../../../../docs/crs/v6/approval/CR-REQ-010-approval-authorization-notification-expiry.md) | [BE-REQ-SOL-010](./BE-REQ-SOL-010-approval-authorization-notification-expiry.md) | TASK-REQ-010-01 đến 07 | Chính sách, thông báo, hết hạn; sửa `notification-service` · ✅ 7/7 (2026-10-08) |
 
 ## Thứ tự phụ thuộc
 

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "kind": "findings",
+  "summary": "Có",
+  "findings": [
+    {
+      "id": "f-1",
+      "statement": "đã dùng",
+      "confidence": 0.9,
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "README"
+        }
+      ]
+    }
+  ]
+}

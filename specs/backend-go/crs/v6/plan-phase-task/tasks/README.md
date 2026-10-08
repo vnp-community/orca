@@ -1,6 +1,6 @@
 # plan-phase-task: tasks backend (TASK-REQ-011-xx đến TASK-REQ-014-xx)
 
-> **📋 Proposed.** Mọi task `[ ] TODO`, chưa triển khai. Tài liệu ngày 2026-10-06; đã đối chiếu code `task-service` thật; `request-service` chưa tồn tại nên các task của nó đọc lại code của CR-REQ-001, 002, 003, 006, 009 khi đã merge.
+> **🚧 Đang triển khai.** SOL-011 7/7 DONE; SOL-012 01, 02 DONE (task-service); SOL-013 7/7 DONE (kiểm chứng 2026-10-08); SOL-014 01, 02, 07 DONE, 03 đến 06 một phần (còn hook `PlanPreconditions` ở `GeneratePlan`/`CommitPlan`, CR-REQ-012). Chi tiết: [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md).
 
 Mỗi task làm được trong 0,5 đến 2 ngày, có đường dẫn file, bước kiểm thử (tên test, lệnh `go test`) và checklist hoàn thành. Lệnh chạy từ `/opt/repos/orca/backend-go`; integration cần Docker (testcontainers, tag `integration`); chưa chạy lần nào. Quy ước: chạy `gitnexus_impact` trước khi sửa symbol có sẵn và `detect_changes` trước khi commit (CLAUDE.md); không `max-lines` disable; không đặt tên `helpers`/`utils`/`common`/`misc`.
 
@@ -8,10 +8,10 @@ Mỗi task làm được trong 0,5 đến 2 ngày, có đường dẫn file, bư
 
 | Solution | Task | Ghi chú |
 |---|---|---|
-| [BE-REQ-SOL-011](../solutions/BE-REQ-SOL-011-task-service-plan-phase-task-types.md) | 011-01 migration 0015/0016 · 011-02 domain + `request_id` + không số task · 011-03 `CreateTask` phân cấp · 011-04 `ListTasks` lọc · 011-05 `SyncContainerStatus` · 011-06 điểm gọi + đối soát · 011-07 chặn tác dụng phụ | Số migration thật 0015, 0016 (kiểm lại trước khi tạo). 03 và 04 song song sau 02 |
-| [BE-REQ-SOL-012](../solutions/BE-REQ-SOL-012-plan-phase-task-generation-from-solution.md) | 012-01 `CreatePlanTree` usecase · 012-02 handler + integration · 012-03 `plan_shape` + validation · 012-04 proto + adapter AI/task · 012-05 `GeneratePlan`/`CommitPlan` · 012-06 `SubjectHandler` + single_task · 012-07 integration/e2e | 01, 02 ở task-service; 03 đến 07 ở request-service. 01 và 03 song song |
-| [BE-REQ-SOL-013](../solutions/BE-REQ-SOL-013-phase-execution-and-feedback-loop.md) | 013-01 đổi cổng + outbox · 013-02 phát sự kiện `cause` · 013-03 migration + repo · 013-04 `StartPhase`/`AdvanceExecution` · 013-05 handler `phase` + guard + consumer · 013-06 `ReportTaskOutcome` · 013-07 đối soát + e2e | 01, 02 ở task-service (song song SOL-012); 03 đến 07 ở request-service |
-| [BE-REQ-SOL-014](../solutions/BE-REQ-SOL-014-type-specific-execution-policies.md) | 014-01 `request_checks` · 014-02 RPC ghi/đọc · 014-03 `TypePolicy` + hook · 014-04 `pre_deploy` + hotfix/security · 014-05 performance/refactor · 014-06 ops_request · 014-07 follow-up hotfix + tích hợp | 05 và 06 song song sau 03 |
+| [BE-REQ-SOL-011](../solutions/BE-REQ-SOL-011-task-service-plan-phase-task-types.md) ✅ 7/7 DONE | 011-01 migration 0015/0016 · 011-02 domain + `request_id` + không số task · 011-03 `CreateTask` phân cấp · 011-04 `ListTasks` lọc · 011-05 `SyncContainerStatus` · 011-06 điểm gọi + đối soát · 011-07 chặn tác dụng phụ | Số migration thật 0015, 0016 (kiểm lại trước khi tạo). 03 và 04 song song sau 02 |
+| [BE-REQ-SOL-012](../solutions/BE-REQ-SOL-012-plan-phase-task-generation-from-solution.md) 🚧 2/7 DONE | 012-01 `CreatePlanTree` usecase · 012-02 handler + integration · 012-03 `plan_shape` + validation · 012-04 proto + adapter AI/task · 012-05 `GeneratePlan`/`CommitPlan` · 012-06 `SubjectHandler` + single_task · 012-07 integration/e2e | 01, 02 ở task-service; 03 đến 07 ở request-service. 01 và 03 song song |
+| [BE-REQ-SOL-013](../solutions/BE-REQ-SOL-013-phase-execution-and-feedback-loop.md) ✅ 7/7 DONE | 013-01 đổi cổng + outbox · 013-02 phát sự kiện `cause` · 013-03 migration + repo · 013-04 `StartPhase`/`AdvanceExecution` · 013-05 handler `phase` + guard + consumer · 013-06 `ReportTaskOutcome` · 013-07 đối soát + e2e | 01, 02 ở task-service (song song SOL-012); 03 đến 07 ở request-service |
+| [BE-REQ-SOL-014](../solutions/BE-REQ-SOL-014-type-specific-execution-policies.md) 🚧 3/7 DONE (03 đến 06 một phần) | 014-01 `request_checks` · 014-02 RPC ghi/đọc · 014-03 `TypePolicy` + hook · 014-04 `pre_deploy` + hotfix/security · 014-05 performance/refactor · 014-06 ops_request · 014-07 follow-up hotfix + tích hợp | 05 và 06 song song sau 03 |
 
 ## Sơ đồ phụ thuộc
 

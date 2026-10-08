@@ -1,0 +1,15 @@
+DROP TABLE analysis_project_gates;
+ALTER TABLE analysis_runs
+    DROP INDEX analysis_runs_project_running,
+    DROP COLUMN repo_check,
+    DROP COLUMN enforcement,
+    DROP COLUMN feedback,
+    DROP COLUMN actor_id,
+    DROP COLUMN project_id,
+    DROP COLUMN solution_id;
+ALTER TABLE solutions
+    DROP INDEX idx_solutions_request_state,
+    DROP COLUMN generation_run_id,
+    DROP COLUMN content_ref,
+    DROP COLUMN status,
+    DROP COLUMN kind;

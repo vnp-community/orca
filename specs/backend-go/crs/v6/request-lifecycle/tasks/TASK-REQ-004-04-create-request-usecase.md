@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/create_request.go`, `internal/usecase/create_request_test.go`, `internal/usecase/ports.go` (sửa: `IssueFetcher`) (mới/sửa)
 **Depends on:** TASK-REQ-003-03, TASK-REQ-004-01, TASK-REQ-004-02
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/domain/... ./internal/usecase/... ./internal/adapter/... (unit) và go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run "Intake|Classification|Migration|Schema" (DB thật)`)
 
 ---
 
@@ -39,3 +39,11 @@ Lệnh: `go test ./services/request-service/internal/usecase/... -run CreateRequ
 
 - Làm giàu ngoài giao dịch nghĩa là hai request đồng thời cùng khoá có thể cùng gọi `GetIssue`; chấp nhận (chỉ tốn một lần gọi).
 - Nếu Request tồn tại nhưng `Get` thất bại ngay sau `Find` (bị xoá): không xảy ra vì không có lệnh xoá; coi là lỗi nội bộ.
+
+## Ghi chú triển khai
+
+- `CreateRequest` nhận cổng `RequestTransitioner` (định nghĩa ở `ports_classification.go`). Bản thật là `TransitionRequest` của agent lifecycle-a; ở nhánh này test dùng fake/`dbTransitioner`, `cmd/server/wire_transitioner_pending.go` trả `Unavailable` cho tới khi hợp nhất (xem IMPLEMENTATION-NOTES).
+- Thứ tự sự kiện: `created` được ghi TRƯỚC khi gọi transition để `seq` cho đúng `created`, `status_changed` (tiêu chí của task); bước 3(f) viết ngược thứ tự.
+- `RequestCreationRecorder` (no-op) là điểm móc cho revision 1 của CR-REQ-027 trong cùng giao dịch; bảng `request_revisions` chưa có nên chưa ghi revision.
+- Làm giàu chạy khi còn thiếu title/body/hints (không chỉ khi title rỗng); lỗi chỉ gây thất bại nếu title vẫn rỗng.
+- Thêm `REQUEST_PROJECT_INVALID` (project_id không phải UUID).

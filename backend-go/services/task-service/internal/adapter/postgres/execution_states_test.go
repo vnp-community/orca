@@ -50,8 +50,8 @@ func TestExecutionStates_Integration(t *testing.T) {
 	}
 
 	// Task D depends on E (open) and F (done)
-	repo.Add(ctx, tenantID, domain.TaskEdge{FromTaskID: taskD.ID, ToTaskID: taskE.ID, Type: domain.EdgeDependsOn})
-	repo.Add(ctx, tenantID, domain.TaskEdge{FromTaskID: taskD.ID, ToTaskID: taskF.ID, Type: domain.EdgeDependsOn})
+	repo.Add(ctx, tenantID, domain.TaskEdge{FromTaskID: taskD.ID, ToTaskID: taskE.ID, Kind: domain.EdgeKindDependsOn})
+	repo.Add(ctx, tenantID, domain.TaskEdge{FromTaskID: taskD.ID, ToTaskID: taskF.ID, Kind: domain.EdgeKindDependsOn})
 
 	t.Run("LastLink_PicksNewest", func(t *testing.T) {
 		states, err := repo.ListExecutionStates(ctx, tenantID, []string{taskA.ID})

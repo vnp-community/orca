@@ -36,6 +36,8 @@ const (
 	KindDeadlineExceeded
 	KindUnavailable
 	KindResourceExhausted
+	// KindAborted is an optimistic-concurrency conflict the caller resolves by re-reading and retrying.
+	KindAborted
 )
 
 // AppError is the typed error every domain/ package returns instead of a
@@ -130,6 +132,8 @@ func ToGRPCStatus(err error) error {
 		code = codes.Unavailable
 	case KindResourceExhausted:
 		code = codes.ResourceExhausted
+	case KindAborted:
+		code = codes.Aborted
 	case KindInternal, KindUnknown:
 		code = codes.Internal
 	}

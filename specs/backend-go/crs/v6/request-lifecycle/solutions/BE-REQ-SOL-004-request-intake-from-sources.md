@@ -1,6 +1,6 @@
 # BE-REQ-SOL-004: Tiếp nhận Request từ Jira, GitHub, thủ công, webhook, MCP
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Phụ thuộc [BE-REQ-SOL-003](./BE-REQ-SOL-003-request-state-machine-and-flow-registry.md).
+> ✅ Đã triển khai (kiểm chứng 2026-10-08). Webhook cài ở `request-service` thay vì `api-gateway`; chưa kiểm chứng với Jira/Linear thật. Chi tiết: [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md).
 
 **CR:** [CR-REQ-004](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-004-request-intake-from-sources.md)
 **Service:** `request-service` (use case, adapter gRPC, adapter `grpcclient`, migration) · `proto` · `api-gateway` (`adapter/httpgateway`, chỉ route webhook)

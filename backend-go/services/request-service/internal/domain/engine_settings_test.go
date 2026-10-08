@@ -9,7 +9,7 @@ func TestEffectiveEngine_Table(t *testing.T) {
 	engineNative := EngineNative
 	engineOpenSpec := EngineOpenSpec
 	pinnedOptions := []*EngineName{nil, &engineNative, &engineOpenSpec}
-	
+
 	settingsOptions := []*ProjectEngineSettings{
 		nil,
 		{Engine: EngineNative},

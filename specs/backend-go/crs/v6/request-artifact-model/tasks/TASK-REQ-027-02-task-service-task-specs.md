@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/migrations/{postgres,mysql}/00NN_task_specs.{up,down}.sql`, `internal/domain/task_spec.go`, `internal/usecase/{set_task_spec,get_task_specs,lock_task_specs}.go`, `internal/usecase/ports.go` (sửa), `internal/usecase/update_task.go` (sửa), `internal/adapter/{postgres,mysql}/task_specs.go`, `internal/adapter/grpc/server_task_spec.go`, `backend-go/proto/orca/task/v1/task.proto` (sửa) và test
 **Depends on:** TASK-REQ-011-01 (migrations `0015`, `0016`), TASK-REQ-011-02 (`Task.RequestID`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./services/task-service/... ; go test -tags integration ./internal/adapter/{postgres,mysql} -run 'TaskSpec|Migration0020|RunInTxWithSpecs' (Postgres 16 và MySQL 8.0 thật))
 
 ---
 
@@ -68,6 +68,8 @@ Quyết định giữ: `task_specs` là bảng riêng (không cột JSON trên `
 - [x] `LockTaskSpecs` gọi hai lần: lần hai `locked=0`, không lỗi.
 - [x] Mọi truy vấn có `tenant_id`; test chéo tenant xanh.
 - [x] Bộ test hiện có của `task-service` không đổi kỳ vọng.
+
+> Ghi chú triển khai: Số migration dùng: `0020` (task_specs). Lệch: quyền `write` thay `edit` (OPA không có `edit`); `expected_version=0` nghĩa là tạo, gửi lại spec y hệt là idempotent; RLS `FORCE` + `WITH CHECK` kiểm bằng role không phải superuser. CI so sánh mẫu vàng với request-service chưa làm (file mẫu ở `task-service/testdata/artifacts/task/canonical_cases.json`).
 
 ## Rủi ro và lưu ý
 

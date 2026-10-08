@@ -31,6 +31,8 @@ func toMySQLDriverDSN(dsn string) (string, error) {
 	q := u.Query()
 	q.Set("parseTime", "true")
 	q.Set("loc", "UTC")
+	// TIMESTAMP columns convert through the session zone; pin it so reads match writes.
+	q.Set("time_zone", "'+00:00'")
 	q.Set("multiStatements", "false")
 
 	return fmt.Sprintf("%stcp(%s)/%s?%s", user, u.Host, dbName, q.Encode()), nil

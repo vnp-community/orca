@@ -14,6 +14,8 @@ const (
 	RequestStatusCompleted                RequestStatus = "completed"
 	RequestStatusRequestBacklog           RequestStatus = "request_backlog"
 	RequestStatusCancelled                RequestStatus = "cancelled"
+	// RequestStatusAwaitingInformation parks a request while a Clarification is open (CR-REQ-028).
+	RequestStatusAwaitingInformation RequestStatus = "awaiting_information"
 )
 
 func AllRequestStatuses() []RequestStatus {
@@ -29,6 +31,7 @@ func AllRequestStatuses() []RequestStatus {
 		RequestStatusCompleted,
 		RequestStatusRequestBacklog,
 		RequestStatusCancelled,
+		RequestStatusAwaitingInformation,
 	}
 }
 
@@ -43,4 +46,13 @@ func ParseRequestStatus(s string) (RequestStatus, error) {
 
 func (s RequestStatus) IsTerminal() bool {
 	return s == RequestStatusCompleted || s == RequestStatusCancelled
+}
+
+// IsHumanWaiting is true for the statuses where the next move belongs to a person.
+func (s RequestStatus) IsHumanWaiting() bool {
+	switch s {
+	case RequestStatusAwaitingTypeConfirmation, RequestStatusAwaitingAnalysisApproval, RequestStatusAwaitingPlanApproval, RequestStatusAwaitingInformation:
+		return true
+	}
+	return false
 }

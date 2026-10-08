@@ -2,15 +2,25 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/stablyai/orca-go/common/errx"
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
 
+func isKind(err error, k apperrors.Kind) bool {
+	var ae *apperrors.AppError
+	return errors.As(err, &ae) && ae.Kind == k
+}
+
+func hasCode(err error, code string) bool {
+	var ae *apperrors.AppError
+	return errors.As(err, &ae) && ae.Code == code
+}
 
 func TestListExecutionStates_EmptyInput(t *testing.T) {
 	uc := NewListExecutionStates(&FakeExecutionStateReader{})
@@ -26,7 +36,7 @@ func TestListExecutionStates_EmptyInput(t *testing.T) {
 func TestListExecutionStates_NoTenant_Unauthenticated(t *testing.T) {
 	uc := NewListExecutionStates(&FakeExecutionStateReader{})
 	_, err := uc.Execute(context.Background(), "", ListExecutionStatesInput{TaskIDs: []string{"task-1"}})
-	if !errx.IsUnauthenticated(err) {
+	if !isKind(err, apperrors.KindUnauthenticated) {
 		t.Fatalf("expected Unauthenticated error, got %v", err)
 	}
 }
@@ -38,7 +48,7 @@ func TestListExecutionStates_TooManyIDs(t *testing.T) {
 		ids = append(ids, fmt.Sprintf("task-%d", i))
 	}
 	_, err := uc.Execute(context.Background(), "t1", ListExecutionStatesInput{TaskIDs: ids})
-	if !errx.IsInvalidArgument(err) || err.(*errx.Error).Code != "TASK_STATES_TOO_MANY_IDS" {
+	if !isKind(err, apperrors.KindInvalidArgument) || !hasCode(err, "TASK_STATES_TOO_MANY_IDS") {
 		t.Fatalf("expected TASK_STATES_TOO_MANY_IDS, got %v", err)
 	}
 }
@@ -56,7 +66,7 @@ func TestListExecutionStates_DedupesAndKeepsOrder(t *testing.T) {
 		},
 	}
 	uc := NewListExecutionStates(reader)
-	
+
 	in := ListExecutionStatesInput{TaskIDs: []string{"task-1", "task-2", "task-1", "task-2"}}
 	res, err := uc.Execute(context.Background(), "t1", in)
 	if err != nil {
@@ -80,7 +90,7 @@ func TestListExecutionStates_FillsMissingTasks(t *testing.T) {
 		},
 	}
 	uc := NewListExecutionStates(reader)
-	
+
 	in := ListExecutionStatesInput{TaskIDs: []string{"task-1", "task-missing"}}
 	res, err := uc.Execute(context.Background(), "t1", in)
 	if err != nil {
@@ -89,7 +99,7 @@ func TestListExecutionStates_FillsMissingTasks(t *testing.T) {
 	if len(res) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(res))
 	}
-	
+
 	want := []domain.ExecutionState{
 		{TaskID: "task-1", LastLinkStatus: "completed", LastStartedAt: now},
 		{TaskID: "task-missing", LastLinkStatus: "", FailedAttempts: 0},

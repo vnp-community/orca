@@ -5,7 +5,7 @@
 **Service:** `request-service`, `api-gateway`
 **File:** `backend-go/services/request-service/internal/domain/rate_limit_policy.go` (mới), `.../internal/usecase/rate_limit_policy.go` (mới), `.../internal/adapter/grpc/rate_limit.go` (mới), `.../internal/adapter/{postgres,mysql}/{concurrency_counts.go,webhook_nonces.go}` (mới), `.../internal/adapter/grpc/server_webhook_nonce.go` (mới: RPC nội bộ `RecordWebhookNonce`), `backend-go/proto/orca/request/v1/request.proto` (sửa), `backend-go/services/api-gateway/internal/adapter/httpgateway/request_webhook_routes.go` (sửa; do TASK-REQ-004-08 tạo), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-035-04 (`Catalog.RateClass`), TASK-REQ-035-06 (bảng `request_webhook_nonces`), TASK-REQ-004-08 (route webhook), BE-REQ-SOL-007 (`analysis_runs`), BE-REQ-SOL-008 (trần 2 run mỗi dự án)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `cd backend-go && opa test policy/orca-authz && go test ./services/request-service/... && go test -tags integration ./services/request-service/...`)
 
 ---
 
@@ -43,7 +43,8 @@
 - [x] Thân webhook lệch thời gian 6 phút hoặc nonce lặp bị từ chối/không tạo trùng.
 - [x] Trần đồng thời theo tenant và dự án được thi hành bằng DB (đúng cả khi nhiều bản sao).
 - [x] Kích thước `title`, `body` vượt trần bị `InvalidArgument`.
-- [x] Không log thân webhook hay chữ ký.
+- [ ] Không log thân webhook hay chữ ký.
+  - chưa: chưa có test log chụp; code không log thân hay chữ ký (handler chỉ trả thông điệp cố định).
 
 ## Ví dụ tham khảo
 
@@ -71,3 +72,10 @@ nonceHash := sha256hex(strings.TrimPrefix(sig, "sha256=")) // khoá chống phá
 - Đổi chuỗi ký webhook thành `timestamp.body` phá vỡ người gửi đang dùng chữ ký chỉ trên thân: cần giai đoạn chuyển tiếp và thông báo (cờ `REQUEST_WEBHOOK_REQUIRE_TIMESTAMP`).
 - Số hạn mức là đề xuất chưa đo; thiết lập sai có thể chặn người dùng thật (`write` 5 req/s có thể quá chặt với tích hợp hàng loạt).
 - `CountRunning` theo dự án phụ thuộc cột dự án của `analysis_runs`; kiểm schema SOL-007 lúc làm.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Lệch vì không sửa proto: không có RPC `RecordWebhookNonce`; webhook HTTP nằm ngay trong `request-service`, nên `httpwebhook` gọi `WebhookReplayGuard` trực tiếp (bảng `request_webhook_nonces`, TTL 10 phút lớn hơn lệch giờ 5 phút). Nonce là `sha256(chữ ký)`; chỉ gọi sau khi HMAC đúng; lỗi lưu nonce là 503 (không bỏ qua); lặp trả 200 `{"created":false,"duplicate":true}`.
+- Chuỗi ký `"<timestamp>.<body>"` với `X-Orca-Timestamp` (Unix giây, lệch tối đa 5 phút). `REQUEST_WEBHOOK_REQUIRE_TIMESTAMP` mặc định true; false là giai đoạn chuyển tiếp cho người gửi cũ chỉ ký thân (thay đổi phá vỡ, cần thông báo). Gateway không còn route webhook tới `request-service` trong cây này nên không sửa gateway.
+- Bộ xô token tự viết (không thêm phụ thuộc `x/time`), khoá `(tenant, lớp, chủ thể)`, MCP/webhook có xô riêng theo người dùng agent. Trần đồng thời đếm bằng DB (`analysis_runs`: 10 mỗi tenant, 2 mỗi dự án; Request mở 2000). Giới hạn kích thước `title` 500 / `body` 100000 đã có sẵn ở `domain.NormalizeTitle/Body` (`InvalidArgument`, mã `REQUEST_BODY_TOO_LARGE`; `REQUEST_PAYLOAD_TOO_LARGE` chỉ dùng cho văn bản quá cửa sổ quét); comment Approval giữ trần 2000 hiện có.
+- Số liệu giới hạn là đề xuất chưa đo.

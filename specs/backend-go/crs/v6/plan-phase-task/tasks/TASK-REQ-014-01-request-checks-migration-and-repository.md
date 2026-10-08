@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_request_checks.{up,down}.sql` (mới), `internal/domain/request_check.go` (mới), `internal/usecase/ports.go`, `internal/adapter/postgres/request_checks.go`, `internal/adapter/mysql/request_checks.go` (mới), `*_integration_test.go` (mới)
 **Depends on:** CR-REQ-001, 002 (module, schema `request`, RLS mẫu); số migration lấy theo quy tắc ở TASK-REQ-013-03
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -56,3 +56,7 @@
 - Superuser Postgres bỏ qua RLS: test tenant phải chạy bằng role thường (xem BE-MCP-SOL-001 mục 1 điều 3 cho cách làm).
 - `JSON DEFAULT` ở MySQL tuỳ phiên bản; nếu tắt default, mọi `INSERT` phải gửi `metrics`.
 - Cột `metrics` có thể lớn: đặt trần ở RPC (task 02), không ở DB.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

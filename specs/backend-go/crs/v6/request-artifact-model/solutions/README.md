@@ -1,13 +1,13 @@
 # Solutions backend: request-artifact-model (v6)
 
-> 📋 Proposed, chưa triển khai. Phạm vi backend của CR-REQ-027 và CR-REQ-028 trong `request-service` (service mới, chưa có mã lúc soạn) và `task-service` (bảng `task_specs`). Hợp đồng chung: [README v6](../../../../../../docs/crs/v6/README.md), mục 8 thắng mục 3.
+> 🚧 SOL-027: 6/8 task xong (027-01 đến 06; 027-07, 027-08 một phần). SOL-028: 6/8 task xong (028-01 đến 05 và 08; 028-06, 028-07 một phần). Kiểm chứng 2026-10-08, xem [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md).
 
 ## Bảng CR, Solution, Task
 
 | CR | Solution | Task | Ghi chú |
 |----|----------|------|---------|
 | [CR-REQ-027](../../../../../../docs/crs/v6/request-artifact-model/CR-REQ-027-artifact-schema-and-ontology.md) | [BE-REQ-SOL-027](./BE-REQ-SOL-027-artifact-schema-ontology-and-task-specs.md) | TASK-REQ-027-01 đến 08 | Schema `schema_version`, `request_revisions`, `artifact_index`, `artifact_relations`, `request_coverage`, `task.task_specs` và 3 RPC task-service, bản chiếu, kiểm ngữ nghĩa |
-| [CR-REQ-028](../../../../../../docs/crs/v6/request-artifact-model/CR-REQ-028-clarification-and-decision-records.md) | [BE-REQ-SOL-028](./BE-REQ-SOL-028-clarification-decision-and-awaiting-information.md) | TASK-REQ-028-01 đến 08 | `awaiting_information`, Clarification, Definition of Ready, Decision, xác nhận lần hai, thông báo |
+| [CR-REQ-028](../../../../../../docs/crs/v6/request-artifact-model/CR-REQ-028-clarification-and-decision-records.md) | [BE-REQ-SOL-028](./BE-REQ-SOL-028-clarification-decision-and-awaiting-information.md) | TASK-REQ-028-01 đến 08 | `awaiting_information`, Clarification, Definition of Ready, Decision, xác nhận lần hai, thông báo · 🚧 5/8 (028-01 đến 05 xong 2026-10-08; 028-06, 07, 08 một phần) |
 
 Frontend và agent: N/A trong thư mục này (UI hỏi đáp và bảng phủ do solution frontend; agent không đổi).
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/ports.go` (sửa: `ProcessedEventRepository`), `internal/adapter/postgres/processed_events.go`, `internal/adapter/mysql/processed_events.go`, `internal/adapter/eventbus/consumer.go`, `internal/adapter/eventbus/consumer_test.go` (mới); `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-001-04, TASK-REQ-001-05
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/adapter/eventbus/... và go test -tags integration ./internal/adapter/eventbus (NATS thật) và go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run "Intake|Classification|Migration|Schema"`)
 
 ---
 
@@ -41,3 +41,9 @@ Bảng `processed_events(tenant_id, event_id, subject, processed_at)` có từ `
 
 - `MarkProcessed` phải gọi trong giao dịch ghi kết quả (TASK-REQ-005-04), không ở consumer; consumer chỉ chuyển `eventID`.
 - Stream chưa tồn tại lúc consumer đăng ký: `awaitStream` của `eventbus` chờ; kiểm lỗi đăng ký chỉ log (như `notification-service`).
+
+## Ghi chú triển khai
+
+- Subject theo hằng `domain.SubjectRequestStatusChanged`; đã sửa giá trị hằng từ `...statuschanged` thành `...status_changed` (cùng `type_confirmed`, `type_changed`) cho khớp CR và `issue-status-sync`. Không còn chỗ nào dùng giá trị cũ.
+- Consumer chỉ đưa việc vào `ClassificationRunner.Run` (tạo run bền) rồi ack; trigger là `ClassificationRunner`, không phải use case chạy AI nội tuyến (xem IMPLEMENTATION-NOTES, quyết định D3).
+- `Prune` chạy xuyên tenant qua GUC `app.relay` (policy `relay_prune_scan`/`relay_prune` trong migration 0027).

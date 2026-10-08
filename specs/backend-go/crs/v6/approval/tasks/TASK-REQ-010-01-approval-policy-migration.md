@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / migrations
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_approval_policies.{up,down}.sql` (mới)
 **Depends on:** TASK-REQ-009-01 (bảng `approvals`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql -run "Migration|ApprovalPolicyContract"`)
 
 ## Context
 
@@ -36,3 +36,6 @@
 ## Rủi ro và lưu ý
 
 - Cột JSON `approvers` chỉ để lưu và hiển thị; không truy vấn bằng toán tử JSON (khác nhau giữa hai DB). Việc lọc người duyệt dùng `approval_approvers`.
+
+## Kết quả triển khai (2026-10-08)
+- `0004_approval_policies` kiểm lại trên Postgres 16 và MySQL 8.0 thật: up/down/up, CHECK từ chối `size`, `urgency`, `subject_type` lạ (`DBChecksRejectUnknownValues`), truy vấn ứng viên `IS NULL OR =` cho kết quả như nhau (`CandidatesFilterByContextAndEnabled`), cô lập tenant (`TenantIsolation`). Cột `approvers` lưu mảng chuỗi (`"reporter"`, `"user:<id>"`...), khớp proto.

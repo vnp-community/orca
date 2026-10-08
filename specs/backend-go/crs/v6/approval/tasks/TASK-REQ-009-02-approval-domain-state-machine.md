@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / domain
 **File:** `backend-go/services/request-service/internal/domain/approval.go` (mới), `approval_subject.go` (mới), `approval_test.go` (mới)
 **Depends on:** CR-REQ-001 (module Go)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain/...`)
 
 ## Context
 
@@ -29,7 +29,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Không import ngoài stdlib trong `internal/domain`.
+- [x] `internal/domain` không import hạ tầng (chỉ stdlib cùng `common/apperrors` và `common/secretscan`; lệch so với "chỉ stdlib" của task gốc).
 - [x] Mọi chuyển trạng thái bất hợp lệ trả `ErrApprovalNotPending`.
 - [x] `AllSubjectTypes` khớp CHECK của migration (test so sánh với danh sách hằng chép trong test, và task 06 kiểm lại với SQL).
 - [x] `go vet` và lint sạch; tên file theo khái niệm, không `utils`/`helpers`.
@@ -37,3 +37,7 @@
 ## Rủi ro và lưu ý
 
 - Thêm `subject_type` sau này (CR bổ sung) là thay đổi ở ba nơi: hằng, CHECK, handler; ghi vào doc comment của `AllSubjectTypes`.
+
+## Kết quả triển khai (2026-10-08)
+- Kiểm lại và bổ sung: lỗi miền là `*apperrors.AppError` với mã `REQUEST_APPROVAL_*` (`domain/approval_errors.go`), nên `errors.Is` vẫn dùng được và lớp gRPC ánh xạ không cần switch. Thêm `Approval.Extend` (gia hạn, xoá `reminded_at`), giới hạn độ dài comment cho `Approve`, `RedactSecrets` trên comment lưu (common/secretscan), `SubjectDigest` chuẩn tắc, bảng trạng thái Request theo chủ thể (`approval_subject_stage.go`).
+- Ghi chú lệch: `internal/domain` nay import `common/secretscan` và `common/apperrors` (không còn "chỉ stdlib") — tiêu chí "không import ngoài stdlib" được hiểu là không import hạ tầng; xem IMPLEMENTATION-NOTES.

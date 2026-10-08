@@ -1,0 +1,1 @@
+ALTER TABLE request.solutions ALTER COLUMN seq DROP NOT NULL;

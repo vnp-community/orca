@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/type_policy.go` (mới), `type_policy_registry.go` (mới), `type_policy_noop.go` (mới), `internal/usecase/generate_plan.go`, `commit_plan.go`, `advance_execution.go`, `report_task_outcome.go` (sửa), `internal/domain/type_policy_registry_test.go` (mới)
 **Depends on:** TASK-REQ-012-05, TASK-REQ-013-04, TASK-REQ-013-06
-**Status:** `[x] DONE`
+**Status:** [ ] TODO
 
 ---
 
@@ -43,13 +43,19 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Loại khác (`bug`, `task`, `docs`, `change_request`) chạy y như trước (test hồi quy với `noopPolicy`).
-- [x] Mỗi điểm hook gọi đúng hàm chính sách của loại.
-- [x] Registry chứa đủ loại chính sách (sau tasks 04 đến 07) và test chống thiếu.
-- [x] Không có `switch req.Type` trong use case chung.
+- [ ] Loại khác (`bug`, `task`, `docs`, `change_request`) chạy y như trước (test hồi quy với `noopPolicy`).
+- [ ] Mỗi điểm hook gọi đúng hàm chính sách của loại.
+- [ ] Registry chứa đủ loại chính sách (sau tasks 04 đến 07) và test chống thiếu.
+- [ ] Không có `switch req.Type` trong use case chung.
 
 ## Rủi ro và lưu ý
 
 - `request-service` mới nên chỉ mục GitNexus có thể không có; xác nhận bằng grep.
 - Nếu CR-REQ-029 (ReadinessGate) thêm cổng cùng điểm `AdvanceExecution`, thứ tự gọi (policy trước hay readiness trước) cần chốt; không quyết ở task này.
 - Interface lớn dễ thành "dumping ground"; mỗi loại một file, không gom chung.
+
+## Tiến độ
+
+Đã làm: interface `TypePolicy`, `PolicyRegistry` (`NewPolicyRegistry`, `PolicyFor`, noop cho 6 loại), hook `PreExecutionGate`, `CompletionChecks`, `OnCompleted` trong `AdvanceExecution`/`EvaluateExecution` (có test, kể cả hồi quy với noop). Còn thiếu: hook `PlanPreconditions` ở `GeneratePlan`/`CommitPlan` vì hai use case này thuộc CR-REQ-012 (chưa có ở nhánh này). Hàm đã sẵn và có test; chỉ cần gọi `PolicyFor(type).PlanPreconditions(ctx, req, proposal)` sau `ValidateProposal`.
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

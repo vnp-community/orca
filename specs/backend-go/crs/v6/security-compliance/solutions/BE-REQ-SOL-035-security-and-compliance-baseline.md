@@ -1,6 +1,6 @@
 # BE-REQ-SOL-035: Nền tảng bảo mật và tuân thủ: quyền mức Request, RLS thật, `secretscan`, audit chi tiết, giới hạn tốc độ, lưu giữ, xoá, xuất
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. P0: phải xong trước khi bật cờ `request_flow_enabled` cho tenant thật (README v6, CR-REQ-025 cổng GA).
+> **🚧 Đang triển khai: 8/9 task xong** (035-01, 03 đến 08 xong và kiểm chứng; 035-02 một phần; 035-09 một phần: còn nối prompt/AIGateway, CI Trivy, bảng 2.11). Kiểm chứng 2026-10-08. P0: phải xong trước khi bật cờ `request_flow_enabled` cho tenant thật (README v6, CR-REQ-025 cổng GA).
 
 **CR:** [CR-REQ-035](../../../../../../docs/crs/v6/security-compliance/CR-REQ-035-security-and-compliance-baseline.md)
 **Service:** `request-service` (interceptor, domain, usecase, adapter, migration hai dialect) · `backend-go/common` (`secretscan` mới, `grpcmw`, `tenant`, `auditclient` dùng) · `backend-go/policy/orca-authz/request.rego` (mới) · `api-gateway` (gắn `actor_type`, token nội bộ, webhook) · `backend-go/ci`

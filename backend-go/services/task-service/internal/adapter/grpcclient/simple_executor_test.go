@@ -119,7 +119,13 @@ func (f *fakeTaskRepository) SetActiveExecutionLink(ctx context.Context, tenantI
 func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
 	panic("not implemented")
 }
-func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error) {
+func (f *fakeTaskRepository) List(ctx context.Context, tenantID string, flt usecase.ListFilter) ([]domain.Task, string, error) {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) ListChildStatuses(ctx context.Context, tenantID, parentID string) ([]domain.Status, error) {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) UpdateContainerStatus(ctx context.Context, tenantID, id string, from, to domain.Status, events []domain.OutboxEvent) (bool, error) {
 	panic("not implemented")
 }
 func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task, events []domain.OutboxEvent) error {
@@ -173,7 +179,7 @@ func (f *fakeTaskRepository) GetSubtreeWithChildPercents(ctx context.Context, te
 func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error {
 	panic("not implemented")
 }
-func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64, events []domain.OutboxEvent) error {
 	panic("not implemented")
 }
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/artifact_projection.go`, `internal/domain/projection_frontmatter.go`, `internal/domain/projection_regions.go`, `internal/usecase/export_artifact_projection.go`, `testdata/projection/*.md` và test (mới)
 **Depends on:** TASK-REQ-027-03 (`Violation`, `CanonicalJSON`, `ValidateArtifact`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain -run 'Projection|Render|Parse|Region|Frontmatter|OrcaJSON'`, `go test ./internal/usecase -run ExportArtifact`, fuzz `FuzzParseProjection` 25s)
 
 ---
 
@@ -73,3 +73,11 @@ CR-REQ-027 mục 2.7: bản chiếu là tệp văn bản sinh từ mô hình chu
 - Đề mục cố định theo `kind` do CR định nghĩa nhưng chưa có mẫu thật; sẽ chỉnh khi có phản hồi UI (CR-REQ-021).
 - `yaml.v3` đã có CVE lịch sử về DoS qua alias; quét chặn trước khi giải là biện pháp chính, không dựa vào thư viện.
 - Quy tắc `Plan` ở đây chỉ gồm khung; văn phạm `tasks.md` thuộc BE-REQ-SOL-026 (`tasks_md_parser.go`), không nhân đôi.
+
+## Ghi chú triển khai (rf/art)
+
+- API: `RenderArtifact(reg, kind, doc, meta)` và `ParseProjection(reg, md, kind)` nhận `*SchemaRegistry` (domain không nhúng schema); `ExportArtifactProjection` ở `usecase/export_artifact_projection.go`. Vùng Orca chia theo khoá cấp cao của tài liệu (Solution: `summary`, `options`, `requirement-coverage`, `assumptions`, `open-questions`, `details`; Plan: `goal`, `phases`, `tasks`, `risks`, `rollback`, `details`; kind khác: một vùng `document`), mỗi vùng có đúng một khối ```orca-json``` và `digest=` riêng. `phases`/`tasks` của Plan là vùng văn xuôi (không dữ liệu), đổ từ `ProjectionMeta.Extra`.
+- Phần mở đầu YAML chặn `&`, `*`, `!tag`, `<<:` bằng quét dòng trước khi giải (chuỗi trong dấu nháy không bị chặn); số dòng tuyệt đối; `KnownFields(true)`. Marker trong khối ``` của văn xuôi không mở/đóng vùng; văn bản do người dùng/agent chèn marker bị trung hoà khi render (`<!` + ký tự zero-width).
+- Mẫu `testdata/projection/`: `solution_ok.md`, `plan_ok.md`, `task_ok.md`, `request_full.md` (golden, sinh lại bằng `go test ./internal/domain -run Projection -update-golden`), `frontmatter_alias.md`, `two_orca_json_blocks.md`, `prose_fake_json.md`, `crlf.md`, `vietnamese_decomposed.md`.
+- Export Plan trả `REQUEST_ARTIFACT_EXPORT_UNSUPPORTED` (cần `PlanReader` từ task-service, thuộc 027-07). Export Solution lấy `OptionsJSON` từ `SolutionCoreRepository`; `status`/`input_request_revision` rỗng cho tới khi tính năng Solution lưu chúng.
+- Chưa kiểm chứng với đầu ra agent thật.

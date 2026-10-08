@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/adapter/grpcclient/task_client.go` (mới), `internal/usecase/start_phase.go` (mới), `internal/usecase/advance_execution.go` (mới), `internal/usecase/start_execution.go` (mới), `internal/usecase/ports.go`, `internal/adapter/grpc/server_phase.go` (mới), `internal/usecase/start_phase_test.go`, `advance_execution_test.go` (mới), `proto/orca/request/v1/request_execution.proto` (mới)
 **Depends on:** TASK-REQ-013-03, SOL-011 (task 04 `ListTasks` lọc), SOL-012 (cây Plan), CR-REQ-003 (`FlowFor`), CR-REQ-009 (`OpenApproval`, đọc Approval `phase`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -47,3 +47,7 @@
 - Giả định worktree dùng chung (chưa kiểm chứng `project-service`): nếu sai, task này phải đổi (mỗi Phase một task lớn hoặc cơ chế merge).
 - Danh tính khi gọi `Execute`: người duyệt có thể không có quyền `execute` trên task do người khác tạo; `REQUEST_EXECUTE_FORBIDDEN`, không đổi danh tính.
 - CR-REQ-029 (ReadinessGate) có thể chặn dispatch; để chỗ nối bằng cổng `PreExecutionGate`, không thêm logic ở đây.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

@@ -1,6 +1,6 @@
 # request-quality-rollout: solutions (backend-go, v6)
 
-> 📋 Proposed. Chưa triển khai, chưa chạy. Viết ngày 2026-10-06 từ khảo sát `issue-status-sync`, `common/auditclient`, `deploy/`, `ci/`, `Makefile`, workflows và `tests/`; `request-service` chưa tồn tại.
+> Cập nhật 2026-10-08: SOL-024 ✅ 8/8 task; SOL-025 🚧 4/8 task (xem `../tasks/README.md` và `../IMPLEMENTATION-NOTES.md`). CR nguồn: [`docs/crs/v6/request-quality-rollout/`](../../../../../../docs/crs/v6/request-quality-rollout/README.md). Hợp đồng: [`docs/crs/v6/README.md`](../../../../../../docs/crs/v6/README.md) (mục 8 thắng mục 3).
 > CR nguồn: [`docs/crs/v6/request-quality-rollout/`](../../../../../../docs/crs/v6/request-quality-rollout/README.md). Hợp đồng: [`docs/crs/v6/README.md`](../../../../../../docs/crs/v6/README.md) (mục 8 thắng mục 3).
 
 ## CR → Solution

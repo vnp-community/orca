@@ -61,4 +61,7 @@ type TargetState struct {
 	// that status category ("todo", "in_progress", "done"). It keeps a sync from
 	// dragging an issue backwards, e.g. In Progress over an already Done issue.
 	OnlyFromCategory string
+	// OnlyFromCategories, when non-empty, takes precedence over OnlyFromCategory
+	// and allows the change from any category in the set.
+	OnlyFromCategories []string
 }

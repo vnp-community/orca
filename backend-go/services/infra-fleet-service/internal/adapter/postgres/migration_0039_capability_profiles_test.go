@@ -16,27 +16,27 @@ func TestMigration0039_UpDownUp(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 	tenantID := uuid.NewString()
-
-	// Need a dev_server first due to foreign key
-	devServerID := uuid.NewString()
-	_, err := repo.pool.Exec(ctx, `
-		INSERT INTO infra.dev_servers (id, tenant_id, host, connection_mode)
-		VALUES ($1, $2, 'localhost', 'direct-websocket')
-	`, devServerID, tenantID)
-	if err != nil {
-		t.Fatalf("insert dev_server: %v", err)
-	}
+	devServerID := seedDevServer(t, repo, tenantID)
 
 	insertProfile := func() error {
-		_, err := repo.pool.Exec(ctx, `
+		tx, err := repo.pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `
 			INSERT INTO infra.dev_server_capability_profiles (dev_server_id, tenant_id, source, fingerprint, probed_at)
-			VALUES ($1, $2, 'probe', 'fake-fingerprint', $3)
-		`, devServerID, tenantID, time.Now())
-		return err
+			VALUES ($1, $2, 'probe', repeat('f', 64), $3)
+		`, devServerID, tenantID, time.Now()); err != nil {
+			return err
+		}
+		return tx.Commit(ctx)
 	}
-
 	if err := insertProfile(); err != nil {
-		t.Fatalf("first insert into capability_profiles: %v", err)
+		t.Fatalf("first insert: %v", err)
 	}
 
 	migrationsPath, err := filepath.Abs("../../../migrations/postgres")
@@ -45,26 +45,16 @@ func TestMigration0039_UpDownUp(t *testing.T) {
 	}
 	dsn := repo.pool.Config().ConnString()
 
-	// Down 1
-	cmdDown := exec.Command("migrate", "-path", migrationsPath, "-database", dsn, "down", "1")
-	if out, err := cmdDown.CombinedOutput(); err != nil {
-		t.Fatalf("running migration down: %v\n%s", err, out)
+	if out, err := exec.Command("migrate", "-path", migrationsPath, "-database", dsn, "down", "1").CombinedOutput(); err != nil {
+		t.Fatalf("migration down: %v\n%s", err, out)
 	}
-
-	// Verify table dropped
-	_, err = repo.pool.Exec(ctx, `SELECT 1 FROM infra.dev_server_capability_profiles LIMIT 1`)
-	if err == nil {
-		t.Fatal("expected table to be dropped")
+	if _, err := repo.pool.Exec(ctx, `SELECT 1 FROM infra.dev_server_capability_profiles LIMIT 1`); err == nil {
+		t.Fatal("expected table to be dropped by down")
 	}
-
-	// Up 1
-	cmdUp := exec.Command("migrate", "-path", migrationsPath, "-database", dsn, "up", "1")
-	if out, err := cmdUp.CombinedOutput(); err != nil {
-		t.Fatalf("running migration up: %v\n%s", err, out)
+	if out, err := exec.Command("migrate", "-path", migrationsPath, "-database", dsn, "up", "1").CombinedOutput(); err != nil {
+		t.Fatalf("migration up: %v\n%s", err, out)
 	}
-
-	// Verify table recreated and can insert
 	if err := insertProfile(); err != nil {
-		t.Fatalf("insert after up: %v", err)
+		t.Fatalf("insert after re-up: %v", err)
 	}
 }

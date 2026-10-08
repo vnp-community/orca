@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / domain, usecase (hàm thuần)
 **File:** `internal/domain/diagnosis_document.go` (mới), `findings_document.go` (mới), `answer_document.go` (mới), `internal/usecase/analysis_document_validation.go` (mới), `analysis_secret_redaction.go` (mới), và `_test.go`; `testdata/analysis_documents/*.json` (mới)
 **Depends on:** TASK-REQ-007-02 (`ExtractJSONObject`, `MaxOptionsBytes`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain/... ./internal/usecase/... -run "Diagnosis|Findings|Answer|Redact|ValidateByKind"`)
 
 ## Context
 
@@ -39,3 +39,9 @@
 
 - Che bí mật là giảm thiểu, không bảo đảm; ghi rõ trong doc comment của hàm.
 - Regex phải tránh backtracking tệ (Go RE2 an toàn, vẫn giới hạn độ dài đầu vào 256 KB).
+
+## Ghi chú triển khai (2026-10-08)
+
+- Ba tài liệu ở `internal/domain/{diagnosis,findings,answer}_document.go` (+ `analysis_evidence.go` dùng chung kiểu `SupportingRef`; tên `Evidence` đã bị bảng bằng chứng của CR-REQ-027 chiếm). Golden hợp lệ/sai ở `internal/domain/testdata/analysis_documents/`.
+- `RedactSecrets` thật dùng `common/secretscan` (PEM, `ghp_`, `AKIA`, JWT, `password=`, cả chuỗi kết nối và token khác); `RedactDocument` duyệt mọi giá trị chuỗi của tài liệu (không chỉ bốn trường được nêu) rồi in lại; `RedactRaw` cắt 256 KB trước khi quét vì `secretscan` chỉ quét một cửa sổ. Hàm `RedactApplicationSecrets` và `domain.RedactSecrets` giả (trả nguyên đầu vào) đã xoá, không có người gọi.
+- Che bí mật là giảm thiểu, không bảo đảm; độ phủ mẫu chưa đo trên dữ liệu thật.

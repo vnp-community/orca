@@ -1,6 +1,6 @@
 # BE-REQ-SOL-007: Sinh Solution nhiều phương án, chọn và duyệt
 
-> **📋 Proposed** (chưa triển khai). Tài liệu thiết kế thực thi ở backend cho CR-REQ-007. Chạy hoàn toàn trong `request-service` (service chưa tồn tại, xem mục 1).
+> **✅ Đã triển khai (kiểm chứng 2026-10-08)** ở `request-service`: use case, repository hai DB, worker có lease, handler Approval và gRPC đã nối vào `main.go`. Hai điểm chờ hợp nhất với đợt Approval (mở Approval thật, bộ hợp đồng handler) ghi ở [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md). Chạy hoàn toàn trong `request-service`.
 
 **CR:** [CR-REQ-007](../../../../../../docs/crs/v6/solution-analysis/CR-REQ-007-solution-generation-options-and-selection.md)
 **Service:** `request-service` (mới) · `proto` · không đổi `task-service`

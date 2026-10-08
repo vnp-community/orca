@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / usecase, cmd công cụ ngoại tuyến, config, composition root, test e2e
 **File:** `internal/usecase/risk_policy_admin.go` (mới), `internal/usecase/enforce_readiness.go` (mới), `internal/usecase/risk_calibration_stats.go` (mới), `internal/adapter/grpc/server_risk_policy.go` (mới), `cmd/impact-calibrate/main.go` (mới), `cmd/impact-calibrate/runner.go` (mới), `testdata/calibration/cases.json` (mới), `internal/adapter/metrics/impact_metrics.go` (mới), `internal/config/config.go` (sửa), `cmd/server/main.go` (sửa), `internal/e2e/impact_risk_e2e_test.go` (mới), `backend-go/policy/orca-authz/request.rego` (sửa, thuộc CR-REQ-035: chỉ đề nghị), và các `_test.go`
 **Depends on:** TASK-REQ-030-02 đến 07; TASK-REQ-024-01 (`AppendDetailed`), TASK-REQ-024-07 (khung chỉ số của `request-service`), TASK-REQ-025-03 (khung e2e), CR-REQ-035 (`request.rego`)
-**Status:** [x] DONE
+**Status:** [ ] TODO
 
 ---
 
@@ -60,13 +60,13 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Kết quả giai đoạn 0 (bảng ≥ 5 ca) ghi vào PR; bảng ngưỡng chỉnh nếu < 4/5 trong lệch ≤ 1 bậc (đổi `RulesVersion`).
-- [x] `shadow`: không chặn gì, không đòi chấp nhận, nhãn "tham khảo" qua `mode` trong dữ liệu trả về; `risk_outcomes` được điền.
-- [x] `enforce` chỉ bật qua `SetRiskPolicy` bởi admin sau khi `EnforceReadiness` đạt (hoặc `force` có lý do và audit).
-- [x] Mỗi mức rủi ro có một e2e; drift mở Approval và chặn `AdvanceExecution`.
-- [x] `REQUEST_IMPACT_ENABLED` bật mà thiếu cổng bắt buộc thì khởi động lỗi; tắt thì RPC trả `REQUEST_IMPACT_DISABLED`.
-- [x] `parity_test.go` (gateway) không bị phá: danh sách kênh `risk.policy.get|set`, `impact.*` đã chuyển cho SOL-016/017.
-- [x] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable.
+- [ ] Kết quả giai đoạn 0 (bảng ≥ 5 ca) ghi vào PR; bảng ngưỡng chỉnh nếu < 4/5 trong lệch ≤ 1 bậc (đổi `RulesVersion`).
+- [ ] `shadow`: không chặn gì, không đòi chấp nhận, nhãn "tham khảo" qua `mode` trong dữ liệu trả về; `risk_outcomes` được điền.
+- [ ] `enforce` chỉ bật qua `SetRiskPolicy` bởi admin sau khi `EnforceReadiness` đạt (hoặc `force` có lý do và audit).
+- [ ] Mỗi mức rủi ro có một e2e; drift mở Approval và chặn `AdvanceExecution`.
+- [ ] `REQUEST_IMPACT_ENABLED` bật mà thiếu cổng bắt buộc thì khởi động lỗi; tắt thì RPC trả `REQUEST_IMPACT_DISABLED`.
+- [ ] `parity_test.go` (gateway) không bị phá: danh sách kênh `risk.policy.get|set`, `impact.*` đã chuyển cho SOL-016/017.
+- [ ] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/NNNN_request_artifact_model.{up,down}.sql`, `migrations/mysql/NNNN_request_artifact_model.{up,down}.sql`, `internal/domain/request_revision.go`, `internal/domain/request.go` (sửa), `internal/domain/solution.go` (sửa) và test (mới trừ các file sửa)
 **Depends on:** TASK-REQ-002-01 (bảng `requests`, `solutions`), TASK-REQ-002-02 (domain)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql` và `go test ./internal/domain`)
 
 ---
 
@@ -74,3 +74,11 @@ Quyết định gộp hay tách: nếu migration `0002_request_core` chưa merge
 - `ALTER ... ADD COLUMN JSON NOT NULL` không default trên MySQL không chạy được với bảng có dòng; dùng `ADD COLUMN ... NULL`, backfill, rồi `MODIFY ... NOT NULL`.
 - `requests.body` giữ nghĩa "phát biểu vấn đề"; không đổi tên cột (SOL-004 và gateway đã dùng).
 - CR-REQ-028 cũng sửa CHECK của `requests.status`; hai migration cùng chạm bảng `requests`: thống nhất thứ tự `NNNN` (027 trước 028) để không đè.
+
+## Ghi chú triển khai (rf/art)
+
+- Số migration: `0060_request_artifact_model` cho cả hai dialect (dải `0060`..`0069` được cấp); 028-01 dùng `0061`. Gộp hay tách: tách (bảng `requests` và `solutions` đã có ở `0002`), backfill `seq` bằng `ROW_NUMBER()`.
+- **Lệch so với task:** `solutions.seq` giữ `NULL` được (không `SET NOT NULL`), kèm `UNIQUE (tenant_id, request_id, seq)` (NULL không va chạm). Lý do: chưa có code tính năng Solution gọi `MintSolutionID`; `NOT NULL` sẽ làm mọi `INSERT` Solution hiện có (và của nhánh solution) vỡ. Khi mọi đường ghi Solution đã mint `seq`, đổi thành `NOT NULL` bằng migration riêng. Cột JSON của MySQL dùng giá trị mặc định dạng biểu thức (`DEFAULT (JSON_ARRAY())`, MySQL 8.0.13+) để các `INSERT` cũ vẫn chạy.
+- `Create` của hai repository ghi 5 cột nội dung (mặc định `[]`, `{}`, `1`, `1`); `Update` không chạm cột nội dung. `UpdateContent` nằm ở cổng riêng `RequestContentWriter` (không thêm vào `RequestRepository` để các fake hiện có không vỡ).
+- Kiểm chứng thật: Postgres 16 (`postgres:16-alpine`) và MySQL 8.0 (`mysql:8.0`): `TestPostgres_Migration_UpDownUp`, `TestMySQL_Migration_UpDownUp`, `Test*_SchemaContract_InformationSchema` (mở rộng bằng `contracttest/expected_columns_artifact.go`), `Test*_Migration_BackfillSolutionSeq_PerRequestOrdered` (5 Solution của 2 Request: `1,2,3` và `1,2`, UNIQUE giữ), `TestPostgres_RLS_ArtifactAndClarificationTables` (role `NOSUPERUSER NOBYPASSRLS`, đọc/ghi chéo tenant, không tenant), `RevisionUniquePerNumber`, `IndexResolveTenantScopedAndIdempotent`, `RelationUniqueTupleIdempotent` (contract hai dialect). Chưa chạy trên Postgres 14 và MySQL đúng 8.0.16 (chỉ bản mới nhất của hai nhánh).
+- Tiêu chí "Domain mới không import gì ngoài stdlib": `request_revision.go` chỉ import `common/apperrors` (quy ước của mọi file domain trong service).

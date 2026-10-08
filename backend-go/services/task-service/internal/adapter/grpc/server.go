@@ -63,6 +63,13 @@ type Server struct {
 	taskSources          usecase.TaskSourceRepository
 
 	listExecutionStates *usecase.ListExecutionStates
+	createPlanTree      planTreeCreator
+
+	// Wired through WithTaskSpecs / WithExecutionRecords so New's positional signature stays stable.
+	setTaskSpec          *usecase.SetTaskSpec
+	getTaskSpecs         *usecase.GetTaskSpecs
+	lockTaskSpecs        *usecase.LockTaskSpecs
+	listExecutionRecords *usecase.ListExecutionRecords
 }
 
 func New(
@@ -136,12 +143,7 @@ func (s *Server) GenerateAgentPrompt(ctx context.Context, req *taskv1.GenerateAg
 func (s *Server) CreateTask(ctx context.Context, req *taskv1.CreateTaskRequest) (*taskv1.CreateTaskResponse, error) {
 	// No ID field on CreateTaskRequest — the usecase assigns one (uuid) when
 	// Input.ID is left empty.
-	task, err := s.createTask.Execute(ctx, usecase.CreateTaskInput{
-		Title:     req.GetTitle(),
-		ParentID:  req.GetParentId(),
-		ProjectID: req.GetProjectId(),
-		CreatorID: req.GetCreatorId(),
-	})
+	task, err := s.createTask.Execute(ctx, toCreateTaskInput(req))
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -280,9 +282,10 @@ func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermi
 
 func (s *Server) Execute(ctx context.Context, req *taskv1.TaskServiceExecuteRequest) (*taskv1.TaskServiceExecuteResponse, error) {
 	result, err := s.executeTask.Execute(ctx, usecase.ExecuteTaskInput{
-		TaskID:    req.GetTaskId(),
-		RequestID: req.GetRequestId(),
-		Prompt:    req.GetPrompt(),
+		TaskID:      req.GetTaskId(),
+		RequestID:   req.GetRequestId(),
+		Prompt:      req.GetPrompt(),
+		ResultNonce: req.GetResultNonce(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -300,9 +303,12 @@ func (s *Server) HasActiveExecutions(ctx context.Context, req *taskv1.HasActiveE
 
 func (s *Server) ListTasks(ctx context.Context, req *taskv1.ListTasksRequest) (*taskv1.ListTasksResponse, error) {
 	result, err := s.listTasks.Execute(ctx, usecase.ListTasksInput{
-		ProjectID: req.GetProjectId(),
-		PageToken: req.GetPageToken(),
-		PageSize:  req.GetPageSize(),
+		ProjectID:  req.GetProjectId(),
+		PageToken:  req.GetPageToken(),
+		PageSize:   req.GetPageSize(),
+		TaskTypes:  req.GetTaskTypes(),
+		RequestIDs: req.GetRequestIds(),
+		ParentID:   req.GetParentId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -659,5 +665,6 @@ func toProtoTask(t domain.Task) *taskv1.Task {
 		DoneSubtasks:       int32(t.DoneSubtasks),
 		TotalSubtasks:      int32(t.TotalSubtasks),
 		ShareToken:         t.ShareToken,
+		RequestId:          t.RequestID,
 	}
 }

@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / usecase, adapter eventbus, adapter grpcclient
 **File:** `internal/usecase/request_impact_assessment.go` (mới), `internal/usecase/collect_impact.go` (mới), `internal/usecase/collect_impact_steps.go` (mới), `internal/usecase/assess_actual_impact.go` (mới), `internal/usecase/recover_impact_assessments.go` (mới), `internal/usecase/record_risk_outcome.go` (mới), `internal/adapter/grpcclient/impact_tool_runner.go` (mới), `internal/adapter/eventbus/impact_trigger_consumer.go` (mới), `internal/config/config.go` (sửa), `cmd/server/main.go` (sửa), và các `_test.go`
 **Depends on:** TASK-REQ-030-02, 030-03, 030-04; TASK-REQ-029-06 (`AgentRelay`, `WorktreeResolver`), TASK-REQ-029-08 (sự kiện `execution.verified`), TASK-REQ-033-04 (`DevServerCapabilityReader`), SOL-007 (sự kiện `solution.proposed`, mẫu lease), SOL-012 (`plan.generated`), SOL-013 (`phase.completed`, `processed_events` consumer)
-**Status:** [x] DONE
+**Status:** [ ] TODO
 
 ---
 
@@ -60,13 +60,13 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Công cụ lỗi hoặc hết thời gian cho `status=partial`, chiều tương ứng `Measured=false`, `confidence` hạ; không bản `ready` nào im lặng bỏ chiều.
-- [x] Index lỗi thời được phát hiện từ `gitnexus.json` và tăng một bậc kèm nhãn "chưa đánh giá được".
-- [x] `solution_option` chạy sau `solution.proposed`; `plan|phase|task` sau `plan.generated`; `actual_*` sau `execution.verified`/`phase.completed`; mỗi bản có `impact_tool_runs` làm bằng chứng (trừ bản dẫn xuất).
-- [x] Sự kiện giao lặp không tạo hai bản đánh giá (`processed_events` + một `collecting` mỗi chủ thể).
-- [x] `buf breaking` chạy trực tiếp, không `|| true`; thử thật với một thay đổi xoá trường proto mẫu phát hiện vi phạm (kiểm thủ công và test fake).
-- [x] Không log `Stdout`/diff; không lệnh nào nối chuỗi shell từ dữ liệu người dùng.
-- [x] `gitnexus_impact` đã chạy cho các hàm của SOL-013/029 mà task này gọi trước khi sửa.
+- [ ] Công cụ lỗi hoặc hết thời gian cho `status=partial`, chiều tương ứng `Measured=false`, `confidence` hạ; không bản `ready` nào im lặng bỏ chiều.
+- [ ] Index lỗi thời được phát hiện từ `gitnexus.json` và tăng một bậc kèm nhãn "chưa đánh giá được".
+- [ ] `solution_option` chạy sau `solution.proposed`; `plan|phase|task` sau `plan.generated`; `actual_*` sau `execution.verified`/`phase.completed`; mỗi bản có `impact_tool_runs` làm bằng chứng (trừ bản dẫn xuất).
+- [ ] Sự kiện giao lặp không tạo hai bản đánh giá (`processed_events` + một `collecting` mỗi chủ thể).
+- [ ] `buf breaking` chạy trực tiếp, không `|| true`; thử thật với một thay đổi xoá trường proto mẫu phát hiện vi phạm (kiểm thủ công và test fake).
+- [ ] Không log `Stdout`/diff; không lệnh nào nối chuỗi shell từ dữ liệu người dùng.
+- [ ] `gitnexus_impact` đã chạy cho các hàm của SOL-013/029 mà task này gọi trước khi sửa.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,16 @@
 **Service/Area:** `infra-fleet-service`, `request-service` / test hợp đồng và tích hợp
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/testdata/agent_capabilities_v1.golden.json` (mới), `backend-go/services/request-service/internal/adapter/grpcclient/testdata/{agent_capabilities_v1.golden.json,execprompt_params.golden.json,execprompt_result_full.golden.json}` (mới), `internal/usecase/capability_degradation_test.go` (mới, infra-fleet), `internal/domain/dev_server_capability_contract_test.go` (mới, request-service), `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/capability_integration_test.go` (mới, `-tags=integration`)
 **Depends on:** TASK-REQ-033-03, TASK-REQ-033-04, TASK-REQ-033-05; bản agent (khu vực `agent`, `AG-REQ-SOL-033-*`) cung cấp file golden TypeScript tương ứng
-**Status:** [x] DONE
+**Status:** [ ] TODO
+
+## Tiến độ (2026-10-07)
+
+Phần `infra-fleet-service` đã làm và kiểm chứng; phần `request-service` để đợt R2 (cần 033-04, 033-05).
+
+- Xong: golden `internal/adapter/devserveragent/testdata/agent_capabilities_v1.golden.json` (bản sao nguyên văn của `agent/src/relay/__fixtures__/agent-capabilities-golden.json`, có hai biến thể `full` và `partial` trong một file; không tạo file `unknown_schema` riêng, hồ sơ lạ schema do request-service suy giảm); test `capability_golden_test.go` (tên trường, fingerprint bỏ qua trường biến động, hình dạng JSON handshake của agent); `capability_degradation_test.go` (bốn kịch bản + báo cáo `partial`, khẳng định cả sự kiện không phát khi fingerprint không đổi); script `backend-go/ci/check-agent-capability-golden.sh` + target `make check-agent-capability-golden` (đã thử sửa một ký tự: script thoát 1); `.gitattributes` ép LF.
+- Còn thiếu (R2): ba golden và `capability_degradation`/contract test của `request-service` (bước 2, 3, 6), `capability_integration_test.go` `-tags=integration` ghép hai đầu; script đã sẵn để so thêm bản sao của request-service (hiện báo "skip" nếu chưa có). CI chưa gọi script (không có workflow backend-go): người điều phối cần chốt chỗ chạy.
+- Tên file golden lệch task (task gọi `agent_capabilities_v1.golden.json` + hai biến thể; agent đã có một fixture hai khoá): giữ fixture của agent làm nguồn để không có hai hợp đồng.
+
 
 ---
 
@@ -39,10 +48,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Ba golden `agent_capabilities` giống hệt (hash) giữa agent, `request-service` và `infra-fleet-service`.
-- [x] Bốn kịch bản suy giảm xanh; chuyển từ `handshake_only` sang `probe` phát đúng một sự kiện.
-- [x] `execprompt_params.golden.json` khoá tên tham số khớp CR-REQ-033 mục 2.1 (`accessMode`, `workspaceKind`, `reportChanges`, `resultBlock`, `maxOutputBytes`).
-- [x] Không test nào gọi mạng ngoài hoặc dev server thật.
+- [ ] Ba golden `agent_capabilities` giống hệt (hash) giữa agent, `request-service` và `infra-fleet-service`.
+- [x] Bốn kịch bản suy giảm xanh; chuyển từ `handshake_only` sang `probe` phát đúng một sự kiện. (TestDegradation_* trong usecase)
+- [ ] `execprompt_params.golden.json` khoá tên tham số khớp CR-REQ-033 mục 2.1 (`accessMode`, `workspaceKind`, `reportChanges`, `resultBlock`, `maxOutputBytes`).
+- [x] Không test nào gọi mạng ngoài hoặc dev server thật. (phần infra-fleet)
 - [x] Không file nào tên `helpers`, `utils`, `common`, `misc`.
 
 ## Thứ tự thực hiện gợi ý

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_status.go` (sửa), `internal/domain/request_trigger.go` (sửa), `internal/domain/request_transition.go` (sửa), `internal/domain/clarification.go`, `internal/domain/clarification_question.go`, `internal/domain/readiness_policy.go`, `internal/domain/question_builder.go`, `internal/domain/decision.go`, `internal/domain/decision_risk.go`, `internal/domain/clarification_errors.go` và test (mới trừ các file sửa)
 **Depends on:** TASK-REQ-003-02 (trigger, `NextStatus`), TASK-REQ-027-05 (`ValidateRequestContent`, `RequiredFields`, `RequestContent`), TASK-REQ-002-02
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain`)
 
 ---
 
@@ -97,3 +97,11 @@ Toàn bộ là mã thuần, không I/O, để bảng test bao phủ hết. Tên 
 - `DefaultDue` dùng số đề xuất; khi SOL-010 có bảng chính sách thì đọc từ đó, nên tách hàm để thay được.
 - Văn bản câu hỏi tiếng Việt hay tiếng Anh: chưa chốt (i18n ở frontend); `Prompt` hiện sinh bằng tiếng Việt cố định, ghi ở README task.
 - `awaiting_information` cần được thêm vào frontend `RequestStatus` và bảng loại trừ của MCP (CR mục 9); không làm ở đây.
+
+## Ghi chú triển khai (rf/art)
+
+- 12 trạng thái, 18 trigger; `NextStatus` giữ chữ ký và từ chối `information_provided`; `NextStatusWithResume` chỉ nhận `analyzing|planning|executing` (`REQUEST_RESUME_STATUS_INVALID`); `StageForStatus` có `awaiting_information` (classification, analysis, plan, [phase], task). Test ma trận cũ (`TestNextStatus_FullMatrix`, nay 12x18 với 44 cặp hợp lệ) đổi số liệu, kỳ vọng các cặp cũ không đổi; thêm test cho từng đích của `information_required`, `NextStatusWithResume` (ba giá trị, sai trạng thái, uỷ quyền các trigger khác).
+- `QuestionBuilder.Build(report, hints)` lấy loại Request từ `ReadinessReport.Type` (thêm trường này so với task để giữ chữ ký hai tham số). `Decision` dùng `Principal` sẵn có của approval cho assignee. `NormalizeTitle` của task đổi tên `NormalizeConfirmationText` (đã có `NormalizeTitle` ở `request_source_normalization.go`).
+- `DecisionRisk.Assess` nhận `RiskSignals` (suy ra từ JSON của phương án bằng `RiskSignalsFromOption`: `breaking_change`, `risks[].severity=high` hoặc `risk.level=high`, số `affected_areas` kind `service`) thay vì kiểu `SolutionOption`, vì kiểu đó đang được nhánh Solution viết lại. `OptionIndexByID` nhận `[]Option` hiện có.
+- Domain của file clarification/decision chỉ import stdlib, `x/text`, `common/apperrors`. (Cả package còn import `santhosh-tekuri/jsonschema` và `yaml.v3` ở các file artifact của 027.)
+- README v6 mục 3.3 được sửa thêm `awaiting_information` để `TestREADMEListsSameTypesAndStatuses` (hợp đồng sẵn có) tiếp tục xanh.

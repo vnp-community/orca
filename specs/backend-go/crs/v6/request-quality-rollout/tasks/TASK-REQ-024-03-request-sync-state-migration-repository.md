@@ -5,7 +5,7 @@
 **Service:** `issue-status-sync`
 **File:** `backend-go/services/issue-status-sync/migrations/postgres/0002_request_sync_state.up.sql`, `.down.sql` (mới), `backend-go/services/issue-status-sync/migrations/mysql/0002_request_sync_state.up.sql`, `.down.sql` (mới), `.../internal/adapter/postgres/request_sync_state.go`, `.../internal/adapter/mysql/request_sync_state.go` (mới), tests tích hợp, `.../internal/usecase/ports.go`
 **Depends on:** None
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test -tags=integration ./internal/adapter/postgres/... ./internal/adapter/mysql/...` PASS trên `postgres:16-alpine` và `mysql:8` thật)
 
 ---
 
@@ -34,9 +34,18 @@
 ## Tiêu chí hoàn thành
 
 - [x] Hai migration up/down chạy; `go build ./...` xanh.
+  Up, down, up, down -all, up chạy bằng CLI `migrate` trên cả hai dialect (test `TestMigrationsUpDownUp`).
 - [x] Test `Advance` xanh trên Postgres và MySQL.
+  Test `TestRequestSyncStateStore_Advance` và `..._ConcurrentAdvanceHasOneWinner` (8 goroutine, đúng 1 `applied=true`) PASS trên Postgres và MySQL thật.
 
 ## Rủi ro và lưu ý
 
 - Bảng không có dọn dẹp (câu hỏi mở Q5); ghi `TODO` kèm số issue.
 - `tenant_id` `VARCHAR(255)` trong khoá chính MySQL: độ dài khoá tối đa với utf8mb4 là 255*4*2 = 2040 byte, trong giới hạn 3072 của InnoDB; kiểm khi chạy.
+
+## Kết quả triển khai
+
+- Migration `0002_request_sync_state` (up/down) ở `migrations/postgres` và `migrations/mysql`; adapter `adapter/postgres/request_sync_state.go` (upsert có điều kiện một câu lệnh, `RETURNING 1`), `adapter/mysql/request_sync_state.go` (giao dịch `SELECT ... FOR UPDATE`, thêm xử lý khoá trùng 1062 khi hai bên cùng chèn dòng đầu rồi thử lại như cập nhật).
+- Cổng `RequestSyncStateStore` ở `usecase/ports.go`; `cmd/server/main.go` dựng store theo `caps.Dialect` và truyền vào use case (task 04).
+- Chưa làm: dọn dẹp (retention) bảng, ghi `TODO` trong migration (câu hỏi mở Q5).
+- Test MySQL chạy bằng cách tái dùng `setupStore` có sẵn (đổi thành `setupStoreAndDSN`, hành vi cũ giữ nguyên); test Postgres là file mới vì trước đây service chưa có test tích hợp Postgres.

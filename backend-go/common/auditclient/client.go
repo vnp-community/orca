@@ -64,6 +64,13 @@ func (c *Client) Append(ctx context.Context, tenantID, actorID, action, target, 
 // actor_type, target_type, target_id, and metadata_json). Like Append, it
 // swallows RPC errors.
 func (c *Client) AppendDetailed(ctx context.Context, e Entry) {
+	_ = c.AppendDetailedStrict(ctx, e)
+}
+
+// AppendDetailedStrict is AppendDetailed that returns the RPC error. It is for
+// durable delivery (an outbox retrying until auth-service accepts the entry);
+// decision paths keep using the best-effort variants above.
+func (c *Client) AppendDetailedStrict(ctx context.Context, e Entry) error {
 	if e.ActorType != "" && e.ActorType != "user" && e.ActorType != "agent" && e.ActorType != "system" {
 		slog.Debug("auditclient: invalid ActorType dropped", "actor_type", e.ActorType)
 		e.ActorType = ""
@@ -71,7 +78,7 @@ func (c *Client) AppendDetailed(ctx context.Context, e Entry) {
 	if len(e.MetadataJSON) > 4096 {
 		e.MetadataJSON = `{"truncated":true}`
 	}
-	_, _ = c.auth.AppendAuditEntry(ctx, &authv1.AppendAuditEntryRequest{
+	_, err := c.auth.AppendAuditEntry(ctx, &authv1.AppendAuditEntryRequest{
 		TenantId:     e.TenantID,
 		ActorId:      e.ActorID,
 		ActorType:    e.ActorType,
@@ -83,5 +90,5 @@ func (c *Client) AppendDetailed(ctx context.Context, e Entry) {
 		IpAddress:    e.IPAddress,
 		MetadataJson: e.MetadataJSON,
 	})
+	return err
 }
-

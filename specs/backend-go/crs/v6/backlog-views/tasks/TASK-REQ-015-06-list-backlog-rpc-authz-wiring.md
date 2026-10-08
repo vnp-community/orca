@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/proto/orca/request/v1/request_backlog.proto` (mới), `internal/usecase/list_backlog.go` (mới), `internal/adapter/grpc/server_backlog.go` (mới), `internal/usecase/request_visibility.go` (mới), `cmd/server/main.go`, `internal/usecase/list_backlog_test.go`, `internal/adapter/grpc/server_backlog_test.go` (mới)
 **Depends on:** TASK-REQ-015-04, 05
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -46,3 +46,7 @@
 - Quy tắc "ai xem được Request" là điểm mở lớn nhất; sai ở đây làm lộ dữ liệu giữa người dùng cùng tenant. Cần chốt ở CR-REQ-010/016 trước khi bật cờ `request_flow_enabled`.
 - `page_size × 100` task mỗi lần có thể chậm; chưa đo, cân nhắc giảm trần nếu cần.
 - Các CR bổ sung (026 đến 036) có thể thêm view hoặc trường; chỉ thêm trường mới (additive).
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

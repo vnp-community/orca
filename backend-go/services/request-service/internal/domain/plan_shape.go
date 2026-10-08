@@ -1,3 +1,3 @@
 package domain
 
-type PlanShape struct {}
+type PlanShape struct{}

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/adapter/postgres/execution_states.go` (mới), `internal/adapter/mysql/execution_states.go` (mới), `internal/adapter/postgres/execution_states_test.go` (mới, tag `integration`), `internal/adapter/mysql/execution_states_test.go` (mới), `cmd/server/main.go`
 **Depends on:** TASK-REQ-015-01
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`; task-service integration Postgres+MySQL `-run ExecutionStates`)
 
 ---
 
@@ -47,3 +47,7 @@ Integration hai dialect (`go test -tags=integration`), dữ liệu: task A hai l
 - `EXPLAIN` truy vấn `DISTINCT ON` trên bảng lớn: dựa chỉ mục `(task_id, started_at DESC)`; ghi kế hoạch trong PR, không bắt buộc test.
 - MySQL < 8.0 không chạy được; thêm kiểm khả năng khi khởi động (`common/dbcapability`) nếu đã có cơ chế.
 - `execution_links` tăng không giới hạn, chưa có dọn dẹp.
+
+## Ghi chú triển khai
+
+Phần task-service đã có từ đợt trước (agent task-a); kiểm lại ngày 2026-10-08.

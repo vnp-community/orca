@@ -29,3 +29,23 @@ func TestFleetPollIntervalFromEnv(t *testing.T) {
 		})
 	}
 }
+
+func TestPositiveDurationFromEnv(t *testing.T) {
+	const name = "INFRA_TEST_DURATION"
+	cases := []struct {
+		raw  string
+		want time.Duration
+	}{
+		{"", time.Hour},
+		{"30m", 30 * time.Minute},
+		{"garbage", time.Hour},
+		{"0s", time.Hour},
+		{"-5m", time.Hour},
+	}
+	for _, tc := range cases {
+		t.Setenv(name, tc.raw)
+		if got := positiveDurationFromEnv(name, time.Hour); got != tc.want {
+			t.Errorf("raw=%q: got %v, want %v", tc.raw, got, tc.want)
+		}
+	}
+}

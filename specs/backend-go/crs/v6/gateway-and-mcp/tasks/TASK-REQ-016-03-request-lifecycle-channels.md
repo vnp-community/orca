@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request.go`, `.../channels_request_flow.go` (mới), `.../channels_request_test.go` (mới), `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-02; RPC của CR-REQ-004, 005, 006, 012, 013, 025 (thêm kênh nào khi RPC của nó đã có trong proto)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -43,3 +43,7 @@
 
 - `ClassifyRequest` và `GeneratePlan` propose có thể vượt 24s cho tới khi CR-REQ-005, 012 làm RPC trả sớm (CONTRACT Q2); test chỉ khẳng định deadline, không mô phỏng AI.
 - Thêm kênh theo từng PR khi RPC tương ứng đã có trong proto để không có kênh gọi RPC `Unimplemented`.
+
+## Ghi chú triển khai (2026-10-08)
+
+Thêm kênh `request.planProposal` (đọc kết quả `GeneratePlan` bất đồng bộ, RPC `GetPlanProposal`) vì propose chỉ trả `runId`. `request.classify` trả thêm `runId`.

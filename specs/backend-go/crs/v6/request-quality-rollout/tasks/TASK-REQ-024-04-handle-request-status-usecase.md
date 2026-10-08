@@ -5,7 +5,7 @@
 **Service:** `issue-status-sync`
 **File:** `backend-go/services/issue-status-sync/internal/domain/request_events.go` (mới), `.../internal/domain/events.go`, `.../internal/usecase/sync_request_status.go` (mới), `.../internal/usecase/sync_issue_status.go`, `.../internal/usecase/ports.go`, `.../internal/adapter/eventbus/subscriber.go`, `.../internal/config/config.go`, `.../cmd/server/main.go`
 **Depends on:** TASK-REQ-024-03; CR-REQ-003 (hai sự kiện, trường bổ sung)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test ./...` trong `services/issue-status-sync` PASS, 183 test/subtest, 0 FAIL)
 
 ---
 
@@ -37,10 +37,22 @@
 ## Tiêu chí hoàn thành
 
 - [x] Bảng 2.2 được kiểm đủ; sự kiện cũ, lặp không đổi Jira lần hai.
+  `TestHandleRequestStatus_MappingTableForAllElevenTypes` (11 loại x 9 trạng thái) cùng test dedupe, stale, actor, category.
 - [x] Hành vi worktree, PR cũ không đổi (test hồi quy xanh).
+  Toàn bộ test cũ của `sync_issue_status_test.go` và `subscriber_contract_test.go` còn xanh (chỉ đổi phép so sánh `TargetState` sang `reflect.DeepEqual`).
 - [x] Hai subscription chạy cùng bốn cái cũ.
+  `Run` có 6 subscription, `errCh` dung lượng 6. Chưa chạy với NATS thật (chỉ kiểm hợp đồng handler và tên durable); stream `REQUEST` chưa kiểm chứng với request-service.
 
 ## Rủi ro và lưu ý
 
 - Chưa kiểm chứng trên Jira thật; mọi tên trạng thái là cấu hình.
 - `errCh` nhỏ hơn số goroutine có thể chặn goroutine thoát; kiểm khi tăng.
+
+## Kết quả triển khai
+
+- `domain/request_events.go` (`RequestStatusEvent`), `TargetState.OnlyFromCategories`, `usecase/sync_request_status.go` (`HandleRequestStatus`, `mapRequestEventToStatus`, `StatusNames`, các `Option`), `adapter/eventbus/subscriber.go` (hai subject trên stream `REQUEST`, `requestStatusWirePayload` không map `title`/`body`), `config.go` (4 biến môi trường + `ISSUE_SYNC_ORCA_BASE_URL`), `main.go` (store, tên trạng thái, observer, `/metrics`).
+- Quyết định lệch task: `NewSyncIssueStatus` giữ nguyên 5 tham số và nhận thêm `opts ...Option` (cộng thêm, không đổi người gọi); `TargetState` thành không so sánh được bằng `==` do có slice, nên 2 test cũ và 1 chỗ trong `HandleWorktreeLifecycle` đổi cách kiểm rỗng (`TrackerState == "" && GitHubLabelPatch == ""`).
+- Người gọi đã kiểm (gitnexus của worktree chưa được lập chỉ mục nên đọc trực tiếp): `updateIssueStatus` chỉ do hai handler cũ gọi (giờ bọc `applyIssueStatus`); `NewSyncIssueStatus` do `cmd/server/main.go` và test (`usecase`, `adapter/eventbus`) gọi.
+- Lỗi `Advance` trả lỗi để Nak tối đa 3 lần rồi ghi `failed`; lỗi Jira sau `doWithRetry` giữ hợp đồng cũ (ghi nhận, `MarkSeen`). Version 0 (publisher không gửi) bỏ qua `Advance`, chỉ dedupe theo `EventID`.
+- `skipped_transition_unavailable` nhận biết bằng chuỗi "transition unavailable" trong lỗi (sentinel Go không qua được gRPC).
+- Chưa kiểm chứng: Jira thật; NATS thật.

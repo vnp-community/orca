@@ -3,7 +3,7 @@
 > **Nguồn sự thật cho mọi thứ frontend và agent gọi hoặc nhận từ `api-gateway` trong feature Request.**
 > Các `BE-REQ-SOL-*` (specs/backend-go/crs/v6) phải hiện thực đúng file này; các `FE-REQ-SOL-*` và `AG-REQ-SOL-*` chỉ dùng những gì có ở đây. Cần đổi thì sửa file này trước, rồi cập nhật cả hai phía.
 > CR gốc: [CR-REQ-016](../../../../../docs/crs/v6/gateway-and-mcp/CR-REQ-016-api-gateway-request-channels.md) và [README v6](../../../../../docs/crs/v6/README.md) (mục 8 thắng mục 3). Mẫu: [`../../v5/CONTRACT-mcp-ui-api.md`](../../v5/CONTRACT-mcp-ui-api.md).
-> Trạng thái: 📋 Proposed. Chưa có dòng nào được hiện thực; chưa chạy trên hệ thống. Solution backend: [`solutions/BE-REQ-SOL-016-api-gateway-request-channels.md`](./solutions/BE-REQ-SOL-016-api-gateway-request-channels.md).
+> Trạng thái: ✅ **28 kênh WS, stream `request.subscribe` (14 sự kiện), 5 route HTTP và 4 kênh bổ sung (2.5 và `request.planProposal`) đã thật trong api-gateway** (2026-10-08, test đơn vị và bufconn; chưa chạy với request-service và NATS thật). Phía `request-service` một số RPC còn `Unimplemented` và trả `REQUEST_NOT_IMPLEMENTED`. Solution backend: [`solutions/BE-REQ-SOL-016-api-gateway-request-channels.md`](./solutions/BE-REQ-SOL-016-api-gateway-request-channels.md).
 
 ## 0. Nguyên tắc tương thích
 
@@ -160,7 +160,7 @@ Cột "Quyền" là mức tối thiểu `request-service` thi hành. "Timeout" l
 Ghi chú:
 - `request.create`: `source.provider` ngoài tập `jira|github|gitlab|linear` bị từ chối `REQUEST_SOURCE_FORBIDDEN` (quy tắc ở mục 6.1). `created=false` khi gọi lặp cùng khoá idempotent.
 - `request.confirmType` bắt buộc người dùng thật; tool MCP không có kênh này (CR-REQ-017 mục 2.2).
-- `request.generatePlan` hai pha theo CR-REQ-012: `propose` không ghi gì, trả `proposal`; `commit` bắt buộc `proposal` (có thể đã sửa tay) và nên gửi `rawAiResponse` từ lần `propose`. Bỏ `mode` thì là `propose`.
+- `request.planProposal {id, runId}` (bổ sung, RPC `GetPlanProposal`) trả `{runId, status, errorCode?, errorMessage?, proposal|null, rawAiResponse}`; `request.generatePlan` mode `propose` trả `{runId, proposal:null, rawAiResponse}` (chạy nền, quyết định D3), `request.classify` trả thêm `runId`. `request.flow` trả các trường của `GetRequestFlowResponse` (camelCase). Mã `REQUEST_FORBIDDEN`, `REQUEST_NOT_IMPLEMENTED`, `REQUEST_INTERNAL` do gateway thêm (additive). `request.generatePlan` hai pha theo CR-REQ-012: `propose` không ghi gì, trả `proposal`; `commit` bắt buộc `proposal` (có thể đã sửa tay) và nên gửi `rawAiResponse` từ lần `propose`. Bỏ `mode` thì là `propose`.
 - **Trần 25 giây của WS.** `wscompat/handler.go` đặt `invokeTimeout = 25s` cho mọi dispatch (khớp `INVOKE_TIMEOUT_MS` 30s của `rpc-client.ts`). `ClassifyRequest` (AI 60 giây, CR-REQ-005) và `GeneratePlan` propose (`ai.complete` đồng bộ, CR-REQ-012) vượt trần này; gateway đặt deadline 24 giây để lỗi là `REQUEST_AI_COMPLETE_TIMEOUT` của ta. **Yêu cầu với CR-REQ-005 và 012:** RPC phải trả sớm (enqueue và trả `Request` ở `classifying`; kết quả qua sự kiện `request.classified`), hoặc propose bất đồng bộ trả `runId` rồi báo qua sự kiện. Cho tới khi chốt (mục 9 Q2), frontend coi hai kênh này có thể trả `REQUEST_AI_COMPLETE_TIMEOUT` và phải chờ sự kiện hoặc polling `request.get`.
 - `request.startPhase`: `phaseTaskId` rỗng chỉ hợp lệ khi Plan không có Phase (CR-REQ-013 mục 2.3).
 - Cây Plan, Phase, Task đọc bằng kênh `task.getSubtree` hiện có với `rootTaskId = request.planTaskId`; không có kênh `plan.*`, `phase.*` (CR-REQ-016 D1).
@@ -200,7 +200,7 @@ Cả ba kênh gọi **một RPC** `ListBacklog` với `view` (CR-REQ-015 mục 2
 
 Quyền: đọc. `pageSize` đếm theo Request (CR-REQ-015 mục 2.5). Lỗi riêng: `REQUEST_BACKLOG_BAD_PAGE_TOKEN`, `REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE`.
 
-### 2.5 Kênh bổ sung đề xuất (cần chốt, không nằm trong 28 kênh của CR-REQ-016)
+### 2.5 Kênh bổ sung (đã thật ở gateway, không nằm trong 28 kênh của CR-REQ-016)
 
 README v6 mục 8 dòng 12 thêm RPC mà CR-016 chưa có kênh. Backend dự trù, frontend **chưa được dùng** tới khi mục 9 câu Q1 chốt:
 

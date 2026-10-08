@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/status_write_guard_test.go`, `internal/domain/readme_contract_test.go` (mới)
 **Depends on:** TASK-REQ-003-03
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./internal/domain ./internal/usecase -run "OnlyTransition|README")
 
 ---
 

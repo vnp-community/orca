@@ -5,7 +5,7 @@
 **Service:** `common`
 **File:** `backend-go/common/auditclient/client.go`, `backend-go/common/auditclient/client_test.go`
 **Depends on:** None
-**Status:** `[x] DONE`
+**Status:** [x] DONE (kiểm toán 2026-10-07: đủ code và test đơn vị)
 
 ---
 

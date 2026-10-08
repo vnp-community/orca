@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/0002_request_core.up.sql`, `0002_request_core.down.sql`, `migrations/mysql/0002_request_core.up.sql`, `0002_request_core.down.sql` (mới)
 **Depends on:** TASK-REQ-001-03 (đã có `0001_init`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/mysql/... -run 'Migration|SchemaContract|RequestRepositoryContract'; golang-migrate up/down/up hai dialect)
 
 ---
 
@@ -44,3 +44,7 @@
 - Đổi khoá idempotency sau khi `0002` merge là migration phá (Q2 của SOL-002); chốt trước.
 - MySQL cũ hơn 8.0.16 bỏ qua `CHECK` âm thầm; ràng buộc phải được `domain` kiểm lại (TASK-REQ-002-02).
 - Chỉ mục `DESC` MySQL 8.0 trên TiDB chưa kiểm chứng.
+
+## Ghi chú triển khai
+
+Số migration cuối cùng là `0002_request_core` sau khi đánh số lại một lần (bảng ở IMPLEMENTATION-NOTES). Lệch so với task: `source_provider` thêm CHECK 7 giá trị, `request_type_history` thêm cột `reason`, `requests.solution_engine` đến từ `0007`. Test: `TestPostgres_Migration_ChecksRejectInvalidValues`, `TestMySQL_Migration_ChecksRejectInvalidValues` (MySQL 8.0 thật, CHECK được thực thi), `TestPostgres_Migration_UpDownUp`, schema contract hai dialect. FORCE RLS kiểm cho mọi bảng trong schema `request`.

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/common/testutil"
 	"github.com/stablyai/orca-go/services/mcp-service/internal/domain"
 	"github.com/stablyai/orca-go/services/mcp-service/internal/usecase"
@@ -230,5 +231,61 @@ func TestExternalServers_ClaimHealthChecksAcrossTenantsOncePerInterval(t *testin
 	again, _ := repo.ClaimHealthChecks(ctx, time.Now().Add(-time.Minute), 10)
 	if len(again) != 0 {
 		t.Fatalf("already claimed within the interval: %v", again)
+	}
+}
+
+type stubToolCaller struct{ calls int }
+
+func (s *stubToolCaller) CallTool(context.Context, usecase.CallTarget, string, []byte, int) (usecase.CallResult, error) {
+	s.calls++
+	return usecase.CallResult{Text: "pong", SizeBytes: 4}, nil
+}
+
+func (s *stubToolCaller) ReadResource(context.Context, usecase.CallTarget, string, int) (usecase.ResourceResult, error) {
+	s.calls++
+	return usecase.ResourceResult{Text: "doc"}, nil
+}
+
+type fixedClock struct{}
+
+func (fixedClock) Now() time.Time { return time.Now().UTC() }
+
+func TestExternalServers_CallExternalToolRespectsTenantRLS(t *testing.T) {
+	repo, _, admin := externalSetup(t)
+	ctx := context.Background()
+	s := newServer(tenantA, "srv")
+	s.HeaderRefs = nil
+	if err := repo.CreateExternalServer(ctx, s, nil); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	tools := []domain.ToolInfo{{Name: "ping", Description: "d"}}
+	if err := repo.RecordProbe(ctx, tenantA, s.ID, usecase.ProbeRecord{Digest: "d1", Tools: tools, At: now, Source: "probe"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.ApplyReview(ctx, usecase.ReviewRecord{TenantID: tenantA, ServerID: s.ID, ReviewerID: "a", Approve: true, ExpectedDigest: "d1", At: now}, nil); err != nil {
+		t.Fatal(err)
+	}
+	caller := &stubToolCaller{}
+	cl := usecase.NewExternalServerClient(repo, nil, caller, repo, fixedClock{})
+
+	if out, err := cl.CallTool(tenant.WithTenantID(ctx, tenantA), usecase.CallToolInput{ServerID: s.ID, Tool: "ping"}); err != nil || out.Text != "pong" {
+		t.Fatalf("tenant A: %+v %v", out, err)
+	}
+	if _, err := cl.CallTool(tenant.WithTenantID(ctx, tenantB), usecase.CallToolInput{ServerID: s.ID, Tool: "ping"}); err == nil || !strings.Contains(err.Error(), domain.CodeNotFound) {
+		t.Fatalf("tenant B must not reach tenant A's server: %v", err)
+	}
+	if _, err := cl.ReadResource(tenant.WithTenantID(ctx, tenantB), usecase.ReadResourceInput{ServerID: s.ID, URI: "file:///x"}); err == nil || !strings.Contains(err.Error(), domain.CodeNotFound) {
+		t.Fatalf("tenant B read: %v", err)
+	}
+	if caller.calls != 1 {
+		t.Fatalf("external server contacted %d times, want 1", caller.calls)
+	}
+	var n int
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mcp.outbox_events WHERE tenant_id = $1 AND payload->>'action' = $2`, tenantA, domain.AuditActionExternalCall).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("audit rows for tenant A: n=%d err=%v", n, err)
+	}
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mcp.outbox_events WHERE tenant_id = $1`, tenantB).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("tenant B must have no events: n=%d err=%v", n, err)
 	}
 }

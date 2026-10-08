@@ -31,9 +31,9 @@ const fakeAgentToken = "test-token-123"
 type fakeAgent struct {
 	t               *testing.T
 	requireToken    string
-	results         map[string]any             // method -> result to reply with
-	rpcErrors       map[string]*JSONRPCError   // method -> error to reply with
-	streamResults   map[string][]any           // method -> ordered sequence of results
+	results         map[string]any           // method -> result to reply with
+	rpcErrors       map[string]*JSONRPCError // method -> error to reply with
+	streamResults   map[string][]any         // method -> ordered sequence of results
 	rejectHandshake bool
 
 	// pushNotifications, if set, are sent (no id, matching a real

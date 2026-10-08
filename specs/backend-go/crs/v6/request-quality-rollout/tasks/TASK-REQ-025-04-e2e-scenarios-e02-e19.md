@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/e2e/request_flow_test.go`, `.../e2e/scenarios_flows.go` (mới), `.../e2e/scenarios_cross_cutting.go` (mới), `.../e2e/type_matrix_test.go` (mới)
 **Depends on:** TASK-REQ-025-03; CR-REQ-006 (backlog, đổi loại), 010 (quyền), 014 (loại đặc thù), BE-REQ-SOL-024 task 02 (audit)
-**Status:** `[x] DONE`
+**Status:** [ ] TODO (một phần, xem Tiến độ 2026-10-08)
 
 ---
 
@@ -30,11 +30,16 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] E02 đến E16 và E19 xanh trên hai dialect.
-- [x] `TestEveryRequestTypeHasScenario` xanh và đỏ khi giả lập thêm loại.
-- [x] Mỗi nhóm luồng có kịch bản xanh.
+- [ ] E02 đến E16 và E19 xanh trên hai dialect.
+- [ ] `TestEveryRequestTypeHasScenario` xanh và đỏ khi giả lập thêm loại.
+- [ ] Mỗi nhóm luồng có kịch bản xanh.
 
 ## Rủi ro và lưu ý
 
 - `performance`, `ops_request`, `spike`, `question` cần năng lực agent chưa có: T1 chỉ kiểm khung luồng với fake, ghi rõ trong tên test để không ai hiểu nhầm là kiểm chất lượng.
 - File dài: tách theo nhóm (không dùng `max-lines` disable).
+
+## Tiến độ (2026-10-08)
+
+Đã làm và xanh trên cả hai dialect: E02..E12 (mỗi loại trong 11 loại tạo, phân loại bằng stub agent, xác nhận loại, trạng thái kế tiếp lấy từ `domain.NextStatus`), E13 (trả về backlog giai đoạn analysis, mở lại, phân loại lại), E14 (đổi loại giữa chừng, lịch sử loại, audit), E19 (người không duyệt bị `REQUEST_APPROVAL_NOT_APPROVER`, audit `denied`), `TestEveryRequestTypeHasScenario` (đỏ khi thêm loại thứ 12, test tự kiểm), mỗi nhóm luồng có kịch bản xanh; kiểm riêng hai dialect: khoá idempotency, hai Approve đồng thời đúng một thắng, phân trang ổn định, `LookupRequestBySource`.
+Còn thiếu (stage SKIP có tên task chặn): các giai đoạn Solution/Plan/Phase/thực thi của E02..E12, E13 phần từ chối Plan, E15, E16 (cần `ReportTaskOutcome`, CR-REQ-013). Không có `Sleep` cố định (thăm dò có hạn). Claim outbox `SKIP LOCKED` hai worker đã có ở test hợp đồng outbox của adapter, không lặp ở e2e.

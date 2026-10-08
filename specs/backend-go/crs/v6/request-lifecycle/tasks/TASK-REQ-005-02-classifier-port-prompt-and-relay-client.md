@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/ports.go` (sửa), `internal/adapter/grpcclient/{request_classifier.go,classification_prompt.go,ai_connection_resolver.go,dev_server_reachability.go,project_repo_lister.go}` và `*_test.go` (mới); `internal/config/config.go`, `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-005-01
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/adapter/grpcclient/...`)
 
 ---
 
@@ -41,3 +41,10 @@
 
 - Nhân đôi logic resolver từ `task-service` (chính sách mỗi service một client); khi `task-service` sửa BUG liên quan phải nhắc sửa bản này.
 - `RelayByDevServer` cần dev server đang kết nối; project không có thì mọi phân loại rơi vào nhánh thất bại (có chủ ý).
+
+## Ghi chú triển khai
+
+- Chưa kiểm chứng với dev server agent thật (`ai.complete` trả JSON ổn định, chất lượng phân loại).
+- Resolver, reachability và relay nằm trong `adapter/grpcclient` (`ai_connection_resolver.go` gộp luôn kiểm `GetFleetHealth`; không tạo `dev_server_reachability.go`/`project_repo_lister.go` riêng). `AIConnectionResolver`/`AIConnection` định nghĩa ở adapter vì chỉ adapter dùng.
+- Thiếu `INFRA_FLEET_SERVICE_ADDR` hoặc `PROJECT_SERVICE_ADDR` thì dùng `UnavailableClassifier` (luôn `ErrNoDevServer`, log cảnh báo) và mọi phân loại rơi về xác nhận tay.
+- `ErrClassifierTimeout` thêm vào usecase để use case ghi đúng lý do "classifier timeout".

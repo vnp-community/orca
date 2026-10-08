@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/{get_request.go,list_requests.go}`, `internal/adapter/grpc/{server.go,request_mapper.go}`, `internal/adapter/grpc/server_test.go`, `cmd/server/main.go`, `README.md` (sửa/mới)
 **Depends on:** TASK-REQ-002-04 hoặc 002-05 (một trong hai để chạy; cả hai để hoàn thành), TASK-REQ-001-05
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test ./internal/usecase/... ./internal/adapter/grpc/...; go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/mysql/... (TestPostgres_RequestServiceRPCs, TestMySQL_RequestServiceRPCs); TestRun_StartsWithDefaultConfig)
 
 ---
 
@@ -41,3 +41,7 @@ TASK-REQ-001-05 để `GetRequest`, `ListRequests` trả `Unimplemented`. CR-REQ
 
 - `confidence` là `optional double` (TASK-REQ-001-02) để UI phân biệt "chưa có đề xuất" với 0; kiểm mapper dùng `HasConfidence`/con trỏ đúng.
 - Chưa có kiểm quyền theo project: không mở `request-service` cho đường vào khác ngoài `api-gateway` (CR-REQ-016).
+
+## Ghi chú triển khai
+
+`NewServer(getRequest, listRequests)`; `ListRequests` kiểm giá trị enum (`InvalidArgument`); không có `Unimplemented` ở hai RPC. Test RPC chạy in-process (bufconn) với repository thật qua `contracttest.RunRequestServiceContract`: `TestGetRequest_NotFound`, `TestGetRequest_OtherTenantNotFound`, `TestListRequests_PaginatesAndFilters` (120 dòng: 50, 50, 20), `TestListRequests_PageSizeCapped` (500 cắt còn 200, 205 dòng), mapper `TestMapper_RoundTripFields`.

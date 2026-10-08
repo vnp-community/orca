@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/0005_request_return_history.{up,down}.sql`, `migrations/mysql/0005_request_return_history.{up,down}.sql` (mới); `internal/domain/{request_return_category.go,request_return_history.go,request_return_stage.go,request_return_errors.go}` và `*_test.go` (mới); `internal/domain/request.go` (sửa); `internal/usecase/ports.go` (sửa: `ReturnHistoryRepository`); `internal/adapter/{postgres,mysql}/{return_history_repository.go,request_repository.go,request_scan.go}` (mới/sửa)
 **Depends on:** TASK-REQ-005-01 (migration `0004`), TASK-REQ-002-04, TASK-REQ-002-05
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./internal/domain ./internal/usecase; go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql (Postgres 16 và MySQL 8.0 thật) -run "Migration|Return")
 
 ---
 

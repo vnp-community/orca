@@ -33,7 +33,7 @@ func (c *InfraCapabilityClient) Get(ctx context.Context, ref usecase.DevServerRe
 
 	// withTenantMetadata must be handled by the interceptor or caller as stated in the task.
 	// In the real code we would inject the tenant metadata here, assuming it's done via interceptor or caller context.
-	
+
 	req := &infrafleetv1.GetDevServerCapabilitiesRequest{
 		ConnectionId: ref.ConnectionID,
 		DevServerId:  ref.DevServerID,

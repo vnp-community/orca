@@ -685,4 +685,3 @@ func TestInboundHandshake_ToolsOmittedNil(t *testing.T) {
 		t.Fatal("AttachInboundSession was never called")
 	}
 }
-

@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / migrations
 **File:** `backend-go/services/request-service/migrations/postgres/NNNN_approvals.{up,down}.sql` (mới), `backend-go/services/request-service/migrations/mysql/NNNN_approvals.{up,down}.sql` (mới)
 **Depends on:** CR-REQ-001 và CR-REQ-002 đã merge (có thư mục migrations và bảng `requests`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql` — Migration_UpDownUp, ChecksReject, hợp đồng Approval; Postgres 16 và MySQL 8.0 thật)
 
 ## Context
 
@@ -41,3 +41,7 @@
 - `subject_id` tối đa 64 ký tự: đủ cho UUID (36). Không thu hẹp.
 - Khoá MySQL: `pending_key` dài 20+1+64=85 < 120, nhưng khoá duy nhất cộng `tenant_id` dưới 3072 byte với `utf8mb4`: kiểm bằng cách chạy thật.
 - Nếu CR-REQ-009 mở rộng `subject_type` ở CR bổ sung sau, đó là migration expand-only riêng.
+
+## Kết quả triển khai (2026-10-08)
+- Số migration thật là `0003_approvals` (đợt R1a đánh số lại); đủ cột `subject_digest`, `self_approval_allowed`, `idempotency_key`, `reminded_at`, nên không cần cột mới. Đợt này chỉ thêm `0040_approval_sweeper` (dải 0040 đến 0049 của approval): Postgres thêm chỉ mục `approvals_sweep` và policy RLS `relay_scan` (chỉ SELECT, khi `app.relay='on'`) cho sweeper quét xuyên tenant; MySQL chỉ thêm chỉ mục. Down chạy sạch (đã có trong UpDownUp).
+- Kiểm lại bằng `RunApprovalRepositoryContract`: `DBChecksRejectUnknownValues` (CHECK từ chối `subject_type`/`status` lạ ở cả hai DB), `PendingSlotFreesAfterDecision` (một `pending` mỗi chủ thể, giải phóng sau quyết định), `TestPostgres_ApprovalSweepPolicyIsReadOnly` (kết nối trần không thấy dòng nào dưới FORCE RLS; chế độ relay chỉ đọc).

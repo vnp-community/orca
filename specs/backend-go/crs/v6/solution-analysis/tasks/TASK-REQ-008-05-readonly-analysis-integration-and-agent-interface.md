@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / test; tài liệu giao diện
 **File:** `internal/adapter/{postgres,mysql}/agent_readonly_flow_integration_test.go` (mới), `testdata/analysis_documents/*.json` (mới, dùng chung task 01), `backend-go/services/request-service/README.md` (sửa: mục "Chế độ chỉ đọc và giới hạn đã biết")
 **Depends on:** TASK-REQ-008-03, TASK-REQ-008-04
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/mysql/... -run SolutionContract` trên Postgres 16 và MySQL 8.0 thật); kịch bản thủ công với agent thật chưa chạy
 
 ## Context
 
@@ -36,3 +36,8 @@
 
 - Test đua cần timeout ngắn để lộ khoá chết.
 - Không nhận định về hành vi agent thật cho tới khi chạy kịch bản thủ công.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Bộ kiểm dùng chung ở `internal/adapter/contracttest/solution_contract.go` (16 kịch bản, chạy với cả hai adapter qua `solution_integration_test.go`), thay vì file `agent_readonly_flow_integration_test.go` riêng: cổng đồng thời (`AgentGateAllowsExactlyTheMaximum`), luồng `question` (`AgentQuestionCompletesWithoutPlan`), `hotfix` (`HotfixAutoApproves`) và JSON vàng ở `internal/domain/testdata/analysis_documents/`.
+- README của service có mục "Chế độ chỉ đọc và giới hạn đã biết". Kịch bản thủ công (chưa chạy, ghi vào PR): `agent.execPrompt` với `accessMode=readonly` và với `trustPreset=default` trên dev server cục bộ và SSH; yêu cầu agent sửa file thử, `git commit`, ghi qua đường dẫn tuyệt đối; quan sát chặn / hỏi quyền / cho phép; kết quả quyết định có cần ép `REQUEST_REQUIRE_ENFORCED_READONLY=true`.

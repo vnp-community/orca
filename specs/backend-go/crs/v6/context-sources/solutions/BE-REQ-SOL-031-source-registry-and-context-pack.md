@@ -1,6 +1,6 @@
 # BE-REQ-SOL-031: Source Registry, Context Pack Builder, Evidence và RPC gọi MCP ngoài ở `mcp-service`
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Giá trị lớn nhất là nguồn nội bộ (đợt 1); phần MCP ngoài (đợt 2) chỉ là đường ống, chưa thử với máy chủ MCP thật.
+> **🚧 Đang triển khai: 1/8 task xong** (TASK-REQ-031-06, `mcp-service` `CallExternalTool` và `ReadExternalResource`, kiểm chứng 2026-10-07). Các task còn lại (01 đến 05, 07, 08) thuộc `request-service`/`api-gateway`, chưa làm. Phần MCP ngoài chưa thử với máy chủ MCP thật.
 
 **CR:** [CR-REQ-031](../../../../../../docs/crs/v6/context-sources/CR-REQ-031-source-registry-and-context-pack.md)
 **Service:** `request-service` (domain, usecase, adapter, migration hai dialect, proto) · `mcp-service` (RPC gọi công cụ và đọc tài nguyên ở máy chủ ngoài, Postgres) · `api-gateway` (`mcpserver/resources`, `tools`) · `proto`

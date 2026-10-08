@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/task_run_events.go` (mới), `internal/usecase/execute_task.go`, `internal/usecase/report_execution_result.go`, `internal/usecase/execution_lease.go`, `internal/usecase/update_task.go` (payload), `internal/usecase/task_run_events_test.go` (mới)
 **Depends on:** TASK-REQ-013-01, TASK-REQ-011-06
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./...` + `go test -tags integration ./internal/adapter/...` (Postgres 16 và MySQL 8) trong task-service)
 
 ---
 
@@ -54,3 +54,11 @@
 - Đường `UpdateStatus(in_progress)` không claimer (cấu hình không bật lease) không cùng tx được; production luôn bật claimer (`WithExecutionClaim`): kiểm `cmd/server/main.go`.
 - `error_message` có thể chứa đường dẫn nội bộ hoặc bí mật từ agent: không log ở mức Info, cân nhắc lọc bí mật (hỏi chủ sở hữu bảo mật).
 - Subject `statuschanged` có consumer `api-gateway` ephemeral: lượng sự kiện tăng, theo dõi.
+
+## Ghi chú triển khai
+
+- `task_run_events.go` (`newRunStatusEvent`, `RunCause`); xoá `EmitExecutionEvent` rỗng (không ai gọi). Payload thêm `execution_link_id`, `engine`, `error_message` (omitempty); fixture `testdata/statuschanged_execution_failed.json` kiểm bằng `TestNewRunStatusEvent_MatchesConsumerFixture`.
+- `ExecuteTask.revertDispatch`: có link thì `ReleaseExecution` (CAS + event cùng tx); trước khi có link (lỗi tạo link, lỗi `SetActiveExecutionLink`) không có khoá CAS nên `UpdateStatus` rồi ghi event best-effort qua `OutboxWriter` (không nguyên tử; đối soát CR-013-07 bù). Không claimer thì không phát event claim. Wiring: `WithRunEvents(repo, repo)` ở `main.go`.
+- Event `recovery` có `engine` rỗng (không có trong `ExpiredRun`); đọc `RequestID` bằng `Get` trước khi release (`WithRunEvents(repo, clock)`).
+- Chưa kiểm chứng: `api-gateway` (`workspace_events.go`) và `notification-service` parse payload mới (chỉ thêm trường omitempty, chưa chạy test của hai service); `parity_test.go` MCP.
+- Chưa làm trong 013-02: không có bước đối soát container mới (đã có từ 011-06).

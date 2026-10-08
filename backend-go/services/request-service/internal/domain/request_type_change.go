@@ -5,7 +5,7 @@ import "time"
 type ActorKind string
 
 const (
-	ActorKindAI     ActorKind = "ai"
+	ActorKindAgent  ActorKind = "agent"
 	ActorKindUser   ActorKind = "user"
 	ActorKindSystem ActorKind = "system"
 )

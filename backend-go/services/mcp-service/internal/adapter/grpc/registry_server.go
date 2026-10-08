@@ -17,10 +17,13 @@ type RegistryServer struct {
 	mcpv1.UnimplementedMcpRegistryServiceServer
 	reg     *usecase.ExternalServerRegistry
 	resolve *usecase.ResolveAgentMcpConfig
+	client  *usecase.ExternalServerClient
 }
 
-func NewRegistryServer(reg *usecase.ExternalServerRegistry, resolve *usecase.ResolveAgentMcpConfig) *RegistryServer {
-	return &RegistryServer{reg: reg, resolve: resolve}
+// NewRegistryServer's client may be nil: the two external-call RPCs then
+// answer MCP_UNAVAILABLE instead of panicking.
+func NewRegistryServer(reg *usecase.ExternalServerRegistry, resolve *usecase.ResolveAgentMcpConfig, client *usecase.ExternalServerClient) *RegistryServer {
+	return &RegistryServer{reg: reg, resolve: resolve, client: client}
 }
 
 func toProtoRefs(refs []domain.SecretRef) []*mcpv1.ExternalSecretRef {
@@ -131,4 +134,34 @@ func (s *RegistryServer) ResolveAgentMcpConfig(ctx context.Context, req *mcpv1.R
 		resp.Warnings = append(resp.Warnings, &mcpv1.AgentConfigWarning{ServerName: w.ServerName, Reason: w.Reason})
 	}
 	return resp, nil
+}
+
+// CallExternalTool never logs or formats req: arguments_json may hold data the
+// caller considers sensitive.
+func (s *RegistryServer) CallExternalTool(ctx context.Context, req *mcpv1.CallExternalToolRequest) (*mcpv1.CallExternalToolResponse, error) {
+	if s.client == nil {
+		return nil, toStatus(domain.ErrUnavailable("external tool client is not configured", nil))
+	}
+	out, err := s.client.CallTool(ctx, usecase.CallToolInput{
+		ServerID: req.GetServerId(), Tool: req.GetTool(), ArgumentsJSON: []byte(req.GetArgumentsJson()), MaxBytes: int(req.GetMaxBytes()),
+	})
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &mcpv1.CallExternalToolResponse{
+		ContentText: out.Text, IsError: out.IsError, Truncated: out.Truncated, SizeBytes: int32(out.SizeBytes), Digest: out.Digest,
+	}, nil
+}
+
+func (s *RegistryServer) ReadExternalResource(ctx context.Context, req *mcpv1.ReadExternalResourceRequest) (*mcpv1.ReadExternalResourceResponse, error) {
+	if s.client == nil {
+		return nil, toStatus(domain.ErrUnavailable("external tool client is not configured", nil))
+	}
+	out, err := s.client.ReadResource(ctx, usecase.ReadResourceInput{ServerID: req.GetServerId(), URI: req.GetUri(), MaxBytes: int(req.GetMaxBytes())})
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &mcpv1.ReadExternalResourceResponse{
+		Text: out.Text, MimeType: out.MimeType, Truncated: out.Truncated, SizeBytes: int32(out.SizeBytes), Digest: out.Digest,
+	}, nil
 }

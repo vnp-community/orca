@@ -36,6 +36,8 @@ type memRepo struct {
 	servers map[string]domain.ExternalServer
 	events  []domain.OutboxRecord
 	probes  []ProbeRecord
+	// lastTools mirrors last_probe_tools so approval snapshots ApprovedTools like SQL.
+	lastTools map[string][]domain.ToolInfo
 }
 
 func newMemRepo() *memRepo { return &memRepo{servers: map[string]domain.ExternalServer{}} }
@@ -112,6 +114,10 @@ func (m *memRepo) RecordProbe(_ context.Context, _, serverID string, r ProbeReco
 	defer m.lock()()
 	s := m.servers[serverID]
 	s.LastProbeDigest, s.LastProbeAt = r.Digest, &r.At
+	if m.lastTools == nil {
+		m.lastTools = map[string][]domain.ToolInfo{}
+	}
+	m.lastTools[serverID] = r.Tools
 	m.servers[serverID] = s
 	m.probes = append(m.probes, r)
 	m.events = append(m.events, ev...)
@@ -129,6 +135,7 @@ func (m *memRepo) ApplyReview(_ context.Context, r ReviewRecord, ev []domain.Out
 			return domain.ExternalServer{}, domain.ErrDigestMismatch()
 		}
 		s.Status, s.ApprovedDigest = domain.StatusApproved, s.LastProbeDigest
+		s.ApprovedTools = m.lastTools[r.ServerID]
 	} else {
 		s.Status = domain.StatusDisabled
 	}

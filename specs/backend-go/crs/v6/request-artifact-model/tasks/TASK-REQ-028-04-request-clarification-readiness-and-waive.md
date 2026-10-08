@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/request_clarification.go`, `internal/usecase/waive_readiness.go`, `internal/usecase/get_request_readiness.go`, `internal/usecase/confirm_request_type.go` (sửa, của SOL-005), `internal/usecase/ports.go` (sửa) và test
 **Depends on:** TASK-REQ-028-02, 028-03, TASK-REQ-027-05 (`AppendWithinTx`), TASK-REQ-005-05 (`ConfirmRequestType`), TASK-REQ-009-04 (`CancelPendingForRequest`), TASK-REQ-010-03 (`ResolveApproverPolicy`, nếu đã có; nếu chưa, dùng cài tạm)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/usecase -run 'RequestClarification|ConfirmRequestType|WaiveReadiness|GetRequestReadiness'` và `go test -tags integration ./internal/adapter/... -run ClarificationContract`)
 
 ---
 
@@ -88,3 +88,12 @@ CR-REQ-028 mục 2.1, 2.3, 2.5, 2.6. Trích từ TASK-REQ-005-05: `ConfirmReques
 - Người gọi nội bộ `task_blocked` chưa tồn tại (CR-REQ-013/029): kiểm thử bằng bên gọi giả; hành vi "task bị chặn quay về `open`" chưa kiểm chứng.
 - Quyền hỏi tay ở mức Request chưa chốt (README mục 8); quy tắc tạm có thể quá rộng hoặc hẹp.
 - `Reason` của câu hỏi sinh bằng tiếng Việt cố định; nếu cần đa ngôn ngữ, đổi sang mã lý do và để frontend dịch.
+
+## Ghi chú triển khai (rf/art)
+
+- `RequestClarification` (+ `CreateWithinTx`, `CreateFollowUp` cho vòng kế tiếp khi Request đã ở `awaiting_information`), `ReadinessGate` (cắm vào `ConfirmRequestType` bằng `WithReadiness`, đủ dữ liệu thì đi `type_confirmed` như cũ; hồi quy: các test cũ của `ConfirmRequestType` vẫn xanh), `GetRequestReadiness`, `WaiveReadiness`. `ConfirmRequestType` lặp khi đã ở `awaiting_information` là no-op thành công.
+- Cấu hình: `REQUEST_CLARIFICATION_MAX_ROUNDS` đọc ở `cmd/server/wire_artifact.go` bằng `os.Getenv` (không sửa `config.Config` dùng chung); `REQUEST_READINESS_AI_DRAFT` **chưa làm** (nháp AC bằng `ai.complete` là tuỳ chọn tắt mặc định; `ReadinessHints.AIDraft` là chỗ nối).
+- Waiver: `WaiveReadiness` ở `awaiting_type_confirmation` ghi revision `edited` có `meta.waiver` và `ConfirmRequestType` sau đó đi tiếp (dò waiver qua `ReadinessWaived` trên các revision, không thêm cột); ở `awaiting_information` (nguồn `readiness`) huỷ Clarification (`waived`) và `information_provided`. Dấu vết là revision + sự kiện `clarification.cancelled`; **chưa ghi `common/auditclient`** (cần địa chỉ auth-service, `request-service` chưa có).
+- Người trả lời mặc định `reporter`; mở rộng `team:` và `role:admin` cần resolver tenant-service/auth-service (`PrincipalRecipients` chỉ nhận user và reporter nếu chưa nối thư mục; ghi log cảnh báo khi khởi động).
+- Quyền hỏi tay (`manual`, `solution_open_question`, `plan_assumption`): tạm reporter hoặc admin (README mục 8 chưa chốt); nguồn `readiness`/`task_blocked` chỉ do hệ thống (`ActorKind=system`).
+- `Reason` của câu hỏi sinh bằng tiếng Việt cố định.

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/hotfix_followups.go` (mới), `internal/domain/type_policy_hotfix.go` (sửa `OnCompleted`), `internal/usecase/type_policy_integration_test.go` (mới), `internal/usecase/hotfix_followups_test.go` (mới)
 **Depends on:** TASK-REQ-014-03 đến 06, CR-REQ-006 (`SpawnChildRequest`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`)
 
 ---
 
@@ -44,3 +44,7 @@
 - Quy ước actor hệ thống cho `SpawnChildRequest` chưa có; nếu CR-REQ-006 không chấp nhận, task này bị chặn ở bước 2 (ghi rõ trong PR).
 - Hai Request theo dõi mặc định có thể thừa; chưa có dữ liệu dùng thực, cân nhắc cờ cấu hình `REQUEST_HOTFIX_FOLLOWUPS` (đề xuất, chưa trong CR).
 - Test tích hợp đầy đủ cần `approval` và `lifecycle` đã merge; nếu chưa, dùng fake và ghi phần chưa chạy.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

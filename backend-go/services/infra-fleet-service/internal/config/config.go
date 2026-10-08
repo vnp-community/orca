@@ -51,6 +51,13 @@ type Config struct {
 	// value falls back to the default, fail-safe: a misconfigured interval
 	// should not silently disable polling (0) or spin (negative).
 	FleetPollInterval time.Duration
+	// CapabilityProfileTTL is how long a stored capability profile is served
+	// without re-probing a connected agent (INFRA_CAPABILITY_PROFILE_TTL, Go
+	// duration, default 24h). CapabilityRefreshMinInterval throttles refresh
+	// per dev server (INFRA_CAPABILITY_REFRESH_MIN_INTERVAL, default 5m).
+	// Unparseable or non-positive values fall back to the default.
+	CapabilityProfileTTL         time.Duration
+	CapabilityRefreshMinInterval time.Duration
 	// FleetWebhookURL is BL-FLEET-03's status-change alert target — read
 	// from FLEET_WEBHOOK_URL, empty (the default) disables webhook.Alerter
 	// entirely (see that package's doc comment).
@@ -92,17 +99,28 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		Base:                    base,
-		ServerDeployment:        os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
-		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
-		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
-		FleetPollInterval:       fleetPollIntervalFromEnv(),
-		FleetWebhookURL:         os.Getenv("FLEET_WEBHOOK_URL"),
-		CredentialBrokerAddr:    commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
-		AIProviderServiceAddr:   commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
-		EphemeralVmSshMode:      sshMode,
-		AuthServiceAddr:         commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
+		Base:                         base,
+		ServerDeployment:             os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		DatabaseCredentialsFile:      commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
+		NATSURL:                      commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		FleetPollInterval:            fleetPollIntervalFromEnv(),
+		CapabilityProfileTTL:         positiveDurationFromEnv("INFRA_CAPABILITY_PROFILE_TTL", 24*time.Hour),
+		CapabilityRefreshMinInterval: positiveDurationFromEnv("INFRA_CAPABILITY_REFRESH_MIN_INTERVAL", 5*time.Minute),
+		FleetWebhookURL:              os.Getenv("FLEET_WEBHOOK_URL"),
+		CredentialBrokerAddr:         commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		AIProviderServiceAddr:        commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
+		EphemeralVmSshMode:           sshMode,
+		AuthServiceAddr:              commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
 	}, nil
+}
+
+func positiveDurationFromEnv(name string, def time.Duration) time.Duration {
+	if raw := os.Getenv(name); raw != "" {
+		if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+			return d
+		}
+	}
+	return def
 }
 
 func fleetPollIntervalFromEnv() time.Duration {

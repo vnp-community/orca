@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/transition_request.go`, `internal/usecase/transition_request_events.go`, `internal/usecase/transition_request_test.go`, `internal/usecase/status_write_guard_test.go` (sửa); `internal/usecase/return_request_to_backlog.go`, `internal/usecase/return_request_to_backlog_test.go` (mới)
 **Depends on:** TASK-REQ-006-01, TASK-REQ-005-04 (`ApprovalCanceller`, `ExecutionGuard`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./internal/domain ./internal/usecase -run "Return|Transition|OnlyTransition")
 
 ---
 

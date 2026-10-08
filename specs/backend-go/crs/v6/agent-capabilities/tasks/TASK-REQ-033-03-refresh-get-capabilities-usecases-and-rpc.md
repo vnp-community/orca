@@ -5,7 +5,7 @@
 **Service/Area:** `infra-fleet-service` / proto, usecase, adapter grpc, config, wiring
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto` (sửa), `internal/usecase/refresh_dev_server_capabilities.go` (mới), `internal/usecase/get_dev_server_capabilities.go` (mới), `internal/adapter/grpc/server_capability.go` (mới), `internal/adapter/grpc/server.go` (sửa), `internal/adapter/devserveragent/client.go` (sửa, option `WithOnSessionAttached`), `internal/config/config.go` (sửa), `cmd/server/main.go` (sửa), và `_test.go`
 **Depends on:** TASK-REQ-033-01 (store, domain), TASK-REQ-033-02 (`HandshakeInfo` mới)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `go test ./...` module infra-fleet-service, `go test -race` cho Refresh/Get/hook; RPC phục vụ qua gRPC thật xuyên `WithAgentSessionList`)
 
 ---
 
@@ -49,11 +49,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `GetDevServerCapabilities` trả `source=probe` với agent mới và `source=handshake_only`, `degraded=true` với agent cũ (agent giả trả -32601).
+- [x] `GetDevServerCapabilities` trả `source=probe` với agent mới và `source=handshake_only`, `degraded=true` với agent cũ (agent giả trả -32601). (TestDegradation_*, TestServer_GetDevServerCapabilities_MapsFields/OldAgentIsDegraded)
 - [x] Sự kiện `capabilities_changed` chỉ phát khi fingerprint đổi hoặc hồ sơ mới.
-- [x] Không có Refresh nào chặn handshake; tám cuộc gọi đồng thời tạo đúng một `Exec`.
-- [x] `buf lint` và `buf breaking` xanh.
-- [x] `grpc.New` và mọi test gọi nó biên dịch; `go vet ./services/infra-fleet-service/...` sạch.
+- [x] Không có Refresh nào chặn handshake; tám cuộc gọi đồng thời tạo đúng một `Exec`. (TestWithOnSessionAttached_CalledAfterHandshake_NotBlocking, TestRefresh_ConcurrentCallsCoalesce)
+- [ ] `buf lint` và `buf breaking` xanh. `buf breaking` xanh với infrafleet; `buf lint` đỏ sẵn (82 dòng cho infrafleet.proto, quy ước đặt tên response), RPC này thêm một dòng cùng loại (`DevServerCapabilityProfile` nên tên `GetDevServerCapabilitiesResponse`); chưa đổi tên vì sẽ là thay đổi proto phá vỡ với client R2.
+- [x] `grpc.New` và mọi test gọi nó biên dịch; `go vet ./services/infra-fleet-service/...` sạch. (không đổi chữ ký New: dùng option WithDevServerCapabilities)
 - [x] Không biến môi trường hay giá trị bí mật nào xuất hiện trong log hay sự kiện (test quét chuỗi mẫu).
 
 ## Thứ tự thực hiện gợi ý
@@ -75,3 +75,17 @@
 - `grpc.New` chỉ có tham số vị trí: sai thứ tự gây lỗi biên dịch khó đọc; thêm tham số ở cuối danh sách.
 - Probe ngay khi vừa attach có thể gặp agent đang khởi động; chấp nhận lỗi và để lần gọi theo yêu cầu làm mới.
 - `refresh=true` có thể bị lạm dụng thành bão probe; giới hạn theo `lastAttempt` cho caller không phải admin (chưa có kiểm admin ở v1: quyết định cuối thuộc người duyệt).
+
+## Ghi chú triển khai (2026-10-07)
+
+- **Handler chưa từng có**: proto khai báo RPC nhưng server chỉ nhúng `Unimplemented`. Thêm `internal/adapter/grpc/server_capability.go` (`WithDevServerCapabilities` + `GetDevServerCapabilities`), nối trong `cmd/server/main.go`. Dùng option thay vì thêm tham số vào `New(...)` (đã hơn 70 tham số vị trí; mọi test gọi `New` giữ nguyên).
+- Subject sự kiện: `orca.infrafleet.dev_server.capabilities_changed` (tiền tố `infrafleet` như `disconnected`, `terminal.closed`; stream INFRAFLEET). Cần sửa solution/CR nếu muốn `orca.infra.`; chưa sửa tài liệu.
+- Chỉ `-32601` (`ErrAgentMethodNotFound`) tạo hồ sơ `handshake_only`; lỗi khác (timeout...) giữ hồ sơ cũ, không hạ cấp agent khoẻ (bản đầu hạ cấp mọi lỗi). Chưa có hồ sơ và probe lỗi thì trả lỗi, không lưu gì.
+- Refresh không bao giờ dial: ngắt kết nối thì trả hồ sơ lưu (hoặc `FailedPrecondition` nếu chưa có). `refresh=true` gửi `{"refresh": true}` cho agent để bỏ cache 60 giây của nó.
+- Gộp probe tự cài (map + kênh `done`) thay vì `x/sync/singleflight` (module là phụ thuộc gián tiếp; tránh đổi go.mod). Probe chạy trên context tách huỷ (giữ tenant) với timeout 15 giây để người gọi đầu không làm hỏng các người chờ.
+- ID outbox dùng `uuid.NewString()` (bản đầu dùng `devServerID`, sự kiện thứ hai sẽ vi phạm khoá chính).
+- `NewRefreshDevServerCapabilities` bỏ tham số `resolver` (không dùng); `NewGetDevServerCapabilities` thêm `devServers` để kiểm dev server thuộc tenant khi gọi bằng `dev_server_id`, và `connection_id` không tồn tại trả NotFound (bản đầu dùng `ds.ID` rỗng).
+- Kích hoạt sau handshake: `devserveragent.WithOnSessionAttached` (chạy `go fn(id)` trong client, nên không chặn handshake, gồm cả nối lại); `main.go` tra tenant bằng `TenantIDForDevServer` rồi gọi Refresh không force (chịu giới hạn 5 phút).
+- Config: `INFRA_CAPABILITY_PROFILE_TTL` (24h), `INFRA_CAPABILITY_REFRESH_MIN_INTERVAL` (5m), dạng Go duration, giá trị sai/không dương rơi về mặc định.
+- Người gọi đã kiểm: `usecase.HandshakeInfo`, `DevServerAgentClient`, `grpc.New` không đổi; chỉ thêm. `devserveragent.initSession` đổi `onAttached` thành hàm bọc `emitResync` + hook (người dùng duy nhất của `onAttached` là `emitResync`).
+- Chưa kiểm chứng: đo độ trễ `agent.capabilities` qua SSH/relay-websocket và thử trên dev server thật (không có môi trường); `grpcurl` thủ công.

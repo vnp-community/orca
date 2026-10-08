@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / usecase port, adapter postgres và mysql
 **File:** `internal/usecase/impact_ports.go` (mới), `internal/adapter/postgres/impact_repository.go` (mới), `internal/adapter/postgres/risk_acceptance_repository.go` (mới), `internal/adapter/postgres/risk_policy_repository.go` (mới), `internal/adapter/postgres/risk_outcome_repository.go` (mới), bản `internal/adapter/mysql/*` tương ứng, và các `_test.go`
 **Depends on:** TASK-REQ-030-01 (bảng), TASK-REQ-030-02 (kiểu domain), TASK-REQ-001-04 (executor trong ctx, `TxRunner`)
-**Status:** [x] DONE
+**Status:** [ ] TODO
 
 ---
 
@@ -79,12 +79,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] Chỉ một `collecting` mỗi chủ thể kể cả khi gọi đồng thời; `InsertCollecting` idempotent.
-- [x] `CompleteImpactAssessment` đặt bản cũ `superseded` cùng giao dịch và từ chối khi mất lease.
-- [x] Quét lease dùng `SKIP LOCKED` ở cả hai dialect, thời gian từ DB.
-- [x] `ListValidAcceptances` chỉ trả chấp nhận có digest hiện hành.
-- [x] Mọi truy vấn có `tenant_id`; không có `UPDATE` nào trên cột `dimensions`/`findings` của bản `ready` (append-only).
-- [x] Hai bản cài thoả cùng bộ test bảng.
+- [ ] Chỉ một `collecting` mỗi chủ thể kể cả khi gọi đồng thời; `InsertCollecting` idempotent.
+- [ ] `CompleteImpactAssessment` đặt bản cũ `superseded` cùng giao dịch và từ chối khi mất lease.
+- [ ] Quét lease dùng `SKIP LOCKED` ở cả hai dialect, thời gian từ DB.
+- [ ] `ListValidAcceptances` chỉ trả chấp nhận có digest hiện hành.
+- [ ] Mọi truy vấn có `tenant_id`; không có `UPDATE` nào trên cột `dimensions`/`findings` của bản `ready` (append-only).
+- [ ] Hai bản cài thoả cùng bộ test bảng.
 
 ## Rủi ro và lưu ý
 

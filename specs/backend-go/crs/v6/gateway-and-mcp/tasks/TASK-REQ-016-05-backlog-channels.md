@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_backlog.go` (mới), `.../channels_request_backlog_test.go` (mới), `.../excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-02; CR-REQ-015 (RPC `ListBacklog`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -39,3 +39,7 @@
 
 - Hình dạng `BacklogGroup`, `BacklogTaskRow` có thể đổi khi CR-REQ-015 hiện thực; sửa view, ghi vào CONTRACT mục 1 và báo frontend (CR-REQ-023 đang dùng tên `backlog.list`, đã chốt bỏ).
 - Không tính view ở gateway; backend là nơi duy nhất định nghĩa ba view (README v6 mục 3.8).
+
+## Ghi chú triển khai (2026-10-08)
+
+Ba kênh gọi một RPC `ListBacklog`, mỗi kênh chỉ chuyển bộ lọc của nó.

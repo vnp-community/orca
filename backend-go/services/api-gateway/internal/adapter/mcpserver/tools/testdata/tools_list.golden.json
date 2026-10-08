@@ -148,6 +148,32 @@
     "props": ["content", "id", "resolved"]
   },
   {
+    "name": "approval_get",
+    "channel": "approval.get",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["id"]
+  },
+  {
+    "name": "approval_list",
+    "channel": "approval.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["request_id"],
+    "props": ["page_size", "page_token", "request_id", "status", "subject_type"]
+  },
+  {
+    "name": "approval_listPending",
+    "channel": "approval.listPending",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["page_size", "page_token", "subject_type"]
+  },
+  {
     "name": "automation_delete",
     "channel": "automation.delete",
     "pack": 4,
@@ -190,6 +216,30 @@
     "scope": "orca:write",
     "required": ["id"],
     "props": ["dtstart", "id", "name", "rrule", "step_config_json", "step_type", "timezone"]
+  },
+  {
+    "name": "backlog_execute",
+    "channel": "backlog.execute",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["page_size", "page_token", "phase_task_id", "project_id"]
+  },
+  {
+    "name": "backlog_requests",
+    "channel": "backlog.requests",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["page_size", "page_token", "project_id"]
+  },
+  {
+    "name": "backlog_tasks",
+    "channel": "backlog.tasks",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["page_size", "page_token", "plan_task_id", "project_id"]
   },
   {
     "name": "connectivity_getSummary",
@@ -1582,6 +1632,132 @@
     "scope": "orca:admin",
     "required": ["member_user_id", "repo_id", "role"],
     "props": ["member_user_id", "repo_id", "role"]
+  },
+  {
+    "name": "request_changeType",
+    "channel": "request.changeType",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["id", "reason", "to_type"],
+    "props": ["id", "reason", "to_type"]
+  },
+  {
+    "name": "request_classify",
+    "channel": "request.classify",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "declared": true,
+    "required": ["id"],
+    "props": ["id"]
+  },
+  {
+    "name": "request_create",
+    "channel": "request.create",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["project_id", "title"],
+    "props": ["body", "client_request_id", "project_id", "title"]
+  },
+  {
+    "name": "request_flowStatus",
+    "channel": "request.flowStatus",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "request_generatePlan",
+    "channel": "request.generatePlan",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "declared": true,
+    "required": ["id"],
+    "props": ["id"]
+  },
+  {
+    "name": "request_get",
+    "channel": "request.get",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["id"]
+  },
+  {
+    "name": "request_list",
+    "channel": "request.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["page_size", "page_token", "project_id", "source_provider", "status", "type"]
+  },
+  {
+    "name": "request_reopen",
+    "channel": "request.reopen",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["id"],
+    "props": ["id"]
+  },
+  {
+    "name": "request_returnToBacklog",
+    "channel": "request.returnToBacklog",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["id", "reason", "stage"],
+    "props": ["id", "reason", "stage"]
+  },
+  {
+    "name": "request_spawnChild",
+    "channel": "request.spawnChild",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["id", "reason", "title"],
+    "props": ["body", "id", "reason", "title"]
+  },
+  {
+    "name": "request_startPhase",
+    "channel": "request.startPhase",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "declared": true,
+    "required": ["id"],
+    "props": ["id", "phase_task_id"]
+  },
+  {
+    "name": "request_typeHistory",
+    "channel": "request.typeHistory",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["id"]
+  },
+  {
+    "name": "solution_generate",
+    "channel": "solution.generate",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["request_id"],
+    "props": ["feedback", "idempotency_key", "request_id"]
+  },
+  {
+    "name": "solution_list",
+    "channel": "solution.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["request_id"],
+    "props": ["kind", "page_size", "page_token", "request_id", "status"]
   },
   {
     "name": "task_addComment",

@@ -4,14 +4,14 @@
 **Hợp đồng chung:** [docs/crs/v6/README.md](../../../../../../docs/crs/v6/README.md) (mục 8 thắng mục 3)
 **TDD tham chiếu:** [`arch/02`](../../../../tdd/architecture/02-microservices-decomposition.md), [`arch/03`](../../../../tdd/architecture/03-clean-architecture-guidelines.md), [`arch/05`](../../../../tdd/architecture/05-data-architecture.md), [`arch/08`](../../../../tdd/architecture/08-inter-service-communication.md), [`arch/09`](../../../../tdd/architecture/09-observability-reliability.md)
 
-> 📋 Proposed. Chưa triển khai, chưa chạy test nào. Đọc lại code liên quan trước khi sửa.
+> 🚧 Đợt R1a (2026-10-07): BE-REQ-SOL-002 ✅ đã triển khai; BE-REQ-SOL-001 🚧 4/6 task xong (còn 001-02, 001-06). Chi tiết ở [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md).
 
 ## Bảng CR, Solution, Task
 
-| CR | Solution | Service / Area | Effort | Task |
-|----|----------|----------------|--------|------|
-| [CR-REQ-001](../../../../../../docs/crs/v6/request-service-foundation/CR-REQ-001-scaffold-request-service.md) | [BE-REQ-SOL-001](./BE-REQ-SOL-001-scaffold-request-service.md) | `request-service` (mới), `proto`, `go.work`, `deploy/*`, CI | Medium | `TASK-REQ-001-01` đến `-06` |
-| [CR-REQ-002](../../../../../../docs/crs/v6/request-service-foundation/CR-REQ-002-request-data-model-and-repositories.md) | [BE-REQ-SOL-002](./BE-REQ-SOL-002-request-data-model-and-repositories.md) | `request-service` (domain, ports, adapter hai dialect, migration `0002`) | Medium | `TASK-REQ-002-01` đến `-07` |
+| CR | Solution | Service / Area | Effort | Task | Trạng thái |
+|----|----------|----------------|--------|------|------------|
+| [CR-REQ-001](../../../../../../docs/crs/v6/request-service-foundation/CR-REQ-001-scaffold-request-service.md) | [BE-REQ-SOL-001](./BE-REQ-SOL-001-scaffold-request-service.md) | `request-service` (mới), `proto`, `go.work`, `deploy/*`, CI | Medium | `TASK-REQ-001-01` đến `-06` | 🚧 4/6 task xong |
+| [CR-REQ-002](../../../../../../docs/crs/v6/request-service-foundation/CR-REQ-002-request-data-model-and-repositories.md) | [BE-REQ-SOL-002](./BE-REQ-SOL-002-request-data-model-and-repositories.md) | `request-service` (domain, ports, adapter hai dialect, migration `0002`) | Medium | `TASK-REQ-002-01` đến `-07` | ✅ 7/7 task xong (2026-10-07) |
 
 ## Re-verify trước khi thiết kế (đối chiếu CR với mã thật, 2026-10-06)
 
@@ -23,7 +23,7 @@
 | `processed_events` khoá theo `event_id` | `notification-service/0002_processed_events` đúng vậy, nhưng README v6 mục 8 buộc mọi bảng có `tenant_id`; `mcp-service` dùng PK `(tenant_id, event_id)` | **Lệch** ⇒ PK kép |
 | Chỉ cần tạo DB, compose, `migrate.sh` | Stack dev thật mount binary `./bin/<svc>/orca`; thêm `build-local.sh` dòng 43 | Bổ sung |
 | Không nhắc stream JetStream | Cần `pub.EnsureStream(ctx, "REQUEST", []string{"orca.request.>"})` cho consumer CR-REQ-005 | Bổ sung |
-| Số migration | `request-service` chưa có thư mục migrations: `0001` (CR-REQ-001), `0002` (CR-REQ-002); các CR sau đọc lại thư mục trước khi đặt số | Không |
+| Số migration | `request-service` chưa có thư mục migrations: `0001` (CR-REQ-001), `0002` (CR-REQ-002); các CR sau đọc lại thư mục trước khi đặt số | Không (đã đánh số lại một lần 2026-10-07, số đóng băng: 0001 đến 0007, bảng ở IMPLEMENTATION-NOTES) |
 | `ListRequestsRequest.status`, `type` | CR ghi số ít; `ListFilter` dùng mảng | **Lệch** ⇒ `repeated string` ngay từ đầu |
 
 ## Thứ tự thực thi và phụ thuộc

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `cmd/server/main.go`, `cmd/server/mysql_dsn.go`, `cmd/server/mysql_dsn_test.go`, `internal/adapter/grpc/server.go`, `internal/adapter/grpc/server_test.go` (tất cả mới)
 **Depends on:** TASK-REQ-001-02 (stub proto), TASK-REQ-001-04 (repository, relay store)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test ./cmd/... (đơn vị) và go test -tags integration ./cmd/... (Postgres, MySQL, NATS thật): TestRun_StartsWithDefaultConfig, TestRun_StartsWithMySQL, TestRun_RelaysOutboxRowToNATS)
 
 ---
 
@@ -44,3 +44,7 @@
 
 - Stream `REQUEST` không tạo được (NATS không có JetStream) thì consumer ở CR-REQ-005 không đăng ký; chỉ log cảnh báo, không thoát.
 - `RegisterApprovalServiceServer` với service rỗng: nếu bỏ `approval.proto` ở TASK-REQ-001-02 thì bỏ dòng này.
+
+## Ghi chú triển khai
+
+`main.go` tách `openStores` (`store_wiring.go`) và `buildApprovalRegistry` (`approval_wiring.go`); `run` thoát khi ctx huỷ. Đã thêm gRPC health (`SERVING`). Mặc định service khởi động được: `REQUEST_APPROVAL_ENABLED=false` nên không đăng ký ApprovalService và không cần handler; bật mà thiếu handler thật thì từ chối khởi động (chi tiết ở IMPLEMENTATION-NOTES). `TestServer_UnimplementedRPCs` đổi thành `TestServer_ListBacklogStaysUnimplemented` vì GetRequest và ListRequests nay là thật; `TestMain_UnknownDSNExitsNonZero` là `TestRun_UnknownDSNExitsWithDialectError`. `mysql_dsn_test.go` viết lại thành test thật; DSN MySQL ghim `time_zone='+00:00'`.

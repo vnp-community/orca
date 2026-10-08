@@ -9,6 +9,7 @@ const (
 	GateStatusNone     GateStatus = "none"
 )
 
+// TaskView is the slice of a task-service Task the backlog views and the execution loop need.
 type TaskView struct {
 	ID             string
 	ParentID       string
@@ -16,40 +17,49 @@ type TaskView struct {
 	Status         string
 	RequestID      string
 	Title          string
-	EstimatedHours int
 	AssigneeID     string
-	Kind           string // For plan kind: plan or task_list
-	Size           string
+	WorktreeID     string
+	EstimatedHours *float64
+	Labels         []string
 }
 
+// Ref converts to the shape type policies read.
+func (t TaskView) Ref() TaskRef {
+	return TaskRef{ID: t.ID, Title: t.Title, ParentID: t.ParentID, Status: t.Status, Labels: t.Labels}
+}
+
+// IsWorkingTask is true for the tasks an agent runs (leaves), as opposed to Plan and Phase containers.
+func (t TaskView) IsWorkingTask() bool { return !IsContainerTaskType(t.Type) && t.Type != "epic" }
+
 type TaskGateInput struct {
-	Request   Request
-	Task      TaskView
+	Request Request
+	Task    TaskView
+	// Container is the task's direct parent: a phase or a plan. Nil for a task with no parent (hotfix).
 	Container *TaskView
+	// Plan is the plan above the task; it equals Container when the task sits directly under the plan.
 	Plan      *TaskView
 	Approvals ApprovalIndex
 }
 
 type GateResolution struct {
-	Approved             bool
-	Status               GateStatus
+	Approved bool
+	Status   GateStatus
+	// WaitingForPhaseSplit means the flow wants Phases but the task still hangs directly under the Plan.
 	WaitingForPhaseSplit bool
 }
 
+// ApprovalIndex holds the newest Approval of each (subject type, subject id).
 type ApprovalIndex map[SubjectType]map[string]Approval
 
+// NewApprovalIndex keeps the row with the latest created_at per subject; ties go to the larger id.
 func NewApprovalIndex(approvals []Approval) ApprovalIndex {
 	idx := make(ApprovalIndex)
 	for _, a := range approvals {
 		if idx[a.SubjectType] == nil {
 			idx[a.SubjectType] = make(map[string]Approval)
 		}
-		existing, ok := idx[a.SubjectType][a.SubjectID]
-		if !ok {
-			idx[a.SubjectType][a.SubjectID] = a
-			continue
-		}
-		if a.CreatedAt.After(existing.CreatedAt) || (a.CreatedAt.Equal(existing.CreatedAt) && a.ID > existing.ID) {
+		cur, ok := idx[a.SubjectType][a.SubjectID]
+		if !ok || a.CreatedAt.After(cur.CreatedAt) || (a.CreatedAt.Equal(cur.CreatedAt) && a.ID > cur.ID) {
 			idx[a.SubjectType][a.SubjectID] = a
 		}
 	}
@@ -57,15 +67,13 @@ func NewApprovalIndex(approvals []Approval) ApprovalIndex {
 }
 
 func (idx ApprovalIndex) GetLatest(st SubjectType, id string) *Approval {
-	if m, ok := idx[st]; ok {
-		if a, ok := m[id]; ok {
-			return &a
-		}
+	if a, ok := idx[st][id]; ok {
+		return &a
 	}
 	return nil
 }
 
-func gateStatusFor(a *Approval) GateStatus {
+func gateStatusOf(a *Approval) GateStatus {
 	if a == nil {
 		return GateStatusNone
 	}
@@ -76,137 +84,66 @@ func gateStatusFor(a *Approval) GateStatus {
 		return GateStatusPending
 	case ApprovalStatusRejected:
 		return GateStatusRejected
-	default:
-		return GateStatusNone
 	}
+	return GateStatusNone // cancelled and expired leave the subject unapproved
 }
 
-// Temporary stubs for FlowFor and PhasesFor
-type FlowDefinition struct {
-	ExecutionGates  []string
-	OpenSpecProfile OpenSpecProfile
-}
-
-func FlowFor(reqType RequestType) FlowDefinition {
-	var gates []string
-	if reqType == RequestTypeChangeRequest {
-		gates = []string{"plan", "phase"}
-	} else {
-		gates = []string{"plan"}
+// startGateSubject is the Approval that releases the Plan itself for this flow.
+func startGateSubject(g GateSubject) (SubjectType, bool) {
+	switch g {
+	case GatePlan:
+		return SubjectPlan, true
+	case GateTaskList:
+		return SubjectTaskList, true
+	case GatePreDeploy:
+		return SubjectPreDeploy, true
 	}
-	return FlowDefinition{
-		ExecutionGates:  gates,
-		OpenSpecProfile: OpenSpecProfileFor(reqType),
-	}
+	return "", false
 }
 
-func PhasesFor(size string) bool {
-	return size == "L"
-}
-
+// ResolveTaskGate says whether the approvals a task needs before it may run are all in place (README v6 3.8).
 func ResolveTaskGate(in TaskGateInput) GateResolution {
-	flow := FlowFor(in.Request.Type)
-	needsPhase := false
-	for _, g := range flow.ExecutionGates {
-		if g == "phase" {
-			needsPhase = true
-			break
-		}
+	flow, err := FlowFor(in.Request.Type)
+	if err != nil {
+		return GateResolution{Status: GateStatusNone} // untyped request: no flow, nothing can have been approved
 	}
-
 	var statuses []GateStatus
-
-	if in.Container != nil && in.Container.Kind == "phase" {
-		// Under a phase container
-		if needsPhase {
-			phaseStatus := gateStatusFor(in.Approvals.GetLatest(SubjectPhase, in.Container.ID))
-			statuses = append(statuses, phaseStatus)
-			if in.Plan != nil {
-				planStatus := gateStatusFor(in.Approvals.GetLatest(SubjectPlan, in.Plan.ID))
-				statuses = append(statuses, planStatus)
-			}
-		} else {
-			if in.Plan != nil {
-				planStatus := gateStatusFor(in.Approvals.GetLatest(SubjectPlan, in.Plan.ID))
-				statuses = append(statuses, planStatus)
-			}
+	planGate := func(plan *TaskView) {
+		subject, ok := startGateSubject(flow.StartGate)
+		if !ok || plan == nil {
+			statuses = append(statuses, GateStatusNone)
+			return
 		}
-	} else if in.Container != nil && (in.Container.Kind == "plan" || in.Container.Kind == "task_list") {
-		// Under a plan container
-		if PhasesFor(in.Task.Size) {
-			return GateResolution{WaitingForPhaseSplit: true, Approved: false, Status: GateStatusNone}
+		statuses = append(statuses, gateStatusOf(in.Approvals.GetLatest(subject, plan.ID)))
+	}
+	switch {
+	case in.Container == nil:
+		if flow.PlanKind != PlanSingleTask {
+			return GateResolution{Status: GateStatusNone}
 		}
-		planStatus := gateStatusFor(in.Approvals.GetLatest(SubjectPlan, in.Container.ID))
-		statuses = append(statuses, planStatus)
-		if in.Task.Type == "security" {
-			// security uses pre_deploy
-			pdStatus := gateStatusFor(in.Approvals.GetLatest(SubjectPreDeploy, in.Container.ID))
-			statuses = append(statuses, pdStatus)
+		statuses = append(statuses, gateStatusOf(in.Approvals.GetLatest(SubjectPreDeploy, in.Task.ID)))
+	case in.Container.Type == TaskTypePhase:
+		if flow.HasExecutionGate(GatePhase) {
+			statuses = append(statuses, gateStatusOf(in.Approvals.GetLatest(SubjectPhase, in.Container.ID)))
 		}
-	} else {
-		// No container (hotfix)
-		pdStatus := gateStatusFor(in.Approvals.GetLatest(SubjectPreDeploy, in.Task.ID))
-		statuses = append(statuses, pdStatus)
-	}
-
-	if len(statuses) == 0 {
-		return GateResolution{Approved: true, Status: GateStatusNone}
-	}
-
-	overall := GateStatusApproved
-	for _, s := range statuses {
-		if s == GateStatusRejected {
-			overall = GateStatusRejected
-			break
+		planGate(in.Plan)
+	default: // directly under the plan
+		if flow.PhasesFor(in.Request.Size) {
+			return GateResolution{Status: GateStatusNone, WaitingForPhaseSplit: true}
 		}
-		if s == GateStatusPending || s == GateStatusNone {
-			if overall != GateStatusRejected {
-				overall = GateStatusPending
-			}
-		}
+		planGate(in.Container)
 	}
-	if overall == GateStatusPending && !hasStatus(statuses, GateStatusRejected) {
-		// keep pending
-	} else if overall != GateStatusRejected && hasStatus(statuses, GateStatusNone) {
-		overall = GateStatusNone // wait... pending overrides none if there's an actual pending?
-		// "nếu có pending thì pending, bản mới nhất rejected thì rejected, không có gì thì none, approved khi tất cả approved"
-	}
-
-	overall2 := GateStatusApproved
-	hasPending := false
-	hasRejected := false
-	hasNone := false
-
-	for _, s := range statuses {
-		if s == GateStatusRejected {
-			hasRejected = true
-		} else if s == GateStatusPending {
-			hasPending = true
-		} else if s == GateStatusNone {
-			hasNone = true
-		}
-	}
-
-	if hasRejected {
-		overall2 = GateStatusRejected
-	} else if hasPending {
-		overall2 = GateStatusPending
-	} else if hasNone {
-		overall2 = GateStatusNone
-	}
-
-	return GateResolution{
-		Approved:             overall2 == GateStatusApproved,
-		Status:               overall2,
-		WaitingForPhaseSplit: false,
-	}
+	return combineGateStatuses(statuses)
 }
 
-func hasStatus(s []GateStatus, st GateStatus) bool {
-	for _, x := range s {
-		if x == st {
-			return true
+// combineGateStatuses: any rejection wins, then any pending, then a missing approval; approved needs every one.
+func combineGateStatuses(statuses []GateStatus) GateResolution {
+	overall := GateStatusApproved
+	rank := map[GateStatus]int{GateStatusApproved: 0, GateStatusNone: 1, GateStatusPending: 2, GateStatusRejected: 3}
+	for _, s := range statuses {
+		if rank[s] > rank[overall] {
+			overall = s
 		}
 	}
-	return false
+	return GateResolution{Approved: overall == GateStatusApproved, Status: overall}
 }

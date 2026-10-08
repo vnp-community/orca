@@ -142,3 +142,6 @@ auth.json
 *.db3
 *.s3db
 *.sl3
+
+# built binary of request-service
+/backend-go/services/request-service/cmd/server/server

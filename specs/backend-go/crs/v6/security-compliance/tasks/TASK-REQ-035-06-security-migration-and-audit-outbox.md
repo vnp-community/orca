@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_security_compliance.{up,down}.sql` (mới), `.../internal/domain/{audit_event.go,audit_metadata.go}` (mới/sửa: do TASK-REQ-024-02 có thể đã tạo `AuditEvent`), `.../internal/usecase/{audit_outbox.go,audit_recorder.go}` (sửa/mới), `.../internal/adapter/{postgres,mysql}/audit_outbox.go` (mới), `.../internal/adapter/auditdelivery/deliverer.go` (mới), `.../cmd/server/main.go` (sửa: chạy bộ giao), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-024-01 (`auditclient.AppendDetailed`, `Entry`), TASK-REQ-024-02 (`AuditRecorder`, `AuditEvent`), TASK-REQ-025-01 (`tenant_settings`), TASK-REQ-035-05 (RLS cho bảng mới)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `cd backend-go && opa test policy/orca-authz && go test ./services/request-service/... && go test -tags integration ./services/request-service/...`; phần chưa làm ghi ở tiêu chí)
 
 ---
 
@@ -63,7 +63,8 @@ ALTER TABLE request.tenant_settings ADD COLUMN request_retention_days INT NOT NU
 ## Tiêu chí hoàn thành
 
 - [x] `request.export` và `request.erase` không mất khi `auth-service` tạm sập (bản ghi nằm trong `request_audit_outbox` và được giao sau).
-- [x] Mọi hành động ở CR-REQ-024 2.8 và CR 035 2.5 tạo đúng một bản ghi `AppendDetailed` với `actor_type` đúng; không có `title`/`body` trong `metadata_json` (test thuộc tính).
+- [ ] Mọi hành động ở CR-REQ-024 2.8 và CR 035 2.5 tạo đúng một bản ghi `AppendDetailed` với `actor_type` đúng; không có `title`/`body` trong `metadata_json` (test thuộc tính).
+  - chưa: hành động `ai.budget.set`/`ai.egress.set` (CR-034, `AiBudgetAdminServer` còn stub) và `approval.approve` pre_deploy (nằm trong `decide_approval.go` của rf-appr) chưa gọi `AuditRecorder`; hạ tầng sẵn (`IsDurableAudit`). Hành động đã phát: `request.export`, `request.erase`, `request.retention.run`, `request.access.denied`.
 - [x] Giao lặp không làm hỏng (có `audit_id` trong metadata).
 - [x] Migration up/down/up sạch hai dialect; RLS bật cho bảng mới.
 - [x] Không đổi hành vi `Append`/`AppendDetailed` hiện có.
@@ -74,3 +75,10 @@ ALTER TABLE request.tenant_settings ADD COLUMN request_retention_days INT NOT NU
 - `AppendDetailedStrict` là thêm vào `common/auditclient` (dùng chung): additive, nhưng chạy `gitnexus_impact` trên `auditclient.Client` trước khi sửa.
 - Audit vẫn best-effort cho hành động thường: sập `auth-service` có thể mất bản ghi `request.access.denied` (chấp nhận, CR mục 2.5).
 - `ALTER TABLE ... ADD COLUMN` MySQL không `IF NOT EXISTS`; chạy một lần; xung đột tên cột với migration của CR 034 (khác tên) cần thứ tự merge rõ.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Migration `0080_security_compliance` (hai dialect, up/down/up kiểm bằng test migration có sẵn). Lệch: cờ `contains_secret_suspected`, `erased_at`, `erased_by` nằm ở bảng bên `request_security_flags` (không sửa bảng `requests` của các đợt khác, tránh đụng `ExpectedColumns`/`scanRequest`); bảng cài đặt tên `tenant_security_settings` (không `tenant_settings`, tránh đụng migration 025-01). Proto không có trường `contains_secret_suspected`, nên cờ chưa lên API.
+- `common/auditclient.AppendDetailedStrict` (cộng thêm; `Append`/`AppendDetailed` giữ hành vi, vẫn nuốt lỗi; người gọi của `auditclient.Client` không đổi chữ ký).
+- `AuditRecorder` (durable vào outbox cùng giao dịch, còn lại best-effort), `MarshalAuditMetadata` (cấm khoá nội dung ở mọi độ sâu, chuỗi dài, 4096 byte), `Deliverer` (backoff min(2^n x 5s, 15m), SKIP LOCKED, dọn bản ghi đã giao 7 ngày). Test hai dialect: rollback, giao đúng một lần, thử lại, không mất khi auth sập, hai bộ giao, audit_id duy nhất, cách ly tenant. Test thuộc tính `TestAuditMetadataNeverContainsContent`.
+- Metric chỉ là bộ đếm trong tiến trình (`Deliverer.DeliveryFailures/Pending`, `RateLimitedTotal`); service chưa có registry Prometheus.

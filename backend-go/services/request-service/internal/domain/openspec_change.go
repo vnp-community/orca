@@ -75,7 +75,7 @@ func NewChangeID(number int64, title string) string {
 
 	t := transform.Chain(norm.NFD, removeMn(), norm.NFC)
 	s, _, _ := transform.String(t, title)
-	
+
 	s = strings.ReplaceAll(s, "đ", "d")
 	s = strings.ReplaceAll(s, "Đ", "d")
 

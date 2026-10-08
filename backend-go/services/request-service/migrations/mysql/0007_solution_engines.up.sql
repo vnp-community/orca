@@ -31,5 +31,3 @@ CREATE TABLE openspec_changes (
 
 ALTER TABLE requests ADD COLUMN solution_engine ENUM('native','openspec') NULL;
 ALTER TABLE analysis_runs ADD COLUMN engine VARCHAR(32) NOT NULL DEFAULT 'native';
-ALTER TABLE analysis_runs DROP CHECK analysis_runs_chk_1; -- Assuming the name, MySQL >= 8.0.16
-ALTER TABLE analysis_runs ADD CONSTRAINT analysis_runs_mode_check CHECK (mode IN ('complete','agent_readonly','agent_proposal'));

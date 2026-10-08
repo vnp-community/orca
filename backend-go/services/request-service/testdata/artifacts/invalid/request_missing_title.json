@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "body": "Người dùng cần đăng nhập một lần cho mọi dịch vụ.",
+  "type": "change_request",
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "text": "Đăng nhập thành công chuyển về trang chủ",
+      "status": "active",
+      "verify_hint": "test"
+    },
+    {
+      "id": "AC-2",
+      "text": "Tài khoản bị khoá hiện thông báo",
+      "status": "retired",
+      "verify_hint": "test"
+    }
+  ],
+  "type_fields": {
+    "ac_next": 3,
+    "goal": "SSO",
+    "value": "giảm ma sát",
+    "scope_in": ["web"],
+    "scope_out": ["mobile"]
+  }
+}

@@ -168,7 +168,7 @@ func TestExecutionLeases_ClaimForExecution_ExactlyOneConcurrentWinner(t *testing
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ok, err := repo.ClaimForExecution(ctx, tenantID, task.ID, domain.StatusOpen)
+			ok, err := repo.ClaimForExecution(ctx, tenantID, task.ID, domain.StatusOpen, nil)
 			if err != nil {
 				t.Errorf("ClaimForExecution: %v", err)
 				return
@@ -188,7 +188,7 @@ func TestExecutionLeases_ClaimForExecution_ExactlyOneConcurrentWinner(t *testing
 	if got.Status != domain.StatusInProgress {
 		t.Errorf("want in_progress, got %s", got.Status)
 	}
-	if ok, _ := repo.ClaimForExecution(ctx, tenantID, task.ID, domain.StatusOpen); ok {
+	if ok, _ := repo.ClaimForExecution(ctx, tenantID, task.ID, domain.StatusOpen, nil); ok {
 		t.Error("a claim from a stale status must fail")
 	}
 }
@@ -210,7 +210,7 @@ func TestExecutionLeases_RecoveryRevertsAbandonedRun_EndToEnd(t *testing.T) {
 	if err := repo.SetActiveExecutionLink(ctx, tenantID, task.ID, link.ID); err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := repo.ClaimForExecution(ctx, tenantID, task.ID, domain.StatusReview); err != nil || !ok {
+	if ok, err := repo.ClaimForExecution(ctx, tenantID, task.ID, domain.StatusReview, nil); err != nil || !ok {
 		t.Fatalf("claim: ok=%v err=%v", ok, err)
 	}
 	if err := repo.StartLease(ctx, tenantID, link.ID, "dead-process", string(domain.StatusReview), time.Millisecond); err != nil {
@@ -333,17 +333,17 @@ func TestExecutionLeases_ReleaseExecution_IsCompareAndSetOnActiveLink(t *testing
 	tenantID := uuid.NewString()
 	taskID, linkID := newActiveRun(t, repo, tenantID, domain.EngineOrchestration)
 
-	if ok, err := repo.ReleaseExecution(ctx, tenantID, taskID, uuid.NewString(), domain.StatusOpen); err != nil || ok {
+	if ok, err := repo.ReleaseExecution(ctx, tenantID, taskID, uuid.NewString(), domain.StatusOpen, nil); err != nil || ok {
 		t.Fatalf("a different link must not release the task: ok=%v err=%v", ok, err)
 	}
-	if ok, err := repo.ReleaseExecution(ctx, tenantID, taskID, linkID, domain.StatusReview); err != nil || !ok {
+	if ok, err := repo.ReleaseExecution(ctx, tenantID, taskID, linkID, domain.StatusReview, nil); err != nil || !ok {
 		t.Fatalf("the active link must release: ok=%v err=%v", ok, err)
 	}
 	got, _ := repo.Get(ctx, tenantID, taskID)
 	if got.Status != domain.StatusReview {
 		t.Errorf("want review, got %s", got.Status)
 	}
-	if ok, _ := repo.ReleaseExecution(ctx, tenantID, taskID, linkID, domain.StatusOpen); ok {
+	if ok, _ := repo.ReleaseExecution(ctx, tenantID, taskID, linkID, domain.StatusOpen, nil); ok {
 		t.Error("a task no longer in_progress must not be released again")
 	}
 }

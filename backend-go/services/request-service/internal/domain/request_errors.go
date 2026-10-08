@@ -9,6 +9,10 @@ func ErrRequestTenantRequired() error {
 	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_TENANT_REQUIRED", "tenant id is required", nil)
 }
 
+func ErrRequestReporterRequired() error {
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_REPORTER_REQUIRED", "reporter id is required", nil)
+}
+
 func ErrRequestInvalidType(t string) error {
 	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_INVALID_TYPE", fmt.Sprintf("invalid request type: %s", t), nil)
 }
@@ -42,7 +46,6 @@ func ErrRequestVersionConflict(id string, expected int64) error {
 }
 
 func ErrSourceAlreadyExists(existingRequestID string) error {
-	// Include the existing request ID in the error message
 	return apperrors.New(apperrors.KindAlreadyExists, "REQUEST_SOURCE_ALREADY_EXISTS", fmt.Sprintf("request source already exists: %s", existingRequestID), nil)
 }
 
@@ -56,4 +59,12 @@ func ErrSolutionNotFound(id string) error {
 
 func ErrSolutionVersionConflict(id string, expected int64) error {
 	return apperrors.New(apperrors.KindFailedPrecondition, "SOLUTION_VERSION_CONFLICT", fmt.Sprintf("solution %s version conflict (expected %d)", id, expected), nil)
+}
+
+func ErrBacklogCategoryUnavailable() error {
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_BACKLOG_CATEGORY_UNAVAILABLE", "backlog category filter needs the request-lifecycle migration", nil)
+}
+
+func ErrBacklogReturnHistoryUnavailable() error {
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_BACKLOG_RETURN_HISTORY_UNAVAILABLE", "return history needs the request-lifecycle migration", nil)
 }

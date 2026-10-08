@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/spawn_child_request.go`, `internal/usecase/spawn_child_request_test.go` (mới); `internal/usecase/create_request.go` (sửa: `Parent`); `internal/domain/request_child_rules.go`, `internal/domain/request_child_rules_test.go` (mới)
 **Depends on:** TASK-REQ-006-02, TASK-REQ-004-04 (`CreateWithinTx`), TASK-REQ-002-04/05 (`RequestLinkRepository`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run RPC (13+ kịch bản gRPC, máy trạng thái thật); go test ./internal/adapter/grpc; buf lint/breaking --path orca/request/v1/request.proto`)
 
 ---
 
@@ -47,3 +47,8 @@ CR-REQ-006 mục 2.6. Quy tắc cha, con (bảng) nằm ở domain để test kh
 
 - Giới hạn con mềm khi đồng thời (mỗi lệnh đếm trước giao dịch); chấp nhận vượt vài đơn vị.
 - `escalation` chưa được README định nghĩa (Q1 của SOL-006); nếu bị bỏ, xoá hằng và nhánh.
+
+## Ghi chú triển khai
+
+- `SpawnChildRequest` nay tạo con qua `IntakeChildCreator` (`child_request_via_intake.go`) trên `CreateRequest.CreateWithinTx`: con vào `classifying`, `type_hint` nằm trong `source_hints` (cột), sự kiện `created` có `parent_request_id` và `link_reason`. `IdempotentChildCreator` không còn được lắp.
+- Test: `SpawnChildAndLinks` (gRPC, thấy `type_hint`, replay trả cùng con, sai quy tắc cha bị từ chối), `SpawnChildConcurrent12SameKey` (12 lệnh đồng thời một con một link) hai dialect; `CreateRequest` công khai vẫn bỏ `type_hint` (`CreateRequest_IgnoresTypeHint`).

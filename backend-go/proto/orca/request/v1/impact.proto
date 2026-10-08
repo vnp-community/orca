@@ -1,0 +1,259 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Impact assessment, risk gate and graph messages (CR-REQ-030, CR-REQ-032 GraphPayload). RPCs live in RequestService.
+// subject_type values: request | solution_option | plan | phase | task | actual_task | actual_phase.
+// level values: low | medium | high | critical.
+
+message DimensionSummary {
+  string dimension = 1;
+  int32 score = 2;
+  bool measured = 3;
+  // tool | heuristic | none
+  string basis = 4;
+}
+
+message ImpactAssessmentSummary {
+  string id = 1;
+  string level = 2;
+  int32 score = 3;
+  string confidence = 4;
+  // shadow | enforce
+  string mode = 5;
+  // collecting | ready | partial | failed | superseded
+  string status = 6;
+  string rules_version = 7;
+  repeated string top_reasons = 8;
+  int64 index_age_seconds = 9;
+  string narrative_json = 10;
+  string digest = 11;
+  google.protobuf.Timestamp assessed_at = 12;
+  repeated DimensionSummary dimensions = 13;
+}
+
+message RequestImpactAssessmentRequest {
+  string request_id = 1;
+  string subject_type = 2;
+  string subject_id = 3;
+}
+
+message RequestImpactAssessmentResponse {
+  ImpactAssessmentSummary assessment = 1;
+}
+
+message GetImpactAssessmentRequest {
+  string subject_type = 1;
+  string subject_id = 2;
+}
+
+message GetImpactAssessmentResponse {
+  ImpactAssessmentSummary assessment = 1;
+}
+
+message GraphNode {
+  // Stable "<kind>:<name>", for example svc:task-service.
+  string id = 1;
+  string kind = 2;
+  string label = 3;
+  string group = 4;
+  // low | medium | high | critical | unknown (never low for an unmeasured dimension).
+  string risk = 5;
+  string status = 6;
+}
+
+message GraphEdge {
+  string from = 1;
+  string to = 2;
+  string kind = 3;
+  // added | removed | unchanged
+  string change = 4;
+}
+
+message GraphPayload {
+  string lens = 1;
+  repeated GraphNode nodes = 2;
+  repeated GraphEdge edges = 3;
+  int32 total_nodes = 4;
+  bool truncated = 5;
+  google.protobuf.Timestamp assessed_at = 6;
+  string tool = 7;
+  bool stale = 8;
+}
+
+message GetImpactGraphRequest {
+  string request_id = 1;
+  string subject_type = 2;
+  string subject_id = 3;
+  // architecture | contract | data | impact
+  string lens = 4;
+  string base = 5;
+  // Default 50, clamped to [1, 200].
+  int32 max_nodes = 6;
+}
+
+message GetImpactGraphResponse {
+  GraphPayload graph = 1;
+}
+
+message DimensionCell {
+  string dimension = 1;
+  int32 score = 2;
+  bool measured = 3;
+  string basis = 4;
+}
+
+message OptionRow {
+  string option_id = 1;
+  string level = 2;
+  int32 score = 3;
+  string confidence = 4;
+  // ready | partial | collecting | missing
+  string status = 5;
+  repeated DimensionCell cells = 6;
+}
+
+message CompareImpactRequest {
+  string solution_id = 1;
+}
+
+message CompareImpactResponse {
+  repeated OptionRow rows = 1;
+}
+
+message ImpactFinding {
+  string id = 1;
+  string dimension = 2;
+  string level = 3;
+  string code = 4;
+  string message = 5;
+  string path = 6;
+  string evidence_run_id = 7;
+}
+
+message ListImpactFindingsRequest {
+  string assessment_id = 1;
+  string dimension = 2;
+  string min_level = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message ListImpactFindingsResponse {
+  repeated ImpactFinding findings = 1;
+  string next_page_token = 2;
+}
+
+message GetImpactEvidenceRequest {
+  string finding_id = 1;
+}
+
+// Output is truncated and passed through secretscan before it leaves the service.
+message GetImpactEvidenceResponse {
+  string tool = 1;
+  string command_digest = 2;
+  string status = 3;
+  string output = 4;
+  string index_commit = 5;
+}
+
+message HeatmapCell {
+  string phase_task_id = 1;
+  string task_id = 2;
+  string level = 3;
+  int32 score = 4;
+  string assessment_id = 5;
+}
+
+message GetPlanRiskHeatmapRequest {
+  string plan_task_id = 1;
+}
+
+message GetPlanRiskHeatmapResponse {
+  repeated HeatmapCell cells = 1;
+}
+
+message GetImpactDriftRequest {
+  string phase_id = 1;
+}
+
+message GetImpactDriftResponse {
+  ImpactAssessmentSummary expected = 1;
+  ImpactAssessmentSummary actual = 2;
+  bool drift = 3;
+  repeated string reasons = 4;
+}
+
+message RiskAcceptance {
+  string id = 1;
+  string request_id = 2;
+  string assessment_id = 3;
+  string assessment_digest = 4;
+  string finding_id = 5;
+  string level = 6;
+  string accepted_by = 7;
+  string rationale = 8;
+  string approval_id = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message AcceptRiskRequest {
+  string assessment_id = 1;
+  string finding_id = 2;
+  // At least 10 characters.
+  string rationale = 3;
+  string assessment_digest = 4;
+}
+
+message AcceptRiskResponse {
+  RiskAcceptance acceptance = 1;
+}
+
+message OverrideRiskGateRequest {
+  string request_id = 1;
+  // solution | plan | phase | execute
+  string gate = 2;
+  // At least 20 characters.
+  string reason = 3;
+  string finding_id = 4;
+}
+
+message OverrideRiskGateResponse {
+  int32 override_count = 1;
+}
+
+message RiskPolicy {
+  string id = 1;
+  int32 version = 2;
+  // draft | shadow | active | retired
+  string status = 3;
+  string thresholds_json = 4;
+  string weights_json = 5;
+  string hard_rules_json = 6;
+  string gate_mapping_json = 7;
+  string created_by = 8;
+  google.protobuf.Timestamp activated_at = 9;
+}
+
+message GetRiskPolicyRequest {}
+
+// default_rules_version is "rp/1" when the tenant has no policy row.
+message GetRiskPolicyResponse {
+  RiskPolicy active = 1;
+  RiskPolicy shadow = 2;
+  string default_rules_version = 3;
+}
+
+// Tenant admin only; status "active" turns enforcement on.
+message SetRiskPolicyRequest {
+  RiskPolicy policy = 1;
+  int32 expected_version = 2;
+}
+
+message SetRiskPolicyResponse {
+  RiskPolicy policy = 1;
+}

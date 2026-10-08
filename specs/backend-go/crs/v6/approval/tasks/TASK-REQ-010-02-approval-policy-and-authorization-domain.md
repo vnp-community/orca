@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / domain
 **File:** `backend-go/services/request-service/internal/domain/approval_policy.go` (mới), `approval_authorization.go` (mới), và `_test.go` tương ứng (mới)
 **Depends on:** TASK-REQ-009-02
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./internal/domain/...`)
 
 ## Context
 
@@ -30,10 +30,13 @@
 ## Tiêu chí hoàn thành
 
 - [x] 8 `subject_type` đều có mặc định; test so khớp bảng 2.5.
-- [x] `Decide` không gọi mạng, không import ngoài stdlib.
+- [x] `Decide` không gọi mạng; package domain chỉ import stdlib và `common/apperrors` (lỗi mang mã `REQUEST_APPROVAL_*`).
 - [x] `hotfix` và `security` mặc định `AllowRequesterApprove=false` ở `request_type`.
 
 ## Rủi ro và lưu ý
 
 - Tenant một người dùng bị khoá ở `pre_deploy`, `hotfix`, `security`, size `L`: đó là hành vi có chủ đích; usecase trả lỗi sớm (task 04).
 - Các con số hạn là đề xuất; đặt thành hằng có tên, không rải số trong mã.
+
+## Kết quả triển khai (2026-10-08)
+- Thay hai test "Stub test" bằng bảng test thật: `SelectPolicy` (độ cụ thể, ưu tiên, tuổi), `DefaultPolicy` theo chủ thể/urgency/size, `Decide` 12 tình huống (tách nhiệm vụ kể cả admin, `system` không chặn, máy bị cấm), `ParsePrincipal` từ chối ID rỗng. Thêm `ApprovalPolicy.Validate` (tối đa 20 principal, kind/size/urgency/request_type hợp lệ). Lỗi `Decide` mang mã `REQUEST_APPROVAL_*`.

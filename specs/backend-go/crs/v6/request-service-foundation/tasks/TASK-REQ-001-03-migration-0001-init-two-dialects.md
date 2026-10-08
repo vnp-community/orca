@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/postgres/0001_init.up.sql`, `0001_init.down.sql` (mới); `migrations/mysql/0001_init.up.sql`, `0001_init.down.sql` (mới)
 **Depends on:** TASK-REQ-001-01 (thư mục service)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test -tags integration ./internal/adapter/postgres/... ./internal/adapter/mysql/... -run 'Migration|RLS|SchemaContract'; golang-migrate (migrate/migrate) up, down -all, up trên Postgres 16 và MySQL 8.0)
 
 ---
 
@@ -40,3 +40,7 @@ Số migration: `services/request-service/migrations/` chưa tồn tại, nên `
 
 - Nếu role kết nối ở dev là superuser thì RLS bị bỏ qua; test tích hợp phải tự tạo role `NOBYPASSRLS` (khuôn `mcp-service/internal/adapter/postgres/*_integration_test.go`).
 - CR-REQ-002 sẽ thêm `0002`; không gộp vào file này.
+
+## Ghi chú triển khai
+
+Test: `TestPostgres_Migration_UpDownUp`, `TestMySQL_Migration_UpDownUp` (down 0007..0002 giữ nguyên 0001, up lại, down toàn bộ, up lại), `TestRLS_TenantIsolation_Outbox` (role `NOSUPERUSER NOBYPASSRLS`), `TestRelayCanReadAcrossTenants`. Tên khác tên trong task (task đặt `TestMigration_0001_UpDownUp`); nội dung phủ cả 0001 lẫn các số sau.

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "diagnosis",
+  "summary": "Lỗi nil pointer",
+  "root_cause": {
+    "statement": "thiếu kiểm tra nil",
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "type": "file",
+        "ref": "a.go:10",
+        "excerpt": "x"
+      }
+    ]
+  },
+  "impact": {
+    "severity": "high"
+  },
+  "fix_directions": [
+    {
+      "id": "fix-1",
+      "summary": "thêm kiểm tra",
+      "risk": "low"
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-1",
+      "text": "?",
+      "blocking": false
+    }
+  ]
+}

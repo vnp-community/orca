@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/engine_name.go`, `internal/domain/openspec_profile.go`, `internal/domain/engine_settings.go`, `internal/domain/openspec_change.go`, `internal/domain/engine_errors.go`, `internal/domain/request_flow_registry.go` (sửa, của SOL-003) và các `*_test.go` (mới)
 **Depends on:** TASK-REQ-003-01 (flow registry), TASK-REQ-002-02 (domain `RequestType`, `apperrors` constructor)
-**Status:** [x] DONE
+**Status:** [x] DONE (kiểm toán 2026-10-07: đủ code và test đơn vị)
 
 ---
 

@@ -136,7 +136,12 @@ func run() error {
 		usecase.TaskSourceRepository
 		usecase.OutboxWriter
 		usecase.VelocityResolver
+		usecase.ExecutionStateReader
+		usecase.ContainerReconcileRepository
 		usecase.TxRunner
+		usecase.SpecTxRunner
+		usecase.TaskSpecRepository
+		usecase.TaskExecutionRecordRepository
 		outbox.Store
 		taskeventbus.OutboxWriter // WriteOutboxEvent — distinct, narrower interface than usecase.OutboxWriter's InsertOutboxEvent
 	}
@@ -254,7 +259,7 @@ func run() error {
 	simpleExecutor := taskgrpcclient.NewSimpleExecutor(
 		repo, repo, projectExecutionResolver, infraFleetClient, profileResolver, projectContextResolver,
 		repo, execOutputRelay,
-	)
+	).WithExecutionRecords(repo)
 
 	aiProviderConn, err := taskgrpcclient.Dial(cfg.AIProviderServiceAddr)
 	if err != nil {
@@ -323,13 +328,22 @@ func run() error {
 	// repo also implements usecase.ExecutionLinkRepository (adapter/postgres's
 	// execution_links.go) — one row per Execute dispatch, across all three
 	// engines (BE-SOL-001/CR-FLOW-TASK-001).
+	// Plan/phase statuses derive from their children; every site that changes a child's
+	// status shares this one syncer, and the recovery sweep reconciles what it misses.
+	recalculateProgressUC := usecase.NewRecalculateProgress(repo)
+	syncContainerUC := usecase.NewSyncContainerStatus(repo, recalculateProgressUC)
 	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor, workflowExecutor, resolvePermissionUC, worktreeProvisioner, projectExecutionResolver, SystemClock{}, repo).
 		WithExecutionClaim(repo).
-		WithExecutionLeases(repo, executionLeaseOwner(), usecase.DefaultLeaseTTL, usecase.DefaultLeaseHeartbeat)
-	recoverInterruptedUC := usecase.NewRecoverInterruptedExecutions(repo)
+		WithRunEvents(repo, repo).
+		WithExecutionLeases(repo, executionLeaseOwner(), usecase.DefaultLeaseTTL, usecase.DefaultLeaseHeartbeat).
+		WithContainerSync(syncContainerUC).
+		WithContract(simpleExecutor, repo)
+	recoverInterruptedUC := usecase.NewRecoverInterruptedExecutions(repo).
+		WithRunEvents(repo, SystemClock{}).
+		WithContainerReconcile(usecase.NewReconcileContainerStatuses(repo, syncContainerUC))
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 	listTasksUC := usecase.NewListTasks(repo)
-	updateTaskUC := usecase.NewUpdateTask(repo, repo)
+	updateTaskUC := usecase.NewUpdateTask(repo, repo).WithContainerSync(syncContainerUC).WithTaskSpecLock(repo)
 	deleteTaskUC := usecase.NewDeleteTask(repo)
 	getDependenciesUC := usecase.NewGetDependencies(repo, repo)
 	// repo also implements usecase.VelocityResolver (RecentCompletedTasks is
@@ -360,7 +374,6 @@ func run() error {
 	// usecase.GrantRepository (ListGrantsForAncestors) for GetSubtree's
 	// per-node visibility filter.
 	getSubtreeUC := usecase.NewGetSubtree(repo, repo, teamScopeResolver)
-	recalculateProgressUC := usecase.NewRecalculateProgress(repo)
 	addCommentUC := usecase.NewAddComment(repo)
 	listCommentsUC := usecase.NewListComments(repo)
 	// reportExecutionResultUC is the shared inbound completion callback for
@@ -370,7 +383,7 @@ func run() error {
 	// workflow-service only — see server.go's ReportTaskExecutionResult doc
 	// comment for the flagged (unresolved) service-identity check this
 	// handler is missing.
-	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo, repo).WithExecutionRelease(repo)
+	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo, repo).WithExecutionRelease(repo).WithContainerSync(syncContainerUC)
 	findTaskByNumberUC := usecase.NewFindTaskByNumber(repo)
 	// TASK-TG-003-05's second, independently-built share-link mechanism —
 	// see task.proto's GenerateShareLink/GetTaskByShareToken doc comment
@@ -378,6 +391,10 @@ func run() error {
 	generateShareLinkUC := usecase.NewGenerateShareLink(repo, resolvePermissionUC)
 	getTaskByShareTokenUC := usecase.NewGetTaskByShareToken(repo)
 	listExecutionStatesUC := usecase.NewListExecutionStates(repo)
+	setTaskSpecUC := usecase.NewSetTaskSpec(repo, repo, resolvePermissionUC)
+	getTaskSpecsUC := usecase.NewGetTaskSpecs(repo)
+	lockTaskSpecsUC := usecase.NewLockTaskSpecs(repo, repo, resolvePermissionUC)
+	listExecutionRecordsUC := usecase.NewListExecutionRecords(repo, resolvePermissionUC)
 
 	// Execution-status mirror consumer (BE-SOL-003/TASK-FT-003-05) —
 	// subscribes orca.orchestration.task.statuschanged /
@@ -439,7 +456,10 @@ func run() error {
 		getSubtreeUC, recalculateProgressUC, addCommentUC, listCommentsUC, reportExecutionResultUC, findTaskByNumberUC,
 		generateShareLinkUC, getTaskByShareTokenUC,
 	).WithTaskSources(usecase.NewCreateTaskFromSource(repo, repo, createTaskUC), repo).
-	WithListExecutionStates(listExecutionStatesUC))
+		WithListExecutionStates(listExecutionStatesUC).
+		WithCreatePlanTree(usecase.NewCreatePlanTree(repo, repo, repo)).
+		WithTaskSpecs(setTaskSpecUC, getTaskSpecsUC, lockTaskSpecsUC).
+		WithExecutionRecords(listExecutionRecordsUC))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// healthSrv (constructed above, alongside the dialect switch that also

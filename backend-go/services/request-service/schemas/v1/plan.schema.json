@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orca.local/schemas/v1/plan.schema.json",
+  "title": "Plan spec",
+  "type": "object",
+  "required": ["schema_version", "goal", "implements"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "kind": { "const": "plan" },
+    "goal": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string" },
+    "risks": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "rollback": { "type": "string" },
+    "verification_strategy": { "type": "string" },
+    "implements": {
+      "type": "object",
+      "required": ["solution_id", "option_id"],
+      "additionalProperties": false,
+      "properties": {
+        "solution_id": { "type": "string", "minLength": 1 },
+        "option_id": { "type": "string", "pattern": "^opt-[1-9][0-9]*$" }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "needs_confirmation"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^A-[1-9][0-9]*$" },
+          "text": { "type": "string", "minLength": 1 },
+          "needs_confirmation": { "type": "boolean" }
+        }
+      }
+    },
+    "satisfies_all": { "type": "boolean" },
+    "provenance": { "type": "object" }
+  }
+}

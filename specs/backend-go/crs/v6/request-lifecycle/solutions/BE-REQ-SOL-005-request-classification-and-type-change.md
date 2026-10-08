@@ -1,6 +1,6 @@
 # BE-REQ-SOL-005: Phân loại Request bằng AI, xác nhận loại, đổi loại và lịch sử
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Phụ thuộc [BE-REQ-SOL-004](./BE-REQ-SOL-004-request-intake-from-sources.md) và [BE-REQ-SOL-003](./BE-REQ-SOL-003-request-state-machine-and-flow-registry.md).
+> ✅ Đã triển khai (kiểm chứng 2026-10-08). AI chạy bất đồng bộ theo run có lease (D3); chưa kiểm chứng với dev server agent thật. Chi tiết: [IMPLEMENTATION-NOTES](../IMPLEMENTATION-NOTES.md).
 
 **CR:** [CR-REQ-005](../../../../../../docs/crs/v6/request-lifecycle/CR-REQ-005-request-classification-and-type-change.md)
 **Service:** `request-service` (use case, consumer, adapter `grpcclient`, adapter `eventbus`, migration) · `proto`

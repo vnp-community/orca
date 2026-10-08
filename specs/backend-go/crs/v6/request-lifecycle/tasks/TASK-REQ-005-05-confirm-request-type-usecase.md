@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/confirm_request_type.go`, `internal/usecase/confirm_request_type_test.go` (mới)
 **Depends on:** TASK-REQ-005-04 (cổng no-op), TASK-REQ-005-01
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -race ./internal/domain/... ./internal/usecase/... ./internal/adapter/... và go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql -run "Intake|Classification|Migration|Schema"`)
 
 ---
 
@@ -36,7 +36,7 @@ Lệnh: `go test ./services/request-service/internal/usecase/... -run Confirm`.
 
 ## Tiêu chí hoàn thành
 
-- [x] Confirm hợp lệ vào `analyzing`/`planning` đúng loại.
+- [ ] Confirm hợp lệ vào `analyzing`/`planning` đúng loại. (mới kiểm với fake transitioner; cần chạy lại với `TransitionRequest` thật sau hợp nhất)
 - [x] Thiếu `size` với `bug`, `refactor` và `hotfix` + `normal` bị từ chối.
 - [x] Hai lần cùng nội dung: lần hai thành công, không dòng lịch sử, không sự kiện.
 - [x] Chấp nhận đề xuất AI không ghi lịch sử.
@@ -45,3 +45,7 @@ Lệnh: `go test ./services/request-service/internal/usecase/... -run Confirm`.
 
 - `urgency` rỗng giữ giá trị hiện có: tránh ghi đè `urgent` AI đề xuất khi UI không gửi.
 - Approval no-op: khi CR-REQ-009 thay, `RequestTypeApproval` và `Approve` phải cùng giao dịch; giữ chữ ký nhận ctx giao dịch.
+
+## Ghi chú triển khai
+
+- `TestConfirm_GoesToAnalyzingOrPlanning` chạy với fake transitioner mô phỏng bảng `FlowFor`; việc chọn `analyzing`/`planning` thật thuộc `TransitionRequest` (chưa hợp nhất) nên cần chạy lại sau khi nối bản thật.

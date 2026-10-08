@@ -1,6 +1,6 @@
 # gateway-and-mcp: solutions (backend-go, v6)
 
-> 📋 Proposed. Chưa triển khai, chưa chạy. Viết ngày 2026-10-06 từ khảo sát code `backend-go/services/api-gateway`; `request-service` chưa tồn tại.
+> SOL-016 ✅ Đã triển khai (2026-10-08); SOL-017 🚧 4/5 task. Viết 2026-10-06; triển khai: xem `../IMPLEMENTATION-NOTES.md`.
 > CR nguồn: [`docs/crs/v6/gateway-and-mcp/`](../../../../../../docs/crs/v6/gateway-and-mcp/README.md). Hợp đồng chung: [`docs/crs/v6/README.md`](../../../../../../docs/crs/v6/README.md) (mục 8 thắng mục 3). **Hợp đồng backend-frontend:** [`../CONTRACT-request-ui-api.md`](../CONTRACT-request-ui-api.md).
 
 ## CR → Solution

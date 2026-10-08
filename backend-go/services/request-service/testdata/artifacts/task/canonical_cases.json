@@ -1,0 +1,50 @@
+[
+  {
+    "name": "key order and whitespace",
+    "input": "{ \"b\": 1,\n \"a\": [ 2 , 3 ] }",
+    "canonical": "{\"a\":[2,3],\"b\":1}",
+    "digest": "2aae3bfa906be39530e7d7a4aa90a7e6d4f29c33e3ac80e1c3b05598c5953c04"
+  },
+  {
+    "name": "nested keys",
+    "input": "{\"z\":{\"y\":1,\"x\":2},\"a\":null}",
+    "canonical": "{\"a\":null,\"z\":{\"x\":2,\"y\":1}}",
+    "digest": "57c25b9312a6aad07802843700d9ba5112bf51bec5d0ac693957a4970f5f7ae7"
+  },
+  {
+    "name": "integral floats",
+    "input": "{\"n\":1.0,\"m\":2e2,\"k\":-0}",
+    "canonical": "{\"k\":0,\"m\":200,\"n\":1}",
+    "digest": "0d647151b8997059330b805ec3b8f84d50f1261e572ba6b37d9daf1a16725905"
+  },
+  {
+    "name": "fractions kept",
+    "input": "{\"p\":0.5,\"q\":2.25}",
+    "canonical": "{\"p\":0.5,\"q\":2.25}",
+    "digest": "ba60ce34c02dcb73386865677a14ee2e6c5c81e75da55993a516ffb03ccfcdb7"
+  },
+  {
+    "name": "html not escaped",
+    "input": "{\"c\":\"a<b && c>d\"}",
+    "canonical": "{\"c\":\"a<b && c>d\"}",
+    "digest": "4e47a109263a3b411384a91fc1918d9bb9139dd7f30bd066c45bc7fcb19165dd"
+  },
+  {
+    "name": "vietnamese nfd to nfc",
+    "input": "{\"t\": \"Nguyễn Văn\"}",
+    "canonical": "{\"t\":\"Nguyễn Văn\"}",
+    "digest": "e836015d74acc66f93017a9143ac42a006325950ad86081740b24930496f90c5"
+  },
+  {
+    "name": "unicode escape",
+    "input": "{\"e\":\"\\u1ec5\"}",
+    "canonical": "{\"e\":\"ễ\"}",
+    "digest": "2986948d34728fb73f33499a291ad0d4fcc3d1222fd3bfb806ba046a71968021"
+  },
+  {
+    "name": "empty containers",
+    "input": "{\"a\":[],\"b\":{}}",
+    "canonical": "{\"a\":[],\"b\":{}}",
+    "digest": "9959f7ea5ff37e0cf81634a894845a335eb6e26fbad0877944e9bc009b4f0644"
+  }
+]

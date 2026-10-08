@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 // Event subjects of the external server registry (BE-MCP-SOL-014 section I).
 // Payloads carry ids, names and counts only: never a secret value or token.
 const (
@@ -20,7 +22,22 @@ const (
 	AuditActionExternalServerSecretSet = "mcp.external_server.secret_set"
 	AuditActionExternalServerProbe     = "mcp.external_server.probe"
 	AuditActionExternalServerReview    = "mcp.external_server.review"
+	AuditActionExternalCall            = "mcp.external.call"
+	AuditActionExternalRead            = "mcp.external.read"
 )
+
+// NewExternalCallAuditEvent audits an external call made by an internal
+// service. actorType is "user", "agent" or "system" (auth-service CHECK); meta
+// must hold ids, sizes and digests only, never arguments or content.
+func NewExternalCallAuditEvent(eventID, auditID, tenantID, actorID, actorType, action, serverID, outcome string, at time.Time, meta map[string]any) (OutboxRecord, error) {
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	return NewOutboxEvent(eventID, SubjectAuditAppended, tenantID, at, map[string]any{
+		"audit_id": auditID, "actor_id": actorID, "action": action, "actor_type": actorType,
+		"target_type": "mcp_external_server", "target_id": serverID, "outcome": outcome, "metadata": meta,
+	})
+}
 
 // Action is something a caller does to a registry entry.
 type Action string

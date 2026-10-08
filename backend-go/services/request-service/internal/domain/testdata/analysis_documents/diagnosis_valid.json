@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "diagnosis",
+  "summary": "Con trỏ rỗng khi hồ sơ thiếu địa chỉ",
+  "root_cause": {
+    "statement": "Hàm đọc địa chỉ không kiểm tra nil",
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "type": "file",
+        "ref": "internal/usecase/profile.go:42",
+        "excerpt": "addr := p.Address.Street"
+      }
+    ]
+  },
+  "reproduction": {
+    "reproducible": "yes",
+    "steps": ["Tạo hồ sơ không có địa chỉ", "Mở trang hồ sơ"],
+    "notes": ""
+  },
+  "impact": {
+    "severity": "high",
+    "scope": "trang hồ sơ",
+    "affected_components": ["request-service"],
+    "user_facing": true,
+    "data_risk": false
+  },
+  "fix_directions": [{ "id": "fix-1", "summary": "Kiểm tra nil trước khi đọc", "risk": "low" }],
+  "suggested_size": "S",
+  "suggest_escalate_to_change_request": false,
+  "escalation_reason": "",
+  "open_questions": []
+}

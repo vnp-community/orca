@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/executor.go`, `.../request_flow_origin.go` (mới), `.../executor_test.go`, `.../schema_no_identity_test.go` (mới)
 **Depends on:** TASK-REQ-017-01, TASK-REQ-016-02 (`resolveRequestSource`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./... -count=1)
 
 ---
 
@@ -38,3 +38,7 @@
 
 - Nếu `Guards.SessionID` chưa được nối ở một đường khởi tạo executor (test hoặc `mcpservertest`), origin rỗng; kiểm tra các nơi gọi `WithGuards`.
 - Không lấy `UserID` từ input; chỉ từ `Principal`.
+
+## Ghi chú triển khai (2026-10-08)
+
+`ToolOrigin` gắn trong `runGuarded` cho namespace request, solution, approval, backlog.

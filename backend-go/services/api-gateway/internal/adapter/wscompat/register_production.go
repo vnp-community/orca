@@ -13,13 +13,14 @@ import (
 	issuetrackingv1 "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1"
 	orchestrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 
-	codeintelv1 "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1"
 	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
+	codeintelv1 "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1"
 )
 
 // ChannelDeps is everything the non-MCP channel registrations need. Every
@@ -54,6 +55,11 @@ type ChannelDeps struct {
 	TaskActivityEnabled bool
 	TaskActivityBus     *commoneventbus.Consumer
 
+	// Request and Approval are request-service's clients; nil when
+	// REQUEST_SERVICE_ADDR is unset (channels then answer REQUEST_UNAVAILABLE).
+	Request  requestv1.RequestServiceClient
+	Approval requestv1.ApprovalServiceClient
+
 	CodeIntel       codeintelv1.CodeIntelServiceClient
 	QualityGate     codeintelv1.QualityGateServiceClient
 	CodeIntelLimits CodeIntelLimits
@@ -82,4 +88,10 @@ func RegisterProductionChannels(r *Registry, d ChannelDeps) {
 	RegisterWorkspaceSubscribeChannel(r, workspaceEvents)
 	RegisterMobileChannels(r, d.InfraFleet, d.Project, d.DeviceSecrets)
 	registerCodeIntelChannels(r, d)
+	// A typed-nil *Consumer would pass a nil check inside the interface, so convert explicitly.
+	var requestBus ephemeralSubscriber
+	if d.TaskActivityBus != nil {
+		requestBus = d.TaskActivityBus
+	}
+	registerRequestChannels(r, d.Request, d.Approval, requestBus, d.TaskActivityEnabled)
 }

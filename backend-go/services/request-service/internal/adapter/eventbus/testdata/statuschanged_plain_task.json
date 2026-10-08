@@ -1,0 +1,8 @@
+{
+  "task_id": "task-9",
+  "project_id": "proj-1",
+  "previous_status": "open",
+  "new_status": "done",
+  "task_type": "task",
+  "cause": "user_update"
+}

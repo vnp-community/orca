@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/ports.go` (bổ sung), `internal/usecase/page_token.go`, `internal/usecase/page_token_test.go` (mới)
 **Depends on:** TASK-REQ-002-02, TASK-REQ-001-04 (`TxRunner`, `OutboxWriter`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: go test ./internal/usecase/... (TestPageToken_*, TestListFilter_Normalize, TestGetRequest_*, TestListRequests_*); go vet)
 
 ---
 
@@ -40,3 +40,7 @@
 
 - `ListFilter` đã có bốn trường nguồn để CR-REQ-004 không đổi chữ ký; adapter phải lọc theo chúng ngay (TASK-REQ-002-04, 002-05).
 - Token mang `created_at` ở micro giây: MySQL `TIMESTAMP(6)` giữ đủ, Postgres `TIMESTAMPTZ` cũng; đừng cắt xuống giây.
+
+## Ghi chú triển khai
+
+Thêm cổng `SolutionCoreRepository` và `RequestTypeHistoryRepository{Append,List}` (xem IMPLEMENTATION-NOTES N2, N3). Assert `var _` ở hai adapter dùng struct riêng (N1) thay vì `(*Repository)`.

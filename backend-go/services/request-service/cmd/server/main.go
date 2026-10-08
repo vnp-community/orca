@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"net"
@@ -12,7 +11,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/dbcapability"
 	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
@@ -23,16 +21,14 @@ import (
 	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
+	eventbusadapter "github.com/stablyai/orca-go/services/request-service/internal/adapter/eventbus"
 	requestgrpc "github.com/stablyai/orca-go/services/request-service/internal/adapter/grpc"
-	mysqladapter "github.com/stablyai/orca-go/services/request-service/internal/adapter/mysql"
-	postgresadapter "github.com/stablyai/orca-go/services/request-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/request-service/internal/config"
-	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 	"google.golang.org/grpc"
+	grpchealth "google.golang.org/grpc/health"
+	grpchealthv1 "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
@@ -77,52 +73,31 @@ func run(ctx context.Context, cfg config.Config) error {
 		return fmt.Errorf("unrecognized DSN scheme: %w", err)
 	}
 
-	var outboxStore outbox.Store
-	var approvalRepo usecase.ApprovalRepository
 	healthSrv := health.New()
-	var closeDB func()
-
-	switch dialect.Dialect {
-	case dbcapability.DialectPostgres:
-		pool, err := pgxpool.New(ctx, dsn)
-		if err != nil {
-			return fmt.Errorf("postgres connect: %w", err)
-		}
-		closeDB = pool.Close
-		repo := postgresadapter.New(pool)
-		outboxStore = repo
-		approvalRepo = repo
-
-		healthSrv.Register("postgres", func() error {
-			return pool.Ping(context.Background())
-		})
-	case dbcapability.DialectMySQL:
-		mysqlDSN, err := toMySQLDriverDSN(dsn)
-		if err != nil {
-			return fmt.Errorf("format mysql dsn: %w", err)
-		}
-		db, err := sql.Open("mysql", mysqlDSN)
-		if err != nil {
-			return fmt.Errorf("mysql open: %w", err)
-		}
-		db.SetMaxOpenConns(25)
-		db.SetMaxIdleConns(25)
-		db.SetConnMaxLifetime(0)
-		closeDB = func() { _ = db.Close() }
-		repo := mysqladapter.New(db)
-		outboxStore = repo
-		approvalRepo = repo
-
-		healthSrv.Register("mysql", func() error {
-			return db.PingContext(context.Background())
-		})
-	default:
-		return fmt.Errorf("unsupported database dialect: %s", dialect.Dialect)
+	stores, err := openStores(ctx, dsn, dialect.Dialect, healthSrv)
+	if err != nil {
+		return err
 	}
-	defer closeDB()
+	defer stores.close()
+	outboxStore := stores.outbox
+	rollout, err := wireRollout(cfg, log, stores) // wraps stores.tx and stores.outboxWriter: keep before any use case is built
+	if err != nil {
+		return err
+	}
+	defer rollout.close()
+
+	dirs, err := dialApprovalDirectories(cfg, log)
+	if err != nil {
+		return err
+	}
+	defer dirs.close()
+	if cfg.ApprovalEnabled {
+		// Approval events get recipients, title and deep link just before they are published.
+		outboxStore = &eventbusadapter.ApprovalNotificationStore{Store: stores.outbox, Notifier: newApprovalNotifier(cfg, log, stores, dirs), Log: log}
+	}
 
 	var outboxRelay *outbox.Relay
-	pub, _, closeBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	pub, busConsumer, closeBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
 	if err != nil {
 		log.WarnContext(ctx, "eventbus unavailable, outbox publishing disabled", slog.Any("error", err))
 	} else {
@@ -146,35 +121,101 @@ func run(ctx context.Context, cfg config.Config) error {
 		}()
 	}
 
-	registry := usecase.NewSubjectHandlerRegistry()
-	noopHandler := &usecase.NoopSubjectHandler{Reason: "Not implemented", Logger: log}
-	for _, st := range domain.AllSubjectTypes {
-		registry.Register(st, noopHandler)
+	// The registry is shared with the lifecycle use cases (they close pending approvals), so it exists before
+	// wireApproval fills it with the subject handlers.
+	var approvalRegistry *usecase.SubjectHandlerRegistry
+	if cfg.ApprovalEnabled {
+		approvalRegistry = usecase.NewSubjectHandlerRegistry()
 	}
 
-	if err := registry.MustCoverAll(); err != nil {
-		return fmt.Errorf("approval subject handler registry: %w", err)
+	execTasks, err := dialExecutionTasks(cfg, log)
+	if err != nil {
+		return err
 	}
-	if !cfg.AllowNoopApprovalHandlers {
-		for _, st := range domain.AllSubjectTypes {
-			if _, isNoop := registry.Get(st).(*usecase.NoopSubjectHandler); isNoop {
-				return fmt.Errorf("noop approval handler found for %s but REQUEST_ALLOW_NOOP_APPROVAL_HANDLERS is false", st)
-			}
-		}
+	defer execTasks.close()
+	lifecycle := wireRequestLifecycle(stores, approvalRegistry, execTasks.guard)
+	transitioner := lifecycle.Transition
+	var lifecycleWG sync.WaitGroup
+	lifecycleCtx, cancelLifecycle := context.WithCancel(ctx)
+	defer cancelLifecycle()
+	// Solution wiring goes first: its handlers (solution, findings, answer) replace the generic ones in the registry,
+	// and it needs the approval pieces back afterwards (the opener) via bindApprovals.
+	solution, err := wireSolution(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, dirs)
+	if err != nil {
+		return err
+	}
+	defer solution.close()
+	approval, err := wireApproval(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, approvalRegistry, dirs, solution.handlers, execTasks.subjectArtifacts())
+	if err != nil {
+		return err
+	}
+	solution.bindApprovals(approval.SolutionOpener())
+	intake, err := wireRequestIntake(cfg, log, stores, transitioner)
+	if err != nil {
+		return err
+	}
+	defer intake.close()
+	intake.attachIntake(lifecycle, stores)
+	rollout.AttachLookup(intake)
+	classification, err := wireClassification(lifecycleCtx, &lifecycleWG, cfg, log, stores, transitioner, approval.Recorder, busConsumer)
+	if err != nil {
+		return err
+	}
+	defer classification.close()
+	rollout.StartSampler(lifecycleCtx, &lifecycleWG)
+	approval.BindConfirm(classification.confirm)
+	execution, err := wireExecution(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, approval, execTasks, busConsumer)
+	if err != nil {
+		return err
+	}
+	defer execution.close()
+	artifact, err := wireArtifact(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, intake, classification, busConsumer, dirs, solution)
+	if err != nil {
+		return err
+	}
+	defer artifact.close()
+	security, err := wireSecurity(lifecycleCtx, &lifecycleWG, cfg, log, stores, rollout.SecurityHooks())
+	if err != nil {
+		return err
+	}
+	defer security.close()
+	registerEntityResolvers(security.authorize, stores.artifact)
+	httpHandler, err := intake.webhookHandler(cfg, log, healthSrv.Handler(), security.replay)
+	if err != nil {
+		return err
 	}
 
-	// Just checking approvalRepo is assigned
-	_ = approvalRepo
+	httpHandler = rollout.MetricsHandler(httpHandler)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(log), grpcmw.StatsHandler())
-	requestv1.RegisterRequestServiceServer(grpcServer, requestgrpc.NewServer())
-	requestv1.RegisterApprovalServiceServer(grpcServer, requestgrpc.NewApprovalServer())
+	// ChainUnary (recovery, tenant extraction, logging) stays first; the security chain (with the flow gate and RPC audit hooks) runs after it.
+	grpcServer := grpc.NewServer(append(append([]grpc.ServerOption{grpcmw.ChainUnary(log), grpcmw.StatsHandler()}, security.options...), rollout.ServerOptions()...)...)
+	requestv1.RegisterRequestServiceServer(grpcServer, artifact.attach(rollout.WithRPCs(requestgrpc.NewServer(
+		usecase.NewGetRequest(stores.requests),
+		usecase.NewListRequests(stores.requests),
+	).WithExecution(execution.Server))).WithIntake(requestgrpc.IntakeUseCases{Create: intake.createRequest, Lookup: intake.lookup}).
+		WithClassification(requestgrpc.ClassificationUseCases{Runner: classification.runner, Confirm: classification.confirm, Change: classification.change, History: classification.history}).
+		WithLifecycle(requestgrpc.LifecycleUseCases{Flow: lifecycle.GetFlow, Return: lifecycle.Return, Reopen: lifecycle.Reopen, Cancel: lifecycle.Cancel, SpawnChild: lifecycle.SpawnChild, Links: lifecycle.ListLinks}).
+		WithSolution(solution.useCases()).
+		WithCompliance(security.compliance))
+	if approval.Enabled {
+		requestv1.RegisterApprovalServiceServer(grpcServer, requestgrpc.NewApprovalServer(approval.Server))
+		requestv1.RegisterApprovalPolicyAdminServiceServer(grpcServer, requestgrpc.NewApprovalPolicyAdminServer(approval.Admin))
+	} else {
+		log.Info("approval service disabled (REQUEST_APPROVAL_ENABLED=false)")
+	}
+
+	requestv1.RegisterAiBudgetAdminServiceServer(grpcServer, requestgrpc.NewAiBudgetAdminServer())
+
+	grpcHealth := grpchealth.NewServer()
+	grpchealthv1.RegisterHealthServer(grpcServer, grpcHealth)
+	grpcHealth.SetServingStatus("", grpchealthv1.HealthCheckResponse_SERVING)
+	grpcHealth.SetServingStatus(requestv1.RequestService_ServiceDesc.ServiceName, grpchealthv1.HealthCheckResponse_SERVING)
 
 	reflection.Register(grpcServer)
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
-		Handler: healthSrv.Handler(),
+		Handler: httpHandler,
 	}
 
 	errCh := make(chan error, 2)
@@ -205,13 +246,16 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	case sig := <-sigCh:
 		log.Info("received signal, shutting down", slog.String("signal", sig.String()))
-		grpcServer.GracefulStop()
-		_ = httpServer.Shutdown(context.Background())
-		cancelOutbox()
-		if outboxRelay != nil {
-			outboxRelayWG.Wait()
-		}
+	case <-ctx.Done():
+		log.Info("context cancelled, shutting down")
 	}
-
+	grpcServer.GracefulStop()
+	_ = httpServer.Shutdown(context.Background())
+	cancelLifecycle()
+	lifecycleWG.Wait()
+	cancelOutbox()
+	if outboxRelay != nil {
+		outboxRelayWG.Wait()
+	}
 	return nil
 }

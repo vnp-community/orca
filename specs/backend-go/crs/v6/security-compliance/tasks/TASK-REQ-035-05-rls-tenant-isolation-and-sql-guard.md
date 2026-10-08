@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/adapter/postgres/tenant_tx.go` (mới/kiểm: do SOL-001 mục 2.D tạo), `.../internal/adapter/postgres/rls_audit_integration_test.go` (mới), `.../internal/adapter/postgres/tenant_isolation_integration_test.go` (mới), `.../internal/adapter/mysql/tenant_scope_test.go` (mới), `.../internal/adapter/mysql/tenant_isolation_integration_test.go` (mới), `.../migrations/postgres/NNNN_rls_hardening.{up,down}.sql` (chỉ khi meta-test phát hiện bảng thiếu `FORCE`/`WITH CHECK`; không có thì không tạo), `backend-go/services/request-service/deploy/` hoặc `deploy/dev` (vai trò `request_app`)
 **Depends on:** BE-REQ-SOL-001 (tx), BE-REQ-SOL-002 (bảng), nên chạy lại mỗi khi CR 004, 006, 007, 009, 010, 031, 034 thêm bảng
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./services/request-service/internal/adapter/...`, `go test ./services/request-service/internal/adapter/{mysql,postgres,contracttest}`)
 
 ---
 
@@ -71,3 +71,10 @@ Cấp quyền cho vai trò ứng dụng (mẫu cho `deploy/dev`): `CREATE ROLE r
 - Test "mọi bảng có fixture" buộc mỗi CR thêm bảng phải thêm fixture: đây là chủ ý nhưng thêm công việc cho CR 004 đến 034; báo trong PR.
 - Quét AST bỏ sót SQL dựng động bằng `fmt.Sprintf` nhiều mảnh: quy ước repo là hằng chuỗi; câu dựng động phải nằm trong danh sách cho phép với lý do.
 - Vai trò chủ bảng ≠ `request_app` làm migration phải `GRANT` cho mỗi bảng mới (dễ quên): thêm test `TestAppRoleHasPrivilegesOnAllTables`.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Postgres: `rls_audit_integration_test.go` (FORCE RLS mọi bảng, policy `FOR ALL` có `WITH CHECK`, `tenant_id NOT NULL`, vai trò app không bypass, quyền trên mọi bảng, cách ly A/B mọi bảng theo fixture bắt buộc cho bảng mới, quên `set_config` trả 0 dòng và không ghi được, relay outbox chỉ đọc/đánh dấu). Kết nối bằng `request_app` NOSUPERUSER NOBYPASSRLS.
+- Quét AST `contracttest.CheckTenantScope` cho cả hai dialect (có test của chính bộ quét, danh sách cho phép phải có lý do và không được cũ). Phát hiện: `mysql/project_engine_settings_repository.go Get` đọc không có `tenant_id` (đã sửa); `mysql/openspec_change_repository.go` GetByRequest/Upsert là stub của đợt solution-engines (Upsert ghi tenant 0000...) nên để trong danh sách cho phép kèm lý do, chủ sở hữu rf-sol phải scope cả hai cùng lúc.
+- MySQL: `TestMySQL_EveryTableHasTenantID`. `TestNoDirectPoolQuery` cho Postgres.
+- Chưa làm: SQL tạo vai trò `request_owner`/`request_app` trong `deploy/dev` (compose do TASK-REQ-001-06 sở hữu); test dựng vai trò bằng `GRANT` trong fixture.

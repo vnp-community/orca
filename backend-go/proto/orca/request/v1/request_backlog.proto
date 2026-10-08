@@ -25,6 +25,10 @@ message ListBacklogRequest {
   int32 page_size = 8;
   string user_id = 9;
   string sort_by = 10;
+  // 11 to 13: filters of the Task and Execute views (CONTRACT section 2.4).
+  string plan_task_id = 11;
+  string phase_task_id = 12;
+  string assignee_id = 13;
 }
 
 message ListBacklogResponse {
@@ -48,6 +52,11 @@ message BacklogRequestRow {
   repeated string parent_request_ids = 11;
   string title = 12;
   string priority = 13;
+  int64 number = 14;
+  string source_provider = 15;
+  string source_ref = 16;
+  string source_url = 17;
+  string return_reason = 18;
 }
 
 message BacklogGroup {
@@ -58,6 +67,9 @@ message BacklogGroup {
   string group_status = 5;
   string group_title = 6;
   int32 total_tasks = 7;
+  string plan_title = 8;
+  string phase_title = 9;
+  string gate_status = 10;
 }
 
 message BacklogTaskRow {
@@ -71,4 +83,5 @@ message BacklogTaskRow {
   string last_link_status = 8;
   int32 failed_attempts = 9;
   string last_error = 10;
+  repeated string blocked_by_task_ids = 11;
 }

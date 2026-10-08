@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_phase_execution.{up,down}.sql` (mới), `internal/domain/phase_start.go` (mới), `internal/domain/task_run_outcome.go` (mới), `internal/usecase/ports.go`, `internal/adapter/postgres/phase_starts.go`, `internal/adapter/postgres/task_run_outcomes.go`, `internal/adapter/mysql/phase_starts.go`, `internal/adapter/mysql/task_run_outcomes.go` (mới), `*_integration_test.go` (mới)
 **Depends on:** CR-REQ-001, CR-REQ-002 (module, `0002_request_core`, `TxRunner`, outbox, `processed_events`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test ./... && go test -tags integration ./internal/adapter/{postgres,mysql,eventbus}` trong `request-service`; migration 0050 up/down/up Postgres+MySQL)
 
 ---
 
@@ -61,3 +61,7 @@
 - Số migration và tên schema Postgres (`request`) cần đối chiếu CR-REQ-001/002 đã merge.
 - `task_run_outcomes` tăng không giới hạn theo số lần chạy; chưa có chính sách dọn (ghi vào backlog).
 - MySQL `INSERT IGNORE` nuốt cả lỗi khác (kiểu dữ liệu): kiểm `Warnings` hoặc dùng `ON DUPLICATE KEY UPDATE tenant_id = tenant_id`.
+
+## Ghi chú triển khai
+
+Lệch so với task và điểm chưa kiểm chứng: xem `IMPLEMENTATION-NOTES.md` mục "Đợt 3, phần request-service (exec)".

@@ -5,7 +5,7 @@
 **Service:** `mcp-service`, `proto`
 **File:** `backend-go/proto/orca/mcp/v1/external_server.proto` (sửa), `backend-go/services/mcp-service/internal/usecase/external_server_client.go` (mới), `.../internal/usecase/external_server_ports.go` (sửa: thêm `ToolCaller`), `.../internal/adapter/mcpprober/caller.go` (mới), `.../internal/adapter/grpc/registry_server.go` (sửa), `.../cmd/server/external_wiring.go` (sửa), `.../internal/domain/audit_event.go` (sửa: hằng audit), `.../internal/domain/external_server_errors.go` (sửa) và `_test.go` tương ứng
 **Depends on:** không (độc lập với phần `request-service`)
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-07: `cd backend-go/services/mcp-service && go test ./...`; `go test -tags=integration ./internal/adapter/postgres/ -run ExternalServers`; `buf breaking --path orca/mcp` xanh)
 
 ---
 
@@ -54,7 +54,7 @@ type ToolCaller interface {
 - `external_server_client_test.go`: bảng từ chối: chưa duyệt (`pending_review`), `disabled`, `ToolsChanged()`, `stdio`, tool ngoài `ApprovedTools`, `arguments_json` chứa `ghp_...` (`ErrEgressSecret`), `server_id` không phải UUID, server của tenant khác (`ErrNotFound`); thành công ghi đúng một audit không có nội dung (`TestAuditHasNoArgumentsOrContent`).
 - `registry_server_test.go`: hai method nằm trong `registryInternalMethods` và bị `internalcaller.Guard` từ chối khi thiếu token.
 - `external_server_integration_test.go` (Postgres): server của tenant A không gọi được bằng ngữ cảnh tenant B (RLS thật).
-- Lệnh: `cd backend-go && go test ./services/mcp-service/... && go test -tags=integration ./services/mcp-service/internal/adapter/postgres/...`; `buf lint && buf breaking`. Chưa chạy.
+- Lệnh: `cd backend-go/services/mcp-service && go test ./... && go test -tags=integration ./internal/adapter/postgres/ -run ExternalServers`; `cd backend-go/proto && buf breaking --against '../../.git#ref=HEAD,subdir=backend-go/proto' --path orca/mcp`. Đã chạy 2026-10-07, PASS.
 
 ## Tiêu chí hoàn thành
 
@@ -70,3 +70,19 @@ type ToolCaller interface {
 - `ApprovedTools` là ảnh chụp lúc duyệt; không có nhãn chỉ-đọc, nên một tool "ghi" bị người duyệt phê chuẩn nhầm vẫn gọi được. Giảm thiểu: `request-service` chỉ gọi tool trong `scopes` của nguồn đã khai (task 07).
 - `MaxBodyBytes` 1 MiB giới hạn cả đường đọc tài nguyên lớn; chủ ý.
 - Thay đổi `registry_server.go` chạm cùng file với handler hiện có: chạy `gitnexus_impact` cho `RegistryServer` trước khi sửa (quy ước repo).
+
+## Tiến độ (2026-10-07)
+
+Đã làm đủ mọi việc 1 đến 10. Điều đã kiểm chứng và lệch so với mô tả:
+
+- Có sẵn `usecase/call_external_tool.go` là stub (`nil, nil`, không ai gọi: đã kiểm bằng grep); đã xóa và thay bằng `external_server_client.go`.
+- `MCP_SERVER_NOT_USABLE` chưa tồn tại trong mã (chỉ có `MCP_SERVER_NOT_APPROVED`): thêm `CodeServerNotUsable` (FailedPrecondition), cùng `CodeToolNotApproved`, `CodeResultTooLarge` (hàm `ErrResultTooLarge` có nhưng v1 luôn cắt nên chưa dùng).
+- `CallTimeout` là hằng 20s; ghi đè trong test qua `Config.CallTimeout` (trường mới, mặc định 0 = dùng hằng).
+- Kết quả trả về được che bí mật (`domain.SecretRedactor`) rồi cắt lại theo `max_bytes`; `digest` là sha256 của văn bản đã che.
+- `resources/read` đọc `result.contents[].text` theo đặc tả MCP (không phải `content[]`); blob bị bỏ. `tools/call` nhận `text` và `resource.text`.
+- Audit qua `OutboxWriter.EnqueueOutbox` (best effort, sau lời gọi), `actor_type` lấy từ `tenant.ActorType(ctx)`; hàm mới `domain.NewExternalCallAuditEvent` vì `NewAdminAuditEvent` cố định `actor_type=user`. Từ chối ghi `outcome=denied` + `reason`; lỗi upstream ghi `outcome=error`.
+- Đã thêm `tenantCaller` (chỉ cần tenant) ở `caller_identity.go`; `uri` chứa userinfo hoặc bí mật bị từ chối.
+- Test: `mcpprober/caller_test.go` (HTTP/TLS giả chạy trong test), `usecase/external_server_client_test.go`, `cmd/server/registry_internal_guard_test.go` (thay cho `registry_server_test.go`, vì guard nằm ở `cmd/server`), integration Postgres `TestExternalServers_CallExternalToolRespectsTenantRLS`. `memRepo` (fake test) được sửa để chụp `ApprovedTools` khi duyệt như SQL.
+- Người gọi đã kiểm: `NewRegistryServer` (một nơi gọi, `external_wiring.go`; tham số `client` mới, nil an toàn), `McpRegistryService*` ở api-gateway (`wscompat/channels_mcp*`, `mcp_external_server_wiring.go`) vẫn build và test xanh.
+
+Chưa kiểm chứng: máy chủ MCP bên thứ ba thật (phiên giữ `Mcp-Session-Id`, định dạng SSE khác), audit của MySQL (mcp-service chỉ Postgres), `gitnexus_impact` (không chạy được MCP trong phiên này; thay bằng grep tên đầy đủ).

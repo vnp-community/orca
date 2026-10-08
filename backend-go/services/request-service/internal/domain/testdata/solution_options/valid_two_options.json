@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "options": [
+    {
+      "id": "opt-1",
+      "title": "Thêm lớp cache ở tầng dịch vụ",
+      "summary": "Giữ nguyên API, thêm cache đọc có TTL.",
+      "approach": "Thêm cache theo khoá `(tenant, id)` với TTL 30 giây.\n\n- Không đổi schema.",
+      "pros": ["Ít rủi ro"],
+      "cons": ["Dữ liệu cũ tối đa 30 giây"],
+      "risks": [{ "description": "Cache không đồng bộ khi ghi", "severity": "medium" }],
+      "effort": { "size": "M", "hours_estimate": 12.5 },
+      "affected_areas": [{ "kind": "service", "name": "request-service" }],
+      "breaking_change": false,
+      "rollback": "Tắt cờ cache.",
+      "recommended": true
+    },
+    {
+      "id": "opt-2",
+      "title": "Tách bảng đọc",
+      "summary": "Tạo bảng đọc riêng được cập nhật qua sự kiện.",
+      "approach": "Consumer cập nhật bảng đọc; API đọc từ bảng đó.",
+      "effort": { "size": "L" },
+      "affected_areas": [{ "kind": "schema", "name": "request.read_model" }],
+      "breaking_change": false,
+      "recommended": false
+    }
+  ],
+  "recommendation": { "option_id": "opt-1", "reason": "Rủi ro thấp nhất" },
+  "assumptions": ["Tải đọc gấp mười lần tải ghi"],
+  "open_questions": ["TTL chấp nhận được là bao nhiêu?"]
+}

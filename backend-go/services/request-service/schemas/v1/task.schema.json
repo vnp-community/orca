@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orca.local/schemas/v1/task.schema.json",
+  "title": "Task spec",
+  "type": "object",
+  "required": ["schema_version", "objective"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "kind": { "const": "task" },
+    "objective": { "type": "string", "minLength": 1 },
+    "satisfies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^AC-[1-9][0-9]*$" }
+    },
+    "acceptance": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "checks": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^c[1-9][0-9]*$" },
+          "kind": { "enum": ["command", "test", "lint", "typecheck", "diff_rule", "manual"] },
+          "description": { "type": "string", "minLength": 1 },
+          "command": { "type": "string" },
+          "expect": { "type": "string" }
+        }
+      }
+    },
+    "exempt_from_coverage": { "type": "boolean" }
+  }
+}

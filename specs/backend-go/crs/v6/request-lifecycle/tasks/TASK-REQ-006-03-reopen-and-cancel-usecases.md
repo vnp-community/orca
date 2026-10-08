@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/reopen_request.go`, `internal/usecase/cancel_request.go` và `*_test.go` (mới)
 **Depends on:** TASK-REQ-006-02
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./internal/domain ./internal/usecase -run "Reopen|Cancel"; go test -tags integration -race ./internal/adapter/postgres ./internal/adapter/mysql (Postgres 16 và MySQL 8.0 thật) -run LifecycleExit)
 
 ---
 
@@ -34,7 +34,8 @@ CR-REQ-006 mục 2.4, 2.5. `reopen` chuyển `request_backlog` về `classifying
 
 ## Tiêu chí hoàn thành
 
-- [x] Mở lại: `classifying`, ba cột trả về NULL hoặc rỗng, lịch sử `reopened`, `attempts=0`.
+- [x] Mở lại: `classifying`, ba cột trả về NULL hoặc rỗng, lịch sử `reopened`, `attempts=0` (`attempts=0` kiểm bằng kịch bản gRPC `ReturnReopenCancel` sau khi nối `ClassificationAttemptsReset`, 2026-10-08).
+  - Chưa kiểm chứng: Tiêu chí `attempts=0`: use case gọi `ClassificationAttemptsResetter` (kiểm bằng resetter giả); cột `classification_attempts` thuộc CR-REQ-005 nên chưa kiểm chứng trên DB.
 - [x] Hủy từ backlog và từ `analyzing` thành công, hủy `completed` bị từ chối, hủy hai lần thành công.
 - [x] Đang có Task chạy (guard giả `true`): hủy bị chặn.
 - [x] Không có sự kiện nào ngoài `status_changed` (kiểm bằng danh sách subject trong outbox giả).

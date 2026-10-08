@@ -1,7 +1,6 @@
 package usecase
 
-
-type InfraFleetClient struct {}
+type InfraFleetClient struct{}
 
 func (c *InfraFleetClient) ReconnectWaitAndRetry() error {
 	return nil

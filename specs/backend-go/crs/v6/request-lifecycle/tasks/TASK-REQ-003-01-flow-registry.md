@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_flow_registry.go`, `internal/domain/request_flow_registry_test.go`, `internal/domain/request_flow_errors.go` (mới)
 **Depends on:** TASK-REQ-002-02 (kiểu `RequestType`, `RequestSize`)
-**Status:** [x] DONE
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: go test ./internal/domain ./internal/usecase -run Flow)
 
 ---
 

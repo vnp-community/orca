@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / adapter
 **File:** `backend-go/services/request-service/internal/adapter/postgres/approval_repository.go` (mới), `internal/adapter/mysql/approval_repository.go` (mới), `internal/usecase/ports.go` (sửa, thêm port), `internal/adapter/{postgres,mysql}/approval_repository_integration_test.go` (mới)
 **Depends on:** TASK-REQ-009-01, TASK-REQ-009-02
-**Status:** `[x] DONE`
+**Status:** [x] DONE (đã kiểm chứng 2026-10-08: `go test -tags integration ./internal/adapter/postgres ./internal/adapter/mysql -run ApprovalRepositoryContract`)
 
 ## Context
 
@@ -40,3 +40,9 @@
 
 - Thông điệp lỗi MySQL 1062 phụ thuộc phiên bản (`for key 'approvals.approvals_one_pending'` ở 8.0): test trên 8.0.x thật; khớp bằng `strings.Contains` tên khoá.
 - Khóa chết: repository không tự khoá Request; thứ tự khoá do usecase (task 04).
+
+## Kết quả triển khai (2026-10-08)
+- Hai kiểu `ApprovalRepository` riêng (`NewApprovalRepository(base)`) thay cho phương thức gắn thẳng vào `Repository`; mọi truy vấn đi qua `scoped` (có tenant, Postgres đặt `set_config('app.tenant_id')`), không còn `exec` trần (nợ R1a). `Get` (không khoá) thêm vào để biết `request_id` trước khi khoá Request. Thêm `FindByIdempotencyKey`, `UpdateDue`, `MarkReminded` (không tăng `version`), `ListPendingForUser` (một SQL join snapshot người duyệt và `requests.reporter_id`, loại dòng quá hạn và dòng bị tách nhiệm vụ).
+- `ClaimDue` và `ClaimDueForReminder` quét xuyên tenant (Postgres qua `withRelayTx` + policy `relay_scan` của migration 0040; MySQL không RLS), không giữ khoá; người thắng được quyết định bởi giao dịch từng ứng viên (khoá Request, `GetForUpdate`, so lại trạng thái).
+- Phân trang `(created_at, id)` bằng token base64 dùng chung (`usecase/approval_page_token.go`); ổn định khi nhiều dòng cùng `created_at` (test có).
+- Kiểm chứng: bộ `RunApprovalRepositoryContract` (14 kịch bản) PASS trên Postgres 16 (vai trò ứng dụng NOSUPERUSER NOBYPASSRLS) và MySQL 8.0 thật: trùng khoá phân biệt đúng, 8 goroutine `UpdateDecision` chỉ một thắng, cô lập tenant, claim xuyên tenant.
