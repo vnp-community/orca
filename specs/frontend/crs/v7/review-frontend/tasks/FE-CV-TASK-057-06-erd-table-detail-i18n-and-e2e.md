@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + i18n + tests
 **File:** `frontend/src/renderer/src/components/review-map/erd/ErdTableDetail.tsx` (mới) + test; `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (sửa: thêm `KEYS`); `tests/e2e/code-intel-web/lenses.web.e2e.ts` (phần ERD; file do FE-CV-TASK-073-05 tạo)
 **Depends on:** FE-CV-TASK-057-05; FE-CV-SOL-053-impact-lens-and-symbol-detail (`SymbolDetailPanel`, mở symbol/diff); FE-CV-TASK-073-02/073-03 (fake backend + Playwright) cho e2e
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — thiếu e2e Playwright (không có `tests/e2e/code-intel-web`/fake WS backend). Phần còn lại đã xác minh 2026-10-07: erd-components.test.tsx 14/14 + review-erd-storage-locale-coverage.test.ts 6/6 PASS
 
 ## Context
 
@@ -33,3 +33,9 @@
 ## Rủi ro
 
 - Phụ thuộc SOL-053 cho mở symbol/diff; nếu chưa có, nút "Mở" tạm ẩn (không lỗi).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Đã làm: `ErdTableDetail` (cột/index/check/RLS/quan hệ/accessor, lọc Tất cả|Ghi|Đọc, "Mở"/"Xem diff"/"Xem migration diff", cảnh báo liên đới nhãn gợi ý), khoá `auto.components.reviewMap.Erd*` đủ 5 locale.
+- Sai lệch: kiểm phủ khoá nằm ở test mới `i18n/review-erd-storage-locale-coverage.test.ts` (không sửa `code-intel-locale-coverage.test.ts` dùng chung). "Mở" gọi `onSelectSymbol` của khung; "Xem diff" dùng `onOpenDiff(path, line)` của khung (chưa có `pendingDiffReveal` của 053 nên nhảy dòng tuỳ khung). Test rò rỉ `erd*`: đã phủ bởi test rò rỉ của `review-ui`.
+- Còn thiếu: e2e web (cần 073-02/073-03).

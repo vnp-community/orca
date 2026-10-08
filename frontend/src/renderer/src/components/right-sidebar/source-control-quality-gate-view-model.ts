@@ -82,11 +82,11 @@ const KNOWN_REASON_CODES: Record<string, string> = {
   dependency_vulnerabilities: 'reason.dependency_vulnerabilities',
 }
 
-function mapReasonCode(code: string | undefined, check: string): string {
+function mapReasonCode(code: string | undefined): string {
   if (code && KNOWN_REASON_CODES[code]) {
     return `${I18N_BASE}.${KNOWN_REASON_CODES[code]}`
   }
-  // Unknown code: fall back to generic key; `check` is passed as params
+  // Unknown code: generic key; the notice passes `check` as an interpolation param
   return `${I18N_BASE}.reason.unknown`
 }
 
@@ -141,7 +141,7 @@ export function buildQualityNoticeViewModel(gate: QualityGate | null | undefined
   const truncated = sortedReasons.slice(0, MAX_DISPLAYED_REASONS)
 
   const reasonViewModels: QualityGateReasonViewModel[] = truncated.map((r) => ({
-    labelKey: mapReasonCode(r.code, r.check),
+    labelKey: mapReasonCode(r.code),
     check: r.check,
     params: r.params ?? {}
   }))

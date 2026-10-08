@@ -5,7 +5,7 @@
 **Area:** frontend (i18n, docs)
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `frontend/src/renderer/src/i18n/request-approval-locale-coverage.test.ts` (mới), `docs/ui/pages/requests.md` (SOL-018 tạo; task này thêm mục "Hộp duyệt")
 **Depends on:** FE-REQ-TASK-022-05, 022-06 (để chốt danh sách khoá thật sự dùng)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: request-approval-locale-coverage.test.ts 10/10, request-locale-coverage.test.ts 15/15; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -40,3 +40,7 @@
 
 - Bản dịch máy chưa được người bản ngữ rà; ghi rõ trong PR.
 - Thêm khoá vào `en.json` có thể làm lệch catalog sinh tự động nếu công cụ sinh ghi đè; kiểm khi chạy `verify:localization-catalog`.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Thêm 3 khoá ngoài danh sách: `ApprovalRow.decided`, `ApprovalSubjectType.unknown`, `ApprovalRow.requestedBy` nhận `{{name}}`. `pnpm verify:localization-*` chưa chạy. Mục Hộp duyệt đã thêm vào `docs/ui/pages/requests.md` và `page-tree.md`.

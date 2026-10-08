@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -30,10 +29,13 @@ import { isDiffComment } from '@/lib/diff-comment-compat'
 import { installEditorSaveShortcut, installMonacoEditorFindShortcut } from './editor-shortcuts'
 import { DiffSectionBody } from './DiffSectionBody'
 import { useDiffSectionLayoutMetrics } from './useDiffSectionLayoutMetrics'
-import { disposeUnattachedMonacoModelPaths } from './diff-monaco-model-disposal'
+import { useDiffSectionModelDisposal } from './useDiffSectionModelDisposal'
 import { getLiveDiffSectionRenderLimit } from './diff-section-live-render-limit'
 import { useDiffSectionFallbackCleanup } from './useDiffSectionFallbackCleanup'
 import { submitDiffSectionComment } from './diff-section-comment-submit'
+import { useQualityFindingMarkers } from './quality-annotations/useQualityFindingMarkers'
+import { QualityAnnotationStrip } from './quality-annotations/QualityAnnotationStrip'
+import type { QualityAnnotationSource } from './quality-annotations/quality-annotation-eligibility'
 
 export function DiffSectionItem({
   section,
@@ -44,6 +46,8 @@ export function DiffSectionItem({
   settings,
   sectionHeight,
   worktreeId,
+  diffSource,
+  compareHeadOid,
   loadSection,
   retrySection,
   toggleSection,
@@ -72,6 +76,8 @@ export function DiffSectionItem({
   } | null
   sectionHeight: number | undefined
   worktreeId?: string
+  diffSource?: QualityAnnotationSource
+  compareHeadOid?: string | null
   loadSection: (index: number) => void
   retrySection: (index: number) => void
   toggleSection: (index: number) => void
@@ -137,31 +143,10 @@ export function DiffSectionItem({
   } | null>(null)
   const hasLineCommentAction = Boolean(worktreeId || onAddLineComment)
 
-  const disposeDiffModels = useCallback(() => {
-    window.setTimeout(() => {
-      disposeUnattachedMonacoModelPaths(monaco, [
-        `${modelPathBase}:original`,
-        `${modelPathBase}:modified`
-      ])
-    }, 0)
-  }, [modelPathBase])
-  const disposeDiffModelsRef = useRef(disposeDiffModels)
-  disposeDiffModelsRef.current = disposeDiffModels
-
-  const setSectionRootNode = useCallback((node: HTMLDivElement | null): void => {
-    if (node) {
-      return
-    }
-    // Why: virtualized diff rows remount as their keyed section/collapse state
-    // changes; the row root is the owner of the detached Monaco models.
-    disposeDiffModelsRef.current()
-  }, [])
-
-  useEffect(() => {
-    if (section.collapsed) {
-      disposeDiffModels()
-    }
-  }, [disposeDiffModels, section.collapsed])
+  const { disposeDiffModels, setSectionRootNode } = useDiffSectionModelDisposal(
+    modelPathBase,
+    section.collapsed
+  )
 
   // Why: only forward the pending scroll id when it matches a comment in this
   // section so unrelated sections don't keep re-rendering their decorator
@@ -198,6 +183,16 @@ export function DiffSectionItem({
     onUpdateComment: worktreeId ? (id, body) => updateDiffComment(worktreeId, id, body) : undefined,
     pendingScrollCommentId: pendingScrollForThisSection,
     onPendingScrollConsumed: () => setScrollToDiffCommentId(null)
+  })
+
+  const qualityAnnotations = useQualityFindingMarkers({
+    editor: modifiedEditor,
+    monacoApi: monaco,
+    worktreeId,
+    relativePath: section.path,
+    diffSource,
+    sectionArea: section.area,
+    compareHeadOid
   })
 
   useEffect(() => {
@@ -412,6 +407,8 @@ export function DiffSectionItem({
         openSectionTitle={openSectionTitle}
         trailingContent={renderHeaderTrailingContent?.(section, index)}
       />
+
+      {!section.collapsed && <QualityAnnotationStrip worktreeId={worktreeId} {...qualityAnnotations} />}
 
       {!section.collapsed && (
         <DiffSectionBody

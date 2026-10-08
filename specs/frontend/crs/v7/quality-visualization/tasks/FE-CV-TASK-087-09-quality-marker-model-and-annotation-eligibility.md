@@ -5,7 +5,7 @@
 **Area:** frontend / pure functions
 **File:** `frontend/src/renderer/src/components/editor/quality-annotations/quality-marker-model.ts`, `quality-annotation-eligibility.ts` (mới) và `*.test.ts`
 **Depends on:** 087-01 (kiểu `QualityFinding`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: quality-marker-model.test.ts + quality-annotation-eligibility.test.ts, 16/16 pass; oxlint + tsc sạch)
 
 ## Context
 
@@ -31,3 +31,7 @@ Marker: mức, kẹp, `endLine<line`, `column` ngoài khoảng, mức tệp, 1 0
 ## Rủi ro
 
 - Nếu `staged`/`commit` cần ánh xạ dòng thì chưa hỗ trợ (SOL câu hỏi mở 4).
+
+## Ghi chú triển khai (2026-10-07)
+
+- `quality-marker-model.ts` không import Monaco (nhận `MarkerSeverity` qua tham số). Cột theo D5 (1-based, 0 = cả dòng). Bảng đủ điều kiện nằm trong `quality-annotation-eligibility.ts` (suy ra từ cách dựng phía modified của từng `DiffSource`).

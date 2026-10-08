@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/components/request/RequestRelatedTab.tsx`, `SpawnChildRequestDialog.tsx` (mới); test cùng tên
 **Depends on:** FE-REQ-TASK-019-03, 019-01 (`CHILD_REQUEST_RULES`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: request-action-components.test.tsx (RequestRelatedTab, SpawnChildRequestDialog) + request-link-groups.test.ts pass)
 
 ## Context
 

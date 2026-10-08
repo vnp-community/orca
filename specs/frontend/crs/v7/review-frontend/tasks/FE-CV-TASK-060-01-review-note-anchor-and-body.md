@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/notes/review-note-anchor.ts` (mới) + `review-note-anchor.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `ReviewNoteAnchor`); FE-CV-TASK-057-01 (`maskSensitiveText`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: review-note-anchor.test.ts 11/11 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - Định dạng tiền tố là hợp đồng ngầm với agent nhận; đổi sau sẽ ảnh hưởng prompt.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Thêm `parseGraphNoteBody` (tách tiền tố để hiển thị) và nhóm `findings` cho neo `finding` (`anchorLensId`). Nhãn bỏ `]`, `·`, xuống dòng; mask + cắt 120.

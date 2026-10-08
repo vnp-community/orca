@@ -15,6 +15,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { useQualityFeatureFlags } from '../../hooks/useQualityFeatureFlags'
+import { createFakeCodeIntelBackend } from '../code-intel-fake-backend'
 
 // Mock useAppStore to return synthetic state
 import { vi } from 'vitest'
@@ -105,13 +106,6 @@ describe('Error state handling', () => {
     expect(flags.quality).toBe(false)
   })
 
-  it('network error keeping previous state: if previous was enabled, stays enabled', () => {
-    // This tests the useCodeIntelSupport hook behavior (not directly testable here without hooks)
-    // Documented as: offline error → keep previous state; no prior state → fail closed
-    // Covered fully in useCodeIntelSupport.test.tsx (050-12)
-    expect(true).toBe(true) // intentional placeholder
-  })
-
   it('PROFILE_UNKNOWN does not hide quality feature', () => {
     // PQ-01: PROFILE_UNKNOWN is a run-time error, not a flag event
     // Quality flag is still enabled; only the profile UI shows an error state
@@ -150,5 +144,55 @@ describe('Regression: window.api proxy guard', () => {
     const flags = useQualityFeatureFlags()
     // Even if window.api.codeIntel exists (it's always a Proxy), flags must be false
     expect(flags.codeIntel).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Flag matrix driven by the fake backend (settings.get is the only flag source)
+// ---------------------------------------------------------------------------
+
+describe('Fake backend settings feed the flag hook; disabled tiers refuse view channels', () => {
+  const sel = { projectId: 'project-1', worktreeId: 'worktree-1' }
+  const cases = [
+    { name: 'all off', patch: { codeIntelEnabled: false }, expected: [false, false, false] },
+    { name: 'code-intel only', patch: { qualityGateEnabled: false }, expected: [true, false, false] },
+    { name: 'code-intel + quality', patch: {}, expected: [true, true, false] },
+    { name: 'all on', patch: { aiReviewEnabled: true }, expected: [true, true, true] },
+    // Why: quality/AI cannot outlive code-intel even when the tenant flags stay true.
+    { name: 'master off beats tenant quality/ai', patch: { codeIntelEnabled: false, aiReviewEnabled: true }, expected: [false, false, false] }
+  ]
+  for (const c of cases) {
+    it(`${c.name}`, async () => {
+      const backend = createFakeCodeIntelBackend()
+      backend.setSettings(c.patch)
+      const settings = (await backend.call('codeIntel.settings.get', {})) as { effective: Record<string, boolean> }
+      setSupport('enabled', settings.effective)
+      const flags = useQualityFeatureFlags()
+      expect([flags.codeIntel, flags.quality, flags.ai]).toEqual(c.expected)
+      // Gated consumers must not call anything but settings.get when their tier is off.
+      if (!flags.codeIntel) {
+        await expect(backend.call('codeIntel.status', sel)).rejects.toThrow(/^CODEINTEL_DISABLED/)
+      }
+      if (flags.codeIntel && !flags.quality) {
+        await expect(backend.call('codeIntel.quality.gate', sel)).rejects.toThrow(/^CODEINTEL_QUALITY_GATE_DISABLED/)
+      }
+    })
+  }
+
+  it('mid-session disable: next call returns CODEINTEL_DISABLED, no push-based flag channel exists', async () => {
+    const backend = createFakeCodeIntelBackend({ role: 'admin' })
+    await expect(backend.call('codeIntel.status', sel)).resolves.toBeTruthy()
+    await backend.call('codeIntel.settings.set', { codeIntelEnabled: false })
+    await expect(backend.call('codeIntel.status', sel)).rejects.toThrow(/^CODEINTEL_DISABLED/)
+    expect(backend.streamCount()).toBe(0)
+  })
+
+  it('PROFILE_UNKNOWN is a run-time error and leaves the flags untouched', async () => {
+    const backend = createFakeCodeIntelBackend()
+    backend.failNext('codeIntel.quality.gate', 'CODEINTEL_PROFILE_UNKNOWN: no profile')
+    await expect(backend.call('codeIntel.quality.gate', sel)).rejects.toThrow(/PROFILE_UNKNOWN/)
+    const settings = (await backend.call('codeIntel.settings.get', {})) as { effective: Record<string, boolean> }
+    setSupport('enabled', settings.effective)
+    expect(useQualityFeatureFlags().quality).toBe(true)
   })
 })

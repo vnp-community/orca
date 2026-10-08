@@ -5,7 +5,7 @@
 **Area:** frontend / components + hooks
 **File:** `frontend/src/renderer/src/components/quality-charts/ChartFrame.tsx`, `ChartTextAlternative.tsx`, `ChartHoverCard.tsx`, `useChartSize.ts`, `useLazyChartMount.ts` (mới) và `__tests__/ChartFrame.test.tsx`, `ChartTextAlternative.test.tsx`, `useChartSize.test.tsx`, `useLazyChartMount.test.tsx`
 **Depends on:** FE-CV-TASK-088-03
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: ChartFrame 10/10, ChartTextAlternative 4/4, useChartSize 3/3, useLazyChartMount 3/3)
 
 ## Context
 
@@ -40,3 +40,7 @@
 ## Rủi ro
 
 - Hoạt động `IntersectionObserver` trong Electron nền ẩn (cửa sổ không hiển thị) chưa kiểm chứng; mặc định `mounted=true` khi `document.visibilityState !== 'visible'`.
+
+## Ghi chú triển khai (2026-10-07)
+
+Thêm `chart-frame-types.ts` (kiểu chung). `ChartFrame` thêm prop `surface: 'img'|'custom'` (lưới tự giữ `role=grid`). Bảng thay thế `sr-only` khi chưa bật. Chưa kiểm hành vi IntersectionObserver trong Electron nền ẩn (mặc định mounted khi document không visible).

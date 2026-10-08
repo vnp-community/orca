@@ -67,7 +67,7 @@ describe('buildStageTimeline — change_request', () => {
   })
 
   it('maps every status to the correct current step', () => {
-    const cases: Array<[string, string]> = [
+    const cases: [string, string][] = [
       ['submitted', 'classification'],
       ['classifying', 'classification'],
       ['awaiting_type_confirmation', 'classification'],
@@ -160,7 +160,6 @@ describe('CHILD_REQUEST_RULES', () => {
   })
 
   it('hotfix has reason followup_hotfix', () => {
-    expect(CHILD_REQUEST_RULES.hotfield?.reason).not.toBeDefined()
     expect(CHILD_REQUEST_RULES.hotfix?.reason).toBe('followup_hotfix')
   })
 })

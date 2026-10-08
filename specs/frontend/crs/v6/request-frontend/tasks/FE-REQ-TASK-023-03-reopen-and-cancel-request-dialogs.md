@@ -5,7 +5,7 @@
 **Area:** frontend (components, hành động ghi)
 **File:** `frontend/src/renderer/src/components/request/backlog/ReopenRequestDialog.tsx`, `CancelRequestDialog.tsx` (mới), test cùng tên (mới)
 **Depends on:** FE-REQ-SOL-018 (`useRequestActions().reopen/cancel`, `RequestRpcError`); không phụ thuộc task 01, 02
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: ReopenRequestDialog.test.tsx 5/5; RequestBacklogTable.test.tsx (luồng Hủy); oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -41,3 +41,7 @@
 
 - Ô ghi chú khi mở lại bị thiếu so với CR-023 vì kênh chưa nhận `note` (SOL-023 Q2); thêm khi CR-016 cập nhật.
 - Quyền: người xem không có quyền ghi vẫn thấy nút (CR-023 mục 2.4), lỗi xử lý bằng toast; không có `viewerCan` (SOL-018 Q4).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Dùng lại `CancelRequestDialog` có sẵn (đợt 019, dựa `RequestReasonDialog`, đã có `Mod+Enter` qua `isScreenSubmitShortcut`) thay vì tạo bản thứ hai ở `backlog/`; thêm prop tuỳ chọn `reasonRequired`. Bắt `Mod+Enter` được kiểm ở test của `RequestReasonDialog`/`RejectReasonDialog`.

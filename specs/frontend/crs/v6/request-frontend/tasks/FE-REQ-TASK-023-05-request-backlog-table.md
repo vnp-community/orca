@@ -5,7 +5,7 @@
 **Area:** frontend (components)
 **File:** `frontend/src/renderer/src/components/request/backlog/RequestBacklogTable.tsx`, `RequestBacklogRow.tsx` (mới), test cùng tên (mới); nối vào `BacklogTab.tsx`
 **Depends on:** FE-REQ-TASK-023-01, 023-03, 023-04; FE-REQ-TASK-022-03 (`formatRelativeTime`, `formatAbsoluteTime`, `useMinuteClock`); FE-REQ-SOL-018 (`RequestTypeBadge`, `RequestSourceBadge`, `openRequestPage`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: RequestBacklogRow.test.tsx 3/3, RequestBacklogTable.test.tsx 5/5; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -44,3 +44,7 @@
 - `parentRequestIds` chưa có chỗ hiển thị (CR-023 không yêu cầu); chỉ giữ trong dữ liệu.
 - Thứ tự "ổn định khi có hàng mới chen vào" do keyset phía backend; client không sắp xếp lại.
 - Bảng rộng: trên cửa sổ hẹp cuộn ngang trong vùng bảng, không làm cuộn ngang cả trang.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Lý do dài dùng `line-clamp-2` + thuộc tính `title` (tooltip gốc) thay vì component `Tooltip`. Lọc `sourceUrl` không-http thực hiện ở parser và `RequestSourceBadge`.

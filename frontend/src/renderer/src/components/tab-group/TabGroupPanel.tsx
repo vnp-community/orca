@@ -21,6 +21,9 @@ import { tabGroupBodyAnchorName } from './tab-group-body-anchor'
 import { translate } from '@/i18n/i18n'
 
 const EditorPanel = lazy(() => import('../editor/EditorPanel'))
+const ReviewTabHost = lazy(() =>
+  import('../review-map/shell/ReviewTabHost').then((m) => ({ default: m.ReviewTabHost }))
+)
 
 export default function TabGroupPanel({
   groupId,
@@ -132,12 +135,14 @@ export default function TabGroupPanel({
       activeFileId={
         activeTab?.contentType === 'terminal' ||
         activeTab?.contentType === 'browser' ||
-        activeTab?.contentType === 'simulator'
+        activeTab?.contentType === 'simulator' ||
+        activeTab?.contentType === 'review'
           ? null
           : activeTab?.id
       }
       activeBrowserTabId={activeTab?.contentType === 'browser' ? activeTab.entityId : null}
       activeSimulatorTabId={activeTab?.contentType === 'simulator' ? activeTab.id : null}
+      activeReviewTabId={activeTab?.contentType === 'review' ? activeTab.id : null}
       activeTabType={
         activeTab?.contentType === 'terminal'
           ? 'terminal'
@@ -145,7 +150,9 @@ export default function TabGroupPanel({
             ? 'browser'
             : activeTab?.contentType === 'simulator'
               ? 'simulator'
-              : 'editor'
+              : activeTab?.contentType === 'review'
+                ? 'review'
+                : 'editor'
       }
       onActivateFile={commands.activateEditor}
       onCloseFile={commands.closeItem}
@@ -369,7 +376,11 @@ export default function TabGroupPanel({
                   </div>
                 }
               >
-                <EditorPanel activeFileId={activeTab.entityId} activeViewStateId={activeTab.id} />
+                {activeTab.contentType === 'review' ? (
+                  <ReviewTabHost worktreeId={worktreeId} tabId={activeTab.id} />
+                ) : (
+                  <EditorPanel activeFileId={activeTab.entityId} activeViewStateId={activeTab.id} />
+                )}
               </Suspense>
             </div>
           )}

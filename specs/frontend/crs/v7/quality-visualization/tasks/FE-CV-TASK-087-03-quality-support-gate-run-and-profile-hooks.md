@@ -5,7 +5,7 @@
 **Area:** frontend / hooks
 **File:** `frontend/src/renderer/src/hooks/useQualitySupport.ts`, `useQualityGate.ts`, `useQualityRun.ts`, `useQualityProfiles.ts` (mới) và `*.test.tsx`
 **Depends on:** 087-01, 087-02; FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelSupport`, settings)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: src/renderer/src/hooks/useQualityHooks.test.tsx 18/18; oxlint + tsc sạch)
 
 ## Context
 
@@ -32,3 +32,8 @@
 ## Rủi ro
 
 - Selector settings của CR-050 chưa tồn tại; nếu thiếu, hook gọi `codeIntel.settings.get` một lần (ghi lại trong PR).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Hook mới: `useQualitySupport`, `useQualityGate`, `useQualityRun`, `useQualityProfiles`. Support đọc `useQualityFeatureFlags` (+ lỗi `quality-disabled` của gate), không gọi `settings.get` riêng.
+- Test dùng store thật hai slice (`test-support/code-intel-quality-test-store.ts`) với seam RPC giả.

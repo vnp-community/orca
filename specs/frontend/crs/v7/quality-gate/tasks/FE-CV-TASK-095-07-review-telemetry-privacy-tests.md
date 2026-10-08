@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/shared/review-telemetry-privacy.test.ts`, `frontend/src/renderer/src/lib/review-telemetry.test.ts` (mới)
 **Depends on:** FE-CV-TASK-095-01..05
-**Status:** [x] DONE — privacy tests chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 5 tests review-telemetry-privacy.test.ts + 34 tests wrapper)
 
 ## Context
 
@@ -27,3 +27,7 @@
 ## Rủi ro
 
 - Phần desktop main nằm ngoài `frontend/`.
+
+## Ghi chú triển khai (2026-10-07)
+
+Phần consent của desktop main nằm ngoài frontend, không kiểm.

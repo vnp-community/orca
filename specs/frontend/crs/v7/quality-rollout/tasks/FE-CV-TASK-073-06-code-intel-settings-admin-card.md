@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + i18n
 **File:** `frontend/src/renderer/src/components/settings/code-intel/CodeIntelSettingsCard.tsx` (mới) + test; `components/settings/Settings.tsx` hoặc registry pane (sửa nhỏ, vị trí chưa kiểm chứng); `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks (`settings.get`, làm mới); FE-CV-TASK-073-02
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: CodeIntelSettingsCard.test 5/5, code-intel-settings-api.test 3/3, useSettingsNavigationMetadata.test 16/16, code-intel-locale-coverage.test PASS)
 
 ## Context
 
@@ -33,3 +33,11 @@
 ## Rủi ro
 
 - Vị trí pane chưa xác định (câu hỏi mở 2); tắt cờ chặn cả đường quay lại nếu `settings.set` bị chặn (service vẫn cho `settings.set` khi tắt, PQ-24).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Thẻ nhận `isAdmin` và `api` {get,set} qua props; nối vào pane/registry và locale để task khác (Settings.tsx, JSON locale dùng chung) thực hiện.
+
+## Ghi chú tích hợp (W6, 2026-10-07)
+
+Thẻ nằm ở mục Settings mới `code-intel` (nhóm `capabilities`; id thêm vào `SettingsNavTarget`, `useSettingsNavigationMetadata`, `Settings.tsx`), hiện trừ khi support = `unsupported` (`lib/code-intel-settings-visibility.ts`). Adapter `code-intel-settings-api.ts` làm mới `codeIntelSupportState` sau mỗi lần đọc vì tab Review (poller duy nhất) có thể đang đóng; `mapSettingsResult` được export từ `useCodeIntelSupport.ts`. i18n 5 locale + `KEYS` trong `code-intel-locale-coverage.test.ts`. `no-top-level-translate.test.ts` hiện đỏ vì `FleetServerStatusBadge.tsx` (ngoài phạm vi), không phải các file này.

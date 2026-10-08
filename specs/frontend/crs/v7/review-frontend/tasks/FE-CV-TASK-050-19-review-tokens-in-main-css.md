@@ -5,7 +5,7 @@
 **Area:** frontend / assets
 **File:** `frontend/src/renderer/src/assets/main.css` (sửa: `:root` :126, `.dark` :216, `@theme inline` :43), test `assets/review-tokens.test.ts` (mới)
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: review-tokens.test 12 pass; contrast script (step 3) not run)
 
 ## Context
 

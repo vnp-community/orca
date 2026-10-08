@@ -1,80 +1,44 @@
 /**
  * ai-summary-report-section.ts — FE-CV-TASK-093-05
  *
- * Builds a labeled Markdown section for the AI summary, suitable for
- * inclusion in the review report (090). Section uses a sentinel comment
- * so the report builder can identify and merge it.
+ * Labelled Markdown block for the AI summary, passed to the report builder through
+ * `extraSections`. It is its own section, never part of the "Quality gate" section,
+ * and says plainly that it is AI-inferred.
  *
  * @module components/review-map/ai-summary/ai-summary-report-section
  */
 
-import type { AiSummaryModel } from './ai-summary-wire-parser'
+import { escapeMarkdownText } from '../report/review-report-markdown'
+import type { ReportTranslate } from '../report/review-report-markdown'
+import type { AiReviewSummary } from './ai-summary-wire-parser'
 
-// ---------------------------------------------------------------------------
-// Sentinel markers (aligned with review-report-markdown.ts pattern)
-// ---------------------------------------------------------------------------
+const K = 'auto.components.reviewMap.aiSummary.report'
 
-export const AI_SUMMARY_SECTION_BEGIN = '<!-- orca-ai-summary:begin -->'
-export const AI_SUMMARY_SECTION_END = '<!-- orca-ai-summary:end -->'
-
-// ---------------------------------------------------------------------------
-// Builder
-// ---------------------------------------------------------------------------
-
-/**
- * Build a labeled Markdown block for the AI summary.
- * Includes sentinel markers for idempotent insertion into larger reports.
- *
- * Language rule: never claim "AI reviewed" — use "AI Summary" label only.
- */
-export function buildAiSummaryReportSection(model: AiSummaryModel): string {
-  const parts: string[] = []
-
-  parts.push(AI_SUMMARY_SECTION_BEGIN)
-  parts.push('')
-  parts.push('## AI Summary')
-  parts.push('')
-
-  if (model.title) {
-    parts.push(`_${model.title}_`)
-    parts.push('')
+export function buildAiSummaryReportSection(
+  summary: AiReviewSummary,
+  t: ReportTranslate
+): { id: string; markdown: string } {
+  const lines: string[] = [
+    `### ${t(`${K}.heading`, 'AI-inferred summary')}`,
+    `_${t(`${K}.disclaimer`, 'Can be wrong or incomplete; check it against the diff. Model: {{model}}. Data sent: {{level}}.', {
+      model: escapeMarkdownText(summary.model || '—', 80),
+      level: summary.level
+    })}_`,
+    '',
+    // Blockquoted so model text can never open a heading or list at the top level.
+    `> ${escapeMarkdownText(summary.summary, 4000)}`
+  ]
+  if (summary.risks.length > 0) {
+    lines.push('', `**${t(`${K}.risks`, 'Risks')}**`)
+    for (const risk of summary.risks.slice(0, 10)) {
+      lines.push(`- ${escapeMarkdownText(risk.text, 300)}`)
+    }
   }
-
-  if (model.summary) {
-    parts.push(model.summary)
-    parts.push('')
+  if (summary.readFirst.length > 0) {
+    lines.push('', `**${t(`${K}.readFirst`, 'Read first')}**`)
+    for (const item of summary.readFirst.slice(0, 10)) {
+      lines.push(`- ${escapeMarkdownText(item.file, 120)} — ${escapeMarkdownText(item.why, 200)}`)
+    }
   }
-
-  for (const section of model.sections) {
-    parts.push(`### ${section.title}`)
-    parts.push('')
-    parts.push(section.body)
-    parts.push('')
-  }
-
-  parts.push(AI_SUMMARY_SECTION_END)
-
-  return parts.join('\n')
-}
-
-/**
- * Merge (replace or append) an AI summary section into an existing body.
- * Idempotent: replaces existing section if markers found.
- */
-export function mergeAiSummaryIntoBody(
-  existingBody: string,
-  model: AiSummaryModel
-): string {
-  const section = buildAiSummaryReportSection(model)
-  const beginIdx = existingBody.indexOf(AI_SUMMARY_SECTION_BEGIN)
-  const endIdx = existingBody.indexOf(AI_SUMMARY_SECTION_END)
-
-  if (beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx) {
-    const before = existingBody.slice(0, beginIdx)
-    const after = existingBody.slice(endIdx + AI_SUMMARY_SECTION_END.length)
-    return (before + section + after).trimEnd()
-  }
-
-  const trimmed = existingBody.trimEnd()
-  return trimmed ? `${trimmed}\n\n${section}` : section
+  return { id: 'ai-summary', markdown: lines.join('\n') }
 }

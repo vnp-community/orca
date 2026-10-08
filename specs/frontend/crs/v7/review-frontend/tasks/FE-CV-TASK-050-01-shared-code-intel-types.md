@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/code-intel-types.ts` (mới), `frontend/src/shared/code-intel-quality-types.ts` (mới, chỉ khung và chú thích: kiểu §4.7 do FE-CV-SOL-085/087 điền), test `code-intel-types.test.ts`
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: types.test 17 pass; types rewritten to contract §2.2/§4.1-4.6 and split by domain into code-intel-*-types.ts with a barrel)
 
 ## Context
 

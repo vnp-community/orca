@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityScorecard.tsx`, `QualityGateVerdictHeader.tsx`, `QualityGateReasonRow.tsx`, `QualityStepList.tsx`, `QualityProvenanceLine.tsx`, `QualityCiComparisonRow.tsx`, `QualityGateChip.tsx` (mới) và `*.test.tsx`
 **Depends on:** FE-CV-TASK-088-03, 088-07; 087-03, 087-04
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: QualityScorecard.test.tsx 29 + QualityGateChip.test.tsx 3 + quality-scorecard-model.test.ts 9; oxlint + tsc sạch)
 
 ## Context
 
@@ -35,3 +35,9 @@ Ma trận verdict × reasons × stale × dirty; `failed` step; `unknown` không 
 ## Rủi ro
 
 - `observed/threshold` định dạng chưa nêu trong hợp đồng; render nguyên văn.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Header: chỉ `pass` có dòng tiêu đề (badge đã gọi tên warn/fail/unknown, tránh lặp). Nhãn lý do dịch theo `code` qua khoá động `scorecard.reasonCode.<code>` (không có thì dùng `check`).
+- Chip mở lens bằng `setReviewLens`; deep link từ ngoài Review: `open-quality-lens.ts` (`openReviewFromEntryPoint` + lens `quality`). `useSourceControlQualityGate.openReason` (085, không thuộc phạm vi) chưa gọi hàm này.
+- Bấm lý do chỉ đặt `ui.source='quality'` và `ui.category`; bộ lọc `tool` chưa có trong ui state; dock không có API mở từ ngoài nên người dùng mở panel "Kiểm tra" thủ công.

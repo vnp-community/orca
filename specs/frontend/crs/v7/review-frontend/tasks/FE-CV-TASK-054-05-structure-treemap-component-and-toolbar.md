@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `StructureTreemap.tsx`, `StructureToolbar.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-054-01, 054-02, 054-03, FE-CV-TASK-053-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: structure/StructureTreemap.test 5/5 pass; color-mix() in SVG fill style not checked in Electron; drag-resize performance not measured)
 
 ## Context
 

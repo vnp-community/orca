@@ -1,6 +1,6 @@
 # FE-CV-SOL-085-source-control-quality-notice: Cảnh báo cổng chất lượng ở Source Control (chỉ báo, không chặn)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ việc ĐỌC code `frontend/src` và hợp đồng v7; chưa chạy test, build hay ứng dụng.
+> Trạng thái (2026-10-07): 7/7 task DONE, 0 PARTIAL, 0 BLOCKED, 0 TODO. Xem mục "Ghi chú triển khai" của từng task; code thật lệch spec ở các điểm đã ghi.
 
 **CR:** [CR-CV-085 mục 2.9b](../../../../../../docs/crs/v7/quality-gate/CR-CV-085-quality-gate.md) (phần frontend; phần backend là `BE-CV-SOL-085-*`)
 **Area:** frontend (`frontend/src/renderer/src/components/right-sidebar`, `hooks`)

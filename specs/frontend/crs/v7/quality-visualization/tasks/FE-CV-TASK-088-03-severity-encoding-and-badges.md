@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/quality-charts/severity-encoding.ts`, `SeverityGlyph.tsx`, `SeverityBadge.tsx`, `GateVerdictBadge.tsx`, `ChartLegend.tsx` (đều mới) và `__tests__/severity-encoding.test.ts`, `SeverityBadge.test.tsx`
 **Depends on:** FE-CV-TASK-088-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: severity-encoding 4/4, SeverityBadge 6/6)
 
 ## Context
 
@@ -39,3 +39,7 @@
 
 - Tên icon `lucide-react` có thể khác bản cài; thay bằng icon tương đương gần nhất và cập nhật bảng SOL-088 2.4.
 - Va chạm hổ phách với `--review-untested`: bảo đảm hình dạng (tam giác ở góc) khác kiểu viền của overlay (xem SOL-088 6.3).
+
+## Ghi chú triển khai (2026-10-07)
+
+Lệch: `EncodingEntry.labelKey` kiểu `QualityChartCopyKey`, chuỗi mặc định ở `quality-chart-copy.ts` (không có `labelFallback`). Glyph SVG dùng `shape`; `icon` lucide giữ trong bảng cho nơi dùng khác.

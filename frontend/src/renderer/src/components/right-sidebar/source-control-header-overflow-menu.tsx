@@ -1,5 +1,13 @@
 import React from 'react'
-import { List, ListTree, MessageSquare, MoreHorizontal, RefreshCw, Settings2 } from 'lucide-react'
+import {
+  List,
+  ListTree,
+  MessageSquare,
+  MoreHorizontal,
+  RefreshCw,
+  ScanSearch,
+  Settings2
+} from 'lucide-react'
 import type { SourceControlViewMode } from '../../../../shared/types'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -20,7 +28,8 @@ export function SourceControlHeaderOverflowMenu({
   onRefreshBranchCompare,
   branchCompareRefreshDisabled,
   diffCommentCount,
-  onExpandNotes
+  onExpandNotes,
+  onReviewChanges
 }: {
   sourceControlViewMode: SourceControlViewMode
   viewModeToggleDisabled: boolean
@@ -30,6 +39,8 @@ export function SourceControlHeaderOverflowMenu({
   branchCompareRefreshDisabled: boolean
   diffCommentCount: number
   onExpandNotes: () => void
+  /** Present only when the Review entry is available. */
+  onReviewChanges?: () => void
 }): React.JSX.Element {
   const viewModeLabel =
     sourceControlViewMode === 'tree'
@@ -84,6 +95,12 @@ export function SourceControlHeaderOverflowMenu({
             'Refresh branch compare'
           )}
         </DropdownMenuItem>
+        {onReviewChanges ? (
+          <DropdownMenuItem onSelect={onReviewChanges}>
+            <ScanSearch className="size-3.5" />
+            {translate('auto.components.reviewMap.EntryButton.label', 'Review changes')}
+          </DropdownMenuItem>
+        ) : null}
         {diffCommentCount > 0 ? (
           <>
             <DropdownMenuSeparator />

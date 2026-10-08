@@ -810,15 +810,11 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     // CR-050: code-intel routes through the same environment transport as MCP
     codeIntel: createCodeIntelApi({
       callEnvironmentEnvelope,
-      subscribe: (method, params, h) => {
-        const environment = requireActiveEnvironmentOrNull()
-        return environment
-          ? getClientForEnvironment(environment).subscribe(method, params, {
-              onResponse: h.onResponse,
-              onClose: h.onClose
-            })
-          : null
-      }
+      subscribe: (environmentId, method, params, h) =>
+        getClientForEnvironment(resolveEnvironment(environmentId)).subscribe(method, params, {
+          onResponse: h.onResponse,
+          onClose: h.onClose
+        })
     }),
     hooks: createHooksApi(),
     stats: {

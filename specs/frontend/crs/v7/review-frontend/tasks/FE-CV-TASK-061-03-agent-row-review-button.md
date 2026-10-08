@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/dashboard/DashboardAgentRow.tsx`, `DashboardAgentRowTrailingControls.tsx`, `components/sidebar/WorktreeCardAgents.tsx`, `worktree-card-compact-agent-row.tsx` (sửa nhỏ) + test
 **Depends on:** FE-CV-TASK-061-01, 061-02
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: DashboardAgentRow.review-button.test.tsx PASS; dashboard + sidebar suite chỉ còn lỗi sẵn có ngoài phạm vi (Sidebar.test SshStatusSection, WorktreeCardMeta clipboard); oxlint/tsc sạch)
 
 ## Context
 
@@ -32,3 +32,7 @@
 ## Rủi ro
 
 - Chỗ trống cuối hàng; chưa kiểm bằng mắt.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Chưa làm: test tương tác dừng nổi bọt và kiểm bằng mắt chỗ trống ô cuối (đã đổi ô cuối sang `w-auto` khi có nút). `CompactAgentRow` nhận thêm `isUnvisited`. `WorktreeCardAgents` truyền `onReview` chỉ khi `useReviewEntryAvailability.visible`.

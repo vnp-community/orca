@@ -5,7 +5,7 @@
 **Area:** frontend / request / impact (duyệt)
 **File:** `frontend/src/renderer/src/components/request/impact/{RiskAcceptanceChecklist,RiskOverrideMenu}.tsx`, `risk-approval-rules.ts` (mới); `components/request/solution/SolutionDecisionBar.tsx`, `components/request/plan/PlanApprovalBar.tsx`, `PhaseApprovalBar.tsx` (sửa); `hooks/useApprovals.ts` (sửa, FE-REQ-TASK-018-03: thêm tham số duyệt); test cùng tên
 **Depends on:** FE-REQ-TASK-036-04 (`SolutionDecisionBar` đã tích hợp Decision), 036-05 (`RiskSummaryCard`, `ImpactFindingList`), 036-02 (`useImpactAssessment`)
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — vitest impact/risk-approval-rules (5), RiskOverrideMenu (3), SolutionDecisionBar.decision (11) pass — thiếu: nối cổng vào PlanApprovalBar/PhaseApprovalBar
 
 ## Context
 
@@ -73,3 +73,7 @@
 - Cờ `viewerCan.override` chưa có trong hợp đồng; nếu không có, menu ghi đè ẩn và quyền chỉ qua backend (câu hỏi mở).
 - Hai ngưỡng khác nhau (10 cho chấp nhận, 20 cho ghi đè): đặt hằng riêng `RISK_ACCEPTANCE_MIN_LENGTH = 10`, `RISK_OVERRIDE_MIN_LENGTH = 20` trong `risk-approval-rules.ts`.
 - Task này sửa ba thanh duyệt đang thuộc SOL-020 và 021: giữ thay đổi ở mức ghép nối.
+
+## Ghi chú triển khai (2026-10-07)
+
+Cổng theo mức chỉ nối vào `SolutionDecisionBar` (`useRiskApprovalGate`, `RiskAcceptanceChecklist`, Collapsible "Xem tác động", `RiskOverrideMenu` chỉ khi `canOverride`). `approval.approve` mang `viewedImpactDigest`/`acceptedFindingIds` (tên tạm) qua `useApprovals.approve` và `useSolutionDecision`. `PlanApprovalBar`/`PhaseApprovalBar` chưa có cổng rủi ro; "Duyệt nhanh" ở hộp duyệt (SOL-022) chưa sửa (ngoài phạm vi).

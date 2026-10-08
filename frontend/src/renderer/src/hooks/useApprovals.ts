@@ -27,7 +27,7 @@ type UseApprovalsResult = {
   pendingCount: number
   isLoading: boolean
   error: string | null
-  approve: (params: { approval: Approval; comment?: string }) => Promise<Result<unknown>>
+  approve: (params: { approval: Approval; comment?: string; viewedImpactDigest?: string; acceptedFindingIds?: string[] }) => Promise<Result<unknown>>
   reject: (params: { approval: Approval; comment: string }) => Promise<Result<unknown>>
   refetch: () => void
 }
@@ -52,7 +52,7 @@ export function useApprovals(filters: ApprovalFilters = {}): UseApprovalsResult 
       : REQUEST_RPC_METHODS.APPROVAL_LIST_PENDING
 
     callRequestRpc<{ approvals: unknown[] }>(method, filters).then((result) => {
-      if (cancelled) return
+      if (cancelled) {return}
       setIsLoading(false)
 
       if (!result.ok) {
@@ -64,8 +64,8 @@ export function useApprovals(filters: ApprovalFilters = {}): UseApprovalsResult 
       setApprovals(parsed)
 
       // Update global pending count from the list
-      const pendingCount = parsed.filter((a) => a.status === 'pending').length
-      setPendingApprovalCount(pendingCount)
+      // Why: only the global pending list is the sidebar badge; a per-request list must not overwrite it.
+      if (!filters.requestId) {setPendingApprovalCount(parsed.filter((a) => a.status === 'pending').length)}
     })
 
     return () => { cancelled = true }
@@ -75,12 +75,18 @@ export function useApprovals(filters: ApprovalFilters = {}): UseApprovalsResult 
   const approve = useCallback(async (params: {
     approval: Approval
     comment?: string
+    /** Impact digest the approver reviewed (medium and above; names provisional, CR-REQ-030 section 8). */
+    viewedImpactDigest?: string
+    acceptedFindingIds?: string[]
   }): Promise<Result<unknown>> => {
     return callRequestRpc(REQUEST_RPC_METHODS.APPROVAL_APPROVE, {
+      id: params.approval.id,
       approvalId: params.approval.id,
       expectedVersion: params.approval.version,
       expectedDigest: params.approval.subjectDigest,
-      comment: params.comment
+      comment: params.comment,
+      ...(params.viewedImpactDigest ? { viewedImpactDigest: params.viewedImpactDigest } : {}),
+      ...(params.acceptedFindingIds && params.acceptedFindingIds.length > 0 ? { acceptedFindingIds: params.acceptedFindingIds } : {})
     })
   }, [])
 
@@ -100,6 +106,7 @@ export function useApprovals(filters: ApprovalFilters = {}): UseApprovalsResult 
       }
     }
     return callRequestRpc(REQUEST_RPC_METHODS.APPROVAL_REJECT, {
+      id: params.approval.id,
       approvalId: params.approval.id,
       expectedVersion: params.approval.version,
       expectedDigest: params.approval.subjectDigest,

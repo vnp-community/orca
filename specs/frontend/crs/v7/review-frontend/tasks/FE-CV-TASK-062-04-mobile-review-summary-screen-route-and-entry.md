@@ -5,7 +5,7 @@
 **Area:** mobile / UI
 **File:** `mobile/app/h/[hostId]/review-summary/[worktreeId].tsx`, `mobile/src/components/{MobileReviewSummaryScreenView,MobileReviewSummaryHeader,MobileReviewMetricGrid,MobileReviewFindingRow}.tsx`, `mobile-review-summary-styles.ts` (mới); `MobileDiffReviewDrawers.tsx`, `source-control/MobileSourceControlBranchCard.tsx` (sửa nhỏ)
 **Depends on:** FE-CV-TASK-062-03
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — route, view, header, metric grid, finding row, styles and the diff-review overflow entry "Review Summary" written, oxlint clean; NOT typechecked or run on device (mobile deps not installed); Source Control branch-card chip and mock-server handler not done
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - Không có test tự động cho UI; rủi ro hồi quy bố cục.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Điểm vào: `onOpenReviewSummary` tuỳ chọn thêm vào `useMobileDiffReviewController` (trả lại nguyên giá trị) + hành động overflow "Review Summary" ở `MobileDiffReviewDrawers.tsx`. Chip ở `MobileSourceControlBranchCard` chưa làm (Q5 mở). Chưa thêm handler giả ở `mobile/scripts/mock-server-rpc-handlers.ts`. Không có banner "loading ≥ 3 s" theo giai đoạn.

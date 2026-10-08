@@ -5,7 +5,7 @@
 **Area:** frontend (components)
 **File:** trong `frontend/src/renderer/src/components/request/backlog/` (mới): `TaskBacklogTable.tsx`, `TaskBacklogRow.tsx`, `ExecuteBacklogTable.tsx`, `ExecuteBacklogRow.tsx`, `BacklogGroupHeaderRow.tsx`, `BacklogGateStatusBadge.tsx`, `BacklogEngineBadge.tsx`, `BacklogTaskSheet.tsx` và test cùng tên
 **Depends on:** FE-REQ-TASK-023-01, 023-04; FE-REQ-TASK-022-03 (`useRequestSummaries`); FE-REQ-SOL-018 (`TaskStatus` đã gỡ `backlog`, `openRequestPage`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: BacklogGroupTables.test.tsx 6/6, BacklogGateStatusBadge.test.tsx 6/6; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -47,3 +47,7 @@
 - `TaskDetail` trong Sheet chưa kiểm chứng ngoài `TaskPage`/`WorkspaceLayout` (phụ thuộc `useWorkspace`); nếu lỗi, dùng `openTaskPage({...})` thay vì Sheet và ghi vào báo cáo.
 - Tên engine backend (`workflow|orchestration|direct_agent`) là giả định theo CR-TG-008; chuỗi lạ hiển thị `-`.
 - Task nằm sâu hơn một cấp bị backend bỏ qua (CR-015 Q4); UI không bù được.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Gộp thân hai bảng vào `BacklogGroupTable` (`TaskBacklogTable`/`ExecuteBacklogTable` là vỏ mỏng); test hàng gộp trong `BacklogGroupTables.test.tsx`. `BacklogTaskSheet` được mock `TaskDetail` trong test (chưa thử ngoài `TaskPage`, xem rủi ro SOL-023). Sau khi đóng Sheet gọi `refetch`.

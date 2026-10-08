@@ -158,6 +158,9 @@ import { resolveSourceControlLaunchPlatform } from '@/lib/source-control-launch-
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { CreateHostedReviewComposer } from './CreateHostedReviewComposer'
+import { SourceControlQualityGateSlot } from './source-control-quality-gate-slot'
+import { recordReviewSurfaceDecision } from '@/lib/review-surface-decision'
+import { useInsertReviewReport } from '../review-map/report/use-insert-review-report'
 import { formatCreateError } from './create-pull-request-review-copy'
 import { stripBaseRef, useCreatePullRequestDialogFields } from './useCreatePullRequestDialogFields'
 import { localizedHostedReviewCopy } from '@/i18n/hosted-review-localized-copy'
@@ -1139,6 +1142,14 @@ export default function ChecksPanel(): React.JSX.Element {
       },
       onCancelGenerate: handleCancelGeneratePullRequestFieldsForActive
     }
+  })
+  // CR-090: undefined while the quality flag is off, so the composer shows no insert button
+  const insertReviewReport = useInsertReviewReport({
+    worktreeId: activeWorktreeId ?? null,
+    projectId: activeWorktree?.projectId,
+    provider: hostedReviewCreateProvider,
+    body: prBody,
+    setBody: setPrBody
   })
   useEffect(() => {
     // Why: checks-panel PR generation can finish while this composer is hidden
@@ -3419,6 +3430,10 @@ export default function ChecksPanel(): React.JSX.Element {
         return
       }
       if (result.ok) {
+        if (activeWorktreeId) {
+          // CR-095: the PR created here is the turn's decision when no Source Control path took it first.
+          recordReviewSurfaceDecision(activeWorktreeId, 'create_review')
+        }
         await handlePullRequestCreated({
           provider: hostedReviewCreateProvider,
           number: result.number,
@@ -3650,6 +3665,14 @@ export default function ChecksPanel(): React.JSX.Element {
               onGenerate={() => void handleGeneratePullRequestFields()}
               onCancelGenerate={handleCancelGeneratePullRequestFields}
               onPrimaryAction={() => void handleCreatePullRequest()}
+              onInsertReviewReport={insertReviewReport}
+              qualityNotice={
+                <SourceControlQualityGateSlot
+                  worktreeId={activeWorktreeId}
+                  projectId={activeWorktree?.projectId}
+                  provider={emptyReviewIsGitLab ? 'gitlab' : 'github'}
+                />
+              }
             />
           </div>
         ) : null}

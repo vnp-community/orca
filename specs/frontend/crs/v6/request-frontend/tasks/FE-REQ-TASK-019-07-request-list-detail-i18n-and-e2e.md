@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + e2e
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `frontend/src/renderer/src/i18n/request-locale-coverage.test.ts` (sửa từ 018-05), `tests/e2e/request-list-detail.spec.ts` (mới), `docs/ui/pages/requests.md` (sửa)
 **Depends on:** FE-REQ-TASK-019-02 đến 019-06
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — 5-locale keys + request-locale-coverage.test + docs done and green; e2e request-list-detail.spec.ts not written; verify:localization-* scripts not run
 
 ## Context
 

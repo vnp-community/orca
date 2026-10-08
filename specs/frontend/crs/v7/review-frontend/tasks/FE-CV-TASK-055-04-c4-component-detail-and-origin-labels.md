@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `C4ComponentDetail.tsx`, `C4InferredNotice.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-055-03, FE-CV-TASK-053-06
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest C4ComponentDetail.test.tsx 9/9)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - `updatedBy` là id hay tên hiển thị: hợp đồng không nói.
+
+## Ghi chú triển khai (2026-10-07)
+
+`C4ComponentDetail` là panel bên phải lens (không dùng drawer khung). `C4InferredNotice` hiện người sửa/thời gian chỉ khi truyền `updatedBy`; lens chưa gọi `c4.get` để lấy (chỉ `hasOverrides` từ view) nên hiển thị bản "có ghi đè thủ công" không tên. Khoá i18n `descSource.c4_yaml` (dấu chấm đổi `_`).

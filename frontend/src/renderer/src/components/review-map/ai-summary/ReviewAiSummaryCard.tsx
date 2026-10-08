@@ -1,177 +1,194 @@
 /**
  * ReviewAiSummaryCard.tsx — FE-CV-TASK-093-04
  *
- * Card component displaying the AI review summary result.
- * Collapsed by default; supports regenerate and feedback actions.
- *
- * Rules:
- * - No dangerouslySetInnerHTML — plain text only
- * - No "AI reviewed" — use "AI Summary" label only
- * - Spinner after ~200ms delay
- * - No import of quality gate hook
+ * Collapsed-by-default card for the AI-inferred summary. Always labelled as inferred
+ * (model + data level shown), rendered as plain text, kept apart from the quality gate.
+ * File references are only clickable when the file really is in the changed set.
  *
  * @module components/review-map/ai-summary/ReviewAiSummaryCard
  */
 
-import React, { useState, useEffect } from 'react'
-import { ChevronDown, ChevronRight, Loader2, RefreshCw, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, Loader2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { AiSummaryModel } from './ai-summary-wire-parser'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { translateCatalogKey } from '@/i18n/catalog-key-translate'
+import { AiSummaryDataPreviewDialog } from './AiSummaryDataPreviewDialog'
+import type { UseReviewAiSummaryResult } from './use-review-ai-summary'
+import type { AiSummaryLevel } from './ai-summary-wire-parser'
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+const BASE = 'auto.components.reviewMap.aiSummary.card'
 
 export type ReviewAiSummaryCardProps = {
-  model: AiSummaryModel | null
-  /** Whether the summary is currently being generated */
-  isGenerating: boolean
-  errorCode: string | null
-  onRegenerate?: () => void
-  onFeedback?: (useful: boolean) => void
-  translate: (key: string, params?: Record<string, unknown>) => string
+  ai: UseReviewAiSummaryResult
+  /** Paths of the changed files; references outside this set are shown as plain text. */
+  changedFiles: ReadonlySet<string>
+  onOpenFile: (path: string) => void
+  /** Optional enum-only feedback hook (no content); buttons render only when provided. */
+  onFeedback?: (value: 'helpful' | 'incorrect') => void
+  translate?: (key: string, params?: Record<string, unknown>) => string
 }
-
-// ---------------------------------------------------------------------------
-// Spinner delay hook — show spinner only after 200ms
-// ---------------------------------------------------------------------------
-
-function useDelayedVisible(active: boolean, delayMs = 200): boolean {
-  const [visible, setVisible] = useState(false)
-  useEffect(() => {
-    if (!active) { setVisible(false); return }
-    const id = setTimeout(() => setVisible(true), delayMs)
-    return () => clearTimeout(id)
-  }, [active, delayMs])
-  return visible
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function ReviewAiSummaryCard({
-  model,
-  isGenerating,
-  errorCode,
-  onRegenerate,
+  ai,
+  changedFiles,
+  onOpenFile,
   onFeedback,
-  translate,
-}: ReviewAiSummaryCardProps): React.ReactElement | null {
-  const [expanded, setExpanded] = useState(false)
-  const [feedbackGiven, setFeedbackGiven] = useState<boolean | null>(null)
-
-  const showSpinner = useDelayedVisible(isGenerating)
-
-  const handleFeedback = (useful: boolean) => {
-    setFeedbackGiven(useful)
-    onFeedback?.(useful)
+  translate = translateCatalogKey
+}: ReviewAiSummaryCardProps): React.JSX.Element | null {
+  const [open, setOpen] = useState(false)
+  const [chosenLevel, setChosenLevel] = useState<AiSummaryLevel>('metadata')
+  if (ai.state === 'hidden') {
+    return null
   }
 
-  // Generating state
-  if (isGenerating) {
-    return (
-      <div
-        role="status"
-        aria-label={translate('auto.components.reviewMap.aiSummary.card.generating')}
-        className="flex items-center gap-2 p-3 text-sm text-muted-foreground"
-      >
-        {showSpinner && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-        {translate('auto.components.reviewMap.aiSummary.card.generating')}
-      </div>
+  const busy = ai.state === 'previewing' || ai.state === 'generating'
+  const summary = ai.view?.summary ?? null
+
+  const fileLink = (path: string): React.JSX.Element =>
+    changedFiles.has(path) ? (
+      <button type="button" className="underline-offset-2 hover:underline" onClick={() => onOpenFile(path)}>
+        {path}
+      </button>
+    ) : (
+      <span>{path}</span>
     )
-  }
 
-  // Error state
-  if (errorCode) {
-    return (
-      <div role="alert" className="p-3">
-        <p className="text-sm text-destructive">
-          {translate('auto.components.reviewMap.aiSummary.card.error')}
-        </p>
-        {onRegenerate && (
-          <Button variant="outline" size="xs" onClick={onRegenerate} className="mt-2">
-            <RefreshCw className="size-3.5 mr-1" aria-hidden />
-            {translate('auto.components.reviewMap.aiSummary.card.retry')}
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border border-border bg-card text-xs">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <CollapsibleTrigger asChild>
+          <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left font-medium text-foreground">
+            <Sparkles className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{translate(`${BASE}.title`)}</span>
+            <ChevronDown className={`size-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+          </button>
+        </CollapsibleTrigger>
+        {busy ? (
+          <>
+            <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />
+            <Button type="button" variant="ghost" size="xs" onClick={ai.cancel}>
+              {translate(`${BASE}.cancel`)}
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => void ai.preview(chosenLevel)}
+          >
+            {translate(summary ? `${BASE}.regenerate` : `${BASE}.generate`)}
           </Button>
         )}
       </div>
-    )
-  }
 
-  // No data yet
-  if (!model) return null
-
-  return (
-    <section
-      aria-label={translate('auto.components.reviewMap.aiSummary.card.label')}
-      className="border border-border rounded-md overflow-hidden"
-    >
-      {/* Header — always visible */}
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-muted/50 transition-colors"
-        aria-expanded={expanded}
-      >
-        <span>{translate('auto.components.reviewMap.aiSummary.card.label')}</span>
-        {expanded
-          ? <ChevronDown className="size-3.5" aria-hidden />
-          : <ChevronRight className="size-3.5" aria-hidden />}
-      </button>
-
-      {/* Body — collapsed by default */}
-      {expanded && (
-        <div className="px-3 pb-3 space-y-3">
-          {model.title && (
-            <p className="text-xs text-muted-foreground italic">{model.title}</p>
-          )}
-
-          {model.summary && (
-            <p className="text-sm">{model.summary}</p>
-          )}
-
-          {model.sections.map((section) => (
-            <div key={section.id}>
-              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
-                {section.title}
-              </h4>
-              <p className="text-sm whitespace-pre-wrap break-words">{section.body}</p>
-            </div>
-          ))}
-
-          {/* Footer actions */}
-          <div className="flex items-center gap-2 pt-2 border-t border-border">
-            {onRegenerate && (
-              <Button variant="ghost" size="xs" onClick={onRegenerate}>
-                <RefreshCw className="size-3.5 mr-1" aria-hidden />
-                {translate('auto.components.reviewMap.aiSummary.card.regenerate')}
+      <CollapsibleContent className="space-y-2 border-t border-border px-3 py-2">
+        {ai.allowedLevels.length > 1 ? (
+          <div className="flex gap-1" role="group" aria-label={translate(`${BASE}.levelLabel`)}>
+            {ai.allowedLevels.map((level) => (
+              <Button
+                key={level}
+                type="button"
+                size="xs"
+                variant={chosenLevel === level ? 'secondary' : 'outline'}
+                aria-pressed={chosenLevel === level}
+                onClick={() => setChosenLevel(level)}
+              >
+                {translate(`${BASE}.level.${level}`)}
               </Button>
-            )}
-
-            {feedbackGiven === null && onFeedback && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => handleFeedback(true)}
-                  aria-label={translate('auto.components.reviewMap.aiSummary.card.useful')}
-                >
-                  <ThumbsUp className="size-3.5" aria-hidden />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => handleFeedback(false)}
-                  aria-label={translate('auto.components.reviewMap.aiSummary.card.notUseful')}
-                >
-                  <ThumbsDown className="size-3.5" aria-hidden />
-                </Button>
-              </>
-            )}
+            ))}
           </div>
-        </div>
-      )}
-    </section>
+        ) : null}
+
+        {busy ? (
+          <p role="status" className="text-muted-foreground">
+            {translate(ai.state === 'previewing' ? `${BASE}.preparing` : `${BASE}.generating`)}
+          </p>
+        ) : null}
+
+        {ai.state === 'error' && ai.error ? (
+          <div role="status" className="space-y-1">
+            <p className="text-muted-foreground">
+              {translate(`${BASE}.error.${ai.error}`, { seconds: ai.retryAfterSeconds ?? 0 })}
+            </p>
+            {ai.error !== 'forbidden' ? (
+              <Button type="button" variant="outline" size="xs" onClick={() => void ai.preview(chosenLevel)}>
+                {translate(`${BASE}.retry`)}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {summary ? (
+          <div className="space-y-2">
+            <p className="text-muted-foreground">
+              {translate(`${BASE}.disclaimer`)}{' '}
+              {translate(`${BASE}.meta`, { model: summary.model || '—', level: translate(`${BASE}.level.${summary.level === 'diff' ? 'diff' : 'metadata'}`) })}
+            </p>
+            {/* Model output: plain text nodes only (no HTML, no Markdown, no links). */}
+            <p className="whitespace-pre-wrap break-words text-foreground">{summary.summary}</p>
+            {summary.risks.length > 0 ? (
+              <div>
+                <p className="font-medium text-foreground">{translate(`${BASE}.risks`)}</p>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {summary.risks.map((risk, i) => (
+                    <li key={i} className="break-words">
+                      {risk.text}
+                      {risk.refs.length > 0 ? (
+                        <span className="ml-1 text-muted-foreground">
+                          {risk.refs.map((ref, j) => (
+                            <span key={ref}>
+                              {j > 0 ? ', ' : ''}
+                              {fileLink(ref)}
+                            </span>
+                          ))}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {summary.readFirst.length > 0 ? (
+              <div>
+                <p className="font-medium text-foreground">{translate(`${BASE}.readFirst`)}</p>
+                <ul className="space-y-0.5">
+                  {summary.readFirst.map((item) => (
+                    <li key={item.file} className="break-words">
+                      {fileLink(item.file)}
+                      <span className="text-muted-foreground"> — {item.why}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {summary.refsDropped > 0 ? (
+              <p className="text-muted-foreground">{translate(`${BASE}.refsDropped`, { count: summary.refsDropped })}</p>
+            ) : null}
+            {onFeedback ? (
+              <div className="flex gap-1">
+                <Button type="button" variant="outline" size="xs" onClick={() => onFeedback('helpful')}>
+                  {translate(`${BASE}.helpful`)}
+                </Button>
+                <Button type="button" variant="outline" size="xs" onClick={() => onFeedback('incorrect')}>
+                  {translate(`${BASE}.incorrect`)}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : ai.state === 'idle' ? (
+          <p className="text-muted-foreground">{translate(`${BASE}.idleHint`)}</p>
+        ) : null}
+      </CollapsibleContent>
+
+      <AiSummaryDataPreviewDialog
+        open={ai.state === 'awaiting-consent'}
+        manifest={ai.manifest}
+        onConfirm={() => void ai.confirmAndGenerate()}
+        onCancel={ai.cancel}
+        translate={translate}
+      />
+    </Collapsible>
   )
 }

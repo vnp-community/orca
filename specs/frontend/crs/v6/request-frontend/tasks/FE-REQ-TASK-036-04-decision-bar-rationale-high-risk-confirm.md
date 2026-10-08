@@ -5,7 +5,7 @@
 **Area:** frontend / request / decision
 **File:** `frontend/src/renderer/src/components/request/decision/{DecisionRationaleField,HighRiskDecisionConfirmDialog,DecisionHistoryList}.tsx`, `decision-rules.ts` (mới); `components/request/solution/SolutionDecisionBar.tsx`, `hooks/useSolutionDecision.ts` (sửa, FE-REQ-TASK-020-04); `components/request/plan/PlanApprovalBar.tsx` (sửa, 021-04); test cùng tên
 **Depends on:** FE-REQ-TASK-036-01, 036-02, FE-REQ-TASK-020-04 (`SolutionDecisionBar`, `useSolutionDecision`, `RejectReasonDialog`), 021-04
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest decision/decision-rules (5), DecisionComponents (8), SolutionDecisionBar.decision (11), useSolutionDecision (+2), RequestPlanTab pass)
 
 ## Context
 
@@ -73,3 +73,7 @@
 - So khớp NFC phải giống server; chênh lệch ở ký tự Unicode lạ có thể khiến client báo khớp mà server từ chối: server luôn thắng, UI hiển thị lỗi cạnh ô.
 - Nhiều lớp xác nhận (lý do, gõ tên, chấp nhận rủi ro) có thể gây mệt mỏi bấm cho qua; không thêm lớp nào ngoài bảng này.
 - `PlanApprovalBar` và `SolutionDecisionBar` do SOL-020, 021 sở hữu: chỉ thêm đúng phần Decision, tránh xung đột.
+
+## Ghi chú triển khai (2026-10-07)
+
+Không có `decision.record`: lý do đi theo `solution.choose {rationale}`; `HighRiskDecisionConfirmDialog` → `decision.confirm` → `approval.approve`. `approveSelected(optionId, comment, extras)` thêm tham số thứ ba (additive). Khoá nút Duyệt Plan: `planBlockedByDecision(useDecisions)` — chặn khi có Decision của solution mà chưa cái nào `effective`; không có Decision/`unsupported` thì không chặn. Khoá "Duyệt" khi digest đổi so với Approval.

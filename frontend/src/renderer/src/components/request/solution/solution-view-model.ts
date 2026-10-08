@@ -230,7 +230,7 @@ export function validateRejectReason(text: string): { ok: boolean; length: numbe
 
 export function clampFeedback(text: string): string {
   const chars = [...text]
-  if (chars.length <= FEEDBACK_MAX_LENGTH) return text
+  if (chars.length <= FEEDBACK_MAX_LENGTH) {return text}
   return chars.slice(0, FEEDBACK_MAX_LENGTH).join('')
 }
 
@@ -243,7 +243,7 @@ export function pickPendingApproval(approvals: Approval[], solution: Solution): 
   const exact = approvals.find(
     (a) => a.status === 'pending' && a.subjectId === solution.id
   )
-  if (exact) return exact
+  if (exact) {return exact}
 
   // Fallback: any pending approval of the same subjectType (assumption noted)
   const fallback = approvals.find(

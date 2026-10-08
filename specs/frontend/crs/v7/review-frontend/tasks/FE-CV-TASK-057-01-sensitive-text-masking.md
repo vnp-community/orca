@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/sensitive-text-masking.ts` (mới), `sensitive-text-masking.test.ts` (mới)
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: sensitive-text-masking.test.ts 19/19 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -34,3 +34,9 @@
 ## Rủi ro
 
 - Che thừa gây khó đọc, che thiếu gây lộ; mẫu là đề xuất, chưa đối chiếu với backend. Regex cần chống ReDoS (test dữ liệu xấu).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tạo `frontend/src/renderer/src/components/review-map/sensitive-text-masking.ts` (+ `.test.ts`). `maskSensitiveText` và `maskSensitiveRecord` đúng chữ ký spec; quét có chặn độ dài (không backtrack vô hạn), test 1 MB dữ liệu xấu < 5 s.
+- Quy tắc hex: chỉ che hex khi đứng sau khoá nhạy cảm hoặc ≥ 64 ký tự; chuỗi base64-like ≥ 32 ký tự chỉ bị che khi có đủ chữ hoa, chữ thường và chữ số (không đụng snake_case, đường dẫn, UUID). `masked` là `output !== input` nên lần chạy thứ hai trả `masked:false` (idempotent về văn bản).
+- Chạy: `cd frontend && npx vitest run --config config/vitest.config.ts src/renderer/src/components/review-map/sensitive-text-masking.test.ts`.

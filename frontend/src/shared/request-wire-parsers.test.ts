@@ -210,3 +210,31 @@ describe('parseRequestTypeHistoryEntry', () => {
     expect(result.toType).toBe('unknown')
   })
 })
+
+describe('CONTRACT-request-ui-api shapes (CR-REQ-018 reconciliation)', () => {
+  it("maps status 'new' to submitted and reads flat source fields", () => {
+    const r = parseRequest({
+      id: 'r1', status: 'new', type: null, sourceProvider: 'jira', sourceRef: 'ABC-1',
+      sourceUrl: 'https://x.example/ABC-1', returnedBy: 'u1'
+    })
+    expect(r.status).toBe('submitted')
+    expect(r.type).toBe('unknown')
+    expect(r.source).toEqual({ provider: 'jira', ref: 'ABC-1', url: 'https://x.example/ABC-1', site: undefined })
+    expect(r.returnedById).toBe('u1')
+  })
+
+  it('reads typeHistory entries that use `at`', () => {
+    const e = parseRequestTypeHistoryEntry({ fromType: null, toType: 'bug', actorKind: 'user', at: '2026-01-01T00:00:00Z' })
+    expect(e.occurredAt).toBe('2026-01-01T00:00:00Z')
+    expect(e.fromType).toBe('unknown')
+    expect(e.id).not.toBe('')
+  })
+
+  it('reads approvals with decidedBy / dueAt and aliased subject types', () => {
+    const a = parseApproval({ id: 'a', subjectType: 'task_list', status: 'approved', decidedBy: 'u', decidedAt: 'd', dueAt: 'due', createdAt: 'c' })
+    expect(a.subjectType).toBe('plan')
+    expect(a.approverId).toBe('u')
+    expect(a.expiresAt).toBe('due')
+    expect(a.updatedAt).toBe('d')
+  })
+})

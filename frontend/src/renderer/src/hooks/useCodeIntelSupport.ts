@@ -20,7 +20,7 @@ const POLL_INTERVAL_MS = 60_000
 const SETTINGS_METHOD = 'codeIntel.settings.get'
 
 // Error kinds that should keep previous state (transient failures)
-const KEEP_PREVIOUS_KINDS = new Set(['offline', 'rate_limited', 'unknown'])
+const KEEP_PREVIOUS_KINDS = new Set(['offline', 'rate-limited', 'timeout', 'unknown'])
 
 // Error kinds that map to 'disabled'
 const DISABLED_KINDS = new Set(['disabled'])
@@ -35,7 +35,7 @@ type CallResult =
 /**
  * Map a settings.get result to CodeIntelSupportState.
  */
-function mapSettingsResult(
+export function mapSettingsResult(
   result: unknown,
   previous: CodeIntelSupportState
 ): CodeIntelSupportState {
@@ -46,7 +46,8 @@ function mapSettingsResult(
   const r = result as Record<string, unknown>
   const effective = r.effective as Record<string, boolean> | undefined
 
-  if (r.enabled === false) {
+  // Contract §6: settings.get effective.codeIntelEnabled is the single source of truth.
+  if (effective?.codeIntelEnabled === false) {
     return { state: 'disabled', effective: null }
   }
 
@@ -105,18 +106,14 @@ export function useCodeIntelSupport({
   isReviewTabOpen,
   callSettings
 }: UseCodeIntelSupportOpts): UseCodeIntelSupportResult {
-  const setCodeIntelSupportState = useAppStore((s) => s.setCodeIntelSupportState as (state: CodeIntelSupportState) => void)
-  const supportState = useAppStore((s) => {
-    // Read from code-intel slice (050-10)
-    const sliceState = s as Record<string, unknown>
-    return (sliceState.codeIntelSupportState as CodeIntelSupportState | undefined) ?? { state: 'unknown' }
-  })
+  const setCodeIntelSupportState = useAppStore((s) => s.setCodeIntelSupportState)
+  const supportState = useAppStore((s) => s.codeIntelSupportState)
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    if (!isReviewTabOpen || !worktreeId) return
+    if (!isReviewTabOpen || !worktreeId) {return}
 
     async function poll() {
       abortRef.current?.abort()
@@ -140,9 +137,9 @@ export function useCodeIntelSupport({
           )
         }
 
-        if (ctrl.signal.aborted) return
+        if (ctrl.signal.aborted) {return}
 
-        const prev = useAppStore.getState().codeIntelSupportState as CodeIntelSupportState | undefined ?? { state: 'unknown' }
+        const prev: CodeIntelSupportState = useAppStore.getState().codeIntelSupportState ?? { state: 'unknown' }
 
         if (result.ok) {
           setCodeIntelSupportState(mapSettingsResult(result.result, prev))
@@ -161,10 +158,10 @@ export function useCodeIntelSupport({
     }, POLL_INTERVAL_MS)
 
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current)
+      if (pollingRef.current) {clearInterval(pollingRef.current)}
       abortRef.current?.abort()
     }
-  }, [worktreeId, environmentId, isReviewTabOpen, callSettings])
+  }, [worktreeId, environmentId, isReviewTabOpen, callSettings, setCodeIntelSupportState])
 
   return { supportState }
 }

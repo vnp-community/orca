@@ -5,7 +5,7 @@
 **Area:** frontend / renderer runtime
 **File:** `frontend/src/renderer/src/runtime/request-rpc-client.ts` (mới), `frontend/src/renderer/src/lib/request-event-bus.ts` (mới), test `request-rpc-client.test.ts`, `request-event-bus.test.ts`
 **Depends on:** FE-REQ-TASK-018-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: request-rpc-client.test.ts + request-event-bus.test.ts pass)
 
 ## Context
 

@@ -1,117 +1,88 @@
-/**
- * review-telemetry.test.ts — FE-CV-TASK-095-03
- *
- * Tests for review telemetry bucket helpers.
- * Mocks track() to verify payloads stay coarse.
- */
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+const track = vi.hoisted(() => vi.fn())
+vi.mock('./telemetry', () => ({ track }))
+
+import { eventSchemas } from '../../../shared/telemetry-events'
 import {
   bucketCount,
+  bucketDwellMs,
   bucketLarge,
   bucketLatencyMs,
-  bucketDwellMs,
   toToolBucket,
-  trackReviewTabOpened,
-  trackReviewLensChanged,
-  trackReviewReportExported,
+  trackQualityFindingTriaged,
+  trackQualityGateViewed,
+  trackReviewAiSummary,
+  trackReviewDecisionMade,
+  trackReviewFindingsSummary,
+  trackReviewLensViewed,
+  trackReviewOpened,
+  trackReviewReportExported
 } from './review-telemetry'
 
-vi.mock('./telemetry', () => ({ track: vi.fn() }))
+beforeEach(() => track.mockClear())
 
-import { track } from './telemetry'
-const mockTrack = track as ReturnType<typeof vi.fn>
+describe('buckets', () => {
+  it.each([
+    [0, '0'], [1, '1'], [2, '2-3'], [3, '2-3'], [4, '4-10'], [10, '4-10'], [11, '11+'], [999, '11+'], [-5, '0'], [Number.NaN, '0'], [2.9, '2-3']
+  ])('bucketCount(%s) = %s', (n, expected) => expect(bucketCount(n)).toBe(expected))
 
-beforeEach(() => {
-  mockTrack.mockClear()
-})
+  it.each([
+    [0, '0'], [1, '1-3'], [3, '1-3'], [4, '4-10'], [10, '4-10'], [11, '11-30'], [30, '11-30'], [31, '31+']
+  ])('bucketLarge(%s) = %s', (n, expected) => expect(bucketLarge(n)).toBe(expected))
 
-// ---------------------------------------------------------------------------
-// Bucket helpers
-// ---------------------------------------------------------------------------
+  it.each([
+    [0, '<1m'], [59_999, '<1m'], [60_000, '<5m'], [299_999, '<5m'], [300_000, '<30m'], [1_800_000, '<4h'], [14_400_000, '>=4h']
+  ])('bucketLatencyMs(%s) = %s', (ms, expected) => expect(bucketLatencyMs(ms)).toBe(expected))
 
-describe('bucketCount', () => {
-  it('returns 0 for n=0', () => expect(bucketCount(0)).toBe('0'))
-  it('returns 1-5 for n=1', () => expect(bucketCount(1)).toBe('1-5'))
-  it('returns 1-5 for n=5', () => expect(bucketCount(5)).toBe('1-5'))
-  it('returns 6-20 for n=6', () => expect(bucketCount(6)).toBe('6-20'))
-  it('returns 6-20 for n=20', () => expect(bucketCount(20)).toBe('6-20'))
-  it('returns 21-50 for n=21', () => expect(bucketCount(21)).toBe('21-50'))
-  it('returns 50+ for n=51', () => expect(bucketCount(51)).toBe('50+'))
-})
+  it.each([
+    [0, '<10s'], [9_999, '<10s'], [10_000, '<1m'], [60_000, '<5m'], [300_000, '>=5m']
+  ])('bucketDwellMs(%s) = %s', (ms, expected) => expect(bucketDwellMs(ms)).toBe(expected))
 
-describe('bucketLarge', () => {
-  it('0→0', () => expect(bucketLarge(0)).toBe('0'))
-  it('1→1', () => expect(bucketLarge(1)).toBe('1'))
-  it('2→2-5', () => expect(bucketLarge(2)).toBe('2-5'))
-  it('5→2-5', () => expect(bucketLarge(5)).toBe('2-5'))
-  it('6→6-20', () => expect(bucketLarge(6)).toBe('6-20'))
-  it('20→6-20', () => expect(bucketLarge(20)).toBe('6-20'))
-  it('21→20+', () => expect(bucketLarge(21)).toBe('20+'))
-})
-
-describe('bucketLatencyMs', () => {
-  it('<1s', () => expect(bucketLatencyMs(999)).toBe('<1s'))
-  it('<5s', () => expect(bucketLatencyMs(1000)).toBe('<5s'))
-  it('<15s', () => expect(bucketLatencyMs(5000)).toBe('<15s'))
-  it('<60s', () => expect(bucketLatencyMs(15000)).toBe('<60s'))
-  it('>=60s', () => expect(bucketLatencyMs(60000)).toBe('>=60s'))
-})
-
-describe('bucketDwellMs', () => {
-  it('<5s for ms=4999', () => expect(bucketDwellMs(4999)).toBe('<5s'))
-  it('<30s for ms=5000', () => expect(bucketDwellMs(5000)).toBe('<30s'))
-  it('<2m for ms=30000', () => expect(bucketDwellMs(30000)).toBe('<2m'))
-  it('>=2m for ms=120000', () => expect(bucketDwellMs(120000)).toBe('>=2m'))
-})
-
-describe('toToolBucket', () => {
-  it('known tool → correct bucket', () => expect(toToolBucket('commit')).toBe('commit'))
-  it('unknown tool → other', () => expect(toToolBucket('something_random')).toBe('other'))
-  it('empty string → other', () => expect(toToolBucket('')).toBe('other'))
-})
-
-// ---------------------------------------------------------------------------
-// Track wrappers
-// ---------------------------------------------------------------------------
-
-describe('trackReviewTabOpened', () => {
-  it('calls track with coarse payload', () => {
-    trackReviewTabOpened({ worktreeFingerprint: 'fp1', trigger: 'click' })
-    expect(mockTrack).toHaveBeenCalledOnce()
-    const [event, payload] = mockTrack.mock.calls[0]
-    expect(event).toBe('review_tab_opened')
-    expect(payload.worktree_fingerprint).toBe('fp1')
-    expect(payload.trigger).toBe('click')
-    // No raw paths, no model/agent_type
-    expect(payload).not.toHaveProperty('model')
-    expect(payload).not.toHaveProperty('agent_type')
+  it('toToolBucket keeps known tools and maps everything else to other', () => {
+    expect(toToolBucket('ESLint')).toBe('eslint')
+    expect(toToolBucket('go test')).toBe('go_test')
+    expect(toToolBucket('golangci-lint')).toBe('golangci_lint')
+    expect(toToolBucket('my-secret-internal-tool')).toBe('other')
+    expect(toToolBucket('')).toBe('other')
+    expect(toToolBucket(null)).toBe('other')
   })
 })
 
-describe('trackReviewLensChanged', () => {
-  it('includes lens_id and previous_lens_id', () => {
-    trackReviewLensChanged({
-      worktreeFingerprint: 'fp2',
-      lensId: 'impact',
-      previousLensId: 'structure',
-    })
-    expect(mockTrack).toHaveBeenCalledOnce()
-    const [, payload] = mockTrack.mock.calls[0]
-    expect(payload.lens_id).toBe('impact')
-    expect(payload.previous_lens_id).toBe('structure')
-  })
-})
+describe('wrappers emit schema-valid payloads', () => {
+  function lastCall(): [string, unknown] {
+    return track.mock.calls.at(-1) as [string, unknown]
+  }
+  function expectValid(): void {
+    const [name, props] = lastCall()
+    const result = eventSchemas[name as keyof typeof eventSchemas].safeParse(props)
+    expect(result.success, JSON.stringify(result.success ? '' : result.error.issues)).toBe(true)
+  }
 
-describe('trackReviewReportExported', () => {
-  it('buckets section_count', () => {
-    trackReviewReportExported({
-      worktreeFingerprint: 'fp3',
-      format: 'markdown',
-      sectionCount: 7,
-    })
-    const [, payload] = mockTrack.mock.calls[0]
-    expect(payload.format).toBe('markdown')
-    expect(payload.section_count).toBe('6-20')
+  it('covers all eight events', () => {
+    trackReviewOpened({ source: 'cmd_k', scope: 'merge_base', lens: 'impact', index: 'fresh', after_agent_turn: true })
+    expectValid()
+    trackReviewLensViewed({ lens: 'quality', dwellMs: 20_000 })
+    expectValid()
+    trackQualityGateViewed({ verdict: 'fail', reasonCount: 7, stale: false, surface: 'source_control', source: 'local' })
+    expectValid()
+    trackReviewDecisionMade({ decision: 'abandon', latencyMs: 5_000_000, usedReview: false, gate: 'none', openFindings: 12 })
+    expectValid()
+    trackReviewFindingsSummary({ shown: 40, dismissed: 3, waived: 1, resolved: 0 })
+    expectValid()
+    trackQualityFindingTriaged({ action: 'waive', reason: 'later', severity: 'error', tool: 'weird-tool', blocking: true })
+    expectValid()
+    trackReviewReportExported({ format: 'html_save', provider: 'gitlab', truncated: false })
+    expectValid()
+    trackReviewAiSummary({ outcome: 'ok', level: 'metadata', cache_hit: false, feedback: 'none' })
+    expectValid()
+    expect(track).toHaveBeenCalledTimes(8)
+  })
+
+  it('never lets a raw count or free-form tool name through', () => {
+    trackQualityGateViewed({ verdict: 'pass', reasonCount: 123456, stale: true, surface: 'review', source: 'ci' })
+    expect(lastCall()[1]).toMatchObject({ reasons: '11+' })
+    trackQualityFindingTriaged({ action: 'dismiss', reason: 'other', severity: 'info', tool: '/home/user/secret-tool', blocking: false })
+    expect(lastCall()[1]).toMatchObject({ tool: 'other' })
   })
 })

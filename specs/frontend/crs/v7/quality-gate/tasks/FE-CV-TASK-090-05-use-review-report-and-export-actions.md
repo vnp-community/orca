@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/use-review-report.ts`, `review-report-export-actions.ts` (mới) + test
 **Depends on:** FE-CV-TASK-085-01, 090-02, 090-04; FE-CV-SOL-050-store-and-query-hooks
-**Status:** [x] DONE — `useReviewReport.ts` hook và export actions chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 7 tests hook + 7 tests export-actions)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - `execCommand` chưa có tiền lệ.
+
+## Ghi chú triển khai (2026-10-07)
+
+Hook theo yêu cầu (không tự gọi), retry inProgress 90 s, copy có fallback textarea và báo lỗi.

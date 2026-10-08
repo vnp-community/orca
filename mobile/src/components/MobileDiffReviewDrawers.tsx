@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native'
-import { Check, Copy, FileText, Plus, Send, Trash2, X } from 'lucide-react-native'
+import { Check, Copy, FileText, ListChecks, Plus, Send, Trash2, X } from 'lucide-react-native'
 import type { DiffComment } from '../vendor-shared/shared/types'
 import { colors } from '../theme/mobile-theme'
 import type { ActionSheetAction } from './ActionSheetModal'
@@ -144,6 +144,12 @@ function useOverflowActions(controller: ReturnType<typeof useMobileDiffReviewCon
         icon: FileText,
         disabled: !controller.currentItem || controller.currentItem.scope === 'branch',
         onPress: () => void controller.openInSession()
+      },
+      {
+        label: 'Review Summary',
+        icon: ListChecks,
+        disabled: !controller.onOpenReviewSummary,
+        onPress: () => controller.onOpenReviewSummary?.()
       }
     ],
     [controller]

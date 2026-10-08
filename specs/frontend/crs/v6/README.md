@@ -61,3 +61,23 @@ Nguyên tắc: UI chỉ làm sau khi RPC và kênh WS tương ứng chạy ở b
 - Task dài 36 đến 100 dòng, dòng dày. Đã lấy mẫu, chưa đọc toàn bộ 54 task.
 - Hiệu năng xyflow với hàng trăm node, `var()` trong SVG, chế độ sáng và tối, màn hình hẹp, di động: chưa kiểm chứng. Các ngưỡng (50 node, 2.000 node, mức zoom, 10 ký tự lý do) là đề xuất.
 - GitNexus `impact` và `detect_changes` chưa chạy; các task nhắc phải chạy trước khi sửa symbol có sẵn.
+
+## Trạng thái triển khai (cập nhật 2026-10-08)
+
+Trạng thái dưới đây được tổng hợp từ dòng `**Status:**` của từng task, **sau khi đã đối chiếu với code và chạy test thật** (không còn dấu DONE hàng loạt như đợt soạn spec). Quy ước: `[x] DONE` chỉ khi file tồn tại, test của task tồn tại và chạy qua, không thêm lỗi `tsc`/`oxlint` ở file đó; `[~] PARTIAL` ghi rõ phần thiếu; `[!] BLOCKED` ghi phụ thuộc; `[ ] TODO` chưa làm. Tên file thực tế có thể khác spec (ghi ở "Ghi chú triển khai" cuối mỗi task).
+
+| Feature | CR | Task | DONE | PARTIAL | BLOCKED | TODO |
+|---|---|---|---|---|---|---|
+| `request-frontend` | CR-REQ-018 | 6 | 4 | 2 | 0 | 0 |
+| `request-frontend` | CR-REQ-019 | 7 | 5 | 2 | 0 | 0 |
+| `request-frontend` | CR-REQ-020 | 5 | 4 | 1 | 0 | 0 |
+| `request-frontend` | CR-REQ-021 | 6 | 5 | 1 | 0 | 0 |
+| `request-frontend` | CR-REQ-022 | 7 | 7 | 0 | 0 | 0 |
+| `request-frontend` | CR-REQ-023 | 7 | 7 | 0 | 0 | 0 |
+| `request-frontend` | CR-REQ-032 | 8 | 4 | 3 | 1 | 0 |
+| `request-frontend` | CR-REQ-036 | 8 | 3 | 5 | 0 | 0 |
+| **Tổng** | | **54** | **39** | **14** | **1** | **0** |
+
+**Kiểm chứng tổng (2026-10-08):** toàn bộ test frontend: 27 file fail / 2 391 (baseline trước khi triển khai: 46 / 2 054); 81 test fail / 20 482 (baseline 281 / 17 864); `tsc -p frontend/tsconfig.json`: 117 lỗi (baseline 184), không lỗi nào ở file của series này. Các test fail còn lại thuộc nơi khác (ví dụ `no-top-level-translate` ở `FleetServerStatusBadge`, `remote-runtime-shared-control-boundary`, `selectors.test`). Hai file `WorktreeCard.*` thỉnh thoảng fail khi chạy gộp do tải (timeout), chạy riêng thì qua.
+
+**Chưa kiểm chứng được trong môi trường này:** e2e Playwright (không có Chromium), build/bundle, `verify:localization-*` (thiếu script), kiểm tay trên Electron/thiết bị thật, typecheck của `mobile/` (chưa cài phụ thuộc), bản dịch es/ja/ko/zh cần người duyệt.

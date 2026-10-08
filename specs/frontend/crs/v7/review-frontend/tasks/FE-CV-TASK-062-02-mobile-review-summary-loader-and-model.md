@@ -5,7 +5,7 @@
 **Area:** mobile / session (hàm thuần + loader)
 **File:** `mobile/src/session/mobile-review-summary-loaders.ts`, `mobile-review-summary-model.ts` (mới) + test
 **Depends on:** FE-CV-TASK-062-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest mobile-review-summary-loaders.test.ts + -model.test.ts PASS; oxlint clean)
 
 ## Context
 
@@ -29,3 +29,7 @@
 ## Rủi ro
 
 - Thông điệp `reason` chưa có bản dịch (mobile không i18n).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Thêm `canOpenMobileReviewFindingDiff`, `mobileReviewTruncationLabel` ở model. Thông điệp `unavailable` bằng tiếng Anh cố định (mobile không i18n).

@@ -5,7 +5,7 @@
 **Area:** frontend (components)
 **File:** trong `frontend/src/renderer/src/components/request/approval/` (mới): `ApprovalRow.tsx`, `ApprovalList.tsx`, `ApprovalSubjectIcon.tsx`, `ApprovalDueLabel.tsx`, `ApprovalInboxToolbar.tsx`, `ApprovalSubjectFilter.tsx`, `ApprovalInboxStates.tsx` và test cùng tên
 **Depends on:** FE-REQ-TASK-022-01, 022-03, 022-04; FE-REQ-SOL-018 (`RequestTypeBadge`); FE-REQ-SOL-020 (`RejectReasonDialog`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: approval/ApprovalRow 13, ApprovalList 4, ApprovalInboxStates 4 tests; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -46,3 +46,7 @@ Chạy (chưa chạy): `pnpm --filter orca-frontend test frontend/src/renderer/s
 
 - Danh sách dài (nhiều trang) chưa ảo hoá; 50 hàng mỗi trang chấp nhận được, đo lại nếu người dùng tải nhiều trang.
 - Trang hộp duyệt chạy trong cửa sổ Electron và web; không dùng API chỉ có ở desktop.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `ProjectFilter` không dựng mới: dùng bộ chọn dự án của `RequestPageHeader` (đọc `listFilters.projectId` từ store). Hàng bọc `div role=option` trong `ApprovalList`; `ApprovalRow` chỉ là nội dung.

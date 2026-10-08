@@ -22,7 +22,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 
 /** Sanitise URL: only http/https links are allowed — blocks javascript: and other schemes */
 function sanitizeUrl(url: string | undefined): string | undefined {
-  if (!url) return undefined
+  if (!url) {return undefined}
   try {
     const parsed = new URL(url)
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {

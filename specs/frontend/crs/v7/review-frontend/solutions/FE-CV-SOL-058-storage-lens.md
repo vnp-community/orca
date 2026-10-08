@@ -1,6 +1,6 @@
 # FE-CV-SOL-058: Lens Lưu trữ (service → kho dữ liệu → topic → secret, chỉ đọc)
 
-> 📋 Proposed. Chưa triển khai. Priority P2 (đợt 6). Viết ngày 2026-10-06 từ khảo sát code `frontend/src` và hợp đồng v7; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 3/5 task DONE (058-01, 02, 04), 2 PARTIAL (058-03 ẩn tab khi `unsupported` nhưng chỉ sau lần mở lens đầu (W6); 058-05 thiếu e2e). Priority P2 (đợt 6). Viết ngày 2026-10-06.
 
 **CR:** [CR-CV-058](../../../../../../docs/crs/v7/review-frontend/CR-CV-058-storage-lens.md)
 **Area:** frontend (`frontend/src/renderer/src/components/review-map/storage/`, hook, khoá slice)
@@ -128,3 +128,10 @@ Hàm thuần: `storage-layout` (tất định, làn đúng, không chồng nút)
 ## 9. Tham chiếu
 
 `/opt/repos/orca/docs/crs/v7/review-frontend/CR-CV-058-storage-lens.md`, `/opt/repos/orca/docs/research/view-code/10-frontend-review-ux.md`, `/opt/repos/orca/guides/STYLEGUIDE.md`, `/opt/repos/orca/frontend/package.json`, `/opt/repos/orca/frontend/src/renderer/src/components/ui/`, `/opt/repos/orca/frontend/src/renderer/src/i18n/no-top-level-translate.test.ts`.
+
+## 10. Ghi chú triển khai (2026-10-07)
+
+- Mã ở `components/review-map/storage/`, `hooks/useCodeIntelStorage.ts`; khoá UI (`storageEnv`, `selectedStorageNodeId`) ở `store/slices/review-ui.ts`. Lens `storage` đã đăng ký `load`. Dùng lại `sensitive-text-masking.ts` của 057-01.
+- Khi backend trả `unsupported`/`disabled`, lens hiện thông báo "không khả dụng" thay vì ẩn tab (ẩn tab cần cơ chế khả dụng theo runtime trong khung, chưa có).
+- Thêm `StorageTextView` (bảng văn bản thay thế). Evidence không đổi chỉ hiện đường dẫn (khung chưa có action mở tệp thường).
+- Việc còn lại: ẩn tab khi `unsupported`; e2e web (073-03).

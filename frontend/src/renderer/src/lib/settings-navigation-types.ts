@@ -32,6 +32,7 @@ export type SettingsNavTarget =
   | 'orchestration'
   | 'servers'
   | 'mcp'
+  | 'code-intel'
   | 'mobile'
   | 'mobile-emulator'
   | 'repo'

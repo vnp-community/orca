@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/` (registry lens của FE-CV-SOL-051, sửa nhỏ)
 **Depends on:** FE-CV-TASK-092-05; FE-CV-SOL-051-review-workspace-shell
-**Status:** [x] DONE — `requirements-lens-registration.ts` chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 2 tests)
 
 ## Context
 
@@ -27,3 +27,7 @@
 ## Rủi ro
 
 - Sửa file thuộc 051.
+
+## Ghi chú triển khai (2026-10-07)
+
+Định nghĩa lens trong `requirements-lens-registration.ts` và liệt kê vào `REVIEW_LENS_DEFINITIONS` (sửa tối thiểu 2 dòng ở review-lens-registry.ts), order 90, `requiresQuality`.

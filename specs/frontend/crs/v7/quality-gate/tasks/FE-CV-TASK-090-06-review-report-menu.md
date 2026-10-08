@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/ReviewReportMenu.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-090-05; FE-CV-SOL-051-review-workspace-shell
-**Status:** [x] DONE — `ReviewReportMenu.tsx` chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: ReviewWorkspace.companions.test 8/8 gồm ca menu hiện khi cờ quality bật / ẩn khi tắt; ReviewReportMenu.test PASS; review-map 130 file PASS)
 
 ## Context
 
@@ -28,3 +28,11 @@
 ## Rủi ro
 
 - Khe của 051 chưa tồn tại.
+
+## Ghi chú triển khai (2026-10-07)
+
+Menu hoàn chỉnh nhưng chưa được mount trong `ReviewSummaryBar`/shell (file của agent shell); cần gắn `<ReviewReportMenu .../>`.
+
+## Ghi chú tích hợp (W6, 2026-10-07)
+
+Mount trong `shell/ReviewCompanionStrip.tsx` cạnh thanh chip. Sai lệch: `provider` chưa được suy ra (truyền `undefined` ⇒ nhãn tổng quát, telemetry `none`; GitLab/Gitea chưa có nhãn riêng), `repoSlug` lấy từ tên worktree.

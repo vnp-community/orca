@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/erd/erd-layout.ts`, `erd-table-filter.ts`, `erd-repository-links.ts` (mới) + `*.test.ts`
 **Depends on:** FE-CV-TASK-057-02
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: erd-layout-filter.test.ts 12/12 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -35,3 +35,8 @@
 ## Rủi ro
 
 - Chất lượng bố cục chưa thử trên dữ liệu thật; ngưỡng là đề xuất. Nếu không đủ tốt, thêm `elkjs` cần duyệt riêng (O5), ngoài task này.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tạo `erd/erd-layout.ts`, `erd/erd-table-filter.ts`, `erd/erd-repository-links.ts`; ba mô-đun được test chung trong `erd/erd-layout-filter.test.ts` (spec nêu ba file test riêng).
+- `filterErdTables` luôn trả `truncated:{shown,total,capped}`. Chế độ `focus` giữ bảng đổi + liền kề + khớp tìm kiếm. Chiều cao nút gồm cả dòng chân "+N cột/Ít cột hơn".

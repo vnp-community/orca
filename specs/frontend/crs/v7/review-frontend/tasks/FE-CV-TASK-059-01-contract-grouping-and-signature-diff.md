@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/contract/contract-grouping.ts`, `contract-detail-rows.ts`, `contract-signature-diff.ts` (mới) + `*.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `ContractChange`, `ContractDiff`); FE-CV-TASK-057-01 (`maskSensitiveText`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: contract-grouping/contract-signature-diff/contract-detail-rows tests 15/15 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -32,3 +32,8 @@
 ## Rủi ro
 
 - Quy ước `details.before|after` chưa được BE chốt; nếu đổi, chỉ sửa `contract-detail-rows.ts`.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Thêm `listContractServices`, bộ lọc chip `compatibility` và `NO_SERVICE_GROUP_KEY=''` (nhóm "(unknown service)" xếp cuối). `onlyChangedByAgent` nhận `changedFiles` qua tham số (không đọc store).
+- Fixture dùng chung: `test-support/contract-findings-fixtures.ts` (mới).

@@ -10,13 +10,15 @@ type SliceState = {
   codeIntelSupportState: ReturnType<typeof createCodeIntelSlice>['codeIntelSupportState']
   codeIntelWorktreeState: ReturnType<typeof createCodeIntelSlice>['codeIntelWorktreeState']
   codeIntelResyncCounter: number
+  codeIntelEventsState: ReturnType<typeof createCodeIntelSlice>['codeIntelEventsState']
 }
 
 function makeSlice() {
   let state: SliceState = {
     codeIntelSupportState: { state: 'unknown' },
     codeIntelWorktreeState: {},
-    codeIntelResyncCounter: 0
+    codeIntelResyncCounter: 0,
+    codeIntelEventsState: 'idle'
   }
   const set = (fn: (prev: SliceState) => Partial<SliceState>) => {
     state = { ...state, ...fn(state) }

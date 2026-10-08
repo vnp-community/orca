@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/components/request/TypeConfirmationCard.tsx`, `ChangeTypeConfirmDialog.tsx`, `RequestHistoryTab.tsx` (đều mới); test cùng tên
 **Depends on:** FE-REQ-TASK-019-03, 018-03
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: request-action-components.test.tsx (TypeConfirmationCard, ChangeTypeConfirmDialog, RequestHistoryTab) pass)
 
 ## Context
 

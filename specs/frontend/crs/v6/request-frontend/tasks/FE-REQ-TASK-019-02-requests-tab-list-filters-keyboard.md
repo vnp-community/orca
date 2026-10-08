@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/components/request/RequestsTab.tsx`, `RequestListToolbar.tsx`, `RequestFilterBar.tsx`, `RequestList.tsx`, `RequestRow.tsx`, `RequestListStates.tsx`, `request-list-keyboard.ts` (đều mới); test cùng tên
 **Depends on:** FE-REQ-TASK-018-03 (`useRequests`), 018-05 (badge, khung), 019-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: RequestsTab.test.tsx 9 tests + request-list-keyboard + request-list-filters pass)
 
 ## Context
 

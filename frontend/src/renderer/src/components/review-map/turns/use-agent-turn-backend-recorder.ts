@@ -1,95 +1,123 @@
 /**
  * use-agent-turn-backend-recorder.ts — FE-CV-TASK-089-04
  *
- * Hook that subscribes to AgentTurnCompletion events and records
- * each completed turn to the backend via quality.turn.record.
- *
- * Rules:
- * - quality flag off → no-op, no store subscription, no RPC
- * - Errors in RPC do NOT block local ReviewTurnMarker creation (SOL-060)
- * - PQ-35: only called from renderer
- * - Prompt excerpts read from settings, not the full text
+ * Samples agent tool use and, when a turn finishes, records metadata to the backend
+ * via `quality.turn.record`. Quality flag off: no store subscription, no RPC.
+ * Errors never reach the UI or block the local review marker (SOL-060).
  *
  * @module components/review-map/turns/use-agent-turn-backend-recorder
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
+import { useAppStore } from '@/store'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { findWorktreeById } from '../../../store/slices/worktree-helpers'
 import { useQualityFeatureFlags } from '../../../hooks/useQualityFeatureFlags'
+import { getCodeIntelClient, classifyCodeIntelError } from '../../../runtime/code-intel-client'
+import { CODE_INTEL_RPC_METHODS } from '../../../../../shared/code-intel-rpc-methods'
+import { createAgentTurnToolCollector } from './agent-tool-use-command-summarizer'
+import { detectAgentTurnCompletions } from './agent-turn-completion-detector'
+import { createAgentTurnRecordQueue } from './agent-turn-record-queue'
+import { buildReviewTurnMarker } from './review-turn-marker-builder'
+import { buildAgentTurnRecordParams } from './agent-turn-record-params'
+import type { AgentTurnRecordParams } from './agent-turn-record-params'
 
-// ---------------------------------------------------------------------------
-// Types (matching the contracts from SOL-060/061 — assumed interface)
-// ---------------------------------------------------------------------------
+// Let git status settle after the agent's final write before reading HEAD / dirty state.
+const GIT_SETTLE_MS = 3000
 
-export type AgentTurnCompletion = {
-  worktreeId: string
-  turnId: string
-  completedAt: number
-  headOid: string | null
-  /** Prompt excerpt — never the full user text */
-  promptExcerpt?: string | null
+type RecordRpcError = Error & { kind: string }
+
+async function sendTurnRecord(params: AgentTurnRecordParams): Promise<void> {
+  const state = useAppStore.getState()
+  const response = await getCodeIntelClient().call(
+    params.worktreeId,
+    CODE_INTEL_RPC_METHODS.QUALITY_TURN_RECORD,
+    params,
+    { environmentId: getRuntimeEnvironmentIdForWorktree(state, params.worktreeId) }
+  )
+  if (!response.ok) {
+    throw Object.assign(new Error(response.error.message), { kind: response.error.kind }) as RecordRpcError
+  }
 }
 
-export type TurnRecordParams = {
-  worktreeId: string
-  turnId: string
-  headOid: string | null
-  promptExcerpt?: string | null
-  completedAt: number
+function classifyRecordError(error: unknown): { kind: string } {
+  const kind = (error as { kind?: unknown } | null)?.kind
+  return typeof kind === 'string' ? { kind } : { kind: classifyCodeIntelError(error).kind }
 }
 
-export type AgentTurnBackendRecorderOpts = {
-  worktreeId: string | null
-  /** Subscribe to turn completion events */
-  onSubscribe: (handler: (event: AgentTurnCompletion) => void) => () => void
-  /** RPC call function */
-  rpcCall?: (method: string, params: TurnRecordParams) => Promise<void>
-}
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
-
-export function useAgentTurnBackendRecorder({
-  worktreeId,
-  onSubscribe,
-  rpcCall,
-}: AgentTurnBackendRecorderOpts): void {
-  const flags = useQualityFeatureFlags(worktreeId)
-  const rpcCallRef = useRef(rpcCall)
-  rpcCallRef.current = rpcCall
+/** Mount once at App level (use-app-agent-turn-recorders). No-op while the quality flag is off. */
+export function useAgentTurnBackendRecorder(opts?: {
+  /** Tenant setting `agentTurnStorePromptExcerpt`; excerpts additionally need a masker, which does not exist yet. */
+  storePromptExcerpt?: boolean
+}): void {
+  const { quality } = useQualityFeatureFlags()
+  const storePromptExcerpt = opts?.storePromptExcerpt ?? false
 
   useEffect(() => {
-    // CR-089: quality flag off → no subscription, no RPC
-    if (!flags.quality || !worktreeId) return
+    if (!quality) {
+      return
+    }
+    const collector = createAgentTurnToolCollector()
+    const queue = createAgentTurnRecordQueue(sendTurnRecord, classifyRecordError)
+    const timers = new Set<ReturnType<typeof setTimeout>>()
 
-    const unsubscribe = onSubscribe(async (event: AgentTurnCompletion) => {
-      if (event.worktreeId !== worktreeId) return
-
-      const params: TurnRecordParams = {
-        worktreeId: event.worktreeId,
-        turnId: event.turnId,
-        headOid: event.headOid,
-        promptExcerpt: event.promptExcerpt ?? null,
-        completedAt: event.completedAt,
+    const unsubscribe = useAppStore.subscribe((state, prevState) => {
+      for (const [paneKey, entry] of Object.entries(state.agentStatusByPaneKey)) {
+        collector.observe(paneKey, entry)
       }
-
-      // Fire and forget — RPC errors do NOT block local turn marker creation
-      void (async () => {
-        try {
-          if (rpcCallRef.current) {
-            await rpcCallRef.current('quality.turn.record', params)
-          } else {
-            // Production path: use code-intel client
-            const { getCodeIntelClient } = await import('../../../runtime/code-intel-client')
-            const client = getCodeIntelClient()
-            await client.call(worktreeId, 'quality.turn.record', params, {})
+      for (const { paneKey, entry } of detectAgentTurnCompletions(
+        prevState.agentStatusByPaneKey,
+        state.agentStatusByPaneKey
+      )) {
+        const commands = collector.take(paneKey)
+        const timer = setTimeout(() => {
+          timers.delete(timer)
+          const current = useAppStore.getState()
+          const worktreeId = entry.worktreeId ?? ''
+          const summary = current.gitBranchCompareSummaryByWorktree[worktreeId]
+          const status = current.gitStatusByWorktree[worktreeId] ?? []
+          // Why: same per-file identity the local ReviewTurnMarker stores, so both records agree.
+          const marker = buildReviewTurnMarker({
+            worktreeId,
+            paneKey,
+            entry,
+            headOid: summary?.headOid ?? null,
+            baseOid: summary?.baseOid ?? null,
+            mergeBase: summary?.mergeBase ?? null,
+            statusEntries: status,
+            symbolKeys: null
+          })
+          const params = buildAgentTurnRecordParams({
+            projectId: findWorktreeById(current.worktreesByRepo, worktreeId)?.projectId,
+            worktreeId,
+            entry: {
+              paneKey,
+              agentType: entry.agentType,
+              prompt: entry.prompt,
+              doneAt: entry.stateStartedAt,
+              stateHistory: entry.stateHistory,
+              interrupted: entry.interrupted
+            },
+            headOid: summary?.headOid,
+            treeDirty: status.length > 0,
+            fileIdentities: marker.files.map((f) => `${f.p}|${f.h}`),
+            commands,
+            storePromptExcerpt
+          })
+          if (params) {
+            queue.enqueue(params)
           }
-        } catch {
-          // Non-fatal: local ReviewTurnMarker was already created by SOL-060
-        }
-      })()
+        }, GIT_SETTLE_MS)
+        timers.add(timer)
+      }
     })
 
-    return unsubscribe
-  }, [flags.quality, worktreeId, onSubscribe])
+    return () => {
+      unsubscribe()
+      queue.dispose()
+      for (const timer of timers) {
+        clearTimeout(timer)
+      }
+    }
+  }, [quality, storePromptExcerpt])
 }

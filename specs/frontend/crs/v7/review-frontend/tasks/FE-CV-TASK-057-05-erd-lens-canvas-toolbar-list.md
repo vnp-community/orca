@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/erd/{ErdLens,ErdToolbar,ErdCanvas,ErdTableNode,ErdGhostTableNode,ErdSchemaGroupNode,ErdRelationEdge,ErdColumnRow,ErdTableList,ErdLegend,ErdWarningsStrip}.tsx` (mới) + test; `review-lens-registry.ts` (SOL-051, thêm một mục đăng ký `id:'erd'`)
 **Depends on:** FE-CV-TASK-057-02, 057-03, 057-04; FE-CV-SOL-051-review-workspace-shell (`ReviewLensProps`, `ReviewViewStateScreen`, `usePerceivedLoadingStage`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: erd/*.test.tsx 25/25 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -36,3 +36,9 @@
 ## Rủi ro
 
 - Hiệu năng 150 nút và chiều cao nút thay đổi khi mở rộng (chạy lại layout cục bộ có debounce) chưa đo.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tạo `ErdLens`, `ErdToolbar`, `ErdCanvas`, `ErdTableNode`, `ErdColumnRow`, `ErdGhostTableNode`, `ErdSchemaGroupNode`, `ErdRelationEdge`, `ErdTableList`, `ErdLegend`, `ErdWarningsStrip`, `erd-change-style.ts`; đăng ký `load` cho lens `erd` trong `review-lens-registry.ts`.
+- Sai lệch: `ErdRelationEdge.tsx` không phải component edge tuỳ chỉnh mà là hàm dựng style cạnh + nhãn nguồn (tooltip `source` nằm ở chi tiết bảng; cạnh `naming` mang nhãn "suy luận"). Danh sách chỉ ảo hoá khi > 60 dòng (test happy-dom không có layout). Chi tiết bảng hiển thị trong cột phải của lens (chưa cắm vào `SymbolDetailPanel`).
+- Đăng ký lens làm hỏng `ReviewLensTabs.test.tsx` (giả định `erd` chưa có loader): đã đổi test dùng lens giả không loader.

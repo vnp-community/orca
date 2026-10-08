@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/use-source-control-quality-gate.ts` (mới) + `.test.tsx`
 **Depends on:** FE-CV-TASK-085-01, 085-02; FE-CV-SOL-050-store-and-query-hooks (bus sự kiện, `codeIntelClient`); FE-CV-SOL-061-review-entry-points (`openReviewFromEntryPoint`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 10 tests use-source-control-quality-gate.test.tsx)
 
 ## Context
 
@@ -36,3 +36,7 @@
 ## Rủi ro
 
 - Tên API 050/061 là giả định; `projectId` thiếu ở workspace cũ.
+
+## Ghi chú triển khai (2026-10-07)
+
+Gọi `codeIntel.quality.gate` thật qua `getCodeIntelClient`; timeout 3 s chỉ là timeout hiển thị; sự kiện `gateChanged/qualityFinished`; `runChecks` = profile.get + quality.start(scope changed). Thêm `verdict`, `reasonCount` cho telemetry. `openReason` mở tab Review qua `ensureReviewTab` (chưa có lens quality / `openReviewFromEntryPoint` của SOL-061).

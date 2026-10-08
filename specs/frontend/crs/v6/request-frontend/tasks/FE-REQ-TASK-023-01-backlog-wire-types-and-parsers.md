@@ -5,7 +5,7 @@
 **Area:** frontend (shared types, parser thuần)
 **File:** `frontend/src/shared/request-backlog-types.ts` (mới), `frontend/src/shared/request-backlog-types.test.ts` (mới)
 **Depends on:** FE-REQ-SOL-018 (`request-types.ts`: `RequestType`, `ReturnedFromStage`; `request-wire-parsers.ts`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: request-backlog-types.test.ts 7/7; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -45,3 +45,7 @@ Chạy (chưa chạy): `pnpm --filter orca-frontend test frontend/src/shared/req
 
 - Tên trường camelCase là giả định cho tới khi CR-016 chốt; một test "snake_case chấp nhận" bảo vệ khỏi lệch nhẹ nhưng nên xoá nhánh này khi chốt (đánh dấu `// TODO` ngắn kèm lý do).
 - Không có `total` trong `ListBacklogResponse`: không khai báo trường `total`.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `BacklogView` giữ kiểu có sẵn `'requests'|'tasks'|'execute'` (slice đang dùng) thay vì đổi sang số ít; `BACKLOG_RPC_BY_VIEW` map theo giá trị đó. Hai kiểu phẳng `TaskBacklogItem`/`ExecuteBacklogItem` ở `request-types.ts` vẫn còn (không còn nơi dùng ngoài `parseBacklogItem`).

@@ -48,6 +48,10 @@ import { createNewIssueDraftSlice } from './new-issue-draft'
 import { createProvisioningSlice } from './provisioning'
 import { createBootstrapSlice } from './bootstrap'
 import { createAuthSlice } from './auth'
+import { createCodeIntelSlice } from './code-intel'
+import { createCodeIntelQualitySlice } from './code-intel-quality-state'
+import { createReviewUiSlice } from './review-ui'
+import { createReviewProgressSlice } from './review-progress'
 import { translate } from '@/i18n/i18n'
 
 export const TEST_REPO = {
@@ -99,7 +103,11 @@ export function createTestStore() {
     ...createNewIssueDraftSlice(...a),
     ...createProvisioningSlice(...a),
     ...createBootstrapSlice(...a),
-    ...createAuthSlice(...a)
+    ...createAuthSlice(...a),
+    ...createCodeIntelSlice(a[0] as never, a[1] as never),
+    ...createCodeIntelQualitySlice(a[0] as never, a[1] as never),
+    ...createReviewUiSlice(...a),
+    ...createReviewProgressSlice(...a)
   }))
 }
 

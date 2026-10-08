@@ -1,6 +1,6 @@
 # FE-CV-SOL-053-impact-lens-and-symbol-detail: Lens Ảnh hưởng, panel chi tiết symbol, liên kết hai chiều với diff, mã hoá lớp phủ
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🚧 Triển khai 2026-10-07: 7/8 task DONE (053-01..07; W6: 053-04 đã có dòng index cũ), 1 PARTIAL (053-08 thiếu e2e). Test: impact/*, review-overlay-model, review-diff-navigation, diff-cursor-line-bus, use-diff-line-reveal, i18n coverage đều xanh. Còn mở: kiểm tay `var()` trong SVG xyflow, O-13.
 
 **CR:** [CR-CV-053](../../../../../../docs/crs/v7/review-frontend/CR-CV-053-impact-lens-and-symbol-detail.md)
 **Area:** frontend (`components/review-map`, `components/editor`, `store/slices/editor.ts`, `lib`)
@@ -123,3 +123,7 @@ Thứ tự: 053-01 → 053-02 → 053-03; 053-04; 053-05 → 053-06 → 053-07 �
 ## 12. Tham chiếu
 
 `/opt/repos/orca/docs/crs/v7/review-frontend/CR-CV-053-impact-lens-and-symbol-detail.md`, `/opt/repos/orca/specs/backend-go/crs/v7/CONTRACT-codeintel-ui-api.md`, `/opt/repos/orca/frontend/src/renderer/src/components/editor/{DiffViewer.tsx,EditorContent.tsx,check-annotation-open.ts}`, `/opt/repos/orca/frontend/src/renderer/src/store/slices/editor.ts`, `/opt/repos/orca/guides/STYLEGUIDE.md`.
+
+## 13. Ghi chú triển khai (2026-10-07)
+
+Xem ghi chú cuối `tasks/FE-CV-TASK-053-08-*.md` (sai lệch so với spec).

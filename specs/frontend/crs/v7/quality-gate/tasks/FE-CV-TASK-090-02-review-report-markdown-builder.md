@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/review-report-markdown.ts` (mới) + test
 **Depends on:** FE-CV-TASK-090-01, 090-03
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 14 tests)
 
 ## Context
 
@@ -33,3 +33,7 @@
 ## Rủi ro
 
 - Render Mermaid ở nhà cung cấp chưa kiểm chứng.
+
+## Ghi chú triển khai (2026-10-07)
+
+Markers `<!-- orca-review:start/end -->`, ngân sách 20 000 ký tự cắt theo khối, escape bảng, chữ không overclaim, `extraSections`.

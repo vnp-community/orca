@@ -1,6 +1,6 @@
 # FE-CV-SOL-087-quality-trend-coverage-hotspot: Phủ test, diff coverage, xu hướng theo lượt, hotspot, DSM
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng. Solution 3/3 của CR-CV-087 ([1](./FE-CV-SOL-087-quality-scorecard-and-state.md), [2](./FE-CV-SOL-087-quality-diff-annotations.md)). Phân pha theo dữ liệu: **pha 2** (coverage, xu hướng) cần CR-083/085; **pha 3** (hotspot, DSM) cần dữ liệu CR-037.
+> Đã triển khai và kiểm thử (2026-10-07): tasks 087-15..20 DONE — 4 hook, 5 bộ chuyển đổi thuần, 4 panel (Coverage, Trend, Hotspot, Dependency) đăng ký lazy trong `quality-lens-blocks.ts`, fake data và i18n 5 locale. Còn thiếu: spec e2e (chỉ kế hoạch); coverage theo D5 là tỉ lệ 0..1.
 
 **CR:** [CR-CV-087](../../../../../../docs/crs/v7/quality-visualization/CR-CV-087-quality-frontend-scorecard-and-annotations.md) mục 2.8
 **Area:** frontend (`components/review-map/quality/`, `hooks/`, `store`)

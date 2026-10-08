@@ -5,7 +5,7 @@
 **Area:** frontend / theme tokens
 **File:** `frontend/src/renderer/src/assets/main.css` (sửa; chèn sau `--annotation-highlight` ở `:root` (:206) và `.dark` (:294) và khối `@theme inline` cạnh `--color-status-success*` (:101-103))
 **Depends on:** không (làm được ngay, không cần backend)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: quality-token-parity 3/3 + quality-token-contrast; tokens in :root/.dark/@theme inline)
 
 ## Context
 
@@ -37,3 +37,7 @@
 
 - Biến `--color-*` của Tailwind 4 có thể không có khi không dùng utility (chưa kiểm chứng); dự phòng ở Việc 3.
 - Hai ô dưới 4,5 trên `muted` (`--quality-error` sáng 4,47; `--quality-unknown` sáng 4,35): không sửa token, chặn bằng quy tắc dùng ở 088-02.
+
+## Ghi chú triển khai (2026-10-07)
+
+Lệch: `--quality-warning/info` dùng giá trị oklch trực tiếp (amber-700/400, sky-700/400) thay vì `var(--color-amber-*)` để tránh rủi ro Tailwind 4 không phát biến chưa dùng (đã ghi "Why" trong main.css). Chưa kiểm tay trên bản dựng.

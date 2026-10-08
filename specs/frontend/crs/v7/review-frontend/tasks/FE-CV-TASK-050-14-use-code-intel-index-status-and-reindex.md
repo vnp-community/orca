@@ -5,7 +5,7 @@
 **Area:** frontend / hooks
 **File:** `hooks/useCodeIntelIndexStatus.ts`, `hooks/useCodeIntelReindex.ts` (mới), tests
 **Depends on:** FE-CV-TASK-050-10, FE-CV-TASK-050-11, FE-CV-TASK-050-13
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: useCodeIntelIndexStatus.test 7 + useCodeIntelReindex.test 8 pass)
 
 ## Context
 

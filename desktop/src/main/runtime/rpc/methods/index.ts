@@ -65,6 +65,7 @@ import { CLAUDE_ACCOUNTS_METHODS } from './claude-accounts'
 import { CODEX_ACCOUNTS_METHODS } from './codex-accounts'
 import { AGENT_STATUS_METHODS } from './agent-status'
 import { MOBILE_METHODS } from './mobile'
+import { CODE_INTEL_METHODS } from './code-intel'
 import { STAR_NAG_METHODS } from './star-nag'
 import { ORCA_PROFILES_METHODS } from './orca-profiles'
 import { ONBOARDING_METHODS } from './onboarding'
@@ -145,6 +146,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...CODEX_ACCOUNTS_METHODS,
   ...AGENT_STATUS_METHODS,
   ...MOBILE_METHODS,
+  ...CODE_INTEL_METHODS,
   ...STAR_NAG_METHODS,
   ...ORCA_PROFILES_METHODS,
   ...ONBOARDING_METHODS,

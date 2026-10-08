@@ -25,6 +25,8 @@ export type ActivityBarItem = {
   folderOnly?: boolean
   /** When true, shown only for worktrees that belong to an SSH repo. */
   sshOnly?: boolean
+  /** When true, shown only while the code-intel flag is on. */
+  codeIntelOnly?: boolean
 }
 
 const STATUS_DOT_COLOR: Record<CheckStatus, string> = {
@@ -38,13 +40,17 @@ export function TopActivityOverflowMenu({
   items,
   activeTab,
   onSelect,
-  checksStatus
+  checksStatus,
+  reviewAttention = false
 }: {
   items: ActivityBarItem[]
   activeTab: ActiveRightSidebarTab
   onSelect: (tab: ActiveRightSidebarTab) => void
   checksStatus?: CheckStatus | null
+  /** Dot on the trigger when the hidden Review tab has an unreviewed agent turn. */
+  reviewAttention?: boolean
 }): React.JSX.Element {
+  const hiddenReviewAttention = reviewAttention && items.some((item) => item.id === 'review')
   const hiddenChecksStatus =
     checksStatus && checksStatus !== 'neutral' && items.some((item) => item.id === 'checks')
       ? checksStatus
@@ -65,6 +71,12 @@ export function TopActivityOverflowMenu({
           )}
         >
           <MoreHorizontal size={16} />
+          {hiddenReviewAttention && !hiddenChecksStatus && (
+            <div
+              className="absolute top-[8px] right-[4px] size-[7px] rounded-full bg-primary ring-1 ring-sidebar"
+              aria-hidden
+            />
+          )}
           {hiddenChecksStatus && (
             <div
               className={cn(
@@ -102,15 +114,20 @@ export function ActivityBarButton({
   active,
   onClick,
   layout,
-  statusIndicator
+  statusIndicator,
+  attentionLabel
 }: {
   item: ActivityBarItem
   active: boolean
   onClick: () => void
   layout: 'top' | 'side'
   statusIndicator?: CheckStatus | null
+  /** When set, shows an accent dot and appends this text to the accessible name. */
+  attentionLabel?: string | null
 }): React.JSX.Element {
   const Icon = item.icon
+  const baseLabel = item.shortcut ? `${item.title} (${item.shortcut})` : item.title
+  const accessibleLabel = attentionLabel ? `${baseLabel}, ${attentionLabel}` : baseLabel
   const isTop = layout === 'top'
 
   return (
@@ -125,7 +142,7 @@ export function ActivityBarButton({
             active ? 'text-foreground' : 'text-muted-foreground/60 hover:text-muted-foreground'
           )}
           onClick={onClick}
-          aria-label={item.shortcut ? `${item.title} (${item.shortcut})` : item.title}
+          aria-label={accessibleLabel}
         >
           <Icon size={isTop ? 16 : 18} />
 
@@ -139,6 +156,16 @@ export function ActivityBarButton({
             />
           )}
 
+          {attentionLabel && (
+            <div
+              className={cn(
+                'absolute rounded-full size-[7px] bg-primary ring-1 ring-sidebar',
+                isTop ? 'bottom-[8px] right-[5px]' : 'bottom-[7px] right-[7px]'
+              )}
+              aria-hidden
+            />
+          )}
+
           {active && isTop && (
             <div className="absolute bottom-0 left-[25%] right-[25%] h-[2px] bg-foreground rounded-t" />
           )}
@@ -148,7 +175,7 @@ export function ActivityBarButton({
         </button>
       </TooltipTrigger>
       <TooltipContent side={isTop ? 'bottom' : 'left'} sideOffset={6}>
-        {item.shortcut ? `${item.title} (${item.shortcut})` : item.title}
+        {accessibleLabel}
       </TooltipContent>
     </Tooltip>
   )

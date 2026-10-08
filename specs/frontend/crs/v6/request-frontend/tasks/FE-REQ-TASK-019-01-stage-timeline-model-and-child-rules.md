@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/components/request/request-stage-timeline-model.ts` (mới), `frontend/src/shared/request-flow-registry.ts` (sửa: thêm `CHILD_REQUEST_RULES`, `isLowConfidence`), test `request-stage-timeline-model.test.ts`
 **Depends on:** FE-REQ-TASK-018-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: request-stage-timeline-model.test.ts pass (cancelled-step bug fixed))
 
 ## Context
 

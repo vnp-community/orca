@@ -1,6 +1,6 @@
 # FE-CV-SOL-087-quality-diff-annotations: Chú thích phát hiện trên diff Monaco, danh sách phát hiện kiểm tra, miễn trừ
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ khảo sát code `frontend/src`; chưa chạy test hay ứng dụng. Solution 2/3 của CR-CV-087 ([1](./FE-CV-SOL-087-quality-scorecard-and-state.md), [3](./FE-CV-SOL-087-quality-trend-coverage-hotspot.md)).
+> Đã triển khai và xác minh 2026-10-07 (tasks 087-09, 10, 12, 13, 14 DONE; 087-11 PARTIAL: `MonacoEditor` thường chưa gắn). Marker `orca-quality` + glyph trên DiffViewer/DiffSectionItem, panel dock "Checks" riêng (không trộn nguồn với Finding cấu trúc), miễn trừ/bỏ miễn trừ. Test pass: 16+18+4+20+4+14 + locale 22.
 
 **CR:** [CR-CV-087](../../../../../../docs/crs/v7/quality-visualization/CR-CV-087-quality-frontend-scorecard-and-annotations.md) mục 1.1, 2.6, 2.7
 **Area:** frontend (`components/editor/`, `components/editor/quality-annotations/`, `components/review-map/quality/findings/`)

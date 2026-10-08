@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (selector + điều hướng lens)
 **File:** `frontend/src/renderer/src/components/review-map/findings/finding-graph-target.ts` (mới) + test; `frontend/src/renderer/src/store/slices/code-intel.ts` (selector đã có từ 059-03; chỉ nối)
 **Depends on:** FE-CV-TASK-059-03, 059-05; FE-CV-SOL-053-impact-lens-and-symbol-detail; FE-CV-SOL-054-structure-lens; FE-CV-SOL-057-erd-lens
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: finding-graph-target.test.ts + open-findings-by-symbol.test.ts PASS trong findings/ 35/35, tsc/oxlint sạch)
 
 ## Context
 
@@ -30,3 +30,8 @@
 ## Rủi ro
 
 - Phụ thuộc `setReviewSelectedSymbol`/`setErdService` đã tồn tại (SOL-051/057); thiếu thì nút ẩn.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `resolveFindingGraphTarget` nhận `{availableLensIds, graphSymbolKeys}` (không import store). `openFindingInGraph` nhận các action `setReviewLens/selectReviewSymbol/setErdService/selectErdTable` qua tham số; `FindingsPanel` đã nối.
+- Việc tô icon cảnh báo trên nút của các lens khác chưa làm (ngoài phạm vi); chỉ cung cấp `useOpenFindingsBySymbolKey`.

@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-turn-record-queue.ts` (mới) + test
 **Depends on:** FE-CV-TASK-089-01; bộ phân loại lỗi của 050
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 10 tests)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Mất lượt chưa gửi khi đóng app (chấp nhận).
+
+## Ghi chú triển khai (2026-10-07)
+
+Sửa số lần retry (3 lần sau lần gửi đầu, backoff 2/6/18 s), thêm `pending()`, khử trùng lặp cả sau khi gửi xong.

@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks
 **File:** `frontend/src/renderer/src/components/review-map/turns/useReviewTurnRecorder.ts` (mới) + test
 **Depends on:** FE-CV-TASK-061-01 (`AgentTurnCompletion`); FE-CV-TASK-060-05, 060-06; FE-CV-SOL-089-agent-turn-recorder (dùng chung khử trùng lặp)
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — hook đã mount trong `ReviewWorkspace` qua `shell/use-review-companions.ts` (đọc lại danh sách đã lưu bằng `use-review-turn-markers.ts`, `onSaved` mới của hook; useReviewTurnRecorder.test 6/6 + ReviewWorkspace.companions.test 8/8 PASS); thiếu: chỉ ghi khi tab Review đang mount (spec muốn mức App/workspace để lượt kết thúc lúc tab đóng vẫn được ghi); chưa có test khẳng định bản ghi mới từ workspace
 
 ## Context
 
@@ -31,3 +31,12 @@
 ## Rủi ro
 
 - Mốc mất nếu renderer đóng lúc agent xong; không tự phục hồi.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Nguồn "agent xong": dùng `detectAgentTurnCompletions` có sẵn trong `turns/` (SOL-061-01 chưa có). Khử trùng lặp theo `turnId`, trễ 3 s chờ git ổn định, không có trường prompt (test kiểm). Đọc `gitStatusByWorktree`/`gitBranchCompareSummaryByWorktree`; `symbolKeys` lấy qua `getSymbolKeys(worktreeId)` do nơi mount cấp.
+- Lưu qua `saveTurnMarkerRow` (dòng worktree-level, ≤ 5 marker); lỗi trả `failedWorktreeId` + `retry()` để UI hiện inline.
+
+## Ghi chú tích hợp (W6, 2026-10-07)
+
+Mount tại `shell/use-review-companions.ts`. Sai lệch so với "mount ở mức App": App.tsx thuộc agent khác nên chưa đụng; cần một component headless ở App nếu muốn ghi khi tab đóng. Thêm tuỳ chọn `onSaved(worktreeId, markers)` vào hook để switcher cập nhật không cần đọc lại.

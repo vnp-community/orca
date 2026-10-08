@@ -14,6 +14,9 @@ import {
   SquareTerminal
 } from 'lucide-react'
 import { useAppStore } from '@/store'
+import { openReviewFromEntryPoint } from '@/components/review-map/entry/open-review-entry'
+import { isReviewLensReleased } from '@/components/review-map/entry/review-lens-release'
+import { resolveCodeIntelSelector } from '@/lib/code-intel-worktree-selector'
 import { getRepoMapFromState, useAllWorktrees } from '@/store/selectors'
 import { selectPaletteStatusInputs } from './worktree-jump-palette-status-inputs'
 import {
@@ -421,7 +424,7 @@ export default function WorktreeJumpPalette(): React.JSX.Element | null {
   const deferredQuery = useDeferredValue(query)
   const [selectedItemId, setSelectedItemId] = useState('')
   const previousWorktreeIdRef = useRef<string | null>(null)
-  const previousActiveTabTypeRef = useRef<'browser' | 'editor' | 'terminal' | 'simulator'>(
+  const previousActiveTabTypeRef = useRef<'browser' | 'editor' | 'terminal' | 'simulator' | 'review'>(
     'terminal'
   )
   const previousBrowserPageIdRef = useRef<string | null>(null)
@@ -892,27 +895,44 @@ export default function WorktreeJumpPalette(): React.JSX.Element | null {
     openSettingsPage()
   }, [openSettingsPage, openSettingsTarget])
 
-  const buildQuickActionContext = useCallback(
-    () =>
-      buildCmdJQuickActionContext({
-        state: useAppStore.getState(),
+  const openReviewChangesAction = useCallback((options?: { lens?: string }) => {
+    const worktreeId = useAppStore.getState().activeWorktreeId
+    if (!worktreeId) {
+      return
+    }
+    // Why: let the palette close before the review tab takes focus.
+    queueMicrotask(() => openReviewFromEntryPoint(worktreeId, 'cmd-k', { lens: options?.lens }))
+  }, [])
+
+  const buildQuickActionContext = useCallback(() => {
+    const state = useAppStore.getState()
+    const codeIntelEnabled =
+      state.codeIntelSupportState?.state === 'enabled' &&
+      state.activeWorktreeId !== null &&
+      resolveCodeIntelSelector(state, state.activeWorktreeId).state === 'ready'
+    const quality = state.codeIntelSupportState?.effective?.qualityGateEnabled === true
+    return buildCmdJQuickActionContext({
+        state,
         activeGroupSnapshot: activeGroupSnapshotRef.current,
         openNewBrowserTab: openNewBrowserTabInActiveWorkspace,
         openNewMarkdownFile: openNewMarkdownInActiveWorkspace,
         openNewTerminalTab: openNewTerminalTabInActiveWorkspace,
         openCreateWorkspace: openCreateWorkspaceAction,
         deleteActiveWorkspace: deleteActiveWorkspaceAction,
-        openAddQuickCommand: openAddQuickCommandAction
-      }),
-    [
+        openAddQuickCommand: openAddQuickCommandAction,
+        codeIntelEnabled,
+        reviewLensAvailable: (lens) => isReviewLensReleased(lens, { quality }),
+        openReviewChanges: openReviewChangesAction
+      })
+  }, [
       deleteActiveWorkspaceAction,
       openAddQuickCommandAction,
+      openReviewChangesAction,
       openCreateWorkspaceAction,
       openNewBrowserTabInActiveWorkspace,
       openNewMarkdownInActiveWorkspace,
       openNewTerminalTabInActiveWorkspace
-    ]
-  )
+  ])
 
   const quickActionContext = buildQuickActionContext()
 

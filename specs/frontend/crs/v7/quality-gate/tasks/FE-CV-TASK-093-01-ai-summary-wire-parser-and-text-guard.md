@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/ai-summary/ai-summary-wire-parser.ts` (mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 12 tests)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Kiểu manifest là đề xuất.
+
+## Ghi chú triển khai (2026-10-07)
+
+Viết lại theo `AiReviewSummary` hợp đồng 4.7 (bản cũ có title/sections tự bịa); lọc ký tự điều khiển/bidi, hiển thị chữ thuần.

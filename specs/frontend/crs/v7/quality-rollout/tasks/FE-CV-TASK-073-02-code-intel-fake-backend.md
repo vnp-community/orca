@@ -5,7 +5,7 @@
 **Area:** frontend / test-support
 **File:** `frontend/src/renderer/src/test-support/code-intel-fake-backend.ts`, `code-intel-fixtures.ts` (mới/mở rộng) + `code-intel-fake-backend.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu §4, `CodeIntelRpcContract`, bộ phân loại lỗi); không cần backend
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest test-support+settings/code-intel 68 pass, oxlint clean, no new tsc errors)
 
 ## Context
 
@@ -36,3 +36,7 @@
 ## Rủi ro
 
 - Fake lệch backend thật; cập nhật cùng bảng hợp đồng §3 khi kênh đổi.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Sai lệch: bộ xử lý dựng sẵn chỉ cho settings/status/bindRepo/reindex/reindexStatus/reviewState/subscribe; các kênh còn lại cấp dữ liệu qua `setChannelData`/`setHandler` (kênh chưa có ⇒ `is not yet implemented`). Tách `code-intel-fake-settings.ts`. Test đối chiếu tệp vàng G1 chưa viết (tệp chưa có).

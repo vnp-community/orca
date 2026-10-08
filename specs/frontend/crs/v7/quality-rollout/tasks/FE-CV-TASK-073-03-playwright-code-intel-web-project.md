@@ -5,7 +5,7 @@
 **Area:** tests / Playwright web
 **File:** `tests/playwright.web.config.ts` (sửa), `tests/e2e/code-intel-web/support/{mock-code-intel-ws,code-intel-app-navigation,code-intel-dev-backend}.ts` (mới), `package.json` gốc (script `test:e2e:code-intel-web`)
 **Depends on:** FE-CV-TASK-073-02
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — `playwright.web.config.ts` (2 project `mcp-web`/`code-intel-web`), `package.json` script, `support/{mock-code-intel-ws,code-intel-app-navigation,code-intel-dev-backend}.ts` có và qua tsc; chưa chạy được e2e (máy không có Chromium của Playwright)
 
 ## Context
 
@@ -32,3 +32,7 @@
 ## Rủi ro
 
 - Đổi cấu hình dùng chung làm hỏng MCP e2e; chưa kiểm chứng Vite/Chromium trong CI.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Biến dev-stack: `CODE_INTEL_E2E_BASE_URL` (cũng đặt BASE của config). `mock-code-intel-ws` dùng lại `BOOT_CHANNEL_STUBS` của mcp-web.

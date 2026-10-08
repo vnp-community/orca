@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/turns/turn-file-identity.ts`, `turn-compare-model.ts` (mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (`ReviewTurnMarker`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: turn-compare-model.test.ts 9/9 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Vân tay thô bỏ sót thay đổi cùng số dòng.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `fileIdentity` dùng FNV-1a có tiền tố độ dài (cùng ý với `buildMobileDiffIdentity`); `compareTurns` luôn trả `estimated:true`; nhãn symbol chỉ `new_in_turn/unchanged_since/reverted_in_turn` (khoá symbol không phân biệt được "đổi"). Thêm `noteProgressHint`.

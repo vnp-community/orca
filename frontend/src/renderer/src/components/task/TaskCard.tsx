@@ -2,11 +2,11 @@ import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { TaskStatusBadge, TaskPriorityBadge } from './TaskStatusBadge'
 import { useAppStore } from '../../store'
 import { computeClientProgress } from '../../hooks/useTasks'
-import type { OrcaTask } from '../../../../shared/task-types'
+import type { TaskWithPlanPath } from '../../../../shared/task-hierarchy'
 import type { ReactNode } from 'react'
 
 type TaskCardProps = {
-  task: OrcaTask
+  task: TaskWithPlanPath
   depth: number
   isExpanded: boolean
   onToggle: (id: string) => void
@@ -67,6 +67,15 @@ export function TaskCard({
         )}
         <span className="text-xs font-mono text-muted-foreground uppercase">{task.type}</span>
         <span className="flex-1 text-sm truncate">{task.title}</span>
+        {task.planPath && task.planPath.length > 0 && (
+          <span
+            className="max-w-40 truncate rounded border px-1.5 text-[10px] text-muted-foreground"
+            title={task.planPath.join(' / ')}
+            data-testid={`task-plan-path-${task.id}`}
+          >
+            {task.planPath.join(' / ')}
+          </span>
+        )}
         <TaskPriorityBadge priority={task.priority} />
         <TaskStatusBadge status={task.status} />
         {(hasChildren || task.progressPercent > 0) && (

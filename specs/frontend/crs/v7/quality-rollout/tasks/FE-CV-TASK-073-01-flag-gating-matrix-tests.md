@@ -5,7 +5,7 @@
 **Area:** frontend / test-support (Vitest, happy-dom)
 **File:** `frontend/src/renderer/src/test-support/code-intel-integration/code-intel-flag-gating.integration.test.tsx` (mới)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelSupport`); FE-CV-TASK-085-01 (`useQualityFeatureFlags`); FE-CV-TASK-073-02 (hoặc mock `codeIntelClient.call`); lối vào của FE-CV-SOL-061
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — ma trận cờ + fake backend: vitest PASS (hook × settings.get, DISABLED/QUALITY_GATE_DISABLED); còn 6 `it.todo` lối vào UI (Agent toolbar, Source Control, Cmd+K, sidebar tab, Review tab, quality notice) vì thành phần chưa được nối
 
 ## Context
 
@@ -33,3 +33,7 @@
 ## Rủi ro
 
 - Phụ thuộc các lối vào đã tồn tại; ca nào chưa có component thì `it.todo` có tên solution chủ.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Sửa test hiện có: bỏ placeholder `expect(true)`, thêm ma trận dựa trên `createFakeCodeIntelBackend`. Không tạo hook cờ thứ hai.

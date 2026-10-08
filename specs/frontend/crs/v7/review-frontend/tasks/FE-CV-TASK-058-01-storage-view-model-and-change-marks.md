@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/storage/storage-view-model.ts`, `storage-change-marks.ts` (mới) + `*.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `StorageMap`, `Store`, `SourceRef`, `ChangedFile`); FE-CV-TASK-057-01 (`maskSensitiveText`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: storage/storage-pure.test.ts 15/15 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -33,3 +33,8 @@
 ## Rủi ro
 
 - Topic không có `change` từ backend: mark topic là suy luận từ `evidence` (có thể sai khi `evidence` thiếu).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tạo `storage/storage-view-model.ts`, `storage/storage-change-marks.ts`, `storage/storage-map.fixture.ts`; test chung ba mô-đun (kể cả layout) trong `storage-pure.test.ts`.
+- Kho `vault` không vào làn Kho mà thành nút secret (khoá = `configKey` hoặc tên kho); nút secret không mang `via`/`payload`. `computeStorageChangeMarks` nhận view model (không phải `StorageMap` thô) để dùng chung id nút; `unknown` chỉ bật khi có tệp đổi nhưng không có `change` lẫn `evidence`.

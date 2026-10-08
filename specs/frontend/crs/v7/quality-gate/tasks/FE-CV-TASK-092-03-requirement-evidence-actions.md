@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/requirements/use-requirement-trace.ts` (mở rộng), test
 **Depends on:** FE-CV-TASK-092-02
-**Status:** [x] DONE — `requirement-evidence-actions.ts` chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 6 tests)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - `scope` chưa chốt.
+
+## Ghi chú triển khai (2026-10-07)
+
+Dùng `quality.trace.confirm {linkKind}` và `quality.trace.link {taskId}` (rỗng = gỡ); bản cũ gọi kênh không tồn tại (`trace.reject/unlink`).

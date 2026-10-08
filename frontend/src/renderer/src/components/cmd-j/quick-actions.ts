@@ -1,8 +1,19 @@
-import { FileText, FolderPlus, Globe, Play, SquareTerminal, Trash2 } from 'lucide-react'
+import {
+  Database,
+  FileText,
+  FolderPlus,
+  Globe,
+  Network,
+  Play,
+  ScanSearch,
+  SquareTerminal,
+  Trash2
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { CmdJQuickActionAvailability, CmdJQuickActionContext } from './quick-action-context'
 import {
   getCurrentWorkspaceActionAvailability,
+  getReviewActionAvailability,
   getWorkspaceScopedActionAvailability
 } from './quick-action-context'
 import { translate } from '@/i18n/i18n'
@@ -51,6 +62,33 @@ async function runWorkspaceAction(
   }
   await run(ctx.activeGroupId)
   return { status: 'ok' }
+}
+
+function reviewAction(
+  id: string,
+  lens: string,
+  title: string,
+  description: string,
+  icon: LucideIcon,
+  verbKeywords: string[]
+): CmdJQuickAction {
+  return {
+    id,
+    kind: 'action',
+    title,
+    description,
+    icon,
+    verbKeywords,
+    isAvailable: (ctx) => getReviewActionAvailability(ctx, lens),
+    run: async (ctx) => {
+      const availability = getReviewActionAvailability(ctx, lens)
+      if (!availability.available) {
+        return { status: 'unavailable', reason: availability.reason }
+      }
+      ctx.openReviewChanges?.({ lens })
+      return { status: 'ok' }
+    }
+  }
 }
 
 // Why: Cmd+J actions are for high-frequency, safe, context-light verbs.
@@ -178,5 +216,51 @@ export const getCmdJQuickActions = createLocalizedCatalog((): CmdJQuickAction[] 
       ctx.openAddQuickCommand()
       return { status: 'ok' }
     }
-  }
+  },
+  reviewAction(
+    'review-changes',
+    'impact',
+    translate('auto.components.reviewMap.QuickActions.review.title', 'Review Changes'),
+    translate(
+      'auto.components.reviewMap.QuickActions.review.description',
+      'Open the code review for the active worktree.'
+    ),
+    ScanSearch,
+    [
+      translate('auto.components.reviewMap.QuickActions.review.verbs.review', 'review changes'),
+      translate('auto.components.reviewMap.QuickActions.review.verbs.open', 'open review'),
+      translate('auto.components.reviewMap.QuickActions.review.verbs.impact', 'impact')
+    ]
+  ),
+  reviewAction(
+    'open-architecture-map',
+    'architecture',
+    translate('auto.components.reviewMap.QuickActions.architecture.title', 'Open Architecture Map'),
+    translate(
+      'auto.components.reviewMap.QuickActions.architecture.description',
+      'Open the architecture lens of the code review.'
+    ),
+    Network,
+    [
+      translate(
+        'auto.components.reviewMap.QuickActions.architecture.verbs.architecture',
+        'architecture map'
+      ),
+      translate('auto.components.reviewMap.QuickActions.architecture.verbs.c4', 'c4')
+    ]
+  ),
+  reviewAction(
+    'open-erd',
+    'erd',
+    translate('auto.components.reviewMap.QuickActions.erd.title', 'Open ERD'),
+    translate(
+      'auto.components.reviewMap.QuickActions.erd.description',
+      'Open the data model (ERD) lens of the code review.'
+    ),
+    Database,
+    [
+      translate('auto.components.reviewMap.QuickActions.erd.verbs.erd', 'erd'),
+      translate('auto.components.reviewMap.QuickActions.erd.verbs.schema', 'database schema')
+    ]
+  )
 ])

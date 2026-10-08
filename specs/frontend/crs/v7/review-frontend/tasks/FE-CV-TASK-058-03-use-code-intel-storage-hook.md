@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks + store
 **File:** `frontend/src/renderer/src/hooks/useCodeIntelStorage.ts` (mới) + test; `frontend/src/renderer/src/store/slices/code-intel.ts` (sửa nhỏ: `storageEnv`, `selectedStorageNodeId` + vào `CODE_INTEL_WORKTREE_KEYED_STATE_KEYS`); `review-lens-registry.ts` (SOL-051; điều kiện hiện)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks; FE-CV-TASK-058-01; G4 fake backend (FE-CV-TASK-073-02)
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — tab Lưu trữ ẩn khi backend trả `unsupported`/`disabled` (StorageLens báo qua `shell/review-lens-availability.ts`, workspace lọc tab; ReviewWorkspace.companions.test 8/8 PASS); thiếu: chỉ ẩn sau lần đầu lens được mở (chưa có thăm dò trước khi mở)
 
 ## Context
 
@@ -33,3 +33,12 @@
 ## Rủi ro
 
 - Cần `projectId` (O-1).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tạo `hooks/useCodeIntelStorage.ts` (+ test); khoá `storageEnv`, `selectedStorageNodeId`, action `setStorageEnv`/`selectStorageNode` ở `store/slices/review-ui.ts` (cùng lý do với 057-04: slice đã được dọn khi xoá worktree).
+- Khi lỗi `unsupported`/`disabled`, `StorageLens` hiện thông báo trơn "không khả dụng" (không retry, không toast) thay vì ẩn tab; ẩn hẳn tab cần sửa khung (ngoài phạm vi, file dùng chung).
+
+## Ghi chú tích hợp (W6, 2026-10-07)
+
+Không thêm RPC `storage` ở lúc mở workspace (nặng). Registry `review-lens-registry.ts` không đổi; lọc nằm ở `useReviewWorkspaceModel`.

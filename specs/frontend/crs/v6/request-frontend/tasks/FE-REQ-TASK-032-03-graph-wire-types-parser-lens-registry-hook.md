@@ -5,7 +5,7 @@
 **Area:** frontend / shared / hooks
 **File:** `frontend/src/shared/graph-types.ts`, `frontend/src/shared/graph-wire-parsers.ts` (mới); `frontend/src/shared/request-rpc-methods.ts` (sửa, tạo ở FE-REQ-TASK-018-01); `frontend/src/renderer/src/components/graph/graph-lens-registry.ts` (mới); `frontend/src/renderer/src/hooks/useGraphLens.ts` (mới); test cùng tên
 **Depends on:** FE-REQ-TASK-018-01 (`request-types.ts`, `request-rpc-methods.ts`), 018-02 (`callRequestRpc`, `classifyRequestRpcError`), 018-03 (mẫu hook, `request-event-bus`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest shared/graph-wire-parsers (5), graph-lens-registry (4), hooks/useGraphLens (7) pass; oxlint+tsc clean)
 
 ## Context
 
@@ -68,3 +68,7 @@
 - `maxNodes` có thể bị backend bỏ qua (mặc định 50); UI vẫn đúng nhờ `truncated`.
 - Cache theo `assessmentDigest` chưa có trong khoá (payload không mang digest); sự kiện `impact.assessed` là cách duy nhất làm mới, nên không thiếu sự kiện (CONTRACT mục 3: không bảo đảm giao đủ): nơi mở `GraphPanel` luôn `refetch` khi mở.
 - File `shared/` không được import từ `renderer/`.
+
+## Ghi chú triển khai (2026-10-07)
+
+Thêm `shared/graph-types.ts`, `graph-wire-parsers.ts`, 4 hằng kênh `impact.*` vào `request-rpc-methods.ts`, `hooks/useGraphLens.ts` (cache 3/Request, hoãn skeleton 200 ms, thử lại `REQUEST_RISK_ASSESSMENT_PENDING` 3 s x5, làm mới theo sự kiện). Sai lệch: lens client không đi qua `buildClient` của hook mà `GraphPanel` dựng payload client bằng `useMemo` (hook tắt bằng `enabled:false`) vì cây Plan đổi theo thời gian; `GraphNode.meta` thêm `drifted`.

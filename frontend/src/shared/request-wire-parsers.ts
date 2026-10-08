@@ -77,6 +77,18 @@ const APPROVAL_SUBJECT_TYPES = new Set<ApprovalSubjectType>([
 ])
 const APPROVAL_STATUSES = new Set<ApprovalStatus>(['pending', 'approved', 'rejected', 'expired'])
 
+// Why: CONTRACT-request-ui-api.md names the first status 'new' and flattens source fields;
+// the parsers accept both that and the earlier draft shape.
+function normalizeRequestStatus(value: unknown): unknown {
+  return value === 'new' ? 'submitted' : value
+}
+
+const APPROVAL_SUBJECT_ALIASES: Record<string, ApprovalSubjectType> = {
+  findings: 'solution',
+  answer: 'solution',
+  task_list: 'plan'
+}
+
 function safeEnum<T extends string>(value: unknown, valid: Set<T>, fallback: T): T {
   return typeof value === 'string' && valid.has(value as T) ? (value as T) : fallback
 }
@@ -90,11 +102,11 @@ function safeOptStr(value: unknown): string | undefined {
 }
 
 function safeOptNum(value: unknown): number | undefined {
-  return typeof value === 'number' && isFinite(value) ? value : undefined
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 function safeNum(value: unknown, fallback: number): number {
-  return typeof value === 'number' && isFinite(value) ? value : fallback
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
 function safeArr<T>(value: unknown, mapper: (item: unknown, i: number) => T): T[] {
@@ -104,7 +116,7 @@ function safeArr<T>(value: unknown, mapper: (item: unknown, i: number) => T): T[
 function safeRaw(obj: Record<string, unknown>, ...known: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(obj)) {
-    if (!known.includes(k)) result[k] = v
+    if (!known.includes(k)) {result[k] = v}
   }
   return result
 }
@@ -131,6 +143,9 @@ function parseRequestLink(raw: unknown): RequestLink {
 export function parseRequest(raw: unknown): OrcaRequest {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
 
+  const flatProvider = SOURCE_PROVIDERS.has(r.sourceProvider as RequestSourceProvider)
+    ? (r.sourceProvider as RequestSourceProvider)
+    : undefined
   const source =
     r.source && typeof r.source === 'object'
       ? (() => {
@@ -142,7 +157,14 @@ export function parseRequest(raw: unknown): OrcaRequest {
             site: safeOptStr(s.site)
           }
         })()
-      : undefined
+      : flatProvider
+        ? {
+            provider: flatProvider,
+            ref: safeOptStr(r.sourceRef),
+            url: safeOptStr(r.sourceUrl),
+            site: safeOptStr(r.sourceSite)
+          }
+        : undefined
 
   const links =
     Array.isArray(r.links) ? r.links.map(parseRequestLink) : undefined
@@ -154,7 +176,7 @@ export function parseRequest(raw: unknown): OrcaRequest {
     title: safeStr(r.title),
     body: safeOptStr(r.body),
     type: safeEnum(r.type, REQUEST_TYPES, 'unknown'),
-    status: safeEnum(r.status, REQUEST_STATUSES, 'unknown'),
+    status: safeEnum(normalizeRequestStatus(r.status), REQUEST_STATUSES, 'unknown'),
     size: REQUEST_SIZES.has(r.size as RequestSize) ? (r.size as RequestSize) : undefined,
     urgency: safeEnum(r.urgency, REQUEST_URGENCIES, 'unknown'),
     confidence: safeOptNum(r.confidence),
@@ -168,7 +190,7 @@ export function parseRequest(raw: unknown): OrcaRequest {
       ? (r.returnedFromStage as ReturnedFromStage)
       : undefined,
     returnReason: safeOptStr(r.returnReason),
-    returnedById: safeOptStr(r.returnedById),
+    returnedById: safeOptStr(r.returnedById) ?? safeOptStr(r.returnedBy),
     returnedAt: safeOptStr(r.returnedAt),
     links,
     version: safeOptNum(r.version),
@@ -192,25 +214,54 @@ function parseSolutionOption(raw: unknown, index: number): SolutionOption {
     summary: safeOptStr(r.summary),
     pros: safeArr(r.pros, (x) => safeStr(x)),
     cons: safeArr(r.cons, (x) => safeStr(x)),
-    estimatedEffort: safeOptStr(r.estimatedEffort),
-    raw: safeRaw(r, ...KNOWN)
+    estimatedEffort: safeOptStr(r.estimatedEffort) ?? safeOptStr(r.estimated_effort),
+    raw: safeRaw(r, ...KNOWN, 'estimated_effort')
   }
+}
+
+// CONTRACT SolutionView statuses -> UI statuses (older drafts already used the UI names).
+const SOLUTION_STATUS_ALIASES: Record<string, string> = {
+  draft: 'generating',
+  proposed: 'ready',
+  approved: 'chosen'
+}
+
+function recommendedOptionId(rec: unknown): string | undefined {
+  const r = rec && typeof rec === 'object' ? (rec as Record<string, unknown>) : { id: rec }
+  return [r.optionId, r.option_id, r.id].find((v): v is string => typeof v === 'string' && v !== '')
 }
 
 export function parseSolution(raw: unknown): Solution {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  // CONTRACT: options is an object { options[], recommendation, ... } for kind=solution
+  // and an AI document for other kinds; older drafts sent a plain array.
+  const optObj =
+    r.options && typeof r.options === 'object' && !Array.isArray(r.options)
+      ? (r.options as Record<string, unknown>)
+      : undefined
+  const optList = Array.isArray(r.options) ? r.options : Array.isArray(optObj?.options) ? optObj.options : undefined
+  let options = optList?.map((item, i) => parseSolutionOption(item, i))
+  const recId = recommendedOptionId(optObj?.recommendation)
+  if (options && recId) {
+    options = options.map((o) => (o.id === recId ? { ...o, raw: { ...o.raw, recommended: true } } : o))
+  }
+  const statusRaw = typeof r.status === 'string' ? (SOLUTION_STATUS_ALIASES[r.status] ?? r.status) : r.status
+  let chosenOptionId = safeOptStr(r.chosenOptionId)
+  if (!chosenOptionId && typeof r.chosenOption === 'number' && r.chosenOption >= 0 && options) {
+    chosenOptionId = options[r.chosenOption]?.id
+  }
+  let content = safeOptStr(r.content)
+  content ??= optObj && !optList ? JSON.stringify(optObj) : undefined
   return {
     id: safeStr(r.id),
     requestId: safeStr(r.requestId),
     kind: safeEnum(r.kind, SOLUTION_KINDS, 'unknown'),
-    status: safeEnum(r.status, SOLUTION_STATUSES, 'unknown'),
-    content: safeOptStr(r.content),
-    options: Array.isArray(r.options)
-      ? r.options.map((item, i) => parseSolutionOption(item, i))
-      : undefined,
-    chosenOptionId: safeOptStr(r.chosenOptionId),
+    status: safeEnum(statusRaw, SOLUTION_STATUSES, 'unknown'),
+    content,
+    options,
+    chosenOptionId,
     rejectionReason: safeOptStr(r.rejectionReason),
-    generatedAt: safeOptStr(r.generatedAt),
+    generatedAt: safeOptStr(r.generatedAt) ?? safeOptStr(r.createdAt),
     reviewedAt: safeOptStr(r.reviewedAt),
     reviewedById: safeOptStr(r.reviewedById),
     version: safeOptNum(r.version)
@@ -226,17 +277,24 @@ export function parseApproval(raw: unknown): Approval {
   return {
     id: safeStr(r.id),
     requestId: safeStr(r.requestId),
-    subjectType: safeEnum(r.subjectType, APPROVAL_SUBJECT_TYPES, 'unknown'),
+    subjectType:
+      typeof r.subjectType === 'string' && APPROVAL_SUBJECT_ALIASES[r.subjectType]
+        ? APPROVAL_SUBJECT_ALIASES[r.subjectType]
+        : safeEnum(r.subjectType, APPROVAL_SUBJECT_TYPES, 'unknown'),
     subjectId: safeStr(r.subjectId),
     subjectDigest: safeOptStr(r.subjectDigest),
     status: safeEnum(r.status, APPROVAL_STATUSES, 'unknown'),
     comment: safeOptStr(r.comment),
-    approverId: safeOptStr(r.approverId),
-    approvedAt: safeOptStr(r.approvedAt),
+    approverId: safeOptStr(r.approverId) ?? safeOptStr(r.decidedBy),
+    approvedAt: safeOptStr(r.approvedAt) ?? safeOptStr(r.decidedAt),
     version: safeOptNum(r.version),
-    expiresAt: safeOptStr(r.expiresAt),
+    expiresAt: safeOptStr(r.expiresAt) ?? safeOptStr(r.dueAt),
+    dueAt: safeOptStr(r.dueAt) ?? safeOptStr(r.expiresAt),
+    requestedBy: safeOptStr(r.requestedBy) ?? safeOptStr(r.createdBy),
+    rawSubjectType: safeOptStr(r.subjectType),
+    stage: safeOptStr(r.stage),
     createdAt: safeStr(r.createdAt),
-    updatedAt: safeStr(r.updatedAt)
+    updatedAt: safeStr(r.updatedAt) || safeStr(r.decidedAt) || safeStr(r.createdAt)
   }
 }
 
@@ -295,8 +353,8 @@ export function parseRequestEvent(raw: unknown): RequestEvent {
     requestId: safeStr(r.requestId),
     // Keep full eventType including any service prefix; consumers normalise
     eventType: safeStr(r.eventType),
-    status: REQUEST_STATUSES.has(r.status as RequestStatus)
-      ? (r.status as RequestStatus)
+    status: REQUEST_STATUSES.has(normalizeRequestStatus(r.status) as RequestStatus)
+      ? (normalizeRequestStatus(r.status) as RequestStatus)
       : undefined,
     type: REQUEST_TYPES.has(r.type as RequestType) ? (r.type as RequestType) : undefined,
     occurredAt: safeStr(r.occurredAt)
@@ -310,13 +368,13 @@ export function parseRequestEvent(raw: unknown): RequestEvent {
 export function parseRequestTypeHistoryEntry(raw: unknown): RequestTypeHistoryEntry {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   return {
-    id: safeStr(r.id),
+    id: safeStr(r.id) || `${safeStr(r.at)}:${safeStr(r.toType)}`,
     requestId: safeStr(r.requestId),
     fromType: safeEnum(r.fromType, REQUEST_TYPES, 'unknown'),
     toType: safeEnum(r.toType, REQUEST_TYPES, 'unknown'),
     reason: safeOptStr(r.reason),
     actorId: safeOptStr(r.actorId),
     actorKind: safeOptStr(r.actorKind),
-    occurredAt: safeStr(r.occurredAt)
+    occurredAt: safeStr(r.occurredAt) || safeStr(r.at)
   }
 }

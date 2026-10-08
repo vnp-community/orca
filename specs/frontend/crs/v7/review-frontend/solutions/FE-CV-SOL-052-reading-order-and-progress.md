@@ -1,6 +1,6 @@
 # FE-CV-SOL-052-reading-order-and-progress: Thứ tự đọc, tiến độ review, phím tắt, lưu qua `reviewState`
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 5/6 task DONE, 052-05 PARTIAL (thiếu cờ lớp phủ `review-overlay-model` của 053-01). Viết ngày 2026-10-06.
 
 **CR:** [CR-CV-052](../../../../../../docs/crs/v7/review-frontend/CR-CV-052-reading-order-and-review-progress.md)
 **Area:** frontend (`components/review-map`, `store/slices/review-progress.ts`)
@@ -116,3 +116,12 @@ Thứ tự: 052-01, 052-02, 052-04 song song → 052-03 → 052-05 → 052-06.
 ## 12. Tham chiếu
 
 `/opt/repos/orca/docs/crs/v7/review-frontend/CR-CV-052-reading-order-and-review-progress.md`, `/opt/repos/orca/specs/backend-go/crs/v7/CONTRACT-codeintel-ui-api.md`, `/opt/repos/orca/specs/frontend/storage/README.md`, `/opt/repos/orca/frontend/src/renderer/src/store/slices/diff-comments-persist-queue.ts`, `/opt/repos/orca/guides/STYLEGUIDE.md`.
+
+## 13. Ghi chú triển khai (2026-10-07)
+
+- Mô hình/UI: `reading-order-model.ts` (`buildReadingOrderItems/Rows`), `reading-progress-merge.ts`, `reading-reason-labels.ts`, `useRovingListKeys.ts`, `reading-order/{ReadingOrderList,ReadingOrderRow,ReadingOrderGroupHeader,ReadingProgressBar}.tsx`; slice `store/slices/review-progress.ts` (+ `review-progress-entry.ts` cho kiểu, tách để dưới 300 dòng).
+- API cho agent 060 (ghi chú): `patchReviewState(worktreeId, patch)` đi cùng hàng chờ ghi, luôn gửi lại `notes`/`turnMarkers` đang biết; `readingProgress` do slice sở hữu (patch bị bỏ qua trường này). Seam test: `setReviewProgressApi(fake)`.
+- Cặp khoá `(baseCommit, headCommit)` = `overlay.scope.mergeBase ?? baseOid` / `headOid` (câu hỏi mở 2 vẫn chờ BE).
+- Hàng đợi: debounce 800 ms, một lần ghi chạy + vòng lặp ghi lại phần sửa trong lúc chờ, `VERSION_CONFLICT` tối đa 3 vòng (tải lại → `mergeReadingProgress` → ghi), lỗi khác ⇒ `saveStatus:'error'` + thử lại 15 s; `forbidden` ⇒ `localOnly`, không thử lại. Thử lại khi kết nối `established` và flush khi `visibilityState==='hidden'`/gỡ tab nằm ở `useReviewWorkspaceModel`.
+- Space trên hàng nhóm đánh dấu cả nhóm; Enter chỉ mở diff (không đánh dấu). Ảo hoá > 150 hàng với `initialRect` cố định; `aria-activedescendant` + ảo hoá chưa kiểm với trình đọc màn hình.
+- Chưa có: cờ lớp phủ trên hàng (đợi `review-overlay-model` 053-01); chưa có tin cậy về `stepKey` dài (cắt tỉa 56 KiB đã có test).

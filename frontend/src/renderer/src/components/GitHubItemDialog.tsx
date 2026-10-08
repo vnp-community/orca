@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- Why: the GH item dialog keeps its header, conversation, files, and checks tabs co-located so the read-only PR/Issue surface stays in one place while this view evolves. */
+import { CreateRequestIssueButton } from '@/components/request/CreateRequestIssueButton'
 import React, {
   Suspense,
   useCallback,
@@ -7428,6 +7429,7 @@ export default function GitHubItemDialog({
                     <ArrowRight className="size-3.5" />
                   </Button>
                 )}
+                <CreateRequestIssueButton item={workItem} repoIdentity={ownerRepo} />
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">

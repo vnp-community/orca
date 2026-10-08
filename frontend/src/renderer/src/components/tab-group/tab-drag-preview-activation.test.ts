@@ -81,3 +81,43 @@ describe('restoreTabDragActivationSnapshot', () => {
     expect(state.activeTabIdByWorktree[WT]).toBe('terminal-1')
   })
 })
+
+describe('applyDragPreviewTab review tab', () => {
+  it('previews a review tab as its own active tab type', () => {
+    const WT_REVIEW = 'wt-review-preview'
+    useAppStore.setState({
+      activeWorktreeId: WT_REVIEW,
+      activeTabType: 'terminal',
+      activeTabTypeByWorktree: { [WT_REVIEW]: 'terminal' },
+      groupsByWorktree: {
+        [WT_REVIEW]: [
+          { id: 'group-1', worktreeId: WT_REVIEW, activeTabId: 'review-1', tabOrder: ['review-1'] }
+        ]
+      },
+      unifiedTabsByWorktree: {
+        [WT_REVIEW]: [
+          {
+            id: 'review-1',
+            groupId: 'group-1',
+            worktreeId: WT_REVIEW,
+            contentType: 'review',
+            entityId: WT_REVIEW,
+            label: 'Review',
+            customLabel: null,
+            color: null,
+            sortOrder: 0,
+            createdAt: 1
+          }
+        ]
+      }
+    } as never)
+    applyDragPreviewTab({
+      worktreeId: WT_REVIEW,
+      groupId: 'group-1',
+      tabId: 'review-1',
+      activeGroupId: 'group-1'
+    })
+    expect(useAppStore.getState().activeTabType).toBe('review')
+    expect(useAppStore.getState().activeTabTypeByWorktree[WT_REVIEW]).toBe('review')
+  })
+})

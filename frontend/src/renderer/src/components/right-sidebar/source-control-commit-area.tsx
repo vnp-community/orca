@@ -171,7 +171,8 @@ export function CommitArea({
   onFixCommitFailureWithAI,
   onFixPushFailureWithAI,
   onPrimaryAction,
-  onDropdownAction
+  onDropdownAction,
+  qualityNotice
 }: CommitAreaProps): React.JSX.Element {
   // Why: cap at 12 rows so a pasted multi-page commit message doesn't push
   // the Commit button off-screen. The textarea keeps `resize-none` (matching

@@ -1,114 +1,78 @@
 /**
  * review-report-export-actions.ts — FE-CV-TASK-090-05
  *
- * Standalone export action functions for review reports.
- * No React imports — pure functions for clipboard and file download.
+ * Clipboard copy and HTML download. Failures are returned, never swallowed, so the
+ * UI can say the copy did not happen.
  *
  * @module components/review-map/report/review-report-export-actions
  */
 
-import { buildReviewReportMarkdown } from './review-report-markdown'
-import { buildReviewReportHtml } from './review-report-html'
-import type { ReviewReportModel } from './review-report-model-parser'
+export type ExportResult = { ok: true } | { ok: false; reason: 'clipboard_unavailable' | 'download_failed' }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+type ClipboardBridge = { ui?: { writeClipboardText?: (text: string) => Promise<void> | void } }
 
-export type ExportResult =
-  | { ok: true }
-  | { ok: false; reason: 'clipboard_unavailable' | 'download_failed' | 'unknown' }
-
-// ---------------------------------------------------------------------------
-// Copy helpers
-// ---------------------------------------------------------------------------
-
-async function writeToClipboard(text: string): Promise<ExportResult> {
-  // Prefer native API (Electron exposes window.api.ui.writeClipboardText)
-  const api = (window as Record<string, unknown>).api as
-    | { ui?: { writeClipboardText?: (text: string) => void } }
-    | undefined
-
-  if (api?.ui?.writeClipboardText) {
-    try {
-      api.ui.writeClipboardText(text)
-      return { ok: true }
-    } catch {
-      // fall through to web fallback
-    }
+function legacyCopy(text: string): boolean {
+  try {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.select()
+    const ok = document.execCommand?.('copy') === true
+    area.remove()
+    return ok
+  } catch {
+    return false
   }
+}
 
-  // Web fallback: navigator.clipboard
-  if (navigator?.clipboard?.writeText) {
-    try {
+/** Preload bridge first; the web bridge is silent without navigator.clipboard, so an insecure context also gets the textarea fallback. */
+export async function copyTextToClipboard(text: string): Promise<ExportResult> {
+  const bridge = (globalThis as { api?: ClipboardBridge }).api
+  let bridged = false
+  try {
+    if (bridge?.ui?.writeClipboardText) {
+      await bridge.ui.writeClipboardText(text)
+      bridged = true
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text)
       return { ok: true }
-    } catch {
-      return { ok: false, reason: 'clipboard_unavailable' }
     }
+  } catch {
+    // fall through to the textarea fallback
   }
-
-  return { ok: false, reason: 'clipboard_unavailable' }
+  if (bridged && !isInsecureContext()) {
+    return { ok: true }
+  }
+  return legacyCopy(text) ? { ok: true } : { ok: false, reason: 'clipboard_unavailable' }
 }
 
-// ---------------------------------------------------------------------------
-// Export actions
-// ---------------------------------------------------------------------------
-
-export type ReviewReportExportActions = {
-  /** Copy report as Markdown (for pasting into any editor) */
-  copyMarkdown: () => Promise<ExportResult>
-  /** Copy report formatted for PR/MR description insertion */
-  copyForReview: () => Promise<ExportResult>
-  /** Download report as an offline HTML file */
-  downloadHtml: (filenameHint?: string) => ExportResult
+function isInsecureContext(): boolean {
+  return typeof window !== 'undefined' && window.isSecureContext === false
 }
 
-/**
- * Build the set of export actions for a given report model.
- * Filename must not contain absolute paths.
- */
-export function buildReviewReportExportActions(
-  model: ReviewReportModel
-): ReviewReportExportActions {
-  return {
-    copyMarkdown: async () => {
-      const markdown = buildReviewReportMarkdown(model)
-      return writeToClipboard(markdown)
-    },
+/** Basename only: never a path, never characters that are invalid on Windows. */
+export function buildReportFileName(repoSlug: string, headCommit: string): string {
+  const slug = repoSlug.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'repo'
+  const head = headCommit.replace(/[^a-f0-9]/gi, '').slice(0, 7) || 'head'
+  return `orca-review-${slug}-${head}.html`
+}
 
-    copyForReview: async () => {
-      // copyForReview includes only the section bodies without sentinel markers
-      // so it can be pasted as plain PR description text
-      const sections = model.sections
-        .map((s) => `**${s.title}**\n\n${s.body.trim()}`)
-        .join('\n\n---\n\n')
-      const text = `**${model.title}**\n\n${model.description}\n\n${sections}`.trim()
-      return writeToClipboard(text)
-    },
-
-    downloadHtml: (filenameHint?: string) => {
-      try {
-        const html = buildReviewReportHtml(model)
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-
-        // Sanitize filename — basename only, no path traversal
-        const rawName = (filenameHint ?? 'review-report').replace(/[/\\:*?"<>|]/g, '_')
-        const filename = `${rawName}.html`
-
-        const a = document.createElement('a')
-        a.href = url
-        a.download = filename
-        a.rel = 'noopener'
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        return { ok: true }
-      } catch {
-        return { ok: false, reason: 'download_failed' }
-      }
-    },
+export function downloadHtmlFile(html: string, fileName: string): ExportResult {
+  try {
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.rel = 'noopener'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    return { ok: true }
+  } catch {
+    return { ok: false, reason: 'download_failed' }
   }
 }

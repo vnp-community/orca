@@ -5,7 +5,7 @@
 **Area:** frontend / renderer cmd-j
 **File:** `frontend/src/renderer/src/components/cmd-j/quick-actions.ts`, `quick-action-context.ts`, `quick-action-context.test.ts`, `components/WorktreeJumpPalette.tsx` (sửa) + test
 **Depends on:** FE-CV-TASK-061-02; lens đã phát hành (`reviewLensAvailable`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: cmd-j/review-quick-actions.test.ts + quick-action-context.test.ts PASS; no-top-level-translate chỉ fail sẵn có (FleetServerStatusBadge); oxlint/tsc sạch)
 
 ## Context
 
@@ -32,3 +32,7 @@
 ## Rủi ro
 
 - Danh mục Cmd+J vốn curated (câu hỏi mở 3).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Trường context mới đều tuỳ chọn (không vỡ test cũ). `reviewLensAvailable` = lens có `load` trong registry (`entry/review-lens-release.ts`) và qua cờ quality. Thông điệp `getUnavailableQuickActionMessage` cho lý do mới viết tiếng Anh cố định như các nhánh cũ. Không có test `WorktreeJumpPalette` riêng cho `openReviewChangesAction`.

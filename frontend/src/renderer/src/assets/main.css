@@ -112,6 +112,20 @@
   --color-status-success: var(--status-success);
   --color-status-success-background: var(--status-success-background);
   --color-status-success-border: var(--status-success-border);
+  --color-risk-low: var(--risk-low);
+  --color-risk-low-background: var(--risk-low-background);
+  --color-risk-low-border: var(--risk-low-border);
+  --color-risk-medium: var(--risk-medium);
+  --color-risk-medium-background: var(--risk-medium-background);
+  --color-risk-medium-border: var(--risk-medium-border);
+  --color-risk-high: var(--risk-high);
+  --color-risk-high-background: var(--risk-high-background);
+  --color-risk-high-border: var(--risk-high-border);
+  --color-risk-critical: var(--risk-critical);
+  --color-risk-critical-background: var(--risk-critical-background);
+  --color-risk-critical-border: var(--risk-critical-border);
+  --color-graph-edge-added: var(--graph-edge-added);
+  --color-graph-edge-removed: var(--graph-edge-removed);
   --color-tab-group-split-divider: var(--tab-group-split-divider);
   --color-tab-group-split-divider-strong: var(--tab-group-split-divider-strong);
   --color-git-graph-ref: var(--git-graph-ref);
@@ -123,6 +137,24 @@
   --color-git-graph-lane-4: var(--git-graph-lane-4);
   --color-git-graph-lane-5: var(--git-graph-lane-5);
   --color-annotation-highlight: var(--annotation-highlight);
+  --color-quality-error: var(--quality-error);
+  --color-quality-warning: var(--quality-warning);
+  --color-quality-info: var(--quality-info);
+  --color-quality-pass: var(--quality-pass);
+  --color-quality-unknown: var(--quality-unknown);
+  --color-quality-error-background: var(--quality-error-background);
+  --color-quality-error-border: var(--quality-error-border);
+  --color-quality-warning-background: var(--quality-warning-background);
+  --color-quality-warning-border: var(--quality-warning-border);
+  --color-quality-info-background: var(--quality-info-background);
+  --color-quality-info-border: var(--quality-info-border);
+  --color-quality-pass-background: var(--quality-pass-background);
+  --color-quality-pass-border: var(--quality-pass-border);
+  --color-quality-heat-1: var(--quality-heat-1);
+  --color-quality-heat-2: var(--quality-heat-2);
+  --color-quality-heat-3: var(--quality-heat-3);
+  --color-quality-heat-4: var(--quality-heat-4);
+  --color-quality-heat-5: var(--quality-heat-5);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -181,6 +213,21 @@
   --status-success: #15803d;
   --status-success-background: color-mix(in srgb, var(--status-success) 10%, transparent);
   --status-success-border: color-mix(in srgb, var(--status-success) 25%, transparent);
+  /* CR-REQ-032: risk level tokens; always paired with text + icon, never color alone */
+  --risk-low: var(--status-success);
+  --risk-medium: var(--color-amber-600);
+  --risk-high: var(--color-orange-600);
+  --risk-critical: var(--destructive);
+  --risk-low-background: color-mix(in srgb, var(--risk-low) 10%, transparent);
+  --risk-low-border: color-mix(in srgb, var(--risk-low) 25%, transparent);
+  --risk-medium-background: color-mix(in srgb, var(--risk-medium) 10%, transparent);
+  --risk-medium-border: color-mix(in srgb, var(--risk-medium) 25%, transparent);
+  --risk-high-background: color-mix(in srgb, var(--risk-high) 10%, transparent);
+  --risk-high-border: color-mix(in srgb, var(--risk-high) 25%, transparent);
+  --risk-critical-background: color-mix(in srgb, var(--risk-critical) 10%, transparent);
+  --risk-critical-border: color-mix(in srgb, var(--risk-critical) 25%, transparent);
+  --graph-edge-added: var(--status-success);
+  --graph-edge-removed: var(--destructive);
   --chart-1: var(--color-blue-300);
   --chart-2: var(--color-blue-500);
   --chart-3: var(--color-blue-600);
@@ -230,6 +277,27 @@
   --git-graph-lane-4: #40b0a6;
   --git-graph-lane-5: #b66dff;
   --annotation-highlight: #f59e0b;
+  /* Why: quality severity/heat tokens; darker heat = needs more attention. Text on heat
+     cells: steps 1-3 use --foreground, steps 4-5 use --background. Direct oklch values
+     (Tailwind amber/sky steps) because Tailwind 4 omits unused --color-* variables. */
+  --quality-error: var(--destructive);
+  --quality-warning: oklch(55.5% 0.163 48.998);
+  --quality-info: oklch(50% 0.134 242.749);
+  --quality-pass: var(--status-success);
+  --quality-unknown: var(--muted-foreground);
+  --quality-error-background: color-mix(in srgb, var(--quality-error) 10%, transparent);
+  --quality-error-border: color-mix(in srgb, var(--quality-error) 25%, transparent);
+  --quality-warning-background: color-mix(in srgb, var(--quality-warning) 10%, transparent);
+  --quality-warning-border: color-mix(in srgb, var(--quality-warning) 25%, transparent);
+  --quality-info-background: color-mix(in srgb, var(--quality-info) 10%, transparent);
+  --quality-info-border: color-mix(in srgb, var(--quality-info) 25%, transparent);
+  --quality-pass-background: color-mix(in srgb, var(--quality-pass) 10%, transparent);
+  --quality-pass-border: color-mix(in srgb, var(--quality-pass) 25%, transparent);
+  --quality-heat-1: color-mix(in srgb, var(--foreground) 8%, var(--card));
+  --quality-heat-2: color-mix(in srgb, var(--foreground) 22%, var(--card));
+  --quality-heat-3: color-mix(in srgb, var(--foreground) 40%, var(--card));
+  --quality-heat-4: color-mix(in srgb, var(--foreground) 62%, var(--card));
+  --quality-heat-5: color-mix(in srgb, var(--foreground) 85%, var(--card));
   /* Why: tab-group splits use a dedicated divider — `--border` is too faint on
      card/editor surfaces when panes are side-by-side or stacked. Default must
      meet >=3:1 against `--card`, not only the hover/drag strong state. */
@@ -277,6 +345,8 @@
   --status-success: #86efac;
   --status-success-background: color-mix(in srgb, var(--status-success) 10%, transparent);
   --status-success-border: color-mix(in srgb, var(--status-success) 25%, transparent);
+  --risk-medium: var(--color-amber-400);
+  --risk-high: var(--color-orange-400);
   --chart-1: var(--color-blue-300);
   --chart-2: var(--color-blue-500);
   --chart-3: var(--color-blue-600);
@@ -330,6 +400,27 @@
   --git-graph-lane-4: #40b0a6;
   --git-graph-lane-5: #b66dff;
   --annotation-highlight: #fbbf24;
+  /* Why: quality severity/heat tokens; darker heat = needs more attention. Text on heat
+     cells: steps 1-3 use --foreground, steps 4-5 use --background. Direct oklch values
+     (Tailwind amber/sky steps) because Tailwind 4 omits unused --color-* variables. */
+  --quality-error: var(--destructive);
+  --quality-warning: oklch(82.8% 0.189 84.429);
+  --quality-info: oklch(74.6% 0.16 232.661);
+  --quality-pass: var(--status-success);
+  --quality-unknown: var(--muted-foreground);
+  --quality-error-background: color-mix(in srgb, var(--quality-error) 10%, transparent);
+  --quality-error-border: color-mix(in srgb, var(--quality-error) 25%, transparent);
+  --quality-warning-background: color-mix(in srgb, var(--quality-warning) 10%, transparent);
+  --quality-warning-border: color-mix(in srgb, var(--quality-warning) 25%, transparent);
+  --quality-info-background: color-mix(in srgb, var(--quality-info) 10%, transparent);
+  --quality-info-border: color-mix(in srgb, var(--quality-info) 25%, transparent);
+  --quality-pass-background: color-mix(in srgb, var(--quality-pass) 10%, transparent);
+  --quality-pass-border: color-mix(in srgb, var(--quality-pass) 25%, transparent);
+  --quality-heat-1: color-mix(in srgb, var(--foreground) 8%, var(--card));
+  --quality-heat-2: color-mix(in srgb, var(--foreground) 22%, var(--card));
+  --quality-heat-3: color-mix(in srgb, var(--foreground) 40%, var(--card));
+  --quality-heat-4: color-mix(in srgb, var(--foreground) 62%, var(--card));
+  --quality-heat-5: color-mix(in srgb, var(--foreground) 85%, var(--card));
   /* Brighter than terminal defaults so the always-visible line clears 3:1 on `--card`. */
   --tab-group-split-divider: #71717a;
   --tab-group-split-divider-strong: #a1a1aa;
@@ -3502,4 +3593,41 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
   box-shadow:
     inset 0 1px 0 0 color-mix(in srgb, var(--foreground) 5%, transparent),
     0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* Why: severity is encoded by shape as well as colour (octagon, triangle, open circle). */
+.orca-quality-glyph-error,
+.orca-quality-glyph-warning,
+.orca-quality-glyph-info {
+  width: 14px;
+  margin-left: 2px;
+  cursor: pointer;
+}
+
+.orca-quality-glyph-error {
+  background: var(--quality-error);
+  clip-path: polygon(
+    calc(50% - 2.5px) calc(50% - 6px),
+    calc(50% + 2.5px) calc(50% - 6px),
+    calc(50% + 6px) calc(50% - 2.5px),
+    calc(50% + 6px) calc(50% + 2.5px),
+    calc(50% + 2.5px) calc(50% + 6px),
+    calc(50% - 2.5px) calc(50% + 6px),
+    calc(50% - 6px) calc(50% + 2.5px),
+    calc(50% - 6px) calc(50% - 2.5px)
+  );
+}
+
+.orca-quality-glyph-warning {
+  background: var(--quality-warning);
+  clip-path: polygon(
+    50% calc(50% - 6px),
+    calc(50% + 6px) calc(50% + 5px),
+    calc(50% - 6px) calc(50% + 5px)
+  );
+}
+
+.orca-quality-glyph-info {
+  background: radial-gradient(circle at 50% 50%, transparent 2.5px, var(--quality-info) 3px);
+  clip-path: circle(5.5px at 50% 50%);
 }

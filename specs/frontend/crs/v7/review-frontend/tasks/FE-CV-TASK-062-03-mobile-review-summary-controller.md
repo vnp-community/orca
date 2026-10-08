@@ -5,7 +5,7 @@
 **Area:** mobile / session hook
 **File:** `mobile/src/session/use-mobile-review-summary-controller.ts` (mới) + test (nếu tách được hàm thuần)
 **Depends on:** FE-CV-TASK-062-02
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — hook written; only the request guard is unit-tested (mobile-review-summary-request-guard.test.ts PASS); hook itself untested (no RN hook infra), mobile typecheck cannot run (mobile/node_modules and expo tsconfig absent)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Không có test hook RN; logic phải ở hàm thuần.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Thêm `mobile-review-summary-request-guard.ts` (hàm thuần, có test) cho bộ đếm thế hệ. Hook nhận `onNavigate(route)` thay vì tự dùng router. `onReconnect` chỉ bọc thành `reconnect` cho UI; chưa gọi tự động khi mất kết nối (sai lệch so với spec).

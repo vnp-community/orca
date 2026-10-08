@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks + store
 **File:** `frontend/src/renderer/src/hooks/useCodeIntelFindings.ts`, `useCodeIntelContractDiff.ts`, `useFindingDismissal.ts` (mới) + test; `frontend/src/renderer/src/store/slices/code-intel.ts` (sửa nhỏ: `findingFilters`, `contractFilters`, `selectOpenFindingsBySymbolKey`)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks; FE-CV-TASK-059-02; G4 fake backend (FE-CV-TASK-073-02)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: useCodeIntelFindings.test.tsx + useCodeIntelContractDiff.test.tsx 12/12 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -35,3 +35,10 @@
 ## Rủi ro
 
 - Nhiều người cùng bỏ qua một phát hiện: kết quả cuối thắng, UI chỉ tải lại (không có `expectedVersion` ở kênh này).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Sai lệch: KHÔNG sửa `store/slices/code-intel.ts`. `findingFilters`/`contractFilters` là state cục bộ của component (không khoá theo worktree nên không có gì rò rỉ ⇒ không cần test rò rỉ). Hiệu lực bỏ qua lạc quan nằm ở map override trong `useCodeIntelFindings` (bị bỏ khi tải lại).
+- `selectOpenFindingsBySymbolKey` là hàm thuần `findings/open-findings-by-symbol.ts` + hook `hooks/useOpenFindingsBySymbolKey.ts` (đọc qua cùng cache `findings`) thay vì selector slice.
+- Phân trang tự viết trong `useCodeIntelFindings` (dựa `useCodeIntelQuery` cho trang 1) vì `useCodeIntelPagedQuery` không trả `dismissedCount`/`indexFreshness`.
+- `useFindingDismissal` nhận `{setOverride, clearOverride, reload}` từ `useCodeIntelFindings`; kết quả trả `{ok, error}` và lỗi giữ theo `findingKey` (`errorsByKey`).

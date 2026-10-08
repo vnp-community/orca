@@ -9,10 +9,7 @@ import { useContextualCopySetup } from './useContextualCopySetup'
 import { selectWorktreeDiffComments } from '@/store/worktree-diff-comments-selector'
 import { useDiffCommentDecorator } from '../diff-comments/useDiffCommentDecorator'
 import { DiffCommentPopover } from '../diff-comments/DiffCommentPopover'
-import {
-  getDiffCommentPopoverLeft,
-  getDiffCommentPopoverTop
-} from '../diff-comments/diff-comment-popover-position'
+import { getDiffCommentPopoverLeft } from '../diff-comments/diff-comment-popover-position'
 import { applyDiffEditorLineNumberOptions } from './diff-editor-line-number-options'
 import type { DiffComment } from '../../../../shared/types'
 import { isDiffComment } from '@/lib/diff-comment-compat'
@@ -25,6 +22,10 @@ import { getDiffViewerLargeDiffSaveAction } from './diff-viewer-large-diff-save-
 import type { DiffViewerProps } from './diff-viewer-props'
 import { buildDiffEditorWordWrapOptions } from './diff-editor-word-wrap-options'
 import { useDiffEditorRegistration } from './diff-navigation-context'
+import { useDiffReviewLinks } from './use-diff-line-reveal'
+import { useDiffPopoverTracking } from './useDiffPopoverTracking'
+import { useQualityFindingMarkers } from './quality-annotations/useQualityFindingMarkers'
+import { QualityAnnotationStrip } from './quality-annotations/QualityAnnotationStrip'
 
 export default function DiffViewer({
   modelKey,
@@ -45,7 +46,10 @@ export default function DiffViewer({
   onContentChange,
   onSave,
   largeDiffRenderLimit,
-  largeDiffSaveContentAvailable
+  largeDiffSaveContentAvailable,
+  reviewReveal,
+  diffSource,
+  compareHeadOid
 }: DiffViewerProps): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const editorFontZoomLevel = useAppStore((s) => s.editorFontZoomLevel)
@@ -134,34 +138,16 @@ export default function DiffViewer({
     onPendingScrollConsumed: () => setScrollToDiffCommentId(null)
   })
 
-  useEffect(() => {
-    if (!modifiedEditor || !popover) {
-      return
-    }
-    const update = (): void => {
-      const lineHeight = modifiedEditor.getOption(monaco.editor.EditorOption.lineHeight)
-      const top = getDiffCommentPopoverTop(modifiedEditor, popover.lineNumber, lineHeight)
-      if (top == null) {
-        setPopover(null)
-        return
-      }
-      const left = getDiffCommentPopoverLeft(modifiedEditor, diffBodyRef.current)
-      setPopover((prev) =>
-        prev ? { ...prev, top, left: left == null ? prev.left : left, lineHeight } : prev
-      )
-    }
-    const scrollSub = modifiedEditor.onDidScrollChange(update)
-    const contentSub = modifiedEditor.onDidContentSizeChange(update)
-    const layoutSub = modifiedEditor.onDidLayoutChange(update)
-    return () => {
-      scrollSub.dispose()
-      contentSub.dispose()
-      layoutSub.dispose()
-    }
-    // Why: depend on popover.lineNumber (not the whole popover object) so the
-    // effect doesn't re-subscribe on every top update it dispatches.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modifiedEditor, popover?.lineNumber])
+  useDiffPopoverTracking({ modifiedEditor, popover, setPopover, diffBodyRef })
+
+  const qualityAnnotations = useQualityFindingMarkers({
+    editor: modifiedEditor,
+    monacoApi: monaco,
+    worktreeId,
+    relativePath,
+    diffSource,
+    compareHeadOid
+  })
 
   // Why: on a fresh open (no cached view state, no pending scroll-to-note),
   // center the first diff change in the viewport. We do this from a dedicated
@@ -175,6 +161,7 @@ export default function DiffViewer({
   // added in this render pass. The didScroll guard makes this strictly
   // one-shot per mount.
   const didAutoScrollFirstDiffRef = useRef(false)
+  const hasReviewReveal = reviewReveal !== undefined
   const didAutoScrollModelKeyRef = useRef(modelKey)
   useEffect(() => {
     if (didAutoScrollModelKeyRef.current !== modelKey) {
@@ -191,6 +178,11 @@ export default function DiffViewer({
       return
     }
     if (diffViewStateCache.get(modelKey)) {
+      return
+    }
+    // Why: a review-lens reveal owns the first scroll; the first-change jump would override it.
+    if (hasReviewReveal) {
+      didAutoScrollFirstDiffRef.current = true
       return
     }
     if (pendingScrollForThisViewer) {
@@ -242,7 +234,9 @@ export default function DiffViewer({
         cancelAnimationFrame(rafId)
       }
     }
-  }, [modifiedEditor, modelKey, pendingScrollForThisViewer])
+  }, [modifiedEditor, modelKey, pendingScrollForThisViewer, hasReviewReveal])
+
+  useDiffReviewLinks({ diffEditorRef, modifiedEditor, reveal: reviewReveal, worktreeId, relativePath })
 
   const handleEnterLargeDiffFallback = useCallback(() => {
     // Why: when a tab transitions to the safety fallback, stale Monaco refs
@@ -413,6 +407,7 @@ export default function DiffViewer({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      <QualityAnnotationStrip worktreeId={worktreeId} {...qualityAnnotations} />
       <div ref={diffBodyRef} className="flex-1 min-h-0 relative">
         {popover && hasLineCommentAction && !renderLimit.limited && (
           <DiffCommentPopover

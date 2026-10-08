@@ -5,7 +5,7 @@
 **Area:** frontend / hooks
 **File:** `frontend/src/renderer/src/hooks/{useClarifications,useDecisions,useImpactAssessment,useTaskReadiness,useExecutionResult}.ts` (mới); test cùng tên
 **Depends on:** FE-REQ-TASK-036-01 (kiểu, hằng kênh), 018-02 (`callRequestRpc`, `subscribeRequestBus`), 018-03 (mẫu `useRequest`, `useApprovals`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest hooks useClarifications (3), useDecisions (3), useImpactAssessment (8), useTaskReadiness (4), useExecutionResult (3) pass)
 
 ## Context
 
@@ -74,3 +74,7 @@
 - `answer` có thể mất kết nối giữa chừng: sau lỗi `network`, `refetch` để biết Clarification đã `answered` chưa (CR-028 2.4 bước 6: gửi lặp cùng nội dung trả kết quả hiện có), không tự gửi lại.
 - Không gộp `useImpactAssessment` với `useGraphLens` (SOL-032): khác vòng đời (một bên tóm tắt, một bên đồ thị), tránh gọi trùng nhưng chia sẻ `assessmentId` qua tham số.
 - Mỗi hook nhỏ gọn; nếu vượt ngưỡng `max-lines`, tách `*-result-merging.ts`, không thêm disable.
+
+## Ghi chú triển khai (2026-10-07)
+
+Thêm `useRefetchOnRequestEvent.ts` và 5 hook. Nháp trả lời chỉ trong state; hook bắt mọi lỗi để không có unhandled rejection. `useImpactAssessment` trả thêm `canOverride` (từ `viewerCan.override` của `impact.get`) và export `ImpactAssessmentApi`.

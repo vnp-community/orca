@@ -78,6 +78,8 @@ export type CreateHostedReviewComposerProps = {
   onDropdownAction?: (kind: DropdownActionKind) => void
   /** CR-085: quality gate notice slot; rendered above buttons, does not affect disabled state */
   qualityNotice?: React.ReactNode
+  /** CR-090: inserts the review report into the description; omitted when the quality flag is off */
+  onInsertReviewReport?: () => Promise<void>
 }
 
 export function CreateHostedReviewComposer({
@@ -110,7 +112,9 @@ export function CreateHostedReviewComposer({
   onGenerate,
   onCancelGenerate,
   onPrimaryAction,
-  onDropdownAction
+  onDropdownAction,
+  qualityNotice,
+  onInsertReviewReport
 }: CreateHostedReviewComposerProps): React.JSX.Element {
   const copy = localizedHostedReviewCopy(resolveSupportedHostedReviewCopyProvider(provider))
   const ReviewIcon = provider === 'gitlab' ? GitMerge : GitPullRequestArrow
@@ -250,6 +254,7 @@ export function CreateHostedReviewComposer({
           normalizedBase={normalizedBase}
           strippedBranch={strippedBranch}
           baseSameAsBranch={baseSameAsBranch}
+          onInsertReviewReport={onInsertReviewReport}
         />
 
         {/* CR-085: quality gate notice slot — optional, does not affect createDisabled */}

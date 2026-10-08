@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/code-intel-errors.ts` (mới), `frontend/src/shared/code-intel-wire-parsers.ts` (mới), tests cùng tên
 **Depends on:** FE-CV-TASK-050-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: parsers.test 79 pass; error table/kinds/envelope/status rewritten to contract §2.3; split into code-intel-error-codes.ts + code-intel-index-status-parser.ts. Tests are code-intel-parsers.test.ts (not the two spec names))
 
 ## Context
 

@@ -25,3 +25,37 @@
 ## Thứ tự thực thi
 
 Xem mục 7 của hợp đồng ([CONTRACT-codeintel-proto-and-data-map.md](../../../backend-go/crs/v7/CONTRACT-codeintel-proto-and-data-map.md)): cổng đồng bộ G0–G4, thứ tự theo khu vực (backend → agent → frontend) và 9 đợt. Frontend chỉ dùng kênh thật sau cổng G3; trước đó dùng fake backend (task `FE-CV-TASK-073-02`).
+
+## Trạng thái triển khai (cập nhật 2026-10-08)
+
+Trạng thái dưới đây được tổng hợp từ dòng `**Status:**` của từng task, **sau khi đã đối chiếu với code và chạy test thật** (không còn dấu DONE hàng loạt như đợt soạn spec). Quy ước: `[x] DONE` chỉ khi file tồn tại, test của task tồn tại và chạy qua, không thêm lỗi `tsc`/`oxlint` ở file đó; `[~] PARTIAL` ghi rõ phần thiếu; `[!] BLOCKED` ghi phụ thuộc; `[ ] TODO` chưa làm. Tên file thực tế có thể khác spec (ghi ở "Ghi chú triển khai" cuối mỗi task).
+
+| Feature | CR | Task | DONE | PARTIAL | BLOCKED | TODO |
+|---|---|---|---|---|---|---|
+| `quality-gate` | CR-CV-085 | 7 | 7 | 0 | 0 | 0 |
+| `quality-gate` | CR-CV-089 | 7 | 6 | 1 | 0 | 0 |
+| `quality-gate` | CR-CV-090 | 8 | 8 | 0 | 0 | 0 |
+| `quality-gate` | CR-CV-092 | 7 | 7 | 0 | 0 | 0 |
+| `quality-gate` | CR-CV-093 | 6 | 5 | 1 | 0 | 0 |
+| `quality-gate` | CR-CV-095 | 7 | 5 | 2 | 0 | 0 |
+| `quality-rollout` | CR-CV-073 | 7 | 2 | 4 | 0 | 1 |
+| `quality-visualization` | CR-CV-087 | 20 | 18 | 2 | 0 | 0 |
+| `quality-visualization` | CR-CV-088 | 9 | 9 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-050 | 20 | 16 | 4 | 0 | 0 |
+| `review-frontend` | CR-CV-051 | 7 | 5 | 2 | 0 | 0 |
+| `review-frontend` | CR-CV-052 | 6 | 6 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-053 | 8 | 7 | 1 | 0 | 0 |
+| `review-frontend` | CR-CV-054 | 6 | 6 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-055 | 7 | 6 | 1 | 0 | 0 |
+| `review-frontend` | CR-CV-056 | 7 | 5 | 2 | 0 | 0 |
+| `review-frontend` | CR-CV-057 | 6 | 5 | 1 | 0 | 0 |
+| `review-frontend` | CR-CV-058 | 5 | 3 | 2 | 0 | 0 |
+| `review-frontend` | CR-CV-059 | 7 | 5 | 2 | 0 | 0 |
+| `review-frontend` | CR-CV-060 | 8 | 5 | 3 | 0 | 0 |
+| `review-frontend` | CR-CV-061 | 7 | 6 | 1 | 0 | 0 |
+| `review-frontend` | CR-CV-062 | 6 | 4 | 2 | 0 | 0 |
+| **Tổng** | | **178** | **146** | **31** | **0** | **1** |
+
+**Kiểm chứng tổng (2026-10-08):** toàn bộ test frontend: 27 file fail / 2 391 (baseline trước khi triển khai: 46 / 2 054); 81 test fail / 20 482 (baseline 281 / 17 864); `tsc -p frontend/tsconfig.json`: 117 lỗi (baseline 184), không lỗi nào ở file của series này. Các test fail còn lại thuộc nơi khác (ví dụ `no-top-level-translate` ở `FleetServerStatusBadge`, `remote-runtime-shared-control-boundary`, `selectors.test`). Hai file `WorktreeCard.*` thỉnh thoảng fail khi chạy gộp do tải (timeout), chạy riêng thì qua.
+
+**Chưa kiểm chứng được trong môi trường này:** e2e Playwright (không có Chromium), build/bundle, `verify:localization-*` (thiếu script), kiểm tay trên Electron/thiết bị thật, typecheck của `mobile/` (chưa cài phụ thuộc), bản dịch es/ja/ko/zh cần người duyệt.

@@ -1,6 +1,6 @@
 # FE-CV-SOL-056-dataflow-lens: Lens Luồng dữ liệu (sơ đồ tuần tự Mermaid, danh sách bước, sao chép/xuất)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 5/7 task DONE (056-01..04, 056-06), 2 PARTIAL (056-05: thiếu lọc trigger/service UI, `Select` <720 px, "Luồng liên quan" đã nối theo `dataFlowId` (W6); 056-07: thiếu e2e và kiểm tay). Code ở `components/review-map/dataflow/`, `hooks/useDataFlow*.ts`, `hooks/useIsDarkTheme.ts`. Viết ngày 2026-10-06.
 
 **CR:** [CR-CV-056](../../../../../../docs/crs/v7/review-frontend/CR-CV-056-dataflow-lens.md)
 **Area:** frontend (`components/review-map`, `hooks`)

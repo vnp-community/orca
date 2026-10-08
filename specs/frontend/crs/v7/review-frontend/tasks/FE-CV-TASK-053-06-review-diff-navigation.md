@@ -5,7 +5,7 @@
 **Area:** frontend / lib
 **File:** `lib/review-diff-navigation.ts` (mới), test
 **Depends on:** FE-CV-TASK-053-05, FE-CV-TASK-051-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: lib/review-diff-navigation.test 10/10 pass; O-13 synthetic compare for range/hostedReview still unverified)
 
 ## Context
 

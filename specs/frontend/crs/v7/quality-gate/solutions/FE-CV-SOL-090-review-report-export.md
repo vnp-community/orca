@@ -1,6 +1,6 @@
 # FE-CV-SOL-090-review-report-export: Xuất báo cáo review (Markdown/HTML) và chèn vào mô tả PR/MR
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ việc ĐỌC code `frontend/src` và hợp đồng v7; chưa chạy test hay ứng dụng.
+> Trạng thái (2026-10-07): 8/8 task DONE, 0 PARTIAL (W6: 090-06 đã mount trong khung Review), 0 BLOCKED, 0 TODO. Xem mục "Ghi chú triển khai" của từng task; code thật lệch spec ở các điểm đã ghi.
 
 **CR:** [CR-CV-090](../../../../../../docs/crs/v7/quality-gate/CR-CV-090-exportable-review-report.md) (phần frontend; mô hình do `BE-CV-SOL-090-review-report-model`)
 **Area:** frontend (`components/review-map/report/`, `components/right-sidebar/`)

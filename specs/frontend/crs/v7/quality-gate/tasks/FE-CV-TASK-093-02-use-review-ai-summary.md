@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/ai-summary/use-review-ai-summary.ts`, `ai-summary-consent-state.ts` (mới) + test
 **Depends on:** FE-CV-TASK-085-01, 093-01; FE-CV-SOL-050-store-and-query-hooks
-**Status:** [x] DONE — `useReviewAiSummary.ts` hook chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 17 tests + 2 tests consent)
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - Thời gian hoàn tất nền chưa đo.
+
+## Ghi chú triển khai (2026-10-07)
+
+dry-run -> xác nhận -> tạo; retry inProgress 90 s; huỷ bỏ kết quả muộn; cờ ai tắt = 0 RPC; `maxLevel` giới hạn mức dữ liệu.

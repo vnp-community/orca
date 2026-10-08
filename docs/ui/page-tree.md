@@ -56,6 +56,10 @@ frontend/ (renderer)
                                                                 │     ├── Task detail drawer
                                                                 │     └── PullRequestPage (PR detail panel, opened from a task)
                                                                 │
+                                                                ├── requests ── Requests (RequestPage) — see pages/requests.md
+                                                                │     ├── Requests tab: list + RequestDetailPane
+                                                                │     └── Approvals inbox (CR-REQ-022) / Backlog: Requests | Tasks | Execute (CR-REQ-023)
+                                                                │
                                                                 ├── activity ── Activity (ActivityPrototypePage)
                                                                 │     └── Agent run feed across worktrees ("Agents" in the sidebar)
                                                                 │

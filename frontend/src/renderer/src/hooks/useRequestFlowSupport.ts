@@ -40,7 +40,7 @@ export function useRequestFlowSupport(): void {
         REQUEST_RPC_METHODS.FLOW_STATUS
       )
 
-      if (cancelled) return
+      if (cancelled) {return}
 
       if (!result.ok) {
         if (result.error.kind === 'unsupported') {

@@ -4,30 +4,9 @@ import { useAppStore } from '@/store'
 import { formatDiffComments } from '@/lib/diff-comments-format'
 import { useComposedAllNotesPrompt } from '@/lib/use-composed-all-notes-prompt'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { markAnnotationsSentBestEffort } from '@/lib/annotation-mark-sent-best-effort'
 import { NotesSendMenu, type NotesSendMenuScope } from './NotesSendMenu'
 import { translate } from '@/i18n/i18n'
-
-// TASK-FE-ANNOTATE-005: best-effort bookkeeping after a successful send —
-// a failure here must never surface as a "send failed" error since the
-// prompt was already delivered by the time this runs. Only meaningful for
-// the 'environment' target (no annotation-service bridge in desktop mode,
-// same guard as useComposedAllNotesPrompt/persistRemote).
-function markAnnotationsSentBestEffort(annotationIds: readonly string[]): void {
-  if (annotationIds.length === 0) {
-    return
-  }
-  const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-  if (target.kind === 'local') {
-    return
-  }
-  void callRuntimeRpc(
-    target,
-    'annotation.markSent',
-    { ids: annotationIds },
-    { timeoutMs: 8000 }
-  ).catch(() => {})
-}
 
 export function DiffNotesSendMenu({
   worktreeId,

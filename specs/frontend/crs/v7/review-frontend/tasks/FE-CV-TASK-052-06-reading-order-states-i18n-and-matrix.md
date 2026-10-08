@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + i18n + docs
 **File:** `ReadingOrderList.tsx` (trạng thái), `i18n/locales/*.json`, `code-intel-locale-coverage.test.ts`, `specs/frontend/storage/feature-persistence-matrix.md`
 **Depends on:** FE-CV-TASK-052-05
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: ReadingOrderList.test empty/load-error/overflow states, locale coverage, feature-persistence-matrix row)
 
 ## Context
 

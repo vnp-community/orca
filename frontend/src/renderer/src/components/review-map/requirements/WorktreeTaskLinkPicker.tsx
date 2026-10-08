@@ -1,126 +1,91 @@
 /**
  * WorktreeTaskLinkPicker.tsx — FE-CV-TASK-092-04
  *
- * Picker for linking a worktree task to a requirement trace.
- * Uses Command inside Popover for searchable list.
- * No extra dependencies — uses existing ui/command.tsx and ui/popover.tsx.
+ * Searchable task picker (Popover + Command) for linking the worktree to a task.
+ * Tasks come from `useTasks(projectId)`; selecting calls `onLink(task.id)`, removal
+ * calls `onUnlink()` (the contract clears a link with an empty taskId).
  *
  * @module components/review-map/requirements/WorktreeTaskLinkPicker
  */
 
-import React, { useState } from 'react'
-import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useState } from 'react'
+import { Link2, Unlink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Link, Unlink } from 'lucide-react'
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { translateCatalogKey } from '@/i18n/catalog-key-translate'
+import { useTasks } from '../../../hooks/useTasks'
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+const BASE = 'auto.components.reviewMap.requirements.taskPicker'
 
-export type WorktreeTask = {
-  id: string
-  /** Short reference like #TG-123 */
-  ref: string
-  title: string
-  url: string
-}
+export type PickerTask = { id: string; title: string; taskNumber?: number }
 
-export type WorktreeTaskLinkPickerProps = {
-  tasks: WorktreeTask[]
-  /** Currently linked task URL, if any */
-  linkedTaskUrl: string | null
-  onLink: (taskUrl: string) => void
-  onUnlink: (taskUrl: string) => void
-  translate: (key: string, params?: Record<string, unknown>) => string
+export type WorktreeTaskLinkPickerViewProps = {
+  tasks: PickerTask[]
+  linkedTaskId: string | null
   disabled?: boolean
+  onLink: (taskId: string) => void
+  onUnlink: () => void
+  translate?: (key: string, params?: Record<string, unknown>) => string
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+export function taskPickerLabel(task: PickerTask): string {
+  return task.taskNumber != null ? `#TG-${task.taskNumber} ${task.title}` : task.title
+}
 
-export function WorktreeTaskLinkPicker({
+export function WorktreeTaskLinkPickerView({
   tasks,
-  linkedTaskUrl,
+  linkedTaskId,
+  disabled = false,
   onLink,
   onUnlink,
-  translate,
-  disabled = false,
-}: WorktreeTaskLinkPickerProps): React.ReactElement {
+  translate = translateCatalogKey
+}: WorktreeTaskLinkPickerViewProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
-
-  const linkedTask = linkedTaskUrl ? tasks.find((t) => t.url === linkedTaskUrl) : null
-
-  const handleSelect = (task: WorktreeTask) => {
-    setOpen(false)
-    onLink(task.url)
-  }
-
-  const handleUnlink = () => {
-    if (linkedTaskUrl) {
-      onUnlink(linkedTaskUrl)
-    }
-  }
-
   return (
-    <div className="flex items-center gap-2">
-      {linkedTask ? (
-        <>
-          <span className="text-xs text-muted-foreground">
-            {linkedTask.ref} {linkedTask.title}
-          </span>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={handleUnlink}
-            disabled={disabled}
-            aria-label={translate('auto.components.reviewMap.requirements.taskPicker.unlink')}
-          >
-            <Unlink className="size-3.5" aria-hidden />
-            {translate('auto.components.reviewMap.requirements.taskPicker.unlink')}
+    <div className="flex items-center gap-1.5">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" size="xs" disabled={disabled}>
+            <Link2 aria-hidden />
+            {translate(linkedTaskId ? `${BASE}.change` : `${BASE}.link`)}
           </Button>
-        </>
-      ) : (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="xs"
-              disabled={disabled}
-              aria-label={translate('auto.components.reviewMap.requirements.taskPicker.link')}
-            >
-              <Link className="size-3.5 mr-1" aria-hidden />
-              {translate('auto.components.reviewMap.requirements.taskPicker.link')}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72 p-0" align="start">
-            <Command>
-              <CommandInput
-                placeholder={translate(
-                  'auto.components.reviewMap.requirements.taskPicker.searchPlaceholder'
-                )}
-                autoFocus
-              />
-              <CommandList>
-                <CommandEmpty>
-                  {translate('auto.components.reviewMap.requirements.taskPicker.noResults')}
-                </CommandEmpty>
-                {tasks.map((task) => (
-                  <CommandItem
-                    key={task.id}
-                    value={`${task.ref} ${task.title}`}
-                    onSelect={() => handleSelect(task)}
-                  >
-                    <span className="text-muted-foreground mr-2 text-xs shrink-0">{task.ref}</span>
-                    <span className="truncate">{task.title}</span>
-                  </CommandItem>
-                ))}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      )}
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-72 p-0">
+          <Command>
+            <CommandInput placeholder={translate(`${BASE}.searchPlaceholder`)} />
+            <CommandList>
+              <CommandEmpty>{translate(`${BASE}.noResults`)}</CommandEmpty>
+              {tasks.map((task) => (
+                <CommandItem
+                  key={task.id}
+                  value={`${taskPickerLabel(task)} ${task.id}`}
+                  onSelect={() => {
+                    setOpen(false)
+                    onLink(task.id)
+                  }}
+                >
+                  <span className="truncate">{taskPickerLabel(task)}</span>
+                </CommandItem>
+              ))}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {linkedTaskId ? (
+        <Button type="button" variant="ghost" size="xs" disabled={disabled} onClick={onUnlink}>
+          <Unlink aria-hidden />
+          {translate(`${BASE}.unlink`)}
+        </Button>
+      ) : null}
     </div>
   )
+}
+
+/** Loads the project's tasks, so it is only mounted when the picker is actually shown. */
+export function WorktreeTaskLinkPicker(
+  props: Omit<WorktreeTaskLinkPickerViewProps, 'tasks'> & { projectId: string }
+): React.JSX.Element {
+  const { filteredTasks } = useTasks(props.projectId)
+  return <WorktreeTaskLinkPickerView {...props} tasks={filteredTasks} />
 }

@@ -5,7 +5,7 @@
 **Area:** tests / Playwright web
 **File:** `tests/e2e/code-intel-web/{review-summary,states,reindex,lenses}.web.e2e.ts` (mới; `review-summary`, `lenses` và `review-notes` có thể được các task lens tạo trước — hợp nhất, không ghi đè)
 **Depends on:** FE-CV-TASK-073-02, 073-03; các lens/khung đã có (050–061)
-**Status:** [x] DONE
+**Status:** [ ] TODO
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Phụ thuộc lens đã hoàn thành; ca chưa có component để `test.fixme` có tên task chủ.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Phụ thuộc các task lens 050–061 (UI Review) chưa có; không viết spec DOM suy đoán.

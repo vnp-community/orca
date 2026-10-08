@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `SymbolDetailPanel.tsx`, `SymbolRelationList.tsx`, `SymbolCoveringTests.tsx`, `SymbolRelatedFlows.tsx`, `SymbolSourcePreview.tsx`, `hooks/useSymbolDetail.ts` (mới), tests
 **Depends on:** FE-CV-TASK-050-13, 053-01, 051-05
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: SymbolDetailPanel.test 10/10 PASS; review-map 130 file PASS)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - `incoming/outgoing` không có `key`/dòng: điều hướng qua `{name,file}` có thể mơ hồ.
+
+## Ghi chú tích hợp (W6, 2026-10-07)
+
+`ReviewDrawerContentProps.indexStatus` (mới) do `ReviewWorkspace` truyền; khi `overall` là `STALE`/`OVERLAY` panel hiện "Line numbers follow the index at {commit}". Còn lại là sai lệch thiết kế: bộ nhớ đệm nguồn được giải phóng theo state của component, không theo query cache.

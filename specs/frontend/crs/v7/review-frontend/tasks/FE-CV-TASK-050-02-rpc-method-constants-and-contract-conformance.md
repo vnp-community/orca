@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/code-intel-rpc-methods.ts` (mới), `frontend/src/shared/code-intel-contract-conformance.test.ts` (mới)
 **Depends on:** FE-CV-TASK-050-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: contract-conformance 9 pass; constants were invented before, now the 46 real channel names)
 
 ## Context
 

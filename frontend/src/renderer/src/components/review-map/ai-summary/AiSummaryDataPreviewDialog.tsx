@@ -1,136 +1,114 @@
 /**
  * AiSummaryDataPreviewDialog.tsx — FE-CV-TASK-093-03
  *
- * Dialog that shows what data will be sent to the LLM provider
- * before the user confirms AI summary generation.
- *
- * Design rules:
- * - No overclaiming: "will send", not "safely sends"
- * - Default focus on Cancel button (safe default)
- * - "Send and generate" locks immediately on submit
- * - No dangerouslySetInnerHTML
+ * Shows exactly what would leave the machine before the user agrees to generate an AI
+ * summary. Initial focus is Cancel, so a stray Enter cannot send data. File paths and
+ * provider names come from the backend and render as text only.
  *
  * @module components/review-map/ai-summary/AiSummaryDataPreviewDialog
  */
 
-import React, { useRef, useEffect } from 'react'
+import { useRef } from 'react'
+import { TriangleAlert } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { AlertTriangle } from 'lucide-react'
+import { translateCatalogKey } from '@/i18n/catalog-key-translate'
+import type { AiSummaryManifest } from './ai-summary-wire-parser'
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type AiSummaryDataManifest = {
-  fileCount: number
-  totalBytes: number
-  withheldCount: number
-  estimatedTokens: number
-  suspectedInjection: boolean
-}
+const BASE = 'auto.components.reviewMap.aiSummary.preview'
+const MAX_LISTED_FILES = 12
 
 export type AiSummaryDataPreviewDialogProps = {
   open: boolean
-  manifest: AiSummaryDataManifest | null
+  manifest: AiSummaryManifest | null
+  /** True while the confirmed request is being sent; locks both buttons. */
+  submitting?: boolean
   onConfirm: () => void
   onCancel: () => void
-  translate: (key: string, params?: Record<string, unknown>) => string
-  isSubmitting?: boolean
+  translate?: (key: string, params?: Record<string, unknown>) => string
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function AiSummaryDataPreviewDialog({
   open,
   manifest,
+  submitting = false,
   onConfirm,
   onCancel,
-  translate,
-  isSubmitting = false,
-}: AiSummaryDataPreviewDialogProps): React.ReactElement {
+  translate = translateCatalogKey
+}: AiSummaryDataPreviewDialogProps): React.JSX.Element {
   const cancelRef = useRef<HTMLButtonElement>(null)
-
-  // Focus cancel button when dialog opens (safe default)
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => cancelRef.current?.focus(), 50)
-    }
-  }, [open])
+  const withheld = manifest?.files.filter((f) => f.withheld).length ?? 0
+  const listed = manifest?.files.slice(0, MAX_LISTED_FILES) ?? []
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel() }}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={(next) => !next && !submitting && onCancel()}>
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          cancelRef.current?.focus()
+        }}
+      >
         <DialogHeader>
-          <DialogTitle>
-            {translate('auto.components.reviewMap.aiSummary.previewDialog.title')}
-          </DialogTitle>
+          <DialogTitle>{translate(`${BASE}.title`)}</DialogTitle>
           <DialogDescription>
-            {translate('auto.components.reviewMap.aiSummary.previewDialog.description')}
+            {translate(`${BASE}.description`, { provider: manifest?.provider ?? translate(`${BASE}.defaultProvider`) })}
           </DialogDescription>
         </DialogHeader>
 
-        {manifest && (
-          <div className="text-sm space-y-2 py-2">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              <span className="text-muted-foreground">
-                {translate('auto.components.reviewMap.aiSummary.previewDialog.fileCount')}
-              </span>
-              <span>{manifest.fileCount}</span>
-
-              <span className="text-muted-foreground">
-                {translate('auto.components.reviewMap.aiSummary.previewDialog.totalBytes')}
-              </span>
-              <span>{manifest.totalBytes.toLocaleString()}</span>
-
-              <span className="text-muted-foreground">
-                {translate('auto.components.reviewMap.aiSummary.previewDialog.withheld')}
-              </span>
-              <span>{manifest.withheldCount}</span>
-
-              <span className="text-muted-foreground">
-                {translate('auto.components.reviewMap.aiSummary.previewDialog.estimatedTokens')}
-              </span>
-              <span>~{manifest.estimatedTokens.toLocaleString()}</span>
-            </div>
-
-            {manifest.suspectedInjection && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded border border-destructive/40 bg-destructive/10 p-2 mt-2"
-              >
-                <AlertTriangle className="size-4 text-destructive shrink-0 mt-0.5" aria-hidden />
-                <p className="text-destructive text-xs">
-                  {translate('auto.components.reviewMap.aiSummary.previewDialog.injectionWarning')}
-                </p>
-              </div>
-            )}
+        {manifest ? (
+          <div className="space-y-2 text-xs">
+            <p className="text-foreground">
+              {translate(`${BASE}.counts`, {
+                files: manifest.files.length,
+                redactions: manifest.redactions,
+                tokens: manifest.estimatedTokens.toLocaleString()
+              })}
+            </p>
+            <p className="text-muted-foreground">{translate(`${BASE}.level.${manifest.level}`)}</p>
+            {withheld > 0 ? (
+              <p className="text-muted-foreground">{translate(`${BASE}.withheld`, { count: withheld })}</p>
+            ) : null}
+            {listed.length > 0 ? (
+              <ul className="max-h-40 space-y-0.5 overflow-y-auto rounded-md border border-border p-2">
+                {listed.map((file) => (
+                  <li key={file.path} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate" title={file.path}>
+                      {file.path}
+                    </span>
+                    <span className="shrink-0 text-muted-foreground">
+                      {file.withheld ? translate(`${BASE}.fileWithheld`) : `${file.bytes.toLocaleString()} B`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {manifest.files.length > MAX_LISTED_FILES ? (
+              <p className="text-muted-foreground">
+                {translate(`${BASE}.moreFiles`, { count: manifest.files.length - MAX_LISTED_FILES })}
+              </p>
+            ) : null}
+            {manifest.suspectedInjection ? (
+              <p role="alert" className="flex items-start gap-1.5 rounded-md border border-border p-2 text-foreground">
+                <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-destructive" aria-hidden />
+                {translate(`${BASE}.injectionWarning`)}
+              </p>
+            ) : null}
           </div>
-        )}
+        ) : null}
 
         <DialogFooter>
-          <Button
-            ref={cancelRef}
-            variant="ghost"
-            onClick={onCancel}
-            disabled={isSubmitting}
-          >
-            {translate('auto.components.reviewMap.aiSummary.previewDialog.cancel')}
+          <Button ref={cancelRef} type="button" variant="ghost" disabled={submitting} onClick={onCancel}>
+            {translate(`${BASE}.cancel`)}
           </Button>
-          <Button
-            onClick={onConfirm}
-            disabled={isSubmitting}
-          >
-            {translate('auto.components.reviewMap.aiSummary.previewDialog.confirm')}
+          <Button type="button" disabled={submitting} onClick={onConfirm}>
+            {translate(`${BASE}.confirm`)}
           </Button>
         </DialogFooter>
       </DialogContent>

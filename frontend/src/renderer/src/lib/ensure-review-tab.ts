@@ -16,7 +16,8 @@
 import { useAppStore } from '@/store'
 import { findReusableRightSplitGroupId } from './emulator-right-split-target'
 import { translate } from '@/i18n/i18n'
-import type { CodeIntelSupportState } from '../store/slices/code-intel'
+import { noteReviewOpened } from './review-decision-tracker'
+import { resolveCodeIntelSelector } from './code-intel-worktree-selector'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,7 +37,7 @@ type ExistingReviewTab = {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Lookup
 // ---------------------------------------------------------------------------
 
 export function getReviewTabForWorktree(worktreeId: string): ExistingReviewTab | null {
@@ -45,12 +46,6 @@ export function getReviewTabForWorktree(worktreeId: string): ExistingReviewTab |
       (tab) => tab.contentType === 'review'
     ) ?? null
   )
-}
-
-function getSupportState(): CodeIntelSupportState['state'] {
-  const state = useAppStore.getState() as Record<string, unknown>
-  const support = state.codeIntelSupportState as CodeIntelSupportState | undefined
-  return support?.state ?? 'unknown'
 }
 
 // ---------------------------------------------------------------------------
@@ -64,12 +59,18 @@ export function ensureReviewTab(
 ): string | null {
   const store = useAppStore.getState()
 
-  // Block when support is explicitly off
-  const supportState = getSupportState()
+  // Block when support is explicitly off; 'unknown' still opens (the probe is in progress).
+  const supportState = store.codeIntelSupportState.state
   if (supportState === 'disabled' || supportState === 'unsupported') {
     return null
   }
-  // 'unknown' → allow open (probe in progress)
+  // Workspace roots and worktrees without a project cannot be addressed by code-intel.
+  if (resolveCodeIntelSelector(store, worktreeId).state === 'unsupported') {
+    return null
+  }
+
+  // Telemetry: lets review_decision_made say whether Review was used after the agent turn.
+  noteReviewOpened(worktreeId)
 
   const sourceGroupId =
     options?.targetGroupId ??
@@ -92,10 +93,7 @@ export function ensureReviewTab(
     return existing.id
   }
 
-  const label = translate(
-    'auto.lib.ensure.review.tab.title',
-    'Review'
-  )
+  const label = translate('auto.lib.ensure.review.tab.title', 'Review')
 
   if (options?.placement === 'rightSplit' && shouldSurface) {
     const reusableRightGroupId = findReusableRightSplitGroupId(
@@ -105,6 +103,7 @@ export function ensureReviewTab(
     if (reusableRightGroupId) {
       const tab = store.createUnifiedTab(worktreeId, 'review', {
         label,
+        entityId: worktreeId,
         targetGroupId: reusableRightGroupId,
         activate: true
       })
@@ -118,7 +117,7 @@ export function ensureReviewTab(
       worktreeId,
       'review',
       { sourceGroupId, splitDirection: 'right' },
-      { label, activate: true }
+      { label, entityId: worktreeId, activate: true }
     )
     if (splitTab) {
       return splitTab.id
@@ -127,6 +126,7 @@ export function ensureReviewTab(
 
   const tab = store.createUnifiedTab(worktreeId, 'review', {
     label,
+    entityId: worktreeId,
     targetGroupId: sourceGroupId,
     activate: shouldSurface
   })

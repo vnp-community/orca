@@ -5,7 +5,7 @@
 **Area:** frontend (components)
 **File:** trong `frontend/src/renderer/src/components/request/backlog/` (mới): `BacklogTab.tsx`, `BacklogSegmentControl.tsx`, `BacklogToolbar.tsx`, `BacklogStates.tsx`, `backlog-view-columns.ts` và test cùng tên; sửa `components/request/RequestPage.tsx` (gắn tab)
 **Depends on:** FE-REQ-TASK-023-02; FE-REQ-TASK-022-03, 022-04 (`useRequestSummaries`, `useMinuteClock`, `useRowListKeyboardNavigation`, `isTypingTarget`); FE-REQ-SOL-018 (slice `requestPage.backlogView`, `requestFlowSupport`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: BacklogTab.test.tsx 9/9, BacklogSegmentControl.test.tsx 3/3, backlog-view-columns.test.ts 4/4; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -44,3 +44,7 @@
 
 - Nếu SOL-018 chưa có action đổi `backlogView`, thêm `setRequestPageBacklogView` vào slice (báo người điều phối, tránh sửa trùng).
 - Bộ lọc client chỉ áp lên trang đã tải; lọc "rỗng" có thể xảy ra khi kết quả nằm ở trang sau: hiện nút "Tải thêm" kể cả khi lọc rỗng nếu còn `nextPageToken`.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Đổi phân đoạn qua `setRequestPageData({backlogView})`. Phím `1/2/3` bắt ở vùng bọc `BacklogTab`. Nhãn số mục chỉ hiện sau khi phân đoạn đã tải.

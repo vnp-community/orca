@@ -24,6 +24,9 @@ export type RequestRpcErrorKind =
   | 'unsupported'
   | 'rate_limited'
   | 'unavailable'
+  | 'expired'
+  | 'pending'
+  | 'no_dev_server'
   | 'network'
   | 'unknown'
 
@@ -82,6 +85,29 @@ const CODE_TO_KIND: Record<string, RequestRpcErrorKind> = {
 
   // Classification limits
   REQUEST_CLASSIFICATION_LIMIT: 'rate_limited',
+
+  // Clarification / decision / risk (CR-REQ-028, 029, 030; codes pending CONTRACT)
+  REQUEST_CLARIFICATION_NOT_FOUND: 'not_found',
+  REQUEST_CLARIFICATION_NOT_OPEN: 'invalid_state',
+  REQUEST_CLARIFICATION_ALREADY_ANSWERED: 'invalid_state',
+  REQUEST_CLARIFICATION_STATE_NOT_ALLOWED: 'invalid_state',
+  REQUEST_CLARIFICATION_EXPIRED: 'expired',
+  REQUEST_CLARIFICATION_INCOMPLETE: 'validation',
+  REQUEST_CLARIFICATION_INVALID_ANSWER: 'validation',
+  REQUEST_CLARIFICATION_NOT_ASSIGNEE: 'forbidden',
+  REQUEST_CLARIFICATION_VERSION_CONFLICT: 'conflict',
+  REQUEST_DECISION_RATIONALE_REQUIRED: 'validation',
+  REQUEST_DECISION_CONFIRMATION_MISMATCH: 'validation',
+  REQUEST_DECISION_NOT_EFFECTIVE: 'invalid_state',
+  REQUEST_DECISION_SELF_CHOICE_FORBIDDEN: 'forbidden',
+  REQUEST_DECISION_AGENT_FORBIDDEN: 'forbidden',
+  REQUEST_RISK_ASSESSMENT_PENDING: 'pending',
+  REQUEST_RISK_ACCEPTANCE_REQUIRED: 'validation',
+  REQUEST_RISK_ASSESSMENT_STALE: 'conflict',
+  REQUEST_RISK_APPROVER_NOT_ALLOWED: 'forbidden',
+  REQUEST_RISK_OVERRIDE_REASON_REQUIRED: 'validation',
+  REQUEST_IMPACT_NO_CONNECTION: 'no_dev_server',
+  REQUEST_READINESS_WAIVE_FORBIDDEN: 'forbidden',
 
   // Not supported by runtime
   METHOD_NOT_FOUND: 'unsupported',

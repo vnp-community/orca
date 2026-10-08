@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `c4-layer-layout.ts`, `c4-edge-style.ts`, `c4-overlay-model.ts` (mới), tests
 **Depends on:** FE-CV-TASK-050-01, FE-CV-TASK-053-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest c4-pure-models.test.ts 15/15)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - Container không hexagonal: phần lớn component rơi vào `other` (đo ở 055-07).
+
+## Ghi chú triển khai (2026-10-07)
+
+`c4/c4-layer-layout.ts`, `c4-edge-style.ts`, `c4-overlay-model.ts` (thư mục con `c4/`, không phẳng như spec). Dải `support` (config/other) không có dải nền. Cạnh `confidence<0.8` ⇒ opacity 0.5 và nét đứt `3 3` nếu loại quan hệ vốn liền. `computeC4OverlayFlags` nhận thêm `containerPath` để thử cả đường dẫn tương đối container. `affected` nhận `{affectedFiles}` thay vì kiểu impact (SOL-054 chưa có).

@@ -5,7 +5,7 @@
 **Area:** frontend / hooks
 **File:** `frontend/src/renderer/src/hooks/useIsDarkTheme.ts` (mới), test
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest useIsDarkTheme.test.tsx 3/3)
 
 ## Context
 
@@ -27,3 +27,7 @@
 ## Rủi ro
 
 - Công thức phải trùng ba nơi cũ.
+
+## Ghi chú triển khai (2026-10-07)
+
+`hooks/useIsDarkTheme.ts` dùng `settings.theme` + `matchMedia` (phản ứng sự kiện `change`), cùng công thức `MarkdownPreview`; không sửa ba nơi cũ.

@@ -5,7 +5,7 @@
 **Area:** frontend / shared + store
 **File:** `shared/types.ts` (:799-808), `shared/workspace-session-schema.ts` (:96-104), `store/slices/tabs.ts` (:412, :1909-1920), `store/slices/worktrees.ts` (:301), `store/selectors.ts` (:86), tests
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: tabs.review.test + workspace-session-schema.review.test 4 pass)
 
 ## Context
 

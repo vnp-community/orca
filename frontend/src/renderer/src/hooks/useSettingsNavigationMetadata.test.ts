@@ -229,4 +229,13 @@ describe('settings navigation metadata', () => {
     expect(user?.group).toBe('capabilities')
     expect(admin!.searchEntries.length).toBeGreaterThan(user!.searchEntries.length)
   })
+
+  it('adds the code-intelligence section in capabilities only when the backend offers it', () => {
+    const base = { isMac: false, isWindows: false, isWebClient: true, isDev: false, repos: [repo] }
+    expect(buildSettingsNavigationMetadata(base).some((s) => s.id === 'code-intel')).toBe(false)
+    const section = buildSettingsNavigationMetadata({ ...base, isCodeIntelVisible: true }).find(
+      (s) => s.id === 'code-intel'
+    )
+    expect(section?.group).toBe('capabilities')
+  })
 })

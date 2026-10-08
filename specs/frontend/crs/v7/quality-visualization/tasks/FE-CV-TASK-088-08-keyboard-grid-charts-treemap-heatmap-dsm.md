@@ -5,7 +5,7 @@
 **Area:** frontend / components (hình có ô tương tác)
 **File:** `frontend/src/renderer/src/components/quality-charts/useChartKeyboardNavigation.ts`, `MetricTreemap.tsx`, `HotspotHeatmap.tsx`, `DependencyMatrix.tsx` (mới) và `__tests__/useChartKeyboardNavigation.test.tsx`, `MetricTreemap.test.tsx`, `HotspotHeatmap.test.tsx`, `DependencyMatrix.test.tsx`
 **Depends on:** FE-CV-TASK-088-04, 088-05, 088-06 (và 088-03 cho glyph)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: grid-navigation-position 4/4, useChartKeyboardNavigation 6/6, MetricTreemap 5/5, HotspotHeatmap 5/5, DependencyMatrix 6/6)
 
 ## Context
 
@@ -41,3 +41,7 @@
 
 - Hành vi mũi tên trong treemap (không phải lưới đều) khó đoán; cần kiểm tay với trình đọc màn hình.
 - Chưa kiểm chứng hiệu năng 700 `<rect>` + sự kiện phím; ngân sách ở SOL-088 2.8 chưa đo.
+
+## Ghi chú triển khai (2026-10-07)
+
+Thêm `grid-navigation-position.ts` (hàm thuần, hỗ trợ lưới thưa cho DSM: nhảy giữa ô lấp), `heat-cell-style.ts`. Treemap: tuyến tính hoá một hàng, ô là `<button role=gridcell>`, ô "+N" không tương tác. Chưa kiểm tay với trình đọc màn hình; UX điều hướng DSM thưa chưa thử người dùng.

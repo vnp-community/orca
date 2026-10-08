@@ -1,5 +1,5 @@
 import React from 'react'
-import { ExternalLink, Loader2, RefreshCw } from 'lucide-react'
+import { ExternalLink, Loader2, RefreshCw, ScanSearch } from 'lucide-react'
 import type { GitBranchCompareSummary, GitUpstreamStatus } from '../../../../shared/types'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
@@ -89,7 +89,8 @@ export function SourceControlBranchContextRow({
   upstreamStatus,
   manualReviewUrl,
   onChangeBaseRef,
-  onRetry
+  onRetry,
+  onReviewChanges
 }: {
   summary: GitBranchCompareSummary | null
   compareBaseRef: string | null
@@ -97,6 +98,8 @@ export function SourceControlBranchContextRow({
   manualReviewUrl?: string | null
   onChangeBaseRef: () => void
   onRetry: () => void
+  /** Present only when the Review entry is available. */
+  onReviewChanges?: () => void
 }): React.JSX.Element | null {
   const displayedBaseRef = resolveSourceControlDisplayedBaseRef(summary, compareBaseRef)
   if (!shouldShowSourceControlBranchContextRow(summary, compareBaseRef) || !displayedBaseRef) {
@@ -180,6 +183,13 @@ export function SourceControlBranchContextRow({
             <ContextStat key={stat.key} stat={stat} />
           ))}
         </span>
+      ) : null}
+      {onReviewChanges && summary.changedFiles > 0 ? (
+        <SourceControlHeaderIconButton
+          icon={ScanSearch}
+          label={translate('auto.components.reviewMap.EntryButton.label', 'Review changes')}
+          onClick={onReviewChanges}
+        />
       ) : null}
       <ManualReviewLinkButton url={manualReviewUrl} />
     </div>

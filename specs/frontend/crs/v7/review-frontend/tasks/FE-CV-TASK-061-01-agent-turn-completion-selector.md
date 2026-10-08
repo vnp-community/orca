@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần + hook)
 **File:** `frontend/src/renderer/src/components/review-map/entry/agent-turn-completion.ts`, `useAgentTurnCompletions.ts` (mới) + test
 **Depends on:** không (đọc `agent-status` slice có sẵn)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest components/review-map/entry — agent-turn-completion.test.ts + useAgentTurnCompletions.test.tsx PASS; oxlint/tsc sạch ở file mới)
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - `done` có thể báo lặp/sớm tuỳ agent (chưa thống kê).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Live-entry gắn worktree qua `entry.worktreeId` hoặc `tabsByWorktree` (tab id = phần trước `:` của paneKey); retained qua `RetainedAgentEntry.worktreeId`. `agentType` mặc định `unknown` khi vắng. Subagent không có entry trong hai map nên tự bị loại.

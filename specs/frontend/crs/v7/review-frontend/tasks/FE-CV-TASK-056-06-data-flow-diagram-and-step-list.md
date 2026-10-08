@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `DataFlowLens.tsx`, `DataFlowDetailPane.tsx`, `DataFlowToolbar.tsx`, `DataFlowDiagram.tsx`, `DataFlowStepList.tsx`, `DataFlowStepDetail.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-056-01, 056-02, 056-03, 056-04, 056-05, FE-CV-TASK-052-04, FE-CV-TASK-053-04
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest DataFlowLens.test.tsx 12/12 (MermaidBlock mock))
 
 ## Context
 
@@ -29,3 +29,7 @@
 ## Rủi ro
 
 - Hàng đợi render Mermaid toàn cục: đổi luồng nhanh có thể hiện kết quả cũ chốc lát.
+
+## Ghi chú triển khai (2026-10-07)
+
+`DataFlowLens`, `DataFlowDetailPane`, `DataFlowToolbar`, `DataFlowDiagram`, `DataFlowStepList`, `DataFlowStepDetail`. Bước có `symbol` ⇒ `onSelectSymbol(key)` (mở drawer khung, nơi 053 đăng ký `SymbolDetailPanel`). Ảo hoá `@tanstack/react-virtual` > 150 hàng (happy-dom không có layout nên chỉ kiểm không lỗi). Chưa có chip phím `ShortcutKeyCombo`. `MermaidBlock.tsx` không sửa.

@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/c4-override-document.ts` (mới), test
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest shared/c4-override-document.test.ts 10/10)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - Kích thước bundle `yaml` trong renderer chưa đo: tải lười cùng lens.
+
+## Ghi chú triển khai (2026-10-07)
+
+Không import `zod`: hook `c4OverrideDocumentSchema` là `null` (O-12 mở). Thêm `offsetToLineColumn`/`lineColumnToOffset`. Kích thước kiểm theo byte UTF-8 trước khi parse. `maxAliasCount` áp dụng qua `doc.toJS`. `yaml` chưa đo bundle; lens đã lazy.

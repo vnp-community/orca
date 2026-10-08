@@ -1,28 +1,18 @@
 /**
  * review-report-html.ts — FE-CV-TASK-090-04
  *
- * Builds a self-contained, offline-ready HTML export of a ReviewReportModel.
- *
- * Safety rules:
- * - No <script> tags, no inline handlers, no external URLs
- * - All user/backend content is HTML-escaped
- * - Mermaid diagrams: rendered as <pre> fallback (lazy mermaid load not available offline)
- * - Color tokens read from CSS variables; hardcoded fallbacks when unavailable
- * - CSP meta tag included
- * - No hex color values in builder source; use CSS var() or token names
+ * Self-contained, offline HTML export of a ReviewReportModel. No script, no external
+ * URL, strict CSP; every model string is HTML-escaped. SVGs arrive pre-sanitized.
  *
  * @module components/review-map/report/review-report-html
  */
 
-import type { ReviewReportModel, ReviewReportSection } from './review-report-model-parser'
-import { guardMermaidDiagram } from './review-report-diagram-guard'
+import type { ReviewReportModel } from './review-report-model-parser'
+import type { ReportColorTokens, ReportThemeTokens } from './review-report-theme-tokens'
+import type { ReportTranslate } from './review-report-markdown'
 
-// ---------------------------------------------------------------------------
-// HTML escape
-// ---------------------------------------------------------------------------
-
-function esc(s: string): string {
-  return s
+export function escapeHtml(value: string): string {
+  return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -30,161 +20,120 @@ function esc(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
-// ---------------------------------------------------------------------------
-// Theme tokens (read from CSS custom properties at build time)
-// Fallback values are neutral and accessible (WCAG AA contrast).
-// ---------------------------------------------------------------------------
+export type ReviewReportHtmlOptions = {
+  t: ReportTranslate
+  /** UI locale, written to <html lang>. */
+  locale: string
+  tokens: ReportThemeTokens
+  /** Sanitized SVG per model.diagrams[i], or null when it could not be rendered. */
+  svgByDiagram: (string | null)[]
+}
 
-/**
- * Read a CSS custom property value from :root if running in a browser context.
- * Falls back to the provided default string otherwise.
- */
-function cssVar(name: string, fallback: string): string {
-  if (typeof document !== 'undefined') {
-    const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-    if (val) return val
+const K = 'auto.components.reviewMap.report.html'
+
+function cssVars(tokens: ReportColorTokens): string {
+  return [
+    `--bg:${tokens.background}`,
+    `--fg:${tokens.foreground}`,
+    `--muted:${tokens.muted}`,
+    `--muted-fg:${tokens.mutedForeground}`,
+    `--border:${tokens.border}`,
+    `--destructive:${tokens.destructive}`
+  ]
+    .map((v) => `${v};`)
+    .join('')
+}
+
+// Token values come from computed styles, never from the model; still refuse anything that could close the <style>.
+function safeCss(tokens: ReportColorTokens): ReportColorTokens {
+  const out = { ...tokens }
+  for (const key of Object.keys(out) as (keyof ReportColorTokens)[]) {
+    if (/[<>{};]/.test(out[key])) {out[key] = 'inherit'}
   }
-  return fallback
+  return out
 }
 
-function buildThemeTokens() {
-  return {
-    background: cssVar('--background', '#ffffff'),
-    foreground: cssVar('--foreground', '#111111'),
-    muted: cssVar('--muted', '#f4f4f5'),
-    mutedForeground: cssVar('--muted-foreground', '#555555'),
-    border: cssVar('--border', '#e4e4e7'),
-    destructive: cssVar('--destructive', '#dc2626'),
-    warning: cssVar('--warning', '#ca8a04'),
+export function buildReviewReportHtml(model: ReviewReportModel, opts: ReviewReportHtmlOptions): string {
+  const { t } = opts
+  const e = escapeHtml
+  const gateText: Record<string, string> = {
+    pass: t(`${K}.gate.pass`, 'The required checks that ran passed.'),
+    warn: t(`${K}.gate.warn`, 'The quality gate has warnings.'),
+    fail: t(`${K}.gate.fail`, 'The quality gate failed.'),
+    unknown: t(`${K}.gate.unknown`, 'Not enough data to conclude.')
   }
-}
+  const title = t(`${K}.title`, 'Orca review report')
 
-// ---------------------------------------------------------------------------
-// Severity badge
-// ---------------------------------------------------------------------------
+  const findingRows = model.findings.top
+    .map(
+      (f) =>
+        `<tr><td>${e(f.severity)}</td><td>${e(f.ruleId)}</td><td>${e(f.line > 0 ? `${f.file}:${f.line}` : f.file)}</td><td>${e(f.message)}</td></tr>`
+    )
+    .join('')
 
-const SEVERITY_LABEL: Record<string, string> = {
-  error: 'Error',
-  warn: 'Warning',
-  info: 'Info',
-  unknown: '',
-}
+  const diagrams = model.diagrams
+    .map((d, i) => {
+      const svg = opts.svgByDiagram[i] ?? null
+      const alt = d.alt.length
+        ? `<ul>${d.alt.map((line) => `<li>${e(line)}</li>`).join('')}</ul>`
+        : ''
+      return `<figure>${svg ? `<div role="img" aria-label="${e(d.alt.join('; ') || d.kind)}">${svg}</div>` : ''}<figcaption>${e(d.kind)}</figcaption>${alt}</figure>`
+    })
+    .join('')
 
-// ---------------------------------------------------------------------------
-// Section renderer
-// ---------------------------------------------------------------------------
+  const reading = model.readingOrder
+    .map((s) => `<li><code>${e(s.file)}</code> — ${e(s.reason)}</li>`)
+    .join('')
 
-function renderSectionHtml(section: ReviewReportSection, t: ReturnType<typeof buildThemeTokens>): string {
-  const diagram = guardMermaidDiagram(section.diagram)
-  const severityLabel = SEVERITY_LABEL[section.severity] ?? ''
-  const badge = severityLabel
-    ? `<span class="badge badge-${esc(section.severity)}">${esc(severityLabel)}</span>`
-    : ''
+  const list = (items: string[]): string => (items.length ? `<ul>${items.map((x) => `<li>${e(x)}</li>`).join('')}</ul>` : '')
+  const contractItems = [
+    ...model.contracts.protoRpc.map((c) => `RPC ${c.name}: ${c.change}${c.breaking ? ` (${t(`${K}.breaking`, 'breaking')})` : ''}`),
+    ...model.contracts.wsChannels.map((c) => `${c.name}: ${c.change}${c.breaking ? ` (${t(`${K}.breaking`, 'breaking')})` : ''}`),
+    ...model.contracts.tables.map((c) => `${c.table} (${c.service}): ${c.op}${c.breaking ? ` (${t(`${K}.breaking`, 'breaking')})` : ''}`)
+  ]
 
-  return `
-  <section class="report-section severity-${esc(section.severity)}">
-    <h3>${esc(section.title)}${badge}</h3>
-    <div class="section-body">${esc(section.body)}</div>
-    ${diagram ? `<pre class="mermaid-pre"><code>${esc(diagram)}</code></pre>` : ''}
-  </section>`
-}
+  const light = safeCss(opts.tokens.light)
+  const dark = safeCss(opts.tokens.dark)
 
-// ---------------------------------------------------------------------------
-// Full HTML builder
-// ---------------------------------------------------------------------------
-
-/**
- * Build a self-contained HTML document from a ReviewReportModel.
- * Safe for offline use; no external resources.
- */
-export function buildReviewReportHtml(model: ReviewReportModel): string {
-  const t = buildThemeTokens()
-  const { title, description, summary, sections, generatedAt } = model
-
-  const checklistHtml = summary.checklistItems.length > 0
-    ? `<ul class="checklist">${summary.checklistItems
-        .map((item) => `<li class="${item.checked ? 'checked' : ''}">${esc(item.text)}</li>`)
-        .join('\n')}</ul>`
-    : ''
-
-  const testedHtml = summary.testedBehavior.length > 0
-    ? `<div class="behavior-list"><strong>Tested behavior:</strong><ul>${
-        summary.testedBehavior.map((b) => `<li>${esc(b)}</li>`).join('')
-      }</ul></div>`
-    : ''
-
-  const untestedHtml = summary.untestedBehavior.length > 0
-    ? `<div class="behavior-list untested"><strong>Untested behavior:</strong><ul>${
-        summary.untestedBehavior.map((b) => `<li>${esc(b)}</li>`).join('')
-      }</ul></div>`
-    : ''
-
-  const sectionsHtml = sections.map((s) => renderSectionHtml(s, t)).join('\n')
-
-  const generatedLine = generatedAt
-    ? `<p class="meta">Generated: ${esc(generatedAt)}</p>`
-    : ''
-
-  return `<!DOCTYPE html>
-<html lang="en">
+  return `<!doctype html>
+<html lang="${e(opts.locale)}">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
-  <title>${esc(title)}</title>
-  <style>
-    :root {
-      --bg: ${t.background};
-      --fg: ${t.foreground};
-      --muted: ${t.muted};
-      --muted-fg: ${t.mutedForeground};
-      --border: ${t.border};
-      --destructive: ${t.destructive};
-      --warning: ${t.warning};
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #111111;
-        --fg: #fafafa;
-        --muted: #27272a;
-        --muted-fg: #a1a1aa;
-        --border: #3f3f46;
-      }
-    }
-    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--fg); max-width: 800px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
-    h1 { border-bottom: 1px solid var(--border); padding-bottom: .5rem; }
-    h3 { margin-top: 1.5rem; }
-    .meta { color: var(--muted-fg); font-size: .85rem; }
-    .badge { display: inline-block; font-size: .7rem; padding: .1em .4em; border-radius: .25rem; margin-left: .5rem; }
-    .badge-error { background: var(--destructive); color: #fff; }
-    .badge-warn { background: var(--warning); color: #fff; }
-    .badge-info { background: var(--muted); color: var(--muted-fg); }
-    .report-section { border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; margin-top: 1rem; }
-    .severity-error { border-color: var(--destructive); }
-    .severity-warn { border-color: var(--warning); }
-    .section-body { white-space: pre-wrap; word-break: break-word; }
-    .mermaid-pre { background: var(--muted); padding: 1rem; border-radius: .25rem; overflow-x: auto; font-size: .85rem; }
-    .checklist { list-style: none; padding: 0; }
-    .checklist li::before { content: "☐ "; }
-    .checklist li.checked::before { content: "☑ "; }
-    .behavior-list { margin-top: .5rem; }
-    .untested { color: var(--muted-fg); }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
+<title>${e(title)}</title>
+<style>
+:root{${cssVars(light)}color-scheme:light dark}
+@media (prefers-color-scheme: dark){:root{${cssVars(dark)}}}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--fg);max-width:52rem;margin:0 auto;padding:1.5rem;line-height:1.55}
+h1,h2{border-bottom:1px solid var(--border);padding-bottom:.25rem}
+table{border-collapse:collapse;width:100%}
+caption{text-align:left;color:var(--muted-fg);padding:.25rem 0}
+th,td{border:1px solid var(--border);padding:.25rem .5rem;text-align:left;vertical-align:top;word-break:break-word}
+th{background:var(--muted)}
+code{background:var(--muted);padding:0 .25rem;border-radius:.25rem}
+.note{color:var(--muted-fg);font-size:.875rem}
+.fail{color:var(--destructive)}
+figure{margin:1rem 0;overflow-x:auto}
+</style>
 </head>
 <body>
-  <h1>${esc(title)}</h1>
-  ${description ? `<p>${esc(description)}</p>` : ''}
-  ${generatedLine}
-
-  <section class="summary">
-    <h2>Overview</h2>
-    <p><strong>Risk:</strong> ${esc(summary.overallRisk)}</p>
-    ${testedHtml}
-    ${untestedHtml}
-    ${checklistHtml}
-  </section>
-
-  ${sectionsHtml}
+<h1>${e(title)}</h1>
+<p class="note">${e(model.subject.branch)} → ${e(model.subject.baseRef)} · ${e(model.subject.headCommit.slice(0, 7))}</p>
+<h2>${e(t(`${K}.gate.heading`, 'Quality gate'))}</h2>
+<p class="${model.gate.verdict === 'fail' ? 'fail' : ''}">${e(gateText[model.gate.verdict])}</p>
+${list(model.gate.reasons.map((r) => `${r.check || r.code || ''}: ${gateText[r.result] ?? ''}`))}
+<h2>${e(t(`${K}.summary.heading`, 'Changes'))}</h2>
+<p>${e(t(`${K}.summary.counts`, '{{files}} file(s), +{{added}} / -{{removed}}, {{symbols}} symbol(s), {{flows}} flow(s).', model.summary))}</p>
+<h2>${e(t(`${K}.findings.heading`, 'Findings'))}</h2>
+<p>${e(t(`${K}.findings.counts`, '{{error}} error(s), {{warning}} warning(s), {{info}} info.', model.findings.counts))}</p>
+${findingRows ? `<table><caption>${e(t(`${K}.findings.caption`, 'Top findings'))}</caption><thead><tr><th scope="col">${e(t(`${K}.findings.colSeverity`, 'Severity'))}</th><th scope="col">${e(t(`${K}.findings.colRule`, 'Rule'))}</th><th scope="col">${e(t(`${K}.findings.colLocation`, 'Location'))}</th><th scope="col">${e(t(`${K}.findings.colMessage`, 'Message'))}</th></tr></thead><tbody>${findingRows}</tbody></table>` : ''}
+${contractItems.length ? `<h2>${e(t(`${K}.contracts.heading`, 'Contracts and data'))}</h2>${list(contractItems)}` : ''}
+${reading ? `<h2>${e(t(`${K}.reading.heading`, 'Suggested reading order'))}</h2><ol>${reading}</ol>` : ''}
+${diagrams ? `<h2>${e(t(`${K}.diagrams.heading`, 'Diagrams'))}</h2>${diagrams}` : ''}
+${model.warnings.length ? `<h2>${e(t(`${K}.warnings.heading`, 'Notes'))}</h2>${list(model.warnings.map((w) => t(`${K}.warning.${w}`, w)))}` : ''}
+<p class="note">${e(t(`${K}.footer`, 'Generated by Orca from profile {{profile}} (model {{digest}}). This is a record of checks that ran, not an approval.', { profile: model.reproducibility.profileRef || '—', digest: model.reproducibility.modelDigest.slice(0, 12) || '—' }))}</p>
 </body>
-</html>`
+</html>
+`
 }

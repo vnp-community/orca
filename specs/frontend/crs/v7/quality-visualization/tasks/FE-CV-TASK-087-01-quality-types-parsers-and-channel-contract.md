@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/code-intel-quality-types.ts`, `code-intel-quality-wire-parsers.ts`, `code-intel-quality-errors.ts` (mới); mục quality trong `code-intel-rpc-methods.ts`, `code-intel-errors.ts`, `code-intel-wire-parsers.ts` (sửa; CR-050 sở hữu file) và `*.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (bridge, `classifyCodeIntelError`); không cần backend
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: src/shared/code-intel-quality-wire-parsers.test.ts 17/17, code-intel-parsers.test.ts + code-intel-bridge.test.ts pass; oxlint + tsc sạch)
 
 ## Context
 
@@ -35,3 +35,10 @@ Vitest node: mỗi parser với dữ liệu hợp lệ, enum lạ, thiếu trư�
 ## Rủi ro
 
 - File chung với CR-050: phối hợp merge. `QualityRun.status` không có `interrupted` nhưng push có (câu hỏi mở SOL-087 #1).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Kiểu viết lại đúng §4.7 (bản cũ trong repo là kiểu tự chế, sai hợp đồng). Tách file để giữ giới hạn 300 dòng: `code-intel-quality-types.ts` (re-export `code-intel-quality-visualization-types.ts`), `code-intel-quality-wire-parsers.ts` (re-export `-profile-parsers`, `-visualization-parsers`), `code-intel-quality-parse-primitives.ts`, `code-intel-quality-errors.ts`.
+- Áp dụng D5: coverage 0..1, cột 1-based, `observed/threshold` là chuỗi, `RunnableProfile.id` = tên profile, `interrupted` có trong `QualityRun.status`.
+- 20 hằng kênh và `classifyCodeIntelError` kinds đã có từ CR-050; chỉ bổ sung: trường push tuỳ chọn (`stage/stepIndex/stepCount/message`, `status/headCommit`, `previousVerdict/profile`) vào `code-intel-push-types.ts`, `code-intel-parsers.ts`, `lib/code-intel-event-bus.ts`, `code-intel-stream-reconnect.ts`; export `parseIndexBasis`.
+- Không thêm kiểu tham số/kết quả vào `CodeIntelRpcContract` (vẫn `unknown`); kiểu kết quả nằm ở `QualityGateResponse`... trong file kiểu.

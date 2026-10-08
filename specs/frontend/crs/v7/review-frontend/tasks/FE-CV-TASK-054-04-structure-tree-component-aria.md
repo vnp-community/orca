@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/StructureTree.tsx` (mới), test
 **Depends on:** FE-CV-TASK-054-02, 054-03
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: structure/StructureTree.test 7/7 pass; aria-activedescendant with virtualization not checked with a screen reader)
 
 ## Context
 

@@ -12,159 +12,131 @@
  * @module test-support/code-intel-fixtures
  */
 
-import type { IndexStatus, ChangeOverlay } from '../../../../shared/code-intel-types'
+import type { IndexOverall, IndexStatus, ReviewState } from '../../../shared/code-intel-types'
+
+export * from './code-intel-symbol-fixtures'
+export * from './code-intel-view-fixtures'
 
 // ---------------------------------------------------------------------------
-// §4.1 — IndexStatus fixtures
+// §4.1 IndexStatus: one fixture per overall state (all 9)
 // ---------------------------------------------------------------------------
 
-/** All 9 overall states for IndexStatus */
-export const INDEX_STATUS_FIXTURES: Record<string, IndexStatus> = {
-  ready: {
-    overall: 'READY',
-    filesIndexed: 1024,
-    filesTotal: 1024,
-    progressPercent: 100,
-    errorMessage: null,
-    lastIndexedAt: '2024-01-01T12:00:00Z'
-  },
-  indexing: {
-    overall: 'INDEXING',
-    filesIndexed: 512,
-    filesTotal: 1024,
-    progressPercent: 50,
-    errorMessage: null,
-    lastIndexedAt: null
-  },
-  partial: {
-    overall: 'PARTIAL',
-    filesIndexed: 900,
-    filesTotal: 1024,
-    progressPercent: 87,
-    errorMessage: 'Some files could not be indexed',
-    lastIndexedAt: '2024-01-01T11:00:00Z'
-  },
-  error: {
-    overall: 'ERROR',
-    filesIndexed: 0,
-    filesTotal: 1024,
-    progressPercent: 0,
-    errorMessage: 'Index failed: out of memory',
-    lastIndexedAt: null
-  },
-  notIndexed: {
-    overall: 'NOT_INDEXED',
-    filesIndexed: 0,
-    filesTotal: 0,
-    progressPercent: 0,
-    errorMessage: null,
-    lastIndexedAt: null
-  },
-  unknown: {
-    overall: 'UNKNOWN',
-    filesIndexed: 0,
-    filesTotal: 0,
-    progressPercent: 0,
-    errorMessage: null,
-    lastIndexedAt: null
-  },
-  cooldown: {
-    overall: 'REINDEX_COOLDOWN',
-    filesIndexed: 1024,
-    filesTotal: 1024,
-    progressPercent: 100,
-    errorMessage: null,
-    lastIndexedAt: '2024-01-01T11:59:00Z'
-  },
-  queued: {
-    overall: 'QUEUED',
-    filesIndexed: 0,
-    filesTotal: 0,
-    progressPercent: 0,
-    errorMessage: null,
-    lastIndexedAt: null
-  },
-  disabled: {
-    overall: 'DISABLED',
-    filesIndexed: 0,
-    filesTotal: 0,
-    progressPercent: 0,
-    errorMessage: null,
-    lastIndexedAt: null
-  }
+function indexStatus(overall: IndexOverall, extra: Partial<IndexStatus> = {}): IndexStatus {
+  return { overall, tools: [], scopeMismatch: false, indexBasis: [], ...extra }
+}
+
+export const INDEX_STATUS_FIXTURES: Record<Lowercase<IndexOverall>, IndexStatus> = {
+  offline: indexStatus('OFFLINE'),
+  unknown: indexStatus('UNKNOWN'),
+  not_installed: indexStatus('NOT_INSTALLED'),
+  building: indexStatus('BUILDING', { activeJob: { id: 'job-1', stage: 'parse', percent: null } }),
+  missing: indexStatus('MISSING', { errorCode: 'CODEINTEL_INDEX_MISSING' }),
+  degraded: indexStatus('DEGRADED', { scopeMismatch: true }),
+  overlay: indexStatus('OVERLAY', {
+    tools: [
+      {
+        tool: 'gitnexus',
+        available: true,
+        supported: true,
+        state: 'stale',
+        indexScope: 'exact',
+        freshness: 'fresh_base',
+        dirtySinceIndex: true,
+        changedFilesNotInIndex: 3
+      }
+    ]
+  }),
+  stale: indexStatus('STALE', {
+    tools: [
+      {
+        tool: 'codegraph',
+        available: true,
+        supported: true,
+        state: 'stale',
+        indexScope: 'repo_root',
+        freshness: 'stale'
+      }
+    ]
+  }),
+  ready: indexStatus('READY', {
+    tools: [
+      {
+        tool: 'gitnexus',
+        available: true,
+        supported: true,
+        state: 'ready',
+        indexScope: 'exact',
+        freshness: 'fresh',
+        stats: { files: 1024 }
+      }
+    ],
+    indexBasis: [
+      {
+        tool: 'gitnexus',
+        indexScope: 'exact',
+        freshness: 'fresh',
+        dirtySinceIndex: false,
+        changedFilesNotInIndex: 0,
+        refreshState: 'idle',
+        indexPolicy: 'auto_in_place'
+      }
+    ]
+  })
 }
 
 // ---------------------------------------------------------------------------
-// §4.3 — ChangeOverlay fixtures
-// ---------------------------------------------------------------------------
-
-/** Small overlay (3 files) */
-export const CHANGE_OVERLAY_SMALL: ChangeOverlay[] = [
-  { path: 'src/a.ts', changeType: 'modified', oldPath: null },
-  { path: 'src/b.ts', changeType: 'added', oldPath: null },
-  { path: 'src/c.ts', changeType: 'deleted', oldPath: null }
-]
-
-/** Overlay with rename */
-export const CHANGE_OVERLAY_WITH_RENAME: ChangeOverlay[] = [
-  { path: 'src/new-name.ts', changeType: 'renamed', oldPath: 'src/old-name.ts' }
-]
-
-/** Overlay with truncated flag */
-export const CHANGE_OVERLAY_TRUNCATED: ChangeOverlay[] = [
-  ...CHANGE_OVERLAY_SMALL,
-  // Simulated truncation: backend returns a marker
-  { path: '...', changeType: 'truncated' as never, oldPath: null }
-]
-
-/** Empty overlay (no changes) */
-export const CHANGE_OVERLAY_EMPTY: ChangeOverlay[] = []
-
-// ---------------------------------------------------------------------------
-// Error scenario wires (for failNext usage with 073-02 fake backend)
+// Error wires (contract §2.3: code lives in error.message; error.code is the RPC-level code)
 // ---------------------------------------------------------------------------
 
 export const ERROR_WIRES = {
   timeout: {
     ok: false,
     error: {
-      code: 'timeout',
-      message: 'CODEINTEL_TIMEOUT | {"retryAfterMs":5000,"inProgress":true}'
+      code: 'internal',
+      message: 'CODEINTEL_TIMEOUT: read timed out | {"retryAfterMs":5000,"inProgress":true}'
     }
   },
   versionConflict: {
     ok: false,
     error: {
-      code: 'conflict',
-      message: 'CODEINTEL_VERSION_CONFLICT | {"expected":2,"actual":3}'
+      code: 'internal',
+      message: 'CODEINTEL_VERSION_CONFLICT: expectedVersion is stale | {"currentVersion":3}'
     }
   },
   ambiguousSymbol: {
     ok: false,
     error: {
-      code: 'ambiguous',
-      message: 'CODEINTEL_AMBIGUOUS_SYMBOL | {"candidates":["a.ts::Foo","b.ts::Foo"]}'
+      code: 'internal',
+      message:
+        'CODEINTEL_AMBIGUOUS_SYMBOL: more than one match | {"candidates":[{"uid":"a","name":"Foo","kind":"type","filePath":"a.ts","line":1}]}'
     }
   },
   reindexCooldown: {
     ok: false,
     error: {
-      code: 'cooldown',
-      message: 'CODEINTEL_REINDEX_COOLDOWN | {"nextAllowedAt":"2024-01-01T12:05:00Z"}'
+      code: 'internal',
+      message: 'CODEINTEL_REINDEX_COOLDOWN: wait before reindexing | {"retryAfterSeconds":300}'
+    }
+  },
+  reindexInProgress: {
+    ok: false,
+    error: {
+      code: 'internal',
+      message: 'CODEINTEL_REINDEX_IN_PROGRESS: job running | {"jobId":"job-1","stage":"parse"}'
     }
   }
 } as const
 
 // ---------------------------------------------------------------------------
-// ReviewState fixture
+// ReviewState: version 0 means "no record yet"
 // ---------------------------------------------------------------------------
 
-export const REVIEW_STATE_INITIAL = {
-  version: 0,
-  headCommit: null,
-  approved: false,
-  approvedBy: null,
-  approvedAt: null,
-  checklistItems: [],
-  comments: []
+export const REVIEW_STATE_INITIAL: ReviewState = {
+  baseCommit: '',
+  headCommit: '',
+  readingProgress: { version: 1, entries: {}, lastFocusedKey: null },
+  notes: { anchors: {}, sentBatches: [] },
+  turnMarkers: [],
+  status: 'open',
+  version: 0
 }

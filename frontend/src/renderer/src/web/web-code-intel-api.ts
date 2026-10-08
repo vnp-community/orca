@@ -12,21 +12,28 @@
  * @module web/web-code-intel-api
  */
 
-import { createCodeIntelBridge } from '../../../../shared/code-intel-bridge'
-import type { CodeIntelBridgeApi, CodeIntelRawEnvelope } from '../../../../shared/code-intel-bridge'
+import { createCodeIntelBridge } from '../../../shared/code-intel-bridge'
+import type { CodeIntelBridgeApi, CodeIntelRawEnvelope } from '../../../shared/code-intel-bridge'
+
+type WebCodeIntelStreamHandlers = {
+  onResponse: (r: { ok: boolean; result?: unknown }) => void
+  onClose: () => void
+}
 
 type WebCodeIntelTransport = {
   callEnvironmentEnvelope: (
-    selector: unknown,
+    selector: string,
     method: string,
     params: unknown,
     timeoutMs?: number
   ) => Promise<CodeIntelRawEnvelope>
+  /** null = no usable environment; otherwise a (possibly pending) stream handle. */
   subscribe?: (
+    environmentId: string,
     method: string,
     params: unknown,
-    callbacks: { onResponse?: (r: unknown) => void; onClose?: () => void }
-  ) => (() => void) | null
+    handlers: WebCodeIntelStreamHandlers
+  ) => Promise<{ unsubscribe: () => void }> | null
 }
 
 const METHOD_NOT_FOUND_ENVELOPE: CodeIntelRawEnvelope = {
@@ -79,8 +86,41 @@ export function createCodeIntelApi(transport: WebCodeIntelTransport): CodeIntelB
      * Subscribe to environment push events.
      */
     subscribeEnvironment(environmentId, method, params, callbacks) {
-      if (!transport.subscribe) return null
-      return transport.subscribe(method, params, callbacks)
+      let cancelled = false
+      let handle: { unsubscribe: () => void } | null = null
+      let pending: Promise<{ unsubscribe: () => void }> | null = null
+      try {
+        pending =
+          transport.subscribe?.(environmentId, method, params, {
+            // First frame is a null ack; later frames are bare push objects.
+            onResponse: (r) => {
+              if (cancelled || !r.ok || r.result == null) {return}
+              callbacks.onEvent(r.result)
+            },
+            onClose: () => {
+              if (!cancelled) {callbacks.onClose()}
+            }
+          }) ?? null
+      } catch {
+        pending = null
+      }
+      if (!pending) {
+        callbacks.onUnsupported()
+        return () => {}
+      }
+      void pending
+        .then((h) => {
+          if (cancelled) {h.unsubscribe()}
+          else {handle = h}
+        })
+        .catch(() => {
+          if (!cancelled) {callbacks.onClose()}
+        })
+      return () => {
+        cancelled = true
+        handle?.unsubscribe()
+        handle = null
+      }
     }
   })
 }

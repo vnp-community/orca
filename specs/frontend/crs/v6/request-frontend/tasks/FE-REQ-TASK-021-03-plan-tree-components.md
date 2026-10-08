@@ -5,7 +5,9 @@
 **Area:** frontend / request / plan
 **File:** `frontend/src/renderer/src/components/request/plan/{PlanSummaryHeader,PlanTree,PhaseNode,PlanTaskRow}.tsx` (mới); test cùng tên
 **Depends on:** FE-REQ-TASK-021-02, 018-05 (badge), 018-06
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest components/request/plan/PlanTree.test.tsx (10 tests) pass; oxlint+tsc clean)
+
+**Ghi chú:** `TaskDetail` trong `Sheet` mới kiểm chứng với `TaskDetail` được stub; chưa xem bố cục thật. `PlanTree` nạp Task vào store (`addTask`) nếu chưa có vì `TaskDetail` đọc từ store. Dùng `TaskStatusBadge`/`ExecutionEngineBadge` hiện có (còn emoji/màu thô, không sửa).
 
 ## Context
 

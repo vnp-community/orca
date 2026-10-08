@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/CreateHostedReviewComposer.tsx` (sửa), `frontend/src/renderer/src/components/right-sidebar/source-control-commit-area.tsx` (sửa, không thêm max-lines disable mới)
 **Depends on:** FE-CV-TASK-085-04
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 2 tests CreateHostedReviewComposer.quality-notice.test.tsx)
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - Tên khe cần thống nhất với FE-CV-SOL-087 (`preSubmitNotice` trong CR-087): một khe duy nhất `qualityNotice`.
+
+## Ghi chú triển khai (2026-10-07)
+
+Khe `qualityNotice` đã có từ trước nhưng chưa được destructure (lỗi tsc `Cannot find name`); đã sửa ở cả composer và CommitArea.

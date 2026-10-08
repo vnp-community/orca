@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/review-report-html.ts`, `review-report-theme-tokens.ts` (mới) + test
 **Depends on:** FE-CV-TASK-090-01, 090-03
-**Status:** [x] DONE — `review-report-html-builder.ts` chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 8 tests html + 3 tests theme-tokens + 2 tests diagram-svg)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Tên token có thể đổi.
+
+## Ghi chú triển khai (2026-10-07)
+
+CSP, không script/URL ngoài, escape, token màu đo lúc xuất (`review-report-theme-tokens.ts`), SVG qua mermaid+DOMPurify (test mock DOMPurify vì happy-dom không đại diện).

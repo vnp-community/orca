@@ -37,12 +37,18 @@ type MockStore = {
   tasks: unknown[]
   settings: Record<string, unknown>
   updateTask: ReturnType<typeof vi.fn>
+  requestFlowSupport: string
+  setActiveView: ReturnType<typeof vi.fn>
+  setRequestPageData: ReturnType<typeof vi.fn>
 }
 
 const mockStore: MockStore = {
   tasks: [],
   settings: {},
-  updateTask: vi.fn()
+  updateTask: vi.fn(),
+  requestFlowSupport: 'unknown',
+  setActiveView: vi.fn(),
+  setRequestPageData: vi.fn()
 }
 
 vi.mock('../../../store', () => ({
@@ -88,11 +94,12 @@ describe('TaskBoardView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockStore.tasks = []
+    mockStore.requestFlowSupport = 'unknown'
   })
 
   afterEach(cleanup)
 
-  it('renders 7 columns in STATUS_ORDER, each counting its own tasks', () => {
+  it('renders the columns in STATUS_ORDER, each counting its own tasks', () => {
     const tasks = [
       makeTask({ id: 't1', status: 'todo' }),
       makeTask({ id: 't2', status: 'done' }),
@@ -101,7 +108,6 @@ describe('TaskBoardView', () => {
     render(<TaskBoardView tasks={tasks} onSelect={onSelect} />)
 
     const columns = [
-      'board-column-backlog',
       'board-column-todo',
       'board-column-in_progress',
       'board-column-blocked',
@@ -114,7 +120,12 @@ describe('TaskBoardView', () => {
     }
     expect(screen.getByTestId('board-column-todo')).toHaveTextContent('(1)')
     expect(screen.getByTestId('board-column-done')).toHaveTextContent('(2)')
-    expect(screen.getByTestId('board-column-backlog')).toHaveTextContent('(0)')
+    expect(screen.queryByTestId('board-column-backlog')).not.toBeInTheDocument()
+  })
+
+  it('shows a legacy backlog-status task in the Open column (CR-REQ-018-06)', () => {
+    render(<TaskBoardView tasks={[makeTask({ id: 'legacy', status: 'backlog' as never })]} onSelect={onSelect} />)
+    expect(screen.getByTestId('board-column-open')).toHaveTextContent('(1)')
   })
 
   it('dragging a card from one column and dropping in another moves it immediately (optimistic), then calls task.update', async () => {
@@ -208,5 +219,33 @@ describe('TaskBoardView', () => {
     const tasks = [makeTask({ id: 't1', status: 'todo' })]
     render(<TaskBoardView tasks={tasks} onSelect={onSelect} />)
     expect(screen.queryByTestId('task-select-t1')).not.toBeInTheDocument()
+  })
+
+  describe('backlog hint (CR-REQ-023)', () => {
+    it('has no backlog column', () => {
+      render(<TaskBoardView tasks={[]} onSelect={onSelect} />)
+      expect(screen.queryByTestId('board-column-backlog')).toBeNull()
+    })
+
+    it('shows the hint only when the request flow is supported', () => {
+      const { unmount } = render(<TaskBoardView tasks={[]} onSelect={onSelect} />)
+      expect(screen.queryByTestId('board-backlog-hint')).toBeNull()
+      unmount()
+      mockStore.requestFlowSupport = 'unsupported'
+      const second = render(<TaskBoardView tasks={[]} onSelect={onSelect} />)
+      expect(screen.queryByTestId('board-backlog-hint')).toBeNull()
+      second.unmount()
+      mockStore.requestFlowSupport = 'supported'
+      render(<TaskBoardView tasks={[]} onSelect={onSelect} />)
+      expect(screen.getByTestId('board-backlog-hint')).toBeInTheDocument()
+    })
+
+    it('opens the Requests > Backlog section from the hint button', () => {
+      mockStore.requestFlowSupport = 'supported'
+      render(<TaskBoardView tasks={[]} onSelect={onSelect} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Open backlog' }))
+      expect(mockStore.setActiveView).toHaveBeenCalledWith('requests')
+      expect(mockStore.setRequestPageData).toHaveBeenCalledWith({ section: 'backlog', focus: undefined })
+    })
   })
 })

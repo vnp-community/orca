@@ -58,7 +58,7 @@ export async function callRequestRpcOrThrow<T>(
   params?: object
 ): Promise<T> {
   const result = await callRequestRpc<T>(method, params)
-  if (!result.ok) throw result.error
+  if (!result.ok) {throw result.error}
   return result.value
 }
 

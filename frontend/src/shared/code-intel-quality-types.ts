@@ -1,183 +1,276 @@
 /**
  * code-intel-quality-types.ts — FE-CV-TASK-087-01
  *
- * Mirror of UI-API §4.7 quality-specific types.
- * Field names MUST NOT be renamed (protocol-level contract).
+ * Mirror of CONTRACT-codeintel-ui-api §4.7 (quality) and the §5 quality push events.
+ * Field names are protocol-level: do not rename. Enum values outside the known set fall
+ * through to 'unknown' in the parsers (U4); `unknown` is never rendered as a pass.
  *
- * Enum values outside known set → 'unknown' (U4, enforced in parsers).
+ * Resolved by contract D5: coverage ratios are 0..1; QualityFinding.column/endColumn are
+ * 1-based (0 = none); GateReason observed/threshold are pre-formatted strings;
+ * RunnableProfile.id equals the part of QualityGate.profile before '@'.
  *
  * @module shared/code-intel-quality-types
  */
 
-import type { WithUnknown } from './code-intel-types'
+import type { WithUnknown } from './code-intel-enum-fallback'
+import type { IndexBasis } from './code-intel-index-types'
 
 // ---------------------------------------------------------------------------
-// §4.7.1 Gate
+// Findings
+// ---------------------------------------------------------------------------
+
+export type QualitySeverity = WithUnknown<'error' | 'warning' | 'info'>
+
+export type QualityCategory = WithUnknown<
+  | 'lint'
+  | 'typecheck'
+  | 'test'
+  | 'coverage'
+  | 'complexity'
+  | 'security'
+  | 'dependency'
+  | 'convention'
+  | 'architecture'
+  | 'ai'
+>
+
+export type QualityFindingWaiver = { by: string; reason: string; expiresAt: string }
+
+export type QualityFinding = {
+  fingerprint: string
+  fpVersion: number
+  ruleId: string
+  severity: QualitySeverity
+  category: QualityCategory
+  file: string
+  /** 1-based; <= 0 means a file-level finding. */
+  line: number
+  endLine: number
+  /** 1-based (LSP style); 0 = no column. */
+  column: number
+  endColumn: number
+  message: string
+  tool: string
+  toolVersion: string
+  fixHint?: string
+  stepId: string
+  inScope: boolean
+  waiver?: QualityFindingWaiver
+}
+
+// ---------------------------------------------------------------------------
+// Run and steps
+// ---------------------------------------------------------------------------
+
+export type QualityStepStatus = WithUnknown<
+  'passed' | 'findings' | 'failed' | 'timeout' | 'cancelled' | 'skipped' | 'env_not_ready'
+>
+
+export type QualityStepFailureKind = WithUnknown<
+  '' | 'format_drift' | 'output_too_large' | 'exit_unexpected' | 'parser_error' | 'env'
+>
+
+export type QualityStep = {
+  id: string
+  profileId: string
+  status: QualityStepStatus
+  failureKind: QualityStepFailureKind
+  envReason?: string
+  exitCode: number
+  durationMs: number
+  tool: string
+  toolVersion: string
+  errorCount: number
+  warningCount: number
+  infoCount: number
+  totalCount: number
+  truncated: boolean
+  outsideScopeCount: number
+}
+
+export type QualityRunScope = WithUnknown<'worktree' | 'changed' | 'commitRange'>
+
+export type QualityRunStatus = WithUnknown<
+  'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
+>
+
+export type QualityRunSummary = {
+  error: number
+  warning: number
+  info: number
+  stepsTotal: number
+  stepsWithFindings: number
+  stepsFailed: number
+  stepsEnvNotReady: number
+  outsideScope: number
+  truncated: boolean
+}
+
+export type QualityRunCi = {
+  provider: string
+  headSha: string
+  url?: string
+  fetchedAt: string
+  staleAfter?: string
+}
+
+export type QualityRun = {
+  id: string
+  worktreeId: string
+  headCommit: string
+  indexCommit: string
+  indexBasis: IndexBasis[]
+  scope: QualityRunScope
+  baseCommit?: string
+  profile: string
+  status: QualityRunStatus
+  source: WithUnknown<'local' | 'ci'>
+  startedAt: string | null
+  finishedAt: string | null
+  summary: QualityRunSummary
+  steps: QualityStep[]
+  errorCode?: string
+  treeFingerprint?: string
+  dirty?: boolean
+  workTreeChangedDuringRun: boolean
+  scopeWidened: boolean
+  ci?: QualityRunCi
+}
+
+// ---------------------------------------------------------------------------
+// Gate, waiver, CI comparison
 // ---------------------------------------------------------------------------
 
 export type GateResult = WithUnknown<'pass' | 'warn' | 'fail'>
 
 export type QualityGateReason = {
   check: string
-  observed: number
-  threshold: number
+  /** Pre-formatted by the backend (D5); rendered verbatim as plain text. */
+  observed: string
+  threshold: string
   result: GateResult
   code?: string
-  params?: Record<string, unknown>
+  params?: Record<string, string>
+  runId?: string
+  waivedCount?: number
+  category?: string
+  tool?: string
+}
+
+export type QualityGateBasedOn = {
+  runIds: string[]
+  indexCommit: string
+  stale: boolean
+  headCommit?: string
+  baseCommit?: string
+  evaluatedAt?: string
+  profileVersion?: number
 }
 
 export type QualityGate = {
-  result: GateResult
+  verdict: GateResult
   reasons: QualityGateReason[]
-  mode: WithUnknown<'block' | 'warn'>
-  stale: boolean
-  unavailable: boolean
-  runId: string | null
+  mode: WithUnknown<'inform' | 'block'>
+  /** "<name>@<scope>/v<version>" */
+  profile: string
+  basedOn: QualityGateBasedOn
 }
 
-// ---------------------------------------------------------------------------
-// §4.7.2 Quality run
-// ---------------------------------------------------------------------------
-
-export type QualityRunStatus = WithUnknown<
-  'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
->
-
-export type QualityStep = {
-  id: string
-  name: string
-  status: QualityRunStatus
-  startedAt: string | null
-  completedAt: string | null
-  error: string | null
-  percent: number | null
-}
-
-export type QualityRun = {
-  id: string
-  worktreeId: string
-  profileId: string
-  status: QualityRunStatus
-  startedAt: string | null
-  completedAt: string | null
-  error: string | null
-  percent: number | null
-  steps: QualityStep[]
-  triggeredBy: WithUnknown<'user' | 'auto' | 'ci'>
-}
-
-// ---------------------------------------------------------------------------
-// §4.7.3 Findings
-// ---------------------------------------------------------------------------
-
-export type QualityFindingSeverity = WithUnknown<'critical' | 'high' | 'medium' | 'low' | 'info'>
-
-export type QualityFindingCategory = WithUnknown<
-  'security' | 'reliability' | 'maintainability' | 'coverage' | 'duplication' | 'other'
->
+export type QualityWaiverSubjectKind = WithUnknown<'finding' | 'structure_finding' | 'check'>
 
 export type QualityWaiver = {
   id: string
-  findingId: string
+  subjectKind: QualityWaiverSubjectKind
+  subjectKey: string
+  scope: string
   reason: string
-  waivedBy: string | null
-  waivedAt: string
-  expiresAt: string | null
+  createdBy: string
+  createdAt: string
+  expiresAt: string
+  revokedAt?: string
 }
 
-export type QualityFinding = {
-  id: string
-  ruleId: string
-  ruleName: string
-  severity: QualityFindingSeverity
-  category: QualityFindingCategory
-  path: string
-  startLine: number
-  endLine: number
-  startColumn: number | null
-  endColumn: number | null
-  message: string
-  snippet: string | null
-  waived: boolean
-  waiver: QualityWaiver | null
-  effortMinutes: number
-  /** Whether this finding appeared in the last run (new finding) */
-  isNew: boolean
-  /** Applicable autofix suggestions */
-  autoFixAvailable: boolean
+export type CiRelation = WithUnknown<
+  | 'agree_pass'
+  | 'agree_fail'
+  | 'local_pass_ci_fail'
+  | 'local_fail_ci_pass'
+  | 'local_only'
+  | 'ci_only'
+  | 'ci_pending'
+  | 'sha_mismatch'
+  | 'not_comparable'
+>
+
+export type CiComparison = {
+  profile: string
+  headCommit: string
+  local: { runId?: string; status?: string; finishedAt?: string; dirty?: boolean }
+  ci: { runId?: string; status?: string; url?: string; fetchedAt?: string; sha?: string }
+  relation: CiRelation
+  reasonsHint?: string[]
+}
+
+/** Result of `quality.gate`. */
+export type QualityGateResponse = {
+  gate: QualityGate
+  waivers: QualityWaiver[]
+  evaluatedAt: string
+  profileDefinitionDigest: string
+  comparison: CiComparison[]
 }
 
 // ---------------------------------------------------------------------------
-// §4.7.4 Profile
+// Profiles
 // ---------------------------------------------------------------------------
+
+export type MissingCheck = { check: string; reason: string; hint?: string }
 
 export type RunnableProfile = {
+  /** Profile name (e.g. "go-test"); equals QualityGate.profile before '@'. Not a UUID. */
   id: string
-  name: string
-  description: string | null
-  isDefault: boolean
-  checks: string[]
-  estimatedMinutes: number | null
+  title: string
+  kind: string
+  ready: boolean
+  heavy: boolean
+  scopes: string[]
+  missing: MissingCheck[]
+  suite?: string[]
+}
+
+export type QualityProfileDefinition = {
+  schemaVersion: number
+  checks: {
+    id: string
+    profile: string
+    category: string
+    required: boolean
+    maxErrors?: number
+    maxWarnings?: number
+    maxFailed?: number
+  }[]
+  findings: { countScope: WithUnknown<'changedFiles' | 'all'>; blockingSeverities: string[]; warnBudget: number }
+  coverage: { required: boolean; diffCoverageWarnBelow: number | null; diffCoverageFailBelow: number | null }
+  structure: {
+    newLayerViolationErrorFails: boolean
+    newLayerViolationWarningWarns: boolean
+    newCyclesWarn: boolean
+  }
+  freshness: { indexMustMatchHead: boolean }
 }
 
 export type QualityProfile = {
-  activeProfileId: string | null
-  profiles: RunnableProfile[]
+  name: string
+  mode: WithUnknown<'inform' | 'block'>
+  definition: QualityProfileDefinition
+  version: number
 }
 
-// ---------------------------------------------------------------------------
-// §4.7.5 Trend
-// ---------------------------------------------------------------------------
-
-export type QualityTrendPoint = {
-  date: string
-  score: number | null
-  coverage: number | null
-  violations: number
-  runId: string | null
+export type QualityProfileResponse = {
+  profile: QualityProfile
+  origin: WithUnknown<'repo' | 'tenant' | 'builtin'>
+  version: number
+  runnableProfiles: RunnableProfile[]
 }
 
-// ---------------------------------------------------------------------------
-// §4.7.6 Coverage
-// ---------------------------------------------------------------------------
-
-export type CoverageReport = {
-  worktreeId: string
-  headCommit: string | null
-  lineCoverage: number | null
-  branchCoverage: number | null
-  statementCoverage: number | null
-  /** Per-file coverage entries */
-  files: CoverageFile[]
-  /** Coverage from CI (if available) */
-  ciCoverage: number | null
-  generatedAt: string | null
-}
-
-export type CoverageFile = {
-  path: string
-  lineCoverage: number | null
-  lines: CoverageLine[]
-}
-
-export type CoverageLine = {
-  line: number
-  covered: boolean | null
-  /** null for non-branch lines */
-  branchCoverage: number | null
-}
-
-// ---------------------------------------------------------------------------
-// §4.7.7 CI comparison
-// ---------------------------------------------------------------------------
-
-export type CiComparison = {
-  runId: string | null
-  ciRunId: string | null
-  verdict: WithUnknown<'better' | 'same' | 'worse'>
-  scoreDelta: number | null
-  coverageDelta: number | null
-  newViolations: number
-  resolvedViolations: number
-  generatedAt: string | null
-}
+export type * from './code-intel-quality-visualization-types'

@@ -1,6 +1,6 @@
 # FE-CV-SOL-073: Gating cờ `code_intel_enabled`/`quality_gate_enabled` và e2e Playwright web (fake backend G4)
 
-> 📋 Proposed. Chưa triển khai. Priority P0 (gate trước khi bật cho người dùng). Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🟡 Partial (2026-10-07): 073-02, 073-06 DONE (W6: thẻ admin đã nối Settings + i18n); 073-01/03/04/07 PARTIAL; 073-05 TODO (xem tasks/README.md). Priority P0 (gate trước khi bật cho người dùng). Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
 
 **CR:** [CR-CV-073](../../../../../../docs/crs/v7/quality-rollout/CR-CV-073-e2e-feature-flag-rollout-runbook.md) (**chỉ phần frontend**: gating cờ, fake backend, T2 web, Electron smoke tối thiểu; service/T1/T3/T4, runbook, script wiring là việc của `BE-CV-SOL-073-settings-flag-and-rollout`)
 **Area:** frontend + `tests/` (Playwright web) + thẻ cài đặt admin

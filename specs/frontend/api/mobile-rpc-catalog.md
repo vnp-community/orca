@@ -106,6 +106,12 @@ but that only the mobile client currently exercises:
 | `clipboard.saveImageAsTempFile` | ✅ | `src/session/mobile-clipboard-image.ts` |
 | `clipboard.startImageUpload` | ✅ | `src/session/mobile-clipboard-image.ts` |
 
+### `codeIntel.*`
+
+| Method | Backend? | Called from |
+|---|---|---|
+| `codeIntel.reviewSummary` | ✅ (host method, read-only; `unavailable` until O-4) | `src/session/mobile-review-summary-loaders.ts` |
+
 ### `files.*`
 
 | Method | Backend? | Called from |

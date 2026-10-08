@@ -5,7 +5,7 @@
 **Area:** frontend / components (pha 3)
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityDependencyPanel.tsx` (mới) và `*.test.tsx`
 **Depends on:** 087-15, FE-CV-TASK-088-05, 088-08; FE-CV-SOL-054-structure-lens (chung cache `structure`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 7 test pass, components/review-map/quality/QualityDependencyPanel.test.tsx)
 
 ## Context
 
@@ -32,3 +32,9 @@
 ## Rủi ro
 
 - Thứ tự DSM có thể kém đọc với đồ thị đầy; cần thử dữ liệu Orca.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Dùng `structure {depth:2}` + `reduceDependencyGraph` (<=60 hàng = 59 + "Other (N)"); khi gộp ghi "Showing X/Y", khi backend `truncated` ghi "returned X of Y modules" (X = số nút nhận được, Y = `totalCount` envelope).
+- Vòng: viền khối (`data-cycle-block`) + tam giác ▲ trên cạnh ngược (do `DependencyMatrix`), có test cho đồ thị vòng và DAG.
+- Bấm ô (Enter trên lưới) -> khung liệt kê cạnh hai chiều giữa hai nút (từ/đến/count) và nút "Open in Structure lens" chỉ hiện khi `onOpenLens` có (gọi `onOpenLens('structure')`). Cạnh của nút "Other" liệt kê dạng đã gộp. Chưa thử dữ liệu Orca thật.

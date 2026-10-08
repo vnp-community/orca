@@ -5,7 +5,7 @@
 **Area:** frontend (components, store wiring)
 **File:** `frontend/src/renderer/src/components/request/approval/ApprovalInboxTab.tsx` (mới) + test; sửa `components/request/RequestPage.tsx` (SOL-018) để gắn tab; sửa `components/sidebar/SidebarNav.test.tsx` (mở rộng)
 **Depends on:** FE-REQ-TASK-022-02, 022-03, 022-05; FE-REQ-SOL-018 (`RequestPage`, `openRequestPage`, slice, chấm số sidebar), FE-REQ-SOL-020 (`RejectReasonDialog`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: ApprovalInboxTab.test.tsx 16/16; RequestPage.test.tsx 4/4; SidebarRequestNavButton.test.tsx đã có test badge 99+; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -54,3 +54,7 @@ Chạy (chưa chạy): `pnpm --filter orca-frontend test frontend/src/renderer/s
 - Duyệt nhanh `phase` và `pre_deploy` là hành động mạnh (chạy agent); hộp xác nhận ngắn có thể chưa đủ (CR-022 mục 6); `description` phải nêu hậu quả cụ thể.
 - Duyệt tự (người yêu cầu cũng là người duyệt): backend chặn bằng `REQUEST_APPROVAL_SELF_APPROVAL_FORBIDDEN`, UI không tự chặn, chỉ báo `forbidden`.
 - SSH/remote: mọi lời gọi qua `callRequestRpc`; không dùng đường dẫn cục bộ.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Chưa mở rộng `SidebarNav.test.tsx` (badge sidebar thuộc `SidebarRequestNavButton`, đã có test). Đếm sidebar: `useRequestEvents` đổi `approval.listPending` sang `pageSize: 100`. Tiêu đề tab Approvals hiển thị số (99+). Không có hàm `openRequestPage` sẵn: thêm `request-page-navigation.ts`; `RequestDetailPane` đọc `requestPage.focus` làm tab khởi đầu rồi xoá. E2E chưa chạy (cần backend).

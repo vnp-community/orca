@@ -1,6 +1,6 @@
 # FE-REQ-SOL-022: Hộp duyệt (Approval inbox) trong tab của `RequestPage`
 
-> 🔴 **Not Started.** Rà soát 2026-10-07: chưa có bất kỳ component `ApprovalInboxTab`, `useApprovalInbox`, `ApprovalRow` nào. Ngày soạn 2026-10-06.
+> ✅ **Done (7/7 tasks DONE, verified 2026-10-07).** Triển khai Hộp duyệt theo CONTRACT-request-ui-api; test đơn vị/component/hook xanh. Còn lại: e2e (cần backend request-service chạy), `pnpm verify:localization-*` chưa chạy được. Sai lệch so với spec ghi ở cuối từng task.
 
 **CR:** [CR-REQ-022](../../../../../../docs/crs/v6/request-frontend/CR-REQ-022-approval-inbox.md)
 **Backend liên quan:** CR-REQ-009 (`ApprovalService`), CR-REQ-010 (quyền, hạn, thông báo), CR-REQ-016 (kênh WS)

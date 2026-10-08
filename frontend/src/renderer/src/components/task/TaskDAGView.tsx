@@ -10,6 +10,10 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { toast } from 'sonner'
+import { translate } from '@/i18n/i18n'
+import { useDocumentColorMode } from '../../hooks/useDocumentColorMode'
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
+import { getTaskDagStatusPresentation } from './task-dag-status-presentation'
 import { useAppStore } from '../../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import type { TaskEdgeMap } from '../../hooks/useTaskDependencyEdges'
@@ -22,20 +26,10 @@ type TaskDAGViewProps = {
   onEdgeAdded?: () => void
 }
 
-// Color coding by status
-const STATUS_COLORS: Record<string, { bg: string; border: string }> = {
-  done: { bg: '#f0fdf4', border: '#16a34a' },
-  in_progress: { bg: '#eff6ff', border: '#2563eb' },
-  blocked: { bg: '#fef2f2', border: '#dc2626' },
-  review: { bg: '#faf5ff', border: '#9333ea' },
-  todo: { bg: '#f8fafc', border: '#94a3b8' },
-  backlog: { bg: '#f8fafc', border: '#cbd5e1' },
-  cancelled: { bg: '#f1f5f9', border: '#64748b' }
-}
-
 function buildDAGLayout(
   tasks: OrcaTask[],
-  dependencyEdges: TaskEdgeMap
+  dependencyEdges: TaskEdgeMap,
+  reduceMotion: boolean
 ): { nodes: Node[]; edges: Edge[] } {
   if (tasks.length === 0) {
     return { nodes: [], edges: [] }
@@ -84,35 +78,28 @@ function buildDAGLayout(
 
   for (const [wave, waveTasks] of waveGroups) {
     waveTasks.forEach((task, idx) => {
-      const colors = STATUS_COLORS[task.status] ?? STATUS_COLORS.todo
+      const presentation = getTaskDagStatusPresentation(task.status)
+      const StatusIcon = presentation.Icon
+      const statusLabel = translate(presentation.labelKey, presentation.labelFallback)
       nodes.push({
         id: task.id,
         position: { x: wave * HORIZONTAL_GAP, y: idx * VERTICAL_GAP },
+        className: presentation.nodeClass,
+        ariaLabel: `${task.title}, ${statusLabel}`,
         data: {
           label: (
-            <div style={{ fontSize: 11, padding: '2px 4px' }}>
-              <div
-                style={{
-                  fontWeight: 600,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  maxWidth: 140
-                }}
-              >
-                {task.title}
+            <div className="px-1 py-0.5 text-[11px]">
+              <div className="flex max-w-[140px] items-center gap-1 font-semibold">
+                <StatusIcon className="size-3 shrink-0" aria-hidden />
+                <span className="truncate">{task.title}</span>
               </div>
-              <div style={{ color: '#6b7280', marginTop: 2 }}>[{task.type}]</div>
+              <div className="mt-0.5 text-muted-foreground">
+                [{task.type}] {statusLabel}
+              </div>
             </div>
           )
         },
-        style: {
-          background: colors.bg,
-          border: `2px solid ${colors.border}`,
-          borderRadius: 8,
-          width: 170,
-          minHeight: 50
-        }
+        style: { width: 170, minHeight: 50 }
       })
     })
   }
@@ -127,8 +114,8 @@ function buildDAGLayout(
           id: `${depId}->${task.id}`,
           source: depId,
           target: task.id,
-          animated: task.status === 'in_progress',
-          style: { stroke: '#94a3b8', strokeWidth: 1.5 }
+          animated: task.status === 'in_progress' && !reduceMotion,
+          style: { stroke: 'var(--border)', strokeWidth: 1.5 }
         })
       }
     }
@@ -138,9 +125,11 @@ function buildDAGLayout(
 }
 
 export function TaskDAGView({ tasks, dependencyEdges, onSelect, onEdgeAdded }: TaskDAGViewProps) {
+  const colorMode = useDocumentColorMode()
+  const reduceMotion = usePrefersReducedMotion()
   const { nodes, edges } = useMemo(
-    () => buildDAGLayout(tasks, dependencyEdges),
-    [tasks, dependencyEdges]
+    () => buildDAGLayout(tasks, dependencyEdges, reduceMotion),
+    [tasks, dependencyEdges, reduceMotion]
   )
   const [addingFor, setAddingFor] = useState<string | null>(null)
 
@@ -254,6 +243,7 @@ export function TaskDAGView({ tasks, dependencyEdges, onSelect, onEdgeAdded }: T
           edges={edges}
           onNodeClick={onNodeClick}
           onConnect={onConnect}
+          colorMode={colorMode}
           fitView
           fitViewOptions={{ padding: 0.2 }}
           nodesDraggable={false}

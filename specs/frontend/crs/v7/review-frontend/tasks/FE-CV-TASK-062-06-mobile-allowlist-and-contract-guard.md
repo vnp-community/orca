@@ -5,7 +5,7 @@
 **Area:** desktop / main runtime (**ngoài `frontend/`, cần chủ sở hữu desktop duyệt**)
 **File:** `desktop/src/main/runtime/runtime-rpc.ts` (sửa: thêm vào `MOBILE_RPC_METHOD_ALLOWLIST`, dòng ~155); test allowlist (cạnh test hiện có của runtime-rpc; vị trí xác nhận khi làm); `specs/frontend/api/mobile-rpc-catalog.md` (cập nhật tài liệu)
 **Depends on:** FE-CV-TASK-062-05
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: code-intel.test.ts allowlist guard PASS — only codeIntel.reviewSummary allowed; mobile-rpc-allowlist.test.ts cannot load in this sandbox (electron ESM interop, pre-existing); catalog row added)
 
 ## Context
 
@@ -32,3 +32,7 @@
 ## Rủi ro
 
 - Mở allowlist sai làm lộ kênh ghi cho mobile; test bảo vệ là chốt chặn.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Thêm đúng một chuỗi vào `MOBILE_RPC_METHOD_ALLOWLIST` (sau `clipboard.startImageUpload`). Test bảo vệ nằm trong `code-intel.test.ts`; không export hằng mới.

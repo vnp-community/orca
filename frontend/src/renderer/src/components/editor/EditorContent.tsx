@@ -192,6 +192,8 @@ export function EditorContent({
   const closeFile = useAppStore((s) => s.closeFile)
   const setRightSidebarTab = useAppStore((s) => s.setRightSidebarTab)
   const setPendingEditorReveal = useAppStore((s) => s.setPendingEditorReveal)
+  const pendingDiffReveal = useAppStore((s) => s.pendingDiffReveal)
+  const setPendingDiffReveal = useAppStore((s) => s.setPendingDiffReveal)
   const reloadOpenCheckRunDetailsTab = useAppStore((s) => s.reloadOpenCheckRunDetailsTab)
   const [conflictNavigationIndexByFile, setConflictNavigationIndexByFile] = React.useState<
     Record<string, number>
@@ -960,6 +962,7 @@ export function EditorContent({
   const diffReloadNonce = activeFile.diffContentReloadNonce ?? 0
   const originalModelKey = `${diffViewStateKey}:original:${getDiffContentSignature(dc.originalContent)}`
   const modifiedModelKey = `${diffViewStateKey}:modified:${getDiffContentSignature(dc.modifiedContent)}:${diffReloadNonce}`
+  const diffReveal = pendingDiffReveal?.fileId === activeFile.id ? pendingDiffReveal : null
   const diffViewer = (
     <DiffViewer
       key={`${viewStateScopeId}:${diffReloadNonce}:${getDiffContentSignature(dc.modifiedContent)}`}
@@ -976,8 +979,25 @@ export function EditorContent({
       sideBySide={sideBySide}
       editable={isEditable}
       worktreeId={activeFile.worktreeId}
+      diffSource={activeFile.diffSource}
+      compareHeadOid={activeFile.branchCompare?.headOid}
       onContentChange={isEditable ? handleContentChange : undefined}
       onSave={isEditable ? (isMarkdown ? md.mdSave : handleSave) : undefined}
+      reviewReveal={
+        diffReveal
+          ? {
+              line: diffReveal.line,
+              side: diffReveal.side,
+              nonce: diffReveal.nonce,
+              // Why: clear only the request we applied, so a newer one is not dropped.
+              onApplied: (nonce) => {
+                if (useAppStore.getState().pendingDiffReveal?.nonce === nonce) {
+                  setPendingDiffReveal(null)
+                }
+              }
+            }
+          : undefined
+      }
     />
   )
   // Why: editable unstaged diffs can hold unsaved edits, so they get the same

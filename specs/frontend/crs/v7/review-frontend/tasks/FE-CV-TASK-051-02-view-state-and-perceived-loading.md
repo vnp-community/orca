@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + hooks
 **File:** `components/review-map/review-view-state.ts`, `ReviewLoadingStage.tsx`, `hooks/usePerceivedLoadingStage.ts` (mới), tests
 **Depends on:** FE-CV-TASK-051-01, FE-CV-TASK-050-14
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: review-view-state.test 13 rows + priority, usePerceivedLoadingStage.test; oxlint/tsc clean)
 
 ## Context
 

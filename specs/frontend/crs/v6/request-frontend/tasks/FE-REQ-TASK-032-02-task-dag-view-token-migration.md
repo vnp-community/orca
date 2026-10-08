@@ -5,7 +5,7 @@
 **Area:** frontend / task
 **File:** `frontend/src/renderer/src/components/task/TaskDAGView.tsx` (sửa); `frontend/src/renderer/src/hooks/useDocumentColorMode.ts` (mới); `frontend/src/renderer/src/components/task/task-dag-status-presentation.ts` (mới); `frontend/src/renderer/src/components/task/__tests__/TaskDAGView.test.tsx` (sửa); test `useDocumentColorMode.test.ts`, `task-dag-status-presentation.test.ts` (mới)
 **Depends on:** FE-REQ-TASK-032-01 (token `--status-success-*` đã có; token rủi ro không cần cho task này), FE-REQ-TASK-018-06 (gỡ `backlog` khỏi `TaskStatus`; nếu chưa làm thì giữ nhánh `backlog` dự phòng)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest TaskDAGView.test (+1 token test), task-dag-status-presentation (3), useDocumentColorMode (1) pass; no hex in TaskDAGView.tsx)
 
 ## Context
 
@@ -73,3 +73,7 @@
 - Task này **độc lập** với bố cục tự động và `elkjs`; có thể vào trước các task 032-03 trở đi và không phụ thuộc quyết định duyệt thư viện.
 - `TaskGraph.tsx` nạp `TaskDAGView` bằng `lazy`; không đổi.
 - Chuyển hẳn `TaskDAGView` sang `GraphCanvas` (bước 2) chưa cam kết (câu hỏi mở 4 của SOL-032).
+
+## Ghi chú triển khai (2026-10-07)
+
+`TaskDAGView` dùng `getTaskDagStatusPresentation` (class token, icon, nhãn), cạnh `var(--border)`, `colorMode`, tắt `animated` khi giảm chuyển động. Chưa kiểm tay `var()` trong SVG xyflow ở sáng/tối (điểm chưa kiểm chứng của CR). Khoá i18n `auto.components.task.TaskDAGView.status.*` (5 locale).

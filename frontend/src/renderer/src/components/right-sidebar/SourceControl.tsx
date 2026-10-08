@@ -216,6 +216,8 @@ import {
 } from './source-control-text-generation-defaults'
 import { useSourceControlAi } from './use-source-control-ai'
 import { useSourceControlQualityGate } from './use-source-control-quality-gate'
+import { useInsertReviewReport } from '../review-map/report/use-insert-review-report'
+import { useReviewDecisionTelemetry } from '../../hooks/useReviewDecisionTelemetry'
 import { SourceControlQualityGateNotice } from './source-control-quality-gate-notice'
 import { translate } from '@/i18n/i18n'
 import {
@@ -615,7 +617,13 @@ function SourceControlInner(): React.JSX.Element {
     headOid: branchSummary?.status === 'ready' ? (branchSummary.headOid ?? null) : null,
     base: branchSummary?.status === 'ready' ? (branchSummary.baseRef ?? null) : null,
   })
-  const qualityNoticeNode = qualityGate.viewModel.variant !== 'hidden' ? (
+  // CR-095: one review_decision_made per finished agent turn; no-op while the flags are off
+  const { recordDecision: recordReviewDecision } = useReviewDecisionTelemetry({
+    gate: qualityGate.verdict,
+    // Gate reasons stand in for open findings until the findings store (087) exists.
+    openFindings: qualityGate.reasonCount
+  })
+  const qualityNoticeNode = qualityGate.viewModel.visible ? (
     <SourceControlQualityGateNotice
       viewModel={qualityGate.viewModel}
       isLoading={qualityGate.isLoading}
@@ -1907,6 +1915,7 @@ function SourceControlInner(): React.JSX.Element {
           void branchCompare.refreshBranchCompare()
           void branchCompare.refreshGitHistory()
         }
+        recordReviewDecision(target.worktreeId, 'commit')
         return true
       } catch (error) {
         setCommitErrorForWorktree(
@@ -1927,6 +1936,7 @@ function SourceControlInner(): React.JSX.Element {
       commitMessage,
       compareBaseRef,
       grouped.staged.length,
+      recordReviewDecision,
       refreshActiveGitStatusAfterMutation,
       setCommitErrorForWorktree,
       updateCommitDrafts,
@@ -2514,6 +2524,9 @@ function SourceControlInner(): React.JSX.Element {
       if (!repoPath || !repoId || !branch) {
         return
       }
+      if (worktreeId) {
+        recordReviewDecision(worktreeId, 'create_review')
+      }
       const copy = localizedHostedReviewCopy(
         resolveSupportedHostedReviewCopyProvider(result.provider)
       )
@@ -2604,6 +2617,7 @@ function SourceControlInner(): React.JSX.Element {
       linkedGiteaPR,
       linkedGitHubPR,
       linkedGitLabMR,
+      recordReviewDecision,
       setRightSidebarOpen,
       setRightSidebarTab,
       updateWorktreeMeta
@@ -2831,6 +2845,14 @@ function SourceControlInner(): React.JSX.Element {
       },
       onCancelGenerate: handleCancelGeneratePullRequestFieldsForActive
     }
+  })
+  // CR-090: undefined while the quality flag is off, so the composer shows no insert button
+  const insertReviewReport = useInsertReviewReport({
+    worktreeId: activeWorktreeId ?? null,
+    projectId: activeWorktree?.projectId,
+    provider: hostedReviewCreateProvider,
+    body: prBody,
+    setBody: setPrBody
   })
 
   const handleGeneratePullRequestFieldsClick = useCallback((): void => {
@@ -5008,6 +5030,7 @@ function SourceControlInner(): React.JSX.Element {
           compareBaseRef={compareBaseRef}
           upstreamStatus={remoteStatus}
           manualReviewUrl={manualReviewUrl}
+          reviewWorktreeId={currentWorktreeId}
         />
 
         {detachedHeadDisplay && (
@@ -5298,6 +5321,7 @@ function SourceControlInner(): React.JSX.Element {
                 onDropdownAction={handleActionInvoke}
                 // CR-085: quality notice — hook provides node; null when flags off or project unavailable
                 qualityNotice={qualityNoticeNode}
+                onInsertReviewReport={insertReviewReport}
               />
             ) : (
               <CommitArea

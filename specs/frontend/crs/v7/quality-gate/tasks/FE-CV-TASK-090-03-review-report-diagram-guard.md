@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/review-report-diagram-guard.ts` (mới) + test
 **Depends on:** FE-CV-TASK-090-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 10 tests)
 
 ## Context
 
@@ -27,3 +27,7 @@
 ## Rủi ro
 
 - Guard quá chặt làm mất sơ đồ hợp lệ.
+
+## Ghi chú triển khai (2026-10-07)
+
+`guardMermaidSource` (too_large/fence/init_directive/html/control_chars) theo spec.

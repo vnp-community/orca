@@ -1,6 +1,6 @@
 # FE-REQ-SOL-023: Màn hình Backlog ba phân đoạn (Request, Task, Execute)
 
-> 🔴 **Not Started.** Rà soát 2026-10-07: chưa có `BacklogTab`, `RequestBacklogTable`, `TaskBacklogTable`. `useBacklog.ts` (2.2 KB) tồn tại nhưng chỉ là skeleton từ SOL-018. Ngày soạn 2026-10-06.
+> ✅ **Done (7/7 tasks DONE, verified 2026-10-07).** Triển khai Backlog theo CONTRACT-request-ui-api; test đơn vị/component/hook xanh. Còn lại: e2e (cần backend request-service chạy), `pnpm verify:localization-*` chưa chạy được. Sai lệch so với spec ghi ở cuối từng task.
 
 **CR:** [CR-REQ-023](../../../../../../docs/crs/v6/request-frontend/CR-REQ-023-backlog-screens.md)
 **Backend liên quan:** CR-REQ-015 (`ListBacklog`, `ListExecutionStates`), CR-REQ-006 (`ReopenRequest`, `CancelRequest`, `returned_category`), CR-REQ-013 (`task_run_outcomes`), CR-REQ-016 (kênh WS)

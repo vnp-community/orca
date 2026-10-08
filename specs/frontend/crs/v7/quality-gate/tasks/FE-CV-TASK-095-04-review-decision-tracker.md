@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/lib/review-decision-tracker.ts` (mới) + test
 **Depends on:** FE-CV-TASK-095-03; FE-CV-SOL-061-review-entry-points (`AgentTurnCompletion`)
-**Status:** [x] DONE — `review-decision-tracker.ts` chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 8 tests)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - Mất khi tắt app.
+
+## Ghi chú triển khai (2026-10-07)
+
+Viết lại: `registerCompletion/noteReviewOpened/decide`, một sự kiện/lượt, abandon khi lượt mới (bản cũ dùng `require()` nên 5/11 test fail).

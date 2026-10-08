@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/shared/review-telemetry-events.ts` (mới) + `.test.ts`; `frontend/src/shared/telemetry-events.ts` (sửa +2 dòng: import và `...reviewEventSchemas`)
 **Depends on:** —
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 27 tests review-telemetry-events.test.ts)
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - Enum lens/reason phụ thuộc CR khác.
+
+## Ghi chú triển khai (2026-10-07)
+
+Schema 8 sự kiện theo spec trong `shared/review-telemetry-events.ts`, spread vào `eventSchemas` (+2 dòng/+3 dòng ở telemetry-events.ts). Bản cũ (`review-map/telemetry/review-telemetry-event-schemas.ts`, tên sự kiện tự đặt, không đăng ký) đã xoá.

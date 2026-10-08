@@ -1,4 +1,4 @@
-export type TabCycleType = 'terminal' | 'editor' | 'browser' | 'simulator'
+export type TabCycleType = 'terminal' | 'editor' | 'browser' | 'simulator' | 'review'
 
 export type TypeCyclableTab = {
   type: TabCycleType
@@ -28,9 +28,7 @@ export function getActiveEntityIdForTabType(
   if (activeTabType === 'browser') {
     return activeBrowserTabId
   }
-  if (activeTabType === 'simulator') {
-    return activeTabId
-  }
+  // simulator and review tabs are identified by the unified tab id, like terminals.
   return activeTabId
 }
 

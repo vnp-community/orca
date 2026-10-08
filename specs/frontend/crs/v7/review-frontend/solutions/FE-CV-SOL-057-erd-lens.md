@@ -1,6 +1,6 @@
 # FE-CV-SOL-057: Lens ERD (bảng, cột, khoá, liên kết logic giữa service, tô thay đổi từ migration)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ khảo sát code `frontend/src` và hợp đồng v7; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 5/6 task DONE (057-01..05), 1 PARTIAL (057-06 thiếu e2e vì package không có `tests/e2e`). Viết ngày 2026-10-06.
 
 **CR:** [CR-CV-057](../../../../../../docs/crs/v7/review-frontend/CR-CV-057-erd-lens.md)
 **Area:** frontend (`frontend/src/renderer/src/components/review-map/erd/`, hook, khoá slice)
@@ -194,3 +194,11 @@ Hàm thuần (môi trường `node`): `erd-view-model`, `erd-column-changes`, `e
 ## 9. Tham chiếu
 
 `/opt/repos/orca/docs/crs/v7/review-frontend/CR-CV-057-erd-lens.md`, `/opt/repos/orca/docs/research/view-code/10-frontend-review-ux.md`, `/opt/repos/orca/guides/STYLEGUIDE.md`, `/opt/repos/orca/frontend/package.json`, `/opt/repos/orca/frontend/config/vitest.config.ts`, `/opt/repos/orca/frontend/src/renderer/src/assets/main.css`, `/opt/repos/orca/frontend/src/renderer/src/components/ui/`, `/opt/repos/orca/frontend/src/renderer/src/store/slices/editor.ts`, `/opt/repos/orca/backend-go/services/infra-fleet-service/migrations/`.
+
+## 14. Ghi chú triển khai (2026-10-07)
+
+- Mã ở `components/review-map/erd/`, `components/review-map/sensitive-text-masking.ts`, `hooks/useCodeIntelErd.ts`; khoá UI (`erdService`, `erdServiceHistory`, `selectedErdTable`) ở `store/slices/review-ui.ts` thay vì `code-intel.ts` (đã được dọn khi xoá worktree, có test rò rỉ). Lens `erd` đã đăng ký `load` trong `review-lens-registry.ts`.
+- Dùng `useCodeIntelQuery(worktreeId, environmentId, {method, params, scopeKey, enabled, parseResult}, callFn)` (chữ ký thật). `base/head` lấy từ `toChangeOverlayParams(scope)`.
+- Chi tiết bảng hiển thị trong cột phải của lens, chưa cắm vào `SymbolDetailPanel`; "Mở" gọi `onSelectSymbol`, "Xem diff" gọi `onOpenDiff(path, line)` của khung.
+- Kiểm phủ i18n ở test mới `i18n/review-erd-storage-locale-coverage.test.ts`; e2e web chưa làm (không có `tests/e2e/code-intel-web`).
+- Việc còn lại: e2e (073-03); cắm `ErdTableDetail` vào `SymbolDetailPanel` nếu 053 muốn; đo hiệu năng 150 nút trên trình duyệt thật.

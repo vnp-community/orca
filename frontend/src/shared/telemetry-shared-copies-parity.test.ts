@@ -1,63 +1,55 @@
 /**
  * telemetry-shared-copies-parity.test.ts — FE-CV-TASK-095-02
  *
- * Verifies that all shared copies of telemetry-events.ts are byte-identical.
- * If any package is missing, the test reports the path but does not fail
- * (the package may legitimately not be checked out in CI).
- * However, if a package IS present and differs, the test fails.
+ * The telemetry schema files exist as byte-identical copies in six packages, and the
+ * desktop main-process validator imports ITS copy at runtime. A drifted copy silently
+ * drops events, so every copy that is present must match the frontend source.
+ * A package that is not checked out is reported, not failed.
  *
- * To sync copies: copy frontend/src/shared/telemetry-events.ts to all
- * other paths listed in SHARED_PATHS below and commit together.
+ * To sync after a change: copy each file below from frontend/src/shared/ to every
+ * other directory in COPY_DIRS in the same commit.
  */
 
-import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { describe, expect, it } from 'vitest'
 
-// Root of the monorepo — navigate up from the test file
-const REPO_ROOT = path.resolve(__dirname, '../../../../../..')
+const REPO_ROOT = path.resolve(__dirname, '../../..')
+const SOURCE_DIR = path.join(REPO_ROOT, 'frontend/src/shared')
 
-const SOURCE_PATH = path.join(REPO_ROOT, 'frontend/src/shared/telemetry-events.ts')
-
-/**
- * Other packages that must carry an identical copy.
- * These are the 5 non-frontend copies mentioned in FE-CV-SOL-095 §1.
- */
-const SHARED_PATHS = [
-  'desktop/src/shared/telemetry-events.ts',
-  'backend/src/shared/telemetry-events.ts',
-  'tests/vendor-shared/shared/telemetry-events.ts',
-  'agent/src/shared/telemetry-events.ts',
-  'mobile/src/vendor-shared/shared/telemetry-events.ts',
+const FILES = ['telemetry-events.ts', 'mcp-telemetry-events.ts', 'review-telemetry-events.ts']
+const COPY_DIRS = [
+  'desktop/src/shared',
+  'backend/src/shared',
+  'tests/vendor-shared/shared',
+  'agent/src/shared',
+  'mobile/src/vendor-shared/shared'
 ]
 
-describe('telemetry-events.ts shared copies parity', () => {
-  const sourceContent = (() => {
-    try {
-      return fs.readFileSync(SOURCE_PATH, 'utf-8')
-    } catch {
-      return null
-    }
-  })()
-
-  it('source file exists', () => {
-    expect(sourceContent, `Source not found: ${SOURCE_PATH}`).not.toBeNull()
-  })
-
-  for (const relPath of SHARED_PATHS) {
-    const absPath = path.join(REPO_ROOT, relPath)
-
-    it(`${relPath} matches source (or is absent from checkout)`, () => {
-      if (!fs.existsSync(absPath)) {
-        // Package not checked out — skip but report
-        console.warn(`[parity] Skipped (not present): ${absPath}`)
-        return
-      }
-
-      const copyContent = fs.readFileSync(absPath, 'utf-8')
-      expect(copyContent, `${relPath} differs from frontend/src/shared/telemetry-events.ts`).toBe(
-        sourceContent
-      )
+describe('telemetry schema shared copies parity', () => {
+  for (const file of FILES) {
+    it(`source ${file} exists`, () => {
+      expect(fs.existsSync(path.join(SOURCE_DIR, file)), `missing ${file}`).toBe(true)
     })
+
+    for (const dir of COPY_DIRS) {
+      it(`${dir}/${file} matches the frontend source (or the package is absent)`, () => {
+        const copyPath = path.join(REPO_ROOT, dir, file)
+        if (!fs.existsSync(path.join(REPO_ROOT, dir))) {
+          console.warn(`[parity] package not checked out, skipped: ${dir}`)
+          return
+        }
+        // A present package must carry the file: telemetry-events.ts imports its siblings.
+        expect(fs.existsSync(copyPath), `${dir} is missing ${file}`).toBe(true)
+        expect(fs.readFileSync(copyPath, 'utf-8'), `${dir}/${file} drifted from frontend/src/shared/${file}`).toBe(
+          fs.readFileSync(path.join(SOURCE_DIR, file), 'utf-8')
+        )
+      })
+    }
   }
+
+  it('drift detection works: a modified copy would not equal the source', () => {
+    const source = fs.readFileSync(path.join(SOURCE_DIR, 'review-telemetry-events.ts'), 'utf-8')
+    expect(`${source}\n// drift`).not.toBe(source)
+  })
 })

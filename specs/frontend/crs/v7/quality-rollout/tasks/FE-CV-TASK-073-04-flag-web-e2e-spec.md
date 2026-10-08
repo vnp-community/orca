@@ -5,7 +5,7 @@
 **Area:** tests / Playwright web
 **File:** `tests/e2e/code-intel-web/flag.web.e2e.ts` (mới)
 **Depends on:** FE-CV-TASK-073-02, 073-03; FE-CV-SOL-061 (lối vào); FE-CV-TASK-073-06 (ca admin)
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — `flag.web.e2e.ts` có 3 ca (cờ tắt, quality tắt, tắt giữa chừng) nhưng chưa chạy (không có Chromium) và chưa có ca `page.clock` 60 s/UI lối vào vì UI Review chưa nối
 
 ## Context
 
@@ -33,3 +33,7 @@
 ## Rủi ro
 
 - `page.clock` tương tác với timer ứng dụng chưa thử.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Ba ca hiện khẳng định ở mức kênh qua fake backend, không phải DOM.

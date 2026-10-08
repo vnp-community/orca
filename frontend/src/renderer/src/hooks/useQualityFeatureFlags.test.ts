@@ -12,7 +12,6 @@ vi.mock('@/store', () => ({
 
 let mockState: Record<string, unknown> = {}
 
-import { useAppStore } from '@/store'
 
 describe('useQualityFeatureFlags — all flags false when unknown', () => {
   beforeEach(() => {

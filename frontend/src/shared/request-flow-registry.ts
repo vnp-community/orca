@@ -147,3 +147,14 @@ export const REQUEST_STATUS_ORDER: readonly string[] = [
 // ---------------------------------------------------------------------------
 
 export const LOW_CONFIDENCE_THRESHOLD = 0.6
+
+// ---------------------------------------------------------------------------
+// Interrupt statuses (CR-REQ-028): not part of any flow's own step list.
+// The step the request resumes at comes from Clarification.resumeStatus.
+// ---------------------------------------------------------------------------
+
+export const REQUEST_INTERRUPT_STATUSES = ['awaiting_information'] as const
+
+export function isInterruptStatus(status: string): boolean {
+  return (REQUEST_INTERRUPT_STATUSES as readonly string[]).includes(status)
+}

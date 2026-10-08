@@ -5,7 +5,7 @@
 **Area:** frontend / i18n
 **File:** `frontend/src/renderer/src/i18n/code-intel-locale-coverage.test.ts` (mới), `i18n/locales/{en,es,ja,ko,zh}.json` (sửa)
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: code-intel-locale-coverage.test pass (only the Review tab title key exists); no-top-level-translate.test fails on baseline (FleetServerStatusBadge))
 
 ## Context
 

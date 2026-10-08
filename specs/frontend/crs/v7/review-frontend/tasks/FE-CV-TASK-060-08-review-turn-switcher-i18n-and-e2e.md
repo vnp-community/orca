@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + i18n + tests
 **File:** `frontend/src/renderer/src/components/review-map/turns/ReviewTurnSwitcher.tsx` (mới) + test; `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`); `tests/e2e/code-intel-web/review-notes.web.e2e.ts`
 **Depends on:** FE-CV-TASK-060-04, 060-06, 060-07; FE-CV-SOL-052/053 (lớp phủ `review-overlay-model.ts`, lọc Thứ tự đọc); 073-02, 073-03
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — switcher đã mount (`shell/ReviewCompanionStrip.tsx`), `onCompare` nối vào Thứ tự đọc (chế độ "Từ lượt trước" lọc theo tệp new/changed; ReviewTurnSwitcher.test 9/9 + ReviewWorkspace.companions.test 8/8 PASS); thiếu: nhãn lượt chưa vào `review-overlay-model.ts` (chưa gắn nhãn trên đồ thị lens), chưa có e2e `review-notes.web.e2e.ts`
 
 ## Context
 
@@ -31,3 +31,11 @@
 ## Rủi ro
 
 - Chế độ 3 chỉ ở mức tệp/symbol; mở diff theo commit khi hai `headOid` khác chưa kiểm chứng.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Chế độ 2–3 bị vô hiệu hoá khi chưa có marker trước; nếu đang ở chế độ đó mà marker biến mất thì tự về "all". Chế độ 3 chỉ đọc, không có nút diff.
+
+## Ghi chú tích hợp (W6, 2026-10-07)
+
+Phạm vi "lớp phủ" hiện chỉ là bộ lọc Thứ tự đọc (giao với bộ lọc chip). Chế độ "Xem lượt trước" vẫn chỉ hiện thông báo chỉ đọc.

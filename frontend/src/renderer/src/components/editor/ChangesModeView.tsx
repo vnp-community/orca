@@ -97,6 +97,7 @@ export function ChangesModeView({
           sideBySide={sideBySide}
           editable={true}
           worktreeId={activeFile.worktreeId}
+          diffSource="worktree"
           onContentChange={onContentChange}
           onSave={onSave}
         />

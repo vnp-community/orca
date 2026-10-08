@@ -1,6 +1,6 @@
 # FE-CV-SOL-051-review-workspace-shell: Khung màn Review (ba cột, thanh tóm tắt, phạm vi, chip index, trạng thái)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 5/7 task DONE (051-02..06), 2 PARTIAL (051-01 thiếu tự gọi `git.branchCompare`; 051-07 thiếu e2e vì package không có `tests/e2e`). Viết ngày 2026-10-06.
 
 **CR:** [CR-CV-051](../../../../../../docs/crs/v7/review-frontend/CR-CV-051-review-workspace-shell.md)
 **Area:** frontend (`frontend/src/renderer/src/{components/review-map,store/slices,hooks}`)
@@ -147,3 +147,30 @@ Thứ tự: 051-01 → 051-02 → 051-03, 051-04 → 051-05 → 051-06 → 051-0
 ## 12. Tham chiếu
 
 `/opt/repos/orca/docs/crs/v7/review-frontend/CR-CV-051-review-workspace-shell.md`, `/opt/repos/orca/specs/backend-go/crs/v7/CONTRACT-codeintel-ui-api.md`, `/opt/repos/orca/guides/STYLEGUIDE.md`, `/opt/repos/orca/frontend/src/shared/types.ts`, `/opt/repos/orca/frontend/src/renderer/src/components/ui/resizable.tsx`, `/opt/repos/orca/frontend/src/renderer/src/store/slices/connectivity-status.ts`.
+
+## 13. Ghi chú triển khai (2026-10-07)
+
+**Cách đăng ký một lens (dành cho các agent lens 053-059, 092...)**
+
+1. Tạo component lens nhận `ReviewLensProps` (`worktreeId, environmentId, scope, overlay, selectedSymbolKey, chipFilter, onSelectSymbol, onOpenDiff, requestSymbolChoice`), `export default`, đặt ở thư mục của lens (vd. `components/review-map/impact/ImpactLens.tsx`).
+2. Trong `components/review-map/review-lens-registry.ts`, ở mục có `id` của lens trong `REVIEW_LENS_DEFINITIONS` (`impact`, `architecture`, `dataflow`, `erd`, `storage`, `structure`, `contract`) thêm `load: () => import('./impact/ImpactLens')`. Chỉ thêm đúng một dòng; không sửa `ReviewLensTabs`/`ReviewWorkspace`. Lens không thuộc 7 id chuẩn (vd. `requirements`, `quality`) gọi `registerReviewLens({ id, order, labelKey, labelFallback, load, requiresQuality? })` từ module đăng ký của mình (idempotent: cùng `id` thì thay thế).
+3. Khoá nhãn `auto.components.reviewMap.lens.<id>.label` đã có đủ 5 locale cho 7 lens chuẩn; lens mới tự thêm khoá của mình.
+4. Lens chưa có `load` hiển thị placeholder "{{lens}} is not available yet." qua registry (không có tab chết).
+5. Chi tiết symbol trong drawer: `setReviewDrawerRenderer((props) => <SymbolDetailPanel {...props} />)` (053). `onSelectSymbol(key)` mở drawer; Esc/`]` đóng và trả tiêu điểm cho phần tử đã mở.
+6. Ký hiệu hai nghĩa của chip: `flows/tables/contracts` chỉ chuyển sang lens `dataflow/erd/contract` (nếu đã hiển thị), không đặt bộ lọc.
+7. Lens gặp lỗi `ambiguous` gọi `props.requestSymbolChoice(candidates)` → nhận `{key}` hoặc `{name,file}` (hoặc `null` nếu huỷ) rồi tự gọi lại truy vấn.
+
+**Sai lệch so với spec**
+
+- Kiểu `IndexStatus/ChangeOverlay/ReadingStep/ReviewState` dùng bản local `review-wire-types.ts` (theo hợp đồng) vì `shared/code-intel-types.ts` (SOL-050) vẫn mang hình dạng cũ trước hợp đồng (`IndexOverall` 5 giá trị, `ChangeOverlay` = một file); khi 050 chỉnh lại thì thay alias. Mọi truy cập wire đi qua `review-shell-data.ts` (normalizer + `classifyReviewError` theo mã `CODEINTEL_*`) và `review-data-api-default.ts` (tải lười store/client để tránh vòng import).
+- Không dùng `useCodeIntelQuery` (cần slice cache + `codeIntelSupportState`); khung dùng `useReviewShellData` riêng (poll 3 s khi đang lập chỉ mục, nghe `changed`/`reindexProgress` từ `code-intel-event-bus`).
+- `Lập lại toàn bộ` xác nhận inline trong popover thay vì `useConfirmationDialog` (không cần provider).
+- Mở diff mặc định = `openDiff(worktree, path)` (diff cây làm việc), chưa nhảy tới dòng (053-06 sẽ thay bằng `openReviewDiffAtSymbol`).
+- Phạm vi mặc định: `gitBranchCompareSummaryByWorktree[wt]` nếu có, nếu chưa thì `worktree.baseRef`; chưa tự gọi `git.branchCompare` (051-01 mục 3). `hostedReview` trong bộ chọn phạm vi chưa được cấp dữ liệu (prop `hostedReview: null`).
+- Progress UI: `ui/progress` không đẩy `aria-valuenow`; thanh tiến độ báo `aria-label` + live region.
+- Điểm mở: `useCodeIntelSelector` (050-09) trả object mới mỗi lần khi `ready` → zustand v5 coi là snapshot đổi liên tục; khung dùng bản snapshot nguyên thuỷ trong `useReviewWorkspaceModel`. Cần W1-A sửa hook gốc.
+- Khoá i18n động (`shell.screen.scope.*`, `shell.risk.*`, `shell.chip.*`, `readingOrder.reason.*`, `lens.*.label`) được kiểm bằng `review-shell-locale-coverage.test.ts`.
+
+### W6 (2026-10-07): gắn thành phần vào khung
+
+Dock đáy `shell/ReviewBottomDock.tsx` + `review-dock-registry.ts` (lens quality đăng ký qua `registerReviewDockPanel`, `requiresQuality`); `shell/use-review-companions.ts` + `ReviewCompanionStrip.tsx` mount recorder lượt, ReviewTurnSwitcher, ReportMenu, AI card; `review-lens-availability.ts` ẩn tab Lưu trữ; `use-review-surface-telemetry.ts`. Test: ReviewWorkspace.companions.test 8/8.

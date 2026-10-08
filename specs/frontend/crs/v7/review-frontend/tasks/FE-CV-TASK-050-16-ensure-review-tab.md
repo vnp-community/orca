@@ -5,7 +5,7 @@
 **Area:** frontend / renderer lib
 **File:** `lib/ensure-review-tab.ts` (mới), tests `ensure-review-tab.test.ts`, `ensure-review-tab-behavior.test.ts`
 **Depends on:** FE-CV-TASK-050-15, FE-CV-TASK-050-10, FE-CV-TASK-050-09
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: ensure-review-tab.test 12 pass; now returns null for unsupported selector and sets entityId=worktreeId)
 
 ## Context
 

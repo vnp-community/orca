@@ -8,6 +8,9 @@ import { TaskCreateDialog } from './TaskCreateDialog'
 import { TaskMergeDialog } from './TaskMergeDialog'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
+import { Checkbox } from '../ui/checkbox'
+import { translate } from '@/i18n/i18n'
+import { isPlanningTask } from '../../../../shared/task-hierarchy'
 import { toast } from 'sonner'
 import {
   derivePhase,
@@ -26,6 +29,9 @@ const TaskBoardView = lazy(() =>
 export function TaskGraph({ projectId }: { projectId: string }) {
   const {
     filteredTasks,
+    hasPlanningTasks,
+    showPlanningTasks,
+    setShowPlanningTasks,
     expandedNodes,
     toggleExpanded,
     setActiveTask,
@@ -54,7 +60,8 @@ export function TaskGraph({ projectId }: { projectId: string }) {
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
 
   const selectedTasks = useMemo(
-    () => filteredTasks.filter((t) => selectedIds.has(t.id)),
+    // Plan/Phase nodes are structural: never part of a batch run.
+    () => filteredTasks.filter((t) => selectedIds.has(t.id) && !isPlanningTask(t)),
     [filteredTasks, selectedIds]
   )
   // BL-TG-06: only show a phase-specific batch action when EVERY selected
@@ -152,6 +159,18 @@ export function TaskGraph({ projectId }: { projectId: string }) {
           <option value="in_progress">In Progress</option>
           <option value="done">Done</option>
         </select>
+        {hasPlanningTasks && (
+          <label
+            className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer"
+            data-testid="toggle-show-planning"
+          >
+            <Checkbox
+              checked={showPlanningTasks}
+              onCheckedChange={(v) => setShowPlanningTasks(v === true)}
+            />
+            {translate('auto.components.task.TaskGraph.showPlanning', 'Show Plan/Phase')}
+          </label>
+        )}
         <Button size="sm" onClick={() => openCreateDialog(undefined)} data-testid="new-task-btn">
           + New Task
         </Button>

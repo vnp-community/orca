@@ -5,7 +5,7 @@
 **Area:** frontend (renderer, logic thuần)
 **File:** `frontend/src/renderer/src/components/request/approval/approval-inbox-rules.ts` (mới), `approval-inbox-rules.test.ts` (mới)
 **Depends on:** FE-REQ-SOL-018 (kiểu `Approval`, `ApprovalSubjectType` trong `frontend/src/shared/request-types.ts`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: approval-inbox-rules.test.ts 27/27; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -48,3 +48,7 @@ Chạy (chưa chạy): `pnpm --filter orca-frontend test frontend/src/renderer/s
 
 - Nhóm `findings`/`answer` vào `other` theo CR-022 mục 2.1 (bộ lọc liệt kê "Khác"); CR-022 Q4 hỏi liệu hai loại này có nên duyệt nhanh, hiện cho phép theo bảng CR.
 - `focus` cần `requestPage.focus` ở slice (yêu cầu bổ sung cho SOL-018); nếu chưa có, task 06 bỏ qua `focus`.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Quy tắc dùng `rawSubjectType` (giá trị gốc trên dây) vì parser của 018 gộp findings/answer/task_list vào solution/plan; thêm `rawSubjectType`, `dueAt`, `requestedBy` vào `Approval` (chỉ thêm). `openTargetFor` trả `focus` (slice có `requestPage.focus`).

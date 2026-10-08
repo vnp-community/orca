@@ -1,0 +1,97 @@
+import { translate } from '@/i18n/i18n'
+
+// Why: single English catalog for the chart primitives. Keys are read by name (not hashed),
+// so the locale coverage test enumerates this table to keep non-English UIs translated.
+export const QUALITY_CHART_COPY = {
+  'severity.error': 'Error',
+  'severity.warning': 'Warning',
+  'severity.info': 'Info',
+  'severity.unknown': 'Unknown',
+  'verdict.pass': 'Pass',
+  'verdict.warn': 'Has warnings',
+  'verdict.fail': 'Fail',
+  'verdict.unknown': 'Unknown',
+  'verdict.unknownLong': 'Not enough data to conclude',
+  stale: 'stale',
+  'frame.viewTable': 'View as table',
+  'frame.viewChart': 'View chart',
+  'frame.retry': 'Retry',
+  'frame.showing': 'Showing {{shown}}/{{total}}',
+  'frame.stale': 'Stale data',
+  'frame.loading': 'Loading chart',
+  'frame.emptyDefault': 'There is no data to chart for this scope.',
+  'frame.errorDefault': 'The chart could not be drawn.',
+  'summary.rangeUp': '{{label}}: rose from {{first}} to {{last}} over {{count}} points',
+  'summary.rangeDown': '{{label}}: fell from {{first}} to {{last}} over {{count}} points',
+  'summary.rangeFlat': '{{label}}: stayed at {{last}} over {{count}} points',
+  'summary.single': '{{label}}: one value, {{value}}',
+  'summary.noValues': '{{label}}: no values recorded',
+  'summary.missing': '{{count}} points have no value',
+  'summary.coverage': '{{percent}}% of changed lines covered ({{covered}}/{{total}})',
+  'summary.coverageNone': 'No coverage data for this scope',
+  'summary.coverageEstimated': 'estimated',
+  'summary.grid': '{{rows}} rows by {{columns}} columns, showing {{shown}} of {{total}}',
+  'summary.treemap': '{{count}} tiles sized by {{size}} and shaded by {{intensity}}',
+  'summary.matrix': '{{nodes}} nodes, {{cells}} filled cells, {{blocks}} cyclic groups',
+  'stackedBar.noData': 'No data yet',
+  'stackedBar.noFindings': 'No findings in the checks that ran',
+  'stackedBar.total': '{{count}} findings',
+  'sparkline.needTwo': 'At least two points are needed',
+  'trend.verdictChange': 'Verdict changed',
+  'trend.axis': 'Horizontal axis: turns, oldest to newest',
+  'trend.point': 'Point',
+  'trend.turn': 'Turn',
+  'trend.verdict': 'Verdict',
+  'gauge.value': '{{percent}}% ({{covered}}/{{total}} changed lines covered)',
+  'gauge.estimated': 'Estimated from test edges, not measured coverage',
+  'gauge.measured': 'Measured',
+  'gauge.partial': 'Partial scope',
+  'gauge.none': 'No coverage data for this scope yet',
+  'gauge.warnBelow': 'Warn below {{value}}%',
+  'gauge.failBelow': 'Fail below {{value}}%',
+  'gauge.belowFail': 'Below the fail threshold',
+  'gauge.belowWarn': 'Below the warn threshold',
+  'gauge.clamped': 'Covered exceeds total; value capped at 100%',
+  'gauge.source': 'Source',
+  'gauge.covered': 'Covered lines',
+  'gauge.total': 'Changed lines',
+  'gauge.percent': 'Coverage',
+  'gauge.scope': 'Scope',
+  'treemap.more': '+{{count}} more',
+  'treemap.moreLabel': '{{count}} further items are not drawn; see the table',
+  'treemap.tileLabel': '{{label}}, {{sizeLabel}}: {{size}}, {{intensityLabel}}: {{intensity}}',
+  'treemap.empty': 'There are no items to show for this scope.',
+  'grid.hint': 'Arrow keys move, Enter selects, Escape leaves the chart.',
+  'treemap.overlay': 'markers: {{tags}}',
+  'heatmap.empty': 'There are no rows to show for this scope.',
+  'matrix.cycleGroup': 'Cyclic group',
+  'matrix.other': 'Other ({{count}})',
+  'matrix.readHint': 'Rows are sources, columns are targets.',
+  'matrix.backEdge': 'Backward dependency',
+  'matrix.empty': 'There are no dependencies to show for this scope.',
+  'matrix.cellLabel': '{{from}} depends on {{to}}, weight {{weight}}',
+  'table.label': 'Label',
+  'table.value': 'Value',
+  'table.size': 'Size',
+  'table.intensity': 'Intensity',
+  'table.from': 'From',
+  'table.to': 'To',
+  'table.weight': 'Weight',
+  'table.note': 'Note',
+  'table.metric': 'Metric',
+  'table.severity': 'Severity',
+  'table.count': 'Count'
+} as const
+
+export type QualityChartCopyKey = keyof typeof QUALITY_CHART_COPY
+
+export const QUALITY_CHART_COPY_PREFIX = 'auto.components.qualityCharts.'
+
+export function chartCopy(
+  key: QualityChartCopyKey,
+  params?: Record<string, string | number>
+): string {
+  return translate(`${QUALITY_CHART_COPY_PREFIX}${key}`, QUALITY_CHART_COPY[key], params)
+}
+
+export const NO_VALUE_DASH = '—'

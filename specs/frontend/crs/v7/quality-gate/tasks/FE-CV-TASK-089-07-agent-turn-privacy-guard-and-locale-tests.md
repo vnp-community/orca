@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-turn-privacy-guard.test.ts` (mới), `frontend/src/renderer/src/i18n/agent-turn-verification-locale-coverage.test.ts` (mới), `frontend/src/renderer/src/i18n/locales/*.json`
 **Depends on:** FE-CV-TASK-089-01..06
-**Status:** [~] PARTIAL — `agent-turn-privacy-guard.test.ts` ✅ đã có. `agent-turn-verification-locale-coverage.test.ts` ❌ chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 7 tests privacy-guard + 5 tests locale-coverage)
 
 ## Context
 
@@ -29,3 +29,7 @@
 ## Rủi ro
 
 - Khoá dịch cần duyệt.
+
+## Ghi chú triển khai (2026-10-07)
+
+Bổ sung 28 khoá locale năm ngôn ngữ (trước đó test locale fail vì thiếu khoá).

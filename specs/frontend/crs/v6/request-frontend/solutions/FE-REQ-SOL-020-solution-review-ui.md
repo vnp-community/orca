@@ -1,6 +1,6 @@
 # FE-REQ-SOL-020: Xem, so sánh, chọn và duyệt Solution (Chẩn đoán, Findings, Answer)
 
-> 🚧 **In Progress.** Rà soát 2026-10-07: 020-01 ✅ (`solution-view-model.ts` + test tồn tại), 020-02..05 ❌ TODO.
+> 🚧 **In Progress.** 2026-10-07: 020-01..04 DONE (vitest 90 pass); 020-05 PARTIAL (i18n xong; e2e chưa chạy, docs trang chưa có).
 
 **CR:** [CR-REQ-020](../../../../../../docs/crs/v6/request-frontend/CR-REQ-020-solution-review-ui.md)
 **Area:** frontend (`components/request/solution/`)

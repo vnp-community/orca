@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `ArchitectureLens.tsx`, `ArchitectureToolbar.tsx`, `C4ContainerPicker.tsx`, `C4DiagramCanvas.tsx`, `C4ComponentNode.tsx`, `C4ExternalNode.tsx`, `C4LayerBand.tsx`, `C4RelationsTable.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-055-01, 055-02, FE-CV-TASK-053-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest ArchitectureLens.test.tsx, C4ComponentDetail.test.tsx (xyflow được mock))
 
 ## Context
 
@@ -29,3 +29,7 @@
 ## Rủi ro
 
 - `var()` trong SVG xyflow chưa kiểm.
+
+## Ghi chú triển khai (2026-10-07)
+
+`ArchitectureLens`, `ArchitectureToolbar`, `C4ContainerPicker`, `C4DiagramCanvas` (nút/dải là node-type nội bộ trong file, không tách `C4ComponentNode.tsx`/`C4ExternalNode.tsx`/`C4LayerBand.tsx`), `C4RelationsTable`, `C4EdgeLegend`. Chưa kiểm `var()` trong SVG xyflow và bố cục với container TS trên dữ liệu thật; canvas chưa lazy riêng (cả lens đã lazy qua registry). Chưa có chú thích "chạm thay đổi" cho nút `affected` (chưa có dữ liệu impact).

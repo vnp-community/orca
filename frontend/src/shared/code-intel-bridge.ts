@@ -13,7 +13,7 @@
  */
 
 import type { CodeIntelPushEvent } from './code-intel-types'
-import { CODE_INTEL_PUSH_EVENTS } from './code-intel-rpc-methods'
+import { parseCodeIntelPushEvent } from './code-intel-parsers'
 
 // ---------------------------------------------------------------------------
 // Bridge API types
@@ -42,6 +42,11 @@ export type CodeIntelSubscribeCallbacks = {
   onUnsupported: () => void
 }
 
+/** Transport-level callbacks: frames are raw (unparsed) and normalized by the bridge. */
+export type CodeIntelRawSubscribeCallbacks = Omit<CodeIntelSubscribeCallbacks, 'onEvent'> & {
+  onEvent: (frame: unknown) => void
+}
+
 export type CodeIntelBridgeDeps = {
   /** Call a local runtime method (desktop only); returns raw envelope */
   callLocal: (method: string, params: unknown) => Promise<CodeIntelRawEnvelope>
@@ -52,7 +57,7 @@ export type CodeIntelBridgeDeps = {
     environmentId: string,
     method: string,
     params: unknown,
-    callbacks: CodeIntelSubscribeCallbacks
+    callbacks: CodeIntelRawSubscribeCallbacks
   ) => () => void
 }
 
@@ -75,10 +80,9 @@ export type CodeIntelBridgeApi = {
 }
 
 // ---------------------------------------------------------------------------
-// Known push event names for filtering
+// Push frames are normalized by parseCodeIntelPushEvent (unknown events dropped)
 // ---------------------------------------------------------------------------
 
-const KNOWN_PUSH_EVENTS = new Set<string>(CODE_INTEL_PUSH_EVENTS)
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -113,16 +117,16 @@ export function createCodeIntelBridge(deps: CodeIntelBridgeDeps): CodeIntelBridg
       'codeIntel.subscribe',
       {},
       {
-        onEvent: (event) => {
-          if (!cancelled && KNOWN_PUSH_EVENTS.has(event.event)) {
-            callbacks.onEvent(event)
-          }
+        onEvent: (frame) => {
+          if (cancelled) {return}
+          const event = parseCodeIntelPushEvent(frame)
+          if (event) {callbacks.onEvent(event)}
         },
         onClose: () => {
-          if (!cancelled) callbacks.onClose()
+          if (!cancelled) {callbacks.onClose()}
         },
         onUnsupported: () => {
-          if (!cancelled) callbacks.onUnsupported()
+          if (!cancelled) {callbacks.onUnsupported()}
         }
       }
     )

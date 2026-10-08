@@ -9,21 +9,25 @@
  *  - Offline → connectivity poll trigger
  *  - Envelope parsing for methods that return envelopes
  *
- * Methods that do NOT return envelopes (per spec §4.8):
- *  status, reindex, reindexStatus, reviewState.*, c4.*, bindRepo,
- *  settings.*, dismissFinding
+ * Only the contract's `Env<...>` view channels (CODE_INTEL_ENVELOPE_METHODS) go through
+ * callEnvelope; status, reindex*, reviewState.*, c4.*, bindRepo, settings.*, dismissFinding
+ * and quality.* return plain results.
  *
  * @module runtime/code-intel-client
  */
 
 import { useAppStore } from '@/store'
+import { resolveCodeIntelSelector } from '../lib/code-intel-worktree-selector'
 import {
-  CODE_INTEL_ERROR_KIND_BY_CODE,
+  codeIntelErrorKindForCode,
   parseCodeIntelErrorMessage,
-  parseCodeIntelEnvelope,
-  parseIndexStatus
+  parseCodeIntelEnvelope
 } from '../../../shared/code-intel-parsers'
-import { getMethodMaxArgsBytes } from '../../../shared/code-intel-rpc-methods'
+import {
+  CODE_INTEL_ENVELOPE_METHODS,
+  getMethodMaxArgsBytes,
+  toCodeIntelMethod
+} from '../../../shared/code-intel-rpc-methods'
 import type { CodeIntelBridgeApi, CodeIntelRawEnvelope } from '../../../shared/code-intel-bridge'
 import type { CodeIntelErrorKind } from '../../../shared/code-intel-parsers'
 import type { CodeIntelEnvelope } from '../../../shared/code-intel-types'
@@ -40,26 +44,19 @@ export type CodeIntelRpcError = {
   retryable: boolean
 }
 
+/** Client-side rejection (never reached the network) carrying its error kind. */
+export class LocalCodeIntelError extends Error {
+  constructor(
+    readonly kind: CodeIntelErrorKind,
+    message: string
+  ) {
+    super(message)
+    this.name = 'LocalCodeIntelError'
+  }
+}
+
 // Methods that receive raw JSON (no envelope wrapping)
-const NO_ENVELOPE_METHODS = new Set([
-  'codeIntel.status',
-  'codeIntel.reindex',
-  'codeIntel.reindexStatus',
-  'codeIntel.reviewState.get',
-  'codeIntel.reviewState.save',
-  'codeIntel.reviewState.approve',
-  'codeIntel.reviewState.reset',
-  'codeIntel.reviewComment.add',
-  'codeIntel.reviewComment.resolve',
-  'codeIntel.reviewComment.delete',
-  'codeIntel.reviewChecklist.set',
-  'codeIntel.c4.get',
-  'codeIntel.c4.save',
-  'codeIntel.bindRepo',
-  'codeIntel.settings.get',
-  'codeIntel.settings.save',
-  'codeIntel.dismissFinding',
-])
+const TENANT_SCOPED_METHODS = new Set(['codeIntel.settings.get', 'codeIntel.settings.set'])
 
 // ---------------------------------------------------------------------------
 // Error classifier
@@ -71,16 +68,26 @@ const NO_ENVELOPE_METHODS = new Set([
 export function classifyCodeIntelError(
   responseOrError: CodeIntelRawEnvelope | Error | unknown
 ): CodeIntelRpcError {
+  if (responseOrError instanceof LocalCodeIntelError) {
+    return {
+      kind: responseOrError.kind,
+      code: null,
+      message: responseOrError.message,
+      data: null,
+      retryable: false
+    }
+  }
+
   if (responseOrError instanceof Error) {
-    // Thrown by transport — parse the message for a CODEINTEL_ code
+    // Thrown by transport: the message may still carry a CODEINTEL_ prefix.
     const parsed = parseCodeIntelErrorMessage(responseOrError.message)
-    const kind = (parsed.code && CODE_INTEL_ERROR_KIND_BY_CODE[parsed.code]) ?? 'unknown'
+    const kind = codeIntelErrorKindForCode(parsed.code)
     return {
       kind,
       code: parsed.code,
       message: parsed.text,
       data: parsed.data,
-      retryable: kind === 'offline' || kind === 'rate_limited'
+      retryable: isRetryableKind(kind)
     }
   }
 
@@ -90,46 +97,37 @@ export function classifyCodeIntelError(
     'ok' in responseOrError &&
     !(responseOrError as { ok: boolean }).ok
   ) {
-    const raw = responseOrError as CodeIntelRawEnvelope
-    const err = raw.error
+    const err = (responseOrError as CodeIntelRawEnvelope).error
     const rawCode = err?.code ?? ''
     const rawMessage = err?.message ?? ''
-
-    // Map RPC-level codes
-    let kind: CodeIntelErrorKind
-    if (rawCode === 'method_not_found') kind = 'unsupported'
-    else if (rawCode === 'forbidden') kind = 'forbidden'
-    else if (
-      rawCode === 'connection_refused' ||
-      rawCode === 'network_error' ||
-      rawCode === 'timeout'
-    )
-      kind = 'offline'
-    // `internal` is NOT a semantic code — fall through to CODEINTEL_ prefix check
-    else {
-      const parsed = parseCodeIntelErrorMessage(rawMessage)
-      kind = (parsed.code && CODE_INTEL_ERROR_KIND_BY_CODE[parsed.code]) ??
-        CODE_INTEL_ERROR_KIND_BY_CODE[rawCode] ?? 'unknown'
-    }
+    // The semantic code lives in error.message (contract §2.3); the RPC-level code is only a
+    // fallback, and 'internal' is never a semantic code.
+    const parsed = parseCodeIntelErrorMessage(rawMessage)
+    const kind =
+      parsed.code !== null
+        ? codeIntelErrorKindForCode(parsed.code)
+        : rawCode === 'internal'
+          ? 'unknown'
+          : codeIntelErrorKindForCode(rawCode)
 
     return {
       kind,
-      code: err?.code ?? null,
-      message: rawMessage,
-      data: typeof err?.data === 'object' && err?.data !== null
-        ? (err.data as Record<string, unknown>)
-        : null,
-      retryable: kind === 'offline' || kind === 'rate_limited'
+      code: parsed.code ?? (rawCode && rawCode !== 'internal' ? rawCode : null),
+      message: parsed.code !== null ? parsed.text : rawMessage,
+      data:
+        parsed.data ??
+        (typeof err?.data === 'object' && err.data !== null
+          ? (err.data as Record<string, unknown>)
+          : null),
+      retryable: isRetryableKind(kind)
     }
   }
 
-  return {
-    kind: 'unknown',
-    code: null,
-    message: 'Unknown error',
-    data: null,
-    retryable: false
-  }
+  return { kind: 'unknown', code: null, message: 'Unknown error', data: null, retryable: false }
+}
+
+function isRetryableKind(kind: CodeIntelErrorKind): boolean {
+  return kind === 'offline' || kind === 'rate-limited' || kind === 'timeout'
 }
 
 // ---------------------------------------------------------------------------
@@ -137,14 +135,15 @@ export function classifyCodeIntelError(
 // ---------------------------------------------------------------------------
 
 function checkArgSizeBytes(method: string, params: unknown): void {
-  if (params === undefined || params === null) return
+  if (params === undefined || params === null) {return}
   const json = JSON.stringify(params)
   const bytes = new TextEncoder().encode(json).length
   const limit = getMethodMaxArgsBytes(method)
   if (bytes > limit) {
-    throw Object.assign(new Error(`[code-intel] params exceed ${limit} bytes for ${method}`), {
-      kind: 'validation' as CodeIntelErrorKind
-    })
+    throw new LocalCodeIntelError(
+      'validation',
+      `[code-intel] params exceed ${limit} bytes for ${method}`
+    )
   }
 }
 
@@ -155,9 +154,9 @@ function checkArgSizeBytes(method: string, params: unknown): void {
 const FORBIDDEN_PARAMS = new Set(['__proto__', 'constructor', 'prototype'])
 
 function hasForbiddenKey(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null) return false
+  if (typeof value !== 'object' || value === null) {return false}
   for (const key of Object.keys(value as object)) {
-    if (FORBIDDEN_PARAMS.has(key)) return true
+    if (FORBIDDEN_PARAMS.has(key)) {return true}
   }
   return Array.isArray(value)
     ? (value as unknown[]).some(hasForbiddenKey)
@@ -171,8 +170,8 @@ function hasForbiddenKey(value: unknown): boolean {
 export type CodeIntelClientCallOpts = {
   /** AbortSignal: result is dropped if aborted (RPC is NOT cancelled) */
   signal?: AbortSignal
-  /** environmentId override; defaults to resolved env from selector */
-  environmentId: string | null
+  /** environmentId override; defaults to the environment resolved from the worktree selector */
+  environmentId?: string | null
 }
 
 export type CodeIntelClient = {
@@ -198,46 +197,66 @@ export type CodeIntelClient = {
  */
 export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClient {
   async function rawCall(
+    worktreeId: string,
     method: string,
     params: unknown,
     opts: CodeIntelClientCallOpts
   ): Promise<CodeIntelRawEnvelope> {
     // Guard: forbidden proto-pollution keys
     if (Array.isArray(params)) {
-      throw new Error(`[code-intel] array params are not allowed for ${method}`)
+      throw new LocalCodeIntelError('validation', `[code-intel] array params are not allowed for ${method}`)
     }
     if (hasForbiddenKey(params)) {
-      throw new Error(`[code-intel] forbidden key in params for ${method}`)
+      throw new LocalCodeIntelError('validation', `[code-intel] forbidden key in params for ${method}`)
     }
 
-    checkArgSizeBytes(method, params)
+    let environmentId = opts.environmentId ?? null
+    let finalParams = params ?? {}
+    // Why: settings.* is tenant-scoped; every other channel needs {projectId, worktreeId} (PQ-04)
+    // and must not hit the network when the worktree has no addressable project.
+    if (!TENANT_SCOPED_METHODS.has(method)) {
+      const selector = resolveCodeIntelSelector(useAppStore.getState(), worktreeId)
+      if (selector.state === 'unsupported') {
+        throw new LocalCodeIntelError('unsupported', `[code-intel] ${selector.reason}`)
+      }
+      if (opts.environmentId === undefined) {
+        environmentId = selector.environmentId
+      }
+      finalParams = {
+        ...(finalParams as Record<string, unknown>),
+        projectId: selector.projectId,
+        worktreeId: selector.worktreeId
+      }
+    }
 
-    const response = await bridge.call({
-      environmentId: opts.environmentId,
-      method,
-      params: params ?? {}
-    })
+    checkArgSizeBytes(method, finalParams)
+
+    const response = await bridge.call({ environmentId, method, params: finalParams })
 
     return response
   }
 
-  function triggerConnectivityPollIfOffline(error: CodeIntelRpcError): void {
-    if (error.kind === 'offline') {
+  function triggerConnectivityPollIfOffline(
+    error: CodeIntelRpcError,
+    environmentId: string | null | undefined
+  ): void {
+    if (error.kind === 'offline' && environmentId) {
       // Trigger connectivity poll via store action
       const store = useAppStore.getState()
       if (typeof store.maybeTriggerConnectivityPollAfterRpcFailure === 'function') {
         store.maybeTriggerConnectivityPollAfterRpcFailure(
           new Error(error.message),
-          'environment'
+          { kind: 'environment', environmentId }
         )
       }
     }
   }
 
   return {
-    async call(worktreeId, method, params, opts) {
+    async call(worktreeId, rawMethod, params, opts) {
+      const method = toCodeIntelMethod(rawMethod)
       try {
-        const response = await rawCall(method, params, opts)
+        const response = await rawCall(worktreeId, method, params, opts)
 
         if (opts.signal?.aborted) {
           // Signal aborted — drop result
@@ -246,7 +265,7 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
 
         if (!response.ok) {
           const error = classifyCodeIntelError(response)
-          triggerConnectivityPollIfOffline(error)
+          triggerConnectivityPollIfOffline(error, opts.environmentId)
           return { ok: false, error }
         }
 
@@ -256,18 +275,19 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
           return { ok: false, error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false } }
         }
         const error = classifyCodeIntelError(err)
-        triggerConnectivityPollIfOffline(error)
+        triggerConnectivityPollIfOffline(error, opts.environmentId)
         return { ok: false, error }
       }
     },
 
-    async callEnvelope(worktreeId, method, params, parseData, opts) {
-      if (NO_ENVELOPE_METHODS.has(method)) {
+    async callEnvelope(worktreeId, rawMethod, params, parseData, opts) {
+      const method = toCodeIntelMethod(rawMethod)
+      if (!CODE_INTEL_ENVELOPE_METHODS.has(method)) {
         throw new Error(`[code-intel] ${method} does not return an envelope — use call()`)
       }
 
       try {
-        const response = await rawCall(method, params, opts)
+        const response = await rawCall(worktreeId, method, params, opts)
 
         if (opts.signal?.aborted) {
           return { ok: false, error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false } }
@@ -275,7 +295,7 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
 
         if (!response.ok) {
           const error = classifyCodeIntelError(response)
-          triggerConnectivityPollIfOffline(error)
+          triggerConnectivityPollIfOffline(error, opts.environmentId)
           return { ok: false, error }
         }
 
@@ -286,7 +306,7 @@ export function createCodeIntelClient(bridge: CodeIntelBridgeApi): CodeIntelClie
           return { ok: false, error: { kind: 'unknown', code: null, message: 'aborted', data: null, retryable: false } }
         }
         const error = classifyCodeIntelError(err)
-        triggerConnectivityPollIfOffline(error)
+        triggerConnectivityPollIfOffline(error, opts.environmentId)
         return { ok: false, error }
       }
     }

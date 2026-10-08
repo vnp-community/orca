@@ -40,6 +40,7 @@ type ControllerInput = {
   initialFilter: MobileDiffReviewQueueFilter
   initialTarget: MobileDiffReviewInitialTarget | null
   onOpenSession: () => void
+  onOpenReviewSummary?: () => void
   onReconnect: (hostId: string) => void | Promise<void>
 }
 
@@ -285,6 +286,7 @@ export function useMobileDiffReviewController(input: ControllerInput) {
     client,
     connState,
     worktreeId,
+    onOpenReviewSummary: input.onOpenReviewSummary,
     prSidebarBranch,
     prSidebarHeadSha,
     actionError,

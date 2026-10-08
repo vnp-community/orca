@@ -5,7 +5,7 @@
 **Area:** frontend / editor hooks
 **File:** `frontend/src/renderer/src/components/editor/quality-annotations/useQualityFindingMarkers.ts`, `quality-annotation-notice.ts` (mới); `frontend/src/renderer/src/hooks/useQualityFindingsForFile.ts` (mới) và `*.test.ts(x)`
 **Depends on:** 087-09, 087-02, 087-03
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: useQualityFindingMarkers.test.tsx + useQualityFindingsForFile.test.tsx + quality-glyph-decorations.test.ts, 18/18 pass; oxlint + tsc sạch)
 
 ## Context
 
@@ -31,3 +31,7 @@ Editor/model giả (`setModelMarkers`, `createDecorationsCollection`, `onDidChan
 ## Rủi ro
 
 - Tương tác với view zone của `useDiffCommentDecorator` (đẩy dòng): marker theo dòng model nên không ảnh hưởng, chưa kiểm chứng bằng chạy thật.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Owner marker `orca-quality`; xoá khi nội dung đổi, dọn khi gỡ/đổi model. Glyph tách ra `quality-glyph-decorations.ts`. Chưa kiểm chứng trên Monaco thật: `glyphMargin` mặc định, F8, `onMouseDown` glyph trong `DiffEditor` (chỉ test bằng editor giả).

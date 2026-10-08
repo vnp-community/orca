@@ -5,7 +5,7 @@
 **Area:** frontend / tests
 **File:** `frontend/src/renderer/src/components/quality-charts/__tests__/quality-token-contrast.test.ts` (mới), `quality-token-parity.test.ts` (mới), `frontend/src/renderer/src/test-support/css-color-resolution.ts` (mới; hàm thuần giải `var()`, `color-mix` srgb, `oklch`, hex → sRGB và tính tỉ lệ WCAG)
 **Depends on:** FE-CV-TASK-088-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: css-color-resolution 5/5, quality-token-contrast 42/42, quality-token-parity 3/3)
 
 ## Context
 
@@ -40,3 +40,7 @@
 
 - Giải `color-mix` bằng sRGB tự viết có thể lệch trình duyệt ±0,01-0,02 (không tiền nhân alpha, làm tròn); coi là gần đúng, không thay kiểm tay.
 - Đường dẫn `theme.css` phụ thuộc pnpm; nếu `require.resolve` không chạy trong vitest node thì dùng đường dẫn từ `process.cwd()` kèm `existsSync` và `it.skip` có thông báo (không im lặng).
+
+## Ghi chú triển khai (2026-10-07)
+
+Lệch: không đọc `tailwindcss/theme.css` (token dùng oklch trực tiếp, `css-color-resolution.ts` giải hex/rgb/oklch/color-mix/var từ `main.css`). `color-mix` nội suy sRGB không tiền nhân; tối bậc 3 đang có biên mỏng (cảnh báo qua console.warn, không fail). Chưa thử thay token xấu một lần ngoài khẳng định âm trên `muted`.

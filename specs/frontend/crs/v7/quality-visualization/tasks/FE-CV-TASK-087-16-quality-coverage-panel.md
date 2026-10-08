@@ -5,7 +5,7 @@
 **Area:** frontend / components (pha 2)
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityCoveragePanel.tsx` (mới) và `*.test.tsx`; đăng ký khối ở `quality-lens-blocks.ts`
 **Depends on:** 087-15, FE-CV-TASK-088-07, 088-08
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 13 test pass, components/review-map/quality/QualityCoveragePanel.test.tsx; kèm QualityCoverageUncoveredList + quality-coverage-uncovered-files)
 
 ## Context
 
@@ -32,3 +32,11 @@ Ma trận `measured|estimated` × `diff null|có` × `partial`; `total=0`; bấm
 ## Rủi ro
 
 - Hiệu năng 400 ô trong Electron chưa đo.
+
+## Ghi chú triển khai (2026-10-07)
+
+- **Đơn vị:** ngưỡng và `pct` là tỉ lệ 0..1 (D5) -> vạch gauge qua `toPercent` (test: 0.8 -> `left: 80%`). Gauge vẫn tính từ `covered/changedExecutable`.
+- **`diff:null`, `changedExecutable<=0`, `report:null`:** khung rỗng có lý do (`diff.reason`/`reason` của backend), không vẽ gauge nên không bao giờ ra 0%. `report:null` có nút "Chạy kiểm tra" chỉ khi `profile.definition.coverage.required` và có profile được chọn; nút gọi `startQualityRun(worktree, {profile, scope:'changed'})`.
+- **Danh sách "Dòng chưa phủ":** `CoverageFile.uncoveredRanges` không nói là dòng đã đổi, nên tiêu đề ghi trung thực "Lines not covered" (không phải "đã đổi chưa phủ"); top 20 tệp theo số dòng chưa phủ, tối đa 20 khoảng mỗi tệp, bấm mở `onOpenDiff(path, từ dòng)`.
+- `estimated`: câu cảnh báo + `estimatedNote` thành chữ; `measured`: "Measured coverage". `partial`, `excludedFiles` (gập), `dirty`, `X/Y` khi `truncated` đều có test.
+- Panel `export default` và named; đăng ký lazy ở `quality-lens-blocks.ts` do lead làm. Hiệu năng 400 ô trong Electron chưa đo.

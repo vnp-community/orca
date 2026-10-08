@@ -19,7 +19,14 @@ import { Button } from '../ui/button'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { useTaskPermission } from '../../hooks/useTaskPermission'
 import { toast } from 'sonner'
+import { translate } from '@/i18n/i18n'
 import { Tracers } from '../../../../shared/trace/tracers'
+import { useTaskReadiness } from '../../hooks/useTaskReadiness'
+import { useExecutionResult } from '../../hooks/useExecutionResult'
+import { ReadinessBadge } from '../request/readiness/ReadinessBadge'
+import { ReadinessReportSheet } from '../request/readiness/ReadinessReportSheet'
+import { isRunBlockedByReadiness } from '../request/readiness/readiness-action-rules'
+import { ExecutionResultPanel } from '../request/execution/ExecutionResultPanel'
 import type { OrcaTask, TaskPriority, TaskStatus } from '../../../../shared/task-types'
 
 // Right-panel detail view for active task
@@ -28,7 +35,6 @@ import type { OrcaTask, TaskPriority, TaskStatus } from '../../../../shared/task
 
 const TASK_STATUSES: OrcaTask['status'][] = [
   'open',
-  'backlog',
   'todo',
   'in_progress',
   'review',
@@ -46,7 +52,7 @@ export function TaskDetail() {
   const setActiveWorkspaceTab = useAppStore((s) => s.setActiveWorkspaceTab)
   const [openingInGit, setOpeningInGit] = useState(false)
   const [localTitle, setLocalTitle] = useState(task?.title ?? '')
-  const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'ai' | 'comments' | 'access'>(
+  const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'ai' | 'comments' | 'access' | 'result'>(
     'details'
   )
   // Polling fallback (FE-TASK-003) — no push channel for task activity exists yet, see
@@ -94,6 +100,14 @@ export function TaskDetail() {
   // khi đã CÓ bằng chứng dương tính (myLevel resolved) rằng quyền không đủ.
   // Gọi trước early-return `if (!task)` bên dưới — Rules of Hooks, cùng pattern useTaskActivity ở trên.
   const currentUserId = useAppStore((s) => s.currentUser?.id)
+  // Set by the Request Plan tab when this task's Plan/Phase is not approved yet.
+  const executionGate = useAppStore((s) => s.executionGateByTaskId?.[activeTaskId ?? ''])
+  // Why: readiness and structured results only exist for tasks created by a Request.
+  const requestOwned = Boolean(task?.requestId)
+  const readinessApi = useTaskReadiness({ requestId: task?.requestId ?? null, taskId: requestOwned ? task?.id : undefined })
+  const execApi = useExecutionResult(requestOwned ? (task?.id ?? null) : null, task?.requestId ?? null)
+  const [readinessOpen, setReadinessOpen] = useState(false)
+  const readinessBlocked = isRunBlockedByReadiness(readinessApi.report, readinessApi.status !== 'unsupported')
   const { level: myLevel, isSupported: permissionSupported } = useTaskPermission(
     task?.id ?? '',
     currentUserId
@@ -206,13 +220,34 @@ export function TaskDetail() {
       {/* Action Buttons */}
       <div className="flex gap-2 mt-2 items-center">
         <ExecutionEngineBadge task={task} />
+        {requestOwned && (
+          <ReadinessBadge report={readinessApi.report} onOpen={() => setReadinessOpen(true)} />
+        )}
+        {requestOwned && readinessApi.status !== 'unsupported' && (
+          <Button variant="outline" size="sm" onClick={() => setReadinessOpen(true)} data-testid="check-readiness-btn">
+            {translate('auto.components.request.readiness.check', 'Check readiness')}
+          </Button>
+        )}
         <TaskSourceBadge taskId={task.id} />
         <AttachWorkflowTemplateAction task={task} />
         {canExecute && (
           <Button
             variant="default"
             onClick={handleRunAgent}
-            disabled={isRunning}
+            disabled={isRunning || !!executionGate || readinessBlocked}
+            title={
+              executionGate
+                ? translate(
+                    'auto.components.task.TaskDetail.phaseNotApproved',
+                    'Approve the Phase or Plan before running this task'
+                  )
+                : readinessBlocked
+                  ? translate(
+                      'auto.components.request.readiness.runBlocked',
+                      'This task is not ready yet. Open the readiness report for details.'
+                    )
+                  : undefined
+            }
             data-testid="run-agent-btn"
           >
             {isRunning ? '⏳ Agent running…' : '▶ Execute with Agent'}
@@ -242,7 +277,7 @@ export function TaskDetail() {
       <Tabs
         value={activeTab}
         onValueChange={(v) =>
-          setActiveTab(v as 'details' | 'subtasks' | 'ai' | 'comments' | 'access')
+          setActiveTab(v as 'details' | 'subtasks' | 'ai' | 'comments' | 'access' | 'result')
         }
         className="mt-4"
       >
@@ -252,6 +287,11 @@ export function TaskDetail() {
           <TabsTrigger value="ai">AI Agent</TabsTrigger>
           <TabsTrigger value="comments">Comments</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
+          {requestOwned && execApi.status !== 'unsupported' && (
+            <TabsTrigger value="result">
+              {translate('auto.components.request.execution.tab', 'Result')}
+            </TabsTrigger>
+          )}
         </TabsList>
         <TabsContent value="details">
           {/* Status, Priority, Type, Progress fields */}
@@ -332,7 +372,23 @@ export function TaskDetail() {
         <TabsContent value="access">
           <TaskGrantModal taskId={task.id} />
         </TabsContent>
+        {requestOwned && execApi.status !== 'unsupported' && (
+          <TabsContent value="result">
+            <ExecutionResultPanel taskId={task.id} requestId={task.requestId} execution={execApi} />
+          </TabsContent>
+        )}
       </Tabs>
+      {requestOwned && (
+        <ReadinessReportSheet
+          open={readinessOpen}
+          onOpenChange={setReadinessOpen}
+          report={readinessApi.report}
+          requestId={task.requestId}
+          canWrite={canExecute}
+          hasDevServer={Boolean(task.worktreeId)}
+          onCheck={() => readinessApi.check(task.id)}
+        />
+      )}
     </div>
   )
 }

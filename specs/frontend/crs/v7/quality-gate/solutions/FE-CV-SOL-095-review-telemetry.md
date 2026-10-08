@@ -1,6 +1,6 @@
 # FE-CV-SOL-095-review-telemetry: Telemetry hiệu quả của Review và cổng chất lượng (chỉ enum/khoảng)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ việc ĐỌC code và hợp đồng v7; chưa chạy test hay ứng dụng.
+> Trạng thái (2026-10-07): 5/7 task DONE, 2 PARTIAL, 0 BLOCKED, 0 TODO. Xem mục "Ghi chú triển khai" của từng task; code thật lệch spec ở các điểm đã ghi.
 
 **CR:** [CR-CV-095](../../../../../../docs/crs/v7/quality-gate/CR-CV-095-review-quality-telemetry.md) (phần frontend; số liệu server nằm ở `BE-CV-SOL-071-metrics-tracing-and-budgets`). Priority P2, Small.
 **Area:** frontend + các bản sao `shared/` ngoài `frontend/` (cần chủ sở hữu từng gói duyệt)

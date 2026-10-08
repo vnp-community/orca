@@ -5,7 +5,7 @@
 **Area:** frontend / renderer lib + hooks
 **File:** `frontend/src/renderer/src/components/review-map/entry/open-review-entry.ts`, `useReviewEntryAvailability.ts`, `ReviewEntryButton.tsx` (mới) + test
 **Depends on:** FE-CV-SOL-050-review-tab-wiring (`ensureReviewTab`); FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelSupport`); FE-CV-SOL-051-review-workspace-shell (phạm vi mặc định O7, `setReviewLens`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: open-review-entry.test.ts + review-entry-availability.test.ts PASS; oxlint/tsc sạch)
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - Phụ thuộc `ensureReviewTab` của SOL-050; thiếu thì không điểm vào nào chạy.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Lệch spec: (1) `useReviewEntryAvailability` chỉ đọc `codeIntelSupportState` trong store (không tự thăm dò) nên thêm `useReviewEntryProbe.ts` (gọi `useCodeIntelSupport`, gắn một lần ở right sidebar `index.tsx`) — trước đó không nơi nào gọi `useCodeIntelSupport`; (2) `openReviewFromEntryPoint` không tự đặt phạm vi: shell tự phân giải mặc định (O7) khi `scope===null`; `ReviewEntryButton.tsx` có nhưng chưa nơi nào dùng (các điểm vào dùng nút nội tuyến theo layout); (3) thêm `reviewed-turn-memory.ts` (ghi lượt đã mở Review cho chấm "chưa review").

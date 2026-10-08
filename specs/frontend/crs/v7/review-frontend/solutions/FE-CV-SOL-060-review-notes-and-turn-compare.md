@@ -1,6 +1,6 @@
 # FE-CV-SOL-060: Ghi chú review gắn nút đồ thị, gửi theo lô cho agent, so sánh lượt trước/lượt này
 
-> 📋 Proposed. Chưa triển khai. Priority P1 (đợt 5). Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 5/8 task DONE (060-01, 02, 04, 05, 06), 3 PARTIAL (W6 2026-10-07: dock, nút ghi chú (symbol/ERD), recorder và switcher đã mount; còn lại 060-03 thiếu huy hiệu xyflow, 060-07 chỉ ghi khi tab mount; 060-08 chưa nối lớp phủ và thiếu e2e). Viết ngày 2026-10-06.
 
 **CR:** [CR-CV-060](../../../../../../docs/crs/v7/review-frontend/CR-CV-060-review-notes-send-to-agent-and-turn-compare.md)
 **Area:** frontend (`components/review-map/notes/`, `components/review-map/turns/`, `lib/`, slice)
@@ -142,3 +142,16 @@ Hàm thuần: `review-note-anchor`, `review-sent-batch` (trần), `turn-file-ide
 ## 9. Tham chiếu
 
 `/opt/repos/orca/docs/crs/v7/review-frontend/CR-CV-060-review-notes-send-to-agent-and-turn-compare.md`, `/opt/repos/orca/docs/research/view-code/10-frontend-review-ux.md` (§6.5–6.6), `/opt/repos/orca/frontend/src/renderer/src/components/editor/DiffNotesSendMenu.tsx`, `NotesSendMenu.tsx`, `/opt/repos/orca/frontend/src/renderer/src/store/slices/diffComments.ts`, `agent-status.ts`, `ui.ts`, `/opt/repos/orca/mobile/src/session/mobile-diff-review-queue.ts`.
+
+## 14. Ghi chú triển khai (2026-10-07)
+
+**Sai lệch so với spec**
+
+- Đã chạy `gitnexus impact`: `markAnnotationsSentBestEffort` LOW (1 caller trực tiếp), `DiffNotesSendMenu` HIGH (3 caller trực tiếp), `clearDeliveredDiffComments` LOW và không đổi. `DiffNotesSendMenu.tsx` chỉ xoá hàm riêng tư và import `lib/annotation-mark-sent-best-effort.ts`; thêm test hồi quy `components/editor/DiffNotesSendMenu.test.tsx`.
+- Không thêm `reviewNotesState/reviewTurnsState` vào slice `code-intel`: dòng (base,head) đi qua `patchReviewState` của slice `review-progress` (writer 052); dòng `('','')` (turnMarkers) đi qua `turns/review-turn-marker-row.ts` (tuần tự theo worktree). Hook `useReviewNotesPersistence` gộp lại notes bị slice 052 ghi đè khi xung đột.
+- `CODEINTEL_PAYLOAD_TOO_LARGE` ánh xạ thành `too-large` (sửa 1 dòng `review-shell-data.ts`); hook thu nhỏ còn 250 mục rồi thử lại một lần.
+- Lô đã gửi: `turnId/targetPaneKey/agentType = null` vì `NotesSendMenu.onDelivered` không báo pane đích. Thứ tự: ghi lô → `clearDeliveredDiffComments` → `markAnnotationsSent` (chỉ scope all).
+- "Agent xong" dùng `detectAgentTurnCompletions` có sẵn (SOL-061-01 chưa có). `useReviewTurnRecorder` chưa được mount (khung của agent khác).
+- `ReviewNotesPanel`, `ReviewNodeNoteBadge`, `ReviewTurnSwitcher` chưa được gắn vào khung/lens; `ReviewNoteButton` đã gắn ở chi tiết Hợp đồng (059) và dòng Phát hiện. Lớp phủ lượt: switcher phát `onCompare(TurnCompareResult)`, chưa nối `review-overlay-model.ts`.
+- Neo `ReviewNoteAnchor` không có `at` ⇒ gộp neo theo commentId: local thắng. Phím `n` cài cục bộ (prop `hotkey`), chưa qua registry 052.
+- Khoá i18n: `auto.components.reviewMap.ReviewNote.*`, `.ReviewSent.*`, `.ReviewTurn.*`; test phủ khoá `i18n/contract-findings-notes-locale-coverage.test.ts`. Chưa có e2e `review-notes.web.e2e.ts`.

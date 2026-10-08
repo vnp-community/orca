@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/source-control-quality-gate-view-model.ts` (mới) + `.test.ts`
 **Depends on:** FE-CV-TASK-085-01; kiểu `QualityGate` từ FE-CV-SOL-050-types-and-runtime-bridge
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 15 tests)
 
 ## Context
 
@@ -32,3 +32,7 @@
 ## Rủi ro
 
 - Mã lý do chưa đủ (backend có thể thêm).
+
+## Ghi chú triển khai (2026-10-07)
+
+View-model dùng `{visible, severity, ...}` thay vì `{kind}` của spec; không nhận `error/timedOut/running` (hook xử lý bên ngoài).

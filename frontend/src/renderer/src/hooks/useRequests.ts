@@ -26,6 +26,8 @@ type UseRequestsResult = {
   requests: OrcaRequest[]
   isLoading: boolean
   error: string | null
+  /** True once the first fetch for the current filters has settled (avoids an empty-state flash). */
+  hasLoaded: boolean
   nextPageToken: string | null
   nextPage: () => void
   refetch: () => void
@@ -38,6 +40,7 @@ export function useRequests(filters: RequestListFilters = {}): UseRequestsResult
 
   const [requests, setRequests] = useState<OrcaRequest[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [nextPageToken, setNextPageToken] = useState<string | null>(null)
   const [refetchTrigger, setRefetchTrigger] = useState(0)
@@ -59,19 +62,20 @@ export function useRequests(filters: RequestListFilters = {}): UseRequestsResult
     if (filtersKeyRef.current !== filtersKey) {
       filtersKeyRef.current = filtersKey
       setRequests([])
+      setHasLoaded(false)
       setPageTokens([])
       setNextPageToken(null)
     }
   }, [filtersKey])
 
   useEffect(() => {
-    if (requestFlowSupport === 'unsupported') return
+    if (requestFlowSupport === 'unsupported') {return}
 
     let cancelled = false
     setIsLoading(true)
     setError(null)
 
-    const currentPageToken = pageTokens[pageTokens.length - 1]
+    const currentPageToken = pageTokens.at(-1)
 
     callRequestRpc<{ requests: unknown[]; nextPageToken?: string }>(
       REQUEST_RPC_METHODS.LIST,
@@ -81,8 +85,9 @@ export function useRequests(filters: RequestListFilters = {}): UseRequestsResult
         ...(currentPageToken ? { pageToken: currentPageToken } : {})
       }
     ).then((result) => {
-      if (cancelled) return
+      if (cancelled) {return}
       setIsLoading(false)
+      setHasLoaded(true)
 
       if (!result.ok) {
         setError(result.error.kind)
@@ -113,6 +118,7 @@ export function useRequests(filters: RequestListFilters = {}): UseRequestsResult
   return {
     requests,
     isLoading,
+    hasLoaded,
     error,
     nextPageToken,
     nextPage,

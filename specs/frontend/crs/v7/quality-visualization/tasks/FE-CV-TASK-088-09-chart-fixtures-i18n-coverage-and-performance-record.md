@@ -5,7 +5,7 @@
 **Area:** frontend / test-support + i18n
 **File:** `frontend/src/renderer/src/test-support/quality-chart-fixtures.ts` (mới), `frontend/src/renderer/src/i18n/code-intel-quality-locale-coverage.test.ts` (mới), `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa; khoá `auto.components.qualityCharts.*`), `frontend/src/renderer/src/components/quality-charts/__tests__/quality-chart-performance.test.ts` (mới)
 **Depends on:** FE-CV-TASK-088-03 đến 088-08
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: code-intel-quality-locale-coverage 11/11, quality-chart-performance 5/5; full quality-charts suite 25 files / 165 tests PASS)
 
 ## Context
 
@@ -40,3 +40,7 @@
 
 - Test thời gian trong happy-dom dễ nhiễu CI: ngưỡng ×5 và có thể đánh dấu để bỏ qua khi `process.env.CI` đặt tải thấp (không `skip` im lặng; ghi lý do).
 - Bản dịch máy cho 4 locale cần người đọc duyệt.
+
+## Ghi chú triển khai (2026-10-07)
+
+Ghi nhận hiệu năng (happy-dom, ngưỡng x5): squarify(400) 0,99 ms; DSM(150) 1,01 ms; render đầu treemap(400) 225,5 ms (sát ngân sách 250 ms nhưng gồm khởi động lạnh), heatmap 60,9 ms, matrix(60 nút/218 cạnh) 99,6 ms. i18n: 78 khoá `auto.components.qualityCharts.*` ở 5 locale (bản dịch 4 locale cần người đọc duyệt; ngoại lệ trùng tiếng Anh: es severity.error, es/ko treemap.tileLabel). Quyết định A1 (tự viết SVG, không dependency) ghi ở SOL-088 mục 2.1; chưa có PR nên chưa ghi vào mô tả PR. Playwright (P2) không làm. Không dependency mới.

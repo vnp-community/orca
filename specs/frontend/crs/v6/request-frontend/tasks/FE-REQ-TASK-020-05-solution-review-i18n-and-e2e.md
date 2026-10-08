@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + e2e
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `frontend/src/renderer/src/i18n/request-locale-coverage.test.ts` (sửa), `tests/e2e/request-solution-review.spec.ts` (mới), `docs/ui/pages/requests.md` (sửa)
 **Depends on:** FE-REQ-TASK-020-02 đến 020-04
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — khoá i18n + test phủ khoá xanh (solution-locale-coverage.test.ts); e2e `tests/e2e/request-solution-review.spec.ts` chỉ là khung `test.skip` CHƯA CHẠY/CHƯA viết thân; `docs/ui/pages/requests.md` chưa tồn tại nên chưa cập nhật
 
 ## Context
 
@@ -36,3 +36,8 @@
 
 - Thứ tự `choose` → `approve` có thể đổi khi CONTRACT ra (xem 020-04): test e2e sửa theo.
 - Bản dịch cần người bản ngữ review.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `request-locale-coverage.test.ts` tự quét khoá; hiện chỉ đỏ vì khoá của 019/021 (không phải 020).
+- Còn lại: viết thân e2e (cần backend/mock WS), cập nhật tài liệu trang khi 019 tạo file.

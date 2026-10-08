@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Why: the right sidebar owns activity-bar visibility, routing, and resize behavior as one interaction surface; splitting the tab table away would make hidden-tab fallbacks harder to audit. */
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Plug, Files, GitBranch, ListChecks, PanelRight, Workflow } from 'lucide-react'
+import { Plug, Files, GitBranch, ListChecks, PanelRight, ScanSearch, Workflow } from 'lucide-react'
 import { useAppStore } from '@/store'
 import type { ActiveRightSidebarTab } from '@/store/slices/editor'
 import { useRepoById } from '@/store/selectors'
@@ -38,6 +38,10 @@ import {
   computeMaxRightSidebarPanelWidth
 } from './right-sidebar-width'
 import { translate } from '@/i18n/i18n'
+import { useReviewEntryProbe } from '@/components/review-map/entry/useReviewEntryProbe'
+import { useAgentTurnCompletions } from '@/components/review-map/entry/useAgentTurnCompletions'
+import { useReviewedTurnId } from '@/components/review-map/entry/reviewed-turn-memory'
+import { hasUnreviewedCompletion } from '@/components/review-map/entry/agent-turn-completion'
 import { RightSidebarPanelContent } from './right-sidebar-panel-content'
 import { useMeasuredWidth } from './right-sidebar-measured-width'
 import { normalizeRightSidebarRoute } from '@/store/right-sidebar-route'
@@ -71,6 +75,17 @@ function RightSidebarInner(): React.JSX.Element {
   const toggleRightSidebar = useAppStore((s) => s.toggleRightSidebar)
   const checksStatus = useAppStore((s) => (s.rightSidebarOpen ? getActiveChecksStatus(s) : null))
   const activityBarPosition = useAppStore((s) => s.activityBarPosition)
+  // Why: the Review tab and its entry points need the code-intel flag even with the sidebar closed.
+  useReviewEntryProbe()
+  const codeIntelEnabled = useAppStore((s) => s.codeIntelSupportState?.state === 'enabled')
+  const reviewWorktreeId = useAppStore((s) => s.activeWorktreeId)
+  const reviewCompletions = useAgentTurnCompletions(reviewWorktreeId)
+  const reviewedTurnId = useReviewedTurnId(reviewWorktreeId)
+  const reviewAttention =
+    codeIntelEnabled && hasUnreviewedCompletion(reviewCompletions, reviewedTurnId)
+  const reviewAttentionLabel = reviewAttention
+    ? translate('auto.components.reviewMap.EntryButton.unreviewed', 'agent finished, not reviewed')
+    : null
   const setActivityBarPosition = useAppStore((s) => s.setActivityBarPosition)
   const [topActivityStripWidth, setTopActivityStripWidth] = useState<number | null>(null)
   const activeWorktreeId = useAppStore((s) => (rightSidebarOpen ? s.activeWorktreeId : null))
@@ -131,6 +146,14 @@ function RightSidebarInner(): React.JSX.Element {
         gitOnly: true
       },
       {
+        id: 'review',
+        icon: ScanSearch,
+        title: translate('auto.components.reviewMap.ReviewSummaryPanel.title', 'Review'),
+        shortcut: '',
+        gitOnly: true,
+        codeIntelOnly: true
+      },
+      {
         id: 'ports',
         icon: Plug,
         title: translate('auto.components.right.sidebar.index.441733b630', 'Ports'),
@@ -146,9 +169,10 @@ function RightSidebarInner(): React.JSX.Element {
       getVisibleRightSidebarActivityItems(activityItems, {
         isFolder,
         isFolderWorkspace,
-        isSshRepo
+        isSshRepo,
+        codeIntelEnabled
       }),
-    [activityItems, isFolder, isFolderWorkspace, isSshRepo]
+    [activityItems, codeIntelEnabled, isFolder, isFolderWorkspace, isSshRepo]
   )
 
   const rememberedFolderTabByWorkspaceKeyRef = useRef<Record<string, ActiveRightSidebarTab>>({})
@@ -245,6 +269,7 @@ function RightSidebarInner(): React.JSX.Element {
       onClick={() => selectActivityTab(item.id)}
       layout="side"
       statusIndicator={item.id === 'checks' ? checksStatus : null}
+                      attentionLabel={item.id === 'review' ? reviewAttentionLabel : null}
     />
   ))
 
@@ -323,6 +348,7 @@ function RightSidebarInner(): React.JSX.Element {
                               onClick={() => selectActivityTab(item.id)}
                               layout="top"
                               statusIndicator={item.id === 'checks' ? checksStatus : null}
+                      attentionLabel={item.id === 'review' ? reviewAttentionLabel : null}
                             />
                           ))}
                         </div>
@@ -332,6 +358,7 @@ function RightSidebarInner(): React.JSX.Element {
                             activeTab={effectiveTab}
                             onSelect={selectActivityTab}
                             checksStatus={checksStatus}
+                            reviewAttention={reviewAttention}
                           />
                         )}
                       </div>
@@ -380,6 +407,7 @@ function RightSidebarInner(): React.JSX.Element {
                           onClick={() => selectActivityTab(item.id)}
                           layout="top"
                           statusIndicator={item.id === 'checks' ? checksStatus : null}
+                      attentionLabel={item.id === 'review' ? reviewAttentionLabel : null}
                         />
                       ))}
                     </div>
@@ -389,6 +417,7 @@ function RightSidebarInner(): React.JSX.Element {
                         activeTab={effectiveTab}
                         onSelect={selectActivityTab}
                         checksStatus={checksStatus}
+                            reviewAttention={reviewAttention}
                       />
                     )}
                   </div>

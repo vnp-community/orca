@@ -5,7 +5,9 @@
 **Area:** frontend / task
 **File:** `frontend/src/shared/task-hierarchy.ts` (mới), `frontend/src/renderer/src/hooks/useTasks.ts` (sửa: dòng 63, 78), `components/task/TaskGraph.tsx` (sửa), `components/task/TaskTreeView.tsx` (sửa), `components/task/TaskCard.tsx` (sửa); test `task-hierarchy.test.ts`, `hooks/useTasks.test.ts`, `components/task/__tests__/{TaskTreeView,TaskBoardView,TaskDAGView,TaskGraph,TaskCard}.test.tsx`
 **Depends on:** FE-REQ-TASK-018-06 (`TaskType` `plan|phase`, `OrcaTask.requestId`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest src/shared/task-hierarchy (22 tests, cycle test fixed), hooks/useTasks-planning, components/task/__tests__ (TaskCard-plan-path) pass; oxlint+tsc clean on touched files)
+
+**Ghi chú:** `hidePlanningTasks` trong `shared/task-hierarchy.ts` gán `parentId` hiệu dụng + `planPath` (TaskWithPlanPath) một chỗ ở `useTasks`; TaskGraph có công tắc `TaskGraph.showPlanning` (chỉ hiện khi `hasPlanningTasks`), batch bỏ Plan/Phase. Test Board/DAG riêng cho công tắc không viết: cả 3 view nhận cùng `filteredTasks` nên test ở hook. Rà `tasks.filter/allTasks` ở thống kê/thông báo chưa làm. GitNexus impact: useTasks, TaskTreeView, TaskGraph, TaskCard đều LOW.
 
 ## Context
 

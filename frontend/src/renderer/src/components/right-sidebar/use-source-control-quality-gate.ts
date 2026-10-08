@@ -1,60 +1,78 @@
 /**
  * use-source-control-quality-gate.ts — FE-CV-TASK-085-03
  *
- * Hook for the Source Control panel quality gate notice.
- * Manages loading the quality gate result, refresh on HEAD change,
- * push event subscription, display timer (3 s), and runChecks action.
+ * Loads the quality gate for the Source Control notice. Informational only:
+ * it never blocks commit / create-PR, and fails closed (no RPC) when the
+ * quality flag is off or the worktree has no projectId.
  *
  * @module components/right-sidebar/use-source-control-quality-gate
  */
 
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAppStore } from '@/store'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { ensureReviewTab } from '@/lib/ensure-review-tab'
 import { useQualityFeatureFlags } from '../../hooks/useQualityFeatureFlags'
+import { getCodeIntelClient } from '../../runtime/code-intel-client'
+import { subscribeCodeIntelEvents } from '../../lib/code-intel-event-bus'
+import { trackQualityGateViewed } from '../../lib/review-telemetry'
+import { CODE_INTEL_RPC_METHODS } from '../../../../shared/code-intel-rpc-methods'
 import { buildQualityNoticeViewModel } from './source-control-quality-gate-view-model'
-import type { QualityGateNoticeViewModel } from './source-control-quality-gate-view-model'
-import type { QualityGate } from '../../../../shared/code-intel-quality-types'
-
-// ---------------------------------------------------------------------------
-// Input
-// ---------------------------------------------------------------------------
+import type {
+  QualityGate,
+  QualityGateNoticeViewModel
+} from './source-control-quality-gate-view-model'
 
 export type UseSourceControlQualityGateOpts = {
   worktreeId: string
   projectId: string | null | undefined
   headOid: string | null
-  /** Base commit for comparison */
+  /** Base ref for comparison */
   base?: string | null
 }
 
-// ---------------------------------------------------------------------------
-// Output
-// ---------------------------------------------------------------------------
-
 export type UseSourceControlQualityGateResult = {
-  /** View model ready for rendering; null = not visible */
+  /** `{ visible: false }` when the notice must not render */
   viewModel: QualityGateNoticeViewModel
-  /** Trigger quality scan run */
   runChecks: () => void
-  /** Open the Review tab with quality lens */
   openReason: (checkName: string) => void
   isLoading: boolean
   timedOut: boolean
+  running: boolean
+  /** Verdict for telemetry; 'none' when no gate result is known. */
+  verdict: 'pass' | 'warn' | 'fail' | 'unknown' | 'none'
+  reasonCount: number
 }
 
-// ---------------------------------------------------------------------------
-// Error kind classification for silent hide
-// ---------------------------------------------------------------------------
-
+// Why: these kinds mean "feature not available here"; the notice hides silently, no toast.
 const SILENT_HIDE_KINDS = new Set([
-  'disabled', 'unsupported', 'forbidden', 'unknown', 'quality_running'
+  'disabled',
+  'quality-disabled',
+  'unsupported',
+  'forbidden',
+  'no-binding',
+  'not-found'
 ])
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
-
 const DEBOUNCE_MS = 400
+// Display-only timeout: the RPC is NOT cancelled so a late result still lands.
 const DISPLAY_TIMEOUT_MS = 3000
+const RETRY_DELAY_MS = 3000
+const MAX_RETRY_MS = 90_000
+
+function readEnvironmentId(worktreeId: string): string | null {
+  return getRuntimeEnvironmentIdForWorktree(useAppStore.getState(), worktreeId)
+}
+
+function pickGate(result: unknown): QualityGate | null {
+  const gate = (result as { gate?: unknown } | null)?.gate
+  return gate && typeof gate === 'object' && typeof (gate as QualityGate).result === 'string'
+    ? (gate as QualityGate)
+    : null
+}
+
+// One quality_gate_viewed per (worktree, HEAD) per session; keeps the event count per turn low.
+const viewedGateKeys = new Set<string>()
 
 export function useSourceControlQualityGate({
   worktreeId,
@@ -63,124 +81,208 @@ export function useSourceControlQualityGate({
   base
 }: UseSourceControlQualityGateOpts): UseSourceControlQualityGateResult {
   const flags = useQualityFeatureFlags()
+  const visible = flags.quality && Boolean(worktreeId) && Boolean(projectId)
 
   const [gate, setGate] = useState<QualityGate | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [running, setRunning] = useState(false)
 
-  const abortRef = useRef<AbortController | null>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const displayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // visible = flags.quality && worktreeId && projectId
-  const visible = flags.quality && Boolean(worktreeId) && Boolean(projectId)
-
-  const fetchGate = useCallback(async (signal: AbortSignal) => {
-    if (!visible || !worktreeId || !projectId) return
-
-    setIsLoading(true)
-    setTimedOut(false)
-
-    // Display timer: 3s → timedOut
-    displayTimerRef.current = setTimeout(() => {
-      setTimedOut(true)
-    }, DISPLAY_TIMEOUT_MS)
-
-    try {
-      // In a real implementation, this calls the code-intel client.
-      // We use a stub here that is overridden in tests.
-      const result = await loadQualityGate({ worktreeId, projectId, base: base ?? null, signal })
-      if (signal.aborted) return
-      setGate(result)
-    } catch (err: unknown) {
-      if (signal.aborted) return
-      // Classify error kind — SILENT_HIDE_KINDS are hidden without toast
-      const kindMsg = err instanceof Error ? err.message : ''
-      const isSilent = Array.from(SILENT_HIDE_KINDS).some((k) => kindMsg.includes(k))
-      if (!isSilent) {
-        // Non-silent errors: show stale/unknown gate
-        setGate((prev) => prev ? { ...prev, stale: true } : null)
-      }
-    } finally {
-      if (!signal.aborted) {
-        setIsLoading(false)
-        if (displayTimerRef.current) clearTimeout(displayTimerRef.current)
-      }
-    }
-  }, [visible, worktreeId, projectId, base])
-
-  // Reload when headOid changes (debounced)
   useEffect(() => {
     if (!visible) {
       setGate(null)
+      setFailed(false)
+      setTimedOut(false)
+      setIsLoading(false)
       return
     }
-
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    abortRef.current?.abort()
     const ctrl = new AbortController()
-    abortRef.current = ctrl
+    let debounce: ReturnType<typeof setTimeout> | null = null
+    let displayTimer: ReturnType<typeof setTimeout> | null = null
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-    debounceRef.current = setTimeout(() => {
-      void fetchGate(ctrl.signal)
-    }, DEBOUNCE_MS)
+    const load = async (startedAt: number): Promise<void> => {
+      if (ctrl.signal.aborted) {
+        return
+      }
+      setIsLoading(true)
+      try {
+        const response = await getCodeIntelClient().call(
+          worktreeId,
+          CODE_INTEL_RPC_METHODS.QUALITY_GATE,
+          { projectId, worktreeId, ...(base ? { base } : {}) },
+          { environmentId: readEnvironmentId(worktreeId), signal: ctrl.signal }
+        )
+        if (ctrl.signal.aborted) {
+          return
+        }
+        if (response.ok) {
+          setGate(pickGate(response.result))
+          setFailed(false)
+        } else if (SILENT_HIDE_KINDS.has(response.error.kind)) {
+          setGate(null)
+          setFailed(false)
+        } else if (
+          response.error.message?.includes('inProgress') &&
+          Date.now() - startedAt < MAX_RETRY_MS
+        ) {
+          retryTimer = setTimeout(() => void load(startedAt), RETRY_DELAY_MS)
+          return
+        } else {
+          // Keep the last gate but mark it stale; with none, show "unknown".
+          setGate((prev) => (prev ? { ...prev, stale: true } : null))
+          setFailed(true)
+        }
+      } catch {
+        if (!ctrl.signal.aborted) {
+          setFailed(true)
+        }
+      }
+      if (!ctrl.signal.aborted) {
+        setIsLoading(false)
+        setTimedOut(false)
+        if (displayTimer) {
+          clearTimeout(displayTimer)
+        }
+      }
+    }
+
+    const schedule = (immediate: boolean): void => {
+      if (debounce) {
+        clearTimeout(debounce)
+      }
+      if (displayTimer) {
+        clearTimeout(displayTimer)
+      }
+      setTimedOut(false)
+      displayTimer = setTimeout(() => setTimedOut(true), DISPLAY_TIMEOUT_MS)
+      debounce = setTimeout(() => void load(Date.now()), immediate ? 0 : DEBOUNCE_MS)
+    }
+    schedule(false)
+
+    const unsubscribe = subscribeCodeIntelEvents((event) => {
+      if (event.worktreeId !== worktreeId) {
+        return
+      }
+      if (event.event === 'gateChanged' || event.event === 'qualityFinished') {
+        if (event.event === 'qualityFinished') {
+          setRunning(false)
+        }
+        schedule(true)
+      }
+    })
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') {
+        schedule(true)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
 
     return () => {
       ctrl.abort()
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      if (displayTimerRef.current) clearTimeout(displayTimerRef.current)
+      unsubscribe()
+      document.removeEventListener('visibilitychange', onVisible)
+      for (const timer of [debounce, displayTimer, retryTimer]) {
+        if (timer) {
+          clearTimeout(timer)
+        }
+      }
     }
-  }, [visible, headOid, fetchGate])
+  }, [visible, worktreeId, projectId, headOid, base])
+
+  useEffect(() => {
+    if (!visible || !gate) {
+      return
+    }
+    const key = `${worktreeId}:${headOid ?? ''}`
+    if (viewedGateKeys.has(key)) {
+      return
+    }
+    viewedGateKeys.add(key)
+    trackQualityGateViewed({
+      verdict: gate.result === 'pass' || gate.result === 'warn' || gate.result === 'fail' ? gate.result : 'unknown',
+      reasonCount: gate.reasons.length,
+      stale: gate.stale === true,
+      surface: 'source_control',
+      source: 'local'
+    })
+  }, [visible, gate, worktreeId, headOid])
 
   const runChecks = useCallback(() => {
-    if (!visible || !worktreeId || !projectId) return
-    // Profile check + quality.start with scope 'changed'
-    void startQualityRun({ worktreeId, projectId })
-  }, [visible, worktreeId, projectId])
+    if (!visible || running) {
+      return
+    }
+    setRunning(true)
+    void (async () => {
+      try {
+        const client = getCodeIntelClient()
+        const opts = { environmentId: readEnvironmentId(worktreeId) }
+        const profileResponse = await client.call(
+          worktreeId,
+          CODE_INTEL_RPC_METHODS.QUALITY_PROFILE_GET,
+          { projectId, worktreeId },
+          opts
+        )
+        const profiles = profileResponse.ok
+          ? ((profileResponse.result as { runnableProfiles?: { name: string; ready?: boolean; heavy?: boolean }[] })
+              .runnableProfiles ?? [])
+          : []
+        const chosen = profiles.find((p) => p.ready !== false && !p.heavy)
+        if (!chosen) {
+          setRunning(false)
+          return
+        }
+        const started = await client.call(
+          worktreeId,
+          CODE_INTEL_RPC_METHODS.QUALITY_START,
+          { projectId, worktreeId, profile: chosen.name, scope: 'changed' },
+          opts
+        )
+        // Why: errors (env not ready, run in progress) are reflected by the next gate load, not a toast.
+        if (!started.ok) {
+          setRunning(false)
+        }
+      } catch {
+        setRunning(false)
+      }
+    })()
+  }, [visible, running, worktreeId, projectId])
 
-  const openReason = useCallback((_checkName: string) => {
-    if (!worktreeId) return
-    // Open Review tab with quality lens
-    openReviewFromEntryPoint(worktreeId, 'source-control', { lens: 'quality' })
-  }, [worktreeId])
+  const openReason = useCallback(
+    (_checkName: string) => {
+      if (worktreeId) {
+        // Why: the 'quality' lens may not be registered yet; opening Review without a lens is the fallback.
+        ensureReviewTab(worktreeId)
+      }
+    },
+    [worktreeId]
+  )
 
-  const viewModel = buildQualityNoticeViewModel(gate)
+  const viewModel = useMemo<QualityGateNoticeViewModel>(() => {
+    if (!visible) {
+      return { visible: false }
+    }
+    if (!gate && !timedOut && !failed) {
+      return { visible: false }
+    }
+    return buildQualityNoticeViewModel(gate)
+  }, [visible, gate, timedOut, failed])
 
-  return { viewModel, runChecks, openReason, isLoading, timedOut }
-}
+  const verdict: UseSourceControlQualityGateResult['verdict'] = !gate
+    ? 'none'
+    : gate.result === 'pass' || gate.result === 'warn' || gate.result === 'fail'
+      ? gate.result
+      : 'unknown'
 
-// ---------------------------------------------------------------------------
-// Injectable stubs (overridden in tests via vi.mock)
-// ---------------------------------------------------------------------------
-
-/**
- * Load the quality gate from the code-intel client.
- * Injected at runtime — tests should mock this module.
- */
-export async function loadQualityGate(_opts: {
-  worktreeId: string
-  projectId: string
-  base: string | null
-  signal: AbortSignal
-}): Promise<QualityGate | null> {
-  // Real implementation delegates to getCodeIntelClient().call(...)
-  // Resolved by FE-CV-TASK-050-07 (code-intel-client) + wiring in 085-04
-  throw new Error('loadQualityGate: not wired (requires code-intel-client init)')
-}
-
-export async function startQualityRun(_opts: {
-  worktreeId: string
-  projectId: string
-}): Promise<void> {
-  // Resolved by 087-02 store action + code-intel-client
-  throw new Error('startQualityRun: not wired')
-}
-
-export function openReviewFromEntryPoint(
-  _worktreeId: string,
-  _source: string,
-  _opts: { lens?: string }
-): void {
-  // Resolved by FE-CV-SOL-061 (entry points wiring)
-  // No-op stub until 061 is implemented
+  return {
+    viewModel,
+    runChecks,
+    openReason,
+    isLoading,
+    timedOut,
+    running,
+    verdict,
+    reasonCount: gate?.reasons.length ?? 0
+  }
 }

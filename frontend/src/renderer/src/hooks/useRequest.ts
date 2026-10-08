@@ -47,9 +47,9 @@ export function useRequest(id: string | null): UseRequestResult {
 
     Promise.all([
       callRequestRpc<unknown>(REQUEST_RPC_METHODS.GET, { id }),
-      callRequestRpc<{ entries: unknown[] }>(REQUEST_RPC_METHODS.TYPE_HISTORY, { id })
+      callRequestRpc<{ entries?: unknown[]; changes?: unknown[] }>(REQUEST_RPC_METHODS.TYPE_HISTORY, { id })
     ]).then(([requestResult, historyResult]) => {
-      if (cancelled) return
+      if (cancelled) {return}
       setIsLoading(false)
 
       if (!requestResult.ok) {
@@ -57,12 +57,16 @@ export function useRequest(id: string | null): UseRequestResult {
         return
       }
 
-      const parsed = parseRequest(requestResult.value)
+      // Why: CONTRACT wraps the entity as {request}; the earlier draft returned it bare.
+      const rawRequest = (requestResult.value as { request?: unknown } | null)?.request ?? requestResult.value
+      const parsed = parseRequest(rawRequest)
       setRequest(parsed)
       upsertRequests([parsed])
 
       if (historyResult.ok) {
-        setHistory((historyResult.value.entries ?? []).map(parseRequestTypeHistoryEntry))
+        setHistory(
+          (historyResult.value.changes ?? historyResult.value.entries ?? []).map(parseRequestTypeHistoryEntry)
+        )
       }
     })
 

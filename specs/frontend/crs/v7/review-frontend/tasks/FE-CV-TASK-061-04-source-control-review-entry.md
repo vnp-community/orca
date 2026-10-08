@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/right-sidebar/source-control-review-entry.tsx` (mới) + test; `source-control-header-toolbar.tsx`, `source-control-header-overflow-menu.tsx`, `source-control-branch-context-row.tsx`, `SourceControl.tsx` (sửa nhỏ)
 **Depends on:** FE-CV-TASK-061-01, 061-02
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: source-control-review-entry.test.tsx PASS; right-sidebar suite chỉ còn lỗi sẵn có FileExplorer.test; oxlint/tsc sạch)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Thanh công cụ có thể chật; kiểm mắt.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Lệch spec: hook `useSourceControlReviewEntry` được gọi trong `SourceControlHeaderToolbar` (prop mới `reviewWorktreeId`) thay vì trong `SourceControl.tsx` (hook muộn trong component lớn có nguy cơ sau early return); `SourceControl.tsx` chỉ thêm 1 dòng prop. Nút ở hàng nhánh chỉ khi `summary.changedFiles>0`; mục menu tràn luôn hiện khi cờ bật.

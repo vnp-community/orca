@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + hooks + shared types
 **File:** `frontend/src/shared/types.ts` (`RightSidebarTab`), `store/right-sidebar-route.ts` (+test), `components/right-sidebar/{index.tsx,activity-bar-buttons.tsx,right-sidebar-panel-content.tsx,right-sidebar-activity-visibility.ts(+test),activity-bar-overflow.ts}` (sửa); `components/right-sidebar/ReviewSummaryPanel.tsx`, `components/review-map/entry/useCodeIntelReviewSummary.ts` (mới) + test
 **Depends on:** FE-CV-TASK-061-01, 061-02; FE-CV-SOL-051-review-workspace-shell (`IndexFreshnessChip`, trạng thái chuẩn); FE-CV-SOL-052 (tiến độ); fake backend G4
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: ReviewSummaryPanel.test.tsx + review-summary-model.test.ts + right-sidebar/review-tab-visibility.test.ts PASS; oxlint/tsc sạch)
 
 ## Context
 
@@ -32,3 +32,7 @@
 ## Rủi ro
 
 - Khoá `totalCounts` chưa chốt; lan union sang lưu phiên.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Lệch spec: (1) đếm "phát hiện" lấy từ `overlay.violations` (không gọi kênh `findings` riêng — tránh thêm 1 round-trip; `nextPageToken`/"N+" chưa có); (2) bỏ `IndexFreshnessChip` (cần `IndexStatusView`), hiện `indexFreshness.state` dạng chữ; (3) chấm "chưa review" dùng `reviewed-turn-memory` (cấp phiên, không lưu); (4) `desktop/src/shared/types.ts` cũng thêm `'review'` vào `RightSidebarTab`. Chưa kiểm bằng mắt, chưa test `ActivityBarButton` chấm/overflow bằng render.

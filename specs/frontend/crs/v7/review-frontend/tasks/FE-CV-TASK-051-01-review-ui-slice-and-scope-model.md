@@ -5,7 +5,7 @@
 **Area:** frontend / store + review-map
 **File:** `store/slices/review-ui.ts` (mới), `components/review-map/review-scope-model.ts` (mới), `store/index.ts`, `store/types.ts`, `store-test-helpers.ts`, tests
 **Depends on:** FE-CV-TASK-050-10
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — scope model + slice + 3 leak tests pass; NOT done: item 3 (fetch `git.branchCompare` via runtime-git-client when no summary: the shell only reads `gitBranchCompareSummaryByWorktree` or falls back to `worktree.baseRef`)
 
 ## Context
 

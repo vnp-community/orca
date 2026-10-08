@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `components/tab-group/TabGroupPanel.tsx`, `useTabGroupWorkspaceModel.ts`, `useTabDragSplit.ts`, `tab-drag-preview-activation.ts`, `components/tab-bar/TabBar.tsx`, `group-tab-order.ts`, `reconcile-order.ts` (đọc), `components/review-map/ReviewTabHost.tsx`, `ReviewTabUnavailableNotice.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-050-16, FE-CV-TASK-050-12, FE-CV-TASK-050-20
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — TabBar/TabGroupPanel/model/drag/group-tab-order/reconcile wired for review (ScanSearch via EditorFileTab language review); ReviewTabHost is W1-D shell; only pure-function tests added (review-tab-wiring.test 7 pass), no TabBar/TabGroupPanel render test
 
 ## Context
 

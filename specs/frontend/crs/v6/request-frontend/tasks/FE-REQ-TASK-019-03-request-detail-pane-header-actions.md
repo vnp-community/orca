@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/components/request/RequestDetailPane.tsx`, `RequestDetailHeader.tsx`, `RequestStageTimeline.tsx`, `RequestOverviewTab.tsx`, `RequestBacklogBanner.tsx`, `ReturnToBacklogDialog.tsx`, `CancelRequestDialog.tsx` (đều mới); test cùng tên
 **Depends on:** FE-REQ-TASK-018-03, 018-05, 019-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: RequestDetailPane.test.tsx 11 tests + request-action-rules.test.ts pass)
 
 ## Context
 

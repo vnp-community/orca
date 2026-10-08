@@ -1,6 +1,6 @@
 # FE-CV-SOL-093-ai-summary-panel: Thẻ "Tóm tắt do AI suy luận" (mặc định tắt)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ việc ĐỌC code `frontend/src` và hợp đồng v7; chưa chạy test hay ứng dụng.
+> Trạng thái (2026-10-07): 5/6 task DONE, 1 PARTIAL, 0 BLOCKED, 0 TODO. Xem mục "Ghi chú triển khai" của từng task; code thật lệch spec ở các điểm đã ghi.
 
 **CR:** [CR-CV-093](../../../../../../docs/crs/v7/quality-gate/CR-CV-093-ai-review-summary.md) (phần frontend; backend `BE-CV-SOL-093-ai-review-summary`). Priority P2, O13.
 **Area:** frontend (`components/review-map/ai-summary/`)

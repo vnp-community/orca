@@ -5,7 +5,7 @@
 **Area:** frontend / request / i18n / tests
 **File:** `frontend/src/renderer/src/components/request/RequestDetailHeader.tsx` (sửa, FE-REQ-TASK-019-03); `components/request/plan/PlanSummaryHeader.tsx` (sửa, 021-03); `components/request/RequestGraphSheet.tsx` (mới); `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa); `frontend/src/renderer/src/i18n/graph-locale-coverage.test.ts` (mới); `tests/e2e/request-graph.spec.ts` (mới); `docs/ui/pages/requests.md` (sửa, tạo ở 018-05)
 **Depends on:** FE-REQ-TASK-032-01, 032-05, 032-06; FE-REQ-TASK-019-03 (header), 021-03 (tab Plan), 021-05
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — vitest graph-locale-coverage (12) pass; điểm vào + docs xong — thiếu: e2e chạy thật, phân tích bundle, `verify:localization-*`
 
 ## Context
 
@@ -71,3 +71,7 @@
 - `verify:localization-catalog` có thể đòi tạo danh mục băm cho chuỗi mới; kiểm lệnh thật trước khi tin vào bước 6.
 - Bản dịch máy chưa kiểm cho `ja`, `ko`, `zh`, `es` có thể sai thuật ngữ rủi ro; nhờ người duyệt.
 - E2E dùng mock runtime có thể lệch so với backend thật; e2e thật cần CR-030 hoàn tất.
+
+## Ghi chú triển khai (2026-10-07)
+
+Đã làm: `RequestGraphSheet` (lazy), nút "Xem đồ thị" ở `RequestDetailHeader`, công tắc Cây|Đồ thị ở `PlanSummaryHeader`/`RequestPlanTab`, 77+ khoá i18n 5 locale, `docs/ui/pages/requests.md`, `tests/e2e/request-graph.spec.ts` (khung, skip như request-plan-tree). Chưa: chạy build/phân tích chunk, `pnpm run verify:localization-catalog` (script `audit-localization-coverage.mjs` không tồn tại trong repo này). Nút "Xem đồ thị" hiện khi luồng Request `supported`; subject mặc định `plan` nếu có `planTaskId`, ngược lại `solution_option` với id Request (chưa lấy Solution mới nhất).

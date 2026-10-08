@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- Why: the Jira drawer co-locates preview,
    metadata edits, and comments so the task page has one full issue surface. */
 /* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: Jira issue hydration, comments, transitions, priorities, and user options are loaded from provider IPC for the selected issue. */
+import { CreateRequestIssueButton } from '@/components/request/CreateRequestIssueButton'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
@@ -433,6 +434,7 @@ export default function JiraIssueWorkspace({
                     {displayed.title}
                   </h2>
                 </div>
+                <CreateRequestIssueButton issue={displayed} />
                 <Button
                   onClick={() => onUse(displayed)}
                   className="hidden shrink-0 gap-2 sm:inline-flex"
@@ -770,6 +772,9 @@ export default function JiraIssueWorkspace({
               </div>
 
               <aside className="border-t border-border/50 bg-muted/20 px-3 py-3 xl:border-l xl:border-t-0">
+                <div className="mb-3 sm:hidden">
+                  <CreateRequestIssueButton issue={displayed} />
+                </div>
                 <Button
                   onClick={() => onUse(displayed)}
                   className="mb-3 w-full justify-center gap-2 sm:hidden"

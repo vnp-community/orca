@@ -1,175 +1,46 @@
 /**
  * code-intel-parsers.ts — FE-CV-TASK-050-03
  *
- * Error codes, error kind classification, envelope parsing, and
- * push-event parsing for the code-intelligence protocol.
+ * Envelope and push-event parsing for the code-intelligence protocol; also re-exports the error
+ * code/kind table (code-intel-error-codes) and the status parser (code-intel-index-status-parser).
  *
  * Invariants:
- *  - Never throws (all parse paths have safe defaults)
- *  - JSON suffix >2 KiB or malformed → data: null
- *  - Unknown CODEINTEL_* codes kept as-is with kind 'unknown'
- *  - IndexStatus.overall values are uppercase (PQ-32)
+ *  - Parsers never throw except parseCodeIntelEnvelope on a non-object (caller bug)
+ *  - Unknown enum values become 'unknown'; unknown push events are dropped (null)
  *
  * @module shared/code-intel-parsers
  */
 
-import type {
-  CodeIntelEnvelope,
-  IndexStatus,
-  IndexOverall,
-  CodeIntelPushEvent
-} from './code-intel-types'
+import type { CodeIntelEnvelope, EnvelopeSource, CodeIntelPushEvent } from './code-intel-types'
 import { CODE_INTEL_PUSH_EVENTS } from './code-intel-rpc-methods'
 
-// ---------------------------------------------------------------------------
-// §2.3 Error codes
-// ---------------------------------------------------------------------------
-
-export const CODE_INTEL_ERROR_CODES = {
-  DISABLED: 'CODEINTEL_DISABLED',
-  UNAVAILABLE: 'CODEINTEL_UNAVAILABLE',
-  RATE_LIMITED: 'CODEINTEL_RATE_LIMITED',
-  NOT_AUTHORIZED: 'CODEINTEL_NOT_AUTHORIZED',
-  WORKTREE_NOT_FOUND: 'CODEINTEL_WORKTREE_NOT_FOUND',
-  INDEX_STALE: 'CODEINTEL_INDEX_STALE',
-  INDEX_NOT_READY: 'CODEINTEL_INDEX_NOT_READY',
-  INDEX_ERROR: 'CODEINTEL_INDEX_ERROR',
-  VALIDATION: 'CODEINTEL_VALIDATION',
-  PAYLOAD_TOO_LARGE: 'CODEINTEL_PAYLOAD_TOO_LARGE',
-  CONFLICT: 'CODEINTEL_CONFLICT',
-  NOT_FOUND: 'CODEINTEL_NOT_FOUND',
-  FINDING_ALREADY_WAIVED: 'CODEINTEL_FINDING_ALREADY_WAIVED',
-  QUALITY_RUN_ALREADY_RUNNING: 'CODEINTEL_QUALITY_RUN_ALREADY_RUNNING',
-  QUALITY_PROFILE_INVALID: 'CODEINTEL_QUALITY_PROFILE_INVALID',
-  COVERAGE_NOT_AVAILABLE: 'CODEINTEL_COVERAGE_NOT_AVAILABLE',
-  TREND_NOT_AVAILABLE: 'CODEINTEL_TREND_NOT_AVAILABLE',
-  SECURITY_SCAN_ALREADY_RUNNING: 'CODEINTEL_SECURITY_SCAN_ALREADY_RUNNING',
-  CONTRACT_DIFF_NOT_AVAILABLE: 'CODEINTEL_CONTRACT_DIFF_NOT_AVAILABLE',
-  C4_INVALID: 'CODEINTEL_C4_INVALID',
-  CHECKLIST_INVALID: 'CODEINTEL_CHECKLIST_INVALID',
-  COMMENT_NOT_FOUND: 'CODEINTEL_COMMENT_NOT_FOUND',
-  APPROVE_NOT_ALLOWED: 'CODEINTEL_APPROVE_NOT_ALLOWED',
-  BIND_REPO_CONFLICT: 'CODEINTEL_BIND_REPO_CONFLICT',
-  IMPACT_QUERY_TIMEOUT: 'CODEINTEL_IMPACT_QUERY_TIMEOUT',
-  HOTSPOT_NOT_AVAILABLE: 'CODEINTEL_HOTSPOT_NOT_AVAILABLE',
-} as const
-
-export type CodeIntelErrorCode = (typeof CODE_INTEL_ERROR_CODES)[keyof typeof CODE_INTEL_ERROR_CODES]
-
-/** Broad kind used for routing: what do we tell the UI? */
-export type CodeIntelErrorKind =
-  | 'unsupported'
-  | 'disabled'
-  | 'forbidden'
-  | 'offline'
-  | 'rate_limited'
-  | 'not_found'
-  | 'validation'
-  | 'payload_too_large'
-  | 'conflict'
-  | 'stale'
-  | 'not_ready'
-  | 'quality_running'
-  | 'security_running'
-  | 'unknown'
-
-/** 26 values — all members of CodeIntelErrorKind */
-const ALL_ERROR_KINDS: CodeIntelErrorKind[] = [
-  'unsupported', 'disabled', 'forbidden', 'offline', 'rate_limited',
-  'not_found', 'validation', 'payload_too_large', 'conflict', 'stale',
-  'not_ready', 'quality_running', 'security_running', 'unknown'
-]
-export { ALL_ERROR_KINDS }
-
-const CODE_TO_KIND: Partial<Record<string, CodeIntelErrorKind>> = {
-  [CODE_INTEL_ERROR_CODES.DISABLED]: 'disabled',
-  [CODE_INTEL_ERROR_CODES.UNAVAILABLE]: 'offline',
-  [CODE_INTEL_ERROR_CODES.RATE_LIMITED]: 'rate_limited',
-  [CODE_INTEL_ERROR_CODES.NOT_AUTHORIZED]: 'forbidden',
-  [CODE_INTEL_ERROR_CODES.WORKTREE_NOT_FOUND]: 'not_found',
-  [CODE_INTEL_ERROR_CODES.INDEX_STALE]: 'stale',
-  [CODE_INTEL_ERROR_CODES.INDEX_NOT_READY]: 'not_ready',
-  [CODE_INTEL_ERROR_CODES.INDEX_ERROR]: 'unknown',
-  [CODE_INTEL_ERROR_CODES.VALIDATION]: 'validation',
-  [CODE_INTEL_ERROR_CODES.PAYLOAD_TOO_LARGE]: 'payload_too_large',
-  [CODE_INTEL_ERROR_CODES.CONFLICT]: 'conflict',
-  [CODE_INTEL_ERROR_CODES.NOT_FOUND]: 'not_found',
-  [CODE_INTEL_ERROR_CODES.FINDING_ALREADY_WAIVED]: 'conflict',
-  [CODE_INTEL_ERROR_CODES.QUALITY_RUN_ALREADY_RUNNING]: 'quality_running',
-  [CODE_INTEL_ERROR_CODES.QUALITY_PROFILE_INVALID]: 'validation',
-  [CODE_INTEL_ERROR_CODES.COVERAGE_NOT_AVAILABLE]: 'unknown',
-  [CODE_INTEL_ERROR_CODES.TREND_NOT_AVAILABLE]: 'unknown',
-  [CODE_INTEL_ERROR_CODES.SECURITY_SCAN_ALREADY_RUNNING]: 'security_running',
-  [CODE_INTEL_ERROR_CODES.CONTRACT_DIFF_NOT_AVAILABLE]: 'unknown',
-  [CODE_INTEL_ERROR_CODES.C4_INVALID]: 'validation',
-  [CODE_INTEL_ERROR_CODES.CHECKLIST_INVALID]: 'validation',
-  [CODE_INTEL_ERROR_CODES.COMMENT_NOT_FOUND]: 'not_found',
-  [CODE_INTEL_ERROR_CODES.APPROVE_NOT_ALLOWED]: 'forbidden',
-  [CODE_INTEL_ERROR_CODES.BIND_REPO_CONFLICT]: 'conflict',
-  [CODE_INTEL_ERROR_CODES.IMPACT_QUERY_TIMEOUT]: 'unknown',
-  [CODE_INTEL_ERROR_CODES.HOTSPOT_NOT_AVAILABLE]: 'unknown',
-  // RPC-level codes
-  method_not_found: 'unsupported',
-  forbidden: 'forbidden',
-  // connectivity
-  connection_refused: 'offline',
-  timeout: 'offline',
-  network_error: 'offline',
-}
-
-export const CODE_INTEL_ERROR_KIND_BY_CODE: Readonly<Record<string, CodeIntelErrorKind>> =
-  CODE_TO_KIND as Record<string, CodeIntelErrorKind>
+export * from './code-intel-error-codes'
+export * from './code-intel-index-status-parser'
 
 // ---------------------------------------------------------------------------
-// §2.3 Error message parser
+// §2.2 Envelope parser
 // ---------------------------------------------------------------------------
 
-const MAX_DATA_BYTES = 2 * 1024 // 2 KiB cap
-
-export type ParsedCodeIntelError = {
-  code: string | null
-  text: string
-  data: Record<string, unknown> | null
+function parseEnvelopeSource(raw: unknown): EnvelopeSource | null {
+  if (typeof raw !== 'object' || raw === null) {
+    return null
+  }
+  const r = raw as Record<string, unknown>
+  if (r.tool !== 'gitnexus' && r.tool !== 'codegraph') {
+    return null
+  }
+  return {
+    tool: r.tool,
+    version: typeof r.version === 'string' ? r.version : '',
+    indexedAt: typeof r.indexedAt === 'string' ? r.indexedAt : null,
+    commit: typeof r.commit === 'string' ? r.commit : null,
+    ...(r.lineBase === 1 ? { lineBase: 1 as const } : {})
+  }
 }
 
 /**
- * Parse a code-intel error message that may embed a JSON suffix.
- * Format: "human text {\"json\":\"payload\"}"
- * Never throws.
- */
-export function parseCodeIntelErrorMessage(message: string): ParsedCodeIntelError {
-  const jsonStart = message.lastIndexOf('{')
-  if (jsonStart === -1) {
-    return { code: null, text: message.trim(), data: null }
-  }
-
-  const jsonPart = message.slice(jsonStart)
-  const textPart = message.slice(0, jsonStart).trim()
-
-  // Guard: skip parsing oversized payloads
-  if (new TextEncoder().encode(jsonPart).length > MAX_DATA_BYTES) {
-    return { code: null, text: textPart || message.trim(), data: null }
-  }
-
-  try {
-    const parsed = JSON.parse(jsonPart)
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return { code: null, text: textPart || message.trim(), data: null }
-    }
-    const code = typeof parsed.code === 'string' ? parsed.code : null
-    return { code, text: textPart || message.trim(), data: parsed as Record<string, unknown> }
-  } catch {
-    return { code: null, text: textPart || message.trim(), data: null }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// §4.2 Envelope parser
-// ---------------------------------------------------------------------------
-
-/**
- * Parse a raw code-intel envelope safely.
- * Unknown/missing fields use safe defaults (stale:false, truncated:false, etc.)
+ * Parse a raw envelope with safe defaults. A notModified envelope never calls parseData
+ * (the backend sends no data in that case).
  */
 export function parseCodeIntelEnvelope<T>(
   raw: unknown,
@@ -179,55 +50,25 @@ export function parseCodeIntelEnvelope<T>(
     throw new Error('[code-intel] unexpected non-object envelope')
   }
   const r = raw as Record<string, unknown>
+  const notModified = r.notModified === true
 
   return {
+    ...(typeof r.repo === 'string' ? { repo: r.repo } : {}),
     worktreeId: typeof r.worktreeId === 'string' ? r.worktreeId : '',
     view: typeof r.view === 'string' ? r.view : '',
-    sources: Array.isArray(r.sources) ? (r.sources as string[]) : [],
+    sources: Array.isArray(r.sources)
+      ? r.sources.map(parseEnvelopeSource).filter((s): s is EnvelopeSource => s !== null)
+      : [],
     headCommit: typeof r.headCommit === 'string' ? r.headCommit : null,
     stale: r.stale === true,
     truncated: r.truncated === true,
     totalCount: typeof r.totalCount === 'number' ? r.totalCount : 0,
-    etag: typeof r.etag === 'string' ? r.etag : null,
-    notModified: r.notModified === true,
-    data: r.notModified ? undefined : parseData(r.data)
-  }
-}
-
-// ---------------------------------------------------------------------------
-// §4.3 IndexStatus parser
-// ---------------------------------------------------------------------------
-
-const VALID_OVERALL: Set<string> = new Set(['READY', 'INDEXING', 'PARTIAL', 'ERROR', 'UNKNOWN'])
-
-export function parseIndexStatus(raw: unknown): IndexStatus {
-  if (typeof raw !== 'object' || raw === null) {
-    return {
-      worktreeId: '',
-      overall: 'UNKNOWN',
-      lastIndexedAt: null,
-      fileCoverage: 0,
-      linesIndexed: 0,
-      running: false,
-      percent: null,
-      error: null
-    }
-  }
-  const r = raw as Record<string, unknown>
-  const rawOverall = typeof r.overall === 'string' ? r.overall.toUpperCase() : ''
-  const overall: IndexOverall = VALID_OVERALL.has(rawOverall)
-    ? (rawOverall as IndexOverall)
-    : 'UNKNOWN'
-
-  return {
-    worktreeId: typeof r.worktreeId === 'string' ? r.worktreeId : '',
-    overall,
-    lastIndexedAt: typeof r.lastIndexedAt === 'string' ? r.lastIndexedAt : null,
-    fileCoverage: typeof r.fileCoverage === 'number' ? r.fileCoverage : 0,
-    linesIndexed: typeof r.linesIndexed === 'number' ? r.linesIndexed : 0,
-    running: r.running === true,
-    percent: typeof r.percent === 'number' ? r.percent : null,
-    error: typeof r.error === 'string' ? r.error : null
+    etag: typeof r.etag === 'string' ? r.etag : '',
+    fromCache: r.fromCache === true,
+    generatedAt: typeof r.generatedAt === 'string' ? r.generatedAt : '',
+    ...(notModified ? { notModified: true as const } : {}),
+    ...(typeof r.nextPageToken === 'string' ? { nextPageToken: r.nextPageToken } : {}),
+    ...(notModified ? {} : { data: parseData(r.data) })
   }
 }
 
@@ -241,19 +82,56 @@ const PUSH_EVENT_NAMES = new Set<string>(CODE_INTEL_PUSH_EVENTS)
  * Parse a raw push frame.
  * Returns null for unknown/malformed events (caller should discard).
  */
+// Unrecognized reasons collapse to 'unknown' so consumers can switch exhaustively.
+const CHANGED_REASONS = new Set(['commit', 'file_save', 'branch_switch', 'reindex', 'manual'])
+
+// Contract §5 wire reasons -> internal reasons (resync is carried by `resync`).
+const WIRE_CHANGED_REASON: Record<string, 'commit' | 'file_save' | 'branch_switch' | 'reindex' | 'manual'> = {
+  index_changed: 'reindex',
+  reindex_finished: 'reindex',
+  head_changed: 'commit'
+}
+
+const FINISHED_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
+
+// Contract §5 wire names are dotted; internal names are camelCase.
+const WIRE_EVENT_ALIASES: Record<string, string> = {
+  'quality.progress': 'qualityProgress',
+  'quality.finished': 'qualityFinished',
+  'quality.gateChanged': 'gateChanged'
+}
+
+function normalizeWirePushFrame(r: Record<string, unknown>): Record<string, unknown> {
+  const alias = typeof r.event === 'string' ? WIRE_EVENT_ALIASES[r.event] : undefined
+  if (!alias) {
+    return r
+  }
+  const out: Record<string, unknown> = { ...r, event: alias }
+  if (alias === 'qualityFinished' && typeof r.status === 'string' && out.success === undefined) {
+    out.success = r.status === 'succeeded'
+    out.error = r.status === 'succeeded' ? null : (r.status as string)
+  }
+  if (alias === 'gateChanged' && out.gate === undefined && typeof r.verdict === 'string') {
+    out.gate = String(r.verdict).toLowerCase()
+  }
+  return out
+}
+
 export function parseCodeIntelPushEvent(raw: unknown): CodeIntelPushEvent | null {
-  if (typeof raw !== 'object' || raw === null) return null
-  const r = raw as Record<string, unknown>
+  if (typeof raw !== 'object' || raw === null) {return null}
+  const r = normalizeWirePushFrame(raw as Record<string, unknown>)
   const eventName = r.event
-  if (typeof eventName !== 'string' || !PUSH_EVENT_NAMES.has(eventName)) return null
+  if (typeof eventName !== 'string' || !PUSH_EVENT_NAMES.has(eventName)) {return null}
 
   switch (eventName) {
     case 'changed':
       return {
         event: 'changed',
         worktreeId: String(r.worktreeId ?? ''),
-        reason: typeof r.reason === 'string' ? (r.reason as 'commit' | 'file_save' | 'branch_switch' | 'reindex' | 'manual') : 'unknown',
-        resync: r.resync === true
+        reason: CHANGED_REASONS.has(r.reason as string)
+          ? (r.reason as 'commit' | 'file_save' | 'branch_switch' | 'reindex' | 'manual')
+          : (WIRE_CHANGED_REASON[r.reason as string] ?? 'unknown'),
+        resync: r.resync === true || r.reason === 'resync'
       }
     case 'reindexProgress':
       return {
@@ -268,7 +146,11 @@ export function parseCodeIntelPushEvent(raw: unknown): CodeIntelPushEvent | null
         worktreeId: String(r.worktreeId ?? ''),
         runId: String(r.runId ?? ''),
         percent: typeof r.percent === 'number' ? r.percent : null,
-        phase: typeof r.phase === 'string' ? (r.phase as 'collect' | 'analyze' | 'report') : 'unknown'
+        phase: typeof r.phase === 'string' ? (r.phase as 'collect' | 'analyze' | 'report') : 'unknown',
+        ...(typeof r.stage === 'string' ? { stage: r.stage } : {}),
+        ...(typeof r.stepIndex === 'number' ? { stepIndex: r.stepIndex } : {}),
+        ...(typeof r.stepCount === 'number' ? { stepCount: r.stepCount } : {}),
+        ...(typeof r.message === 'string' ? { message: r.message } : {})
       }
     case 'qualityFinished':
       return {
@@ -276,13 +158,24 @@ export function parseCodeIntelPushEvent(raw: unknown): CodeIntelPushEvent | null
         worktreeId: String(r.worktreeId ?? ''),
         runId: String(r.runId ?? ''),
         success: r.success === true,
-        error: typeof r.error === 'string' ? r.error : null
+        error: typeof r.error === 'string' ? r.error : null,
+        ...(FINISHED_STATUSES.has(r.status as string)
+          ? { status: r.status as 'succeeded' | 'failed' | 'cancelled' | 'interrupted' }
+          : {}),
+        ...(typeof r.headCommit === 'string' ? { headCommit: r.headCommit } : {})
       }
     case 'gateChanged':
       return {
         event: 'gateChanged',
         worktreeId: String(r.worktreeId ?? ''),
-        gate: typeof r.gate === 'string' ? (r.gate as 'pass' | 'warn' | 'fail' | 'unknown') : 'unknown'
+        gate: typeof r.gate === 'string' ? (r.gate as 'pass' | 'warn' | 'fail' | 'unknown') : 'unknown',
+        ...(typeof r.previousVerdict === 'string'
+          ? { previousVerdict: r.previousVerdict as 'pass' | 'warn' | 'fail' | 'unknown' }
+          : r.previousVerdict === null
+            ? { previousVerdict: null }
+            : {}),
+        ...(typeof r.headCommit === 'string' ? { headCommit: r.headCommit } : {}),
+        ...(typeof r.profile === 'string' ? { profile: r.profile } : {})
       }
     default:
       return null

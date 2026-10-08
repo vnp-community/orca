@@ -5,7 +5,7 @@
 **Area:** frontend / renderer lib
 **File:** `frontend/src/renderer/src/lib/annotation-mark-sent-best-effort.ts` (mới) + test; `frontend/src/renderer/src/components/editor/DiffNotesSendMenu.tsx` (sửa: chỉ import lại)
 **Depends on:** không (độc lập; làm trước 060-04)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: annotation-mark-sent-best-effort.test.ts 4/4 + DiffNotesSendMenu.test.tsx 3/3 + NotesSendMenu/ReviewNotesSendMenuContent PASS, tổng 35/35, tsc/oxlint sạch)
 
 ## Context
 
@@ -32,3 +32,9 @@
 ## Rủi ro
 
 - `DiffNotesSendMenu` có 3 nơi gọi (theo CR; chưa kiểm lại): sai import làm hỏng Source Control.
+
+## Ghi chú triển khai (2026-10-07)
+
+- GitNexus impact: `markAnnotationsSentBestEffort` = LOW (1 caller trực tiếp); `DiffNotesSendMenu` = HIGH (5 symbol bị ảnh hưởng, 3 caller trực tiếp). Thay đổi trong `DiffNotesSendMenu.tsx` chỉ là xoá hàm riêng tư và import lại; props/hành vi không đổi.
+- Trước đây `DiffNotesSendMenu` chưa có test: thêm `components/editor/DiffNotesSendMenu.test.tsx` (hồi quy: scope all/file, `clearDelivered`, `markSent` chỉ khi giao đúng toàn bộ scope all).
+- `clearDeliveredDiffComments` không đổi (impact LOW).

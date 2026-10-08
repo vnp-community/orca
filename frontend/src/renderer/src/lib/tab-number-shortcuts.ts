@@ -99,6 +99,12 @@ export function activateTabNumberShortcut(index: number): boolean {
     return true
   }
 
+  if (target.contentType === 'review') {
+    store.setActiveTab(target.id)
+    store.setActiveTabType('review')
+    return true
+  }
+
   store.setActiveFile(target.entityId)
   store.setActiveTabType('editor')
   return true

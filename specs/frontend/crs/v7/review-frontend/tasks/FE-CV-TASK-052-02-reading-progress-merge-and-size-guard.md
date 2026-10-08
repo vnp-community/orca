@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/reading-progress-merge.ts` (mới), test
 **Depends on:** FE-CV-TASK-050-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: reading-progress-merge.test 8 cases)
 
 ## Context
 

@@ -344,6 +344,11 @@
           "tab": {
             "372d21d428": "モバイルエミュレータ"
           }
+        },
+        "review": {
+          "tab": {
+            "title": "レビュー"
+          }
         }
       },
       "fix": {
@@ -698,7 +703,9 @@
         "devSearchKeywordToast": "toast",
         "devSearchKeywordSonner": "sonner",
         "devSearchKeywordError": "error",
-        "devSearchKeywordNotification": "notification"
+        "devSearchKeywordNotification": "notification",
+        "codeIntelTitle": "コードインテリジェンス",
+        "codeIntelDesc": "組織のコードレビューマップと品質ゲートのオン/オフを切り替えます。"
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "貼り付け内容が大きすぎます。"
@@ -6421,7 +6428,9 @@
           "2309068a6f": "破壊的な",
           "65358016ea": "破棄",
           "dev": "Dev Tools",
-          "devDescription": "Dev-only tools for exercising UI states."
+          "devDescription": "Dev-only tools for exercising UI states.",
+          "codeIntelTitle": "コードインテリジェンス",
+          "codeIntelDesc": "組織のコードレビューマップと品質ゲートのオン/オフを切り替えます。"
         },
         "SettingsFormControls": {
           "42a4d15a30": "一致するフォントがありません。",
@@ -12783,6 +12792,26 @@
         "GenerateAgentPromptButton": {
           "confirmReplace": "現在のプロンプトを生成されたものに置き換えますか?",
           "label": "AI で生成"
+        },
+        "TaskGraph": {
+          "showPlanning": "プラン/フェーズを表示"
+        },
+        "TaskDetail": {
+          "phaseNotApproved": "このタスクを実行する前にフェーズまたはプランを承認してください"
+        },
+        "TaskDAGView": {
+          "status": {
+            "done": "完了",
+            "in_progress": "進行中",
+            "blocked": "ブロック中",
+            "review": "レビュー中",
+            "open": "未着手",
+            "cancelled": "キャンセル"
+          }
+        },
+        "TaskBoardView": {
+          "backlogMoved": "未開始のタスクは リクエスト > バックログ にあります",
+          "openBacklog": "バックログを開く"
         }
       },
       "taskPageEmptyState": {
@@ -13038,7 +13067,8 @@
             "requests": "リクエスト",
             "approvals": "承認",
             "backlog": "バックログ"
-          }
+          },
+          "close": "リクエストページを閉じる"
         },
         "RequestUnsupportedNotice": {
           "title": "リクエスト管理は非対応です",
@@ -13047,6 +13077,2667 @@
         "SidebarRequestNavButton": {
           "label": "リクエスト",
           "badge": "承認待ち"
+        },
+        "RequestType": {
+          "bug": {
+            "label": "バグ",
+            "description": "不具合の修正が必要です。"
+          },
+          "task": {
+            "label": "タスク",
+            "description": "明確に定義された作業です。"
+          },
+          "docs": {
+            "label": "ドキュメント",
+            "description": "ドキュメントの作成・更新です。"
+          },
+          "question": {
+            "label": "質問",
+            "description": "コード変更ではなく回答が必要です。"
+          },
+          "hotfix": {
+            "label": "ホットフィックス",
+            "description": "緊急の本番修正を高速経路で行います。"
+          },
+          "security": {
+            "label": "セキュリティ",
+            "description": "セキュリティ上の問題または強化です。"
+          },
+          "ops_request": {
+            "label": "運用リクエスト",
+            "description": "運用またはインフラの変更です。"
+          },
+          "change_request": {
+            "label": "変更リクエスト",
+            "description": "機能または動作の変更です。"
+          },
+          "refactor": {
+            "label": "リファクタリング",
+            "description": "動作を変えずにコードを整理します。"
+          },
+          "spike": {
+            "label": "スパイク",
+            "description": "期間を区切った調査です。"
+          },
+          "performance": {
+            "label": "パフォーマンス",
+            "description": "速度やリソース使用量を改善します。"
+          },
+          "unknown": {
+            "label": "不明",
+            "description": "このバージョンでは認識できない種別です。"
+          }
+        },
+        "ApprovalStatus": {
+          "pending": "承認待ち",
+          "approved": "承認済み",
+          "rejected": "却下",
+          "expired": "期限切れ",
+          "unknown": "不明"
+        },
+        "RequestSource": {
+          "jira": "Jira",
+          "github": "GitHub",
+          "gitlab": "GitLab",
+          "linear": "Linear",
+          "mcp": "エージェント (MCP)",
+          "manual": "手動",
+          "webhook": "Webhook",
+          "unknown": "不明なソース"
+        },
+        "RequestPageHeader": {
+          "project": "プロジェクト",
+          "allProjects": "すべてのプロジェクト",
+          "createRequest": "リクエストを作成"
+        },
+        "error": {
+          "forbidden": "この操作を行う権限がありません。",
+          "notFound": "この項目は存在しません。",
+          "conflict": "他の人が変更しました。更新して再試行してください。",
+          "invalidState": "現在の状態ではこの操作はできません。",
+          "network": "ネットワークエラーです。接続を確認してください。",
+          "unavailable": "リクエストサービスは利用できません。しばらくしてから再試行してください。",
+          "rateLimited": "試行回数が多すぎます。少し待って再試行してください。",
+          "validation": "入力内容を確認して再試行してください。",
+          "unknown": "問題が発生しました。",
+          "retry": "再試行"
+        },
+        "AnswerView": {
+          "answer": "回答",
+          "citations": "引用"
+        },
+        "DiagnosisView": {
+          "rootCause": "根本原因",
+          "impact": "影響範囲",
+          "baseline": "測定したベースライン"
+        },
+        "FindingsView": {
+          "question": "調査課題",
+          "findings": "調査結果",
+          "sources": "情報源",
+          "conclusion": "結論"
+        },
+        "RejectReasonDialog": {
+          "title": "却下",
+          "description": "理由を入力してください。理由は記録され、チームに表示されます。",
+          "placeholder": "却下する理由は何ですか?",
+          "required": "理由が必要です({{min}}文字以上)。",
+          "regenerate": "このフィードバックをもとに再生成",
+          "cancel": "キャンセル",
+          "submit": "却下"
+        },
+        "RequestMarkdownContent": {
+          "viewFull": "全文を表示",
+          "fullTitle": "全内容"
+        },
+        "SolutionComparisonTable": {
+          "criterion": "基準",
+          "differs": "選択肢間で異なります",
+          "row": {
+            "summary": "概要",
+            "pros": "長所",
+            "cons": "短所",
+            "effort": "工数",
+            "risk": "リスク"
+          }
+        },
+        "SolutionDecisionBar": {
+          "accept": "承認する",
+          "approve": "承認",
+          "approveOption": "この案を承認",
+          "reject": "却下",
+          "alreadyDecided": "すでに決定済みです。",
+          "chooseOne": "承認する案を選択してください。",
+          "expired": "期限切れ",
+          "generatePlan": "計画を生成",
+          "noPermission": "承認する権限がありません",
+          "partial": "案は選択されましたが、まだ承認されていません。もう一度承認してください。"
+        },
+        "SolutionGenerationState": {
+          "analyzing": "AIがこのリクエストを分析しています",
+          "drafting": "AIが分析を作成しています",
+          "failed": "分析を生成できませんでした。",
+          "regenerate": "再生成"
+        },
+        "SolutionOptionCard": {
+          "chosen": "選択済み",
+          "cons": "短所",
+          "pros": "長所",
+          "effort": "工数",
+          "risk": "リスク",
+          "recommended": "推奨"
+        },
+        "SolutionOptionCompare": {
+          "cards": "カード",
+          "compare": "比較",
+          "needTwo": "2つ以上の案が必要です。",
+          "options": "選択肢"
+        },
+        "SolutionPanel": {
+          "banner": {
+            "awaitingApproval": "承認待ち",
+            "chosen": "承認済み",
+            "generating": "AIがこの分析を作成中です",
+            "readOnly": "分析は読み取り専用です",
+            "ready": "レビュー可能",
+            "rejected": "却下",
+            "superseded": "旧バージョン",
+            "unknown": "状態を取得できません"
+          },
+          "empty": "分析はまだありません。",
+          "forbidden": "分析を表示する権限がありません。",
+          "noData": "データなし",
+          "retry": "再試行"
+        },
+        "SolutionStatusBanner": {
+          "dueAt": "期限 {{date}}",
+          "updated": "このソリューションは更新されました。"
+        },
+        "SolutionVersionSwitcher": {
+          "label": "バージョン",
+          "old": "旧バージョン",
+          "version": "v{{n}}"
+        },
+        "RequestReasonDialog": {
+          "cancel": "キャンセル"
+        },
+        "CancelRequestDialog": {
+          "title": "このリクエストをキャンセルしますか?",
+          "description": "進行中の作業は停止します。リクエストは引き続き閲覧できます。",
+          "reason": "理由(任意)",
+          "confirm": "リクエストをキャンセル",
+          "reasonRequired": "理由（必須）"
+        },
+        "ReturnToBacklogDialog": {
+          "title": "バックログに戻す",
+          "description": "リクエストは進行中のフローから外れ、後で再開できます。",
+          "reason": "戻す理由は?",
+          "stage": "戻す元のステージ",
+          "confirm": "バックログに戻す"
+        },
+        "ChangeTypeConfirmDialog": {
+          "title": "リクエスト種別を変更",
+          "description": "既存のソリューション・プラン・タスクは参照として残り、リクエストは種別確認に戻ります。",
+          "reason": "種別を変更する理由は?",
+          "confirm": "種別を変更",
+          "newType": "新しい種別",
+          "placeholder": "種別を選択",
+          "done": "種別を変更しました",
+          "useChild": "この種別変更は子リクエストで行う必要があります。",
+          "spawnChild": "子リクエストを作成"
+        },
+        "RequestBacklogBanner": {
+          "title": "バックログに戻されました",
+          "titleFrom": "{{stage}}からバックログに戻されました",
+          "reopen": "再開"
+        },
+        "RequestDetailHeader": {
+          "backToList": "一覧に戻る",
+          "reopen": "再開",
+          "returnToBacklog": "バックログに戻す",
+          "changeType": "種別を変更",
+          "spawnChild": "子リクエストを作成",
+          "cancel": "リクエストをキャンセル"
+        },
+        "RequestDetailPane": {
+          "backToList": "一覧に戻る",
+          "notFound": "このリクエストは存在しません。",
+          "reopened": "リクエストを再開しました",
+          "tab": {
+            "overview": "概要",
+            "analysis": "分析",
+            "plan": "プラン",
+            "history": "履歴",
+            "related": "関連"
+          }
+        },
+        "RequestOverviewTab": {
+          "noBody": "説明はありません。",
+          "source": "ソース",
+          "reporter": "報告者",
+          "size": "サイズ",
+          "urgencyLabel": "緊急度",
+          "urgency": {
+            "normal": "通常",
+            "urgent": "緊急"
+          }
+        },
+        "StageTimeline": {
+          "step": {
+            "classification": "分類",
+            "analysis": "分析",
+            "plan": "プラン",
+            "phase": "フェーズ",
+            "execution": "実行"
+          },
+          "state": {
+            "done": "完了",
+            "current": "現在",
+            "pending": "未着手",
+            "skipped": "中断"
+          },
+          "note": {
+            "hotfix": "ホットフィックス: 迅速診断で、プラン前の承認はありません。"
+          }
+        },
+        "RequestsTab": {
+          "selectPrompt": "リクエストを選択すると詳細が表示されます。"
+        },
+        "RequestRow": {
+          "unclassified": "未分類",
+          "urgent": "緊急"
+        },
+        "RequestList": {
+          "label": "リクエスト",
+          "loadMore": "さらに読み込む"
+        },
+        "RequestListToolbar": {
+          "count": "{{count}} 件のリクエスト",
+          "refresh": "更新"
+        },
+        "RequestListStates": {
+          "emptyNone": "リクエストはまだありません。",
+          "emptyFiltered": "条件に一致するリクエストはありません。",
+          "clearFilters": "フィルターを解除",
+          "create": "リクエストを作成"
+        },
+        "RequestFilterBar": {
+          "chip": {
+            "needsMyConfirmation": "確認待ち",
+            "running": "実行中"
+          },
+          "status": "ステータス",
+          "type": "種別",
+          "source": "ソース",
+          "anySource": "すべてのソース",
+          "clear": "フィルターを解除"
+        },
+        "TypeConfirmationCard": {
+          "title": "リクエスト種別を確認",
+          "classifying": "AIがこのリクエストを分類しています",
+          "reclassify": "再分類",
+          "classifyLimit": "再分類の上限(5回)に達しました。",
+          "confidence": "信頼度",
+          "lowConfidence": "AIはこの種別に自信がありません。確認してください。",
+          "showMore": "もっと見る",
+          "showLess": "閉じる",
+          "editedByHuman": "あなたが編集",
+          "type": "種別",
+          "typePlaceholder": "種別を選択",
+          "typeRequired": "続けるには種別を選択してください。",
+          "size": "サイズ",
+          "urgency": "緊急度",
+          "reason": "理由",
+          "reasonPlaceholder": "この種別にする理由(任意)",
+          "confirm": "種別を確認",
+          "confirmed": "種別を確認しました",
+          "flow": {
+            "analysis": "分析",
+            "noAnalysis": "分析なし",
+            "plan": "プラン",
+            "noPlan": "プランなし",
+            "phase": "フェーズ",
+            "gates": "承認ゲート {{count}} 件",
+            "noGates": "承認ゲートなし"
+          }
+        },
+        "RequestHistoryTab": {
+          "empty": "種別はまだ変更されていません。",
+          "ai": "AI"
+        },
+        "RequestRelatedTab": {
+          "group": {
+            "parent": "親",
+            "child": "子",
+            "followUp": "フォローアップ"
+          },
+          "empty": "関連するリクエストはありません。",
+          "unsupported": "このランタイムはリクエストのリンク表示にまだ対応していません。",
+          "unreadable": "このリクエストは表示できません",
+          "loading": "読み込み中..."
+        },
+        "SpawnChildRequestDialog": {
+          "title": "子リクエストを作成",
+          "titleLabel": "タイトル",
+          "body": "説明",
+          "type": "種別",
+          "letAi": "AIに分類させる",
+          "submit": "作成",
+          "created": "子リクエストを作成しました",
+          "backToParent": "親に戻る",
+          "reason": {
+            "spawned_by_spike": "スパイクから",
+            "spawned_by_question": "質問から",
+            "followup_hotfix": "ホットフィックスの後続",
+            "escalation": "エスカレーション"
+          }
+        },
+        "CreateRequestDialog": {
+          "title": "リクエストを作成",
+          "titleLabel": "タイトル",
+          "body": "説明",
+          "project": "プロジェクト",
+          "projectPlaceholder": "プロジェクトを選択",
+          "projectRequired": "このリクエストが属するプロジェクトを選択してください。",
+          "urgency": "緊急度",
+          "typeHint": "種別のヒント",
+          "letAi": "AIに分類させる",
+          "submit": "作成",
+          "duplicate": "このイシューにはすでにリクエストがあります",
+          "open": "開く",
+          "pendingLimit": "分類待ちのリクエストが多すぎます。後でもう一度お試しください。"
+        },
+        "CreateRequestIssueButton": {
+          "label": "リクエストを作成",
+          "tooltip": "このイシューを分析フローに送ります。ワークスペース開始と違い、すぐにワークツリーは開きません。"
+        },
+        "plan": {
+          "PhaseNode": {
+            "blocked": "{{count}} 件ブロック",
+            "empty": "このフェーズにタスクはありません。",
+            "running": "{{count}} 件実行中",
+            "summary": "{{done}}/{{total}} 件のタスクが完了"
+          },
+          "PhaseApprovalBar": {
+            "approve": "フェーズを承認",
+            "reject": "却下",
+            "rejectTitle": "フェーズを却下",
+            "notApproved": "フェーズはまだ承認されていません",
+            "start": "フェーズを開始",
+            "rejectedNote": "フェーズが却下されました。リクエストは計画段階に戻る場合があります。",
+            "notApprover": "これを承認する権限がありません。"
+          },
+          "PlanApprovalBar": {
+            "regenerate": "プランを再生成",
+            "rejected": "このプランは却下されました。",
+            "approveTaskList": "タスクリストを承認",
+            "approve": "プランを承認",
+            "reject": "却下",
+            "rejectTitle": "プランを却下",
+            "notApprover": "これを承認する権限がありません。",
+            "conflict": "確認中に内容が変更されました。最新版を読み込んだので、もう一度確認してください。",
+            "alreadyDecided": "これはすでに決定済みです。",
+            "expired": "この承認は期限切れです。最新版を読み込みました。"
+          },
+          "PlanGateChips": {
+            "plan": "プラン",
+            "phases": "承認済みフェーズ {{approved}}/{{total}}",
+            "preDeploy": "デプロイ前",
+            "preDeployPending": "デプロイ前の承認が必要です",
+            "approvePreDeploy": "デプロイ前を承認",
+            "reject": "却下",
+            "rejectTitle": "デプロイ前を却下"
+          },
+          "PlanStates": {
+            "generate": "プランを生成",
+            "generating": "AI がプランを作成しています...",
+            "retry": "再試行",
+            "forbidden": "このリクエストのタスクを表示する権限がありません。",
+            "notYet": "プランはまだありません。",
+            "notFound": "プランが見つかりません。",
+            "empty": "プランは空です。",
+            "currentStep": "現在のステップ: {{step}}"
+          },
+          "PlanSummaryHeader": {
+            "counts": "{{phases}} フェーズ、{{tasks}} タスク",
+            "estimated": "推定",
+            "progress": "プランの進捗"
+          },
+          "PlanTaskRow": {
+            "blocked": "ブロック中",
+            "estimate": "{{hours}}時間"
+          },
+          "PlanTree": {
+            "taskSheetDescription": "タスクの詳細",
+            "taskSheetTitle": "タスク"
+          },
+          "RequestPlanTab": {
+            "reload": "再読み込み",
+            "truncated": "タスク一覧が途中で切れています。一部のタスクが表示されていない可能性があります。"
+          }
+        },
+        "approval": {
+          "ApprovalInboxTab": {
+            "title": "承認",
+            "empty": "承認待ちの項目はありません。",
+            "emptyFiltered": "これらの条件に一致する承認はありません。",
+            "clearFilters": "フィルターを解除",
+            "loadMore": "さらに読み込む"
+          },
+          "ApprovalSubjectFilter": {
+            "all": "すべて",
+            "requestType": "リクエスト種別",
+            "solution": "ソリューション",
+            "plan": "プラン",
+            "phase": "フェーズ",
+            "preDeploy": "デプロイ前",
+            "other": "その他"
+          },
+          "OverdueToggle": {
+            "label": "期限超過のみ"
+          },
+          "ApprovalRow": {
+            "open": "開く",
+            "approve": "クイック承認",
+            "reject": "却下",
+            "dueIn": "期限: {{relative}}",
+            "overdueBy": "期限超過: {{relative}}",
+            "requestedBy": "依頼者: {{name}}",
+            "systemActor": "AI / システム",
+            "alreadyDecided": "すでに他のユーザーが判断しました。",
+            "changed": "この項目は一覧表示後に変更されました。開いて確認してください。",
+            "requestGone": "このリクエストは存在しなくなりました。",
+            "decided": "判断を記録しました。",
+            "confirmApprove": {
+              "request_type": "リクエスト種別が確定し、分析に進みます。",
+              "findings": "調査結果をこのリクエストの成果として承認します。",
+              "answer": "回答を承認し、リクエストを完了します。",
+              "task_list": "タスクリストを承認し、タスクの準備に進めます。",
+              "phase": "フェーズを承認し、タスクを実行可能にします。",
+              "pre_deploy": "デプロイ前チェックを承認し、リリースを進めます。"
+            }
+          },
+          "ApprovalInboxErrorState": {
+            "network": "承認を読み込めませんでした。接続を確認してください。",
+            "forbidden": "これらの承認を表示する権限がありません。",
+            "retry": "再試行"
+          },
+          "ApprovalSubjectType": {
+            "request_type": "リクエスト種別",
+            "solution": "ソリューション",
+            "findings": "調査結果",
+            "answer": "回答",
+            "plan": "プラン",
+            "phase": "フェーズ",
+            "task_list": "タスクリスト",
+            "pre_deploy": "デプロイ前",
+            "unknown": "その他"
+          }
+        },
+        "backlog": {
+          "BacklogSegmentControl": {
+            "request": "リクエスト",
+            "task": "タスク",
+            "execute": "実行"
+          },
+          "BacklogToolbar": {
+            "search": "タイトルまたは #番号 で検索",
+            "type": "種別",
+            "category": "カテゴリ",
+            "refresh": "更新",
+            "allTypes": "すべての種別",
+            "allCategories": "すべてのカテゴリ"
+          },
+          "RequestBacklogTable": {
+            "col": {
+              "request": "リクエスト",
+              "source": "ソース",
+              "type": "種別",
+              "stage": "差し戻し元",
+              "category": "カテゴリ",
+              "reason": "理由",
+              "by": "差し戻し者",
+              "at": "日時",
+              "actions": "操作"
+            },
+            "actorSystem": "AI / システム",
+            "reopen": "再開",
+            "cancel": "キャンセル"
+          },
+          "TaskBacklogTable": {
+            "col": {
+              "task": "タスク",
+              "estimate": "見積もり",
+              "dependencies": "待機中"
+            }
+          },
+          "ExecuteBacklogTable": {
+            "col": {
+              "task": "タスク",
+              "blockedBy": "ブロック元",
+              "lastError": "直近のエラー",
+              "failedAttempts": "失敗回数",
+              "engine": "エンジン"
+            },
+            "noErrorDetail": "失敗しましたがエラー詳細は記録されていません"
+          },
+          "ReturnedFromStage": {
+            "classification": "分類",
+            "analysis": "分析",
+            "plan": "プラン",
+            "phase": "フェーズ",
+            "task": "タスク"
+          },
+          "ReturnedCategory": {
+            "missing_info": "情報不足",
+            "infeasible": "実現不可",
+            "blocked_dependency": "依存関係でブロック",
+            "rejected": "却下",
+            "other": "その他"
+          },
+          "GateStatus": {
+            "approved": "承認済み",
+            "pending": "承認待ち",
+            "rejected": "却下",
+            "none": "ゲートなし",
+            "unknown": "不明"
+          },
+          "BacklogEngineBadge": {
+            "workflow": "ワークフロー",
+            "orchestration": "オーケストレーション",
+            "direct_agent": "ダイレクトエージェント"
+          },
+          "ReopenRequestDialog": {
+            "title": "このリクエストを再開しますか？",
+            "body": "リクエスト #{{number}} は {{stage}} から差し戻され、再度分類されます。既存のソリューション、プラン、タスクは参照用に保持されます。",
+            "cancel": "今はしない",
+            "confirm": "再開",
+            "viewRequest": "リクエストを表示"
+          },
+          "BacklogEmptyState": {
+            "requests": "バックログに差し戻されたリクエストはありません。",
+            "tasks": "すべてのタスクに承認済みのプランがあります。",
+            "execute": "実行待ちまたは失敗したタスクはありません。",
+            "filtered": "これらの条件に一致するものはありません。",
+            "clearFilters": "フィルターを解除"
+          },
+          "BacklogErrorState": {
+            "network": "バックログを読み込めませんでした。接続を確認してください。",
+            "forbidden": "このプロジェクトのバックログを表示する権限がありません。",
+            "retry": "再試行"
+          },
+          "BacklogRow": {
+            "reopened": "リクエストを再開しました。再度分類されます。",
+            "alreadyHandled": "このリクエストはすでに処理されています。"
+          },
+          "BacklogTab": {
+            "loadMore": "さらに読み込む"
+          },
+          "BacklogGroupHeaderRow": {
+            "openPlan": "プランを開く"
+          },
+          "TaskBacklogRow": {
+            "planNotSplit": "まだフェーズに分割されていません"
+          },
+          "BacklogTaskSheet": {
+            "title": "タスクの詳細",
+            "description": "選択したタスクの詳細"
+          }
+        },
+        "clarification": {
+          "title": "追加情報が必要です",
+          "round": "ラウンド {{round}}",
+          "submit": "回答を送信",
+          "submitHint": "で送信",
+          "answeredResume": "受け付けました。AI が {{step}} ステップを再実行しています。",
+          "stillMissing": "まだ不足している情報があるため、新しいラウンドを開始しました。",
+          "required": "必須",
+          "suggested": "提案",
+          "useSuggested": "提案を使う",
+          "editInstead": "代わりに編集",
+          "readOnlyWaiting": "担当者の回答を待っています",
+          "dueIn": "残り {{count}} 日",
+          "expired": "期限切れです。リクエストはバックログに戻ります (情報不足)。",
+          "leaveWarning": "未送信の回答があります。",
+          "fileTooLarge": "ファイルが 64 KB を超えています",
+          "fileBinary": "テキストファイルのみ対応しています",
+          "textTooLong": "回答が長すぎます",
+          "invalidChoice": "選択肢から選んでください",
+          "yes": "はい",
+          "no": "いいえ",
+          "retry": "再試行",
+          "waitingForInfo": "情報の提供を待っています",
+          "timelineWaiting": "追加情報を待っています",
+          "source": {
+            "readiness": "準備状況チェック",
+            "solution_open_question": "解決策の未解決の質問",
+            "plan_assumption": "計画の前提",
+            "task_blocked": "タスクがブロック中"
+          }
+        },
+        "decision": {
+          "rationaleLabel": "選択の理由",
+          "rationaleRequired": "推奨以外を選ぶ場合は理由が必要です",
+          "rationaleOptional": "任意",
+          "confirmTitle": "高リスクの選択を確認",
+          "confirmBody": "この選択は高リスクと判定されました。理由を確認し、オプション名を入力して確定してください。",
+          "confirmInputLabel": "確認のため \"{{title}}\" と入力",
+          "confirmMismatch": "入力内容がオプション名と一致しません",
+          "cancel": "キャンセル",
+          "confirmSubmit": "選択を確定",
+          "pendingConfirmation": "この高リスクの選択の二度目の確認を待っています",
+          "digestChanged": "内容が変更されました。承認前にもう一度確認してください。",
+          "selfChoiceForbidden": "報告者は自分のリクエストを選択できません",
+          "history": {
+            "title": "決定履歴",
+            "empty": "記録された決定はまだありません"
+          },
+          "status": {
+            "open": "未決",
+            "chosen": "選択済み",
+            "effective": "有効",
+            "superseded": "置き換え済み",
+            "unknown": "不明"
+          },
+          "planBlocked": "選択したオプションの決定はまだ記録されていません"
+        },
+        "impact": {
+          "forbidden": "評価を表示する権限がありません",
+          "noDevServer": "開発サーバーが接続されていません",
+          "connectDevServer": "接続",
+          "collecting": "コードグラフを照会中",
+          "run": "評価を実行",
+          "score": "スコア {{score}}",
+          "advisory": "参考",
+          "raisedBy": "引き上げ理由: {{rules}}",
+          "caption": "評価日時 {{at}}、使用ツール {{tool}}",
+          "confidence": {
+            "low": "信頼度 低",
+            "medium": "信頼度 中",
+            "high": "信頼度 高"
+          },
+          "stale": "インデックスが古く、評価が不完全です",
+          "narrative": "AI による説明",
+          "title": "影響とリスク",
+          "notAssessed": "未評価",
+          "dimension": "観点",
+          "recommended": "推奨",
+          "differs": "オプション間で異なります",
+          "evidence": "根拠",
+          "evidenceDescription": "この検出事項の生の根拠",
+          "loading": "読み込み中...",
+          "evidenceError": "根拠を読み込めませんでした",
+          "truncated": "省略あり",
+          "copy": "コピー",
+          "noFindings": "中以上の検出事項はありません",
+          "viewOnGraph": "グラフで表示",
+          "dim": {
+            "architecture": "アーキテクチャ",
+            "contract": "コントラクト",
+            "data": "データ",
+            "blast_radius": "影響範囲",
+            "security": "セキュリティ",
+            "operations": "運用",
+            "quality": "品質",
+            "uncertainty": "不確実性",
+            "size": "規模"
+          },
+          "findings": "検出事項",
+          "acceptance": {
+            "title": "残りのリスクを受け入れる",
+            "reasonLabel": "受け入れる理由",
+            "reasonRequired": "{{min}} 文字以上",
+            "record": "受け入れを記録",
+            "recorded": "受け入れ済み",
+            "invalidated": "評価が変更されました。もう一度確認してください。",
+            "secondApprover": "2人目の承認者を待っています",
+            "splitPhase": "より小さなフェーズに分割し、ロールバックを事前に試すことを検討してください。",
+            "error": "受け入れを記録できませんでした"
+          },
+          "gate": {
+            "viewImpact": "影響を表示",
+            "viewImpactFirst": "承認前に影響セクションを開いてください",
+            "needsAcceptance": "承認前に残りの高リスクを受け入れてください",
+            "approverNotAllowed": "指定チームの承認者が必要です"
+          },
+          "override": {
+            "menu": "ゲートのその他のオプション",
+            "title": "ゲートをバイパス",
+            "description": "理由とともに監査ログに記録されます。",
+            "reasonLabel": "理由",
+            "reasonRequired": "{{min}} 文字以上",
+            "cancel": "キャンセル",
+            "submit": "ゲートをバイパス"
+          }
+        },
+        "readiness": {
+          "badge": {
+            "ready": "準備完了",
+            "needs_info": "情報が必要",
+            "spec_defect": "仕様の不備",
+            "env_defect": "環境の問題"
+          },
+          "title": "タスクの準備状況",
+          "notChecked": "未確認",
+          "tier": {
+            "structure": "構造",
+            "semantic": "意味",
+            "environment": "環境"
+          },
+          "envVarNames": "変数名のみ表示され、値は表示されません。",
+          "notCounted": "試行回数に含まれません",
+          "action": {
+            "run": "実行",
+            "answer": "質問に回答",
+            "regenerate": "計画ステップに戻してタスクを再生成",
+            "connect": "開発サーバーを接続",
+            "notify": "オペレーターに通知"
+          },
+          "runHint": "準備ができたらタスクの実行ボタンを使ってください。",
+          "checking": "確認中...",
+          "check": "準備状況を確認",
+          "runBlocked": "このタスクはまだ準備できていません。詳細は準備状況レポートを開いてください。",
+          "phase": {
+            "ready": "{{count}} 件が準備完了",
+            "needsInfo": "{{count}} 件が情報不足",
+            "specDefect": "{{count}} 件の仕様不備",
+            "envDefect": "{{count}} 件の環境問題"
+          },
+          "drift": {
+            "shadow": "参考: 実際の変更が計画を超えています。",
+            "banner": "実際の変更が計画を超えています。フェーズ {{name}} は一時停止中です。",
+            "review": "確認して判断",
+            "loadError": "差分の詳細を読み込めませんでした",
+            "task": "タスク",
+            "expected": "予定",
+            "actual": "実際",
+            "noDetails": "詳細行はありません",
+            "runningNote": "実行中のタスクは完了するまで続行されます。",
+            "accept": "差分を受け入れて続行",
+            "return": "差し戻す",
+            "returnNote": "差し戻すとポリシーに従いリクエストはバックログに戻ります。"
+          }
+        },
+        "execution": {
+          "tab": "結果",
+          "error": "結果を読み込めませんでした",
+          "legacy": "この結果には構造がありません",
+          "noOutput": "出力なし",
+          "malformed": "結果が想定の形式ではありません",
+          "status": {
+            "done": "完了",
+            "failed": "失敗",
+            "blocked": "ブロック中",
+            "needs_info": "情報が必要"
+          },
+          "attempt": "試行 {{n}}",
+          "files": {
+            "title": "変更されたファイル",
+            "none": "変更されたファイルはありません",
+            "inScope": "範囲内",
+            "outOfScope": "範囲外"
+          },
+          "checks": {
+            "check": "チェック",
+            "agent": "エージェントの報告",
+            "orca": "Orca の再実行",
+            "compare": "比較",
+            "notRerun": "まだ再実行されていません",
+            "passed": "成功",
+            "failed": "失敗",
+            "mismatch": "不一致",
+            "note": "Orca はエージェントの報告を信用しません。"
+          },
+          "secrets": {
+            "label": "シークレットスキャン",
+            "passed": "成功",
+            "failed": "失敗",
+            "notRun": "未実行"
+          },
+          "outputs": {
+            "title": "出力",
+            "view": "表示",
+            "preview": "プレーンテキストで表示 (16 KB で切り捨て)"
+          },
+          "toQuestion": "質問に回答",
+          "route": {
+            "retryable": "最大 {{count}} 回まで再試行します",
+            "spec_defect": "計画ステップに戻しました",
+            "needs_info": "質問に変換しました",
+            "env_defect": "試行回数に含まれません",
+            "agent_defect": "形式の注意を添えて一度再試行します",
+            "unknown": "未分類の失敗"
+          }
+        }
+      },
+      "reviewMap": {
+        "turns": {
+          "verification": {
+            "agreement": {
+              "consistent": "{{kind}} の再実行結果はエージェントの申告と一致しています",
+              "contradicted": "{{kind}} の再実行結果はエージェントの申告と異なります",
+              "unverified": "{{kind}}: 未確認です",
+              "unknown": "{{kind}}: 判断するにはデータが不足しています"
+            },
+            "kind": {
+              "tests_pass": "テスト",
+              "tests_fail": "失敗しているテスト",
+              "lint_clean": "Lint",
+              "typecheck_clean": "型チェック",
+              "build_ok": "ビルド",
+              "all_done": "全体の完了",
+              "other": "チェック"
+            },
+            "basis": {
+              "stated": "エージェントの文面からの推定です(信頼度は低)"
+            },
+            "reason": {
+              "tree_may_differ": "作業ツリーがエージェント完了時と異なる可能性があります。",
+              "no_run": "独立した実行がまだありません。",
+              "run_failed": "再実行が完了しませんでした。"
+            },
+            "category": {
+              "test": "テスト",
+              "lint": "Lint",
+              "typecheck": "型チェック",
+              "build": "ビルド",
+              "install": "インストール",
+              "git": "git",
+              "other": "その他"
+            },
+            "ran": "エージェントが実行: {{commands}}",
+            "ranItemMany": "{{name}} ({{count}} 回)",
+            "ranMore": "ほか",
+            "recordedNote": "記録であり検証ではありません: エージェントのプロセスは不正確に報告する場合があります。",
+            "viewRun": "実行を表示",
+            "runChecks": "チェックを再実行"
+          }
+        },
+        "report": {
+          "md": {
+            "gate": {
+              "pass": "実行された必須チェックはすべて合格しました。",
+              "warn": "品質ゲートに警告があります。",
+              "fail": "品質ゲートが不合格です。",
+              "unknown": "判断するにはデータが不足しています。",
+              "heading": "品質ゲート",
+              "moreReasons": "…ほか {{count}} 件。",
+              "waivers": "有効な免除 {{count}} 件。"
+            },
+            "summary": {
+              "heading": "変更",
+              "counts": "{{files}} ファイル、+{{added}} / -{{removed}}、シンボル {{symbols}} 件、フロー {{flows}} 件。",
+              "components": "コンポーネント: {{list}}。"
+            },
+            "findings": {
+              "heading": "検出事項",
+              "counts": "エラー {{error}} 件、警告 {{warning}} 件、情報 {{info}} 件。",
+              "colSeverity": "重大度",
+              "colRule": "ルール",
+              "colLocation": "場所",
+              "colMessage": "メッセージ",
+              "truncated": "主な検出事項のみを表示しています。"
+            },
+            "contracts": {
+              "heading": "コントラクトとデータ",
+              "breaking": "破壊的変更",
+              "channel": "チャネル",
+              "table": "テーブル"
+            },
+            "reading": {
+              "heading": "推奨される読む順序"
+            },
+            "diagrams": {
+              "heading": "図",
+              "alt": "テキストによる説明"
+            },
+            "warnings": {
+              "heading": "注記"
+            },
+            "warning": {
+              "no_gate": "品質ゲートの結果がありませんでした。",
+              "index_stale": "コードインデックスが HEAD より古い可能性があります。",
+              "overlay_partial": "変更データが不完全な可能性があります。"
+            },
+            "footer": "Orca がプロファイル {{profile}}(モデル {{digest}})から生成しました。実行されたチェックの記録であり、承認ではありません。",
+            "title": "この {{review}} に対する Orca レビュー",
+            "subject": "ブランチ {{branch}}、ベース {{base}}、head {{head}}。",
+            "risk": {
+              "heading": "リスク",
+              "level": {
+                "LOW": "リスクレベル: 低。",
+                "MEDIUM": "リスクレベル: 中。",
+                "HIGH": "リスクレベル: 高。",
+                "CRITICAL": "リスクレベル: 重大。",
+                "UNKNOWN": "リスクレベル: 判断するにはデータが不足しています。"
+              }
+            },
+            "truncated": "短縮しています。完全なレポートは Orca で確認してください。"
+          },
+          "html": {
+            "gate": {
+              "pass": "実行された必須チェックはすべて合格しました。",
+              "warn": "品質ゲートに警告があります。",
+              "fail": "品質ゲートが不合格です。",
+              "unknown": "判断するにはデータが不足しています。",
+              "heading": "品質ゲート"
+            },
+            "summary": {
+              "heading": "変更",
+              "counts": "{{files}} ファイル、+{{added}} / -{{removed}}、シンボル {{symbols}} 件、フロー {{flows}} 件。"
+            },
+            "findings": {
+              "heading": "検出事項",
+              "counts": "エラー {{error}} 件、警告 {{warning}} 件、情報 {{info}} 件。",
+              "colSeverity": "重大度",
+              "colRule": "ルール",
+              "colLocation": "場所",
+              "colMessage": "メッセージ",
+              "caption": "主な検出事項"
+            },
+            "contracts": {
+              "heading": "コントラクトとデータ"
+            },
+            "reading": {
+              "heading": "推奨される読む順序"
+            },
+            "diagrams": {
+              "heading": "図"
+            },
+            "warnings": {
+              "heading": "注記"
+            },
+            "warning": {
+              "no_gate": "品質ゲートの結果がありませんでした。",
+              "index_stale": "コードインデックスが HEAD より古い可能性があります。",
+              "overlay_partial": "変更データが不完全な可能性があります。"
+            },
+            "footer": "Orca がプロファイル {{profile}}(モデル {{digest}})から生成しました。実行されたチェックの記録であり、承認ではありません。",
+            "title": "Orca レビューレポート",
+            "breaking": "破壊的変更"
+          },
+          "menu": {
+            "label": "レポートをエクスポート",
+            "copyMarkdown": "Markdown をコピー",
+            "copyForDescription": "{{review}} の説明用にコピー",
+            "saveHtml": "HTML を保存",
+            "copied": "レポートをコピーしました。",
+            "copiedShortened": "短縮したレポートをコピーしました。",
+            "copyError": "クリップボードにコピーできませんでした。",
+            "saved": "レポートを HTML として保存しました。",
+            "saveError": "レポートを保存できませんでした。",
+            "fetchError": "レビューレポートを読み込めませんでした。"
+          },
+          "insert": {
+            "label": "レビューレポートを挿入"
+          }
+        },
+        "requirements": {
+          "trace": {
+            "state": {
+              "has_evidence": "根拠が見つかりました(未確認)",
+              "partial": "一部の根拠が見つかりました",
+              "no_evidence": "根拠が見つかりません",
+              "manual_pending": "手動での確認が必要です",
+              "unknown": "判断するにはデータが不足しています"
+            },
+            "group": {
+              "noEvidence": "根拠が見つからない",
+              "partial": "一部の根拠あり",
+              "manualPending": "手動確認が必要",
+              "hasEvidence": "根拠が見つかった",
+              "unknown": "データ不足",
+              "unlinked": "要件に紐づかない変更"
+            },
+            "suggestions": "候補",
+            "inferred": "推定",
+            "confirm": "確認",
+            "dismiss": "却下",
+            "manualConfirm": "確認しました",
+            "loading": "要件を読み込み中…",
+            "error": "要件を読み込めませんでした。",
+            "retry": "再試行",
+            "label": "要件",
+            "showInferred": "推定の候補を表示",
+            "stale": "読み込み後にインデックスが変更されました。",
+            "readOnly": "要件は表示のみで、変更はできません。",
+            "actionError": "変更は保存されませんでした。もう一度お試しください。",
+            "empty": "表示する要件がありません。",
+            "link": {
+              "explicit": "タスクを明示的に関連付け済み",
+              "derived": "ブランチまたはコミットからタスクを関連付け",
+              "inferred": "タスクの関連付けは推定です",
+              "none": "関連付けられたタスクなし"
+            },
+            "warning": {
+              "no_structured_criteria": "このタスクには構造化された受け入れ基準がありません。",
+              "index_stale": "コードインデックスが HEAD より古い可能性があります。",
+              "generic": "一部のデータが不完全な可能性があります。"
+            }
+          },
+          "taskPicker": {
+            "link": "タスクに関連付け…",
+            "change": "タスクを変更…",
+            "unlink": "関連付けを解除",
+            "searchPlaceholder": "タスクを検索…",
+            "noResults": "タスクが見つかりません。"
+          }
+        },
+        "lens": {
+          "requirements": {
+            "label": "要件"
+          },
+          "impact": {
+            "label": "影響"
+          },
+          "architecture": {
+            "label": "アーキテクチャ"
+          },
+          "dataflow": {
+            "label": "フロー"
+          },
+          "erd": {
+            "label": "ERD"
+          },
+          "storage": {
+            "label": "ストレージ"
+          },
+          "structure": {
+            "label": "構造"
+          },
+          "contract": {
+            "label": "コントラクト"
+          },
+          "quality": {
+            "label": "品質"
+          }
+        },
+        "shell": {
+          "lens": {
+            "unavailable": "{{lens}}はまだ利用できません。"
+          },
+          "index": {
+            "ready": "インデックス準備完了",
+            "stale": "インデックスが古い {{sha}}",
+            "overlay": "メインチェックアウトのインデックス + 差分",
+            "overlayNote": "メインチェックアウトのインデックスと差分に基づきます。行番号がずれる場合があります。",
+            "buildingPercent": "インデックス作成中 {{percent}}%",
+            "building": "インデックス作成中",
+            "missing": "インデックスがありません",
+            "notInstalled": "ツールが未インストール",
+            "degraded": "インデックスは一部のみ利用可能",
+            "offline": "オフライン",
+            "unknown": "不明",
+            "aria": "インデックスの状態: {{label}}"
+          },
+          "header": {
+            "title": "レビュー"
+          },
+          "banner": {
+            "stale": "インデックスがHEADより古い状態です({{indexed}} から {{head}})。最近の変更が反映されない場合があります。",
+            "truncated": "{{total}} 件中 {{shown}} 件のファイルを表示しています。",
+            "scopeMismatch": "インデックスはこのワークツリーとは別のチェックアウトを対象としています。",
+            "offline": "オフライン: 最後に読み込んだデータを表示しています。",
+            "retry": "再試行",
+            "errorCached": "更新できませんでした: {{message}}",
+            "newData": "新しいデータがあります。",
+            "apply": "今すぐ更新"
+          },
+          "reindex": {
+            "refresh": "インデックスを更新",
+            "fullConfirm": "すべて再構築",
+            "full": "インデックス全体を再構築",
+            "cooldown": "{{seconds}}秒後に再度利用できます"
+          },
+          "scope": {
+            "current": "{{label}} との比較",
+            "choose": "範囲",
+            "branch": "ベースブランチ",
+            "range": "コミット範囲",
+            "hosted": "送信済みレビュー",
+            "basePlaceholder": "origin/main",
+            "baseAria": "ベースブランチ",
+            "uncommitted": "未コミットの変更を含める",
+            "fromCommit": "開始コミット",
+            "toCommit": "終了コミット",
+            "apply": "適用"
+          },
+          "screen": {
+            "unsupported": {
+              "title": "ここではレビューを利用できません",
+              "body": "このワークスペースまたはバックエンドはコードレビューのデータを提供していません。"
+            },
+            "closeTab": "タブを閉じる",
+            "disabled": {
+              "title": "コードレビューはオフです",
+              "body": "管理者がこのワークスペースのコードインテリジェンスを無効にしています。"
+            },
+            "chooseScope": "比較対象を選択",
+            "noBinding": {
+              "title": "このワークツリーはコードインデックスに接続されていません",
+              "body": "リポジトリを開発サーバーに接続してから、もう一度お試しください。",
+              "action": "再接続を試す"
+            },
+            "forbidden": {
+              "title": "このレビューへのアクセス権がありません",
+              "body": "ワークスペースの管理者にコードインテリジェンスの読み取り権限を依頼してください。"
+            },
+            "loading": {
+              "title": "変更を読み込み中"
+            },
+            "toolUnavailable": {
+              "title": "コードインデックスツールがインストールされていません",
+              "body": "このリポジトリがあるマシンに GitNexus または CodeGraph をインストールしてください。"
+            },
+            "retry": "再試行",
+            "notRegistered": {
+              "title": "このリポジトリはインデックスツールに登録されていません",
+              "body": "インデックスを作成して登録してください。"
+            },
+            "buildIndex": "インデックスを作成",
+            "pathNotAllowed": {
+              "title": "ファイルパスが拒否されました",
+              "body": "バックエンドがこの変更セット内のパスを拒否しました。"
+            },
+            "indexMissing": {
+              "title": "このリポジトリにはまだインデックスがありません",
+              "body": "レビューにはシンボルと影響範囲を対応付けるインデックスが必要です。"
+            },
+            "indexBuilding": {
+              "title": "インデックスを作成中",
+              "unknown": "数分かかる場合があります。",
+              "percent": "{{percent}}% 完了"
+            },
+            "offline": {
+              "title": "コードインデックスに接続できません",
+              "body": "接続が切れています。復旧すると、この画面は再試行します。"
+            },
+            "error": {
+              "title": "レビューを読み込めませんでした"
+            },
+            "noChanges": {
+              "unborn": "このブランチにはまだコミットがありません",
+              "title": "この範囲に変更はありません",
+              "body": "別のベースまたは範囲を選ぶと変更を確認できます。"
+            },
+            "copied": "コピーしました",
+            "copyDetails": "詳細をコピー",
+            "scope": {
+              "invalid-base": {
+                "title": "ベースブランチが見つかりません",
+                "body": "比較する別のベースブランチを選んでください。"
+              },
+              "unborn-head": {
+                "title": "このブランチにはまだコミットがありません",
+                "body": "何かコミットしてから、変更をレビューしてください。"
+              },
+              "no-merge-base": {
+                "title": "ベースとの共通の祖先がありません",
+                "body": "別のベースブランチまたはコミット範囲を選んでください。"
+              },
+              "error": {
+                "title": "比較を計算できませんでした",
+                "body": "別のベースを試してください。"
+              }
+            }
+          },
+          "chip": {
+            "aria": "変更の概要",
+            "files": "ファイル {{count}}",
+            "symbols": "シンボル {{count}}",
+            "flows": "フロー {{count}}",
+            "tables": "テーブル {{count}}",
+            "contracts": "コントラクト {{count}}",
+            "untested": "テスト無し {{count}}",
+            "violations": "違反 {{count}}"
+          },
+          "risk": {
+            "incomplete": "データ不足",
+            "incompleteNote": "インデックスのデータが不足しているため、結論は出していません。",
+            "noReasons": "理由は報告されていません。",
+            "low": "インデックス上はリスク低",
+            "medium": "リスク中",
+            "high": "リスク高",
+            "critical": "リスク重大"
+          },
+          "ambiguous": {
+            "title": "どのシンボルですか?",
+            "body": "複数のシンボルが一致しました。目的のものを選んでください。",
+            "search": "一致項目を検索",
+            "empty": "一致なし"
+          },
+          "drawer": {
+            "unavailable": "詳細はまだ利用できません。",
+            "title": "詳細",
+            "close": "詳細を閉じる"
+          },
+          "pane": {
+            "reading": "読む順序",
+            "lens": "ビュー"
+          },
+          "cancel": "キャンセル",
+          "host": {
+            "loading": "レビューを読み込み中"
+          },
+          "dock": {
+            "label": "レビューパネル",
+            "findings": "検出事項",
+            "notes": "ノート",
+            "collapse": "パネルを折りたたむ",
+            "expand": "パネルを展開",
+            "qualityFindings": "チェック"
+          },
+          "turnFilter": "前のターン以降"
+        },
+        "readingOrder": {
+          "noOrder": "インデックスから読む順序を作成できませんでした。",
+          "empty": "この範囲に変更はありません。",
+          "progressLoadFailed": "保存済みの進捗を読み込めませんでした。",
+          "retry": "再試行",
+          "filtering": "{{label}} で絞り込み中: {{total}} 件中 {{shown}} 件",
+          "clearFilter": "フィルターを解除",
+          "aria": "読む順序",
+          "overflow": "{{total}} 件中 {{shown}} 件のファイルを一覧表示",
+          "keys": "j/k 移動 · Space 既読にする · Enter 差分を開く",
+          "markFile": "{{file}} を既読にする",
+          "cycle": "依存関係の循環",
+          "after": "前のステップの後に読む",
+          "viewDiff": "差分を表示",
+          "otherGroup": "その他",
+          "markGroup": "{{group}} を既読にする",
+          "progress": "{{total}} 件中 {{seen}} 件を既読",
+          "localOnly": "未保存(読み取り専用アクセス)",
+          "notSaved": "未保存",
+          "saved": "保存済み",
+          "saving": "保存中",
+          "progressAria": "読む進捗",
+          "oversize": "進捗が大きすぎるため、一部は保存されません。",
+          "reason": {
+            "contract": "コントラクトの変更",
+            "dependencyOf": "後のステップの依存先",
+            "leaf": "末端の変更",
+            "cycle": "依存関係の循環内",
+            "noEdges": "既知の依存関係なし",
+            "test": "テスト",
+            "doc": "ドキュメント",
+            "generated": "生成ファイル",
+            "overflow": "一覧にないファイルがあります"
+          }
+        },
+        "aiSummary": {
+          "preview": {
+            "title": "送信される内容の確認",
+            "description": "以下のデータは、開発サーバーが使用する LLM プロバイダー({{provider}})に送信されます。確認するまで何も送信されません。",
+            "defaultProvider": "設定済みのプロバイダー",
+            "counts": "{{files}} ファイル、マスク {{redactions}} 件、約 {{tokens}} トークン。",
+            "level": {
+              "metadata": "データレベル: メタデータのみ(コードなし)",
+              "diff": "データレベル: diff(変更されたコード)",
+              "unknown": "データレベル: 不明"
+            },
+            "withheld": "{{count}} ファイルはリクエストから除外されました。",
+            "fileWithheld": "除外",
+            "moreFiles": "…ほか {{count}} ファイル。",
+            "injectionWarning": "一部の内容が AI モデル向けの指示のように見えます。要約に影響する可能性があるため、慎重に確認してください。",
+            "cancel": "キャンセル",
+            "confirm": "送信して要約を生成"
+          },
+          "card": {
+            "title": "AI による推定要約",
+            "generate": "要約を生成(AI)",
+            "regenerate": "再生成",
+            "cancel": "キャンセル",
+            "levelLabel": "送信するデータ",
+            "level": {
+              "metadata": "メタデータ",
+              "diff": "Diff"
+            },
+            "preparing": "データのプレビューを準備中…",
+            "generating": "要約を生成中…時間がかかる場合があります。",
+            "error": {
+              "no-relay": "開発サーバーが接続されていません。",
+              "bad-output": "有効な要約を生成できませんでした。",
+              "rate-limited": "リクエストが多すぎます。{{seconds}} 秒後に再試行してください。",
+              "timeout": "要約の生成に時間がかかりすぎました。",
+              "forbidden": "要約を生成する権限がありません。",
+              "unknown": "要約を生成できませんでした。"
+            },
+            "retry": "再試行",
+            "disclaimer": "誤りや抜けがある可能性があります。diff と照らし合わせて確認してください。",
+            "meta": "モデル: {{model}}。送信データ: {{level}}。",
+            "risks": "リスク",
+            "readFirst": "最初に読む",
+            "refsDropped": "無効な参照 {{count}} 件を除外しました。",
+            "helpful": "役に立った",
+            "incorrect": "不正確",
+            "idleHint": "要約を生成すると、AI が推定した概要が表示されます。確認するまで何も送信されません。"
+          },
+          "report": {
+            "heading": "AI による推定要約",
+            "disclaimer": "誤りや抜けがある可能性があります。diff と照らし合わせて確認してください。モデル: {{model}}。送信データ: {{level}}。",
+            "risks": "リスク",
+            "readFirst": "最初に読む"
+          }
+        },
+        "c4": {
+          "error": "アーキテクチャビューを読み込めませんでした。",
+          "retry": "再試行",
+          "loading": "アーキテクチャを読み込み中",
+          "noContainers": "コンテナを推定できませんでした。フォルダ規約を確認してください。",
+          "noView": "このコンテナのコンポーネントビューはまだありません。",
+          "toolbar": "アーキテクチャのオプション",
+          "mode": {
+            "graph": "グラフ",
+            "list": "リスト"
+          },
+          "includeHidden": "非表示のコンポーネントを表示",
+          "viewYaml": "c4.yaml を表示",
+          "editYaml": "c4.yaml を編集",
+          "container": "コンテナ",
+          "evidence": "根拠",
+          "viewDiff": "差分を表示",
+          "showMore": "さらに表示 ({{count}})",
+          "detail": "詳細",
+          "close": "閉じる",
+          "copyPath": "パスをコピー",
+          "noDescription": "説明はまだありません",
+          "addDescription": "説明を追加",
+          "symbols": "{{count}} 件のシンボル",
+          "flag": {
+            "changed": "変更あり",
+            "untested": "テストなし",
+            "violation": "レイヤー違反",
+            "lowConfidence": "信頼度低"
+          },
+          "outgoing": "発信",
+          "incoming": "着信",
+          "violationNote": "この依存はヘキサゴナルのレイヤー境界を誤った向きで越えています。",
+          "legend": "凡例",
+          "diagramLabel": "コンポーネント図。テキスト版はリスト表示を使用してください",
+          "editor": {
+            "title": "c4.yaml を編集",
+            "description": "{{container}} の手動オーバーライド。保存後にサーバーが図を再構築します。",
+            "loading": "読み込み中...",
+            "loadError": "c4.yaml を読み込めませんでした。",
+            "readOnly": "c4.yaml を編集する権限がありません。",
+            "seed": "テンプレートの出典: {{source}}",
+            "label": "c4.yaml のソース",
+            "size": "{{bytes}} / 65536 バイト",
+            "semanticsNote": "ここでは内容の意味は検証しません。保存時にサーバーが検証します。",
+            "issues": "問題",
+            "warnings": "サーバーの警告",
+            "offline": "未保存: 接続に失敗しました。下書きは保持されています。",
+            "tooLarge": "未保存: ドキュメントが大きすぎます。",
+            "failed": "未保存: {{message}}",
+            "conflictTitle": "バージョンの競合",
+            "conflict": "他のユーザーがより新しい c4.yaml を保存しました。",
+            "loadLatest": "最新を読み込む",
+            "copyMine": "自分の版をコピー",
+            "confirmOverwrite": "確認: 新しい版を置き換える",
+            "overwrite": "自分の版で上書き",
+            "discardTitle": "変更を破棄",
+            "discard": "変更を保存せずに閉じますか?",
+            "keepEditing": "編集を続ける",
+            "discardAction": "破棄",
+            "savingSlow": "サーバーの応答を待っています...",
+            "saving": "保存中...",
+            "savedAt": "{{time}} に保存しました",
+            "unsaved": "未保存",
+            "close": "閉じる",
+            "save": "保存"
+          },
+          "showingCount": "{{shown}}/{{total}} 件を表示",
+          "col": {
+            "from": "From",
+            "kind": "種類",
+            "to": "To",
+            "count": "件数",
+            "flags": "フラグ"
+          },
+          "origin": {
+            "merged": "一部編集済み",
+            "declared": "宣言済み",
+            "derived": "推定"
+          },
+          "notice": {
+            "withOverrides": "推定 ({{by}} によるオーバーライドあり){{at}}",
+            "withOverridesAnon": "推定 (手動オーバーライドあり)",
+            "inferred": "この図はフォルダ構造とヘキサゴナルのルールから推定したもので、意図した設計と一致しない場合があります。"
+          },
+          "layer": {
+            "grpc-server": "gRPC サーバー",
+            "usecase": "ユースケース",
+            "domain": "ドメイン",
+            "adapter": "アダプター",
+            "external": "外部",
+            "support": "サポート"
+          },
+          "relation": {
+            "uses": "使用",
+            "implements": "実装",
+            "calls-rpc": "RPC 呼び出し",
+            "reads": "読み取り",
+            "writes": "書き込み",
+            "publishes": "発行",
+            "subscribes": "購読",
+            "unknown": "不明"
+          },
+          "descSource": {
+            "c4_yaml": "c4.yaml",
+            "package-doc": "パッケージのドキュメント",
+            "none": "なし"
+          }
+        },
+        "dataflow": {
+          "toolbar": "フローのオプション",
+          "detail": {
+            "service": "サービス",
+            "component": "コンポーネント"
+          },
+          "zoomOut": "縮小",
+          "zoomReset": "ズームをリセット",
+          "zoomIn": "拡大",
+          "copied": "コピーしました",
+          "copy": "Mermaid をコピー",
+          "stepDetail": "ステップの詳細",
+          "col": {
+            "step": "ステップ",
+            "route": "From → To",
+            "confidence": "信頼度",
+            "stores": "ストア"
+          },
+          "request": "リクエスト",
+          "response": "レスポンス",
+          "changedTag": "変更",
+          "notFound": "«{{label}}» に一致するデータフローはまだありません。",
+          "detailError": "このフローを読み込めませんでした。",
+          "retry": "再試行",
+          "loading": "フローを読み込み中...",
+          "partialBanner": "このフローは不完全です。解決できなかったステップがあります。欠落箇所はステップ一覧に表示されます。",
+          "diagramLabel": "{{label}} のシーケンス図。テキスト版はステップ一覧を参照してください",
+          "search": "フローを検索",
+          "touchOnly": "変更に関わるフローのみ",
+          "touchUnknown": "どのフローが変更に関わるかはまだ判別できません。",
+          "error": "フローを読み込めませんでした。",
+          "empty": "このリポジトリではまだデータフローを構築できていません。",
+          "list": "フロー",
+          "hops": "{{count}} ホップ",
+          "partialTag": "部分的",
+          "count": "{{shown}} / {{total}} 件",
+          "loadMore": "さらに読み込む",
+          "diagramLoading": "図を読み込み中",
+          "diagram": {
+            "empty": "このフローには描画するメッセージがありません。",
+            "tooManyParticipants": "参加者が多すぎて描画できません。下のステップ一覧を使用してください。",
+            "tooLong": "図が大きすぎて描画できません。下のステップ一覧を使用してください。",
+            "truncated": "{{rendered}}/{{total}} 件のメッセージを表示中。すべてはステップ一覧にあります。"
+          },
+          "pick": "フローを選ぶとシーケンスを表示します。",
+          "gapAfter": "ステップ {{n}} の後にデータが欠けています",
+          "async": "非同期",
+          "inferred": "推定",
+          "changed": "変更あり",
+          "untested": "テストなし",
+          "unimplemented": "未実装",
+          "steps": "フローのステップ"
+        },
+        "impact": {
+          "direction": "方向",
+          "upstream": "呼び出し元",
+          "both": "両方",
+          "downstream": "依存先",
+          "depth": "深さ",
+          "view": "表示",
+          "viewGraph": "グラフ",
+          "viewList": "リスト",
+          "columnCenter": "選択中のシンボル",
+          "columnUp": "上流、レベル {{level}}",
+          "columnDown": "下流、レベル {{level}}",
+          "more": "他 {{count}} 件",
+          "direct": "直接",
+          "openPathBlocked": "このパスはワークツリーの外にあるため開きませんでした。",
+          "errTimeout": "影響範囲の取得がタイムアウトしました。",
+          "errTooLarge": "結果が大きすぎます。深さを下げるか別のシンボルを選んでください。",
+          "errNotFound": "このシンボルがインデックスに見つかりません。インデックスが古い可能性があります。",
+          "errFailed": "影響範囲の取得に失敗しました。",
+          "pick": "変更されたシンボルを選ぶと影響範囲が表示されます。",
+          "noEdges": "データにエッジ情報がないため、シンボルはレベル別に表示されます。",
+          "truncated": "結果の一部のみ表示しています。",
+          "none": "このシンボルの依存関係はインデックスに見つかりませんでした。",
+          "openUnavailable": "このファイルの差分を開けませんでした。",
+          "risk": {
+            "low": "リスク低",
+            "medium": "リスク中",
+            "high": "リスク高",
+            "critical": "リスク重大",
+            "unknown": "データ不足"
+          }
+        },
+        "symbolDetail": {
+          "testsError": "テストを読み込めませんでした。",
+          "retry": "再試行",
+          "testsEmpty": "インデックスにカバーするテストが見つかりません。",
+          "sourceError": "ソースを読み込めませんでした。",
+          "sourceCut": "最初の {{count}} 行を表示しています。",
+          "sourceMasked": "機密と思われる情報を非表示にしました。",
+          "viewDiff": "差分を表示",
+          "setCenter": "中心に設定",
+          "openEditor": "エディタで開く",
+          "copyKey": "キーをコピー",
+          "notFound": "このシンボルがインデックスに見つかりません。インデックスが古い可能性があります。",
+          "loadError": "シンボルの詳細を読み込めませんでした。",
+          "back": "戻る",
+          "incoming": "呼び出し元",
+          "outgoing": "呼び出し先",
+          "flows": "関連フロー",
+          "tests": "カバーするテスト",
+          "source": "ソース",
+          "relationsEmpty": "インデックスに見つかりません。",
+          "showMore": "さらに {{count}} 件表示",
+          "flowsEmpty": "インデックスにフローが見つかりません。",
+          "flowStep": "ステップ {{step}}/{{total}}",
+          "copyPath": "パスをコピー",
+          "omitted": {
+            "gitignored": "ソース省略: ファイルは git で無視されています。",
+            "binary": "ソース省略: バイナリファイルです。",
+            "sensitive": "ソース省略: このパスには機密情報がある可能性があります。",
+            "notRequested": "ソースは要求されませんでした。",
+            "unavailable": "ソースがありません。"
+          },
+          "indexLines": "行番号は {{commit}} 時点のインデックスに基づきます。"
+        },
+        "structure": {
+          "rootError": "リポジトリの構造を読み込めませんでした。",
+          "empty": "このパスの構造情報はインデックスにありません。",
+          "up": "1 つ上へ",
+          "deleted": "削除された {{count}} 件のファイルは表示されません",
+          "capReached": "{{count}} ノードで読み込みを停止しました。フォルダを開くとさらに表示されます。",
+          "paneTreemap": "ツリーマップ",
+          "paneTree": "ツリー",
+          "treemapLabel": "{{count}} 件のツリーマップ。キーボード操作にはツリーを使ってください。",
+          "small": "小さい項目 +{{count}}",
+          "tipSymbols": "シンボル {{count}} 件",
+          "changedCount": "{{count}} 件変更",
+          "sizeBy": "サイズ基準",
+          "sizeSymbols": "シンボル",
+          "noLoc": "このフォルダの行数はインデックスにありません。",
+          "sizeLoc": "行数",
+          "colorBy": "色分け",
+          "colorArea": "エリア",
+          "colorLanguage": "言語",
+          "breadcrumb": "パス",
+          "root": "リポジトリ",
+          "colorLegend": "色",
+          "treeLabel": "ファイルとフォルダ",
+          "loading": "読み込み中...",
+          "folderError": "このフォルダを読み込めませんでした。",
+          "shown": "{{count}} 件表示",
+          "loadMore": "さらに読み込む",
+          "fileDetail": "ファイル詳細",
+          "closeDetail": "ファイル詳細を閉じる",
+          "changedSymbols": "このファイルの変更されたシンボル"
+        },
+        "overlay": {
+          "legend": {
+            "title": "凡例"
+          },
+          "changed": {
+            "label": "変更",
+            "description": "このレビュー範囲で変更"
+          },
+          "affected": {
+            "label": "影響あり",
+            "description": "インデックス上で変更シンボルから到達可能"
+          },
+          "untested": {
+            "label": "テスト未検出",
+            "description": "インデックスにカバーするテストが見つかりません"
+          },
+          "violation": {
+            "label": "ルール検出",
+            "description": "含まれるファイルにルール検出があります"
+          }
+        },
+        "ErdWarningsStrip": {
+          "summary": "{{count}} 件の解析警告、{{tables}} 件のテーブルが不完全な可能性があります",
+          "degraded": "{{table}} の ER 図は不完全な可能性があります"
+        },
+        "ErdLens": {
+          "error": {
+            "offline": "ワークスペースとの接続が切れています。",
+            "forbidden": "このリポジトリへのアクセス権がありません。",
+            "tooLarge": "ER 図が大きすぎて一度に読み込めません。",
+            "timeout": "ER 図の作成に時間がかかりすぎました。",
+            "unavailable": "このリポジトリでは ER 図を利用できません。",
+            "generic": "ER 図を読み込めませんでした。"
+          },
+          "retry": "再試行",
+          "noMigrations": "このリポジトリにはマイグレーションを持つサービスが見つかりませんでした。",
+          "building": "ER 図を作成しています...",
+          "emptyService": "このサービスのマイグレーションにはテーブルがありません。",
+          "newData": "新しいデータがあります。更新",
+          "backendTruncated": "バックエンドがこの結果を制限しました。",
+          "showingCount": "{{total}} 件中 {{shown}} 件のテーブルを表示しています。残りは一覧にあります。",
+          "tableLevelOnly": "列の詳細はありません。変更されたテーブルを強調表示しています。",
+          "noCodeLinks": "コードとの関連はまだありません（コードのインデックスがない可能性があります）。",
+          "noMatches": "現在のフィルターに一致するテーブルはありません。",
+          "clearFilters": "フィルターを解除",
+          "label": "エンティティ関連図",
+          "back": "前のサービスに戻る"
+        },
+        "ErdCanvas": {
+          "label": "エンティティ関連図。テキストで確認するには一覧表示を使用してください"
+        },
+        "ErdGhostTableNode": {
+          "owner": "{{service}} が所有 — その ER 図を開く"
+        },
+        "ErdTableList": {
+          "summary": "{{columns}} 列 · 読み取り {{reads}} · 書き込み {{writes}}",
+          "label": "テーブル"
+        },
+        "ErdToolbar": {
+          "label": "ER 図のコントロール",
+          "service": "サービス",
+          "dialect": "SQL 方言",
+          "schemas": "スキーマ",
+          "search": "テーブル・列・コードを検索 (/)",
+          "searchLabel": "ER 図内を検索",
+          "scope": "表示するテーブル",
+          "focus": "変更 + 関連",
+          "all": "すべて",
+          "view": "表示",
+          "graph": "グラフ",
+          "list": "一覧",
+          "asOf": "マイグレーション {{migration}} 時点"
+        },
+        "ErdColumnRow": {
+          "primaryKey": "主キー",
+          "foreignKey": "外部キー",
+          "masked": "機密テキストをマスクしました"
+        },
+        "ErdTableDetail": {
+          "changedSymbol": "変更済み",
+          "openSymbol": "開く",
+          "viewDiff": "差分を表示",
+          "label": "テーブルの詳細: {{name}}",
+          "close": "詳細を閉じる",
+          "degraded": "このテーブルの ER 図は不完全な可能性があります。",
+          "tenantScoped": "テナントスコープ: {{value}}",
+          "yes": "はい",
+          "no": "いいえ",
+          "rlsState": "行レベルセキュリティ: {{state}}",
+          "columns": "列",
+          "colName": "名前",
+          "colType": "型",
+          "colDefault": "デフォルト",
+          "colKey": "キー",
+          "indexes": "インデックス",
+          "unique": "一意",
+          "partialUnique": "部分一意インデックスをエミュレート",
+          "rules": "チェック制約と行レベルセキュリティ",
+          "relations": "リレーション",
+          "anomaly": "想定外のデータ",
+          "openService": "{{service}} を開く",
+          "accessors": "このテーブルを読み書きするコード ({{count}})",
+          "accessFilter": "アクセスのフィルター",
+          "filterAll": "すべて",
+          "filterWrite": "書き込み",
+          "filterRead": "読み取り",
+          "accessHint": "テーブル名の検索による手がかりです。動的に組み立てられたクエリは見落とされる場合があります。",
+          "staleAccessWarning": "ヒントであり誤りの可能性があります。この変更は、変更範囲外のコードがまだ使っている列を変更しています。",
+          "noAccessors": "コードとの関連は見つかりませんでした。インデックスがないか、クエリが動的に組み立てられている可能性があります。",
+          "migrations": "この変更に含まれるマイグレーション",
+          "viewMigration": "マイグレーションの差分を表示"
+        },
+        "ErdRelationEdge": {
+          "source": {
+            "ddl": "DDL で宣言",
+            "declared": "erd-links で宣言",
+            "comment": "SQL コメントから",
+            "naming": "命名からの推測",
+            "unknown": "不明な出典"
+          }
+        },
+        "ErdLegend": {
+          "added": "追加",
+          "modified": "変更",
+          "removed": "削除",
+          "label": "凡例",
+          "foreignKey": "外部キー",
+          "logicalLink": "論理リンク"
+        },
+        "ErdTableNode": {
+          "adjacent": "関連",
+          "ariaLabel": "テーブル {{name}}、{{count}} 列{{state}}",
+          "dropped": "この変更で削除されたテーブル",
+          "noColumnDetail": "列の詳細はありません",
+          "fewerColumns": "列の表示を減らす",
+          "moreColumns": "+{{count}} 列",
+          "change": {
+            "added": "追加",
+            "modified": "変更",
+            "removed": "削除"
+          }
+        },
+        "StorageToolbar": {
+          "label": "ストレージのコントロール",
+          "env": "環境",
+          "legacy": "レガシーを表示",
+          "onlyChanged": "変更されたものと関連のみ",
+          "kinds": "ストアの種類",
+          "asOf": "コミット {{commit}} 時点"
+        },
+        "StorageInferenceNotice": {
+          "inferred": "{{count}} 件は宣言ではなく設定から推測されたものです。",
+          "redacted": "バックエンドが {{count}} 件の値を伏せました。"
+        },
+        "StorageNodeDetail": {
+          "label": "詳細: {{name}}",
+          "close": "詳細を閉じる",
+          "vaultPath": "Vault パス: {{path}}",
+          "neverShown": "値は表示もコピーもされません。",
+          "copyKey": "キー名をコピー",
+          "owner": "所有者",
+          "schemas": "スキーマ",
+          "delivery": "配信",
+          "stream": "ストリーム",
+          "payload": "ペイロード",
+          "status": "状態",
+          "deployed": "デプロイ済み",
+          "openErd": "{{service}} の ER 図を開く",
+          "connections": "接続",
+          "evidence": "根拠",
+          "viewDiff": "差分を表示"
+        },
+        "StorageCanvas": {
+          "notDeployed": "未デプロイ",
+          "noCodeSupport": "コード側の対応なし",
+          "external": "外部",
+          "label": "ストレージマップ。テキストで確認するにはテキスト表示を使用してください",
+          "mark": {
+            "added": "追加",
+            "modified": "変更",
+            "removed": "削除",
+            "related": "関連"
+          },
+          "confidence": {
+            "inferred": "推測",
+            "derived": "導出"
+          }
+        },
+        "StorageSecretNode": {
+          "ariaLabel": "シークレット参照 {{name}}",
+          "masked": "画面上で機密テキストをマスクしました",
+          "neverShown": "値は表示されません",
+          "copyKey": "キー名をコピー"
+        },
+        "StorageTextView": {
+          "summary": "テキスト表示",
+          "from": "開始",
+          "relation": "関係",
+          "to": "終了"
+        },
+        "StorageLens": {
+          "error": {
+            "offline": "ワークスペースとの接続が切れています。",
+            "forbidden": "このリポジトリへのアクセス権がありません。",
+            "generic": "ストレージマップを読み込めませんでした。"
+          },
+          "unavailable": "このバックエンドではストレージマップを利用できません。",
+          "retry": "再試行",
+          "building": "ストレージ設定を読み込んでいます...",
+          "empty": "このリポジトリにはストレージ設定が見つかりませんでした。",
+          "newData": "新しいデータがあります。更新",
+          "truncated": "バックエンドがこの結果を制限しました。",
+          "unknownChange": "どのコンポーネントが変更されたか判別できません。バックエンドが出典の根拠を提供していません。",
+          "noStorageChange": "インデックス範囲内では、ストレージ設定の変更は検出されませんでした。",
+          "label": "ストレージマップ"
+        },
+        "StorageLegend": {
+          "label": "凡例",
+          "added": "追加",
+          "modified": "変更",
+          "removed": "削除",
+          "related": "変更に関連",
+          "binding": "読み書き (rw) または読み取り専用 (ro)",
+          "topic": "発行 / 購読",
+          "configKey": "シークレット参照"
+        },
+        "contract": {
+          "migration": {
+            "label": "マイグレーション {{service}}",
+            "files": "ファイル",
+            "dialectOnly": "{{dialect}} のみ",
+            "title": "マイグレーション · {{service}}"
+          },
+          "detail": {
+            "openErd": "ERD で開く",
+            "label": "契約変更の詳細",
+            "files": "ファイル",
+            "noFiles": "ファイルは報告されていません",
+            "viewDiff": "差分を表示",
+            "notInChange": "この変更には含まれません",
+            "consumers": "利用側",
+            "noConsumersBreaking": "利用側が見つかりません（このリポジトリ外、または未インデックスの可能性があります）",
+            "noConsumers": "利用側が見つかりません"
+          },
+          "change": {
+            "added": "追加",
+            "removed": "削除",
+            "modified": "変更",
+            "unknown": "変更（未分類）"
+          },
+          "table": {
+            "noDetails": "詳細なし",
+            "label": "契約の変更",
+            "col": {
+              "contract": "契約",
+              "before": "変更前",
+              "after": "変更後",
+              "compat": "互換性"
+            }
+          },
+          "compat": {
+            "breaking": "破壊的",
+            "risky": "リスクあり",
+            "compatible": "互換",
+            "unknown": "未分類"
+          },
+          "kind": {
+            "proto": "Proto",
+            "wsChannel": "WS チャネル",
+            "route": "ルート",
+            "migration": "マイグレーション",
+            "unknown": "その他"
+          },
+          "loading": "契約の変更を読み込み中...",
+          "error": {
+            "noIndex": "コードインデックスが利用できないため、契約の変更をまだ一覧できません。",
+            "load": "契約の変更を読み込めませんでした。"
+          },
+          "retry": "再試行",
+          "filter": {
+            "kind": "契約の種類",
+            "service": "サービス",
+            "allServices": "すべてのサービス",
+            "onlyBreaking": "破壊的のみ",
+            "onlyChanged": "この変更によるもののみ",
+            "search": "契約を検索"
+          },
+          "summary": {
+            "label": "互換性の概要"
+          },
+          "truncated": "{{total}} 件中 {{shown}} 件を表示しています。残りを見るにはフィルターを絞り込んでください。",
+          "empty": "このスコープでは契約の変更は検出されませんでした（proto、WS チャネル、ルート、マイグレーション）。",
+          "emptyFiltered": "現在のフィルターに一致する変更はありません。",
+          "group": {
+            "noService": "（不明なサービス）"
+          },
+          "signature": {
+            "absent": "（なし）"
+          }
+        },
+        "findings": {
+          "reason": {
+            "not_applicable": "該当なし",
+            "accepted_risk": "リスク受容",
+            "false_positive": "誤検知",
+            "later": "後で修正"
+          },
+          "dismiss": {
+            "reasonLegend": "この指摘を無視する理由は？",
+            "notePlaceholder": "任意のメモ",
+            "noteLabel": "メモ",
+            "scopeNote": "リポジトリ全体に適用されます。エラーの指摘に対する品質ゲートは免除されません。",
+            "confirm": "無視"
+          },
+          "kind": {
+            "layer_violation": "レイヤー違反",
+            "dependency_cycle": "依存の循環",
+            "hotspot": "ホットスポット",
+            "missing_tenant_id": "tenant_id の欠落",
+            "dead_code": "未使用の可能性があるコード",
+            "rls_removed": "RLS の削除",
+            "unknown": "その他"
+          },
+          "filter": {
+            "onlyIntroduced": "この変更によるもののみ",
+            "showDismissed": "無視済みを表示 ({{count}})",
+            "search": "指摘を検索"
+          },
+          "freshness": {
+            "stale": "データが古い可能性があります"
+          },
+          "severity": {
+            "error": "エラー",
+            "warning": "警告",
+            "info": "情報",
+            "unknown": "未分類"
+          },
+          "origin": {
+            "introduced": "この変更で導入",
+            "touched": "変更されたファイル内",
+            "preexisting": "既存",
+            "unknown": "由来不明"
+          },
+          "error": {
+            "forbidden": "指摘を無視する権限がありません。",
+            "offline": "オフラインです。指摘は変更されていません。",
+            "notFound": "この指摘はもう存在しません。一覧を再読み込みしました。",
+            "conflict": "この指摘は他のユーザーによって変更されました。一覧を再読み込みしました。",
+            "reasonRequired": "先に理由を選択してください。",
+            "generic": "指摘を更新できませんでした。",
+            "noIndex": "コードインデックスが利用できないため、構造上の指摘をまだ一覧できません。",
+            "load": "指摘を読み込めませんでした。"
+          },
+          "confidence": "信頼度: {{level}}",
+          "state": {
+            "resolved": "解決済みとしてマーク",
+            "ignored": "無視: {{reason}}"
+          },
+          "saving": "保存中",
+          "action": {
+            "viewInGraph": "グラフで表示",
+            "note": "メモ",
+            "restore": "再開",
+            "ignore": "無視",
+            "resolve": "解決済みにする",
+            "viewDiff": "差分を表示",
+            "openFile": "ファイルを開く"
+          },
+          "retry": "再試行",
+          "loading": "指摘を読み込み中...",
+          "label": "構造上の指摘",
+          "empty": "インデックス済みの範囲で問題は見つかりませんでした。",
+          "emptyIndexed": "インデックス: {{commit}}（{{date}}）。",
+          "list": {
+            "partial": "読み込み済みの {{count}} 件を表示中。フィルターを絞るか、さらに読み込んでください。",
+            "loadMore": "さらに読み込む"
+          },
+          "title": {
+            "layer_violation": "レイヤー違反: {{from}} が {{to}} に依存",
+            "dependency_cycle": "依存の循環",
+            "hotspot": "ホットスポット: 変更が多く複雑",
+            "missing_tenant_id": "クエリに tenant_id フィルターがない可能性",
+            "dead_code": "未使用の可能性があるコード",
+            "rls_removed": "行レベルセキュリティの削除"
+          }
+        },
+        "ReviewSent": {
+          "hint": {
+            "changed": "送信後にファイルが変更されました（推定）",
+            "unchanged": "このファイルに変更は見られません（推定）"
+          },
+          "empty": "まだ何も送信されていません。",
+          "title": "以前のターンで送信済み",
+          "count": "{{count}} 件のメモ",
+          "recordFailed": "送信しましたが、バッチ履歴は保存されませんでした。"
+        },
+        "ReviewNote": {
+          "scope": {
+            "all": "未送信のメモすべて",
+            "lens": "このビューのメモ",
+            "selection": "選択したメモ"
+          },
+          "previewButton": "プレビュー",
+          "badge": "未送信のメモ {{count}} 件",
+          "lens": {
+            "findings": "指摘"
+          },
+          "sent": "送信済み",
+          "label": "メモ",
+          "saveFailed": "メモを保存できませんでした。入力内容は保持されています。",
+          "save": "メモを保存",
+          "cancel": "キャンセル",
+          "jump": "移動",
+          "edit": "編集",
+          "delete": "削除",
+          "panel": "レビューメモ",
+          "persistFailed": "メモ履歴を保存できませんでした。メモはローカルに保持されます。",
+          "empty": "メモはまだありません。ノードまたは指摘で「メモ」を使用してください。",
+          "attachesTo": "{{where}} に付与されます",
+          "noFile": "この項目にはメモを付けるファイルがありません。",
+          "placeholder": "エージェント向けのメモを書く",
+          "button": "メモ",
+          "noFileReason": "付与できるファイルがありません",
+          "preview": {
+            "title": "プロンプトのプレビュー",
+            "description": "{{count}} 件のメモが以下の内容で送信されます。",
+            "tooMany": "大きなバッチです。先に小さい範囲で送信することを検討してください。"
+          }
+        },
+        "ReviewTurn": {
+          "label": {
+            "new": "このターンで新規",
+            "changed": "このターンで変更",
+            "unchanged": "前のターンから変更なし",
+            "reverted": "変更ではなくなりました"
+          },
+          "groupLabel": "ターンの比較",
+          "mode": {
+            "all": "すべての変更",
+            "since": "前のターン以降",
+            "previous": "前のターンを表示"
+          },
+          "turns": "ターン ({{count}})",
+          "agent": "エージェント",
+          "interrupted": "中断",
+          "sentNotes": "送信済みメモ {{count}} 件",
+          "noPrevious": "比較できる前のターンがまだありません。",
+          "estimate": "推定: ファイルごとの変更行数に基づくため、行数が同じ編集は見逃されることがあります。",
+          "readOnly": "前のターンの読み取り専用ビューです。その差分は再構築されません。",
+          "saveFailed": "ターンのマーカーを保存できませんでした。",
+          "retry": "再試行"
+        },
+        "EntryButton": {
+          "label": "変更をレビュー",
+          "interrupted": "変更をレビュー(エージェントは中断されました)",
+          "short": "レビュー",
+          "unreviewed": "エージェントが完了、未レビュー"
+        },
+        "QuickActions": {
+          "review": {
+            "title": "変更をレビュー",
+            "description": "アクティブなワークツリーのコードレビューを開きます。",
+            "verbs": {
+              "review": "変更をレビュー",
+              "open": "レビューを開く",
+              "impact": "影響"
+            }
+          },
+          "architecture": {
+            "title": "アーキテクチャマップを開く",
+            "description": "コードレビューのアーキテクチャビューを開きます。",
+            "verbs": {
+              "architecture": "アーキテクチャマップ",
+              "c4": "c4"
+            }
+          },
+          "erd": {
+            "title": "ERD を開く",
+            "description": "コードレビューのデータモデル(ERD)ビューを開きます。",
+            "verbs": {
+              "erd": "erd",
+              "schema": "データベーススキーマ"
+            }
+          }
+        },
+        "ReviewSummaryPanel": {
+          "title": "レビュー",
+          "openFull": "全体を開く",
+          "vs": "比較",
+          "index": "インデックス",
+          "files": "ファイル",
+          "symbols": "シンボル",
+          "flows": "フロー",
+          "tables": "テーブル",
+          "contracts": "コントラクト",
+          "untested": "テストなし",
+          "findings": "指摘",
+          "errors": "エラー",
+          "warnings": "警告",
+          "progress": "既読",
+          "loading": "サマリーを読み込み中…",
+          "unavailable": "レビューサマリーを利用できません。",
+          "retry": "再試行",
+          "disabled": "このワークスペースではコードレビューが有効になっていません。"
+        }
+      },
+      "qualityCharts": {
+        "severity": {
+          "error": "エラー",
+          "warning": "警告",
+          "info": "情報",
+          "unknown": "不明"
+        },
+        "verdict": {
+          "pass": "合格",
+          "warn": "警告あり",
+          "fail": "不合格",
+          "unknown": "不明",
+          "unknownLong": "結論を出すにはデータが不足しています"
+        },
+        "stale": "古い",
+        "frame": {
+          "viewTable": "表で表示",
+          "viewChart": "グラフを表示",
+          "retry": "再試行",
+          "showing": "{{shown}}/{{total}} 件を表示中",
+          "stale": "古いデータ",
+          "loading": "グラフを読み込み中",
+          "emptyDefault": "この範囲にはグラフ化するデータがありません。",
+          "errorDefault": "グラフを描画できませんでした。"
+        },
+        "summary": {
+          "rangeUp": "{{label}}: {{count}} 点で {{first}} から {{last}} に増加",
+          "rangeDown": "{{label}}: {{count}} 点で {{first}} から {{last}} に減少",
+          "rangeFlat": "{{label}}: {{count}} 点にわたり {{last}} のまま",
+          "single": "{{label}}: 値は 1 つ、{{value}}",
+          "noValues": "{{label}}: 記録された値なし",
+          "missing": "{{count}} 点に値がありません",
+          "coverage": "変更行の {{percent}}% をカバー ({{covered}}/{{total}})",
+          "coverageNone": "この範囲のカバレッジデータはありません",
+          "coverageEstimated": "推定",
+          "grid": "{{rows}} 行 × {{columns}} 列、{{total}} 件中 {{shown}} 件を表示",
+          "treemap": "{{count}} 個のタイル（サイズ: {{size}}、濃淡: {{intensity}}）",
+          "matrix": "{{nodes}} ノード、{{cells}} 個の塗りセル、{{blocks}} 個の循環グループ"
+        },
+        "stackedBar": {
+          "noData": "まだデータがありません",
+          "noFindings": "実行したチェックでは検出なし",
+          "total": "検出 {{count}} 件"
+        },
+        "sparkline": {
+          "needTwo": "少なくとも 2 点が必要です"
+        },
+        "trend": {
+          "verdictChange": "判定が変化",
+          "axis": "横軸: ターン（古い順から新しい順）",
+          "point": "点",
+          "turn": "ターン",
+          "verdict": "判定"
+        },
+        "gauge": {
+          "value": "{{percent}}%（変更行 {{covered}}/{{total}} をカバー）",
+          "estimated": "テストの関連から推定した値で、実測のカバレッジではありません",
+          "measured": "実測",
+          "partial": "一部の範囲",
+          "none": "この範囲のカバレッジデータはまだありません",
+          "warnBelow": "{{value}}% 未満で警告",
+          "failBelow": "{{value}}% 未満で不合格",
+          "belowFail": "不合格のしきい値を下回っています",
+          "belowWarn": "警告のしきい値を下回っています",
+          "clamped": "カバー行数が合計を超えています。値は 100% に制限しました",
+          "source": "ソース",
+          "covered": "カバー行数",
+          "total": "変更行数",
+          "percent": "カバレッジ",
+          "scope": "範囲"
+        },
+        "treemap": {
+          "more": "ほか {{count}} 件",
+          "moreLabel": "ほか {{count}} 件は描画されていません。表を参照してください",
+          "tileLabel": "{{label}}、{{sizeLabel}}: {{size}}、{{intensityLabel}}: {{intensity}}",
+          "empty": "この範囲に表示する項目はありません。",
+          "overlay": "マーカー: {{tags}}"
+        },
+        "grid": {
+          "hint": "矢印キーで移動、Enter で選択、Esc でグラフを離れます。"
+        },
+        "heatmap": {
+          "empty": "この範囲に表示する行はありません。"
+        },
+        "matrix": {
+          "cycleGroup": "循環グループ",
+          "other": "その他 ({{count}})",
+          "readHint": "行は依存元、列は依存先です。",
+          "backEdge": "逆方向の依存",
+          "empty": "この範囲に表示する依存関係はありません。",
+          "cellLabel": "{{from}} は {{to}} に依存、重み {{weight}}"
+        },
+        "table": {
+          "label": "ラベル",
+          "value": "値",
+          "size": "サイズ",
+          "intensity": "強度",
+          "from": "依存元",
+          "to": "依存先",
+          "weight": "重み",
+          "note": "メモ",
+          "metric": "指標",
+          "severity": "重大度",
+          "count": "件数"
+        }
+      },
+      "graph": {
+        "RiskLevel": {
+          "low": "低",
+          "medium": "中",
+          "high": "高",
+          "critical": "重大",
+          "unknown": "未評価"
+        },
+        "RiskTooltip": "リスク {{level}}、評価日時 {{assessedAt}}、使用ツール {{tool}}",
+        "RiskTooltipUnassessed": "リスク {{level}}、評価日時の記録なし",
+        "Edge": {
+          "added": "追加",
+          "removed": "削除"
+        },
+        "Entry": {
+          "description": "リクエストのフロー、計画、影響をグラフまたはリストで確認します",
+          "planGraph": "グラフ",
+          "planView": "計画の表示",
+          "title": "リクエストグラフ",
+          "tree": "ツリー",
+          "viewGraph": "グラフを表示"
+        },
+        "GroupSummary": "影響なし +{{count}} 件 ({{kinds}})",
+        "Legend": {
+          "added": "追加された接続 (実線)",
+          "removed": "削除された接続 (破線)",
+          "title": "凡例"
+        },
+        "List": {
+          "shown": "{{total}} 件中 {{shown}} 件を表示",
+          "Change": {
+            "added": "追加",
+            "removed": "削除",
+            "unchanged": "変更なし"
+          },
+          "col": {
+            "kind": "種類",
+            "label": "ラベル",
+            "group": "グループ",
+            "risk": "リスク",
+            "status": "状態",
+            "change": "変更",
+            "relations": "接続数"
+          }
+        },
+        "Mini": {
+          "addedEdges": "{{count}} 件の接続を追加",
+          "breaking": "{{count}} 件の破壊的変更",
+          "empty": "未評価",
+          "nodes": "{{count}} ノード",
+          "removedEdges": "{{count}} 件の接続を削除"
+        },
+        "Node": {
+          "ariaLabel": "{{label}}、{{kind}}、リスク {{risk}}{{status}}"
+        },
+        "Search": {
+          "description": "ラベル、種類、グループでノードを検索",
+          "empty": "一致するノードがありません",
+          "placeholder": "ノードを検索...",
+          "title": "グラフを検索"
+        },
+        "Sheet": {
+          "findings": "検出事項",
+          "incoming": "入力",
+          "open": "開く",
+          "outgoing": "出力"
+        },
+        "State": {
+          "empty": "この表示では影響を受ける項目はありません",
+          "error": "グラフを読み込めませんでした",
+          "forbidden": "評価を表示する権限がありません",
+          "loading": "グラフを読み込み中",
+          "noAssessment": "影響評価はまだありません",
+          "noDevServer": "開発サーバーが接続されていません",
+          "retry": "再試行",
+          "runAssessment": "評価を実行",
+          "stale": "分析インデックスが古いため、結果が不完全な可能性があります",
+          "truncated": "{{total}} ノード中 {{shown}} ノードを表示",
+          "connectDevServer": "開発サーバーを接続"
+        },
+        "Status": {
+          "added": "追加",
+          "blocked": "ブロック中",
+          "breaking": "破壊的変更",
+          "cancelled": "キャンセル",
+          "done": "完了",
+          "in_progress": "進行中",
+          "irreversible": "元に戻せない",
+          "modified": "変更あり",
+          "open": "未着手",
+          "removed": "削除",
+          "review": "レビュー中"
+        },
+        "Toolbar": {
+          "after": "変更後",
+          "before": "変更前",
+          "changeView": "変更前後",
+          "graph": "グラフ",
+          "lens": "レンズ",
+          "list": "リスト",
+          "search": "検索",
+          "view": "表示"
+        },
+        "LensDisabled": {
+          "noAssessment": "影響評価はまだありません",
+          "noPlan": "計画はまだありません",
+          "notExecuting": "まだ実行されていません",
+          "unsupported": "このランタイムでは未対応です"
+        },
+        "lens": {
+          "flow": "フロー",
+          "architecture": "アーキテクチャ",
+          "contract": "コントラクト",
+          "data": "データ",
+          "impact": "影響",
+          "plan": "計画",
+          "execution": "実行"
+        }
+      },
+      "reviewQuality": {
+        "visualization": {
+          "block": {
+            "refresh": "更新",
+            "unavailable": "この表示にはコードインテリジェンスが扱えるワークツリーが必要です。",
+            "stale": "直近の更新に失敗しました。以前に読み込んだデータを表示しています。"
+          },
+          "error": {
+            "generic": "このデータを読み込めませんでした。",
+            "timeout": "分析に時間がかかっています。しばらくしてからもう一度お試しください。",
+            "tooLarge": "結果が大きすぎて表示できません。範囲を絞ってもう一度お試しください。"
+          },
+          "coverage": {
+            "title": "テストカバレッジ",
+            "description": "変更行とファイルごとのカバレッジ。濃いタイルほど未カバーの文の割合が大きくなります。",
+            "diffTitle": "差分カバレッジ",
+            "treemapTitle": "ファイル別カバレッジ",
+            "sizeLabel": "文",
+            "intensityLabel": "未カバー率(%)",
+            "estimatedBanner": "テストとの関係から推定した値で、実測のカバレッジではありません。",
+            "measuredLine": "実測のカバレッジ。",
+            "totals": "レポート全体: {{stmts}} 文中 {{percent}}% がカバー済み。",
+            "dirty": "測定時、作業ツリーに未コミットの変更がありました。",
+            "noReport": "この範囲のカバレッジデータはまだありません。",
+            "noReportReason": "この範囲のカバレッジデータはまだありません。理由: {{reason}}",
+            "noDiff": "この範囲では差分カバレッジを利用できません。",
+            "noDiffReason": "この範囲では差分カバレッジを利用できません。理由: {{reason}}",
+            "noChangedLines": "この範囲に実行可能な変更行はありません。",
+            "runCheck": "チェックを実行",
+            "partial": "部分的な範囲: 一部の変更ファイルは測定されていません。",
+            "excluded": "除外されたファイル({{count}})",
+            "excludedItem": "{{path}}:{{reason}}",
+            "noStatements": "文のないファイル {{count}} 件は描画されません。",
+            "uncoveredTitle": "未カバーの行",
+            "uncoveredNone": "未カバーの行範囲は報告されていません。",
+            "uncoveredFile": "{{path}}({{count}} 行)",
+            "uncoveredRange": "{{from}}〜{{to}} 行",
+            "uncoveredLine": "{{line}} 行",
+            "openDiff": "{{path}} の {{line}} 行目で差分を開く",
+            "uncoveredMore": "未カバー行が多い上位 {{shown}} 件のファイルを表示中(全 {{total}} 件)。"
+          },
+          "trend": {
+            "title": "ターン別の推移",
+            "titleCommit": "コミット別の推移",
+            "description": "ポイントごとの指摘件数。線の途切れは、そのポイントで数値が記録されていないことを示します。",
+            "groupBy": "グループ化",
+            "groupTurn": "ターン",
+            "groupCommit": "コミット",
+            "empty": "このワークツリーの品質実行はまだ記録されていません。",
+            "needTwo": "推移を表示するには少なくとも 2 ターン必要です。",
+            "latest": "最新のポイント: エラー {{error}} 件、警告 {{warning}} 件、情報 {{info}} 件。",
+            "clickHint": "ターンを選択すると、前のターンと比較できます。",
+            "diffCoverage": "差分カバレッジ",
+            "diffCoverageMissing": "{{count}} 個のポイントに差分カバレッジの数値がありません。",
+            "sourceLocal": "ローカル",
+            "sourceCi": "CI",
+            "sourceUnknown": "不明なソース",
+            "details": "ポイントごとの詳細",
+            "colPoint": "ポイント",
+            "colSource": "ソース",
+            "colVerdict": "判定",
+            "colCoverage": "差分カバレッジ",
+            "headNote": "HEAD {{commit}} 時点の数値 · {{source}}"
+          },
+          "hotspot": {
+            "title": "ホットスポット",
+            "description": "設定された履歴期間内に構造解析 (ルール hotspot.file) が検出したファイルです。品質スコアではありません。",
+            "empty": "ホットスポットのデータはまだありません。",
+            "emptyReason": "ホットスポットのデータはまだありません。構造解析が有効で十分な履歴があると表示されます。",
+            "moreRows": "バックエンドにはさらに {{count}} 件のファイルがあり、読み込まれていません。",
+            "allMetrics": "すべての指標({{count}})",
+            "colFile": "ファイル",
+            "selected": "選択中: {{path}}",
+            "owner": "オーナー: {{owner}}",
+            "openDiff": "差分を開く"
+          },
+          "dependency": {
+            "title": "依存関係",
+            "description": "行はインポートする側、列はインポートされる側のモジュールです。枠線付きのブロックと ▲ は循環グループを示します。",
+            "emptyReason": "この範囲の依存関係データはまだありません。",
+            "backendTruncated": "バックエンドは {{total}} 個中 {{shown}} 個のモジュールを返しました。",
+            "edgesTitle": "{{from}} と {{to}} の間のエッジ",
+            "edgeLine": "{{from}} は {{to}} をインポート({{count}})",
+            "noEdge": "これらのモジュール間にインポートのエッジはありません。",
+            "openStructure": "構造レンズで開く",
+            "close": "閉じる"
+          }
+        },
+        "scorecard": {
+          "lens": {
+            "title": "品質",
+            "findingsLink": "{{count}} 件の指摘を表示",
+            "findingsLinkNone": "指摘を表示"
+          },
+          "blocks": {
+            "coverage": "テストカバレッジ",
+            "trend": "ターンごとの推移",
+            "hotspot": "ホットスポット",
+            "dependency": "依存関係",
+            "loading": "読み込み中"
+          },
+          "verdict": {
+            "pass": "プロファイル {{profile}} のチェックはすべて通過しました",
+            "warn": "警告があります",
+            "fail": "通過しませんでした",
+            "unknown": "結論を出すにはデータが不足しています",
+            "unknownNoReason": "バックエンドから理由が返されませんでした",
+            "profileMissing": "名前のないプロファイル"
+          },
+          "mode": {
+            "inform": "情報モード: レビューの作成はブロックされません",
+            "block": "ブロック設定ですが、この画面では警告のみ表示します",
+            "unknown": "ゲートのモードが不明です"
+          },
+          "reasons": {
+            "title": "この判定の根拠となるチェック",
+            "none": "バックエンドはチェックごとの理由を返しませんでした"
+          },
+          "reason": {
+            "pass": "通過",
+            "warn": "警告",
+            "fail": "失敗",
+            "unknown": "不明",
+            "values": "観測値 {{observed}}、しきい値 {{threshold}}",
+            "waived": "{{count}} 件を免除",
+            "show": "指摘を表示",
+            "noFilter": "このチェックの指摘は絞り込めません"
+          },
+          "steps": {
+            "title": "実行したステップ ({{count}})",
+            "none": "この実行にはステップが記録されていません"
+          },
+          "step": {
+            "passed": "通過",
+            "findings": "指摘あり",
+            "failed": "失敗",
+            "timeout": "タイムアウト",
+            "cancelled": "キャンセル済み",
+            "skipped": "スキップ",
+            "env_not_ready": "環境が未準備",
+            "unknown": "不明",
+            "failure": {
+              "format_drift": "出力形式が変わりました",
+              "output_too_large": "出力が大きすぎます",
+              "exit_unexpected": "予期しない終了",
+              "parser_error": "出力を解析できませんでした",
+              "env": "環境の問題"
+            },
+            "noResult": "このステップは完了しなかったため、指摘は含まれず結果は不明です",
+            "counts": "エラー {{errors}} 件、警告 {{warnings}} 件、情報 {{infos}} 件",
+            "duration": "{{seconds}} 秒",
+            "truncated": "出力が切り詰められました",
+            "outside": "変更範囲外が {{count}} 件"
+          },
+          "source": {
+            "local": "ローカル",
+            "ci": "CI",
+            "unknown": "不明なソース"
+          },
+          "provenance": {
+            "line": "{{source}} · 実行 {{time}} · HEAD {{head}} · インデックス {{index}}",
+            "lineNoRun": "{{source}} · HEAD {{head}} · インデックス {{index}}",
+            "indexBehind": "コードインデックスが HEAD と異なるコミットにあります",
+            "unknownValue": "不明"
+          },
+          "stale": {
+            "title": "この結果は古くなっています",
+            "headMoved": "この結果の計算後に HEAD が移動しました。",
+            "backend": "バックエンドがこの結果を古いものとしてマークしました。",
+            "cache": "この結果の取得後にリポジトリが変更されました。更新中です。",
+            "rerun": "再実行",
+            "label": "古い"
+          },
+          "banner": {
+            "dirty": "実行中、作業ツリーに未コミットの変更がありました。行番号がずれている可能性があります。",
+            "changedDuringRun": "実行中に作業ツリーが変更されました。行番号がずれている可能性があります。",
+            "scopeWidened": "範囲が要求より広げられました。",
+            "outsideScope": "{{count}} 件の指摘が変更範囲外にあり、ゲートには含まれません",
+            "truncated": "バックエンドがこの実行の指摘を切り詰めました。"
+          },
+          "counts": {
+            "title": "重大度別の指摘",
+            "description": "この判定の根拠となる実行のエラー・警告・情報の件数です。"
+          },
+          "ci": {
+            "title": "ローカルと CI の比較",
+            "agree_pass": "ローカルも CI も通過しました",
+            "agree_fail": "ローカルも CI も失敗しました",
+            "local_pass_ci_fail": "ローカルは通過しましたが CI は通過しませんでした。通過とは見なせません",
+            "local_fail_ci_pass": "ローカルは失敗しましたが CI は通過しました",
+            "local_only": "ローカル実行のみ存在します",
+            "ci_only": "CI 実行のみ存在します",
+            "ci_pending": "CI はまだ実行中です",
+            "sha_mismatch": "CI は HEAD と異なるコミットで実行されました",
+            "not_comparable": "ローカルと CI の結果は比較できません",
+            "unknown": "比較結果は不明です",
+            "open": "CI 実行を開く",
+            "hints": "考えられる原因"
+          },
+          "chip": {
+            "label": "品質",
+            "open": "品質ビューを開く"
+          },
+          "run": {
+            "profile": "プロファイル",
+            "scopeLabel": "範囲",
+            "scope": {
+              "changed": "変更したファイル",
+              "worktree": "作業ツリー全体",
+              "commitRange": "コミット範囲"
+            },
+            "start": "チェックを実行",
+            "starting": "開始中",
+            "heavy": "重い",
+            "notReady": "未準備",
+            "missing": "不足: {{check}} ({{reason}})",
+            "missingHint": "ヒント: {{hint}}",
+            "noProfiles": "実行可能なプロファイルがありません",
+            "cancel": "キャンセル",
+            "cancelling": "キャンセル中、確認待ちです",
+            "queued": "待機中",
+            "running": "実行中",
+            "stage": "ステージ: {{stage}}",
+            "step": "ステップ {{index}} / {{count}}",
+            "percent": "{{percent}}%",
+            "progressUnknown": "進捗は不明です",
+            "finished": {
+              "succeeded": "実行が完了しました",
+              "failed": "実行は完了しませんでした",
+              "interrupted": "実行は中断され、完了しませんでした",
+              "cancelled": "実行はキャンセルされました",
+              "unknown": "実行は不明な状態で終了しました"
+            },
+            "dismiss": "閉じる",
+            "copyDetails": "詳細をコピー",
+            "details": "実行 {{runId}} · {{status}}"
+          },
+          "error": {
+            "envNotReady": "環境がこれらのチェックを実行できる状態ではありません",
+            "recheck": "再確認",
+            "profileUnknown": "そのプロファイルは利用できなくなりました。一覧を更新しました",
+            "profileAvailable": "利用可能: {{names}}",
+            "rateLimited": "実行の要求が多すぎます",
+            "rateLimitedIn": "{{seconds}} 秒後にもう一度お試しください",
+            "forbidden": "チェックを実行する権限がありません。結果は引き続き閲覧できます",
+            "offline": "オフラインです。キャッシュされた結果を表示しており、実行はできません",
+            "generic": "チェックを開始できませんでした"
+          },
+          "state": {
+            "loading": "品質結果を読み込み中",
+            "notRun": {
+              "title": "この範囲ではまだチェックが実行されていません",
+              "body": "チェックを実行すると判定が得られます。それまでは何も結論づけられません。"
+            },
+            "empty": "実行したチェックでは指摘がありません ({{profile}})",
+            "error": "品質結果を読み込めませんでした",
+            "retry": "再試行",
+            "forbidden": "品質結果へのアクセス権がありません",
+            "offline": "オフラインです。最後にキャッシュされた結果を表示しています",
+            "indexStale": "コードインデックスが HEAD より古いため、構造チェックで最近の変更を見逃す可能性があります",
+            "runFailed": "前回の実行は完了しなかったため、そこから判定は出せません",
+            "cancelled": "前回の実行はキャンセルされました"
+          }
+        },
+        "annotations": {
+          "toggleLabel": "チェック注釈",
+          "toggleOn": "チェック注釈を隠す",
+          "toggleOff": "チェック注釈を表示",
+          "noticeContentChanged": "内容が変更されたため、チェック注釈を非表示にしました。チェックを再実行すると更新されます。",
+          "noticeDirty": "未コミットの変更がある状態で実行したため、チェック注釈が数行ずれる可能性があります。",
+          "noticeChangedDuringRun": "チェックの実行中にファイルが変更されたため、チェック注釈がずれている可能性があります。",
+          "glyphCount": "この行にチェックの指摘が {{count}} 件あります",
+          "glyphMore": "他 {{count}} 件"
+        },
+        "findings": {
+          "toolbarSeverity": "重大度で絞り込み",
+          "toolbarCategory": "カテゴリ",
+          "toolbarCategoryCount": "カテゴリ ({{count}})",
+          "toolbarOnlyInScope": "変更したファイルのみ",
+          "toolbarShowWaived": "免除済みを表示 ({{count}})",
+          "toolbarSearchPlaceholder": "メッセージ、ルール、ファイルを検索",
+          "categoryLint": "リント",
+          "categoryTypecheck": "型チェック",
+          "categoryTest": "テスト",
+          "categoryCoverage": "カバレッジ",
+          "categoryComplexity": "複雑度",
+          "categorySecurity": "セキュリティ",
+          "categoryDependency": "依存関係",
+          "categoryConvention": "規約",
+          "categoryArchitecture": "アーキテクチャ",
+          "categoryAi": "AIレビュー",
+          "loading": "読み込み中…",
+          "loadError": "チェックの指摘を読み込めませんでした。",
+          "retry": "再試行",
+          "loadMore": "さらに読み込む",
+          "emptyNoRun": "まだチェックを実行していません。実行すると指摘がここに表示されます。",
+          "emptyNone": "実行したチェックの対象範囲に指摘はありません。",
+          "emptyFiltered": "現在のフィルターに一致する指摘はありません。",
+          "footerShowing": "{{total}} 件中 {{shown}} 件を表示",
+          "footerOutsideScope": "変更範囲外が {{count}} 件（ゲートには含まれません）",
+          "footerCapped": "先頭の 5,000 件を表示しています。残りはフィルターで絞り込んでください。",
+          "footerTruncated": "ツールの出力が切り詰められたため、この一覧は不完全な可能性があります。",
+          "rowTool": "{{tool}} {{version}}",
+          "rowViewDiff": "差分を表示",
+          "rowOpenFile": "ファイルを開く",
+          "rowFixHint": "修正のヒント",
+          "rowWaived": "{{by}} が {{date}} まで免除",
+          "rowWaivedNoBy": "{{date}} まで免除",
+          "waiveOpen": "免除",
+          "waiveRevoke": "免除を解除",
+          "waiveReasonLabel": "理由",
+          "waiveReasonPlaceholder": "この指摘を許容できる理由は？",
+          "waiveReasonCount": "{{count}}/{{max}}",
+          "waiveExpiryLabel": "免除の期限",
+          "waiveExpiryDays": "{{days}} 日",
+          "waiveExpiryDate": "期限日",
+          "waiveCancel": "キャンセル",
+          "waiveSubmit": "指摘を免除",
+          "waiveSaving": "保存中…",
+          "waiveToastWaived": "指摘を免除しました",
+          "waiveToastRevoked": "免除を解除しました",
+          "waiveErrReasonRequired": "理由を入力してください（1000 文字まで）。",
+          "waiveErrExpiryRequired": "免除の期限を選択してください。",
+          "waiveErrExpiryPast": "期限は未来の日付にしてください。",
+          "waiveErrExpiry": "免除の期間は最長 {{maxDays}} 日です。",
+          "waiveErrForbidden": "指摘を免除する権限がありません。",
+          "waiveErrOffline": "オフラインです。免除は保存されませんでした。",
+          "waiveErrConflict": "この指摘は変更されました。一覧を再読み込みして、もう一度お試しください。",
+          "waiveErrValidation": "免除が拒否されました。理由と期限を確認してください。",
+          "waiveErrUnknown": "免除を保存できませんでした。"
         }
       }
     },
@@ -13085,6 +15776,17 @@
           "disabled": "コードインテリジェンス無効",
           "unsupported": "この環境では非対応"
         }
+      }
+    },
+    "settings": {
+      "codeIntel": {
+        "loading": "コードインテリジェンスの設定を読み込み中",
+        "notAuthorized": "これらのスイッチを変更できるのは管理者のみです。",
+        "codeIntelLabel": "コードインテリジェンス",
+        "qualityLabel": "品質ゲート",
+        "needsMaster": "先にコードインテリジェンスをオンにしてください。",
+        "serverOff": "組織で有効化されていますが、サーバー側のスイッチが現在オフです。",
+        "readOnly": "これらのスイッチの変更は管理者に依頼してください。"
       }
     }
   },

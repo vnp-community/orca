@@ -8,82 +8,83 @@
  */
 
 // ---------------------------------------------------------------------------
-// §3 RPC Methods — all 46
+// §3 RPC Methods — all 46 (26 + 20), names verbatim from CONTRACT-codeintel-ui-api
 // ---------------------------------------------------------------------------
 
 export const CODE_INTEL_RPC_METHODS = {
-  // Status & index
+  // CONTRACT-codeintel-ui-api §3.1 (26 channels, incl. the single stream)
   STATUS: 'codeIntel.status',
   REINDEX: 'codeIntel.reindex',
   REINDEX_STATUS: 'codeIntel.reindexStatus',
-  BIND_REPO: 'codeIntel.bindRepo',
-  SUBSCRIBE: 'codeIntel.subscribe',
-
-  // Settings
-  SETTINGS_GET: 'codeIntel.settings.get',
-  SETTINGS_SAVE: 'codeIntel.settings.save',
-
-  // Review state
+  STRUCTURE: 'codeIntel.structure',
+  ARCHITECTURE: 'codeIntel.architecture',
+  DATA_FLOWS: 'codeIntel.dataFlows',
+  DATA_FLOW: 'codeIntel.dataFlow',
+  ERD: 'codeIntel.erd',
+  STORAGE: 'codeIntel.storage',
+  SUBGRAPH: 'codeIntel.subgraph',
+  IMPACT: 'codeIntel.impact',
+  SYMBOL: 'codeIntel.symbol',
+  ROUTES: 'codeIntel.routes',
+  CHANGE_OVERLAY: 'codeIntel.changeOverlay',
+  READING_ORDER: 'codeIntel.readingOrder',
+  FINDINGS: 'codeIntel.findings',
+  DISMISS_FINDING: 'codeIntel.dismissFinding',
+  CONTRACT_DIFF: 'codeIntel.contractDiff',
   REVIEW_STATE_GET: 'codeIntel.reviewState.get',
   REVIEW_STATE_SAVE: 'codeIntel.reviewState.save',
-  REVIEW_STATE_APPROVE: 'codeIntel.reviewState.approve',
-  REVIEW_STATE_RESET: 'codeIntel.reviewState.reset',
-
-  // Review comments
-  REVIEW_COMMENT_ADD: 'codeIntel.reviewComment.add',
-  REVIEW_COMMENT_RESOLVE: 'codeIntel.reviewComment.resolve',
-  REVIEW_COMMENT_DELETE: 'codeIntel.reviewComment.delete',
-
-  // Review checklist
-  REVIEW_CHECKLIST_SET: 'codeIntel.reviewChecklist.set',
-
-  // Overlay
-  OVERLAY_GET: 'codeIntel.overlay.get',
-
-  // Impact
-  IMPACT_QUERY: 'codeIntel.impact.query',
-  IMPACT_GRAPH: 'codeIntel.impact.graph',
-
-  // Symbol
-  SYMBOL_SEARCH: 'codeIntel.symbol.search',
-  SYMBOL_HOVER: 'codeIntel.symbol.hover',
-  SYMBOL_REFERENCES: 'codeIntel.symbol.references',
-  SYMBOL_DEFINITION: 'codeIntel.symbol.definition',
-
-  // Findings
-  FINDING_LIST: 'codeIntel.finding.list',
-  FINDING_WAIVE: 'codeIntel.finding.waive',
-  FINDING_REVOKE: 'codeIntel.finding.revoke',
-  DISMISS_FINDING: 'codeIntel.dismissFinding',
-
-  // Quality
-  QUALITY_PROFILE_GET: 'codeIntel.quality.profile.get',
-  QUALITY_PROFILE_SAVE: 'codeIntel.quality.profile.save',
-  QUALITY_GATE_GET: 'codeIntel.quality.gate.get',
-  QUALITY_RUN_START: 'codeIntel.quality.run.start',
-  QUALITY_RUN_STATUS: 'codeIntel.quality.run.status',
-  QUALITY_RUN_CANCEL: 'codeIntel.quality.run.cancel',
-  QUALITY_TRACE_LIST: 'codeIntel.quality.trace.list',
-  QUALITY_TRACE_CONFIRM: 'codeIntel.quality.trace.confirm',
-  QUALITY_TRACE_LINK: 'codeIntel.quality.trace.link',
-  QUALITY_COVERAGE_GET: 'codeIntel.quality.coverage.get',
-  QUALITY_TREND_LIST: 'codeIntel.quality.trend.list',
-  QUALITY_HOTSPOT_LIST: 'codeIntel.quality.hotspot.list',
-  QUALITY_DEPENDENCY_LIST: 'codeIntel.quality.dependency.list',
-
-  // C4
   C4_GET: 'codeIntel.c4.get',
   C4_SAVE: 'codeIntel.c4.save',
+  BIND_REPO: 'codeIntel.bindRepo',
+  SETTINGS_GET: 'codeIntel.settings.get',
+  SETTINGS_SET: 'codeIntel.settings.set',
+  SUBSCRIBE: 'codeIntel.subscribe',
 
-  // Contract
-  CONTRACT_DIFF_GET: 'codeIntel.contract.diff.get',
-  CONTRACT_DIFF_APPROVE: 'codeIntel.contract.diff.approve',
-
-  // Security
-  SECURITY_SCAN_START: 'codeIntel.security.scan.start',
-  SECURITY_SCAN_STATUS: 'codeIntel.security.scan.status',
-  SECURITY_SCAN_CANCEL: 'codeIntel.security.scan.cancel',
+  // CONTRACT-codeintel-ui-api §3.2 (20 channels)
+  QUALITY_START: 'codeIntel.quality.start',
+  QUALITY_CANCEL: 'codeIntel.quality.cancel',
+  QUALITY_RUN: 'codeIntel.quality.run',
+  QUALITY_RUNS: 'codeIntel.quality.runs',
+  QUALITY_FINDINGS: 'codeIntel.quality.findings',
+  QUALITY_WAIVE: 'codeIntel.quality.waive',
+  QUALITY_GATE: 'codeIntel.quality.gate',
+  QUALITY_PROFILE_GET: 'codeIntel.quality.profile.get',
+  QUALITY_PROFILE_SAVE: 'codeIntel.quality.profile.save',
+  QUALITY_TREND: 'codeIntel.quality.trend',
+  QUALITY_COVERAGE: 'codeIntel.quality.coverage',
+  QUALITY_TRACE: 'codeIntel.quality.trace',
+  QUALITY_TRACE_CONFIRM: 'codeIntel.quality.trace.confirm',
+  QUALITY_TRACE_LINK: 'codeIntel.quality.trace.link',
+  QUALITY_SUMMARY: 'codeIntel.quality.summary',
+  QUALITY_REPORT: 'codeIntel.quality.report',
+  QUALITY_CI: 'codeIntel.quality.ci',
+  QUALITY_TURN_RECORD: 'codeIntel.quality.turn.record',
+  QUALITY_TURNS: 'codeIntel.quality.turns',
+  QUALITY_TURN: 'codeIntel.quality.turn'
 } as const
+
+/** Channels whose result is wrapped in the §2.2 envelope (`Env<...>` in the contract). */
+export const CODE_INTEL_ENVELOPE_METHODS: ReadonlySet<string> = new Set([
+  CODE_INTEL_RPC_METHODS.STRUCTURE,
+  CODE_INTEL_RPC_METHODS.ARCHITECTURE,
+  CODE_INTEL_RPC_METHODS.DATA_FLOWS,
+  CODE_INTEL_RPC_METHODS.DATA_FLOW,
+  CODE_INTEL_RPC_METHODS.ERD,
+  CODE_INTEL_RPC_METHODS.STORAGE,
+  CODE_INTEL_RPC_METHODS.SUBGRAPH,
+  CODE_INTEL_RPC_METHODS.IMPACT,
+  CODE_INTEL_RPC_METHODS.SYMBOL,
+  CODE_INTEL_RPC_METHODS.ROUTES,
+  CODE_INTEL_RPC_METHODS.CHANGE_OVERLAY,
+  CODE_INTEL_RPC_METHODS.READING_ORDER,
+  CODE_INTEL_RPC_METHODS.FINDINGS,
+  CODE_INTEL_RPC_METHODS.CONTRACT_DIFF
+])
+
+/** Accepts `quality.trace` or `codeIntel.quality.trace`; returns the full channel name. */
+export function toCodeIntelMethod(method: string): string {
+  return method.startsWith('codeIntel.') ? method : `codeIntel.${method}`
+}
 
 export type CodeIntelMethod = (typeof CODE_INTEL_RPC_METHODS)[keyof typeof CODE_INTEL_RPC_METHODS]
 
@@ -131,9 +132,7 @@ export function getMethodMaxArgsBytes(method: string): number {
 // §2.3 Contract type stubs (review channels; quality remains unknown until 085/087)
 // ---------------------------------------------------------------------------
 
-export type CodeIntelRpcContract = {
-  [M in CodeIntelMethod]: {
+export type CodeIntelRpcContract = Record<CodeIntelMethod, {
     params: unknown
     result: unknown
-  }
-}
+  }>

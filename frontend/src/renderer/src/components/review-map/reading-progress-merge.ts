@@ -1,88 +1,79 @@
 /**
  * reading-progress-merge.ts — FE-CV-TASK-052-02
  *
- * Merges reading progress entries from multiple sources and
- * enforces a 64 KiB size guard for serialization.
- *
- * @module components/review-map/reading-progress-merge
+ * Last-writer-wins merge of ReadingProgress (per stepKey, by `at`) and the 64 KiB guard.
+ * Pure; never mutates inputs.
  */
 
-import type { ReadingProgressEntry, SerializedReadingProgress } from './reading-order-model'
+import type { ReadingProgress, ReadingProgressEntry } from './review-wire-types'
 
-// 64 KiB limit for serialized progress
-const MAX_PROGRESS_BYTES = 64 * 1024
-const PROGRESS_VERSION = 1
+/** Backend cap is 64 KiB; prune at 56 KiB to leave room for the envelope. */
+export const READING_PROGRESS_PRUNE_BYTES = 57344
 
-/**
- * Merge two sets of reading progress entries.
- * More recent `updatedAt` wins on conflict.
- * Result is sorted by path for stable serialization.
- */
 export function mergeReadingProgress(
-  base: ReadingProgressEntry[],
-  incoming: ReadingProgressEntry[]
-): ReadingProgressEntry[] {
-  const merged = new Map<string, ReadingProgressEntry>()
-
-  for (const entry of base) {
-    merged.set(entry.path, entry)
-  }
-
-  for (const entry of incoming) {
-    const existing = merged.get(entry.path)
-    if (!existing || entry.updatedAt > existing.updatedAt) {
-      merged.set(entry.path, entry)
+  local: ReadingProgress,
+  remote: ReadingProgress
+): ReadingProgress {
+  const entries: Record<string, ReadingProgressEntry> = { ...remote.entries }
+  for (const [key, entry] of Object.entries(local.entries)) {
+    const other = entries[key]
+    // Tie goes to local so a just-made toggle is not lost on equal clocks.
+    if (!other || entry.at >= other.at) {
+      entries[key] = entry
     }
   }
-
-  return Array.from(merged.values()).sort((a, b) => a.path.localeCompare(b.path))
+  const newest = (p: ReadingProgress): number =>
+    p.lastFocusedKey ? (p.entries[p.lastFocusedKey]?.at ?? 0) : -1
+  const lastFocusedKey =
+    newest(local) >= newest(remote) ? local.lastFocusedKey : remote.lastFocusedKey
+  return {
+    version: 1,
+    entries,
+    lastFocusedKey: lastFocusedKey ?? local.lastFocusedKey ?? remote.lastFocusedKey
+  }
 }
 
-/**
- * Serialize reading progress to JSON string.
- * Returns null if the serialized size exceeds 64 KiB.
- */
-export function serializeReadingProgress(
-  entries: ReadingProgressEntry[]
-): string | null {
-  const payload: SerializedReadingProgress = { entries, version: PROGRESS_VERSION }
-  const json = JSON.stringify(payload)
-  const bytes = new TextEncoder().encode(json).length
+export function measureReadingProgressBytes(progress: ReadingProgress): number {
+  return new TextEncoder().encode(JSON.stringify(progress)).length
+}
 
-  if (bytes > MAX_PROGRESS_BYTES) {
-    // Over size limit — trim oldest entries until it fits
-    const sorted = [...entries].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
-    while (sorted.length > 0) {
-      sorted.shift() // Remove oldest
-      const trimmed = JSON.stringify({ entries: sorted, version: PROGRESS_VERSION })
-      if (new TextEncoder().encode(trimmed).length <= MAX_PROGRESS_BYTES) {
-        return trimmed
-      }
+export type PrunedReadingProgress = {
+  progress: ReadingProgress
+  droppedUnseen: number
+  stillTooLarge: boolean
+}
+
+/** Keeps every `seen`; drops oldest `unseen` tombstones until the payload fits. */
+export function pruneReadingProgress(
+  progress: ReadingProgress,
+  maxBytes: number = READING_PROGRESS_PRUNE_BYTES
+): PrunedReadingProgress {
+  if (measureReadingProgressBytes(progress) <= maxBytes) {
+    return { progress, droppedUnseen: 0, stillTooLarge: false }
+  }
+  const tombstones = Object.entries(progress.entries)
+    .filter(([, e]) => e.state === 'unseen')
+    .sort((a, b) => a[1].at - b[1].at)
+  const entries = { ...progress.entries }
+  let dropped = 0
+  let next: ReadingProgress = { ...progress, entries }
+  for (const [key] of tombstones) {
+    delete entries[key]
+    dropped += 1
+    next = { ...progress, entries }
+    if (measureReadingProgressBytes(next) <= maxBytes) {
+      return { progress: next, droppedUnseen: dropped, stillTooLarge: false }
     }
-    return null
   }
-
-  return json
+  return { progress: next, droppedUnseen: dropped, stillTooLarge: true }
 }
 
-/**
- * Deserialize reading progress from JSON string.
- * Returns empty entries on parse failure (never throws).
- */
-export function deserializeReadingProgress(json: string): ReadingProgressEntry[] {
-  try {
-    const parsed = JSON.parse(json) as { entries?: unknown[]; version?: unknown }
-    if (!Array.isArray(parsed.entries)) return []
-
-    return parsed.entries
-      .filter((e): e is ReadingProgressEntry =>
-        typeof e === 'object' &&
-        e !== null &&
-        typeof (e as ReadingProgressEntry).path === 'string' &&
-        typeof (e as ReadingProgressEntry).status === 'string' &&
-        typeof (e as ReadingProgressEntry).updatedAt === 'string'
-      )
-  } catch {
-    return []
+export function countSeen(progress: ReadingProgress, stepKeys: readonly string[]): number {
+  let n = 0
+  for (const k of stepKeys) {
+    if (progress.entries[k]?.state === 'seen') {
+      n += 1
+    }
   }
+  return n
 }

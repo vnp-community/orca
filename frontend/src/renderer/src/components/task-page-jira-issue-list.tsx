@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { CreateRequestIssueButton } from '@/components/request/CreateRequestIssueButton'
 import { ArrowRight, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -227,6 +228,7 @@ function JiraIssueRow({
       </Tooltip>
 
       <div className="flex shrink-0 items-center justify-end gap-1 md:opacity-0 md:transition-opacity md:group-hover/row:opacity-100 md:group-focus-within/row:opacity-100">
+        <CreateRequestIssueButton issue={issue} compact />
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

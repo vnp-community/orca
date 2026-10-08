@@ -181,6 +181,7 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'clipboard.commitImageUpload',
   'clipboard.saveImageAsTempFile',
   'clipboard.startImageUpload',
+  'codeIntel.reviewSummary',
   'diagnostics.memory',
   'files.browseServerDir',
   'files.createFile',

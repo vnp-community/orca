@@ -1,105 +1,70 @@
 /**
  * agent-turn-privacy-guard.test.ts — FE-CV-TASK-089-07
  *
- * Privacy guard: verifies that agent turn recording modules
- * do NOT contain raw prompts, telemetry imports, or sensitive field names.
+ * Static + behavioural guard: the turn recorder modules never import telemetry and
+ * never put raw prompt / tool input in the outgoing payload; the verification
+ * wording stays free of attribution language.
  */
 
-import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { buildAgentTurnRecordParams } from './agent-turn-record-params'
+import { createAgentTurnToolCollector } from './agent-tool-use-command-summarizer'
 
-const TURNS_DIR = join(
-  import.meta.dirname,
-  // Relative from this test file to the turns directory
-  '.'
-)
+const TURNS_DIR = import.meta.dirname
 
-const MODULE_FILES = [
+const RECORDER_MODULES = [
   'agent-turn-record-params.ts',
   'agent-turn-record-queue.ts',
   'agent-tool-use-command-summarizer.ts',
-  'agent-turn-verification-view-model.ts'
+  'agent-turn-completion-detector.ts',
+  'use-agent-turn-backend-recorder.ts'
 ]
 
-describe('Privacy guard: no raw prompt/sensitive fields in output', () => {
-  it('buildAgentTurnRecordParams does not include raw prompt without masking', async () => {
-    const { buildAgentTurnRecordParams } = await import('./agent-turn-record-params')
-    const result = await buildAgentTurnRecordParams({
-      paneKey: 'pane-1',
-      projectId: 'proj-1',
-      worktreeId: 'repo-1::main',
-      headOid: 'abc123',
-      stateStartedAt: '2024-01-01T00:00:00Z',
-      endedAt: '2024-01-01T01:00:00Z',
-      stateHistory: [],
-      fileIdentifiers: [],
-      // No promptExcerptEnabled, no masking function, raw prompt present
-      rawPrompt: 'secret system prompt with credentials',
-    })
-    expect(result).not.toBeNull()
-    if (result) {
-      const serialized = JSON.stringify(result)
-      expect(serialized).not.toContain('secret system prompt')
-      expect(serialized).not.toContain('credentials')
-      expect(result).not.toHaveProperty('promptExcerpt')
-    }
-  })
+const read = (file: string): string => readFileSync(join(TURNS_DIR, file), 'utf-8')
 
-  it('promptExcerpt only present when flag AND masking function are both provided', async () => {
-    const { buildAgentTurnRecordParams } = await import('./agent-turn-record-params')
-    const maskFn = (text: string) => text.replace(/secret/gi, '[REDACTED]')
-    const result = await buildAgentTurnRecordParams({
-      paneKey: 'pane-1',
-      projectId: 'proj-1',
-      worktreeId: 'repo-1::main',
-      headOid: 'abc123',
-      stateStartedAt: '2024-01-01T00:00:00Z',
-      endedAt: '2024-01-01T01:00:00Z',
-      stateHistory: [],
-      fileIdentifiers: [],
-      promptExcerptEnabled: true,
-      maskSensitiveText: maskFn,
-      rawPrompt: 'secret prompt text'
-    })
-    expect(result?.promptExcerpt).toBeDefined()
-    expect(result?.promptExcerpt).not.toContain('secret')
-    expect(result?.promptExcerpt).toContain('[REDACTED]')
-  })
-})
-
-describe('Privacy guard: no telemetry imports in recorder modules', () => {
-  for (const file of MODULE_FILES) {
-    it(`${file} does not import telemetry/track`, () => {
-      const content = readFileSync(join(TURNS_DIR, file), 'utf-8')
-      expect(content).not.toMatch(/import.*\btrack\b/i)
-      expect(content).not.toMatch(/import.*\btelemetry\b/i)
-      expect(content).not.toMatch(/\bsendTelemetry\b/)
-      expect(content).not.toMatch(/\btrackEvent\b/)
+describe('recorder modules do not import telemetry', () => {
+  for (const file of RECORDER_MODULES) {
+    it(file, () => {
+      const content = read(file)
+      expect(content).not.toMatch(/from\s+['"][^'"]*telemetry[^'"]*['"]/i)
+      expect(content).not.toMatch(/\btrackEvent\b|\bsendTelemetry\b/)
     })
   }
 })
 
-describe('Privacy guard: verification view model uses no forbidden attribution language', () => {
-  it('view model file does not contain forbidden words', () => {
-    const content = readFileSync(
-      join(TURNS_DIR, 'agent-turn-verification-view-model.ts'),
-      'utf-8'
-    )
-    const forbidden = ['lying', 'lied', 'deceiving', 'faking', 'fake', 'hallucin']
-    for (const word of forbidden) {
-      expect(content.toLowerCase()).not.toContain(word)
-    }
-  })
+describe('outgoing payload carries no raw text', () => {
+  const secret = 'sk-live-SECRET-token and my private prompt'
 
-  it('unverified agreement does not map to consistent', async () => {
-    const { buildAgentTurnVerificationViewModel } = await import('./agent-turn-verification-view-model')
-    const vm = buildAgentTurnVerificationViewModel({
-      claims: [{ id: 'c1', text: 'test passed', agreement: 'unverified' }],
-      commandsSummary: null
+  it('omits the prompt, tool input and assistant text from params', () => {
+    const collector = createAgentTurnToolCollector()
+    collector.observe('p', { state: 'working', updatedAt: 1, toolName: 'Bash', toolInput: `echo ${secret}` })
+    const params = buildAgentTurnRecordParams({
+      projectId: 'p1',
+      worktreeId: 'repo::wt',
+      entry: { paneKey: 'p', prompt: secret, doneAt: 1, stateHistory: [] },
+      headOid: 'abc',
+      treeDirty: false,
+      fileIdentities: [],
+      commands: collector.take('p'),
+      storePromptExcerpt: true // flag on, but no masker exists -> still no excerpt
     })
-    const unverifiedClaim = vm.claims[0]
-    expect(unverifiedClaim.labelKey).not.toContain('consistent')
-    expect(unverifiedClaim.agreement).toBe('unverified')
+    const serialized = JSON.stringify(params)
+    expect(serialized).not.toContain('SECRET')
+    expect(serialized).not.toContain('private prompt')
+    expect(params).not.toHaveProperty('promptExcerpt')
+  })
+})
+
+describe('verification wording', () => {
+  it('uses no attribution language in code', () => {
+    const forbidden = ['lying', 'lied', 'deceiv', 'fake', 'faking', 'hallucin', 'dishonest']
+    for (const file of ['agent-turn-verification-view-model.ts', 'AgentTurnVerificationLine.tsx']) {
+      const content = read(file).toLowerCase()
+      for (const word of forbidden) {
+        expect(content, `${file} contains "${word}"`).not.toContain(word)
+      }
+    }
   })
 })

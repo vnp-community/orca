@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `ReadingOrderList.tsx`, `ReadingOrderRow.tsx`, `ReadingOrderGroupHeader.tsx`, `ReadingProgressBar.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-052-01, 052-03, 052-04, FE-CV-TASK-051-05, FE-CV-TASK-053-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: reading-order tests 22/22 pass incl. overlay marks; ReadingProgressBar; 500-row virtualization)
 
 ## Context
 
@@ -29,3 +29,8 @@
 ## Rủi ro
 
 - `aria-activedescendant` + ảo hoá chưa kiểm với trình đọc màn hình.
+
+
+## Ghi chú triển khai (2026-10-07)
+
+- Cờ lớp phủ trên hàng: `computeReadingStepOverlayFlags` (`review-overlay-model.ts`) chỉ trả `untested` (symbol của bước) và `violation` (theo file); bỏ `changed` vì mọi bước đều là file đổi. Prop `overlay?` thêm vào `ReadingOrderList`, `ReviewWorkspace` truyền xuống.

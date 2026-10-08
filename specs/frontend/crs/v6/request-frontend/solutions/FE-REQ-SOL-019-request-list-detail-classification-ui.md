@@ -1,6 +1,6 @@
 # FE-REQ-SOL-019: Danh sách, chi tiết Request, xác nhận phân loại, "Tạo Request" từ Tasks
 
-> 🚧 **In Progress.** Rà soát 2026-10-07: 019-01 ✅ (`request-stage-timeline-model.ts`), 019-02 🟡 partial (`request-list-keyboard.ts` done, `RequestsTab` UI chưa), 019-03..07 ❌ TODO. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🚧 **Mostly done.** Verified 2026-10-07: 019-01..05 DONE; 019-06 and 019-07 PARTIAL (e2e specs not written/run). Notes: contract has no `request.links` yet so Related tab reads `links` from request.get; CreateRequestDialog sends the type hint as `hints.issueType`.
 
 **CR:** [CR-REQ-019](../../../../../../docs/crs/v6/request-frontend/CR-REQ-019-request-list-detail-classification-ui.md)
 **Area:** frontend (`components/request/`, `components/TaskPage.tsx` qua component riêng)

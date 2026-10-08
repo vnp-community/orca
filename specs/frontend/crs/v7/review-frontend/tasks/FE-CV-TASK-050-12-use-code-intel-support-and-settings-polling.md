@@ -5,7 +5,7 @@
 **Area:** frontend / hooks
 **File:** `frontend/src/renderer/src/hooks/useCodeIntelSupport.ts` (mới), test `useCodeIntelSupport.test.tsx`
 **Depends on:** FE-CV-TASK-050-07, FE-CV-TASK-050-10
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: useCodeIntelSupport.test 13 pass; mapping fixed to effective.codeIntelEnabled (contract §6))
 
 ## Context
 

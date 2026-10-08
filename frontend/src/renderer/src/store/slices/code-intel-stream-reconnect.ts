@@ -1,183 +1,155 @@
 /**
  * code-intel-stream-reconnect.ts — FE-CV-TASK-050-11
  *
- * Manages the code-intel push stream with exponential backoff reconnection.
- * Follows the pattern of startMcpEvents in mcp-slice.ts.
+ * Ref-counted push stream (`codeIntel.subscribe`, one per environment) with reconnect backoff,
+ * following startMcpEvents in mcp-slice.ts.
  *
- * Rules:
- * - Ref-counted: only one stream per environment
- * - Backoff: 1s → 30s, resets after 30s of healthy connection
- * - resync events increment codeIntelResyncCounter
- * - onUnsupported/RATE_LIMITED → polling mode
- * - Clears all timers on reset/dispose
+ * - `changed` invalidates the worktree cache (stale chip); `changed{resync}` also bumps the
+ *   resync counter so open views reload. A gateway-initiated close reconnects and resyncs.
+ * - Backoff 1 s -> 30 s, reset after 30 s of healthy connection.
+ * - Unsupported transport (local target, no stream) -> polling mode; timers are always cleared.
  *
  * @module store/slices/code-intel-stream-reconnect
  */
 
 import { publishCodeIntelEvent } from '../../lib/code-intel-event-bus'
-import type { CodeIntelPushEvent } from '../../lib/code-intel-event-bus'
+import type { CodeIntelPushEvent as BusEvent } from '../../lib/code-intel-event-bus'
+import type { CodeIntelPushEvent } from '../../../../shared/code-intel-types'
+import type { CodeIntelSubscribeCallbacks } from '../../../../shared/code-intel-bridge'
+import type { CodeIntelEventsState } from './code-intel'
 
-// ---------------------------------------------------------------------------
-// Backoff constants
-// ---------------------------------------------------------------------------
+export const BACKOFF_INITIAL_MS = 1_000
+export const BACKOFF_MAX_MS = 30_000
+export const HEALTHY_DURATION_MS = 30_000
 
-const BACKOFF_INITIAL_MS = 1_000
-const BACKOFF_MAX_MS = 30_000
-const HEALTHY_DURATION_MS = 30_000
-
-// ---------------------------------------------------------------------------
-// Stream state
-// ---------------------------------------------------------------------------
+export type CodeIntelStreamDeps = {
+  subscribe: (environmentId: string | null, callbacks: CodeIntelSubscribeCallbacks) => () => void
+  invalidateWorktree: (worktreeId: string) => void
+  triggerResync: () => void
+  setEventsState: (state: CodeIntelEventsState) => void
+}
 
 type StreamState = {
-  environmentId: string
+  environmentId: string | null
   refCount: number
   unsubscribe: (() => void) | null
   backoffMs: number
   reconnectTimer: ReturnType<typeof setTimeout> | null
   healthyTimer: ReturnType<typeof setTimeout> | null
-  startedAt: number
+  /** Set after an unexpected close: the next successful open must reload views. */
+  resyncOnReconnect: boolean
+  disposed: boolean
 }
 
 const streams = new Map<string, StreamState>()
+const LOCAL_KEY = '\0local'
 
-// ---------------------------------------------------------------------------
-// Callbacks (injected by store to avoid circular deps)
-// ---------------------------------------------------------------------------
-
-export type StreamCallbacks = {
-  triggerResync: () => void
-  setPollingMode: (environmentId: string) => void
-  getSubscribe: (environmentId: string, method: string, params: object, callbacks: {
-    onResponse: (raw: unknown) => void
-    onClose: (code?: number) => void
-  }) => (() => void) | null
-}
-
-let _callbacks: StreamCallbacks | null = null
-
-export function initCodeIntelStreamCallbacks(callbacks: StreamCallbacks): void {
-  _callbacks = callbacks
-}
-
-// ---------------------------------------------------------------------------
-// Frame parser
-// ---------------------------------------------------------------------------
-
-function parseFrame(raw: unknown): CodeIntelPushEvent | null {
-  if (typeof raw !== 'object' || raw === null) return null
-  const frame = raw as Record<string, unknown>
-  const event = frame.event
-
-  if (!event || typeof event !== 'string') return null
-
-  const worktreeId = typeof frame.worktreeId === 'string' ? frame.worktreeId : ''
-
-  switch (event) {
+/** The internal bus keeps its own (looser) event shape for older consumers. */
+function toBusEvent(event: CodeIntelPushEvent): BusEvent {
+  switch (event.event) {
     case 'changed':
-      return {
-        event: 'changed',
-        worktreeId,
-        reason: typeof frame.reason === 'string' ? frame.reason : undefined,
-        resync: frame.resync === true
-      }
+      return { event: 'changed', worktreeId: event.worktreeId, reason: event.reason, resync: event.resync }
     case 'reindexProgress':
       return {
         event: 'reindexProgress',
-        worktreeId,
-        percent: typeof frame.percent === 'number' ? frame.percent : null,
-        overall: typeof frame.overall === 'string' ? frame.overall : 'UNKNOWN'
+        worktreeId: event.worktreeId,
+        percent: event.percent,
+        overall: event.running ? 'BUILDING' : 'UNKNOWN'
       }
     case 'qualityProgress':
       return {
         event: 'qualityProgress',
-        worktreeId,
-        runId: typeof frame.runId === 'string' ? frame.runId : '',
-        percent: typeof frame.percent === 'number' ? frame.percent : null
+        worktreeId: event.worktreeId,
+        runId: event.runId,
+        percent: event.percent,
+        stage: event.stage,
+        stepIndex: event.stepIndex,
+        stepCount: event.stepCount,
+        message: event.message
       }
     case 'qualityFinished':
       return {
         event: 'qualityFinished',
-        worktreeId,
-        runId: typeof frame.runId === 'string' ? frame.runId : '',
-        success: frame.success === true,
-        error: typeof frame.error === 'string' ? frame.error : null
+        worktreeId: event.worktreeId,
+        runId: event.runId,
+        success: event.success,
+        error: event.error,
+        status: event.status,
+        headCommit: event.headCommit
       }
     case 'gateChanged':
-      return { event: 'gateChanged', worktreeId, gate: frame.gate }
-    default:
-      // Unknown event — silently drop (U4)
-      return null
+      return {
+        event: 'gateChanged',
+        worktreeId: event.worktreeId,
+        gate: event.gate,
+        headCommit: event.headCommit,
+        profile: event.profile
+      }
   }
 }
 
-// ---------------------------------------------------------------------------
-// Stream lifecycle
-// ---------------------------------------------------------------------------
+function clearTimers(state: StreamState): void {
+  if (state.reconnectTimer) {clearTimeout(state.reconnectTimer)}
+  if (state.healthyTimer) {clearTimeout(state.healthyTimer)}
+  state.reconnectTimer = null
+  state.healthyTimer = null
+}
 
-function connect(state: StreamState): void {
-  if (!_callbacks) return
+function connect(state: StreamState, deps: CodeIntelStreamDeps): void {
+  if (state.disposed) {return}
 
-  const healthyStart = Date.now()
+  if (state.resyncOnReconnect) {
+    state.resyncOnReconnect = false
+    deps.triggerResync()
+  }
+  deps.setEventsState('streaming')
+  state.healthyTimer = setTimeout(() => {
+    state.backoffMs = BACKOFF_INITIAL_MS
+  }, HEALTHY_DURATION_MS)
 
-  const unsub = _callbacks.getSubscribe(
-    state.environmentId,
-    'codeIntel.subscribe',
-    {},
-    {
-      onResponse: (raw) => {
-        // Ack frame: null → ignore
-        if (raw === null) return
-
-        const parsed = parseFrame(raw)
-        if (!parsed) return
-
-        // Publish to bus first
-        publishCodeIntelEvent(parsed)
-
-        // resync → trigger resync
-        if (parsed.event === 'changed' && parsed.resync) {
-          _callbacks?.triggerResync()
-        }
-
-        // Reset healthy timer on any successful frame
-        if (state.healthyTimer) clearTimeout(state.healthyTimer)
-        state.healthyTimer = setTimeout(() => {
-          state.backoffMs = BACKOFF_INITIAL_MS
-        }, HEALTHY_DURATION_MS)
-      },
-
-      onClose: (code) => {
-        if (state.healthyTimer) clearTimeout(state.healthyTimer)
-
-        const isUnsupported = code === 1008 // Policy violation / unsupported
-        const isRateLimited = code === 1013 // Try again later
-
-        if (isUnsupported || isRateLimited) {
-          _callbacks?.setPollingMode(state.environmentId)
-          return
-        }
-
-        // Reconnect with backoff
-        if (state.refCount > 0) {
-          state.reconnectTimer = setTimeout(() => {
-            state.backoffMs = Math.min(state.backoffMs * 2, BACKOFF_MAX_MS)
-            connect(state)
-          }, state.backoffMs)
-        }
+  state.unsubscribe = deps.subscribe(state.environmentId, {
+    onEvent: (event) => {
+      if (state.disposed) {return}
+      if (event.event === 'changed') {
+        // Why: a plain `changed` only marks cached data stale; the UI shows a chip instead of reloading.
+        deps.invalidateWorktree(event.worktreeId)
+        if (event.resync) {deps.triggerResync()}
       }
+      publishCodeIntelEvent(toBusEvent(event))
+    },
+    onClose: () => {
+      if (state.disposed) {return}
+      if (state.healthyTimer) {clearTimeout(state.healthyTimer)}
+      state.healthyTimer = null
+      state.unsubscribe = null
+      if (state.refCount <= 0) {return}
+      state.resyncOnReconnect = true
+      const delay = state.backoffMs
+      state.backoffMs = Math.min(state.backoffMs * 2, BACKOFF_MAX_MS)
+      state.reconnectTimer = setTimeout(() => {
+        state.reconnectTimer = null
+        connect(state, deps)
+      }, delay)
+    },
+    onUnsupported: () => {
+      if (state.disposed) {return}
+      clearTimers(state)
+      state.unsubscribe = null
+      deps.setEventsState('polling')
     }
-  )
-
-  state.unsubscribe = unsub
+  })
 }
 
 /**
- * Retain the push stream for an environment.
- * Returns a release function.
+ * Retain the push stream for an environment (null = local target, which falls back to polling).
+ * Returns an idempotent release function.
  */
-export function retainCodeIntelStream(environmentId: string): () => void {
-  let state = streams.get(environmentId)
+export function retainCodeIntelStream(
+  environmentId: string | null,
+  deps: CodeIntelStreamDeps
+): () => void {
+  const key = environmentId ?? LOCAL_KEY
+  let state = streams.get(key)
   if (!state) {
     state = {
       environmentId,
@@ -186,33 +158,39 @@ export function retainCodeIntelStream(environmentId: string): () => void {
       backoffMs: BACKOFF_INITIAL_MS,
       reconnectTimer: null,
       healthyTimer: null,
-      startedAt: Date.now()
+      resyncOnReconnect: false,
+      disposed: false
     }
-    streams.set(environmentId, state)
-    connect(state)
+    streams.set(key, state)
+    state.refCount++
+    connect(state, deps)
+  } else {
+    state.refCount++
   }
 
-  state.refCount++
-
+  const owned = state
+  let released = false
   return () => {
-    if (!state) return
-    state.refCount--
-    if (state.refCount <= 0) {
-      // Clean up
-      state.unsubscribe?.()
-      if (state.reconnectTimer) clearTimeout(state.reconnectTimer)
-      if (state.healthyTimer) clearTimeout(state.healthyTimer)
-      streams.delete(environmentId)
+    if (released) {return}
+    released = true
+    owned.refCount--
+    if (owned.refCount <= 0) {
+      owned.disposed = true
+      owned.unsubscribe?.()
+      owned.unsubscribe = null
+      clearTimers(owned)
+      if (streams.get(key) === owned) {streams.delete(key)}
+      deps.setEventsState('idle')
     }
   }
 }
 
-/** For testing: reset all streams. */
+/** For testing: drop every stream and timer. */
 export function resetCodeIntelStreams(): void {
   for (const state of streams.values()) {
+    state.disposed = true
     state.unsubscribe?.()
-    if (state.reconnectTimer) clearTimeout(state.reconnectTimer)
-    if (state.healthyTimer) clearTimeout(state.healthyTimer)
+    clearTimers(state)
   }
   streams.clear()
 }

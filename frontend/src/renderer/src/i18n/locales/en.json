@@ -344,6 +344,11 @@
           "tab": {
             "372d21d428": "Mobile Emulator"
           }
+        },
+        "review": {
+          "tab": {
+            "title": "Review"
+          }
         }
       },
       "fix": {
@@ -698,7 +703,9 @@
         "devSearchKeywordToast": "toast",
         "devSearchKeywordSonner": "sonner",
         "devSearchKeywordError": "error",
-        "devSearchKeywordNotification": "notification"
+        "devSearchKeywordNotification": "notification",
+        "codeIntelTitle": "Code intelligence",
+        "codeIntelDesc": "Turn code review maps and the quality gate on or off for your organization."
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "Paste is too large."
@@ -6436,7 +6443,9 @@
           "2309068a6f": "destructive",
           "65358016ea": "Discard",
           "dev": "Dev Tools",
-          "devDescription": "Dev-only tools for exercising UI states."
+          "devDescription": "Dev-only tools for exercising UI states.",
+          "codeIntelTitle": "Code intelligence",
+          "codeIntelDesc": "Turn code review maps and the quality gate on or off for your organization."
         },
         "SettingsFormControls": {
           "42a4d15a30": "No matching fonts.",
@@ -12783,6 +12792,26 @@
         "GenerateAgentPromptButton": {
           "confirmReplace": "Replace the current prompt with the generated one?",
           "label": "Generate with AI"
+        },
+        "TaskGraph": {
+          "showPlanning": "Show Plan/Phase"
+        },
+        "TaskDetail": {
+          "phaseNotApproved": "Approve the Phase or Plan before running this task"
+        },
+        "TaskDAGView": {
+          "status": {
+            "done": "Done",
+            "in_progress": "In progress",
+            "blocked": "Blocked",
+            "review": "In review",
+            "open": "Open",
+            "cancelled": "Cancelled"
+          }
+        },
+        "TaskBoardView": {
+          "backlogMoved": "Tasks not started yet live under Requests > Backlog",
+          "openBacklog": "Open backlog"
         }
       },
       "taskPageEmptyState": {
@@ -13038,7 +13067,8 @@
             "requests": "Requests",
             "approvals": "Approvals",
             "backlog": "Backlog"
-          }
+          },
+          "close": "Close requests page"
         },
         "RequestUnsupportedNotice": {
           "title": "Request management not supported",
@@ -13047,6 +13077,2667 @@
         "SidebarRequestNavButton": {
           "label": "Requests",
           "badge": "pending approvals"
+        },
+        "RequestType": {
+          "bug": {
+            "label": "Bug",
+            "description": "Something is broken and needs a fix."
+          },
+          "task": {
+            "label": "Task",
+            "description": "A well-defined piece of work."
+          },
+          "docs": {
+            "label": "Docs",
+            "description": "Write or update documentation."
+          },
+          "question": {
+            "label": "Question",
+            "description": "Needs an answer, not a code change."
+          },
+          "hotfix": {
+            "label": "Hotfix",
+            "description": "Urgent production fix on a fast path."
+          },
+          "security": {
+            "label": "Security",
+            "description": "Security issue or hardening."
+          },
+          "ops_request": {
+            "label": "Ops request",
+            "description": "Operational or infrastructure change."
+          },
+          "change_request": {
+            "label": "Change request",
+            "description": "A feature or behaviour change."
+          },
+          "refactor": {
+            "label": "Refactor",
+            "description": "Restructure code without changing behaviour."
+          },
+          "spike": {
+            "label": "Spike",
+            "description": "Time-boxed investigation."
+          },
+          "performance": {
+            "label": "Performance",
+            "description": "Improve speed or resource use."
+          },
+          "unknown": {
+            "label": "Unknown",
+            "description": "Type not recognised by this app version."
+          }
+        },
+        "ApprovalStatus": {
+          "pending": "Pending",
+          "approved": "Approved",
+          "rejected": "Rejected",
+          "expired": "Expired",
+          "unknown": "Unknown"
+        },
+        "RequestSource": {
+          "jira": "Jira",
+          "github": "GitHub",
+          "gitlab": "GitLab",
+          "linear": "Linear",
+          "mcp": "Agent (MCP)",
+          "manual": "Manual",
+          "webhook": "Webhook",
+          "unknown": "Unknown source"
+        },
+        "RequestPageHeader": {
+          "project": "Project",
+          "allProjects": "All projects",
+          "createRequest": "Create request"
+        },
+        "error": {
+          "forbidden": "You do not have permission to do this.",
+          "notFound": "This item no longer exists.",
+          "conflict": "Someone else changed this. Refresh and try again.",
+          "invalidState": "This action is not allowed in the current state.",
+          "network": "Network error. Check your connection.",
+          "unavailable": "The request service is unavailable. Try again shortly.",
+          "rateLimited": "Too many attempts. Wait a moment and retry.",
+          "validation": "Check the highlighted fields and try again.",
+          "unknown": "Something went wrong.",
+          "retry": "Retry"
+        },
+        "AnswerView": {
+          "answer": "Answer",
+          "citations": "Citations"
+        },
+        "DiagnosisView": {
+          "rootCause": "Root cause",
+          "impact": "Affected scope",
+          "baseline": "Measured baseline"
+        },
+        "FindingsView": {
+          "question": "Question",
+          "findings": "Findings",
+          "sources": "Sources",
+          "conclusion": "Conclusion"
+        },
+        "RejectReasonDialog": {
+          "title": "Reject",
+          "description": "Explain why. The reason is recorded and shown to the team.",
+          "placeholder": "Why is this being rejected?",
+          "required": "A reason is required (at least {{min}} characters).",
+          "regenerate": "Regenerate based on this feedback",
+          "cancel": "Cancel",
+          "submit": "Reject"
+        },
+        "RequestMarkdownContent": {
+          "viewFull": "View full",
+          "fullTitle": "Full content"
+        },
+        "SolutionComparisonTable": {
+          "criterion": "Criterion",
+          "differs": "Differs between options",
+          "row": {
+            "summary": "Summary",
+            "pros": "Pros",
+            "cons": "Cons",
+            "effort": "Effort",
+            "risk": "Risk"
+          }
+        },
+        "SolutionDecisionBar": {
+          "accept": "Accept",
+          "approve": "Approve",
+          "approveOption": "Approve this option",
+          "reject": "Reject",
+          "alreadyDecided": "This was already decided.",
+          "chooseOne": "Choose an option to approve.",
+          "expired": "Expired",
+          "generatePlan": "Generate plan",
+          "noPermission": "You do not have permission to approve",
+          "partial": "The option was chosen but not yet approved. Try approving again."
+        },
+        "SolutionGenerationState": {
+          "analyzing": "AI is analyzing this request",
+          "drafting": "AI is drafting the analysis",
+          "failed": "Could not generate the analysis.",
+          "regenerate": "Regenerate"
+        },
+        "SolutionOptionCard": {
+          "chosen": "Chosen",
+          "cons": "Cons",
+          "pros": "Pros",
+          "effort": "Effort",
+          "risk": "Risk",
+          "recommended": "Recommended"
+        },
+        "SolutionOptionCompare": {
+          "cards": "Cards",
+          "compare": "Compare",
+          "needTwo": "At least 2 options are required.",
+          "options": "Options"
+        },
+        "SolutionPanel": {
+          "banner": {
+            "awaitingApproval": "Awaiting approval",
+            "chosen": "Approved",
+            "generating": "AI is drafting this analysis",
+            "readOnly": "Analysis is read-only",
+            "ready": "Ready for review",
+            "rejected": "Rejected",
+            "superseded": "Older version",
+            "unknown": "Status unavailable"
+          },
+          "empty": "No analysis yet.",
+          "forbidden": "You do not have permission to view the analysis.",
+          "noData": "No data",
+          "retry": "Retry"
+        },
+        "SolutionStatusBanner": {
+          "dueAt": "Due {{date}}",
+          "updated": "This solution was just updated."
+        },
+        "SolutionVersionSwitcher": {
+          "label": "Versions",
+          "old": "Older version",
+          "version": "v{{n}}"
+        },
+        "RequestReasonDialog": {
+          "cancel": "Cancel"
+        },
+        "CancelRequestDialog": {
+          "title": "Cancel this request?",
+          "description": "Work in progress stops. You can still read the request afterwards.",
+          "reason": "Reason (optional)",
+          "confirm": "Cancel request",
+          "reasonRequired": "Reason (required)"
+        },
+        "ReturnToBacklogDialog": {
+          "title": "Return to backlog",
+          "description": "The request leaves the active flow and can be reopened later.",
+          "reason": "Why is it being returned?",
+          "stage": "Returned from stage",
+          "confirm": "Return to backlog"
+        },
+        "ChangeTypeConfirmDialog": {
+          "title": "Change request type",
+          "description": "Existing solutions, plans and tasks are kept as references and the request returns to type confirmation.",
+          "reason": "Why is the type changing?",
+          "confirm": "Change type",
+          "newType": "New type",
+          "placeholder": "Choose a type",
+          "done": "Type changed",
+          "useChild": "This type change must be done with a child request.",
+          "spawnChild": "Create child request"
+        },
+        "RequestBacklogBanner": {
+          "title": "Returned to backlog",
+          "titleFrom": "Returned to backlog from {{stage}}",
+          "reopen": "Reopen"
+        },
+        "RequestDetailHeader": {
+          "backToList": "Back to list",
+          "reopen": "Reopen",
+          "returnToBacklog": "Return to backlog",
+          "changeType": "Change type",
+          "spawnChild": "Create child request",
+          "cancel": "Cancel request"
+        },
+        "RequestDetailPane": {
+          "backToList": "Back to list",
+          "notFound": "This request no longer exists.",
+          "reopened": "Request reopened",
+          "tab": {
+            "overview": "Overview",
+            "analysis": "Analysis",
+            "plan": "Plan",
+            "history": "History",
+            "related": "Related"
+          }
+        },
+        "RequestOverviewTab": {
+          "noBody": "No description.",
+          "source": "Source",
+          "reporter": "Reporter",
+          "size": "Size",
+          "urgencyLabel": "Urgency",
+          "urgency": {
+            "normal": "Normal",
+            "urgent": "Urgent"
+          }
+        },
+        "StageTimeline": {
+          "step": {
+            "classification": "Classification",
+            "analysis": "Analysis",
+            "plan": "Plan",
+            "phase": "Phases",
+            "execution": "Execution"
+          },
+          "state": {
+            "done": "done",
+            "current": "current",
+            "pending": "pending",
+            "skipped": "stopped"
+          },
+          "note": {
+            "hotfix": "Hotfix: fast diagnosis, no approval before the plan."
+          }
+        },
+        "RequestsTab": {
+          "selectPrompt": "Select a request to see its details."
+        },
+        "RequestRow": {
+          "unclassified": "Unclassified",
+          "urgent": "Urgent"
+        },
+        "RequestList": {
+          "label": "Requests",
+          "loadMore": "Load more"
+        },
+        "RequestListToolbar": {
+          "count": "{{count}} requests",
+          "refresh": "Refresh"
+        },
+        "RequestListStates": {
+          "emptyNone": "No requests yet.",
+          "emptyFiltered": "No requests match these filters.",
+          "clearFilters": "Clear filters",
+          "create": "Create request"
+        },
+        "RequestFilterBar": {
+          "chip": {
+            "needsMyConfirmation": "Needs my confirmation",
+            "running": "Running"
+          },
+          "status": "Status",
+          "type": "Type",
+          "source": "Source",
+          "anySource": "Any source",
+          "clear": "Clear filters"
+        },
+        "TypeConfirmationCard": {
+          "title": "Confirm request type",
+          "classifying": "AI is classifying this request",
+          "reclassify": "Reclassify",
+          "classifyLimit": "Reclassification limit reached (5 attempts).",
+          "confidence": "Confidence",
+          "lowConfidence": "The AI is not confident about this type. Please check it.",
+          "showMore": "Show more",
+          "showLess": "Show less",
+          "editedByHuman": "Edited by you",
+          "type": "Type",
+          "typePlaceholder": "Choose a type",
+          "typeRequired": "Pick a type to continue.",
+          "size": "Size",
+          "urgency": "Urgency",
+          "reason": "Reason",
+          "reasonPlaceholder": "Why this type? (optional)",
+          "confirm": "Confirm type",
+          "confirmed": "Type confirmed",
+          "flow": {
+            "analysis": "Analysis",
+            "noAnalysis": "No analysis",
+            "plan": "Plan",
+            "noPlan": "No plan",
+            "phase": "Phases",
+            "gates": "{{count}} approval gates",
+            "noGates": "No approval gates"
+          }
+        },
+        "RequestHistoryTab": {
+          "empty": "The type has not been changed yet.",
+          "ai": "AI"
+        },
+        "RequestRelatedTab": {
+          "group": {
+            "parent": "Parent",
+            "child": "Children",
+            "followUp": "Follow-ups"
+          },
+          "empty": "No related requests.",
+          "unsupported": "This runtime does not support viewing request links yet.",
+          "unreadable": "Cannot view this request",
+          "loading": "Loading..."
+        },
+        "SpawnChildRequestDialog": {
+          "title": "Create child request",
+          "titleLabel": "Title",
+          "body": "Description",
+          "type": "Type",
+          "letAi": "Let the AI classify",
+          "submit": "Create",
+          "created": "Child request created",
+          "backToParent": "Back to parent",
+          "reason": {
+            "spawned_by_spike": "from spike",
+            "spawned_by_question": "from question",
+            "followup_hotfix": "hotfix follow-up",
+            "escalation": "escalation"
+          }
+        },
+        "CreateRequestDialog": {
+          "title": "Create request",
+          "titleLabel": "Title",
+          "body": "Description",
+          "project": "Project",
+          "projectPlaceholder": "Choose a project",
+          "projectRequired": "Choose the project this request belongs to.",
+          "urgency": "Urgency",
+          "typeHint": "Type hint",
+          "letAi": "Let the AI classify",
+          "submit": "Create",
+          "duplicate": "This issue already has a request",
+          "open": "Open",
+          "pendingLimit": "Too many requests are waiting for classification. Try again later."
+        },
+        "CreateRequestIssueButton": {
+          "label": "Create request",
+          "tooltip": "Send this issue into the analysis flow. Unlike Start workspace, no worktree is opened right away."
+        },
+        "plan": {
+          "PhaseNode": {
+            "blocked": "{{count}} blocked",
+            "empty": "No tasks in this phase.",
+            "running": "{{count}} running",
+            "summary": "{{done}}/{{total}} tasks done"
+          },
+          "PhaseApprovalBar": {
+            "approve": "Approve phase",
+            "reject": "Reject",
+            "rejectTitle": "Reject phase",
+            "notApproved": "Phase is not approved yet",
+            "start": "Start phase",
+            "rejectedNote": "Phase rejected. The request may return to planning.",
+            "notApprover": "You are not allowed to approve this."
+          },
+          "PlanApprovalBar": {
+            "regenerate": "Regenerate plan",
+            "rejected": "This plan was rejected.",
+            "approveTaskList": "Approve task list",
+            "approve": "Approve plan",
+            "reject": "Reject",
+            "rejectTitle": "Reject plan",
+            "notApprover": "You are not allowed to approve this.",
+            "conflict": "This changed while you were reviewing it. The latest version was loaded; review it again.",
+            "alreadyDecided": "This was already decided.",
+            "expired": "This approval expired. The latest version was loaded."
+          },
+          "PlanGateChips": {
+            "plan": "Plan",
+            "phases": "Phases approved {{approved}}/{{total}}",
+            "preDeploy": "Pre-deploy",
+            "preDeployPending": "Pre-deploy approval needed",
+            "approvePreDeploy": "Approve pre-deploy",
+            "reject": "Reject",
+            "rejectTitle": "Reject pre-deploy"
+          },
+          "PlanStates": {
+            "generate": "Generate plan",
+            "generating": "AI is drafting the plan...",
+            "retry": "Try again",
+            "forbidden": "You do not have permission to view the tasks of this request.",
+            "notYet": "No plan yet.",
+            "notFound": "Plan not found.",
+            "empty": "The plan is empty.",
+            "currentStep": "Current step: {{step}}"
+          },
+          "PlanSummaryHeader": {
+            "counts": "{{phases}} phases, {{tasks}} tasks",
+            "estimated": "estimated",
+            "progress": "Plan progress"
+          },
+          "PlanTaskRow": {
+            "blocked": "Blocked",
+            "estimate": "{{hours}}h"
+          },
+          "PlanTree": {
+            "taskSheetDescription": "Task details",
+            "taskSheetTitle": "Task"
+          },
+          "RequestPlanTab": {
+            "reload": "Reload",
+            "truncated": "The task list was cut off; some tasks may be missing."
+          }
+        },
+        "approval": {
+          "ApprovalInboxTab": {
+            "title": "Approvals",
+            "empty": "Nothing is waiting for your approval.",
+            "emptyFiltered": "No approvals match these filters.",
+            "clearFilters": "Clear filters",
+            "loadMore": "Load more"
+          },
+          "ApprovalSubjectFilter": {
+            "all": "All",
+            "requestType": "Request type",
+            "solution": "Solution",
+            "plan": "Plan",
+            "phase": "Phase",
+            "preDeploy": "Pre-deploy",
+            "other": "Other"
+          },
+          "OverdueToggle": {
+            "label": "Overdue only"
+          },
+          "ApprovalRow": {
+            "open": "Open",
+            "approve": "Quick approve",
+            "reject": "Reject",
+            "dueIn": "Due {{relative}}",
+            "overdueBy": "Overdue {{relative}}",
+            "requestedBy": "Requested by {{name}}",
+            "systemActor": "AI / System",
+            "alreadyDecided": "Already decided by someone else.",
+            "changed": "This item changed after it was listed. Open it to review.",
+            "requestGone": "This request no longer exists.",
+            "decided": "Decision recorded.",
+            "confirmApprove": {
+              "request_type": "The request type is confirmed and the request moves on to analysis.",
+              "findings": "The findings are accepted as the outcome of this request.",
+              "answer": "The answer is accepted and the request is closed.",
+              "task_list": "The task list is approved and tasks can be prepared.",
+              "phase": "The phase is approved and its tasks become ready to run.",
+              "pre_deploy": "The pre-deploy check is approved and the release can proceed."
+            }
+          },
+          "ApprovalInboxErrorState": {
+            "network": "Could not load approvals. Check your connection.",
+            "forbidden": "You do not have permission to see these approvals.",
+            "retry": "Retry"
+          },
+          "ApprovalSubjectType": {
+            "request_type": "Request type",
+            "solution": "Solution",
+            "findings": "Findings",
+            "answer": "Answer",
+            "plan": "Plan",
+            "phase": "Phase",
+            "task_list": "Task list",
+            "pre_deploy": "Pre-deploy",
+            "unknown": "Other"
+          }
+        },
+        "backlog": {
+          "BacklogSegmentControl": {
+            "request": "Requests",
+            "task": "Tasks",
+            "execute": "Execute"
+          },
+          "BacklogToolbar": {
+            "search": "Search title or #number",
+            "type": "Type",
+            "category": "Category",
+            "refresh": "Refresh",
+            "allTypes": "All types",
+            "allCategories": "All categories"
+          },
+          "RequestBacklogTable": {
+            "col": {
+              "request": "Request",
+              "source": "Source",
+              "type": "Type",
+              "stage": "Returned from",
+              "category": "Category",
+              "reason": "Reason",
+              "by": "Returned by",
+              "at": "When",
+              "actions": "Actions"
+            },
+            "actorSystem": "AI / System",
+            "reopen": "Reopen",
+            "cancel": "Cancel"
+          },
+          "TaskBacklogTable": {
+            "col": {
+              "task": "Task",
+              "estimate": "Estimate",
+              "dependencies": "Waiting on"
+            }
+          },
+          "ExecuteBacklogTable": {
+            "col": {
+              "task": "Task",
+              "blockedBy": "Blocked by",
+              "lastError": "Last error",
+              "failedAttempts": "Failed runs",
+              "engine": "Engine"
+            },
+            "noErrorDetail": "Failed, no error detail recorded"
+          },
+          "ReturnedFromStage": {
+            "classification": "Classification",
+            "analysis": "Analysis",
+            "plan": "Plan",
+            "phase": "Phase",
+            "task": "Task"
+          },
+          "ReturnedCategory": {
+            "missing_info": "Missing information",
+            "infeasible": "Not feasible",
+            "blocked_dependency": "Blocked by dependency",
+            "rejected": "Rejected",
+            "other": "Other"
+          },
+          "GateStatus": {
+            "approved": "Approved",
+            "pending": "Awaiting approval",
+            "rejected": "Rejected",
+            "none": "No gate",
+            "unknown": "Unknown"
+          },
+          "BacklogEngineBadge": {
+            "workflow": "Workflow",
+            "orchestration": "Orchestration",
+            "direct_agent": "Direct agent"
+          },
+          "ReopenRequestDialog": {
+            "title": "Reopen this request?",
+            "body": "Request #{{number}} was returned from {{stage}} and will be classified again. Its Solution, Plan and Tasks are kept for reference.",
+            "cancel": "Not now",
+            "confirm": "Reopen",
+            "viewRequest": "View request"
+          },
+          "BacklogEmptyState": {
+            "requests": "No Request has been returned to the backlog.",
+            "tasks": "Every task already has an approved Plan.",
+            "execute": "No task is waiting to run or failed.",
+            "filtered": "Nothing matches these filters.",
+            "clearFilters": "Clear filters"
+          },
+          "BacklogErrorState": {
+            "network": "Could not load the backlog. Check your connection.",
+            "forbidden": "You do not have permission to see the backlog of this project.",
+            "retry": "Retry"
+          },
+          "BacklogRow": {
+            "reopened": "Request reopened. It will be classified again.",
+            "alreadyHandled": "This request was already handled."
+          },
+          "BacklogTab": {
+            "loadMore": "Load more"
+          },
+          "BacklogGroupHeaderRow": {
+            "openPlan": "Open plan"
+          },
+          "TaskBacklogRow": {
+            "planNotSplit": "Not split into phases yet"
+          },
+          "BacklogTaskSheet": {
+            "title": "Task details",
+            "description": "Details of the selected task"
+          }
+        },
+        "clarification": {
+          "title": "Information needed",
+          "round": "Round {{round}}",
+          "submit": "Submit answers",
+          "submitHint": "to submit",
+          "answeredResume": "Received. The AI is re-running the {{step}} step.",
+          "stillMissing": "Some information is still missing; a new round was opened.",
+          "required": "Required",
+          "suggested": "Suggested",
+          "useSuggested": "Use suggestion",
+          "editInstead": "Edit instead",
+          "readOnlyWaiting": "Waiting for the assigned person to answer",
+          "dueIn": "{{count}} days left",
+          "expired": "Overdue. The request will return to the backlog (missing information).",
+          "leaveWarning": "You have unsent answers.",
+          "fileTooLarge": "File is larger than 64 KB",
+          "fileBinary": "Only text files are supported",
+          "textTooLong": "Answer is too long",
+          "invalidChoice": "Choose one of the listed options",
+          "yes": "Yes",
+          "no": "No",
+          "retry": "Retry",
+          "waitingForInfo": "Waiting for the information to be provided",
+          "timelineWaiting": "Waiting for additional information",
+          "source": {
+            "readiness": "Readiness check",
+            "solution_open_question": "Solution open question",
+            "plan_assumption": "Plan assumption",
+            "task_blocked": "Task blocked"
+          }
+        },
+        "decision": {
+          "rationaleLabel": "Reason for choosing",
+          "rationaleRequired": "A reason is required when choosing something other than the recommendation",
+          "rationaleOptional": "Optional",
+          "confirmTitle": "Confirm a high-risk choice",
+          "confirmBody": "This choice was flagged as high risk. Review the reasons, then type the option name to confirm.",
+          "confirmInputLabel": "Type \"{{title}}\" to confirm",
+          "confirmMismatch": "The text does not match the option name",
+          "cancel": "Cancel",
+          "confirmSubmit": "Confirm choice",
+          "pendingConfirmation": "Waiting for the second confirmation of this high-risk choice",
+          "digestChanged": "The content just changed. Review it again before approving.",
+          "selfChoiceForbidden": "The reporter cannot choose their own request",
+          "history": {
+            "title": "Decision history",
+            "empty": "No decisions recorded yet"
+          },
+          "status": {
+            "open": "Open",
+            "chosen": "Chosen",
+            "effective": "Effective",
+            "superseded": "Superseded",
+            "unknown": "Unknown"
+          },
+          "planBlocked": "No decision recorded for the chosen option yet"
+        },
+        "impact": {
+          "forbidden": "You do not have permission to view the assessment",
+          "noDevServer": "No dev server connected",
+          "connectDevServer": "Connect",
+          "collecting": "Querying the code graph",
+          "run": "Run assessment",
+          "score": "Score {{score}}",
+          "advisory": "Advisory",
+          "raisedBy": "Raised because: {{rules}}",
+          "caption": "Assessed {{at}}, based on {{tool}}",
+          "confidence": {
+            "low": "Confidence low",
+            "medium": "Confidence medium",
+            "high": "Confidence high"
+          },
+          "stale": "Index is out of date; not fully assessed",
+          "narrative": "AI-written explanation",
+          "title": "Impact and risk",
+          "notAssessed": "Not assessed",
+          "dimension": "Dimension",
+          "recommended": "Recommended",
+          "differs": "Differs between options",
+          "evidence": "Evidence",
+          "evidenceDescription": "Raw evidence for this finding",
+          "loading": "Loading...",
+          "evidenceError": "Could not load the evidence",
+          "truncated": "Truncated",
+          "copy": "Copy",
+          "noFindings": "No findings at medium level or above",
+          "viewOnGraph": "View on graph",
+          "dim": {
+            "architecture": "Architecture",
+            "contract": "Contracts",
+            "data": "Data",
+            "blast_radius": "Blast radius",
+            "security": "Security",
+            "operations": "Operations",
+            "quality": "Quality",
+            "uncertainty": "Uncertainty",
+            "size": "Size"
+          },
+          "findings": "Findings",
+          "acceptance": {
+            "title": "Accept the remaining risks",
+            "reasonLabel": "Reason for accepting",
+            "reasonRequired": "At least {{min}} characters",
+            "record": "Record acceptance",
+            "recorded": "Accepted",
+            "invalidated": "The assessment changed. Please confirm again.",
+            "secondApprover": "Waiting for a second approver",
+            "splitPhase": "Consider splitting into smaller phases and rehearsing a rollback.",
+            "error": "Could not record the acceptance"
+          },
+          "gate": {
+            "viewImpact": "View impact",
+            "viewImpactFirst": "Open the impact section before approving",
+            "needsAcceptance": "Accept the remaining high risks before approving",
+            "approverNotAllowed": "An approver from the designated team is required"
+          },
+          "override": {
+            "menu": "More gate options",
+            "title": "Bypass the gate",
+            "description": "This is recorded in the audit log with your reason.",
+            "reasonLabel": "Reason",
+            "reasonRequired": "At least {{min}} characters",
+            "cancel": "Cancel",
+            "submit": "Bypass gate"
+          }
+        },
+        "readiness": {
+          "badge": {
+            "ready": "Ready",
+            "needs_info": "Needs information",
+            "spec_defect": "Spec defect",
+            "env_defect": "Environment issue"
+          },
+          "title": "Task readiness",
+          "notChecked": "Not checked yet",
+          "tier": {
+            "structure": "Structure",
+            "semantic": "Semantics",
+            "environment": "Environment"
+          },
+          "envVarNames": "Only variable names are shown, never values.",
+          "notCounted": "Does not count as an attempt",
+          "action": {
+            "run": "Run",
+            "answer": "Answer the questions",
+            "regenerate": "Return to the Plan step to regenerate the task",
+            "connect": "Connect a dev server",
+            "notify": "Notify the operator"
+          },
+          "runHint": "Use Run on the task when you are ready.",
+          "checking": "Checking...",
+          "check": "Check readiness",
+          "runBlocked": "This task is not ready yet. Open the readiness report for details.",
+          "phase": {
+            "ready": "{{count}} ready",
+            "needsInfo": "{{count}} need information",
+            "specDefect": "{{count}} spec defects",
+            "envDefect": "{{count}} environment issues"
+          },
+          "drift": {
+            "shadow": "Advisory: actual changes exceed the plan.",
+            "banner": "Actual changes exceed the plan. Phase {{name}} is paused.",
+            "review": "Review and decide",
+            "loadError": "Could not load the drift details",
+            "task": "Task",
+            "expected": "Expected",
+            "actual": "Actual",
+            "noDetails": "No detail rows were provided",
+            "runningNote": "Tasks already running continue until they finish.",
+            "accept": "Accept the drift and continue",
+            "return": "Return",
+            "returnNote": "Returning sends the request back to the backlog per policy."
+          }
+        },
+        "execution": {
+          "tab": "Result",
+          "error": "Could not load the result",
+          "legacy": "This result has no structure",
+          "noOutput": "No output",
+          "malformed": "The result is not in the expected format",
+          "status": {
+            "done": "Done",
+            "failed": "Failed",
+            "blocked": "Blocked",
+            "needs_info": "Needs information"
+          },
+          "attempt": "Attempt {{n}}",
+          "files": {
+            "title": "Changed files",
+            "none": "No files changed",
+            "inScope": "In scope",
+            "outOfScope": "Out of scope"
+          },
+          "checks": {
+            "check": "Check",
+            "agent": "Agent reported",
+            "orca": "Orca re-ran",
+            "compare": "Comparison",
+            "notRerun": "Not re-run yet",
+            "passed": "Passed",
+            "failed": "Failed",
+            "mismatch": "Mismatch",
+            "note": "Orca does not rely on the agent’s word."
+          },
+          "secrets": {
+            "label": "Secret scan",
+            "passed": "Passed",
+            "failed": "Failed",
+            "notRun": "Not run"
+          },
+          "outputs": {
+            "title": "Outputs",
+            "view": "View",
+            "preview": "Shown as plain text, cut at 16 KB"
+          },
+          "toQuestion": "Answer the question",
+          "route": {
+            "retryable": "Will retry up to {{count}} more times",
+            "spec_defect": "Returned to the Plan step",
+            "needs_info": "Turned into a question",
+            "env_defect": "Does not count as an attempt",
+            "agent_defect": "Retries once with a format reminder",
+            "unknown": "Unclassified failure"
+          }
+        }
+      },
+      "reviewMap": {
+        "turns": {
+          "verification": {
+            "agreement": {
+              "consistent": "A re-run of {{kind}} matches the agent's statement",
+              "contradicted": "A re-run of {{kind}} differs from the agent's statement",
+              "unverified": "{{kind}}: not yet checked",
+              "unknown": "{{kind}}: not enough data to conclude"
+            },
+            "kind": {
+              "tests_pass": "tests",
+              "tests_fail": "failing tests",
+              "lint_clean": "lint",
+              "typecheck_clean": "type check",
+              "build_ok": "build",
+              "all_done": "overall completion",
+              "other": "check"
+            },
+            "basis": {
+              "stated": "Inferred from the agent's text (low confidence)"
+            },
+            "reason": {
+              "tree_may_differ": "The working tree may differ from when the agent finished.",
+              "no_run": "No independent run exists yet.",
+              "run_failed": "The re-run did not finish."
+            },
+            "category": {
+              "test": "test",
+              "lint": "lint",
+              "typecheck": "typecheck",
+              "build": "build",
+              "install": "install",
+              "git": "git",
+              "other": "other"
+            },
+            "ran": "Agent ran: {{commands}}",
+            "ranItemMany": "{{name}} ({{count}} times)",
+            "ranMore": "and more",
+            "recordedNote": "Recorded, not verified: the agent process can report inaccurately.",
+            "viewRun": "View run",
+            "runChecks": "Re-run checks"
+          }
+        },
+        "report": {
+          "md": {
+            "gate": {
+              "pass": "The required checks that ran passed.",
+              "warn": "The quality gate has warnings.",
+              "fail": "The quality gate failed.",
+              "unknown": "Not enough data to conclude.",
+              "heading": "Quality gate",
+              "moreReasons": "…and {{count}} more.",
+              "waivers": "{{count}} active waiver(s)."
+            },
+            "summary": {
+              "heading": "Changes",
+              "counts": "{{files}} file(s), +{{added}} / -{{removed}}, {{symbols}} symbol(s), {{flows}} flow(s).",
+              "components": "Components: {{list}}."
+            },
+            "findings": {
+              "heading": "Findings",
+              "counts": "{{error}} error(s), {{warning}} warning(s), {{info}} info.",
+              "colSeverity": "Severity",
+              "colRule": "Rule",
+              "colLocation": "Location",
+              "colMessage": "Message",
+              "truncated": "Only the top findings are listed."
+            },
+            "contracts": {
+              "heading": "Contracts and data",
+              "breaking": "breaking",
+              "channel": "Channel",
+              "table": "Table"
+            },
+            "reading": {
+              "heading": "Suggested reading order"
+            },
+            "diagrams": {
+              "heading": "Diagrams",
+              "alt": "Text description"
+            },
+            "warnings": {
+              "heading": "Notes"
+            },
+            "warning": {
+              "no_gate": "No quality gate result was available.",
+              "index_stale": "The code index may be older than HEAD.",
+              "overlay_partial": "Change data may be incomplete."
+            },
+            "footer": "Generated by Orca from profile {{profile}} (model {{digest}}). This is a record of checks that ran, not an approval.",
+            "title": "Orca review for this {{review}}",
+            "subject": "Branch {{branch}} against {{base}}, head {{head}}.",
+            "risk": {
+              "heading": "Risk",
+              "level": {
+                "LOW": "Risk level: low.",
+                "MEDIUM": "Risk level: medium.",
+                "HIGH": "Risk level: high.",
+                "CRITICAL": "Risk level: critical.",
+                "UNKNOWN": "Risk level: not enough data to conclude."
+              }
+            },
+            "truncated": "Shortened; see the full report in Orca."
+          },
+          "html": {
+            "gate": {
+              "pass": "The required checks that ran passed.",
+              "warn": "The quality gate has warnings.",
+              "fail": "The quality gate failed.",
+              "unknown": "Not enough data to conclude.",
+              "heading": "Quality gate"
+            },
+            "summary": {
+              "heading": "Changes",
+              "counts": "{{files}} file(s), +{{added}} / -{{removed}}, {{symbols}} symbol(s), {{flows}} flow(s)."
+            },
+            "findings": {
+              "heading": "Findings",
+              "counts": "{{error}} error(s), {{warning}} warning(s), {{info}} info.",
+              "colSeverity": "Severity",
+              "colRule": "Rule",
+              "colLocation": "Location",
+              "colMessage": "Message",
+              "caption": "Top findings"
+            },
+            "contracts": {
+              "heading": "Contracts and data"
+            },
+            "reading": {
+              "heading": "Suggested reading order"
+            },
+            "diagrams": {
+              "heading": "Diagrams"
+            },
+            "warnings": {
+              "heading": "Notes"
+            },
+            "warning": {
+              "no_gate": "No quality gate result was available.",
+              "index_stale": "The code index may be older than HEAD.",
+              "overlay_partial": "Change data may be incomplete."
+            },
+            "footer": "Generated by Orca from profile {{profile}} (model {{digest}}). This is a record of checks that ran, not an approval.",
+            "title": "Orca review report",
+            "breaking": "breaking"
+          },
+          "menu": {
+            "label": "Export report",
+            "copyMarkdown": "Copy Markdown",
+            "copyForDescription": "Copy for {{review}} description",
+            "saveHtml": "Save HTML",
+            "copied": "Report copied.",
+            "copiedShortened": "Copied a shortened report.",
+            "copyError": "Could not copy to the clipboard.",
+            "saved": "Report saved as HTML.",
+            "saveError": "Could not save the report.",
+            "fetchError": "Could not load the review report."
+          },
+          "insert": {
+            "label": "Insert review report"
+          }
+        },
+        "requirements": {
+          "trace": {
+            "state": {
+              "has_evidence": "Evidence found (not confirmed)",
+              "partial": "Partial evidence found",
+              "no_evidence": "No evidence found",
+              "manual_pending": "Needs manual confirmation",
+              "unknown": "Not enough data to conclude"
+            },
+            "group": {
+              "noEvidence": "No evidence found",
+              "partial": "Partial evidence",
+              "manualPending": "Needs manual confirmation",
+              "hasEvidence": "Evidence found",
+              "unknown": "Not enough data to conclude",
+              "unlinked": "Changes not tied to a requirement"
+            },
+            "suggestions": "Suggestions",
+            "inferred": "Inferred",
+            "confirm": "Confirm",
+            "dismiss": "Dismiss",
+            "manualConfirm": "I checked this",
+            "loading": "Loading requirements…",
+            "error": "Could not load requirements.",
+            "retry": "Retry",
+            "label": "Requirements",
+            "showInferred": "Show inferred suggestions",
+            "stale": "The index changed since this was loaded.",
+            "readOnly": "You can view requirements but not change them.",
+            "actionError": "The change was not saved. Try again.",
+            "empty": "No requirements to show.",
+            "link": {
+              "explicit": "Task linked explicitly",
+              "derived": "Task linked from the branch or commits",
+              "inferred": "Task link inferred",
+              "none": "No task linked"
+            },
+            "warning": {
+              "no_structured_criteria": "This task has no structured acceptance criteria.",
+              "index_stale": "The code index may be older than HEAD.",
+              "generic": "Some data may be incomplete."
+            }
+          },
+          "taskPicker": {
+            "link": "Link to task…",
+            "change": "Change task…",
+            "unlink": "Unlink",
+            "searchPlaceholder": "Search tasks…",
+            "noResults": "No tasks found."
+          }
+        },
+        "lens": {
+          "requirements": {
+            "label": "Requirements"
+          },
+          "impact": {
+            "label": "Impact"
+          },
+          "architecture": {
+            "label": "Architecture"
+          },
+          "dataflow": {
+            "label": "Flows"
+          },
+          "erd": {
+            "label": "ERD"
+          },
+          "storage": {
+            "label": "Storage"
+          },
+          "structure": {
+            "label": "Structure"
+          },
+          "contract": {
+            "label": "Contracts"
+          },
+          "quality": {
+            "label": "Quality"
+          }
+        },
+        "shell": {
+          "lens": {
+            "unavailable": "{{lens}} is not available yet."
+          },
+          "index": {
+            "ready": "Index ready",
+            "stale": "Index out of date {{sha}}",
+            "overlay": "Main checkout index + diff",
+            "overlayNote": "Based on the main checkout index plus the diff; line numbers may be off.",
+            "buildingPercent": "Indexing {{percent}}%",
+            "building": "Indexing",
+            "missing": "No index yet",
+            "notInstalled": "Tool not installed",
+            "degraded": "Index partly available",
+            "offline": "Offline",
+            "unknown": "Unknown",
+            "aria": "Index status: {{label}}"
+          },
+          "header": {
+            "title": "Review"
+          },
+          "banner": {
+            "stale": "The index is behind HEAD ({{indexed}} to {{head}}); results may miss recent changes.",
+            "truncated": "Showing {{shown}} of {{total}} files.",
+            "scopeMismatch": "The index covers a different checkout than this worktree.",
+            "offline": "Offline: showing the last loaded data.",
+            "retry": "Try again",
+            "errorCached": "Could not refresh: {{message}}",
+            "newData": "New data is available.",
+            "apply": "Update now"
+          },
+          "reindex": {
+            "refresh": "Refresh index",
+            "fullConfirm": "Rebuild everything",
+            "full": "Rebuild all",
+            "cooldown": "Available again in {{seconds}}s"
+          },
+          "scope": {
+            "current": "vs {{label}}",
+            "choose": "Scope",
+            "branch": "Base branch",
+            "range": "Commit range",
+            "hosted": "Submitted review",
+            "basePlaceholder": "origin/main",
+            "baseAria": "Base branch",
+            "uncommitted": "Include uncommitted changes",
+            "fromCommit": "From commit",
+            "toCommit": "To commit",
+            "apply": "Apply"
+          },
+          "screen": {
+            "unsupported": {
+              "title": "Review is not available here",
+              "body": "This workspace or backend does not provide code review data."
+            },
+            "closeTab": "Close tab",
+            "disabled": {
+              "title": "Code review is turned off",
+              "body": "An administrator has disabled code intelligence for this workspace."
+            },
+            "chooseScope": "Choose what to compare",
+            "noBinding": {
+              "title": "This worktree is not connected to a code index",
+              "body": "Connect the repository to its dev server, then try again.",
+              "action": "Try reconnecting"
+            },
+            "forbidden": {
+              "title": "You do not have access to this review",
+              "body": "Ask a workspace admin for read access to code intelligence."
+            },
+            "loading": {
+              "title": "Loading changes"
+            },
+            "toolUnavailable": {
+              "title": "No code index tool is installed",
+              "body": "Install GitNexus or CodeGraph on the machine that holds this repository."
+            },
+            "retry": "Try again",
+            "notRegistered": {
+              "title": "This repository is not registered with the index tool",
+              "body": "Build the index to register it."
+            },
+            "buildIndex": "Build index",
+            "pathNotAllowed": {
+              "title": "A file path was rejected",
+              "body": "The backend refused a path in this change set."
+            },
+            "indexMissing": {
+              "title": "There is no index for this repository yet",
+              "body": "Review needs an index to map symbols and impact."
+            },
+            "indexBuilding": {
+              "title": "Building the index",
+              "unknown": "This can take a few minutes.",
+              "percent": "{{percent}}% done"
+            },
+            "offline": {
+              "title": "Cannot reach the code index",
+              "body": "The connection is down. This view retries when it comes back."
+            },
+            "error": {
+              "title": "The review could not be loaded"
+            },
+            "noChanges": {
+              "unborn": "This branch has no commits yet",
+              "title": "No changes in this scope",
+              "body": "Choose a different base or range to see changes."
+            },
+            "copied": "Copied",
+            "copyDetails": "Copy details",
+            "scope": {
+              "invalid-base": {
+                "title": "The base branch was not found",
+                "body": "Pick another base branch to compare against."
+              },
+              "unborn-head": {
+                "title": "This branch has no commits yet",
+                "body": "Commit something, then review the changes."
+              },
+              "no-merge-base": {
+                "title": "No common ancestor with the base",
+                "body": "Pick another base branch or a commit range."
+              },
+              "error": {
+                "title": "The comparison could not be computed",
+                "body": "Try another base."
+              }
+            }
+          },
+          "chip": {
+            "aria": "Change summary",
+            "files": "{{count}} files",
+            "symbols": "{{count}} symbols",
+            "flows": "{{count}} flows",
+            "tables": "{{count}} tables",
+            "contracts": "{{count}} contracts",
+            "untested": "{{count}} untested",
+            "violations": "{{count}} violations"
+          },
+          "risk": {
+            "incomplete": "Not enough data",
+            "incompleteNote": "The index is missing data, so no conclusion is drawn.",
+            "noReasons": "No reasons reported.",
+            "low": "Low risk by index",
+            "medium": "Medium risk",
+            "high": "High risk",
+            "critical": "Critical risk"
+          },
+          "ambiguous": {
+            "title": "Which symbol?",
+            "body": "More than one symbol matches. Pick the one you mean.",
+            "search": "Search matches",
+            "empty": "No match"
+          },
+          "drawer": {
+            "unavailable": "Details are not available yet.",
+            "title": "Details",
+            "close": "Close details"
+          },
+          "pane": {
+            "reading": "Reading order",
+            "lens": "Lens"
+          },
+          "cancel": "Cancel",
+          "host": {
+            "loading": "Loading review"
+          },
+          "dock": {
+            "label": "Review panels",
+            "findings": "Findings",
+            "notes": "Notes",
+            "collapse": "Collapse panel",
+            "expand": "Expand panel",
+            "qualityFindings": "Checks"
+          },
+          "turnFilter": "Since previous turn"
+        },
+        "readingOrder": {
+          "noOrder": "No reading order could be built from the index.",
+          "empty": "No changes in this scope.",
+          "progressLoadFailed": "Saved progress could not be loaded.",
+          "retry": "Retry",
+          "filtering": "Filtering {{label}}: {{shown}} of {{total}}",
+          "clearFilter": "Clear filter",
+          "aria": "Reading order",
+          "overflow": "{{shown}} of {{total}} files listed",
+          "keys": "j/k move · Space mark read · Enter open diff",
+          "markFile": "Mark {{file}} as read",
+          "cycle": "Dependency cycle",
+          "after": "Read after earlier steps",
+          "viewDiff": "View diff",
+          "otherGroup": "Other",
+          "markGroup": "Mark {{group}} as read",
+          "progress": "{{seen}} of {{total}} read",
+          "localOnly": "Not saved (read-only access)",
+          "notSaved": "Not saved",
+          "saved": "Saved",
+          "saving": "Saving",
+          "progressAria": "Reading progress",
+          "oversize": "Progress is too large; part of it is not saved.",
+          "reason": {
+            "contract": "Contract change",
+            "dependencyOf": "Dependency of a later step",
+            "leaf": "Leaf change",
+            "cycle": "In a dependency cycle",
+            "noEdges": "No known dependencies",
+            "test": "Test",
+            "doc": "Documentation",
+            "generated": "Generated file",
+            "overflow": "More files not listed"
+          }
+        },
+        "aiSummary": {
+          "preview": {
+            "title": "Review what will be sent",
+            "description": "The data below is sent to the LLM provider used by your dev server ({{provider}}). Nothing is sent until you confirm.",
+            "defaultProvider": "the configured provider",
+            "counts": "{{files}} file(s), {{redactions}} redaction(s), about {{tokens}} tokens.",
+            "level": {
+              "metadata": "Data level: metadata only (no code)",
+              "diff": "Data level: diff (changed code)",
+              "unknown": "Data level: unknown"
+            },
+            "withheld": "{{count}} file(s) withheld from the request.",
+            "fileWithheld": "withheld",
+            "moreFiles": "…and {{count}} more file(s).",
+            "injectionWarning": "Some content looks like instructions aimed at an AI model. The summary may be affected; review it carefully.",
+            "cancel": "Cancel",
+            "confirm": "Send and generate summary"
+          },
+          "card": {
+            "title": "AI-inferred summary",
+            "generate": "Generate summary (AI)",
+            "regenerate": "Regenerate",
+            "cancel": "Cancel",
+            "levelLabel": "Data to send",
+            "level": {
+              "metadata": "Metadata",
+              "diff": "Diff"
+            },
+            "preparing": "Preparing the data preview…",
+            "generating": "Generating the summary… this can take a while.",
+            "error": {
+              "no-relay": "No dev server is connected.",
+              "bad-output": "Could not produce a valid summary.",
+              "rate-limited": "Too many requests. Try again in {{seconds}} s.",
+              "timeout": "The summary took too long.",
+              "forbidden": "You do not have permission to generate a summary.",
+              "unknown": "Could not generate the summary."
+            },
+            "retry": "Try again",
+            "disclaimer": "Can be wrong or incomplete; check it against the diff.",
+            "meta": "Model: {{model}}. Data sent: {{level}}.",
+            "risks": "Risks",
+            "readFirst": "Read first",
+            "refsDropped": "{{count}} invalid reference(s) were dropped.",
+            "helpful": "Helpful",
+            "incorrect": "Incorrect",
+            "idleHint": "Generate a summary to get an AI-inferred overview. Nothing is sent until you confirm."
+          },
+          "report": {
+            "heading": "AI-inferred summary",
+            "disclaimer": "Can be wrong or incomplete; check it against the diff. Model: {{model}}. Data sent: {{level}}.",
+            "risks": "Risks",
+            "readFirst": "Read first"
+          }
+        },
+        "c4": {
+          "error": "Could not load the architecture view.",
+          "retry": "Retry",
+          "loading": "Loading architecture",
+          "noContainers": "No containers were inferred; check the folder conventions.",
+          "noView": "No component view is available for this container yet.",
+          "toolbar": "Architecture options",
+          "mode": {
+            "graph": "Graph",
+            "list": "List"
+          },
+          "includeHidden": "Show hidden components",
+          "viewYaml": "View c4.yaml",
+          "editYaml": "Edit c4.yaml",
+          "container": "Container",
+          "evidence": "Evidence",
+          "viewDiff": "View diff",
+          "showMore": "Show more ({{count}})",
+          "detail": "Details",
+          "close": "Close",
+          "copyPath": "Copy path",
+          "noDescription": "No description yet",
+          "addDescription": "Add description",
+          "symbols": "{{count}} symbols",
+          "flag": {
+            "changed": "changed",
+            "untested": "untested",
+            "violation": "layering",
+            "lowConfidence": "low confidence"
+          },
+          "outgoing": "Outgoing",
+          "incoming": "Incoming",
+          "violationNote": "This dependency crosses a hexagonal layer boundary the wrong way.",
+          "legend": "Legend",
+          "diagramLabel": "Component diagram; use the list view for a text equivalent",
+          "editor": {
+            "title": "Edit c4.yaml",
+            "description": "Manual overrides for {{container}}. The diagram is rebuilt by the server after saving.",
+            "loading": "Loading...",
+            "loadError": "Could not load c4.yaml.",
+            "readOnly": "You do not have permission to edit c4.yaml.",
+            "seed": "Template source: {{source}}",
+            "label": "c4.yaml source",
+            "size": "{{bytes}} / 65536 bytes",
+            "semanticsNote": "Meaning is not checked here; the server checks it when you save.",
+            "issues": "Issues",
+            "warnings": "Server warnings",
+            "offline": "Not saved: the connection failed. Your draft is kept.",
+            "tooLarge": "Not saved: the document is too large.",
+            "failed": "Not saved: {{message}}",
+            "conflictTitle": "Version conflict",
+            "conflict": "Someone else saved a newer c4.yaml.",
+            "loadLatest": "Load latest",
+            "copyMine": "Copy mine",
+            "confirmOverwrite": "Confirm: replace the newer version",
+            "overwrite": "Overwrite with mine",
+            "discardTitle": "Discard changes",
+            "discard": "Close without saving your changes?",
+            "keepEditing": "Keep editing",
+            "discardAction": "Discard",
+            "savingSlow": "Waiting for the server...",
+            "saving": "Saving...",
+            "savedAt": "Saved at {{time}}",
+            "unsaved": "Unsaved",
+            "close": "Close",
+            "save": "Save"
+          },
+          "showingCount": "Showing {{shown}}/{{total}}",
+          "col": {
+            "from": "From",
+            "kind": "Type",
+            "to": "To",
+            "count": "Count",
+            "flags": "Flags"
+          },
+          "origin": {
+            "merged": "Partly edited",
+            "declared": "Declared",
+            "derived": "Inferred"
+          },
+          "notice": {
+            "withOverrides": "Inferred, with overrides by {{by}}{{at}}",
+            "withOverridesAnon": "Inferred, with manual overrides",
+            "inferred": "This diagram is inferred from the folder structure and hexagonal rules; it may not match the intended design."
+          },
+          "layer": {
+            "grpc-server": "gRPC server",
+            "usecase": "Use cases",
+            "domain": "Domain",
+            "adapter": "Adapters",
+            "external": "External",
+            "support": "Support"
+          },
+          "relation": {
+            "uses": "uses",
+            "implements": "implements",
+            "calls-rpc": "calls RPC",
+            "reads": "reads",
+            "writes": "writes",
+            "publishes": "publishes",
+            "subscribes": "subscribes",
+            "unknown": "unknown"
+          },
+          "descSource": {
+            "c4_yaml": "c4.yaml",
+            "package-doc": "package doc",
+            "none": "none"
+          }
+        },
+        "dataflow": {
+          "toolbar": "Flow options",
+          "detail": {
+            "service": "Services",
+            "component": "Components"
+          },
+          "zoomOut": "Zoom out",
+          "zoomReset": "Reset zoom",
+          "zoomIn": "Zoom in",
+          "copied": "Copied",
+          "copy": "Copy Mermaid",
+          "stepDetail": "Step details",
+          "col": {
+            "step": "Step",
+            "route": "From → To",
+            "confidence": "Confidence",
+            "stores": "Stores"
+          },
+          "request": "Request",
+          "response": "Response",
+          "changedTag": "changed",
+          "notFound": "No data flow matches «{{label}}» yet.",
+          "detailError": "Could not load this flow.",
+          "retry": "Retry",
+          "loading": "Loading flows...",
+          "partialBanner": "This flow is incomplete: some steps could not be resolved. Gaps are marked in the step list.",
+          "diagramLabel": "Sequence diagram of {{label}}; see the step list for the text equivalent",
+          "search": "Search flows",
+          "touchOnly": "Only flows touching changes",
+          "touchUnknown": "Cannot tell yet which flows touch the changes.",
+          "error": "Could not load flows.",
+          "empty": "No data flows could be built for this repo yet.",
+          "list": "Flows",
+          "hops": "{{count}} hops",
+          "partialTag": "partial",
+          "count": "{{shown}} of {{total}}",
+          "loadMore": "Load more",
+          "diagramLoading": "Loading diagram",
+          "diagram": {
+            "empty": "This flow has no messages to draw.",
+            "tooManyParticipants": "Too many participants to draw; use the step list below.",
+            "tooLong": "The diagram is too large to draw; use the step list below.",
+            "truncated": "Showing {{rendered}}/{{total}} messages; the step list has all of them."
+          },
+          "pick": "Pick a flow to see its sequence.",
+          "gapAfter": "Data is missing after step {{n}}",
+          "async": "async",
+          "inferred": "Inferred",
+          "changed": "changed",
+          "untested": "untested",
+          "unimplemented": "not implemented",
+          "steps": "Flow steps"
+        },
+        "impact": {
+          "direction": "Direction",
+          "upstream": "Callers",
+          "both": "Both",
+          "downstream": "Dependencies",
+          "depth": "Depth",
+          "view": "View",
+          "viewGraph": "Graph",
+          "viewList": "List",
+          "columnCenter": "Selected symbol",
+          "columnUp": "Upstream, level {{level}}",
+          "columnDown": "Downstream, level {{level}}",
+          "more": "+{{count}} more",
+          "direct": "direct",
+          "openPathBlocked": "This path is outside the worktree and was not opened.",
+          "errTimeout": "The impact query timed out.",
+          "errTooLarge": "The result is too large. Lower the depth or pick another symbol.",
+          "errNotFound": "This symbol was not found in the index; the index may be out of date.",
+          "errFailed": "The impact query failed.",
+          "pick": "Select a changed symbol to see what it affects.",
+          "noEdges": "The data has no edge information; symbols are shown by level.",
+          "truncated": "Showing only part of the result.",
+          "none": "No dependencies found in the index for this symbol.",
+          "openUnavailable": "The diff for this file could not be opened.",
+          "risk": {
+            "low": "Low risk",
+            "medium": "Medium risk",
+            "high": "High risk",
+            "critical": "Critical risk",
+            "unknown": "Not enough data"
+          }
+        },
+        "symbolDetail": {
+          "testsError": "Could not load tests.",
+          "retry": "Retry",
+          "testsEmpty": "No covering test found in the index.",
+          "sourceError": "Could not load source.",
+          "sourceCut": "Showing the first {{count}} lines.",
+          "sourceMasked": "Possible secrets were hidden.",
+          "viewDiff": "View diff",
+          "setCenter": "Set as center",
+          "openEditor": "Open in editor",
+          "copyKey": "Copy key",
+          "notFound": "This symbol was not found in the index; the index may be out of date.",
+          "loadError": "Could not load symbol details.",
+          "back": "Back",
+          "incoming": "Called by",
+          "outgoing": "Calls",
+          "flows": "Related flows",
+          "tests": "Covering tests",
+          "source": "Source",
+          "relationsEmpty": "None found in the index.",
+          "showMore": "Show {{count}} more",
+          "flowsEmpty": "No flow found in the index.",
+          "flowStep": "step {{step}}/{{total}}",
+          "copyPath": "Copy path",
+          "omitted": {
+            "gitignored": "Source omitted: the file is git-ignored.",
+            "binary": "Source omitted: binary file.",
+            "sensitive": "Source omitted: the path may hold secrets.",
+            "notRequested": "Source was not requested.",
+            "unavailable": "No source available."
+          },
+          "indexLines": "Line numbers follow the index at {{commit}}."
+        },
+        "structure": {
+          "rootError": "Could not load the repository structure.",
+          "empty": "The index has no structure information for this path.",
+          "up": "Up one level",
+          "deleted": "{{count}} deleted files are not shown",
+          "capReached": "Stopped loading at {{count}} nodes. Open a folder to see more.",
+          "paneTreemap": "Treemap",
+          "paneTree": "Tree",
+          "treemapLabel": "Treemap of {{count}} items; use the tree for keyboard access.",
+          "small": "+{{count}} small",
+          "tipSymbols": "{{count}} symbols",
+          "changedCount": "{{count}} changed",
+          "sizeBy": "Size by",
+          "sizeSymbols": "Symbols",
+          "noLoc": "The index has no line counts for this folder.",
+          "sizeLoc": "Lines",
+          "colorBy": "Color by",
+          "colorArea": "Area",
+          "colorLanguage": "Language",
+          "breadcrumb": "Path",
+          "root": "Repository",
+          "colorLegend": "Colors",
+          "treeLabel": "Files and folders",
+          "loading": "Loading...",
+          "folderError": "Could not load this folder.",
+          "shown": "{{count}} shown",
+          "loadMore": "Load more",
+          "fileDetail": "File details",
+          "closeDetail": "Close file details",
+          "changedSymbols": "Changed symbols in this file"
+        },
+        "overlay": {
+          "legend": {
+            "title": "Legend"
+          },
+          "changed": {
+            "label": "Changed",
+            "description": "Changed in this review scope"
+          },
+          "affected": {
+            "label": "Affected",
+            "description": "Reached by a changed symbol according to the index"
+          },
+          "untested": {
+            "label": "No test found",
+            "description": "No covering test found in the index"
+          },
+          "violation": {
+            "label": "Rule finding",
+            "description": "The containing file has a rule finding"
+          }
+        },
+        "ErdWarningsStrip": {
+          "summary": "{{count}} parse warnings, {{tables}} tables may be incomplete",
+          "degraded": "ERD of {{table}} may be incomplete"
+        },
+        "ErdLens": {
+          "error": {
+            "offline": "The connection to the workspace is down.",
+            "forbidden": "You do not have access to this repository.",
+            "tooLarge": "The ERD is too large to load at once.",
+            "timeout": "Building the ERD took too long.",
+            "unavailable": "The ERD is not available for this repository.",
+            "generic": "The ERD could not be loaded."
+          },
+          "retry": "Retry",
+          "noMigrations": "No services with migrations were found in this repository.",
+          "building": "Building the ERD...",
+          "emptyService": "This service has no tables in its migrations.",
+          "newData": "New data available - refresh",
+          "backendTruncated": "The backend limited this result.",
+          "showingCount": "Showing {{shown}} of {{total}} tables; the rest are in the list.",
+          "tableLevelOnly": "Column details are not available; changed tables are highlighted.",
+          "noCodeLinks": "No links to code yet (the code index may be missing).",
+          "noMatches": "No tables match the current filters.",
+          "clearFilters": "Clear filters",
+          "label": "Entity-relationship diagram",
+          "back": "Back to previous service"
+        },
+        "ErdCanvas": {
+          "label": "Entity-relationship diagram; use the list view for a text equivalent"
+        },
+        "ErdGhostTableNode": {
+          "owner": "Owned by {{service}} — open its ERD"
+        },
+        "ErdTableList": {
+          "summary": "{{columns}} columns · {{reads}} read · {{writes}} write",
+          "label": "Tables"
+        },
+        "ErdToolbar": {
+          "label": "ERD controls",
+          "service": "Service",
+          "dialect": "SQL dialect",
+          "schemas": "Schemas",
+          "search": "Search tables, columns, code (/)",
+          "searchLabel": "Search the ERD",
+          "scope": "Tables shown",
+          "focus": "Changed + related",
+          "all": "All",
+          "view": "View",
+          "graph": "Graph",
+          "list": "List",
+          "asOf": "As of migration {{migration}}"
+        },
+        "ErdColumnRow": {
+          "primaryKey": "Primary key",
+          "foreignKey": "Foreign key",
+          "masked": "Sensitive text was masked"
+        },
+        "ErdTableDetail": {
+          "changedSymbol": "changed",
+          "openSymbol": "Open",
+          "viewDiff": "View diff",
+          "label": "Table detail: {{name}}",
+          "close": "Close detail",
+          "degraded": "The ERD of this table may be incomplete.",
+          "tenantScoped": "Tenant-scoped: {{value}}",
+          "yes": "yes",
+          "no": "no",
+          "rlsState": "Row-level security: {{state}}",
+          "columns": "Columns",
+          "colName": "Name",
+          "colType": "Type",
+          "colDefault": "Default",
+          "colKey": "Key",
+          "indexes": "Indexes",
+          "unique": "unique",
+          "partialUnique": "emulates a partial unique index",
+          "rules": "Checks and row-level security",
+          "relations": "Relations",
+          "anomaly": "unexpected data",
+          "openService": "Open {{service}}",
+          "accessors": "Code that reads or writes this table ({{count}})",
+          "accessFilter": "Access filter",
+          "filterAll": "All",
+          "filterWrite": "Write",
+          "filterRead": "Read",
+          "accessHint": "Hint from a table-name scan; dynamic queries can be missed.",
+          "staleAccessWarning": "Hint, may be wrong: this change alters columns that code outside the change set still touches.",
+          "noAccessors": "No links to code were found. The index may be missing or the queries are built dynamically.",
+          "migrations": "Migrations in this change",
+          "viewMigration": "View migration diff"
+        },
+        "ErdRelationEdge": {
+          "source": {
+            "ddl": "Declared in DDL",
+            "declared": "Declared in erd-links",
+            "comment": "From a SQL comment",
+            "naming": "Inferred from naming",
+            "unknown": "Unknown source"
+          }
+        },
+        "ErdLegend": {
+          "added": "added",
+          "modified": "changed",
+          "removed": "removed",
+          "label": "Legend",
+          "foreignKey": "foreign key",
+          "logicalLink": "logical link"
+        },
+        "ErdTableNode": {
+          "adjacent": "Related",
+          "ariaLabel": "Table {{name}}, {{count}} columns{{state}}",
+          "dropped": "Table dropped by this change",
+          "noColumnDetail": "No column detail available",
+          "fewerColumns": "Show fewer columns",
+          "moreColumns": "+{{count}} more columns",
+          "change": {
+            "added": "Added",
+            "modified": "Changed",
+            "removed": "Removed"
+          }
+        },
+        "StorageToolbar": {
+          "label": "Storage controls",
+          "env": "Environment",
+          "legacy": "Show legacy",
+          "onlyChanged": "Only changed and related",
+          "kinds": "Store kinds",
+          "asOf": "As of commit {{commit}}"
+        },
+        "StorageInferenceNotice": {
+          "inferred": "{{count}} items are inferred from configuration, not declared.",
+          "redacted": "{{count}} values were redacted by the backend."
+        },
+        "StorageNodeDetail": {
+          "label": "Detail: {{name}}",
+          "close": "Close detail",
+          "vaultPath": "Vault path: {{path}}",
+          "neverShown": "The value is never shown or copied.",
+          "copyKey": "Copy key name",
+          "owner": "Owner",
+          "schemas": "Schemas",
+          "delivery": "Delivery",
+          "stream": "Stream",
+          "payload": "Payload",
+          "status": "Status",
+          "deployed": "deployed",
+          "openErd": "Open ERD of {{service}}",
+          "connections": "Connections",
+          "evidence": "Evidence",
+          "viewDiff": "View diff"
+        },
+        "StorageCanvas": {
+          "notDeployed": "not deployed",
+          "noCodeSupport": "no code support",
+          "external": "external",
+          "label": "Storage map; use the text view for an equivalent",
+          "mark": {
+            "added": "Added",
+            "modified": "Modified",
+            "removed": "Removed",
+            "related": "Related"
+          },
+          "confidence": {
+            "inferred": "Inferred",
+            "derived": "Derived"
+          }
+        },
+        "StorageSecretNode": {
+          "ariaLabel": "Secret reference {{name}}",
+          "masked": "Sensitive text was masked in the interface",
+          "neverShown": "value is never shown",
+          "copyKey": "Copy key name"
+        },
+        "StorageTextView": {
+          "summary": "Text view",
+          "from": "From",
+          "relation": "Relation",
+          "to": "To"
+        },
+        "StorageLens": {
+          "error": {
+            "offline": "The connection to the workspace is down.",
+            "forbidden": "You do not have access to this repository.",
+            "generic": "The storage map could not be loaded."
+          },
+          "unavailable": "The storage map is not available for this backend.",
+          "retry": "Retry",
+          "building": "Reading storage configuration...",
+          "empty": "No storage configuration was found in this repository.",
+          "newData": "New data available - refresh",
+          "truncated": "The backend limited this result.",
+          "unknownChange": "Cannot tell which components changed: the backend did not supply source evidence.",
+          "noStorageChange": "No change to storage configuration was detected within the indexed scope.",
+          "label": "Storage map"
+        },
+        "StorageLegend": {
+          "label": "Legend",
+          "added": "added",
+          "modified": "modified",
+          "removed": "removed",
+          "related": "related to a change",
+          "binding": "read/write (rw) or read-only (ro)",
+          "topic": "publish / subscribe",
+          "configKey": "secret reference"
+        },
+        "contract": {
+          "migration": {
+            "label": "Migration {{service}}",
+            "files": "files",
+            "dialectOnly": "only {{dialect}}",
+            "title": "Migration · {{service}}"
+          },
+          "detail": {
+            "openErd": "Open in ERD",
+            "label": "Contract change detail",
+            "files": "Files",
+            "noFiles": "No files reported",
+            "viewDiff": "View diff",
+            "notInChange": "not in this change",
+            "consumers": "Consumers",
+            "noConsumersBreaking": "No consumers found (they may be outside this repo or not indexed)",
+            "noConsumers": "No consumers found"
+          },
+          "change": {
+            "added": "Added",
+            "removed": "Removed",
+            "modified": "Modified",
+            "unknown": "Changed (unclassified)"
+          },
+          "table": {
+            "noDetails": "No details provided",
+            "label": "Contract changes",
+            "col": {
+              "contract": "Contract",
+              "before": "Before",
+              "after": "After",
+              "compat": "Compatibility"
+            }
+          },
+          "compat": {
+            "breaking": "Breaking",
+            "risky": "Risky",
+            "compatible": "Compatible",
+            "unknown": "Not classified"
+          },
+          "kind": {
+            "proto": "Proto",
+            "wsChannel": "WS channel",
+            "route": "Route",
+            "migration": "Migration",
+            "unknown": "Other"
+          },
+          "loading": "Loading contract changes...",
+          "error": {
+            "noIndex": "The code index is not available, so contract changes cannot be listed yet.",
+            "load": "Could not load contract changes."
+          },
+          "retry": "Retry",
+          "filter": {
+            "kind": "Contract kind",
+            "service": "Service",
+            "allServices": "All services",
+            "onlyBreaking": "Breaking only",
+            "onlyChanged": "Only from this change",
+            "search": "Search contracts"
+          },
+          "summary": {
+            "label": "Compatibility summary"
+          },
+          "truncated": "Showing {{shown}} of {{total}} changes. Narrow the filters to see the rest.",
+          "empty": "No contract changes were detected in this scope (proto, WS channels, routes, migrations).",
+          "emptyFiltered": "No changes match the current filters.",
+          "group": {
+            "noService": "(unknown service)"
+          },
+          "signature": {
+            "absent": "(none)"
+          }
+        },
+        "findings": {
+          "reason": {
+            "not_applicable": "Not applicable",
+            "accepted_risk": "Accepted risk",
+            "false_positive": "False positive",
+            "later": "Fix later"
+          },
+          "dismiss": {
+            "reasonLegend": "Why ignore this finding?",
+            "notePlaceholder": "Optional note",
+            "noteLabel": "Note",
+            "scopeNote": "Applies to the whole repository. It does not waive the quality gate for error findings.",
+            "confirm": "Ignore"
+          },
+          "kind": {
+            "layer_violation": "Layer violations",
+            "dependency_cycle": "Dependency cycles",
+            "hotspot": "Hotspots",
+            "missing_tenant_id": "Missing tenant_id",
+            "dead_code": "Possibly unused code",
+            "rls_removed": "RLS removed",
+            "unknown": "Other"
+          },
+          "filter": {
+            "onlyIntroduced": "Only from this change",
+            "showDismissed": "Show dismissed ({{count}})",
+            "search": "Search findings"
+          },
+          "freshness": {
+            "stale": "Data may be out of date"
+          },
+          "severity": {
+            "error": "Error",
+            "warning": "Warning",
+            "info": "Info",
+            "unknown": "Unclassified"
+          },
+          "origin": {
+            "introduced": "Introduced by this change",
+            "touched": "In a changed file",
+            "preexisting": "Pre-existing",
+            "unknown": "Origin unknown"
+          },
+          "error": {
+            "forbidden": "You do not have permission to dismiss findings.",
+            "offline": "Offline. The finding was left unchanged.",
+            "notFound": "This finding no longer exists. The list was reloaded.",
+            "conflict": "This finding was changed by someone else. The list was reloaded.",
+            "reasonRequired": "Choose a reason first.",
+            "generic": "Could not update the finding.",
+            "noIndex": "The code index is not available, so structural findings cannot be listed yet.",
+            "load": "Could not load findings."
+          },
+          "confidence": "Confidence: {{level}}",
+          "state": {
+            "resolved": "Marked as resolved",
+            "ignored": "Ignored: {{reason}}"
+          },
+          "saving": "Saving",
+          "action": {
+            "viewInGraph": "View in graph",
+            "note": "Note",
+            "restore": "Reopen",
+            "ignore": "Ignore",
+            "resolve": "Mark resolved",
+            "viewDiff": "View diff",
+            "openFile": "Open file"
+          },
+          "retry": "Retry",
+          "loading": "Loading findings...",
+          "label": "Structural findings",
+          "empty": "No problems were found in the indexed scope.",
+          "emptyIndexed": "Index: {{commit}} at {{date}}.",
+          "list": {
+            "partial": "Showing {{count}} loaded findings. Narrow the filters or load more.",
+            "loadMore": "Load more"
+          },
+          "title": {
+            "layer_violation": "Layer violation: {{from}} depends on {{to}}",
+            "dependency_cycle": "Dependency cycle",
+            "hotspot": "Hotspot: frequently changed and complex",
+            "missing_tenant_id": "Query may be missing a tenant_id filter",
+            "dead_code": "Possibly unused code",
+            "rls_removed": "Row-level security removed"
+          }
+        },
+        "ReviewSent": {
+          "hint": {
+            "changed": "File changed since sending (estimate)",
+            "unchanged": "No change seen in this file (estimate)"
+          },
+          "empty": "Nothing sent yet.",
+          "title": "Sent in earlier turns",
+          "count": "{{count}} notes",
+          "recordFailed": "Sent, but the batch history was not saved."
+        },
+        "ReviewNote": {
+          "scope": {
+            "all": "All unsent notes",
+            "lens": "Notes in this lens",
+            "selection": "Selected notes"
+          },
+          "previewButton": "Preview",
+          "badge": "{{count}} unsent notes",
+          "lens": {
+            "findings": "Findings"
+          },
+          "sent": "Sent",
+          "label": "Note",
+          "saveFailed": "Could not save the note. Your text is kept.",
+          "save": "Save note",
+          "cancel": "Cancel",
+          "jump": "Go to",
+          "edit": "Edit",
+          "delete": "Delete",
+          "panel": "Review notes",
+          "persistFailed": "Could not save the note history. Notes are kept locally.",
+          "empty": "No notes yet. Use Note on a node or a finding.",
+          "attachesTo": "Attaches to {{where}}",
+          "noFile": "This item has no file to attach a note to.",
+          "placeholder": "Write a note for the agent",
+          "button": "Note",
+          "noFileReason": "No file to attach to",
+          "preview": {
+            "title": "Prompt preview",
+            "description": "{{count}} notes will be sent as written below.",
+            "tooMany": "This is a large batch. Consider sending a smaller scope first."
+          }
+        },
+        "ReviewTurn": {
+          "label": {
+            "new": "New in this turn",
+            "changed": "Changed in this turn",
+            "unchanged": "Unchanged since previous turn",
+            "reverted": "No longer changed"
+          },
+          "groupLabel": "Turn comparison",
+          "mode": {
+            "all": "All changes",
+            "since": "Since previous turn",
+            "previous": "View previous turn"
+          },
+          "turns": "Turns ({{count}})",
+          "agent": "Agent",
+          "interrupted": "interrupted",
+          "sentNotes": "{{count}} sent notes",
+          "noPrevious": "No previous turn to compare yet.",
+          "estimate": "Estimate: based on file change counts, so an edit that keeps the same counts can be missed.",
+          "readOnly": "Read-only view of the previous turn. Its diff is not rebuilt.",
+          "saveFailed": "Could not save the turn marker.",
+          "retry": "Retry"
+        },
+        "EntryButton": {
+          "label": "Review changes",
+          "interrupted": "Review changes (agent was interrupted)",
+          "short": "Review",
+          "unreviewed": "agent finished, not reviewed"
+        },
+        "QuickActions": {
+          "review": {
+            "title": "Review Changes",
+            "description": "Open the code review for the active worktree.",
+            "verbs": {
+              "review": "review changes",
+              "open": "open review",
+              "impact": "impact"
+            }
+          },
+          "architecture": {
+            "title": "Open Architecture Map",
+            "description": "Open the architecture lens of the code review.",
+            "verbs": {
+              "architecture": "architecture map",
+              "c4": "c4"
+            }
+          },
+          "erd": {
+            "title": "Open ERD",
+            "description": "Open the data model (ERD) lens of the code review.",
+            "verbs": {
+              "erd": "erd",
+              "schema": "database schema"
+            }
+          }
+        },
+        "ReviewSummaryPanel": {
+          "title": "Review",
+          "openFull": "Open full",
+          "vs": "vs",
+          "index": "Index",
+          "files": "files",
+          "symbols": "symbols",
+          "flows": "flows",
+          "tables": "tables",
+          "contracts": "contracts",
+          "untested": "untested",
+          "findings": "Findings",
+          "errors": "errors",
+          "warnings": "warnings",
+          "progress": "Read",
+          "loading": "Loading summary…",
+          "unavailable": "Review summary is unavailable.",
+          "retry": "Retry",
+          "disabled": "Code review isn't enabled for this workspace."
+        }
+      },
+      "qualityCharts": {
+        "severity": {
+          "error": "Error",
+          "warning": "Warning",
+          "info": "Info",
+          "unknown": "Unknown"
+        },
+        "verdict": {
+          "pass": "Pass",
+          "warn": "Has warnings",
+          "fail": "Fail",
+          "unknown": "Unknown",
+          "unknownLong": "Not enough data to conclude"
+        },
+        "stale": "stale",
+        "frame": {
+          "viewTable": "View as table",
+          "viewChart": "View chart",
+          "retry": "Retry",
+          "showing": "Showing {{shown}}/{{total}}",
+          "stale": "Stale data",
+          "loading": "Loading chart",
+          "emptyDefault": "There is no data to chart for this scope.",
+          "errorDefault": "The chart could not be drawn."
+        },
+        "summary": {
+          "rangeUp": "{{label}}: rose from {{first}} to {{last}} over {{count}} points",
+          "rangeDown": "{{label}}: fell from {{first}} to {{last}} over {{count}} points",
+          "rangeFlat": "{{label}}: stayed at {{last}} over {{count}} points",
+          "single": "{{label}}: one value, {{value}}",
+          "noValues": "{{label}}: no values recorded",
+          "missing": "{{count}} points have no value",
+          "coverage": "{{percent}}% of changed lines covered ({{covered}}/{{total}})",
+          "coverageNone": "No coverage data for this scope",
+          "coverageEstimated": "estimated",
+          "grid": "{{rows}} rows by {{columns}} columns, showing {{shown}} of {{total}}",
+          "treemap": "{{count}} tiles sized by {{size}} and shaded by {{intensity}}",
+          "matrix": "{{nodes}} nodes, {{cells}} filled cells, {{blocks}} cyclic groups"
+        },
+        "stackedBar": {
+          "noData": "No data yet",
+          "noFindings": "No findings in the checks that ran",
+          "total": "{{count}} findings"
+        },
+        "sparkline": {
+          "needTwo": "At least two points are needed"
+        },
+        "trend": {
+          "verdictChange": "Verdict changed",
+          "axis": "Horizontal axis: turns, oldest to newest",
+          "point": "Point",
+          "turn": "Turn",
+          "verdict": "Verdict"
+        },
+        "gauge": {
+          "value": "{{percent}}% ({{covered}}/{{total}} changed lines covered)",
+          "estimated": "Estimated from test edges, not measured coverage",
+          "measured": "Measured",
+          "partial": "Partial scope",
+          "none": "No coverage data for this scope yet",
+          "warnBelow": "Warn below {{value}}%",
+          "failBelow": "Fail below {{value}}%",
+          "belowFail": "Below the fail threshold",
+          "belowWarn": "Below the warn threshold",
+          "clamped": "Covered exceeds total; value capped at 100%",
+          "source": "Source",
+          "covered": "Covered lines",
+          "total": "Changed lines",
+          "percent": "Coverage",
+          "scope": "Scope"
+        },
+        "treemap": {
+          "more": "+{{count}} more",
+          "moreLabel": "{{count}} further items are not drawn; see the table",
+          "tileLabel": "{{label}}, {{sizeLabel}}: {{size}}, {{intensityLabel}}: {{intensity}}",
+          "empty": "There are no items to show for this scope.",
+          "overlay": "markers: {{tags}}"
+        },
+        "grid": {
+          "hint": "Arrow keys move, Enter selects, Escape leaves the chart."
+        },
+        "heatmap": {
+          "empty": "There are no rows to show for this scope."
+        },
+        "matrix": {
+          "cycleGroup": "Cyclic group",
+          "other": "Other ({{count}})",
+          "readHint": "Rows are sources, columns are targets.",
+          "backEdge": "Backward dependency",
+          "empty": "There are no dependencies to show for this scope.",
+          "cellLabel": "{{from}} depends on {{to}}, weight {{weight}}"
+        },
+        "table": {
+          "label": "Label",
+          "value": "Value",
+          "size": "Size",
+          "intensity": "Intensity",
+          "from": "From",
+          "to": "To",
+          "weight": "Weight",
+          "note": "Note",
+          "metric": "Metric",
+          "severity": "Severity",
+          "count": "Count"
+        }
+      },
+      "graph": {
+        "RiskLevel": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "critical": "Critical",
+          "unknown": "Not assessed"
+        },
+        "RiskTooltip": "Risk {{level}}, assessed {{assessedAt}}, based on {{tool}}",
+        "RiskTooltipUnassessed": "Risk {{level}}, no assessment time recorded",
+        "Edge": {
+          "added": "Added",
+          "removed": "Removed"
+        },
+        "Entry": {
+          "description": "Explore the request flow, plan and impact as a graph or list",
+          "planGraph": "Graph",
+          "planView": "Plan view",
+          "title": "Request graph",
+          "tree": "Tree",
+          "viewGraph": "View graph"
+        },
+        "GroupSummary": "+{{count}} not affected ({{kinds}})",
+        "Legend": {
+          "added": "Added link (solid)",
+          "removed": "Removed link (dashed)",
+          "title": "Legend"
+        },
+        "List": {
+          "shown": "Showing {{shown}} of {{total}}",
+          "Change": {
+            "added": "Added",
+            "removed": "Removed",
+            "unchanged": "Unchanged"
+          },
+          "col": {
+            "kind": "Kind",
+            "label": "Label",
+            "group": "Group",
+            "risk": "Risk",
+            "status": "Status",
+            "change": "Change",
+            "relations": "Links"
+          }
+        },
+        "Mini": {
+          "addedEdges": "{{count}} edges added",
+          "breaking": "{{count}} breaking",
+          "empty": "Not assessed",
+          "nodes": "{{count}} nodes",
+          "removedEdges": "{{count}} edges removed"
+        },
+        "Node": {
+          "ariaLabel": "{{label}}, {{kind}}, risk {{risk}}{{status}}"
+        },
+        "Search": {
+          "description": "Find a node by label, kind or group",
+          "empty": "No matching nodes",
+          "placeholder": "Search nodes...",
+          "title": "Search graph"
+        },
+        "Sheet": {
+          "findings": "Findings",
+          "incoming": "Incoming",
+          "open": "Open",
+          "outgoing": "Outgoing"
+        },
+        "State": {
+          "empty": "No affected items found for this view",
+          "error": "Could not load the graph",
+          "forbidden": "You do not have permission to view the assessment",
+          "loading": "Loading graph",
+          "noAssessment": "No impact assessment yet",
+          "noDevServer": "No dev server connected",
+          "retry": "Retry",
+          "runAssessment": "Run assessment",
+          "stale": "The analysis index is out of date; results may be incomplete",
+          "truncated": "Showing {{shown}} of {{total}} nodes",
+          "connectDevServer": "Connect dev server"
+        },
+        "Status": {
+          "added": "Added",
+          "blocked": "Blocked",
+          "breaking": "Breaking change",
+          "cancelled": "Cancelled",
+          "done": "Done",
+          "in_progress": "In progress",
+          "irreversible": "Irreversible",
+          "modified": "Modified",
+          "open": "Open",
+          "removed": "Removed",
+          "review": "In review"
+        },
+        "Toolbar": {
+          "after": "After",
+          "before": "Before",
+          "changeView": "Before or after",
+          "graph": "Graph",
+          "lens": "Lens",
+          "list": "List",
+          "search": "Search",
+          "view": "View"
+        },
+        "LensDisabled": {
+          "noAssessment": "No impact assessment yet",
+          "noPlan": "No plan yet",
+          "notExecuting": "Not executing yet",
+          "unsupported": "Not supported by this runtime"
+        },
+        "lens": {
+          "flow": "Flow",
+          "architecture": "Architecture",
+          "contract": "Contracts",
+          "data": "Data",
+          "impact": "Impact",
+          "plan": "Plan",
+          "execution": "Execution"
+        }
+      },
+      "reviewQuality": {
+        "visualization": {
+          "block": {
+            "refresh": "Refresh",
+            "unavailable": "This view needs a worktree that code intelligence can address.",
+            "stale": "The last refresh failed; showing the previously loaded data."
+          },
+          "error": {
+            "generic": "Could not load this data.",
+            "timeout": "The analysis is taking too long. Try again in a moment.",
+            "tooLarge": "The result is too large to show. Narrow the scope and try again."
+          },
+          "coverage": {
+            "title": "Test coverage",
+            "description": "Coverage of the changed lines and per file. Darker tiles have a larger share of statements not covered.",
+            "diffTitle": "Diff coverage",
+            "treemapTitle": "Coverage by file",
+            "sizeLabel": "statements",
+            "intensityLabel": "not covered %",
+            "estimatedBanner": "Estimated from test edges, not measured coverage.",
+            "measuredLine": "Measured coverage.",
+            "totals": "Whole report: {{percent}}% of {{stmts}} statements covered.",
+            "dirty": "The working tree had uncommitted changes when this was measured.",
+            "noReport": "No coverage data for this scope yet.",
+            "noReportReason": "No coverage data for this scope yet. Reason: {{reason}}",
+            "noDiff": "Diff coverage is not available for this scope.",
+            "noDiffReason": "Diff coverage is not available for this scope. Reason: {{reason}}",
+            "noChangedLines": "There are no changed executable lines in this scope.",
+            "runCheck": "Run check",
+            "partial": "Partial scope: some changed files are not measured.",
+            "excluded": "Excluded files ({{count}})",
+            "excludedItem": "{{path}}: {{reason}}",
+            "noStatements": "{{count}} files without statements are not drawn.",
+            "uncoveredTitle": "Lines not covered",
+            "uncoveredNone": "No uncovered line ranges were reported.",
+            "uncoveredFile": "{{path}} ({{count}} lines)",
+            "uncoveredRange": "Lines {{from}}-{{to}}",
+            "uncoveredLine": "Line {{line}}",
+            "openDiff": "Open diff of {{path}} at line {{line}}",
+            "uncoveredMore": "Showing the {{shown}} files with the most uncovered lines of {{total}}."
+          },
+          "trend": {
+            "title": "Trend by turn",
+            "titleCommit": "Trend by commit",
+            "description": "Findings per point. A gap in a line means that no number was recorded for that point.",
+            "groupBy": "Group by",
+            "groupTurn": "Turn",
+            "groupCommit": "Commit",
+            "empty": "No quality runs have been recorded for this worktree yet.",
+            "needTwo": "At least two turns are needed to show a trend.",
+            "latest": "Latest point: {{error}} errors, {{warning}} warnings, {{info}} info.",
+            "clickHint": "Select a turn to compare it with the previous one.",
+            "diffCoverage": "Diff coverage",
+            "diffCoverageMissing": "{{count}} points have no diff coverage number.",
+            "sourceLocal": "Local",
+            "sourceCi": "CI",
+            "sourceUnknown": "Unknown source",
+            "details": "Per-point details",
+            "colPoint": "Point",
+            "colSource": "Source",
+            "colVerdict": "Verdict",
+            "colCoverage": "Diff coverage",
+            "headNote": "Figures at HEAD {{commit}} · {{source}}"
+          },
+          "hotspot": {
+            "title": "Hotspots",
+            "description": "Files flagged by the structure analysis (rule hotspot.file) over the configured history window. This is not a quality score.",
+            "empty": "No hotspot data yet.",
+            "emptyReason": "No hotspot data yet. Hotspots appear once the structure analysis is on and has enough history.",
+            "moreRows": "{{count}} more files exist on the backend and are not loaded.",
+            "allMetrics": "All metrics ({{count}})",
+            "colFile": "File",
+            "selected": "Selected: {{path}}",
+            "owner": "Owner: {{owner}}",
+            "openDiff": "Open diff"
+          },
+          "dependency": {
+            "title": "Dependencies",
+            "description": "Rows are importing modules, columns are imported modules. Outlined blocks and ▲ mark cyclic groups.",
+            "emptyReason": "No dependency data yet for this scope.",
+            "backendTruncated": "The backend returned {{shown}} of {{total}} modules.",
+            "edgesTitle": "Edges between {{from}} and {{to}}",
+            "edgeLine": "{{from}} imports {{to}} ({{count}})",
+            "noEdge": "No import edge between these modules.",
+            "openStructure": "Open in Structure lens",
+            "close": "Close"
+          }
+        },
+        "scorecard": {
+          "lens": {
+            "title": "Quality",
+            "findingsLink": "View {{count}} findings",
+            "findingsLinkNone": "View findings"
+          },
+          "blocks": {
+            "coverage": "Test coverage",
+            "trend": "Trend by turn",
+            "hotspot": "Hotspots",
+            "dependency": "Dependencies",
+            "loading": "Loading"
+          },
+          "verdict": {
+            "pass": "The checks of profile {{profile}} all passed",
+            "warn": "Has warnings",
+            "fail": "Did not pass",
+            "unknown": "Not enough data to conclude",
+            "unknownNoReason": "The backend gave no reason",
+            "profileMissing": "unnamed profile"
+          },
+          "mode": {
+            "inform": "Inform mode: this does not block creating a review",
+            "block": "Configured to block; this interface only warns",
+            "unknown": "The gate mode is not known"
+          },
+          "reasons": {
+            "title": "Checks behind this verdict",
+            "none": "The backend returned no per-check reasons"
+          },
+          "reason": {
+            "pass": "Passed",
+            "warn": "Warning",
+            "fail": "Failed",
+            "unknown": "Unknown",
+            "values": "observed {{observed}}, threshold {{threshold}}",
+            "waived": "{{count}} waived",
+            "show": "Show findings",
+            "noFilter": "Findings cannot be filtered for this check"
+          },
+          "steps": {
+            "title": "Steps that ran ({{count}})",
+            "none": "No steps were recorded for this run"
+          },
+          "step": {
+            "passed": "Passed",
+            "findings": "Has findings",
+            "failed": "Failed",
+            "timeout": "Timed out",
+            "cancelled": "Cancelled",
+            "skipped": "Skipped",
+            "env_not_ready": "Environment not ready",
+            "unknown": "Unknown",
+            "failure": {
+              "format_drift": "Output format changed",
+              "output_too_large": "Output too large",
+              "exit_unexpected": "Unexpected exit",
+              "parser_error": "Output could not be parsed",
+              "env": "Environment problem"
+            },
+            "noResult": "This step did not complete, so it contributed no findings and its result is unknown",
+            "counts": "{{errors}} errors, {{warnings}} warnings, {{infos}} info",
+            "duration": "{{seconds}} s",
+            "truncated": "Output truncated",
+            "outside": "{{count}} outside the changed scope"
+          },
+          "source": {
+            "local": "Local",
+            "ci": "CI",
+            "unknown": "Unknown source"
+          },
+          "provenance": {
+            "line": "{{source}} · ran {{time}} · HEAD {{head}} · index {{index}}",
+            "lineNoRun": "{{source}} · HEAD {{head}} · index {{index}}",
+            "indexBehind": "The code index is at a different commit than HEAD",
+            "unknownValue": "unknown"
+          },
+          "stale": {
+            "title": "This result is out of date",
+            "headMoved": "HEAD has moved since this result was computed.",
+            "backend": "The backend marked this result as stale.",
+            "cache": "The repository changed after this result was fetched; it is being refreshed.",
+            "rerun": "Run again",
+            "label": "stale"
+          },
+          "banner": {
+            "dirty": "The working tree had uncommitted changes during the run; line numbers may be off.",
+            "changedDuringRun": "The working tree changed during the run; line numbers may be off.",
+            "scopeWidened": "The scope was widened compared with the request.",
+            "outsideScope": "{{count}} findings are outside the changed scope and are not counted in the gate",
+            "truncated": "The backend truncated the findings of this run."
+          },
+          "counts": {
+            "title": "Findings by severity",
+            "description": "Counts of errors, warnings and info from the runs behind this verdict."
+          },
+          "ci": {
+            "title": "Local versus CI",
+            "agree_pass": "Local and CI both passed",
+            "agree_fail": "Local and CI both failed",
+            "local_pass_ci_fail": "Local passed but CI did not; this cannot be treated as passing",
+            "local_fail_ci_pass": "Local failed but CI passed",
+            "local_only": "Only a local run exists",
+            "ci_only": "Only a CI run exists",
+            "ci_pending": "CI is still running",
+            "sha_mismatch": "CI ran on a different commit than HEAD",
+            "not_comparable": "Local and CI results cannot be compared",
+            "unknown": "The comparison is not known",
+            "open": "Open CI run",
+            "hints": "Possible causes"
+          },
+          "chip": {
+            "label": "Quality",
+            "open": "Open the quality view"
+          },
+          "run": {
+            "profile": "Profile",
+            "scopeLabel": "Scope",
+            "scope": {
+              "changed": "Changed files",
+              "worktree": "Whole worktree",
+              "commitRange": "Commit range"
+            },
+            "start": "Run checks",
+            "starting": "Starting",
+            "heavy": "heavy",
+            "notReady": "Not ready",
+            "missing": "Missing: {{check}} ({{reason}})",
+            "missingHint": "Hint: {{hint}}",
+            "noProfiles": "No runnable profiles are available",
+            "cancel": "Cancel",
+            "cancelling": "Cancelling, waiting for confirmation",
+            "queued": "Queued",
+            "running": "Running",
+            "stage": "Stage: {{stage}}",
+            "step": "Step {{index}} of {{count}}",
+            "percent": "{{percent}}%",
+            "progressUnknown": "Progress is not known",
+            "finished": {
+              "succeeded": "The run finished",
+              "failed": "The run did not complete",
+              "interrupted": "The run was interrupted and did not complete",
+              "cancelled": "The run was cancelled",
+              "unknown": "The run ended in an unknown state"
+            },
+            "dismiss": "Dismiss",
+            "copyDetails": "Copy details",
+            "details": "Run {{runId}} · {{status}}"
+          },
+          "error": {
+            "envNotReady": "The environment is not ready to run these checks",
+            "recheck": "Check again",
+            "profileUnknown": "That profile is no longer available; the list was refreshed",
+            "profileAvailable": "Available: {{names}}",
+            "rateLimited": "Too many runs were requested",
+            "rateLimitedIn": "Try again in {{seconds}} s",
+            "forbidden": "You do not have permission to run checks; results stay readable",
+            "offline": "You are offline: cached results are shown and running is unavailable",
+            "generic": "The checks could not be started"
+          },
+          "state": {
+            "loading": "Loading quality results",
+            "notRun": {
+              "title": "The checks have not run for this scope",
+              "body": "Run the checks to get a verdict. Until then nothing is concluded."
+            },
+            "empty": "No findings in the checks that ran ({{profile}})",
+            "error": "Quality results could not be loaded",
+            "retry": "Retry",
+            "forbidden": "You do not have access to quality results",
+            "offline": "You are offline: showing the last cached result",
+            "indexStale": "The code index is behind HEAD; structural checks may miss recent changes",
+            "runFailed": "The last run did not complete, so no verdict can be drawn from it",
+            "cancelled": "The last run was cancelled"
+          }
+        },
+        "annotations": {
+          "toggleLabel": "Check annotations",
+          "toggleOn": "Hide check annotations",
+          "toggleOff": "Show check annotations",
+          "noticeContentChanged": "Check annotations are hidden because the content changed. Re-run checks to refresh them.",
+          "noticeDirty": "Check annotations may be a few lines off: the run started with uncommitted changes.",
+          "noticeChangedDuringRun": "Check annotations may be off: files changed while the checks were running.",
+          "glyphCount": "{{count}} check findings on this line",
+          "glyphMore": "+{{count}} more"
+        },
+        "findings": {
+          "toolbarSeverity": "Filter by severity",
+          "toolbarCategory": "Category",
+          "toolbarCategoryCount": "Category ({{count}})",
+          "toolbarOnlyInScope": "Only changed files",
+          "toolbarShowWaived": "Show waived ({{count}})",
+          "toolbarSearchPlaceholder": "Search message, rule or file",
+          "categoryLint": "Lint",
+          "categoryTypecheck": "Type check",
+          "categoryTest": "Tests",
+          "categoryCoverage": "Coverage",
+          "categoryComplexity": "Complexity",
+          "categorySecurity": "Security",
+          "categoryDependency": "Dependencies",
+          "categoryConvention": "Conventions",
+          "categoryArchitecture": "Architecture",
+          "categoryAi": "AI review",
+          "loading": "Loading…",
+          "loadError": "Could not load check findings.",
+          "retry": "Retry",
+          "loadMore": "Load more",
+          "emptyNoRun": "No checks have run yet. Run checks to see findings here.",
+          "emptyNone": "No findings in the scope of the checks that ran.",
+          "emptyFiltered": "No findings match the current filters.",
+          "footerShowing": "Showing {{shown}} of {{total}}",
+          "footerOutsideScope": "{{count}} outside the changed scope (not counted in the gate)",
+          "footerCapped": "Showing the first 5,000 findings. Narrow the filters to see the rest.",
+          "footerTruncated": "The tool output was truncated, so this list may be incomplete.",
+          "rowTool": "{{tool}} {{version}}",
+          "rowViewDiff": "View diff",
+          "rowOpenFile": "Open file",
+          "rowFixHint": "Fix hint",
+          "rowWaived": "Waived by {{by}} until {{date}}",
+          "rowWaivedNoBy": "Waived until {{date}}",
+          "waiveOpen": "Waive",
+          "waiveRevoke": "Remove waiver",
+          "waiveReasonLabel": "Reason",
+          "waiveReasonPlaceholder": "Why is this finding acceptable?",
+          "waiveReasonCount": "{{count}}/{{max}}",
+          "waiveExpiryLabel": "Waiver expires",
+          "waiveExpiryDays": "{{days}} days",
+          "waiveExpiryDate": "Expiry date",
+          "waiveCancel": "Cancel",
+          "waiveSubmit": "Waive finding",
+          "waiveSaving": "Saving…",
+          "waiveToastWaived": "Finding waived",
+          "waiveToastRevoked": "Waiver removed",
+          "waiveErrReasonRequired": "Enter a reason (up to 1000 characters).",
+          "waiveErrExpiryRequired": "Choose when the waiver expires.",
+          "waiveErrExpiryPast": "The expiry date must be in the future.",
+          "waiveErrExpiry": "A waiver can last at most {{maxDays}} days.",
+          "waiveErrForbidden": "You do not have permission to waive findings.",
+          "waiveErrOffline": "You are offline. The waiver was not saved.",
+          "waiveErrConflict": "This finding changed. Reload the list and try again.",
+          "waiveErrValidation": "The waiver was rejected. Check the reason and expiry.",
+          "waiveErrUnknown": "Could not save the waiver."
         }
       }
     },
@@ -13832,6 +16523,17 @@
           "disabled": "Code Intelligence disabled",
           "unsupported": "Not supported in this environment"
         }
+      }
+    },
+    "settings": {
+      "codeIntel": {
+        "loading": "Loading code intelligence settings",
+        "notAuthorized": "Only administrators can change these switches.",
+        "codeIntelLabel": "Code intelligence",
+        "qualityLabel": "Quality gate",
+        "needsMaster": "Turn on code intelligence first.",
+        "serverOff": "Your organization turned this on, but the server switch is currently off.",
+        "readOnly": "Ask an administrator to change these switches."
       }
     }
   },

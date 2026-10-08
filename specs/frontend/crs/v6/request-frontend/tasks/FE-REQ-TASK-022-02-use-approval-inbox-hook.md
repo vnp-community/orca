@@ -5,7 +5,7 @@
 **Area:** frontend (hooks, lib)
 **File:** `frontend/src/renderer/src/hooks/useApprovalInbox.ts` (mới), `frontend/src/renderer/src/lib/approval-decision-outcome.ts` (mới), tests cùng tên `.test.ts(x)` (mới)
 **Depends on:** FE-REQ-TASK-022-01; FE-REQ-SOL-018 (`callRequestRpc`, `RequestRpcError`, `subscribeRequestEvents`, slice `setPendingApprovalCount`, `setRequestFlowSupport`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: useApprovalInbox.test.tsx 9/9, approval-decision-outcome.test.ts 15/15; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -45,3 +45,7 @@ Chạy (chưa chạy): `pnpm --filter orca-frontend test frontend/src/renderer/s
 - Chạy được trên runtime environment/SSH vì chỉ đi qua `callRequestRpc`; không dùng `window.api` riêng cục bộ.
 - Hai nguồn đếm (`setPendingApprovalCount` ở đây và lời gọi nền của SOL-018) có thể chênh nhau tạm thời; task 06 chốt nguồn chính.
 - `projectId` của hàng chỉ có sau khi `useRequestSummaries` nạp xong; lọc dự án có thể "nhấp nháy" khi dữ liệu về.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Sự kiện đi qua `useRequestSubscription` (bus của `useRequestEvents`) thay vì mở `subscribeRequestEvents` thứ hai. Tham số ghi chỉ có `id/expectedVersion/expectedDigest/comment` (không gửi `approvalId`). Đếm chấm số: chỉ cập nhật khi chưa lọc server.

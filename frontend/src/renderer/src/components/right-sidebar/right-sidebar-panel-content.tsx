@@ -9,6 +9,7 @@ const PortsPanel = lazy(() => import('./PortsPanel'))
 const AiVaultPanel = lazy(() => import('./AiVaultPanel'))
 const FolderWorkspaceWorktreesPanel = lazy(() => import('./FolderWorkspaceWorktreesPanel'))
 const FolderWorkspacePrChecksPanel = lazy(() => import('./FolderWorkspacePrChecksPanel'))
+const ReviewSummaryPanel = lazy(() => import('../review-map/entry/ReviewSummaryPanel'))
 
 type RightSidebarPanelContentProps = {
   effectiveTab: ActiveRightSidebarTab
@@ -30,6 +31,9 @@ export function RightSidebarPanelContent({
             expose. Keep this panel reachable only for SSH worktrees. */}
         {effectiveTab === 'ports' && (
           <PortsPanel isVisible={rightSidebarOpen && effectiveTab === 'ports'} />
+        )}
+        {effectiveTab === 'review' && (
+          <ReviewSummaryPanel isVisible={rightSidebarOpen && effectiveTab === 'review'} />
         )}
         {effectiveTab === 'vault' && <AiVaultPanel />}
         {effectiveTab === 'workspaces' && <FolderWorkspaceWorktreesPanel />}

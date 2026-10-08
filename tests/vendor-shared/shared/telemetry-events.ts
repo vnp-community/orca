@@ -15,6 +15,7 @@
 
 import { z } from 'zod'
 import { mcpEventSchemas } from './mcp-telemetry-events'
+import { reviewEventSchemas } from './review-telemetry-events'
 import { FEATURE_WALL_MAX_DWELL_MS } from './feature-wall-telemetry'
 import { FEATURE_WALL_EXIT_ACTIONS, FEATURE_WALL_TOUR_DEPTH_STEPS } from './feature-wall-tour-depth'
 import {
@@ -1487,7 +1488,10 @@ export const eventSchemas = {
   smart_to_recent_switch: smartToRecentSwitchSchema,
 
   // MCP UI (additive; see mcp-telemetry-events.ts). Web build has no telemetry bridge.
-  ...mcpEventSchemas
+  ...mcpEventSchemas,
+
+  // Review / quality gate (additive; see review-telemetry-events.ts).
+  ...reviewEventSchemas
 } as const
 
 export type EventMap = { [N in keyof typeof eventSchemas]: z.infer<(typeof eventSchemas)[N]> }

@@ -1,6 +1,6 @@
 # FE-CV-SOL-092-requirement-trace-view: Lens "Yêu cầu" (truy vết yêu cầu ↔ thay đổi ↔ test)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ việc ĐỌC code `frontend/src` và hợp đồng v7; chưa chạy test hay ứng dụng.
+> Trạng thái (2026-10-07): 7/7 task DONE, 0 PARTIAL, 0 BLOCKED, 0 TODO. Xem mục "Ghi chú triển khai" của từng task; code thật lệch spec ở các điểm đã ghi.
 
 **CR:** [CR-CV-092](../../../../../../docs/crs/v7/quality-gate/CR-CV-092-requirement-traceability.md) (phần frontend; dữ liệu do `BE-CV-SOL-092-requirement-trace`). Priority P2.
 **Area:** frontend (`components/review-map/requirements/`, `hooks`)

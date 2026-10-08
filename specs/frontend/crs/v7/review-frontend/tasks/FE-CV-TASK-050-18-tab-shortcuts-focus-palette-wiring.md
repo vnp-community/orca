@@ -5,7 +5,7 @@
 **Area:** frontend / lib + hooks + components
 **File:** `lib/tab-number-shortcuts.ts`, `components/terminal/tab-type-cycle.ts`, `components/Terminal.tsx`, `hooks/ipc-tab-switch.ts`, `hooks/resolve-zoom-target.ts`, `hooks/modal-return-focus-action.ts`, `hooks/useModalReturnFocus.ts`, `lib/workspace-tab-palette-search.ts`, `components/WorktreeJumpPalette.tsx`, `components/floating-terminal/FloatingTerminalPanel.tsx` (đọc/xác nhận), `runtime/sync-runtime-graph.ts` (đọc), tests
 **Depends on:** FE-CV-TASK-050-17
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — tab cycle, number shortcut, zoom (ui), modal focus return, Terminal.tsx hide, mobile sync exclusion (read-only check) done; palette search for the Review tab (workspace-tab-palette-search results) NOT implemented, only types widened; no per-file test cases for tab-number-shortcuts/ipc-tab-switch
 
 ## Context
 

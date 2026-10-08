@@ -5,7 +5,7 @@
 **Area:** frontend / pure functions
 **File:** `frontend/src/renderer/src/components/quality-charts/chart-linear-scale.ts`, `heat-intensity-scale.ts`, `chart-text-summary.ts` (mới) và `__tests__/*.test.ts`
 **Depends on:** FE-CV-TASK-088-03 (nhãn mức dùng trong mô tả)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: chart-linear-scale 5/5, heat-intensity-scale 3/3, chart-text-summary 5/5)
 
 ## Context
 
@@ -37,3 +37,7 @@
 ## Rủi ro
 
 - Làm tròn tick với số thập phân nhị phân (0,1+0,2); dùng bước nguyên × lũy thừa 10 rồi nhân, không cộng dồn.
+
+## Ghi chú triển khai (2026-10-07)
+
+Thêm `describeTreemap`, `describeMatrix`, `formatChartNumber`. Thang+tick 70 dòng (<120): không kích hoạt điều kiện xem lại A2. Không tạo `shared/chart-text-summary-types.ts` (kiểu nằm cùng module).

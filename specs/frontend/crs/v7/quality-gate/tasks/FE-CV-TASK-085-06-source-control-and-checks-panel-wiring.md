@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/SourceControl.tsx` (sửa ~vài dòng gần :606, :5247, :5282), `frontend/src/renderer/src/components/right-sidebar/ChecksPanel.tsx` (sửa gần :3611)
 **Depends on:** FE-CV-TASK-085-03, 085-05
-**Status:** [~] PARTIAL — khe `qualityNotice` đã thêm vào Composer và CommitArea, nhưng `SourceControl.tsx` dùng `qualityNotice={null}` (placeholder); `ChecksPanel.tsx` chưa có wiring. Hook `useSourceControlQualityGate` chưa được kết nối. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: dựa trên test hook/notice/composer; không có test render SourceControl/ChecksPanel)
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - SourceControl.tsx 6 723 dòng: chỉ thêm vài dòng.
+
+## Ghi chú triển khai (2026-10-07)
+
+SourceControl dùng hook trực tiếp (đã sửa `variant` -> `visible`); ChecksPanel dùng `source-control-quality-gate-slot.tsx` mới. Impact: CreateHostedReviewComposer LOW, ChecksPanel LOW.

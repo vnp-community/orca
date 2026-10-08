@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/notes/{ReviewNoteButton,ReviewNoteComposerPopover,ReviewNodeNoteBadge,ReviewNotesPanel}.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-060-01; FE-CV-SOL-051-review-workspace-shell; FE-CV-SOL-053-impact-lens-and-symbol-detail (panel chi tiết, nhảy tới neo)
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — panel + dock + nút ghi chú đã gắn (ReviewNotesPanel trong dock; ReviewNoteButton trong SymbolDetailPanel và ErdTableDetail; notes/ 7 file 49/49 PASS, ReviewWorkspace.companions.test 8/8, SymbolDetailPanel.test 10/10, erd-components.test PASS); thiếu: `ReviewNodeNoteBadge` chưa gắn vào nút xyflow, phím `n` còn cài cục bộ (prop `hotkey`, bật ở SymbolDetailPanel) chưa qua registry SOL-052
 
 ## Context
 
@@ -32,3 +32,13 @@
 ## Rủi ro
 
 - Nhảy đúng dòng phụ thuộc SOL-053.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Ghi chú đã gửi bị `clearDeliveredDiffComments` xoá khỏi store nên "sửa ghi chú đã gửi đưa về hàng chờ" chỉ áp dụng cho ghi chú còn trong store (legacy `sentAt`).
+- Điều hướng neo: `review-note-navigation.ts` (erd → `selectErdTable`, storage → `selectStorageNode`, dataflow → `setReviewDataFlowId`, impact/architecture/structure → `selectReviewSymbol`, rồi mở diff tại dòng).
+- Thêm `review-note-selectors.ts` (`noteCountByNodeKey`, `groupNotesByLens`) cho badge/panel.
+
+## Ghi chú tích hợp (W6, 2026-10-07)
+
+`ReviewNoteButton` gắn vào `impact/SymbolDetailPanel.tsx` (anchor graph-node lens `impact`, `hotkey`) và `erd/ErdTableDetail.tsx` (prop mới `worktreeId`, anchor lens `erd`, file = `lastMigration || firstMigration`; không có file thì nút bị khoá kèm lý do). `ReviewSendMenu` ghi quyết định `send_to_agent` (095-05). Test cũ `SymbolDetailPanel.test`/`ErdLens.test` mock `@/store` một phần nên phải mock `../notes/ReviewNoteButton` (giả định cũ "panel không dùng store-bound child" không còn đúng).

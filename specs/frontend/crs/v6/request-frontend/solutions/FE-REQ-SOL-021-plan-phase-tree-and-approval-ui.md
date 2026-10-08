@@ -1,6 +1,6 @@
 # FE-REQ-SOL-021: Cây Plan → Phase → Task, duyệt Plan/Phase, lọc khỏi Board
 
-> 🔴 **Not Started.** Rà soát 2026-10-07: chỉ có `plan-approval-model.ts` (skeleton cho 021-04), tất cả tasks UI chưa bắt đầu.
+> 🚧 **In Progress (5/6 tasks DONE, 021-06 PARTIAL).** Rà soát 2026-10-07: lọc Plan/Phase, `usePlanTree`, cây, thanh duyệt, `RequestPlanTab` + khoá Chạy, i18n đã có test xanh. Còn: e2e (skip, cần backend), docs `ui/pages`, UI duyệt đề xuất `generatePlan` mode propose/commit.
 
 **CR:** [CR-REQ-021](../../../../../../docs/crs/v6/request-frontend/CR-REQ-021-plan-phase-tree-and-approval-ui.md)
 **Area:** frontend (`components/request/plan/`, `components/task/*`, `hooks/useTasks.ts`)

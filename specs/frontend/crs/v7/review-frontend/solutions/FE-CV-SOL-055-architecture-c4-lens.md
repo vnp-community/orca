@@ -1,6 +1,6 @@
 # FE-CV-SOL-055-architecture-c4-lens: Lens Kiến trúc C4 mức 3 và chỉnh `c4.yaml`
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 6/7 task DONE (055-01..06), 1 PARTIAL (055-07: thiếu e2e và kiểm tay bố cục). Code ở `components/review-map/c4/`, `hooks/useC4*`, `shared/c4-override-document.ts`. Viết ngày 2026-10-06.
 
 **CR:** [CR-CV-055](../../../../../../docs/crs/v7/review-frontend/CR-CV-055-architecture-c4-lens.md)
 **Area:** frontend (`components/review-map`, `shared/c4-override-document.ts`)

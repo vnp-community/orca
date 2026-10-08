@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/findings/{FindingsPanel,FindingsToolbar,FindingsList,FindingRow,FindingDismissPopover}.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-059-02, 059-03; FE-CV-SOL-051-review-workspace-shell (dock đáy, `react-resizable-panels`); `lib/screen-submit-shortcut.ts`, `components/ShortcutKeyCombo.tsx` (đã có)
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — component + dock đáy đã gắn (ReviewBottomDock + review-dock-registry; ReviewWorkspace.companions.test 8/8, findings/ 36/36 PASS); thiếu: chip "N phát hiện" ở thanh tóm tắt; phím j/k/Enter/d/r/Esc vẫn xử lý cục bộ trong panel (chưa qua registry SOL-052)
 
 ## Context
 
@@ -34,3 +34,13 @@
 ## Rủi ro
 
 - Xung đột phím `j/k` với "Thứ tự đọc" (SOL-052): chỉ kích hoạt khi tiêu điểm trong dock.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `FindingsPanel` nhận props (`changedFiles`, `graphSymbolKeys`, `availableLensIds`, `onOpenDiff`, `onOpenFile`) và có thể gắn vào dock khi khung có; hành động "Ghi chú" dùng `ReviewNoteButton` (neo `finding`) khi finding có `evidence[0].path`.
+- Thử lại trên dòng lặp lại đúng thao tác lỗi cuối (ignore/resolve/restore). `d` bấm nút "Ignore" của dòng đang chọn để mở popover.
+- Danh sách > 50 dòng dùng cửa sổ ảo (phẳng); ≤ 50 nhóm theo kind.
+
+## Ghi chú tích hợp (W6, 2026-10-07)
+
+Dock đáy thu gọn được (mặc định đóng, không mount panel khi đóng) trong `shell/ReviewBottomDock.tsx`; nguồn đăng ký ở `shell/review-dock-registry.ts` (`registerReviewDockPanel`, cờ `requiresQuality`) và `shell/review-dock-builtin-panels.tsx` (Finding cấu trúc = `findings`, ghi chú = `notes`). `QualityFinding` của lens quality (W5-A) phải đăng ký panel riêng id khác qua registry — hai nguồn không gộp. Thêm `review_findings_summary` (một lần mỗi lần mount panel, chỉ đếm). Sai lệch: nút dock dùng `aria-pressed`, không dùng role `tab`, để không lẫn với tab lens (test cũ đếm 7 tab).

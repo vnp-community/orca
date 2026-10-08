@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/source-control-quality-gate-notice.tsx` (mới) + `.test.tsx`
 **Depends on:** FE-CV-TASK-085-02, 085-03
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 7 tests notice.test.tsx)
 
 ## Context
 
@@ -32,3 +32,7 @@
 ## Rủi ro
 
 - Chiều rộng sidebar hẹp: dùng `break-words`.
+
+## Ghi chú triển khai (2026-10-07)
+
+`translate` là prop tuỳ chọn, mặc định `translateCatalogKey` (i18n/catalog-key-translate.ts).

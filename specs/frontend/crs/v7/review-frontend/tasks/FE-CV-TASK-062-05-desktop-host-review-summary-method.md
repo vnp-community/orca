@@ -5,7 +5,7 @@
 **Area:** desktop / main runtime (**ngoài `frontend/`, cần chủ sở hữu desktop duyệt**)
 **File:** `desktop/src/main/runtime/rpc/methods/code-intel.ts` (mới) + `code-intel.test.ts`; `desktop/src/main/runtime/rpc/methods/index.ts` (sửa: đăng ký `CODE_INTEL_METHODS`)
 **Depends on:** FE-CV-TASK-062-01 (shape); O-4 cho port thật; hợp đồng UI-API §8
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: desktop vitest rpc/methods/code-intel.test.ts 12/12 PASS; oxlint clean on new files)
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - Phụ thuộc O-4; bảng mẫu `titleKey` có thể lệch backend.
+
+## Ghi chú triển khai (2026-10-07)
+
+- File: `desktop/src/main/runtime/rpc/methods/{code-intel.ts, code-intel-summary-port.ts, code-intel-review-summary-mapping.ts, code-intel.test.ts}`; đăng ký ở `methods/index.ts`. Cổng mặc định ném `CODEINTEL_UNAVAILABLE` ⇒ `{available:false}` (không `reason`). Bảng mẫu `titleKey` là đề xuất, cần đồng bộ với backend. Bộ che chuỗi cục bộ (`maskReviewSummaryText`) thay cho bộ che chung (O-16). **Ngoài `frontend/`, cần chủ sở hữu desktop duyệt.** `gitnexus impact` trả `ambiguous` (2 symbol trùng tên, 0 ảnh hưởng, LOW).

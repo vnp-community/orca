@@ -5,7 +5,7 @@
 **Area:** frontend / components (hình không tương tác từng điểm)
 **File:** `frontend/src/renderer/src/components/quality-charts/StackedSeverityBar.tsx`, `SparklineChart.tsx`, `TrendLineChart.tsx`, `DiffCoverageGauge.tsx` (mới) và `__tests__/*.test.tsx`
 **Depends on:** FE-CV-TASK-088-03, 088-04, 088-06
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: StackedSeverityBar 3/3, SparklineChart 3/3, TrendLineChart 6/6, DiffCoverageGauge 5/5)
 
 ## Context
 
@@ -41,3 +41,7 @@
 
 - `role="meter"` chưa kiểm chứng ở trình đọc màn hình; dự phòng đã nêu.
 - Nhãn trục dài (hash commit) chồng nhau: rút gọn bằng `xLabels` do nơi gọi dựng + xoay bị cấm; thay bằng hiển thị mỗi k nhãn và có đủ trong bảng.
+
+## Ghi chú triển khai (2026-10-07)
+
+Lệch: mỗi hình nhận prop `frame` (id/title/…) và tự bọc `ChartFrame`; `SparklineChart` cho phép dùng gọn không frame (vẫn có role=img + bảng sr-only). `TrendLineChart` có `onSelectPoint` dùng `useChartKeyboardNavigation`. `role=meter` chưa kiểm với trình đọc màn hình. Thêm `chart-line-segments.ts`.

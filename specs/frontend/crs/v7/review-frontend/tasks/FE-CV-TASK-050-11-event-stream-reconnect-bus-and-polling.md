@@ -5,7 +5,7 @@
 **Area:** frontend / store + lib + hooks
 **File:** `store/slices/code-intel.ts` (thêm), `store/slices/code-intel-stream-reconnect.ts` (mới), `lib/code-intel-event-bus.ts` (mới), `hooks/useCodeIntelEvents.ts` (mới), `App.tsx` (sửa một dòng), tests
 **Depends on:** FE-CV-TASK-050-10, FE-CV-TASK-050-04
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: stream-reconnect.test 12 pass; module rewritten with injected deps, useCodeIntelEvents mounted in App.tsx; RATE_LIMITED close code not exposed by the bridge so only onUnsupported triggers polling)
 
 ## Context
 

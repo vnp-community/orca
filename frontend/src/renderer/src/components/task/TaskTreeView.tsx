@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { OrcaTask } from '../../../../shared/task-types'
+import type { TaskWithPlanPath } from '../../../../shared/task-hierarchy'
 import { TaskCard } from './TaskCard'
 
 // Hoisted so the default prop values are stable across renders instead of a new
@@ -9,7 +9,7 @@ const NOOP_TOGGLE_SELECT = (): void => {}
 
 // Recursive tree render from flat list using parentId
 function renderLevel(
-  tasks: OrcaTask[],
+  tasks: TaskWithPlanPath[],
   parentId: string | null,
   depth: number,
   expandedNodes: Set<string>,
@@ -53,7 +53,7 @@ function renderLevel(
 }
 
 type TaskTreeViewProps = {
-  tasks: OrcaTask[]
+  tasks: TaskWithPlanPath[]
   expandedNodes: Set<string>
   toggleExpanded: (id: string) => void
   setActiveTask: (id: string | null) => void

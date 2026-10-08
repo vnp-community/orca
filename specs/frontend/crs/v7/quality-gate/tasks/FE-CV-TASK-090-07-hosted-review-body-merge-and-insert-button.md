@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/merge-review-report-into-body.ts` (mới); `frontend/src/renderer/src/components/right-sidebar/CreateHostedReviewComposer.tsx`, `CreateHostedReviewComposerFields.tsx`, `SourceControl.tsx`, `ChecksPanel.tsx` (sửa)
 **Depends on:** FE-CV-TASK-090-05
-**Status:** [x] DONE — insert button vào PR/MR body chưa implement. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 7 tests merge + 5 tests use-insert-review-report + 3 tests nút trong composer)
 
 ## Context
 
@@ -29,3 +29,7 @@
 ## Rủi ro
 
 - Đua với field revisions.
+
+## Ghi chú triển khai (2026-10-07)
+
+Nút "Chèn báo cáo review" trong `CreateHostedReviewComposerFields`, nối ở SourceControl và ChecksPanel qua `useInsertReviewReport`; ẩn khi cờ quality tắt, khoá khi đang generate.

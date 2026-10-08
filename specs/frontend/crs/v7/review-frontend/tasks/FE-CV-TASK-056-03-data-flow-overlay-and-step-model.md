@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/data-flow-overlay.ts` (mới), test
 **Depends on:** FE-CV-TASK-053-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest data-flow-overlay-export.test.ts)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - Giả định `messages.n = steps.n` (SOL câu hỏi 2).
+
+## Ghi chú triển khai (2026-10-07)
+
+`dataflow/data-flow-overlay.ts`: `buildStepRows`, `changedMessageSet`, `flowTouchesChange`, `filterFlowsTouchingChange` (trả `unknown` khi không giao). `touchedTables`/`affectedFlows` là `unknown[]` trong wire nên đọc `string` hoặc object `{table|name|id}`/`{id|flowId|processId}`. Giả định `messages.n = steps.n` (câu hỏi 2 mở).

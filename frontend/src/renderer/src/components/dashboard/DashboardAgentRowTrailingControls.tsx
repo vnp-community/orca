@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { ChevronDown, Send, X } from 'lucide-react'
+import { ChevronDown, ScanSearch, Send, X } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +15,11 @@ type DashboardAgentRowTrailingControlsProps = {
   onDismiss: (paneKey: string) => void
   onToggleExpanded: () => void
   onSendTargetClick?: (paneKey: string) => void
+  /** Present only for finished agents whose worktree can open Review. */
+  onReview?: () => void
+  /** Always show the Review button (unvisited rows); otherwise hover/focus only. */
+  reviewAlwaysVisible?: boolean
+  reviewInterrupted?: boolean
 }
 
 export function DashboardAgentRowTrailingControls({
@@ -26,7 +31,10 @@ export function DashboardAgentRowTrailingControls({
   sendTargetStatus,
   onDismiss,
   onToggleExpanded,
-  onSendTargetClick
+  onSendTargetClick,
+  onReview,
+  reviewAlwaysVisible = false,
+  reviewInterrupted = false
 }: DashboardAgentRowTrailingControlsProps): React.JSX.Element {
   // Why: stop propagation so clicking nested row controls does not also
   // activate the agent row or parent worktree card.
@@ -64,8 +72,43 @@ export function DashboardAgentRowTrailingControls({
     [onSendTargetClick, paneKey, sendTargetStatus]
   )
 
+  const showReview = onReview !== undefined && !sendTargetStatus
+  const reviewLabel = reviewInterrupted
+    ? translate(
+        'auto.components.reviewMap.EntryButton.interrupted',
+        'Review changes (agent was interrupted)'
+      )
+    : translate('auto.components.reviewMap.EntryButton.label', 'Review changes')
+
   return (
-    <span className="relative ml-auto flex h-3.5 w-12 shrink-0 items-center justify-end">
+    <span
+      className={cn(
+        'relative ml-auto flex h-3.5 shrink-0 items-center justify-end',
+        showReview ? 'w-auto gap-1' : 'w-12'
+      )}
+    >
+      {showReview && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onReview()
+          }}
+          onMouseDown={stopMouseDown}
+          onKeyDown={stopKeyDown}
+          className={cn(
+            'inline-flex shrink-0 items-center justify-center text-muted-foreground/70 hover:text-foreground',
+            !reviewAlwaysVisible &&
+              'can-hover:opacity-0 transition-opacity duration-150 group-hover/agent-row:opacity-100 focus-visible:opacity-100'
+          )}
+          aria-label={reviewLabel}
+          title={reviewLabel}
+          data-agent-review-button
+        >
+          <ScanSearch className="size-3.5" />
+        </button>
+      )}
       {(sendTargetStatus === 'eligible' || sendTargetStatus === 'sending') && (
         <button
           type="button"

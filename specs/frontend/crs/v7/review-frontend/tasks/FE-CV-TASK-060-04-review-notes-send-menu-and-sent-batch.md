@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + hàm thuần
 **File:** `frontend/src/renderer/src/components/review-map/notes/{ReviewNotesSendMenu,ReviewSendPreviewDialog,ReviewSentBatchList}.tsx`, `review-sent-batch.ts` (mới) + test
 **Depends on:** FE-CV-TASK-060-01, 060-02, 060-03
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: notes/ 7 file test 48/48 PASS gồm ReviewNotesSendMenu 5, review-notes-delivery 4, review-sent-batch 8; tsc/oxlint sạch)
 
 ## Context
 
@@ -32,3 +32,9 @@
 ## Rủi ro
 
 - Nếu lưu lô thất bại mà ghi chú đã bị xoá thì mất lịch sử (chấp nhận, báo inline).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Thứ tự giao: `handleNotesDelivered` (review-notes-delivery.ts): ghi lô → `clearDeliveredDiffComments` → `markAnnotationsSentBestEffort` (chỉ khi giao đúng toàn bộ scope all). Ghi lô thất bại chỉ báo inline "Sent, but the batch history was not saved.", không chặn.
+- Sai lệch: `NotesSendMenu.onDelivered` không cho biết pane/agent đích nên `turnId`, `targetPaneKey`, `agentType` của lô là `null`.
+- Scope `selection` cần prop `selectedCommentIds` (panel chưa có ô chọn nhiều). `fileIdentityAtSend` lấy từ `gitStatusByWorktree` (ước lượng).

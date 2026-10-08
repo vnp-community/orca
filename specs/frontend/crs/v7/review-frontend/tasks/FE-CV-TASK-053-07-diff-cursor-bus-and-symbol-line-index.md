@@ -5,7 +5,7 @@
 **Area:** frontend / lib + editor + review-map
 **File:** `lib/diff-cursor-line-bus.ts`, `components/editor/useDiffCursorEmitter.ts`, `components/review-map/symbol-line-index.ts` (mới), `DiffViewer.tsx` (gắn emitter), `ReviewWorkspace.tsx` (đăng ký), tests
 **Depends on:** FE-CV-TASK-053-05, 053-06, 051-05
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: diff-cursor-line-bus.test 4/4, useDiffCursorEmitter.test 2/2, symbol-line-index.test 4/4 pass; ReviewWorkspace subscribes via impact/use-diff-cursor-symbol-sync)
 
 ## Context
 

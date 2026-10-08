@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + tests
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`); `tests/e2e/code-intel-web/lenses.web.e2e.ts` (phần Contract/Findings)
 **Depends on:** FE-CV-TASK-059-04, 059-05; FE-CV-TASK-073-02, 073-03
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — i18n 5 locale + test phủ khoá xanh (i18n/contract-findings-notes-locale-coverage.test.ts 11/11 PASS); thiếu e2e `lenses.web.e2e.ts` (package không có `tests/e2e/code-intel-web`, 073-03 chưa có)
 
 ## Context
 
@@ -29,3 +29,8 @@
 ## Rủi ro
 
 - Dịch `ruleId` hàng loạt dễ sót; mã lạ nguyên văn là lưới an toàn.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Khoá nằm dưới `auto.components.reviewMap.contract.*` và `auto.components.reviewMap.findings.*` (theo README nhóm). Test phủ khoá là file mới thay vì sửa `code-intel-locale-coverage.test.ts` (tránh sửa file dùng chung); thêm kiểm placeholder `{{x}}` khớp bản en và bản dịch khác en.
+- Kiểm DOM chuỗi giống DSN: đã có ở unit test (`ContractChangeTable`, `finding-model`), chưa có ở e2e.

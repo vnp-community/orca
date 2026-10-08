@@ -12,18 +12,22 @@
  * @module components/request/RequestPage
  */
 
-import React, { useCallback, useEffect } from 'react'
-import { X } from 'lucide-react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { useRequestFlowSupport } from '../../hooks/useRequestFlowSupport'
 import { RequestUnsupportedNotice } from './RequestUnsupportedNotice'
+import { RequestPageHeader } from './RequestPageHeader'
+import { RequestsTab } from './RequestsTab'
+import { CreateRequestDialog } from './CreateRequestDialog'
+import { ApprovalInboxTab } from './approval/ApprovalInboxTab'
+import { BacklogTab } from './backlog/BacklogTab'
 import type { RequestPageData } from '../../store/slices/request'
 
 function isInputElement(el: EventTarget | null): boolean {
-  if (!el || !(el instanceof Element)) return false
+  if (!el || !(el instanceof Element)) {return false}
   const tag = el.tagName.toLowerCase()
   return (
     tag === 'input' ||
@@ -39,7 +43,9 @@ export default function RequestPage(): React.JSX.Element {
 
   const requestFlowSupport = useAppStore((s) => s.requestFlowSupport)
   const requestPage = useAppStore((s) => s.requestPage)
+  const pendingApprovalCount = useAppStore((s) => s.pendingApprovalCount)
   const setRequestPageSection = useAppStore((s) => s.setRequestPageSection)
+  const [createOpen, setCreateOpen] = useState(false)
   const closeRequestPage = useCallback(() => {
     useAppStore.getState().setActiveView('terminal')
   }, [])
@@ -59,19 +65,11 @@ export default function RequestPage(): React.JSX.Element {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
-        <h1 className="text-sm font-semibold text-foreground">
-          {translate('auto.components.request.RequestPage.title', 'Requests')}
-        </h1>
-        <button
-          onClick={closeRequestPage}
-          aria-label="Close requests page"
-          className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-        >
-          <X className="size-4" aria-hidden />
-        </button>
-      </div>
+      <RequestPageHeader
+        onClose={closeRequestPage}
+        onCreate={requestFlowSupport === 'supported' ? () => setCreateOpen(true) : undefined}
+      />
+      {createOpen && <CreateRequestDialog open onOpenChange={setCreateOpen} />}
 
       {/* Body */}
       {requestFlowSupport === 'unknown' && (
@@ -96,6 +94,11 @@ export default function RequestPage(): React.JSX.Element {
             </TabsTrigger>
             <TabsTrigger value="approvals">
               {translate('auto.components.request.RequestPage.tab.approvals', 'Approvals')}
+              {pendingApprovalCount > 0 && (
+                <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">
+                  {pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="backlog">
               {translate('auto.components.request.RequestPage.tab.backlog', 'Backlog')}
@@ -103,18 +106,15 @@ export default function RequestPage(): React.JSX.Element {
           </TabsList>
 
           <TabsContent value="requests" className="flex-1 overflow-hidden mt-0">
-            {/* Placeholder — filled by CR-019 */}
-            <div data-testid="request-tab-requests" className="h-full" />
+            <RequestsTab onCreate={() => setCreateOpen(true)} />
           </TabsContent>
 
           <TabsContent value="approvals" className="flex-1 overflow-hidden mt-0">
-            {/* Placeholder — filled by CR-022 */}
-            <div data-testid="request-tab-approvals" className="h-full" />
+            <ApprovalInboxTab />
           </TabsContent>
 
           <TabsContent value="backlog" className="flex-1 overflow-hidden mt-0">
-            {/* Placeholder — filled by CR-023 */}
-            <div data-testid="request-tab-backlog" className="h-full" />
+            <BacklogTab />
           </TabsContent>
         </Tabs>
       )}

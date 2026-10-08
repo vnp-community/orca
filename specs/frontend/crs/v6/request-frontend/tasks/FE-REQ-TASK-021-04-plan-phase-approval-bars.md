@@ -5,7 +5,9 @@
 **Area:** frontend / request / plan
 **File:** `frontend/src/renderer/src/components/request/plan/{PlanApprovalBar,PhaseApprovalBar,PlanGateChips}.tsx` (mới); `hooks/usePlanDecision.ts` (mới); test cùng tên
 **Depends on:** FE-REQ-TASK-021-02, 021-03, 020-04 (`RejectReasonDialog`), 018-03
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest plan-approval-bars.test.tsx (15 tests) pass; oxlint+tsc clean)
+
+**Ghi chú:** dùng `RejectReasonDialog` của 020 (Mod+Enter, test cả Mac/Linux). `generatePlan` gửi `{id}` như spec CR-016, nhưng CONTRACT mới có `mode propose|commit` (propose không ghi gì): cần UI duyệt đề xuất khi backend chốt. `startPhase` gọi trực tiếp `{id, phaseTaskId}` vì `useRequestActions.startPhase` còn gửi `phaseId`.
 
 ## Context
 

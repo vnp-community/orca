@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/requirements/WorktreeTaskLinkPicker.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-092-03; `hooks/useTasks.ts` (có sẵn)
-**Status:** [x] DONE — `worktree-task-link-picker.tsx` chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 4 tests)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - Danh sách task lớn.
+
+## Ghi chú triển khai (2026-10-07)
+
+Tên file thực: `WorktreeTaskLinkPicker.tsx` (spec ghi chữ thường trong tiêu đề).

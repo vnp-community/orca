@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/requirements/use-requirement-trace.ts` (mới) + test
 **Depends on:** FE-CV-TASK-085-01, 092-01; FE-CV-SOL-050-store-and-query-hooks
-**Status:** [x] DONE — `useRequirementTrace.ts` hook chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 10 tests)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Quy mô dữ liệu chưa đo.
+
+## Ghi chú triển khai (2026-10-07)
+
+Dùng `codeIntel.quality.trace`; retry inProgress; reload khi qualityFinished/gateChanged; `changed` chỉ đánh dấu stale.

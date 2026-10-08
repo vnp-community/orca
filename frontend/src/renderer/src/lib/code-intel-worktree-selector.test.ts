@@ -14,14 +14,17 @@ type FakeState = Parameters<typeof resolveCodeIntelSelector>[0]
 
 function makeState(
   overrides: {
-    worktrees?: Array<{ id: string; repoId: string; projectId?: string }>
-    repos?: Array<{ id: string; projectId?: string }>
+    worktrees?: { id: string; repoId: string; projectId?: string }[]
+    repos?: { id: string; projectId?: string }[]
   } = {}
 ): FakeState {
+  const worktreesByRepo: Record<string, unknown[]> = {}
+  for (const wt of overrides.worktrees ?? []) {
+    ;(worktreesByRepo[wt.repoId] ??= []).push(wt)
+  }
   return {
-    worktrees: overrides.worktrees ?? [],
-    repos: overrides.repos ?? [],
-    preflightStatus: null
+    worktreesByRepo,
+    repos: overrides.repos ?? []
   } as unknown as FakeState
 }
 
@@ -63,25 +66,25 @@ describe('resolveCodeIntelSelector — unsupported cases', () => {
   it('workspace id → workspace-scope', () => {
     const result = resolveCodeIntelSelector(makeState(), 'workspace')
     expect(result.state).toBe('unsupported')
-    if (result.state === 'unsupported') expect(result.reason).toBe('workspace-scope')
+    if (result.state === 'unsupported') {expect(result.reason).toBe('workspace-scope')}
   })
 
   it('::workspace: prefix → workspace-scope', () => {
     const result = resolveCodeIntelSelector(makeState(), '::workspace:root')
     expect(result.state).toBe('unsupported')
-    if (result.state === 'unsupported') expect(result.reason).toBe('workspace-scope')
+    if (result.state === 'unsupported') {expect(result.reason).toBe('workspace-scope')}
   })
 
   it('folder: prefix → workspace-scope', () => {
     const result = resolveCodeIntelSelector(makeState(), 'folder:/tmp')
     expect(result.state).toBe('unsupported')
-    if (result.state === 'unsupported') expect(result.reason).toBe('workspace-scope')
+    if (result.state === 'unsupported') {expect(result.reason).toBe('workspace-scope')}
   })
 
   it('unknown worktree id → unknown-worktree', () => {
     const result = resolveCodeIntelSelector(makeState(), 'nonexistent::main')
     expect(result.state).toBe('unsupported')
-    if (result.state === 'unsupported') expect(result.reason).toBe('unknown-worktree')
+    if (result.state === 'unsupported') {expect(result.reason).toBe('unknown-worktree')}
   })
 
   it('no projectId on worktree or repo → no-project', () => {
@@ -91,6 +94,6 @@ describe('resolveCodeIntelSelector — unsupported cases', () => {
     })
     const result = resolveCodeIntelSelector(state, 'repo-1::main')
     expect(result.state).toBe('unsupported')
-    if (result.state === 'unsupported') expect(result.reason).toBe('no-project')
+    if (result.state === 'unsupported') {expect(result.reason).toBe('no-project')}
   })
 })

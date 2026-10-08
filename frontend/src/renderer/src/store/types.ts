@@ -54,6 +54,10 @@ import type { McpSlice } from './slices/mcp-slice'
 import type { McpApprovalSlice } from './slices/mcp-approval-slice'
 import type { McpTerminalOriginSlice } from './slices/mcp-terminal-origin'
 import type { RequestSlice } from './slices/request'
+import type { CodeIntelSlice } from './slices/code-intel'
+import type { CodeIntelQualitySlice } from './slices/code-intel-quality-state'
+import type { ReviewUiSlice } from './slices/review-ui'
+import type { ReviewProgressSlice } from './slices/review-progress'
 
 // ── Re-exports for cross-slice consumers (import from '@/store/types') ────────
 export type {
@@ -120,4 +124,8 @@ export type AppState = RepoSlice &
   McpSlice &
   McpApprovalSlice &
   McpTerminalOriginSlice &
-  RequestSlice
+  RequestSlice &
+  CodeIntelSlice &
+  CodeIntelQualitySlice &
+  ReviewUiSlice &
+  ReviewProgressSlice

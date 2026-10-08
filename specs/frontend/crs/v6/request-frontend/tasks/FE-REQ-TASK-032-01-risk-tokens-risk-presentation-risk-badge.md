@@ -5,7 +5,7 @@
 **Area:** frontend / design tokens / graph
 **File:** `frontend/src/renderer/src/assets/main.css` (sửa); `guides/STYLEGUIDE.md` (sửa); `frontend/src/renderer/src/components/graph/risk-presentation.ts`, `RiskBadge.tsx` (mới); test cùng tên; `frontend/src/shared/graph-types.ts` chỉ import kiểu `GraphRisk` (task 032-03 tạo; nếu làm trước thì khai `type GraphRisk` tạm trong `risk-presentation.ts` rồi chuyển)
 **Depends on:** không (có thể làm ngay)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest components/graph/risk-presentation (4), RiskBadge (7) pass; oxlint+tsc clean; no hex in components/graph)
 
 ## Context
 
@@ -70,3 +70,7 @@ Trạng thái giao diện của `RiskBadge`: mức hợp lệ hiển thị chữ
 - Phối hợp với v7 CR-CV-050: nếu `--review-untested` được thêm trước, tham chiếu cùng `--color-amber-*`; không tạo hai sắc hổ phách khác nhau.
 - `--risk-low` dùng `--status-success`: nghĩa "đã đạt" trong nơi khác của app; chữ "Thấp" và icon `CircleCheck` giữ nghĩa là mức rủi ro, không phải "đã xác minh an toàn".
 - `main.css` rất lớn (hơn 3.400 dòng, ratchet `config/max-lines-baseline.txt` có thể áp dụng): chỉ thêm khối token vào các vùng sẵn có, không thêm `max-lines` disable.
+
+## Ghi chú triển khai (2026-10-07)
+
+Token `--risk-*`, `--graph-edge-*` thêm vào `main.css` (`:root`, `.dark` medium/high, `@theme inline`), mục "Risk tokens" trong STYLEGUIDE. `--color-amber-*`/`--color-orange-*` đã có sẵn (dùng bởi `--review-*`). Chưa làm: chụp thang xám, đo tương phản, build để xác nhận CSS (không chạy build theo quy tắc).

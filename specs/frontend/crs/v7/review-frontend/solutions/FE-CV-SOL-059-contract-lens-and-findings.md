@@ -1,6 +1,6 @@
 # FE-CV-SOL-059: Lens Hợp đồng và danh sách Phát hiện (Bỏ qua / Đã xử lý)
 
-> 📋 Proposed. Chưa triển khai. Priority P1 (đợt 5). Viết ngày 2026-10-06 từ khảo sát code `frontend/src` và hợp đồng v7; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 5/7 task DONE (059-01, 02, 03, 04, 06), 2 PARTIAL (059-05 đã gắn dock đáy (W6), còn thiếu chip "N phát hiện"; 059-07 thiếu e2e vì package không có `tests/e2e`). Viết ngày 2026-10-06.
 
 **CR:** [CR-CV-059](../../../../../../docs/crs/v7/review-frontend/CR-CV-059-contract-lens-and-findings.md)
 **Area:** frontend (`components/review-map/contract/`, `components/review-map/findings/`, hook, selector slice)
@@ -155,3 +155,17 @@ Hàm thuần: `contract-grouping`, `contract-signature-diff` (thêm/xoá/đổi,
 ## 9. Tham chiếu
 
 `/opt/repos/orca/docs/crs/v7/review-frontend/CR-CV-059-contract-lens-and-findings.md`, `/opt/repos/orca/docs/research/view-code/10-frontend-review-ux.md` (§5, §6.1, §6.7, §7), `/opt/repos/orca/guides/STYLEGUIDE.md`, `/opt/repos/orca/frontend/src/renderer/src/lib/screen-submit-shortcut.ts`, `/opt/repos/orca/frontend/src/renderer/src/components/ShortcutKeyCombo.tsx`, `/opt/repos/orca/frontend/src/renderer/src/store/slices/editor.ts`.
+
+## 10. Ghi chú triển khai (2026-10-07)
+
+**Sai lệch so với spec**
+
+- Không sửa `store/slices/code-intel.ts`: bộ lọc là state cục bộ; `selectOpenFindingsBySymbolKey` là hàm thuần (`findings/open-findings-by-symbol.ts`) + hook `useOpenFindingsBySymbolKey`.
+- Phân trang `findings` tự viết trên `useCodeIntelQuery` (hook phân trang chung không trả `dismissedCount`/`indexFreshness`); bỏ qua lạc quan qua map override, bị bỏ khi tải lại.
+- `FindingsPanel` là component độc lập chờ dock đáy của khung (chưa có); "Ghi chú" dùng `ReviewNoteButton` (SOL-060) với neo `finding`.
+- Chi tiết thay đổi hợp đồng hiển thị dưới bảng, không vào drawer symbol. "Xem diff" chỉ cho tệp ∈ `changedFiles`; "Mở trong ERD" chỉ khi lens `erd` đã có `load`; khoá bảng ERD giả định là tên bảng.
+- Quy ước `details.before|after` giữ trong `contract-detail-rows.ts` (chưa chốt với BE-CV-SOL-038). Bảng `titleKey` đóng: chỉ `finding.<kind>.title`; còn lại hiển thị `rule`.
+- Phím cục bộ `j/k/Enter/d/r/Esc` xử lý trong panel (chưa qua registry SOL-052). Bộ lọc dịch vụ dùng `<select>` gốc.
+- Thiếu: e2e (không có `tests/e2e/code-intel-web`), nhóm Migration chưa render `findings[]` bằng `FindingRow`, chip "N phát hiện" ở thanh tóm tắt, tô icon cảnh báo trên nút lens khác.
+- Khoá i18n: `auto.components.reviewMap.contract.*` và `.findings.*`; test phủ khoá mới `i18n/contract-findings-notes-locale-coverage.test.ts`.
+- Fake backend: fixture `test-support/contract-findings-fixtures.ts`; hook test dùng `callFn` tiêm vào (mẫu `useCodeIntelPagedQuery.test.tsx`).

@@ -5,7 +5,7 @@
 **Area:** frontend / request / solution
 **File:** `frontend/src/renderer/src/components/request/solution/RejectReasonDialog.tsx`, `SolutionDecisionBar.tsx` (mới); `hooks/useSolutionDecision.ts` (mới); test cùng tên
 **Depends on:** FE-REQ-TASK-020-01, 020-02, 020-03, 018-03
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: RejectReasonDialog.test.tsx, useSolutionDecision.test.ts, SolutionPanel.test.tsx pass)
 
 ## Context
 
@@ -40,3 +40,9 @@
 
 - Chuỗi hai lời gọi có thể dừng giữa chừng khi mất mạng: UI báo rõ "đã chọn nhưng chưa duyệt" và cho thử lại.
 - Nếu CONTRACT gộp `choose` vào `approve`, thay bước 1 bằng tham số; giữ `useSolutionDecision` là điểm đổi duy nhất.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Sai lệch: hook đặt tại `components/request/solution/useSolutionDecision.ts` (không phải `hooks/`) do phạm vi tệp; chữ ký `onSubmit(comment, {regenerate})` tương thích API được yêu cầu cho SOL-021.
+- `approve` dùng `approvalDigest` do `solution.choose` trả về làm `expectedDigest` (CONTRACT).
+- CẦN SỬA ngoài phạm vi: `useApprovals.approve/reject` đang gửi `approvalId`, CONTRACT yêu cầu `id` (agent 019 đang xử lý).

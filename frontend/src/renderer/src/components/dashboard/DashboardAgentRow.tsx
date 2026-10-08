@@ -133,6 +133,8 @@ type Props = {
   sendTargetStatus?: 'eligible' | 'disabled' | 'sending'
   sendTargetDisabledReason?: string
   onSendTargetClick?: (paneKey: string) => void
+  /** Opens Review for this finished agent's worktree; omitted => no Review button. */
+  onReview?: (agent: DashboardAgentRowData) => void
 }
 
 const DashboardAgentRow = React.memo(function DashboardAgentRow({
@@ -152,7 +154,8 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
   hideLineageConnectors = false,
   sendTargetStatus,
   sendTargetDisabledReason,
-  onSendTargetClick
+  onSendTargetClick,
+  onReview
 }: Props) {
   const hasChildDisclosure =
     typeof childAgentCount === 'number' &&
@@ -401,6 +404,13 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
           onDismiss={onDismiss}
           onToggleExpanded={handleToggleExpanded}
           onSendTargetClick={onSendTargetClick}
+          onReview={
+            onReview && agent.state === 'done' && agent.rowSource !== 'subagent'
+              ? () => onReview(agent)
+              : undefined
+          }
+          reviewAlwaysVisible={isUnvisited}
+          reviewInterrupted={agent.entry.interrupted === true}
         />
       </div>
       <DashboardAgentRowToolStep

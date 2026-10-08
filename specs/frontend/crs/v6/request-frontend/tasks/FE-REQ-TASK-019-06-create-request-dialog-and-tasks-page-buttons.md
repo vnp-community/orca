@@ -5,7 +5,7 @@
 **Area:** frontend / request + Tasks page
 **File:** `frontend/src/renderer/src/components/request/CreateRequestDialog.tsx`, `CreateRequestButton.tsx`, `CreateRequestIssueButton.tsx`, `create-request-from-issue.ts` (mới); `components/task-page-jira-issue-list.tsx` (sửa, quanh dòng 225-245), `components/JiraIssueWorkspace.tsx` (sửa, dòng 437 và 774), `components/GitHubItemDialog.tsx` (sửa); test `create-request-from-issue.test.ts`, `CreateRequestDialog.test.tsx`, bổ sung vào test hiện có của danh sách Jira
 **Depends on:** FE-REQ-TASK-018-03, 018-05
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — CreateRequestDialog/IssueButton, create-request-from-issue + tests pass and buttons mounted in Jira list/workspace and GitHubItemDialog; e2e not written, no row-level test that Start workspace is untouched
 
 ## Context
 

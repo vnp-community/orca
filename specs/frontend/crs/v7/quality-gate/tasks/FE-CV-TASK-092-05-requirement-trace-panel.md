@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/requirements/RequirementTracePanel.tsx`, `RequirementRow.tsx`, `RequirementEvidenceList.tsx`, `UnlinkedChangesList.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-092-01..04; FE-CV-SOL-053-impact-lens-and-symbol-detail
-**Status:** [x] DONE — `RequirementTracePanel.tsx` chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 10 tests panel + RequirementRow/RequirementEvidenceList/UnlinkedChangesList (kiểm qua panel))
 
 ## Context
 
@@ -29,3 +29,7 @@
 ## Rủi ro
 
 - Phụ thuộc 053.
+
+## Ghi chú triển khai (2026-10-07)
+
+Tách thêm `RequirementRow.tsx`, `RequirementEvidenceList.tsx`, `UnlinkedChangesList.tsx` đúng cây file spec. Nhảy tới bằng chứng dùng `onOpenDiff` (chưa có `pendingDiffReveal` của SOL-053).

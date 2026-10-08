@@ -5,7 +5,7 @@
 **Area:** frontend / pure algorithms
 **File:** `frontend/src/renderer/src/components/quality-charts/treemap-squarified-layout.ts`, `dependency-matrix-ordering.ts` (mới) và `__tests__/treemap-squarified-layout.test.ts`, `dependency-matrix-ordering.test.ts`
 **Depends on:** không (làm được ngay)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: treemap-squarified-layout 6/6, dependency-matrix-ordering 7/7)
 
 ## Context
 
@@ -35,3 +35,7 @@
 
 - Thứ tự tô-pô có thể kém đọc với đồ thị gần đầy (SOL-088 6.4); cần thử trên dữ liệu thật ở 087-19.
 - Squarified với nhiều ô rất nhỏ tạo ô dưới 1 px: `MetricTreemap` (088-08) chịu trách nhiệm gộp "+N".
+
+## Ghi chú triển khai (2026-10-07)
+
+`squarify` trả `{rects, omitted}`. Test so tỉ lệ cạnh trung bình với `buildTreemapLayout` (squarified tốt hơn hoặc bằng); không sửa `workspace-space-layout.ts`. Thời gian đo: squarify(400) ~1 ms, DSM(150) ~1 ms.

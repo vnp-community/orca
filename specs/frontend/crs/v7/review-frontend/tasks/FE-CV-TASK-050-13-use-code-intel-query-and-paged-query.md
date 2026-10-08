@@ -5,7 +5,7 @@
 **Area:** frontend / hooks
 **File:** `hooks/useCodeIntelQuery.ts`, `hooks/useCodeIntelPagedQuery.ts` (mới), tests `.test.tsx`
 **Depends on:** FE-CV-TASK-050-07, FE-CV-TASK-050-10, FE-CV-TASK-050-12
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: useCodeIntelQuery.test 14 + useCodeIntelPagedQuery.test 5 pass; hook signature kept (worktreeId, environmentId, opts) for existing callers; envelope channels return meta/truncated)
 
 ## Context
 

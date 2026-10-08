@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/findings/finding-view-model.ts`, `finding-filter.ts`, `finding-sort.ts` (mới) + `*.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `Finding`, `Owner`, `IndexFreshness`); FE-CV-TASK-057-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: finding-model.test.ts 10/10 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -31,3 +31,9 @@
 ## Rủi ro
 
 - Bảng `titleKey` đầy đủ chưa có (không đóng); `rule` lạ hiển thị nguyên văn.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Bảng `titleKey` đóng: chỉ `finding.<kind>.title` với 6 `kind` đã biết được dịch (khoá `findings.title.<kind>`); mọi `titleKey`/`kind` lạ hiển thị nguyên `rule`.
+- `toFindingRow` nhận `t(key, fallback, params)` để không gọi `translate()` ở cấp module.
+- Thêm `groupFindingsByKind` (nhóm theo kind, nhóm nặng nhất trước).

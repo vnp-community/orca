@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + hooks
 **File:** `structure-tree-model.ts`, `hooks/useStructureTree.ts` (mới), tests
 **Depends on:** FE-CV-TASK-050-13, FE-CV-TASK-050-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: structure-tree-model.test + use-structure-tree.test 6/6 pass; folder-at-a-time loader instead of useCodeIntelPagedQuery, no cross-mount cache by headCommit)
 
 ## Context
 

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Tests for request-list-keyboard.ts (CR-REQ-019-02)
  */

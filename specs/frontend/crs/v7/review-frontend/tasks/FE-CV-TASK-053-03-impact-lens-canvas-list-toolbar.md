@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `ImpactLens.tsx`, `ImpactToolbar.tsx`, `ImpactGraphCanvas.tsx`, `ImpactSymbolNode.tsx`, `ImpactColumnsList.tsx`, `store/slices/review-ui.ts` (thêm `impactFocusKey`), tests
 **Depends on:** FE-CV-TASK-053-01, 053-02, 051-05, 052-04, FE-CV-TASK-050-13
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: impact/ImpactLens.test 9/9 pass with xyflow canvas mocked; MANUAL NOT DONE: `var()` in xyflow SVG light/dark, Space/Enter key conflict in canvas nodes)
 
 ## Context
 

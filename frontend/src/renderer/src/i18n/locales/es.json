@@ -344,6 +344,11 @@
           "tab": {
             "372d21d428": "Emulador móvil"
           }
+        },
+        "review": {
+          "tab": {
+            "title": "Revisión"
+          }
         }
       },
       "fix": {
@@ -698,7 +703,9 @@
         "devSearchKeywordToast": "toast",
         "devSearchKeywordSonner": "sonner",
         "devSearchKeywordError": "error",
-        "devSearchKeywordNotification": "notification"
+        "devSearchKeywordNotification": "notification",
+        "codeIntelTitle": "Inteligencia de código",
+        "codeIntelDesc": "Activa o desactiva los mapas de revisión de código y el control de calidad en tu organización."
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "El contenido pegado es demasiado grande."
@@ -6399,7 +6406,9 @@
           "2309068a6f": "destructivo",
           "65358016ea": "Desechar",
           "dev": "Herramientas de desarrollo",
-          "devDescription": "Herramientas solo de desarrollo para probar estados de la UI."
+          "devDescription": "Herramientas solo de desarrollo para probar estados de la UI.",
+          "codeIntelTitle": "Inteligencia de código",
+          "codeIntelDesc": "Activa o desactiva los mapas de revisión de código y el control de calidad en tu organización."
         },
         "SettingsFormControls": {
           "42a4d15a30": "No hay fuentes coincidentes.",
@@ -12783,6 +12792,26 @@
         "GenerateAgentPromptButton": {
           "confirmReplace": "¿Reemplazar el prompt actual por el generado?",
           "label": "Generar con IA"
+        },
+        "TaskGraph": {
+          "showPlanning": "Mostrar plan/fase"
+        },
+        "TaskDetail": {
+          "phaseNotApproved": "Aprueba la fase o el plan antes de ejecutar esta tarea"
+        },
+        "TaskDAGView": {
+          "status": {
+            "done": "Hecho",
+            "in_progress": "En curso",
+            "blocked": "Bloqueado",
+            "review": "En revisión",
+            "open": "Abierto",
+            "cancelled": "Cancelado"
+          }
+        },
+        "TaskBoardView": {
+          "backlogMoved": "Las tareas sin iniciar están en Solicitudes > Backlog",
+          "openBacklog": "Abrir backlog"
         }
       },
       "taskPageEmptyState": {
@@ -13038,7 +13067,8 @@
             "requests": "Solicitudes",
             "approvals": "Aprobaciones",
             "backlog": "Pendiente"
-          }
+          },
+          "close": "Cerrar la página de solicitudes"
         },
         "RequestUnsupportedNotice": {
           "title": "Gestión de solicitudes no compatible",
@@ -13047,6 +13077,2667 @@
         "SidebarRequestNavButton": {
           "label": "Solicitudes",
           "badge": "aprobaciones pendientes"
+        },
+        "RequestType": {
+          "bug": {
+            "label": "Error",
+            "description": "Algo está roto y necesita corrección."
+          },
+          "task": {
+            "label": "Tarea",
+            "description": "Un trabajo bien definido."
+          },
+          "docs": {
+            "label": "Documentación",
+            "description": "Escribir o actualizar documentación."
+          },
+          "question": {
+            "label": "Pregunta",
+            "description": "Requiere una respuesta, no un cambio de código."
+          },
+          "hotfix": {
+            "label": "Hotfix",
+            "description": "Corrección urgente en producción por vía rápida."
+          },
+          "security": {
+            "label": "Seguridad",
+            "description": "Problema de seguridad o refuerzo."
+          },
+          "ops_request": {
+            "label": "Solicitud de operaciones",
+            "description": "Cambio operativo o de infraestructura."
+          },
+          "change_request": {
+            "label": "Solicitud de cambio",
+            "description": "Un cambio de funcionalidad o comportamiento."
+          },
+          "refactor": {
+            "label": "Refactorización",
+            "description": "Reestructurar código sin cambiar el comportamiento."
+          },
+          "spike": {
+            "label": "Spike",
+            "description": "Investigación acotada en el tiempo."
+          },
+          "performance": {
+            "label": "Rendimiento",
+            "description": "Mejorar la velocidad o el uso de recursos."
+          },
+          "unknown": {
+            "label": "Desconocido",
+            "description": "Tipo no reconocido por esta versión."
+          }
+        },
+        "ApprovalStatus": {
+          "pending": "Pendiente",
+          "approved": "Aprobado",
+          "rejected": "Rechazado",
+          "expired": "Caducado",
+          "unknown": "Desconocido"
+        },
+        "RequestSource": {
+          "jira": "Jira",
+          "github": "GitHub",
+          "gitlab": "GitLab",
+          "linear": "Linear",
+          "mcp": "Agente (MCP)",
+          "manual": "Manual",
+          "webhook": "Webhook",
+          "unknown": "Origen desconocido"
+        },
+        "RequestPageHeader": {
+          "project": "Proyecto",
+          "allProjects": "Todos los proyectos",
+          "createRequest": "Crear solicitud"
+        },
+        "error": {
+          "forbidden": "No tienes permiso para hacer esto.",
+          "notFound": "Este elemento ya no existe.",
+          "conflict": "Alguien más lo cambió. Actualiza e inténtalo de nuevo.",
+          "invalidState": "Esta acción no está permitida en el estado actual.",
+          "network": "Error de red. Comprueba tu conexión.",
+          "unavailable": "El servicio no está disponible. Inténtalo de nuevo en breve.",
+          "rateLimited": "Demasiados intentos. Espera un momento.",
+          "validation": "Revisa los campos e inténtalo de nuevo.",
+          "unknown": "Algo salió mal.",
+          "retry": "Reintentar"
+        },
+        "AnswerView": {
+          "answer": "Respuesta",
+          "citations": "Citas"
+        },
+        "DiagnosisView": {
+          "rootCause": "Causa raíz",
+          "impact": "Alcance afectado",
+          "baseline": "Línea base medida"
+        },
+        "FindingsView": {
+          "question": "Pregunta",
+          "findings": "Hallazgos",
+          "sources": "Fuentes",
+          "conclusion": "Conclusión"
+        },
+        "RejectReasonDialog": {
+          "title": "Rechazar",
+          "description": "Explica el motivo. Se registra y se muestra al equipo.",
+          "placeholder": "¿Por qué se rechaza?",
+          "required": "Se requiere un motivo (al menos {{min}} caracteres).",
+          "regenerate": "Regenerar según esta opinión",
+          "cancel": "Cancelar",
+          "submit": "Rechazar"
+        },
+        "RequestMarkdownContent": {
+          "viewFull": "Ver completo",
+          "fullTitle": "Contenido completo"
+        },
+        "SolutionComparisonTable": {
+          "criterion": "Criterio",
+          "differs": "Difiere entre opciones",
+          "row": {
+            "summary": "Resumen",
+            "pros": "Ventajas",
+            "cons": "Desventajas",
+            "effort": "Esfuerzo",
+            "risk": "Riesgo"
+          }
+        },
+        "SolutionDecisionBar": {
+          "accept": "Aceptar",
+          "approve": "Aprobar",
+          "approveOption": "Aprobar esta opción",
+          "reject": "Rechazar",
+          "alreadyDecided": "Ya se decidió.",
+          "chooseOne": "Elige una opción para aprobar.",
+          "expired": "Vencido",
+          "generatePlan": "Generar plan",
+          "noPermission": "No tienes permiso para aprobar",
+          "partial": "La opción se eligió pero aún no se aprobó. Intenta aprobar de nuevo."
+        },
+        "SolutionGenerationState": {
+          "analyzing": "La IA está analizando esta solicitud",
+          "drafting": "La IA está redactando el análisis",
+          "failed": "No se pudo generar el análisis.",
+          "regenerate": "Regenerar"
+        },
+        "SolutionOptionCard": {
+          "chosen": "Elegida",
+          "cons": "Desventajas",
+          "pros": "Ventajas",
+          "effort": "Esfuerzo",
+          "risk": "Riesgo",
+          "recommended": "Recomendada"
+        },
+        "SolutionOptionCompare": {
+          "cards": "Tarjetas",
+          "compare": "Comparar",
+          "needTwo": "Se requieren al menos 2 opciones.",
+          "options": "Opciones"
+        },
+        "SolutionPanel": {
+          "banner": {
+            "awaitingApproval": "Pendiente de aprobación",
+            "chosen": "Aprobado",
+            "generating": "La IA está redactando este análisis",
+            "readOnly": "El análisis es de solo lectura",
+            "ready": "Listo para revisar",
+            "rejected": "Rechazado",
+            "superseded": "Versión anterior",
+            "unknown": "Estado no disponible"
+          },
+          "empty": "Aún no hay análisis.",
+          "forbidden": "No tienes permiso para ver el análisis.",
+          "noData": "Sin datos",
+          "retry": "Reintentar"
+        },
+        "SolutionStatusBanner": {
+          "dueAt": "Vence {{date}}",
+          "updated": "Esta solución acaba de actualizarse."
+        },
+        "SolutionVersionSwitcher": {
+          "label": "Versiones",
+          "old": "Versión anterior",
+          "version": "v{{n}}"
+        },
+        "RequestReasonDialog": {
+          "cancel": "Cancelar"
+        },
+        "CancelRequestDialog": {
+          "title": "¿Cancelar esta solicitud?",
+          "description": "El trabajo en curso se detiene. Podrás seguir consultando la solicitud.",
+          "reason": "Motivo (opcional)",
+          "confirm": "Cancelar solicitud",
+          "reasonRequired": "Motivo (obligatorio)"
+        },
+        "ReturnToBacklogDialog": {
+          "title": "Devolver al backlog",
+          "description": "La solicitud sale del flujo activo y puede reabrirse más tarde.",
+          "reason": "¿Por qué se devuelve?",
+          "stage": "Etapa de origen",
+          "confirm": "Devolver al backlog"
+        },
+        "ChangeTypeConfirmDialog": {
+          "title": "Cambiar el tipo de solicitud",
+          "description": "Las soluciones, planes y tareas existentes se conservan como referencia y la solicitud vuelve a la confirmación de tipo.",
+          "reason": "¿Por qué cambia el tipo?",
+          "confirm": "Cambiar tipo",
+          "newType": "Nuevo tipo",
+          "placeholder": "Elige un tipo",
+          "done": "Tipo cambiado",
+          "useChild": "Este cambio de tipo debe hacerse con una solicitud hija.",
+          "spawnChild": "Crear solicitud hija"
+        },
+        "RequestBacklogBanner": {
+          "title": "Devuelta al backlog",
+          "titleFrom": "Devuelta al backlog desde {{stage}}",
+          "reopen": "Reabrir"
+        },
+        "RequestDetailHeader": {
+          "backToList": "Volver a la lista",
+          "reopen": "Reabrir",
+          "returnToBacklog": "Devolver al backlog",
+          "changeType": "Cambiar tipo",
+          "spawnChild": "Crear solicitud hija",
+          "cancel": "Cancelar solicitud"
+        },
+        "RequestDetailPane": {
+          "backToList": "Volver a la lista",
+          "notFound": "Esta solicitud ya no existe.",
+          "reopened": "Solicitud reabierta",
+          "tab": {
+            "overview": "Resumen",
+            "analysis": "Análisis",
+            "plan": "Plan",
+            "history": "Historial",
+            "related": "Relacionadas"
+          }
+        },
+        "RequestOverviewTab": {
+          "noBody": "Sin descripción.",
+          "source": "Origen",
+          "reporter": "Informante",
+          "size": "Tamaño",
+          "urgencyLabel": "Urgencia",
+          "urgency": {
+            "normal": "Normal",
+            "urgent": "Urgente"
+          }
+        },
+        "StageTimeline": {
+          "step": {
+            "classification": "Clasificación",
+            "analysis": "Análisis",
+            "plan": "Plan",
+            "phase": "Fases",
+            "execution": "Ejecución"
+          },
+          "state": {
+            "done": "hecho",
+            "current": "actual",
+            "pending": "pendiente",
+            "skipped": "detenido"
+          },
+          "note": {
+            "hotfix": "Hotfix: diagnóstico rápido, sin aprobación antes del plan."
+          }
+        },
+        "RequestsTab": {
+          "selectPrompt": "Selecciona una solicitud para ver sus detalles."
+        },
+        "RequestRow": {
+          "unclassified": "Sin clasificar",
+          "urgent": "Urgente"
+        },
+        "RequestList": {
+          "label": "Solicitudes",
+          "loadMore": "Cargar más"
+        },
+        "RequestListToolbar": {
+          "count": "{{count}} solicitudes",
+          "refresh": "Actualizar"
+        },
+        "RequestListStates": {
+          "emptyNone": "Aún no hay solicitudes.",
+          "emptyFiltered": "Ninguna solicitud coincide con estos filtros.",
+          "clearFilters": "Quitar filtros",
+          "create": "Crear solicitud"
+        },
+        "RequestFilterBar": {
+          "chip": {
+            "needsMyConfirmation": "Requiere mi confirmación",
+            "running": "En curso"
+          },
+          "status": "Estado",
+          "type": "Tipo",
+          "source": "Origen",
+          "anySource": "Cualquier origen",
+          "clear": "Quitar filtros"
+        },
+        "TypeConfirmationCard": {
+          "title": "Confirmar el tipo de solicitud",
+          "classifying": "La IA está clasificando esta solicitud",
+          "reclassify": "Reclasificar",
+          "classifyLimit": "Se alcanzó el límite de reclasificación (5 intentos).",
+          "confidence": "Confianza",
+          "lowConfidence": "La IA no está segura de este tipo. Revísalo.",
+          "showMore": "Ver más",
+          "showLess": "Ver menos",
+          "editedByHuman": "Editado por ti",
+          "type": "Tipo",
+          "typePlaceholder": "Elige un tipo",
+          "typeRequired": "Elige un tipo para continuar.",
+          "size": "Tamaño",
+          "urgency": "Urgencia",
+          "reason": "Motivo",
+          "reasonPlaceholder": "¿Por qué este tipo? (opcional)",
+          "confirm": "Confirmar tipo",
+          "confirmed": "Tipo confirmado",
+          "flow": {
+            "analysis": "Análisis",
+            "noAnalysis": "Sin análisis",
+            "plan": "Plan",
+            "noPlan": "Sin plan",
+            "phase": "Fases",
+            "gates": "{{count}} puntos de aprobación",
+            "noGates": "Sin puntos de aprobación"
+          }
+        },
+        "RequestHistoryTab": {
+          "empty": "El tipo aún no se ha cambiado.",
+          "ai": "IA"
+        },
+        "RequestRelatedTab": {
+          "group": {
+            "parent": "Madre",
+            "child": "Hijas",
+            "followUp": "Seguimientos"
+          },
+          "empty": "No hay solicitudes relacionadas.",
+          "unsupported": "Este runtime aún no permite ver los vínculos entre solicitudes.",
+          "unreadable": "No se puede ver esta solicitud",
+          "loading": "Cargando..."
+        },
+        "SpawnChildRequestDialog": {
+          "title": "Crear solicitud hija",
+          "titleLabel": "Título",
+          "body": "Descripción",
+          "type": "Tipo",
+          "letAi": "Que la IA clasifique",
+          "submit": "Crear",
+          "created": "Solicitud hija creada",
+          "backToParent": "Volver a la madre",
+          "reason": {
+            "spawned_by_spike": "desde spike",
+            "spawned_by_question": "desde pregunta",
+            "followup_hotfix": "seguimiento de hotfix",
+            "escalation": "escalado"
+          }
+        },
+        "CreateRequestDialog": {
+          "title": "Crear solicitud",
+          "titleLabel": "Título",
+          "body": "Descripción",
+          "project": "Proyecto",
+          "projectPlaceholder": "Elige un proyecto",
+          "projectRequired": "Elige el proyecto al que pertenece esta solicitud.",
+          "urgency": "Urgencia",
+          "typeHint": "Pista de tipo",
+          "letAi": "Que la IA clasifique",
+          "submit": "Crear",
+          "duplicate": "Esta incidencia ya tiene una solicitud",
+          "open": "Abrir",
+          "pendingLimit": "Hay demasiadas solicitudes pendientes de clasificar. Inténtalo más tarde."
+        },
+        "CreateRequestIssueButton": {
+          "label": "Crear solicitud",
+          "tooltip": "Envía esta incidencia al flujo de análisis. A diferencia de Iniciar espacio de trabajo, no se abre un worktree de inmediato."
+        },
+        "plan": {
+          "PhaseNode": {
+            "blocked": "{{count}} bloqueadas",
+            "empty": "No hay tareas en esta fase.",
+            "running": "{{count}} en curso",
+            "summary": "{{done}}/{{total}} tareas completadas"
+          },
+          "PhaseApprovalBar": {
+            "approve": "Aprobar fase",
+            "reject": "Rechazar",
+            "rejectTitle": "Rechazar fase",
+            "notApproved": "La fase aún no está aprobada",
+            "start": "Iniciar fase",
+            "rejectedNote": "Fase rechazada. La solicitud puede volver a planificación.",
+            "notApprover": "No tienes permiso para aprobar esto."
+          },
+          "PlanApprovalBar": {
+            "regenerate": "Regenerar plan",
+            "rejected": "Este plan fue rechazado.",
+            "approveTaskList": "Aprobar lista de tareas",
+            "approve": "Aprobar plan",
+            "reject": "Rechazar",
+            "rejectTitle": "Rechazar plan",
+            "notApprover": "No tienes permiso para aprobar esto.",
+            "conflict": "Esto cambió mientras lo revisabas. Se cargó la última versión; revísala de nuevo.",
+            "alreadyDecided": "Esto ya fue decidido.",
+            "expired": "Esta aprobación caducó. Se cargó la última versión."
+          },
+          "PlanGateChips": {
+            "plan": "Plan",
+            "phases": "Fases aprobadas {{approved}}/{{total}}",
+            "preDeploy": "Predespliegue",
+            "preDeployPending": "Se necesita aprobación de predespliegue",
+            "approvePreDeploy": "Aprobar predespliegue",
+            "reject": "Rechazar",
+            "rejectTitle": "Rechazar predespliegue"
+          },
+          "PlanStates": {
+            "generate": "Generar plan",
+            "generating": "La IA está redactando el plan...",
+            "retry": "Reintentar",
+            "forbidden": "No tienes permiso para ver las tareas de esta solicitud.",
+            "notYet": "Aún no hay plan.",
+            "notFound": "Plan no encontrado.",
+            "empty": "El plan está vacío.",
+            "currentStep": "Paso actual: {{step}}"
+          },
+          "PlanSummaryHeader": {
+            "counts": "{{phases}} fases, {{tasks}} tareas",
+            "estimated": "estimado",
+            "progress": "Progreso del plan"
+          },
+          "PlanTaskRow": {
+            "blocked": "Bloqueada",
+            "estimate": "{{hours}} h"
+          },
+          "PlanTree": {
+            "taskSheetDescription": "Detalles de la tarea",
+            "taskSheetTitle": "Tarea"
+          },
+          "RequestPlanTab": {
+            "reload": "Recargar",
+            "truncated": "La lista de tareas se truncó; pueden faltar algunas tareas."
+          }
+        },
+        "approval": {
+          "ApprovalInboxTab": {
+            "title": "Aprobaciones",
+            "empty": "No hay nada pendiente de tu aprobación.",
+            "emptyFiltered": "Ninguna aprobación coincide con estos filtros.",
+            "clearFilters": "Borrar filtros",
+            "loadMore": "Cargar más"
+          },
+          "ApprovalSubjectFilter": {
+            "all": "Todas",
+            "requestType": "Tipo de solicitud",
+            "solution": "Solución",
+            "plan": "Plan",
+            "phase": "Fase",
+            "preDeploy": "Predespliegue",
+            "other": "Otras"
+          },
+          "OverdueToggle": {
+            "label": "Solo vencidas"
+          },
+          "ApprovalRow": {
+            "open": "Abrir",
+            "approve": "Aprobar rápido",
+            "reject": "Rechazar",
+            "dueIn": "Vence {{relative}}",
+            "overdueBy": "Vencida {{relative}}",
+            "requestedBy": "Solicitada por {{name}}",
+            "systemActor": "IA / Sistema",
+            "alreadyDecided": "Otra persona ya lo ha resuelto.",
+            "changed": "Este elemento cambió después de listarse. Ábrelo para revisarlo.",
+            "requestGone": "Esta solicitud ya no existe.",
+            "decided": "Decisión registrada.",
+            "confirmApprove": {
+              "request_type": "Se confirma el tipo y la solicitud pasa al análisis.",
+              "findings": "Los hallazgos se aceptan como resultado de la solicitud.",
+              "answer": "Se acepta la respuesta y se cierra la solicitud.",
+              "task_list": "Se aprueba la lista de tareas y se pueden preparar las tareas.",
+              "phase": "Se aprueba la fase y sus tareas quedan listas para ejecutarse.",
+              "pre_deploy": "Se aprueba la verificación previa y el despliegue puede continuar."
+            }
+          },
+          "ApprovalInboxErrorState": {
+            "network": "No se pudieron cargar las aprobaciones. Revisa tu conexión.",
+            "forbidden": "No tienes permiso para ver estas aprobaciones.",
+            "retry": "Reintentar"
+          },
+          "ApprovalSubjectType": {
+            "request_type": "Tipo de solicitud",
+            "solution": "Solución",
+            "findings": "Hallazgos",
+            "answer": "Respuesta",
+            "plan": "Plan",
+            "phase": "Fase",
+            "task_list": "Lista de tareas",
+            "pre_deploy": "Predespliegue",
+            "unknown": "Otro"
+          }
+        },
+        "backlog": {
+          "BacklogSegmentControl": {
+            "request": "Solicitudes",
+            "task": "Tareas",
+            "execute": "Ejecución"
+          },
+          "BacklogToolbar": {
+            "search": "Buscar título o #número",
+            "type": "Tipo",
+            "category": "Categoría",
+            "refresh": "Actualizar",
+            "allTypes": "Todos los tipos",
+            "allCategories": "Todas las categorías"
+          },
+          "RequestBacklogTable": {
+            "col": {
+              "request": "Solicitud",
+              "source": "Origen",
+              "type": "Tipo",
+              "stage": "Devuelta desde",
+              "category": "Categoría",
+              "reason": "Motivo",
+              "by": "Devuelta por",
+              "at": "Cuándo",
+              "actions": "Acciones"
+            },
+            "actorSystem": "IA / Sistema",
+            "reopen": "Reabrir",
+            "cancel": "Cancelar"
+          },
+          "TaskBacklogTable": {
+            "col": {
+              "task": "Tarea",
+              "estimate": "Estimación",
+              "dependencies": "Esperando a"
+            }
+          },
+          "ExecuteBacklogTable": {
+            "col": {
+              "task": "Tarea",
+              "blockedBy": "Bloqueada por",
+              "lastError": "Último error",
+              "failedAttempts": "Ejecuciones fallidas",
+              "engine": "Motor"
+            },
+            "noErrorDetail": "Falló, sin detalle de error registrado"
+          },
+          "ReturnedFromStage": {
+            "classification": "Clasificación",
+            "analysis": "Análisis",
+            "plan": "Plan",
+            "phase": "Fase",
+            "task": "Tarea"
+          },
+          "ReturnedCategory": {
+            "missing_info": "Falta información",
+            "infeasible": "No viable",
+            "blocked_dependency": "Bloqueada por dependencia",
+            "rejected": "Rechazada",
+            "other": "Otra"
+          },
+          "GateStatus": {
+            "approved": "Aprobada",
+            "pending": "Pendiente de aprobación",
+            "rejected": "Rechazada",
+            "none": "Sin aprobación",
+            "unknown": "Desconocido"
+          },
+          "BacklogEngineBadge": {
+            "workflow": "Flujo de trabajo",
+            "orchestration": "Orquestación",
+            "direct_agent": "Agente directo"
+          },
+          "ReopenRequestDialog": {
+            "title": "¿Reabrir esta solicitud?",
+            "body": "La solicitud #{{number}} se devolvió desde {{stage}} y se volverá a clasificar. Su solución, plan y tareas se conservan como referencia.",
+            "cancel": "Ahora no",
+            "confirm": "Reabrir",
+            "viewRequest": "Ver solicitud"
+          },
+          "BacklogEmptyState": {
+            "requests": "Ninguna solicitud se ha devuelto al backlog.",
+            "tasks": "Todas las tareas ya tienen un plan aprobado.",
+            "execute": "Ninguna tarea está esperando ejecutarse ni ha fallado.",
+            "filtered": "Nada coincide con estos filtros.",
+            "clearFilters": "Borrar filtros"
+          },
+          "BacklogErrorState": {
+            "network": "No se pudo cargar el backlog. Revisa tu conexión.",
+            "forbidden": "No tienes permiso para ver el backlog de este proyecto.",
+            "retry": "Reintentar"
+          },
+          "BacklogRow": {
+            "reopened": "Solicitud reabierta. Se volverá a clasificar.",
+            "alreadyHandled": "Esta solicitud ya fue gestionada."
+          },
+          "BacklogTab": {
+            "loadMore": "Cargar más"
+          },
+          "BacklogGroupHeaderRow": {
+            "openPlan": "Abrir plan"
+          },
+          "TaskBacklogRow": {
+            "planNotSplit": "Aún sin dividir en fases"
+          },
+          "BacklogTaskSheet": {
+            "title": "Detalles de la tarea",
+            "description": "Detalles de la tarea seleccionada"
+          }
+        },
+        "clarification": {
+          "title": "Se necesita información",
+          "round": "Ronda {{round}}",
+          "submit": "Enviar respuestas",
+          "submitHint": "para enviar",
+          "answeredResume": "Recibido. La IA vuelve a ejecutar el paso {{step}}.",
+          "stillMissing": "Aún falta información; se abrió una nueva ronda.",
+          "required": "Obligatorio",
+          "suggested": "Sugerido",
+          "useSuggested": "Usar sugerencia",
+          "editInstead": "Editar en su lugar",
+          "readOnlyWaiting": "Esperando la respuesta de la persona asignada",
+          "dueIn": "Quedan {{count}} días",
+          "expired": "Vencido. La solicitud volverá al backlog (falta información).",
+          "leaveWarning": "Tienes respuestas sin enviar.",
+          "fileTooLarge": "El archivo supera 64 KB",
+          "fileBinary": "Solo se admiten archivos de texto",
+          "textTooLong": "La respuesta es demasiado larga",
+          "invalidChoice": "Elige una de las opciones",
+          "yes": "Sí",
+          "no": "No",
+          "retry": "Reintentar",
+          "waitingForInfo": "Esperando que se proporcione la información",
+          "timelineWaiting": "Esperando información adicional",
+          "source": {
+            "readiness": "Comprobación de preparación",
+            "solution_open_question": "Pregunta abierta de la solución",
+            "plan_assumption": "Suposición del plan",
+            "task_blocked": "Tarea bloqueada"
+          }
+        },
+        "decision": {
+          "rationaleLabel": "Motivo de la elección",
+          "rationaleRequired": "Se requiere un motivo al elegir algo distinto de la recomendación",
+          "rationaleOptional": "Opcional",
+          "confirmTitle": "Confirmar una elección de alto riesgo",
+          "confirmBody": "Esta elección se marcó como de alto riesgo. Revisa los motivos y escribe el nombre de la opción para confirmar.",
+          "confirmInputLabel": "Escribe \"{{title}}\" para confirmar",
+          "confirmMismatch": "El texto no coincide con el nombre de la opción",
+          "cancel": "Cancelar",
+          "confirmSubmit": "Confirmar elección",
+          "pendingConfirmation": "Esperando la segunda confirmación de esta elección de alto riesgo",
+          "digestChanged": "El contenido acaba de cambiar. Revísalo de nuevo antes de aprobar.",
+          "selfChoiceForbidden": "El solicitante no puede elegir su propia solicitud",
+          "history": {
+            "title": "Historial de decisiones",
+            "empty": "Aún no hay decisiones registradas"
+          },
+          "status": {
+            "open": "Abierta",
+            "chosen": "Elegida",
+            "effective": "Vigente",
+            "superseded": "Reemplazada",
+            "unknown": "Desconocida"
+          },
+          "planBlocked": "Aún no se registró una decisión para la opción elegida"
+        },
+        "impact": {
+          "forbidden": "No tienes permiso para ver la evaluación",
+          "noDevServer": "No hay servidor de desarrollo conectado",
+          "connectDevServer": "Conectar",
+          "collecting": "Consultando el grafo de código",
+          "run": "Ejecutar evaluación",
+          "score": "Puntuación {{score}}",
+          "advisory": "Orientativo",
+          "raisedBy": "Elevado por: {{rules}}",
+          "caption": "Evaluado {{at}}, según {{tool}}",
+          "confidence": {
+            "low": "Confianza baja",
+            "medium": "Confianza media",
+            "high": "Confianza alta"
+          },
+          "stale": "El índice está desactualizado; evaluación incompleta",
+          "narrative": "Explicación escrita por IA",
+          "title": "Impacto y riesgo",
+          "notAssessed": "Sin evaluar",
+          "dimension": "Dimensión",
+          "recommended": "Recomendada",
+          "differs": "Difiere entre opciones",
+          "evidence": "Evidencia",
+          "evidenceDescription": "Evidencia original de este hallazgo",
+          "loading": "Cargando...",
+          "evidenceError": "No se pudo cargar la evidencia",
+          "truncated": "Truncado",
+          "copy": "Copiar",
+          "noFindings": "Sin hallazgos de nivel medio o superior",
+          "viewOnGraph": "Ver en el grafo",
+          "dim": {
+            "architecture": "Arquitectura",
+            "contract": "Contratos",
+            "data": "Datos",
+            "blast_radius": "Radio de impacto",
+            "security": "Seguridad",
+            "operations": "Operaciones",
+            "quality": "Calidad",
+            "uncertainty": "Incertidumbre",
+            "size": "Tamaño"
+          },
+          "findings": "Hallazgos",
+          "acceptance": {
+            "title": "Aceptar los riesgos restantes",
+            "reasonLabel": "Motivo de la aceptación",
+            "reasonRequired": "Al menos {{min}} caracteres",
+            "record": "Registrar aceptación",
+            "recorded": "Aceptado",
+            "invalidated": "La evaluación cambió. Confirma de nuevo.",
+            "secondApprover": "Esperando a un segundo aprobador",
+            "splitPhase": "Considera dividir en fases más pequeñas y ensayar una reversión.",
+            "error": "No se pudo registrar la aceptación"
+          },
+          "gate": {
+            "viewImpact": "Ver impacto",
+            "viewImpactFirst": "Abre la sección de impacto antes de aprobar",
+            "needsAcceptance": "Acepta los riesgos altos restantes antes de aprobar",
+            "approverNotAllowed": "Se requiere un aprobador del equipo designado"
+          },
+          "override": {
+            "menu": "Más opciones de la puerta",
+            "title": "Omitir la puerta",
+            "description": "Se registra en el registro de auditoría con tu motivo.",
+            "reasonLabel": "Motivo",
+            "reasonRequired": "Al menos {{min}} caracteres",
+            "cancel": "Cancelar",
+            "submit": "Omitir puerta"
+          }
+        },
+        "readiness": {
+          "badge": {
+            "ready": "Listo",
+            "needs_info": "Falta información",
+            "spec_defect": "Defecto de especificación",
+            "env_defect": "Problema de entorno"
+          },
+          "title": "Preparación de la tarea",
+          "notChecked": "Aún sin comprobar",
+          "tier": {
+            "structure": "Estructura",
+            "semantic": "Semántica",
+            "environment": "Entorno"
+          },
+          "envVarNames": "Solo se muestran nombres de variables, nunca valores.",
+          "notCounted": "No cuenta como intento",
+          "action": {
+            "run": "Ejecutar",
+            "answer": "Responder las preguntas",
+            "regenerate": "Volver al paso del plan para regenerar la tarea",
+            "connect": "Conectar un servidor de desarrollo",
+            "notify": "Avisar al operador"
+          },
+          "runHint": "Usa Ejecutar en la tarea cuando estés listo.",
+          "checking": "Comprobando...",
+          "check": "Comprobar preparación",
+          "runBlocked": "Esta tarea aún no está lista. Abre el informe de preparación para más detalles.",
+          "phase": {
+            "ready": "{{count}} listas",
+            "needsInfo": "{{count}} requieren información",
+            "specDefect": "{{count}} defectos de especificación",
+            "envDefect": "{{count}} problemas de entorno"
+          },
+          "drift": {
+            "shadow": "Orientativo: los cambios reales superan el plan.",
+            "banner": "Los cambios reales superan el plan. La fase {{name}} está en pausa.",
+            "review": "Revisar y decidir",
+            "loadError": "No se pudieron cargar los detalles de la desviación",
+            "task": "Tarea",
+            "expected": "Esperado",
+            "actual": "Real",
+            "noDetails": "No se proporcionaron filas de detalle",
+            "runningNote": "Las tareas en ejecución continúan hasta terminar.",
+            "accept": "Aceptar la desviación y continuar",
+            "return": "Devolver",
+            "returnNote": "Devolver envía la solicitud al backlog según la política."
+          }
+        },
+        "execution": {
+          "tab": "Resultado",
+          "error": "No se pudo cargar el resultado",
+          "legacy": "Este resultado no tiene estructura",
+          "noOutput": "Sin salida",
+          "malformed": "El resultado no tiene el formato esperado",
+          "status": {
+            "done": "Hecho",
+            "failed": "Fallido",
+            "blocked": "Bloqueado",
+            "needs_info": "Falta información"
+          },
+          "attempt": "Intento {{n}}",
+          "files": {
+            "title": "Archivos modificados",
+            "none": "No se modificó ningún archivo",
+            "inScope": "En el alcance",
+            "outOfScope": "Fuera del alcance"
+          },
+          "checks": {
+            "check": "Comprobación",
+            "agent": "Informado por el agente",
+            "orca": "Orca volvió a ejecutar",
+            "compare": "Comparación",
+            "notRerun": "Aún no se vuelve a ejecutar",
+            "passed": "Correcto",
+            "failed": "Fallido",
+            "mismatch": "No coincide",
+            "note": "Orca no se fía de lo que diga el agente."
+          },
+          "secrets": {
+            "label": "Análisis de secretos",
+            "passed": "Correcto",
+            "failed": "Fallido",
+            "notRun": "No ejecutado"
+          },
+          "outputs": {
+            "title": "Salidas",
+            "view": "Ver",
+            "preview": "Se muestra como texto plano, cortado a 16 KB"
+          },
+          "toQuestion": "Responder la pregunta",
+          "route": {
+            "retryable": "Se reintentará hasta {{count}} veces más",
+            "spec_defect": "Devuelto al paso del plan",
+            "needs_info": "Convertido en una pregunta",
+            "env_defect": "No cuenta como intento",
+            "agent_defect": "Se reintenta una vez con un recordatorio de formato",
+            "unknown": "Fallo sin clasificar"
+          }
+        }
+      },
+      "reviewMap": {
+        "turns": {
+          "verification": {
+            "agreement": {
+              "consistent": "Una nueva ejecución de {{kind}} coincide con lo que dijo el agente",
+              "contradicted": "Una nueva ejecución de {{kind}} difiere de lo que dijo el agente",
+              "unverified": "{{kind}}: aún sin comprobar",
+              "unknown": "{{kind}}: datos insuficientes para concluir"
+            },
+            "kind": {
+              "tests_pass": "pruebas",
+              "tests_fail": "pruebas fallidas",
+              "lint_clean": "lint",
+              "typecheck_clean": "comprobación de tipos",
+              "build_ok": "compilación",
+              "all_done": "finalización general",
+              "other": "comprobación"
+            },
+            "basis": {
+              "stated": "Inferido del texto del agente (confianza baja)"
+            },
+            "reason": {
+              "tree_may_differ": "El árbol de trabajo puede diferir del momento en que terminó el agente.",
+              "no_run": "Todavía no hay una ejecución independiente.",
+              "run_failed": "La nueva ejecución no terminó."
+            },
+            "category": {
+              "test": "pruebas",
+              "lint": "lint",
+              "typecheck": "tipos",
+              "build": "compilación",
+              "install": "instalación",
+              "git": "git",
+              "other": "otros"
+            },
+            "ran": "El agente ejecutó: {{commands}}",
+            "ranItemMany": "{{name}} ({{count}} veces)",
+            "ranMore": "y más",
+            "recordedNote": "Registrado, no verificado: el proceso del agente puede informar de forma inexacta.",
+            "viewRun": "Ver ejecución",
+            "runChecks": "Volver a ejecutar comprobaciones"
+          }
+        },
+        "report": {
+          "md": {
+            "gate": {
+              "pass": "Las comprobaciones requeridas que se ejecutaron pasaron.",
+              "warn": "La puerta de calidad tiene advertencias.",
+              "fail": "La puerta de calidad falló.",
+              "unknown": "Datos insuficientes para concluir.",
+              "heading": "Puerta de calidad",
+              "moreReasons": "…y {{count}} más.",
+              "waivers": "{{count}} exención(es) activa(s)."
+            },
+            "summary": {
+              "heading": "Cambios",
+              "counts": "{{files}} archivo(s), +{{added}} / -{{removed}}, {{symbols}} símbolo(s), {{flows}} flujo(s).",
+              "components": "Componentes: {{list}}."
+            },
+            "findings": {
+              "heading": "Hallazgos",
+              "counts": "{{error}} error(es), {{warning}} advertencia(s), {{info}} informativo(s).",
+              "colSeverity": "Gravedad",
+              "colRule": "Regla",
+              "colLocation": "Ubicación",
+              "colMessage": "Mensaje",
+              "truncated": "Solo se muestran los hallazgos principales."
+            },
+            "contracts": {
+              "heading": "Contratos y datos",
+              "breaking": "incompatible",
+              "channel": "Canal",
+              "table": "Tabla"
+            },
+            "reading": {
+              "heading": "Orden de lectura sugerido"
+            },
+            "diagrams": {
+              "heading": "Diagramas",
+              "alt": "Descripción en texto"
+            },
+            "warnings": {
+              "heading": "Notas"
+            },
+            "warning": {
+              "no_gate": "No había ningún resultado de la puerta de calidad.",
+              "index_stale": "El índice de código puede ser más antiguo que HEAD.",
+              "overlay_partial": "Los datos de cambios pueden estar incompletos."
+            },
+            "footer": "Generado por Orca con el perfil {{profile}} (modelo {{digest}}). Es un registro de las comprobaciones ejecutadas, no una aprobación.",
+            "title": "Revisión de Orca para este {{review}}",
+            "subject": "Rama {{branch}} frente a {{base}}, head {{head}}.",
+            "risk": {
+              "heading": "Riesgo",
+              "level": {
+                "LOW": "Nivel de riesgo: bajo.",
+                "MEDIUM": "Nivel de riesgo: medio.",
+                "HIGH": "Nivel de riesgo: alto.",
+                "CRITICAL": "Nivel de riesgo: crítico.",
+                "UNKNOWN": "Nivel de riesgo: datos insuficientes para concluir."
+              }
+            },
+            "truncated": "Abreviado; consulta el informe completo en Orca."
+          },
+          "html": {
+            "gate": {
+              "pass": "Las comprobaciones requeridas que se ejecutaron pasaron.",
+              "warn": "La puerta de calidad tiene advertencias.",
+              "fail": "La puerta de calidad falló.",
+              "unknown": "Datos insuficientes para concluir.",
+              "heading": "Puerta de calidad"
+            },
+            "summary": {
+              "heading": "Cambios",
+              "counts": "{{files}} archivo(s), +{{added}} / -{{removed}}, {{symbols}} símbolo(s), {{flows}} flujo(s)."
+            },
+            "findings": {
+              "heading": "Hallazgos",
+              "counts": "{{error}} error(es), {{warning}} advertencia(s), {{info}} informativo(s).",
+              "colSeverity": "Gravedad",
+              "colRule": "Regla",
+              "colLocation": "Ubicación",
+              "colMessage": "Mensaje",
+              "caption": "Hallazgos principales"
+            },
+            "contracts": {
+              "heading": "Contratos y datos"
+            },
+            "reading": {
+              "heading": "Orden de lectura sugerido"
+            },
+            "diagrams": {
+              "heading": "Diagramas"
+            },
+            "warnings": {
+              "heading": "Notas"
+            },
+            "warning": {
+              "no_gate": "No había ningún resultado de la puerta de calidad.",
+              "index_stale": "El índice de código puede ser más antiguo que HEAD.",
+              "overlay_partial": "Los datos de cambios pueden estar incompletos."
+            },
+            "footer": "Generado por Orca con el perfil {{profile}} (modelo {{digest}}). Es un registro de las comprobaciones ejecutadas, no una aprobación.",
+            "title": "Informe de revisión de Orca",
+            "breaking": "incompatible"
+          },
+          "menu": {
+            "label": "Exportar informe",
+            "copyMarkdown": "Copiar Markdown",
+            "copyForDescription": "Copiar para la descripción del {{review}}",
+            "saveHtml": "Guardar HTML",
+            "copied": "Informe copiado.",
+            "copiedShortened": "Se copió un informe abreviado.",
+            "copyError": "No se pudo copiar al portapapeles.",
+            "saved": "Informe guardado como HTML.",
+            "saveError": "No se pudo guardar el informe.",
+            "fetchError": "No se pudo cargar el informe de revisión."
+          },
+          "insert": {
+            "label": "Insertar informe de revisión"
+          }
+        },
+        "requirements": {
+          "trace": {
+            "state": {
+              "has_evidence": "Evidencia encontrada (sin confirmar)",
+              "partial": "Evidencia parcial encontrada",
+              "no_evidence": "No se encontró evidencia",
+              "manual_pending": "Requiere confirmación manual",
+              "unknown": "Datos insuficientes para concluir"
+            },
+            "group": {
+              "noEvidence": "Sin evidencia encontrada",
+              "partial": "Evidencia parcial",
+              "manualPending": "Requiere confirmación manual",
+              "hasEvidence": "Evidencia encontrada",
+              "unknown": "Datos insuficientes para concluir",
+              "unlinked": "Cambios sin relación con un requisito"
+            },
+            "suggestions": "Sugerencias",
+            "inferred": "Inferido",
+            "confirm": "Confirmar",
+            "dismiss": "Descartar",
+            "manualConfirm": "Lo he comprobado",
+            "loading": "Cargando requisitos…",
+            "error": "No se pudieron cargar los requisitos.",
+            "retry": "Reintentar",
+            "label": "Requisitos",
+            "showInferred": "Mostrar sugerencias inferidas",
+            "stale": "El índice cambió desde que se cargó.",
+            "readOnly": "Puedes ver los requisitos pero no cambiarlos.",
+            "actionError": "El cambio no se guardó. Inténtalo de nuevo.",
+            "empty": "No hay requisitos que mostrar.",
+            "link": {
+              "explicit": "Tarea vinculada explícitamente",
+              "derived": "Tarea vinculada desde la rama o los commits",
+              "inferred": "Vínculo de tarea inferido",
+              "none": "Ninguna tarea vinculada"
+            },
+            "warning": {
+              "no_structured_criteria": "Esta tarea no tiene criterios de aceptación estructurados.",
+              "index_stale": "El índice de código puede ser más antiguo que HEAD.",
+              "generic": "Algunos datos pueden estar incompletos."
+            }
+          },
+          "taskPicker": {
+            "link": "Vincular a una tarea…",
+            "change": "Cambiar tarea…",
+            "unlink": "Desvincular",
+            "searchPlaceholder": "Buscar tareas…",
+            "noResults": "No se encontraron tareas."
+          }
+        },
+        "lens": {
+          "requirements": {
+            "label": "Requisitos"
+          },
+          "impact": {
+            "label": "Impacto"
+          },
+          "architecture": {
+            "label": "Arquitectura"
+          },
+          "dataflow": {
+            "label": "Flujos"
+          },
+          "erd": {
+            "label": "ERD"
+          },
+          "storage": {
+            "label": "Almacenamiento"
+          },
+          "structure": {
+            "label": "Estructura"
+          },
+          "contract": {
+            "label": "Contratos"
+          },
+          "quality": {
+            "label": "Calidad"
+          }
+        },
+        "shell": {
+          "lens": {
+            "unavailable": "{{lens}} aún no está disponible."
+          },
+          "index": {
+            "ready": "Índice listo",
+            "stale": "Índice desactualizado {{sha}}",
+            "overlay": "Índice del checkout principal + diff",
+            "overlayNote": "Basado en el índice del checkout principal más el diff; los números de línea pueden diferir.",
+            "buildingPercent": "Indexando {{percent}}%",
+            "building": "Indexando",
+            "missing": "Aún no hay índice",
+            "notInstalled": "Herramienta no instalada",
+            "degraded": "Índice parcialmente disponible",
+            "offline": "Sin conexión",
+            "unknown": "Desconocido",
+            "aria": "Estado del índice: {{label}}"
+          },
+          "header": {
+            "title": "Revisión"
+          },
+          "banner": {
+            "stale": "El índice está por detrás de HEAD ({{indexed}} a {{head}}); los resultados pueden omitir cambios recientes.",
+            "truncated": "Mostrando {{shown}} de {{total}} archivos.",
+            "scopeMismatch": "El índice cubre un checkout distinto al de este worktree.",
+            "offline": "Sin conexión: se muestran los últimos datos cargados.",
+            "retry": "Reintentar",
+            "errorCached": "No se pudo actualizar: {{message}}",
+            "newData": "Hay datos nuevos disponibles.",
+            "apply": "Actualizar ahora"
+          },
+          "reindex": {
+            "refresh": "Actualizar índice",
+            "fullConfirm": "Reconstruir todo",
+            "full": "Reconstruir todo el índice",
+            "cooldown": "Disponible de nuevo en {{seconds}} s"
+          },
+          "scope": {
+            "current": "frente a {{label}}",
+            "choose": "Alcance",
+            "branch": "Rama base",
+            "range": "Rango de commits",
+            "hosted": "Revisión enviada",
+            "basePlaceholder": "origin/main",
+            "baseAria": "Rama base",
+            "uncommitted": "Incluir cambios sin confirmar",
+            "fromCommit": "Desde el commit",
+            "toCommit": "Hasta el commit",
+            "apply": "Aplicar"
+          },
+          "screen": {
+            "unsupported": {
+              "title": "La revisión no está disponible aquí",
+              "body": "Este espacio de trabajo o backend no ofrece datos de revisión de código."
+            },
+            "closeTab": "Cerrar pestaña",
+            "disabled": {
+              "title": "La revisión de código está desactivada",
+              "body": "Un administrador desactivó la inteligencia de código en este espacio de trabajo."
+            },
+            "chooseScope": "Elegir qué comparar",
+            "noBinding": {
+              "title": "Este worktree no está conectado a un índice de código",
+              "body": "Conecta el repositorio con su servidor de desarrollo y vuelve a intentarlo.",
+              "action": "Intentar reconectar"
+            },
+            "forbidden": {
+              "title": "No tienes acceso a esta revisión",
+              "body": "Pide a un administrador del espacio de trabajo acceso de lectura a la inteligencia de código."
+            },
+            "loading": {
+              "title": "Cargando cambios"
+            },
+            "toolUnavailable": {
+              "title": "No hay ninguna herramienta de índice de código instalada",
+              "body": "Instala GitNexus o CodeGraph en la máquina que contiene este repositorio."
+            },
+            "retry": "Reintentar",
+            "notRegistered": {
+              "title": "Este repositorio no está registrado en la herramienta de índice",
+              "body": "Crea el índice para registrarlo."
+            },
+            "buildIndex": "Crear índice",
+            "pathNotAllowed": {
+              "title": "Se rechazó una ruta de archivo",
+              "body": "El backend rechazó una ruta de este conjunto de cambios."
+            },
+            "indexMissing": {
+              "title": "Este repositorio aún no tiene índice",
+              "body": "La revisión necesita un índice para relacionar símbolos e impacto."
+            },
+            "indexBuilding": {
+              "title": "Creando el índice",
+              "unknown": "Esto puede tardar unos minutos.",
+              "percent": "{{percent}}% completado"
+            },
+            "offline": {
+              "title": "No se puede acceder al índice de código",
+              "body": "La conexión está caída. Esta vista reintenta al recuperarse."
+            },
+            "error": {
+              "title": "No se pudo cargar la revisión"
+            },
+            "noChanges": {
+              "unborn": "Esta rama aún no tiene commits",
+              "title": "No hay cambios en este alcance",
+              "body": "Elige otra base o rango para ver cambios."
+            },
+            "copied": "Copiado",
+            "copyDetails": "Copiar detalles",
+            "scope": {
+              "invalid-base": {
+                "title": "No se encontró la rama base",
+                "body": "Elige otra rama base con la que comparar."
+              },
+              "unborn-head": {
+                "title": "Esta rama aún no tiene commits",
+                "body": "Haz un commit y luego revisa los cambios."
+              },
+              "no-merge-base": {
+                "title": "No hay un ancestro común con la base",
+                "body": "Elige otra rama base o un rango de commits."
+              },
+              "error": {
+                "title": "No se pudo calcular la comparación",
+                "body": "Prueba con otra base."
+              }
+            }
+          },
+          "chip": {
+            "aria": "Resumen de cambios",
+            "files": "{{count}} archivos",
+            "symbols": "{{count}} símbolos",
+            "flows": "{{count}} flujos",
+            "tables": "{{count}} tablas",
+            "contracts": "{{count}} contratos",
+            "untested": "{{count}} sin pruebas",
+            "violations": "{{count}} infracciones"
+          },
+          "risk": {
+            "incomplete": "Datos insuficientes",
+            "incompleteNote": "Al índice le faltan datos, por lo que no se extrae ninguna conclusión.",
+            "noReasons": "No se informaron motivos.",
+            "low": "Riesgo bajo según el índice",
+            "medium": "Riesgo medio",
+            "high": "Riesgo alto",
+            "critical": "Riesgo crítico"
+          },
+          "ambiguous": {
+            "title": "¿Qué símbolo?",
+            "body": "Coinciden varios símbolos. Elige el que quieres.",
+            "search": "Buscar coincidencias",
+            "empty": "Sin coincidencias"
+          },
+          "drawer": {
+            "unavailable": "Los detalles aún no están disponibles.",
+            "title": "Detalles",
+            "close": "Cerrar detalles"
+          },
+          "pane": {
+            "reading": "Orden de lectura",
+            "lens": "Vista"
+          },
+          "cancel": "Cancelar",
+          "host": {
+            "loading": "Cargando la revisión"
+          },
+          "dock": {
+            "label": "Paneles de revisión",
+            "findings": "Hallazgos",
+            "notes": "Notas",
+            "collapse": "Contraer panel",
+            "expand": "Expandir panel",
+            "qualityFindings": "Comprobaciones"
+          },
+          "turnFilter": "Desde el turno anterior"
+        },
+        "readingOrder": {
+          "noOrder": "No se pudo construir un orden de lectura a partir del índice.",
+          "empty": "No hay cambios en este alcance.",
+          "progressLoadFailed": "No se pudo cargar el progreso guardado.",
+          "retry": "Reintentar",
+          "filtering": "Filtrando {{label}}: {{shown}} de {{total}}",
+          "clearFilter": "Quitar filtro",
+          "aria": "Orden de lectura",
+          "overflow": "{{shown}} de {{total}} archivos en la lista",
+          "keys": "j/k mover · Espacio marcar leído · Enter abrir diff",
+          "markFile": "Marcar {{file}} como leído",
+          "cycle": "Ciclo de dependencias",
+          "after": "Leer después de pasos anteriores",
+          "viewDiff": "Ver diff",
+          "otherGroup": "Otros",
+          "markGroup": "Marcar {{group}} como leído",
+          "progress": "{{seen}} de {{total}} leídos",
+          "localOnly": "Sin guardar (acceso de solo lectura)",
+          "notSaved": "Sin guardar",
+          "saved": "Guardado",
+          "saving": "Guardando",
+          "progressAria": "Progreso de lectura",
+          "oversize": "El progreso es demasiado grande; una parte no se guarda.",
+          "reason": {
+            "contract": "Cambio de contrato",
+            "dependencyOf": "Dependencia de un paso posterior",
+            "leaf": "Cambio en una hoja",
+            "cycle": "En un ciclo de dependencias",
+            "noEdges": "Sin dependencias conocidas",
+            "test": "Prueba",
+            "doc": "Documentación",
+            "generated": "Archivo generado",
+            "overflow": "Hay más archivos sin listar"
+          }
+        },
+        "aiSummary": {
+          "preview": {
+            "title": "Revisa lo que se enviará",
+            "description": "Los datos siguientes se envían al proveedor de LLM que usa tu servidor de desarrollo ({{provider}}). No se envía nada hasta que confirmes.",
+            "defaultProvider": "el proveedor configurado",
+            "counts": "{{files}} archivo(s), {{redactions}} redacción(es), unos {{tokens}} tokens.",
+            "level": {
+              "metadata": "Nivel de datos: solo metadatos (sin código)",
+              "diff": "Nivel de datos: diff (código modificado)",
+              "unknown": "Nivel de datos: desconocido"
+            },
+            "withheld": "{{count}} archivo(s) excluido(s) de la solicitud.",
+            "fileWithheld": "excluido",
+            "moreFiles": "…y {{count}} archivo(s) más.",
+            "injectionWarning": "Parte del contenido parece instrucciones dirigidas a un modelo de IA. El resumen puede verse afectado; revísalo con cuidado.",
+            "cancel": "Cancelar",
+            "confirm": "Enviar y generar resumen"
+          },
+          "card": {
+            "title": "Resumen inferido por IA",
+            "generate": "Generar resumen (IA)",
+            "regenerate": "Regenerar",
+            "cancel": "Cancelar",
+            "levelLabel": "Datos a enviar",
+            "level": {
+              "metadata": "Metadatos",
+              "diff": "Diff"
+            },
+            "preparing": "Preparando la vista previa de datos…",
+            "generating": "Generando el resumen… puede tardar un poco.",
+            "error": {
+              "no-relay": "No hay ningún servidor de desarrollo conectado.",
+              "bad-output": "No se pudo generar un resumen válido.",
+              "rate-limited": "Demasiadas solicitudes. Inténtalo de nuevo en {{seconds}} s.",
+              "timeout": "El resumen tardó demasiado.",
+              "forbidden": "No tienes permiso para generar un resumen.",
+              "unknown": "No se pudo generar el resumen."
+            },
+            "retry": "Reintentar",
+            "disclaimer": "Puede ser incorrecto o incompleto; compáralo con el diff.",
+            "meta": "Modelo: {{model}}. Datos enviados: {{level}}.",
+            "risks": "Riesgos",
+            "readFirst": "Leer primero",
+            "refsDropped": "Se descartaron {{count}} referencia(s) no válida(s).",
+            "helpful": "Útil",
+            "incorrect": "Incorrecto",
+            "idleHint": "Genera un resumen para obtener una visión inferida por IA. No se envía nada hasta que confirmes."
+          },
+          "report": {
+            "heading": "Resumen inferido por IA",
+            "disclaimer": "Puede ser incorrecto o incompleto; compáralo con el diff. Modelo: {{model}}. Datos enviados: {{level}}.",
+            "risks": "Riesgos",
+            "readFirst": "Leer primero"
+          }
+        },
+        "c4": {
+          "error": "No se pudo cargar la vista de arquitectura.",
+          "retry": "Reintentar",
+          "loading": "Cargando arquitectura",
+          "noContainers": "No se dedujo ningún contenedor; revisa las convenciones de carpetas.",
+          "noView": "Aún no hay vista de componentes para este contenedor.",
+          "toolbar": "Opciones de arquitectura",
+          "mode": {
+            "graph": "Grafo",
+            "list": "Lista"
+          },
+          "includeHidden": "Mostrar componentes ocultos",
+          "viewYaml": "Ver c4.yaml",
+          "editYaml": "Editar c4.yaml",
+          "container": "Contenedor",
+          "evidence": "Evidencia",
+          "viewDiff": "Ver diff",
+          "showMore": "Mostrar más ({{count}})",
+          "detail": "Detalles",
+          "close": "Cerrar",
+          "copyPath": "Copiar ruta",
+          "noDescription": "Aún sin descripción",
+          "addDescription": "Añadir descripción",
+          "symbols": "{{count}} símbolos",
+          "flag": {
+            "changed": "cambiado",
+            "untested": "sin pruebas",
+            "violation": "capas",
+            "lowConfidence": "confianza baja"
+          },
+          "outgoing": "Salientes",
+          "incoming": "Entrantes",
+          "violationNote": "Esta dependencia cruza un límite de capas hexagonal en sentido incorrecto.",
+          "legend": "Leyenda",
+          "diagramLabel": "Diagrama de componentes; usa la vista de lista como equivalente en texto",
+          "editor": {
+            "title": "Editar c4.yaml",
+            "description": "Ajustes manuales de {{container}}. El servidor reconstruye el diagrama tras guardar.",
+            "loading": "Cargando...",
+            "loadError": "No se pudo cargar c4.yaml.",
+            "readOnly": "No tienes permiso para editar c4.yaml.",
+            "seed": "Origen de la plantilla: {{source}}",
+            "label": "Código de c4.yaml",
+            "size": "{{bytes}} / 65536 bytes",
+            "semanticsNote": "Aquí no se comprueba el significado; el servidor lo comprueba al guardar.",
+            "issues": "Problemas",
+            "warnings": "Avisos del servidor",
+            "offline": "No guardado: falló la conexión. Se conserva tu borrador.",
+            "tooLarge": "No guardado: el documento es demasiado grande.",
+            "failed": "No guardado: {{message}}",
+            "conflictTitle": "Conflicto de versión",
+            "conflict": "Otra persona guardó un c4.yaml más reciente.",
+            "loadLatest": "Cargar la última",
+            "copyMine": "Copiar la mía",
+            "confirmOverwrite": "Confirmar: reemplazar la versión más reciente",
+            "overwrite": "Sobrescribir con la mía",
+            "discardTitle": "Descartar cambios",
+            "discard": "¿Cerrar sin guardar los cambios?",
+            "keepEditing": "Seguir editando",
+            "discardAction": "Descartar",
+            "savingSlow": "Esperando al servidor...",
+            "saving": "Guardando...",
+            "savedAt": "Guardado a las {{time}}",
+            "unsaved": "Sin guardar",
+            "close": "Cerrar",
+            "save": "Guardar"
+          },
+          "showingCount": "Mostrando {{shown}}/{{total}}",
+          "col": {
+            "from": "Desde",
+            "kind": "Tipo",
+            "to": "Hacia",
+            "count": "Cantidad",
+            "flags": "Marcas"
+          },
+          "origin": {
+            "merged": "Editado en parte",
+            "declared": "Declarado",
+            "derived": "Deducido"
+          },
+          "notice": {
+            "withOverrides": "Deducido, con ajustes de {{by}}{{at}}",
+            "withOverridesAnon": "Deducido, con ajustes manuales",
+            "inferred": "Este diagrama se deduce de la estructura de carpetas y de reglas hexagonales; puede no coincidir con el diseño previsto."
+          },
+          "layer": {
+            "grpc-server": "Servidor gRPC",
+            "usecase": "Casos de uso",
+            "domain": "Dominio",
+            "adapter": "Adaptadores",
+            "external": "Externos",
+            "support": "Soporte"
+          },
+          "relation": {
+            "uses": "usa",
+            "implements": "implementa",
+            "calls-rpc": "llama RPC",
+            "reads": "lee",
+            "writes": "escribe",
+            "publishes": "publica",
+            "subscribes": "se suscribe",
+            "unknown": "desconocido"
+          },
+          "descSource": {
+            "c4_yaml": "c4.yaml",
+            "package-doc": "doc del paquete",
+            "none": "ninguna"
+          }
+        },
+        "dataflow": {
+          "toolbar": "Opciones del flujo",
+          "detail": {
+            "service": "Servicios",
+            "component": "Componentes"
+          },
+          "zoomOut": "Reducir",
+          "zoomReset": "Restablecer zoom",
+          "zoomIn": "Ampliar",
+          "copied": "Copiado",
+          "copy": "Copiar Mermaid",
+          "stepDetail": "Detalles del paso",
+          "col": {
+            "step": "Paso",
+            "route": "Desde → Hacia",
+            "confidence": "Confianza",
+            "stores": "Almacenes"
+          },
+          "request": "Solicitud",
+          "response": "Respuesta",
+          "changedTag": "cambiado",
+          "notFound": "Aún no hay un flujo de datos que coincida con «{{label}}».",
+          "detailError": "No se pudo cargar este flujo.",
+          "retry": "Reintentar",
+          "loading": "Cargando flujos...",
+          "partialBanner": "Este flujo está incompleto: algunos pasos no se pudieron resolver. Los vacíos se marcan en la lista de pasos.",
+          "diagramLabel": "Diagrama de secuencia de {{label}}; consulta la lista de pasos como equivalente en texto",
+          "search": "Buscar flujos",
+          "touchOnly": "Solo flujos que tocan los cambios",
+          "touchUnknown": "Aún no se puede saber qué flujos tocan los cambios.",
+          "error": "No se pudieron cargar los flujos.",
+          "empty": "Aún no se pudo construir ningún flujo de datos para este repositorio.",
+          "list": "Flujos",
+          "hops": "{{count}} saltos",
+          "partialTag": "parcial",
+          "count": "{{shown}} de {{total}}",
+          "loadMore": "Cargar más",
+          "diagramLoading": "Cargando diagrama",
+          "diagram": {
+            "empty": "Este flujo no tiene mensajes que dibujar.",
+            "tooManyParticipants": "Demasiados participantes para dibujar; usa la lista de pasos de abajo.",
+            "tooLong": "El diagrama es demasiado grande para dibujarse; usa la lista de pasos de abajo.",
+            "truncated": "Mostrando {{rendered}}/{{total}} mensajes; la lista de pasos tiene todos."
+          },
+          "pick": "Elige un flujo para ver su secuencia.",
+          "gapAfter": "Faltan datos después del paso {{n}}",
+          "async": "asíncrono",
+          "inferred": "Deducido",
+          "changed": "cambiado",
+          "untested": "sin pruebas",
+          "unimplemented": "no implementado",
+          "steps": "Pasos del flujo"
+        },
+        "impact": {
+          "direction": "Dirección",
+          "upstream": "Llamadores",
+          "both": "Ambos",
+          "downstream": "Dependencias",
+          "depth": "Profundidad",
+          "view": "Vista",
+          "viewGraph": "Grafo",
+          "viewList": "Lista",
+          "columnCenter": "Símbolo seleccionado",
+          "columnUp": "Llamadores, nivel {{level}}",
+          "columnDown": "Dependencias, nivel {{level}}",
+          "more": "+{{count}} más",
+          "direct": "directo",
+          "openPathBlocked": "Esta ruta está fuera del worktree y no se abrió.",
+          "errTimeout": "La consulta de impacto agotó el tiempo.",
+          "errTooLarge": "El resultado es demasiado grande. Reduce la profundidad o elige otro símbolo.",
+          "errNotFound": "Este símbolo no se encontró en el índice; puede estar desactualizado.",
+          "errFailed": "La consulta de impacto falló.",
+          "pick": "Selecciona un símbolo modificado para ver qué afecta.",
+          "noEdges": "Los datos no incluyen aristas; los símbolos se muestran por nivel.",
+          "truncated": "Se muestra solo una parte del resultado.",
+          "none": "No se encontraron dependencias en el índice para este símbolo.",
+          "openUnavailable": "No se pudo abrir el diff de este archivo.",
+          "risk": {
+            "low": "Riesgo bajo",
+            "medium": "Riesgo medio",
+            "high": "Riesgo alto",
+            "critical": "Riesgo crítico",
+            "unknown": "Datos insuficientes"
+          }
+        },
+        "symbolDetail": {
+          "testsError": "No se pudieron cargar los tests.",
+          "retry": "Reintentar",
+          "testsEmpty": "No se encontró ningún test que lo cubra en el índice.",
+          "sourceError": "No se pudo cargar el código.",
+          "sourceCut": "Se muestran las primeras {{count}} líneas.",
+          "sourceMasked": "Se ocultaron posibles secretos.",
+          "viewDiff": "Ver diff",
+          "setCenter": "Establecer como centro",
+          "openEditor": "Abrir en el editor",
+          "copyKey": "Copiar clave",
+          "notFound": "Este símbolo no se encontró en el índice; puede estar desactualizado.",
+          "loadError": "No se pudieron cargar los detalles del símbolo.",
+          "back": "Atrás",
+          "incoming": "Llamado por",
+          "outgoing": "Llama a",
+          "flows": "Flujos relacionados",
+          "tests": "Tests que lo cubren",
+          "source": "Código",
+          "relationsEmpty": "No se encontró nada en el índice.",
+          "showMore": "Mostrar {{count}} más",
+          "flowsEmpty": "No se encontró ningún flujo en el índice.",
+          "flowStep": "paso {{step}}/{{total}}",
+          "copyPath": "Copiar ruta",
+          "omitted": {
+            "gitignored": "Código omitido: el archivo está ignorado por git.",
+            "binary": "Código omitido: archivo binario.",
+            "sensitive": "Código omitido: la ruta puede contener secretos.",
+            "notRequested": "No se solicitó el código.",
+            "unavailable": "No hay código disponible."
+          },
+          "indexLines": "Los números de línea siguen el índice en {{commit}}."
+        },
+        "structure": {
+          "rootError": "No se pudo cargar la estructura del repositorio.",
+          "empty": "El índice no tiene información de estructura para esta ruta.",
+          "up": "Subir un nivel",
+          "deleted": "{{count}} archivos eliminados no se muestran",
+          "capReached": "La carga se detuvo en {{count}} nodos. Abre una carpeta para ver más.",
+          "paneTreemap": "Treemap",
+          "paneTree": "Árbol",
+          "treemapLabel": "Treemap de {{count}} elementos; usa el árbol para acceder con el teclado.",
+          "small": "+{{count}} pequeños",
+          "tipSymbols": "{{count}} símbolos",
+          "changedCount": "{{count}} modificados",
+          "sizeBy": "Tamaño por",
+          "sizeSymbols": "Símbolos",
+          "noLoc": "El índice no tiene conteo de líneas para esta carpeta.",
+          "sizeLoc": "Líneas",
+          "colorBy": "Colorear por",
+          "colorArea": "Área",
+          "colorLanguage": "Lenguaje",
+          "breadcrumb": "Ruta",
+          "root": "Repositorio",
+          "colorLegend": "Colores",
+          "treeLabel": "Archivos y carpetas",
+          "loading": "Cargando...",
+          "folderError": "No se pudo cargar esta carpeta.",
+          "shown": "{{count}} mostrados",
+          "loadMore": "Cargar más",
+          "fileDetail": "Detalles del archivo",
+          "closeDetail": "Cerrar detalles del archivo",
+          "changedSymbols": "Símbolos modificados en este archivo"
+        },
+        "overlay": {
+          "legend": {
+            "title": "Leyenda"
+          },
+          "changed": {
+            "label": "Modificado",
+            "description": "Modificado en este ámbito de revisión"
+          },
+          "affected": {
+            "label": "Afectado",
+            "description": "Alcanzado por un símbolo modificado según el índice"
+          },
+          "untested": {
+            "label": "Sin test encontrado",
+            "description": "No se encontró ningún test que lo cubra en el índice"
+          },
+          "violation": {
+            "label": "Hallazgo de regla",
+            "description": "El archivo que lo contiene tiene un hallazgo de regla"
+          }
+        },
+        "ErdWarningsStrip": {
+          "summary": "{{count}} avisos de análisis, {{tables}} tablas pueden estar incompletas",
+          "degraded": "El ERD de {{table}} puede estar incompleto"
+        },
+        "ErdLens": {
+          "error": {
+            "offline": "Se perdió la conexión con el espacio de trabajo.",
+            "forbidden": "No tienes acceso a este repositorio.",
+            "tooLarge": "El ERD es demasiado grande para cargarlo de una vez.",
+            "timeout": "La generación del ERD tardó demasiado.",
+            "unavailable": "El ERD no está disponible para este repositorio.",
+            "generic": "No se pudo cargar el ERD."
+          },
+          "retry": "Reintentar",
+          "noMigrations": "No se encontraron servicios con migraciones en este repositorio.",
+          "building": "Generando el ERD...",
+          "emptyService": "Este servicio no tiene tablas en sus migraciones.",
+          "newData": "Hay datos nuevos: actualizar",
+          "backendTruncated": "El backend limitó este resultado.",
+          "showingCount": "Mostrando {{shown}} de {{total}} tablas; el resto está en la lista.",
+          "tableLevelOnly": "No hay detalle de columnas; se resaltan las tablas modificadas.",
+          "noCodeLinks": "Aún no hay vínculos con el código (puede faltar el índice de código).",
+          "noMatches": "Ninguna tabla coincide con los filtros actuales.",
+          "clearFilters": "Borrar filtros",
+          "label": "Diagrama entidad-relación",
+          "back": "Volver al servicio anterior"
+        },
+        "ErdCanvas": {
+          "label": "Diagrama entidad-relación; usa la vista de lista como equivalente en texto"
+        },
+        "ErdGhostTableNode": {
+          "owner": "Pertenece a {{service}}: abrir su ERD"
+        },
+        "ErdTableList": {
+          "summary": "{{columns}} columnas · {{reads}} lecturas · {{writes}} escrituras",
+          "label": "Tablas"
+        },
+        "ErdToolbar": {
+          "label": "Controles del ERD",
+          "service": "Servicio",
+          "dialect": "Dialecto SQL",
+          "schemas": "Esquemas",
+          "search": "Buscar tablas, columnas, código (/)",
+          "searchLabel": "Buscar en el ERD",
+          "scope": "Tablas mostradas",
+          "focus": "Modificadas + relacionadas",
+          "all": "Todas",
+          "view": "Vista",
+          "graph": "Grafo",
+          "list": "Lista",
+          "asOf": "Hasta la migración {{migration}}"
+        },
+        "ErdColumnRow": {
+          "primaryKey": "Clave primaria",
+          "foreignKey": "Clave foránea",
+          "masked": "Se ocultó texto sensible"
+        },
+        "ErdTableDetail": {
+          "changedSymbol": "modificado",
+          "openSymbol": "Abrir",
+          "viewDiff": "Ver diff",
+          "label": "Detalle de la tabla: {{name}}",
+          "close": "Cerrar detalle",
+          "degraded": "El ERD de esta tabla puede estar incompleto.",
+          "tenantScoped": "Ámbito de tenant: {{value}}",
+          "yes": "sí",
+          "no": "no",
+          "rlsState": "Seguridad a nivel de fila: {{state}}",
+          "columns": "Columnas",
+          "colName": "Nombre",
+          "colType": "Tipo",
+          "colDefault": "Valor por defecto",
+          "colKey": "Clave",
+          "indexes": "Índices",
+          "unique": "único",
+          "partialUnique": "emula un índice único parcial",
+          "rules": "Restricciones y seguridad a nivel de fila",
+          "relations": "Relaciones",
+          "anomaly": "datos inesperados",
+          "openService": "Abrir {{service}}",
+          "accessors": "Código que lee o escribe esta tabla ({{count}})",
+          "accessFilter": "Filtro de acceso",
+          "filterAll": "Todos",
+          "filterWrite": "Escritura",
+          "filterRead": "Lectura",
+          "accessHint": "Pista obtenida al buscar el nombre de la tabla; las consultas dinámicas pueden pasar desapercibidas.",
+          "staleAccessWarning": "Pista, puede ser incorrecta: este cambio altera columnas que código fuera del cambio sigue usando.",
+          "noAccessors": "No se encontraron vínculos con el código. Puede faltar el índice o las consultas se construyen dinámicamente.",
+          "migrations": "Migraciones de este cambio",
+          "viewMigration": "Ver diff de la migración"
+        },
+        "ErdRelationEdge": {
+          "source": {
+            "ddl": "Declarada en el DDL",
+            "declared": "Declarada en erd-links",
+            "comment": "Desde un comentario SQL",
+            "naming": "Inferida por los nombres",
+            "unknown": "Origen desconocido"
+          }
+        },
+        "ErdLegend": {
+          "added": "añadido",
+          "modified": "modificado",
+          "removed": "eliminado",
+          "label": "Leyenda",
+          "foreignKey": "clave foránea",
+          "logicalLink": "vínculo lógico"
+        },
+        "ErdTableNode": {
+          "adjacent": "Relacionada",
+          "ariaLabel": "Tabla {{name}}, {{count}} columnas{{state}}",
+          "dropped": "Tabla eliminada por este cambio",
+          "noColumnDetail": "No hay detalle de columnas",
+          "fewerColumns": "Mostrar menos columnas",
+          "moreColumns": "+{{count}} columnas más",
+          "change": {
+            "added": "Añadida",
+            "modified": "Modificada",
+            "removed": "Eliminada"
+          }
+        },
+        "StorageToolbar": {
+          "label": "Controles de almacenamiento",
+          "env": "Entorno",
+          "legacy": "Mostrar heredado",
+          "onlyChanged": "Solo modificados y relacionados",
+          "kinds": "Tipos de almacén",
+          "asOf": "Hasta el commit {{commit}}"
+        },
+        "StorageInferenceNotice": {
+          "inferred": "{{count}} elementos se infieren de la configuración, no están declarados.",
+          "redacted": "El backend ocultó {{count}} valores."
+        },
+        "StorageNodeDetail": {
+          "label": "Detalle: {{name}}",
+          "close": "Cerrar detalle",
+          "vaultPath": "Ruta de Vault: {{path}}",
+          "neverShown": "El valor nunca se muestra ni se copia.",
+          "copyKey": "Copiar nombre de la clave",
+          "owner": "Propietario",
+          "schemas": "Esquemas",
+          "delivery": "Entrega",
+          "stream": "Stream",
+          "payload": "Carga útil",
+          "status": "Estado",
+          "deployed": "desplegado",
+          "openErd": "Abrir el ERD de {{service}}",
+          "connections": "Conexiones",
+          "evidence": "Evidencia",
+          "viewDiff": "Ver diff"
+        },
+        "StorageCanvas": {
+          "notDeployed": "sin desplegar",
+          "noCodeSupport": "sin soporte en el código",
+          "external": "externo",
+          "label": "Mapa de almacenamiento; usa la vista de texto como equivalente",
+          "mark": {
+            "added": "Añadido",
+            "modified": "Modificado",
+            "removed": "Eliminado",
+            "related": "Relacionado"
+          },
+          "confidence": {
+            "inferred": "Inferido",
+            "derived": "Derivado"
+          }
+        },
+        "StorageSecretNode": {
+          "ariaLabel": "Referencia a un secreto {{name}}",
+          "masked": "Se ocultó texto sensible en la interfaz",
+          "neverShown": "el valor nunca se muestra",
+          "copyKey": "Copiar nombre de la clave"
+        },
+        "StorageTextView": {
+          "summary": "Vista de texto",
+          "from": "Desde",
+          "relation": "Relación",
+          "to": "Hasta"
+        },
+        "StorageLens": {
+          "error": {
+            "offline": "Se perdió la conexión con el espacio de trabajo.",
+            "forbidden": "No tienes acceso a este repositorio.",
+            "generic": "No se pudo cargar el mapa de almacenamiento."
+          },
+          "unavailable": "El mapa de almacenamiento no está disponible para este backend.",
+          "retry": "Reintentar",
+          "building": "Leyendo la configuración de almacenamiento...",
+          "empty": "No se encontró configuración de almacenamiento en este repositorio.",
+          "newData": "Hay datos nuevos: actualizar",
+          "truncated": "El backend limitó este resultado.",
+          "unknownChange": "No se puede saber qué componentes cambiaron: el backend no aportó evidencia de origen.",
+          "noStorageChange": "No se detectó ningún cambio en la configuración de almacenamiento dentro del alcance indexado.",
+          "label": "Mapa de almacenamiento"
+        },
+        "StorageLegend": {
+          "label": "Leyenda",
+          "added": "añadido",
+          "modified": "modificado",
+          "removed": "eliminado",
+          "related": "relacionado con un cambio",
+          "binding": "lectura/escritura (rw) o solo lectura (ro)",
+          "topic": "publicar / suscribirse",
+          "configKey": "referencia a un secreto"
+        },
+        "contract": {
+          "migration": {
+            "label": "Migración {{service}}",
+            "files": "archivos",
+            "dialectOnly": "solo {{dialect}}",
+            "title": "Migración · {{service}}"
+          },
+          "detail": {
+            "openErd": "Abrir en ERD",
+            "label": "Detalle del cambio de contrato",
+            "files": "Archivos",
+            "noFiles": "No se informaron archivos",
+            "viewDiff": "Ver diff",
+            "notInChange": "no está en este cambio",
+            "consumers": "Consumidores",
+            "noConsumersBreaking": "No se encontraron consumidores (pueden estar fuera de este repositorio o sin indexar)",
+            "noConsumers": "No se encontraron consumidores"
+          },
+          "change": {
+            "added": "Añadido",
+            "removed": "Eliminado",
+            "modified": "Modificado",
+            "unknown": "Cambiado (sin clasificar)"
+          },
+          "table": {
+            "noDetails": "Sin detalles",
+            "label": "Cambios de contrato",
+            "col": {
+              "contract": "Contrato",
+              "before": "Antes",
+              "after": "Después",
+              "compat": "Compatibilidad"
+            }
+          },
+          "compat": {
+            "breaking": "Incompatible",
+            "risky": "Riesgoso",
+            "compatible": "Compatible",
+            "unknown": "Sin clasificar"
+          },
+          "kind": {
+            "proto": "Proto",
+            "wsChannel": "Canal WS",
+            "route": "Ruta",
+            "migration": "Migración",
+            "unknown": "Otro"
+          },
+          "loading": "Cargando cambios de contrato...",
+          "error": {
+            "noIndex": "El índice de código no está disponible, así que aún no se pueden listar los cambios de contrato.",
+            "load": "No se pudieron cargar los cambios de contrato."
+          },
+          "retry": "Reintentar",
+          "filter": {
+            "kind": "Tipo de contrato",
+            "service": "Servicio",
+            "allServices": "Todos los servicios",
+            "onlyBreaking": "Solo incompatibles",
+            "onlyChanged": "Solo de este cambio",
+            "search": "Buscar contratos"
+          },
+          "summary": {
+            "label": "Resumen de compatibilidad"
+          },
+          "truncated": "Mostrando {{shown}} de {{total}} cambios. Acota los filtros para ver el resto.",
+          "empty": "No se detectaron cambios de contrato en este ámbito (proto, canales WS, rutas, migraciones).",
+          "emptyFiltered": "Ningún cambio coincide con los filtros actuales.",
+          "group": {
+            "noService": "(servicio desconocido)"
+          },
+          "signature": {
+            "absent": "(ninguno)"
+          }
+        },
+        "findings": {
+          "reason": {
+            "not_applicable": "No aplica",
+            "accepted_risk": "Riesgo aceptado",
+            "false_positive": "Falso positivo",
+            "later": "Corregir más tarde"
+          },
+          "dismiss": {
+            "reasonLegend": "¿Por qué ignorar este hallazgo?",
+            "notePlaceholder": "Nota opcional",
+            "noteLabel": "Nota",
+            "scopeNote": "Se aplica a todo el repositorio. No exime la puerta de calidad para hallazgos de tipo error.",
+            "confirm": "Ignorar"
+          },
+          "kind": {
+            "layer_violation": "Violaciones de capa",
+            "dependency_cycle": "Ciclos de dependencia",
+            "hotspot": "Puntos críticos",
+            "missing_tenant_id": "Falta tenant_id",
+            "dead_code": "Posible código sin uso",
+            "rls_removed": "RLS eliminado",
+            "unknown": "Otro"
+          },
+          "filter": {
+            "onlyIntroduced": "Solo de este cambio",
+            "showDismissed": "Mostrar ignorados ({{count}})",
+            "search": "Buscar hallazgos"
+          },
+          "freshness": {
+            "stale": "Los datos pueden estar desactualizados"
+          },
+          "severity": {
+            "error": "Error",
+            "warning": "Advertencia",
+            "info": "Información",
+            "unknown": "Sin clasificar"
+          },
+          "origin": {
+            "introduced": "Introducido por este cambio",
+            "touched": "En un archivo modificado",
+            "preexisting": "Preexistente",
+            "unknown": "Origen desconocido"
+          },
+          "error": {
+            "forbidden": "No tienes permiso para ignorar hallazgos.",
+            "offline": "Sin conexión. El hallazgo no se modificó.",
+            "notFound": "Este hallazgo ya no existe. Se recargó la lista.",
+            "conflict": "Otra persona modificó este hallazgo. Se recargó la lista.",
+            "reasonRequired": "Elige primero un motivo.",
+            "generic": "No se pudo actualizar el hallazgo.",
+            "noIndex": "El índice de código no está disponible, así que aún no se pueden listar los hallazgos estructurales.",
+            "load": "No se pudieron cargar los hallazgos."
+          },
+          "confidence": "Confianza: {{level}}",
+          "state": {
+            "resolved": "Marcado como resuelto",
+            "ignored": "Ignorado: {{reason}}"
+          },
+          "saving": "Guardando",
+          "action": {
+            "viewInGraph": "Ver en el grafo",
+            "note": "Nota",
+            "restore": "Reabrir",
+            "ignore": "Ignorar",
+            "resolve": "Marcar como resuelto",
+            "viewDiff": "Ver diff",
+            "openFile": "Abrir archivo"
+          },
+          "retry": "Reintentar",
+          "loading": "Cargando hallazgos...",
+          "label": "Hallazgos estructurales",
+          "empty": "No se encontraron problemas en el ámbito indexado.",
+          "emptyIndexed": "Índice: {{commit}} a las {{date}}.",
+          "list": {
+            "partial": "Mostrando {{count}} hallazgos cargados. Acota los filtros o carga más.",
+            "loadMore": "Cargar más"
+          },
+          "title": {
+            "layer_violation": "Violación de capa: {{from}} depende de {{to}}",
+            "dependency_cycle": "Ciclo de dependencia",
+            "hotspot": "Punto crítico: cambia con frecuencia y es complejo",
+            "missing_tenant_id": "La consulta puede carecer de filtro tenant_id",
+            "dead_code": "Posible código sin uso",
+            "rls_removed": "Seguridad a nivel de fila eliminada"
+          }
+        },
+        "ReviewSent": {
+          "hint": {
+            "changed": "El archivo cambió desde el envío (estimación)",
+            "unchanged": "No se ve cambio en este archivo (estimación)"
+          },
+          "empty": "Aún no se ha enviado nada.",
+          "title": "Enviado en turnos anteriores",
+          "count": "{{count}} notas",
+          "recordFailed": "Enviado, pero no se guardó el historial del lote."
+        },
+        "ReviewNote": {
+          "scope": {
+            "all": "Todas las notas sin enviar",
+            "lens": "Notas de esta vista",
+            "selection": "Notas seleccionadas"
+          },
+          "previewButton": "Vista previa",
+          "badge": "{{count}} notas sin enviar",
+          "lens": {
+            "findings": "Hallazgos"
+          },
+          "sent": "Enviada",
+          "label": "Nota",
+          "saveFailed": "No se pudo guardar la nota. Se conserva tu texto.",
+          "save": "Guardar nota",
+          "cancel": "Cancelar",
+          "jump": "Ir a",
+          "edit": "Editar",
+          "delete": "Eliminar",
+          "panel": "Notas de revisión",
+          "persistFailed": "No se pudo guardar el historial de notas. Las notas se conservan localmente.",
+          "empty": "Aún no hay notas. Usa Nota en un nodo o un hallazgo.",
+          "attachesTo": "Se adjunta a {{where}}",
+          "noFile": "Este elemento no tiene archivo al que adjuntar una nota.",
+          "placeholder": "Escribe una nota para el agente",
+          "button": "Nota",
+          "noFileReason": "Sin archivo al que adjuntar",
+          "preview": {
+            "title": "Vista previa del prompt",
+            "description": "Se enviarán {{count}} notas tal como se muestra abajo.",
+            "tooMany": "Es un lote grande. Considera enviar primero un ámbito menor."
+          }
+        },
+        "ReviewTurn": {
+          "label": {
+            "new": "Nuevo en este turno",
+            "changed": "Cambiado en este turno",
+            "unchanged": "Sin cambios desde el turno anterior",
+            "reverted": "Ya no está cambiado"
+          },
+          "groupLabel": "Comparación de turnos",
+          "mode": {
+            "all": "Todos los cambios",
+            "since": "Desde el turno anterior",
+            "previous": "Ver turno anterior"
+          },
+          "turns": "Turnos ({{count}})",
+          "agent": "Agente",
+          "interrupted": "interrumpido",
+          "sentNotes": "{{count}} notas enviadas",
+          "noPrevious": "Aún no hay un turno anterior con el que comparar.",
+          "estimate": "Estimación: se basa en el número de líneas cambiadas por archivo, por lo que puede pasar por alto una edición que mantenga los mismos números.",
+          "readOnly": "Vista de solo lectura del turno anterior. Su diff no se reconstruye.",
+          "saveFailed": "No se pudo guardar el marcador del turno.",
+          "retry": "Reintentar"
+        },
+        "EntryButton": {
+          "label": "Revisar cambios",
+          "interrupted": "Revisar cambios (el agente fue interrumpido)",
+          "short": "Revisar",
+          "unreviewed": "el agente terminó, sin revisar"
+        },
+        "QuickActions": {
+          "review": {
+            "title": "Revisar cambios",
+            "description": "Abre la revisión de código del worktree activo.",
+            "verbs": {
+              "review": "revisar cambios",
+              "open": "abrir revisión",
+              "impact": "impacto"
+            }
+          },
+          "architecture": {
+            "title": "Abrir mapa de arquitectura",
+            "description": "Abre la lente de arquitectura de la revisión.",
+            "verbs": {
+              "architecture": "mapa de arquitectura",
+              "c4": "c4"
+            }
+          },
+          "erd": {
+            "title": "Abrir ERD",
+            "description": "Abre la lente del modelo de datos (ERD) de la revisión.",
+            "verbs": {
+              "erd": "erd",
+              "schema": "esquema de base de datos"
+            }
+          }
+        },
+        "ReviewSummaryPanel": {
+          "title": "Revisión",
+          "openFull": "Abrir completa",
+          "vs": "vs",
+          "index": "Índice",
+          "files": "archivos",
+          "symbols": "símbolos",
+          "flows": "flujos",
+          "tables": "tablas",
+          "contracts": "contratos",
+          "untested": "sin pruebas",
+          "findings": "Hallazgos",
+          "errors": "errores",
+          "warnings": "advertencias",
+          "progress": "Leído",
+          "loading": "Cargando resumen…",
+          "unavailable": "El resumen de revisión no está disponible.",
+          "retry": "Reintentar",
+          "disabled": "La revisión de código no está habilitada para este espacio de trabajo."
+        }
+      },
+      "qualityCharts": {
+        "severity": {
+          "error": "Error",
+          "warning": "Advertencia",
+          "info": "Información",
+          "unknown": "Desconocido"
+        },
+        "verdict": {
+          "pass": "Aprobado",
+          "warn": "Con advertencias",
+          "fail": "Fallido",
+          "unknown": "Desconocido",
+          "unknownLong": "Datos insuficientes para concluir"
+        },
+        "stale": "desactualizado",
+        "frame": {
+          "viewTable": "Ver como tabla",
+          "viewChart": "Ver gráfico",
+          "retry": "Reintentar",
+          "showing": "Mostrando {{shown}}/{{total}}",
+          "stale": "Datos desactualizados",
+          "loading": "Cargando gráfico",
+          "emptyDefault": "No hay datos para graficar en este ámbito.",
+          "errorDefault": "No se pudo dibujar el gráfico."
+        },
+        "summary": {
+          "rangeUp": "{{label}}: subió de {{first}} a {{last}} en {{count}} puntos",
+          "rangeDown": "{{label}}: bajó de {{first}} a {{last}} en {{count}} puntos",
+          "rangeFlat": "{{label}}: se mantuvo en {{last}} en {{count}} puntos",
+          "single": "{{label}}: un valor, {{value}}",
+          "noValues": "{{label}}: sin valores registrados",
+          "missing": "{{count}} puntos no tienen valor",
+          "coverage": "{{percent}}% de las líneas modificadas cubiertas ({{covered}}/{{total}})",
+          "coverageNone": "Sin datos de cobertura para este ámbito",
+          "coverageEstimated": "estimado",
+          "grid": "{{rows}} filas por {{columns}} columnas, mostrando {{shown}} de {{total}}",
+          "treemap": "{{count}} bloques dimensionados por {{size}} y sombreados por {{intensity}}",
+          "matrix": "{{nodes}} nodos, {{cells}} celdas ocupadas, {{blocks}} grupos cíclicos"
+        },
+        "stackedBar": {
+          "noData": "Aún no hay datos",
+          "noFindings": "Sin hallazgos en las comprobaciones ejecutadas",
+          "total": "{{count}} hallazgos"
+        },
+        "sparkline": {
+          "needTwo": "Se necesitan al menos dos puntos"
+        },
+        "trend": {
+          "verdictChange": "Cambió el veredicto",
+          "axis": "Eje horizontal: turnos, del más antiguo al más reciente",
+          "point": "Punto",
+          "turn": "Turno",
+          "verdict": "Veredicto"
+        },
+        "gauge": {
+          "value": "{{percent}}% ({{covered}}/{{total}} líneas modificadas cubiertas)",
+          "estimated": "Estimado a partir de las relaciones de prueba, no cobertura medida",
+          "measured": "Medido",
+          "partial": "Ámbito parcial",
+          "none": "Aún no hay datos de cobertura para este ámbito",
+          "warnBelow": "Advertir por debajo de {{value}}%",
+          "failBelow": "Fallar por debajo de {{value}}%",
+          "belowFail": "Por debajo del umbral de fallo",
+          "belowWarn": "Por debajo del umbral de advertencia",
+          "clamped": "Las líneas cubiertas superan el total; valor limitado al 100%",
+          "source": "Origen",
+          "covered": "Líneas cubiertas",
+          "total": "Líneas modificadas",
+          "percent": "Cobertura",
+          "scope": "Ámbito"
+        },
+        "treemap": {
+          "more": "+{{count}} más",
+          "moreLabel": "{{count}} elementos más no se dibujan; consulte la tabla",
+          "tileLabel": "{{label}}, {{sizeLabel}}: {{size}}, {{intensityLabel}}: {{intensity}}",
+          "empty": "No hay elementos que mostrar en este ámbito.",
+          "overlay": "marcas: {{tags}}"
+        },
+        "grid": {
+          "hint": "Las flechas mueven, Intro selecciona, Esc sale del gráfico."
+        },
+        "heatmap": {
+          "empty": "No hay filas que mostrar en este ámbito."
+        },
+        "matrix": {
+          "cycleGroup": "Grupo cíclico",
+          "other": "Otros ({{count}})",
+          "readHint": "Las filas son orígenes y las columnas son destinos.",
+          "backEdge": "Dependencia hacia atrás",
+          "empty": "No hay dependencias que mostrar en este ámbito.",
+          "cellLabel": "{{from}} depende de {{to}}, peso {{weight}}"
+        },
+        "table": {
+          "label": "Etiqueta",
+          "value": "Valor",
+          "size": "Tamaño",
+          "intensity": "Intensidad",
+          "from": "Desde",
+          "to": "Hasta",
+          "weight": "Peso",
+          "note": "Nota",
+          "metric": "Métrica",
+          "severity": "Gravedad",
+          "count": "Cantidad"
+        }
+      },
+      "graph": {
+        "RiskLevel": {
+          "low": "Bajo",
+          "medium": "Medio",
+          "high": "Alto",
+          "critical": "Crítico",
+          "unknown": "Sin evaluar"
+        },
+        "RiskTooltip": "Riesgo {{level}}, evaluado {{assessedAt}}, según {{tool}}",
+        "RiskTooltipUnassessed": "Riesgo {{level}}, sin hora de evaluación registrada",
+        "Edge": {
+          "added": "Añadido",
+          "removed": "Eliminado"
+        },
+        "Entry": {
+          "description": "Explora el flujo, el plan y el impacto de la solicitud como grafo o lista",
+          "planGraph": "Grafo",
+          "planView": "Vista del plan",
+          "title": "Grafo de la solicitud",
+          "tree": "Árbol",
+          "viewGraph": "Ver grafo"
+        },
+        "GroupSummary": "+{{count}} no afectados ({{kinds}})",
+        "Legend": {
+          "added": "Enlace añadido (continuo)",
+          "removed": "Enlace eliminado (discontinuo)",
+          "title": "Leyenda"
+        },
+        "List": {
+          "shown": "Mostrando {{shown}} de {{total}}",
+          "Change": {
+            "added": "Añadido",
+            "removed": "Eliminado",
+            "unchanged": "Sin cambios"
+          },
+          "col": {
+            "kind": "Tipo",
+            "label": "Etiqueta",
+            "group": "Grupo",
+            "risk": "Riesgo",
+            "status": "Estado",
+            "change": "Cambio",
+            "relations": "Enlaces"
+          }
+        },
+        "Mini": {
+          "addedEdges": "{{count}} enlaces añadidos",
+          "breaking": "{{count}} incompatibles",
+          "empty": "Sin evaluar",
+          "nodes": "{{count}} nodos",
+          "removedEdges": "{{count}} enlaces eliminados"
+        },
+        "Node": {
+          "ariaLabel": "{{label}}, {{kind}}, riesgo {{risk}}{{status}}"
+        },
+        "Search": {
+          "description": "Busca un nodo por etiqueta, tipo o grupo",
+          "empty": "No hay nodos coincidentes",
+          "placeholder": "Buscar nodos...",
+          "title": "Buscar en el grafo"
+        },
+        "Sheet": {
+          "findings": "Hallazgos",
+          "incoming": "Entrantes",
+          "open": "Abrir",
+          "outgoing": "Salientes"
+        },
+        "State": {
+          "empty": "No se encontraron elementos afectados en esta vista",
+          "error": "No se pudo cargar el grafo",
+          "forbidden": "No tienes permiso para ver la evaluación",
+          "loading": "Cargando grafo",
+          "noAssessment": "Aún no hay evaluación de impacto",
+          "noDevServer": "No hay servidor de desarrollo conectado",
+          "retry": "Reintentar",
+          "runAssessment": "Ejecutar evaluación",
+          "stale": "El índice de análisis está desactualizado; los resultados pueden estar incompletos",
+          "truncated": "Mostrando {{shown}} de {{total}} nodos",
+          "connectDevServer": "Conectar servidor de desarrollo"
+        },
+        "Status": {
+          "added": "Añadido",
+          "blocked": "Bloqueado",
+          "breaking": "Cambio incompatible",
+          "cancelled": "Cancelado",
+          "done": "Hecho",
+          "in_progress": "En curso",
+          "irreversible": "Irreversible",
+          "modified": "Modificado",
+          "open": "Abierto",
+          "removed": "Eliminado",
+          "review": "En revisión"
+        },
+        "Toolbar": {
+          "after": "Después",
+          "before": "Antes",
+          "changeView": "Antes o después",
+          "graph": "Grafo",
+          "lens": "Vista",
+          "list": "Lista",
+          "search": "Buscar",
+          "view": "Vista"
+        },
+        "LensDisabled": {
+          "noAssessment": "Aún no hay evaluación de impacto",
+          "noPlan": "Aún no hay plan",
+          "notExecuting": "Aún no se ejecuta",
+          "unsupported": "No compatible con este runtime"
+        },
+        "lens": {
+          "flow": "Flujo",
+          "architecture": "Arquitectura",
+          "contract": "Contratos",
+          "data": "Datos",
+          "impact": "Impacto",
+          "plan": "Plan",
+          "execution": "Ejecución"
+        }
+      },
+      "reviewQuality": {
+        "visualization": {
+          "block": {
+            "refresh": "Actualizar",
+            "unavailable": "Esta vista necesita un worktree que la inteligencia de código pueda direccionar.",
+            "stale": "La última actualización falló; se muestran los datos cargados anteriormente."
+          },
+          "error": {
+            "generic": "No se pudieron cargar estos datos.",
+            "timeout": "El análisis tarda demasiado. Inténtalo de nuevo en un momento.",
+            "tooLarge": "El resultado es demasiado grande para mostrarlo. Reduce el alcance e inténtalo de nuevo."
+          },
+          "coverage": {
+            "title": "Cobertura de pruebas",
+            "description": "Cobertura de las líneas modificadas y por archivo. Los bloques más oscuros tienen una mayor proporción de instrucciones sin cubrir.",
+            "diffTitle": "Cobertura del diff",
+            "treemapTitle": "Cobertura por archivo",
+            "sizeLabel": "instrucciones",
+            "intensityLabel": "% sin cubrir",
+            "estimatedBanner": "Estimada a partir de las relaciones con pruebas, no es cobertura medida.",
+            "measuredLine": "Cobertura medida.",
+            "totals": "Informe completo: {{percent}}% de {{stmts}} instrucciones cubiertas.",
+            "dirty": "El árbol de trabajo tenía cambios sin confirmar cuando se midió.",
+            "noReport": "Aún no hay datos de cobertura para este alcance.",
+            "noReportReason": "Aún no hay datos de cobertura para este alcance. Motivo: {{reason}}",
+            "noDiff": "La cobertura del diff no está disponible para este alcance.",
+            "noDiffReason": "La cobertura del diff no está disponible para este alcance. Motivo: {{reason}}",
+            "noChangedLines": "No hay líneas ejecutables modificadas en este alcance.",
+            "runCheck": "Ejecutar comprobación",
+            "partial": "Alcance parcial: algunos archivos modificados no se midieron.",
+            "excluded": "Archivos excluidos ({{count}})",
+            "excludedItem": "{{path}}: {{reason}}",
+            "noStatements": "{{count}} archivos sin instrucciones no se dibujan.",
+            "uncoveredTitle": "Líneas sin cubrir",
+            "uncoveredNone": "No se informaron rangos de líneas sin cubrir.",
+            "uncoveredFile": "{{path}} ({{count}} líneas)",
+            "uncoveredRange": "Líneas {{from}}-{{to}}",
+            "uncoveredLine": "Línea {{line}}",
+            "openDiff": "Abrir el diff de {{path}} en la línea {{line}}",
+            "uncoveredMore": "Se muestran los {{shown}} archivos con más líneas sin cubrir de {{total}}."
+          },
+          "trend": {
+            "title": "Tendencia por turno",
+            "titleCommit": "Tendencia por commit",
+            "description": "Hallazgos por punto. Un hueco en una línea significa que no se registró ningún número en ese punto.",
+            "groupBy": "Agrupar por",
+            "groupTurn": "Turno",
+            "groupCommit": "Commit",
+            "empty": "Aún no se han registrado ejecuciones de calidad para este worktree.",
+            "needTwo": "Se necesitan al menos dos turnos para mostrar una tendencia.",
+            "latest": "Último punto: {{error}} errores, {{warning}} advertencias, {{info}} informativos.",
+            "clickHint": "Selecciona un turno para compararlo con el anterior.",
+            "diffCoverage": "Cobertura del diff",
+            "diffCoverageMissing": "{{count}} puntos no tienen número de cobertura del diff.",
+            "sourceLocal": "Local",
+            "sourceCi": "CI",
+            "sourceUnknown": "Origen desconocido",
+            "details": "Detalle por punto",
+            "colPoint": "Punto",
+            "colSource": "Origen",
+            "colVerdict": "Veredicto",
+            "colCoverage": "Cobertura del diff",
+            "headNote": "Cifras en HEAD {{commit}} · {{source}}"
+          },
+          "hotspot": {
+            "title": "Puntos críticos",
+            "description": "Archivos señalados por el análisis de estructura (regla hotspot.file) en la ventana de historial configurada. No es una puntuación de calidad.",
+            "empty": "Aún no hay datos de puntos críticos.",
+            "emptyReason": "Aún no hay datos de puntos críticos. Aparecen cuando el análisis de estructura está activo y tiene suficiente historial.",
+            "moreRows": "Hay {{count}} archivos más en el backend que no se han cargado.",
+            "allMetrics": "Todas las métricas ({{count}})",
+            "colFile": "Archivo",
+            "selected": "Seleccionado: {{path}}",
+            "owner": "Responsable: {{owner}}",
+            "openDiff": "Abrir diff"
+          },
+          "dependency": {
+            "title": "Dependencias",
+            "description": "Las filas son los módulos que importan; las columnas, los módulos importados. Los bloques con borde y ▲ marcan grupos cíclicos.",
+            "emptyReason": "Aún no hay datos de dependencias para este alcance.",
+            "backendTruncated": "El backend devolvió {{shown}} de {{total}} módulos.",
+            "edgesTitle": "Aristas entre {{from}} y {{to}}",
+            "edgeLine": "{{from}} importa {{to}} ({{count}})",
+            "noEdge": "No hay arista de importación entre estos módulos.",
+            "openStructure": "Abrir en la lente Estructura",
+            "close": "Cerrar"
+          }
+        },
+        "scorecard": {
+          "lens": {
+            "title": "Calidad",
+            "findingsLink": "Ver {{count}} hallazgos",
+            "findingsLinkNone": "Ver hallazgos"
+          },
+          "blocks": {
+            "coverage": "Cobertura de pruebas",
+            "trend": "Tendencia por turno",
+            "hotspot": "Puntos críticos",
+            "dependency": "Dependencias",
+            "loading": "Cargando"
+          },
+          "verdict": {
+            "pass": "Todas las comprobaciones del perfil {{profile}} pasaron",
+            "warn": "Hay advertencias",
+            "fail": "No superó la comprobación",
+            "unknown": "No hay datos suficientes para concluir",
+            "unknownNoReason": "El backend no indicó ningún motivo",
+            "profileMissing": "perfil sin nombre"
+          },
+          "mode": {
+            "inform": "Modo informativo: no bloquea la creación de una revisión",
+            "block": "Configurado para bloquear; esta interfaz solo avisa",
+            "unknown": "Se desconoce el modo de la puerta"
+          },
+          "reasons": {
+            "title": "Comprobaciones tras este veredicto",
+            "none": "El backend no devolvió motivos por comprobación"
+          },
+          "reason": {
+            "pass": "Superada",
+            "warn": "Advertencia",
+            "fail": "Fallida",
+            "unknown": "Desconocido",
+            "values": "observado {{observed}}, umbral {{threshold}}",
+            "waived": "{{count}} exentos",
+            "show": "Mostrar hallazgos",
+            "noFilter": "No se pueden filtrar los hallazgos de esta comprobación"
+          },
+          "steps": {
+            "title": "Pasos ejecutados ({{count}})",
+            "none": "No se registraron pasos en esta ejecución"
+          },
+          "step": {
+            "passed": "Superado",
+            "findings": "Con hallazgos",
+            "failed": "Fallido",
+            "timeout": "Tiempo agotado",
+            "cancelled": "Cancelado",
+            "skipped": "Omitido",
+            "env_not_ready": "Entorno no preparado",
+            "unknown": "Desconocido",
+            "failure": {
+              "format_drift": "Cambió el formato de salida",
+              "output_too_large": "Salida demasiado grande",
+              "exit_unexpected": "Salida inesperada",
+              "parser_error": "No se pudo analizar la salida",
+              "env": "Problema de entorno"
+            },
+            "noResult": "Este paso no terminó, así que no aportó hallazgos y su resultado se desconoce",
+            "counts": "{{errors}} errores, {{warnings}} advertencias, {{infos}} informativos",
+            "duration": "{{seconds}} s",
+            "truncated": "Salida truncada",
+            "outside": "{{count}} fuera del alcance modificado"
+          },
+          "source": {
+            "local": "Local",
+            "ci": "CI",
+            "unknown": "Origen desconocido"
+          },
+          "provenance": {
+            "line": "{{source}} · ejecutado {{time}} · HEAD {{head}} · índice {{index}}",
+            "lineNoRun": "{{source}} · HEAD {{head}} · índice {{index}}",
+            "indexBehind": "El índice de código está en un commit distinto de HEAD",
+            "unknownValue": "desconocido"
+          },
+          "stale": {
+            "title": "Este resultado está desactualizado",
+            "headMoved": "HEAD se movió desde que se calculó este resultado.",
+            "backend": "El backend marcó este resultado como obsoleto.",
+            "cache": "El repositorio cambió tras obtener este resultado; se está actualizando.",
+            "rerun": "Ejecutar de nuevo",
+            "label": "obsoleto"
+          },
+          "banner": {
+            "dirty": "El árbol de trabajo tenía cambios sin confirmar durante la ejecución; los números de línea pueden no coincidir.",
+            "changedDuringRun": "El árbol de trabajo cambió durante la ejecución; los números de línea pueden no coincidir.",
+            "scopeWidened": "El alcance se amplió respecto a lo solicitado.",
+            "outsideScope": "{{count}} hallazgos están fuera del alcance modificado y no cuentan en la puerta",
+            "truncated": "El backend truncó los hallazgos de esta ejecución."
+          },
+          "counts": {
+            "title": "Hallazgos por gravedad",
+            "description": "Recuento de errores, advertencias e informativos de las ejecuciones tras este veredicto."
+          },
+          "ci": {
+            "title": "Local frente a CI",
+            "agree_pass": "Local y CI pasaron",
+            "agree_fail": "Local y CI fallaron",
+            "local_pass_ci_fail": "Local pasó pero CI no; no puede considerarse superado",
+            "local_fail_ci_pass": "Local falló pero CI pasó",
+            "local_only": "Solo existe una ejecución local",
+            "ci_only": "Solo existe una ejecución de CI",
+            "ci_pending": "CI sigue en ejecución",
+            "sha_mismatch": "CI se ejecutó en un commit distinto de HEAD",
+            "not_comparable": "Los resultados local y de CI no son comparables",
+            "unknown": "Se desconoce la comparación",
+            "open": "Abrir ejecución de CI",
+            "hints": "Causas posibles"
+          },
+          "chip": {
+            "label": "Calidad",
+            "open": "Abrir la vista de calidad"
+          },
+          "run": {
+            "profile": "Perfil",
+            "scopeLabel": "Alcance",
+            "scope": {
+              "changed": "Archivos modificados",
+              "worktree": "Todo el árbol de trabajo",
+              "commitRange": "Rango de commits"
+            },
+            "start": "Ejecutar comprobaciones",
+            "starting": "Iniciando",
+            "heavy": "pesado",
+            "notReady": "No listo",
+            "missing": "Falta: {{check}} ({{reason}})",
+            "missingHint": "Sugerencia: {{hint}}",
+            "noProfiles": "No hay perfiles ejecutables",
+            "cancel": "Cancelar",
+            "cancelling": "Cancelando, esperando confirmación",
+            "queued": "En cola",
+            "running": "En ejecución",
+            "stage": "Etapa: {{stage}}",
+            "step": "Paso {{index}} de {{count}}",
+            "percent": "{{percent}} %",
+            "progressUnknown": "Se desconoce el progreso",
+            "finished": {
+              "succeeded": "La ejecución terminó",
+              "failed": "La ejecución no se completó",
+              "interrupted": "La ejecución se interrumpió y no se completó",
+              "cancelled": "La ejecución se canceló",
+              "unknown": "La ejecución terminó en un estado desconocido"
+            },
+            "dismiss": "Descartar",
+            "copyDetails": "Copiar detalles",
+            "details": "Ejecución {{runId}} · {{status}}"
+          },
+          "error": {
+            "envNotReady": "El entorno no está preparado para ejecutar estas comprobaciones",
+            "recheck": "Comprobar de nuevo",
+            "profileUnknown": "Ese perfil ya no está disponible; se actualizó la lista",
+            "profileAvailable": "Disponibles: {{names}}",
+            "rateLimited": "Se solicitaron demasiadas ejecuciones",
+            "rateLimitedIn": "Inténtalo de nuevo en {{seconds}} s",
+            "forbidden": "No tienes permiso para ejecutar comprobaciones; los resultados siguen siendo legibles",
+            "offline": "Sin conexión: se muestran resultados en caché y no se puede ejecutar",
+            "generic": "No se pudieron iniciar las comprobaciones"
+          },
+          "state": {
+            "loading": "Cargando resultados de calidad",
+            "notRun": {
+              "title": "Las comprobaciones no se han ejecutado para este alcance",
+              "body": "Ejecuta las comprobaciones para obtener un veredicto. Hasta entonces no se concluye nada."
+            },
+            "empty": "Sin hallazgos en las comprobaciones ejecutadas ({{profile}})",
+            "error": "No se pudieron cargar los resultados de calidad",
+            "retry": "Reintentar",
+            "forbidden": "No tienes acceso a los resultados de calidad",
+            "offline": "Sin conexión: se muestra el último resultado en caché",
+            "indexStale": "El índice de código va por detrás de HEAD; las comprobaciones estructurales pueden omitir cambios recientes",
+            "runFailed": "La última ejecución no se completó, así que no se puede sacar un veredicto de ella",
+            "cancelled": "La última ejecución se canceló"
+          }
+        },
+        "annotations": {
+          "toggleLabel": "Anotaciones de verificación",
+          "toggleOn": "Ocultar anotaciones de verificación",
+          "toggleOff": "Mostrar anotaciones de verificación",
+          "noticeContentChanged": "Las anotaciones de verificación están ocultas porque el contenido cambió. Vuelve a ejecutar las verificaciones para actualizarlas.",
+          "noticeDirty": "Las anotaciones de verificación pueden estar desplazadas unas líneas: la ejecución comenzó con cambios sin confirmar.",
+          "noticeChangedDuringRun": "Las anotaciones de verificación pueden ser inexactas: los archivos cambiaron mientras se ejecutaban las verificaciones.",
+          "glyphCount": "{{count}} hallazgos de verificación en esta línea",
+          "glyphMore": "+{{count}} más"
+        },
+        "findings": {
+          "toolbarSeverity": "Filtrar por gravedad",
+          "toolbarCategory": "Categoría",
+          "toolbarCategoryCount": "Categoría ({{count}})",
+          "toolbarOnlyInScope": "Solo archivos modificados",
+          "toolbarShowWaived": "Mostrar exentos ({{count}})",
+          "toolbarSearchPlaceholder": "Buscar mensaje, regla o archivo",
+          "categoryLint": "Estilo (lint)",
+          "categoryTypecheck": "Tipos",
+          "categoryTest": "Pruebas",
+          "categoryCoverage": "Cobertura",
+          "categoryComplexity": "Complejidad",
+          "categorySecurity": "Seguridad",
+          "categoryDependency": "Dependencias",
+          "categoryConvention": "Convenciones",
+          "categoryArchitecture": "Arquitectura",
+          "categoryAi": "Revisión de IA",
+          "loading": "Cargando…",
+          "loadError": "No se pudieron cargar los hallazgos de verificación.",
+          "retry": "Reintentar",
+          "loadMore": "Cargar más",
+          "emptyNoRun": "Aún no se ha ejecutado ninguna verificación. Ejecútalas para ver los hallazgos aquí.",
+          "emptyNone": "No hay hallazgos en el alcance de las verificaciones ejecutadas.",
+          "emptyFiltered": "Ningún hallazgo coincide con los filtros actuales.",
+          "footerShowing": "Mostrando {{shown}} de {{total}}",
+          "footerOutsideScope": "{{count}} fuera del alcance modificado (no cuentan en la puerta de calidad)",
+          "footerCapped": "Se muestran los primeros 5000 hallazgos. Acota los filtros para ver el resto.",
+          "footerTruncated": "La salida de la herramienta se truncó, así que esta lista puede estar incompleta.",
+          "rowTool": "{{tool}} {{version}}",
+          "rowViewDiff": "Ver diff",
+          "rowOpenFile": "Abrir archivo",
+          "rowFixHint": "Sugerencia de corrección",
+          "rowWaived": "Exento por {{by}} hasta {{date}}",
+          "rowWaivedNoBy": "Exento hasta {{date}}",
+          "waiveOpen": "Eximir",
+          "waiveRevoke": "Quitar exención",
+          "waiveReasonLabel": "Motivo",
+          "waiveReasonPlaceholder": "¿Por qué es aceptable este hallazgo?",
+          "waiveReasonCount": "{{count}}/{{max}}",
+          "waiveExpiryLabel": "La exención caduca",
+          "waiveExpiryDays": "{{days}} días",
+          "waiveExpiryDate": "Fecha de caducidad",
+          "waiveCancel": "Cancelar",
+          "waiveSubmit": "Eximir hallazgo",
+          "waiveSaving": "Guardando…",
+          "waiveToastWaived": "Hallazgo eximido",
+          "waiveToastRevoked": "Exención eliminada",
+          "waiveErrReasonRequired": "Escribe un motivo (hasta 1000 caracteres).",
+          "waiveErrExpiryRequired": "Elige cuándo caduca la exención.",
+          "waiveErrExpiryPast": "La fecha de caducidad debe ser futura.",
+          "waiveErrExpiry": "Una exención puede durar como máximo {{maxDays}} días.",
+          "waiveErrForbidden": "No tienes permiso para eximir hallazgos.",
+          "waiveErrOffline": "Sin conexión. La exención no se guardó.",
+          "waiveErrConflict": "Este hallazgo cambió. Recarga la lista e inténtalo de nuevo.",
+          "waiveErrValidation": "Se rechazó la exención. Revisa el motivo y la caducidad.",
+          "waiveErrUnknown": "No se pudo guardar la exención."
         }
       }
     },
@@ -13085,6 +15776,17 @@
           "disabled": "Inteligencia de código desactivada",
           "unsupported": "No compatible con este entorno"
         }
+      }
+    },
+    "settings": {
+      "codeIntel": {
+        "loading": "Cargando la configuración de inteligencia de código",
+        "notAuthorized": "Solo los administradores pueden cambiar estos interruptores.",
+        "codeIntelLabel": "Inteligencia de código",
+        "qualityLabel": "Control de calidad",
+        "needsMaster": "Activa primero la inteligencia de código.",
+        "serverOff": "Tu organización lo activó, pero el interruptor del servidor está desactivado.",
+        "readOnly": "Pide a un administrador que cambie estos interruptores."
       }
     }
   },

@@ -8,6 +8,7 @@ export type CmdJUnavailableReason =
   | 'no-active-workspace'
   | 'ssh-disconnected'
   | 'no-active-group'
+  | 'code-intel-disabled'
 
 export type CmdJQuickActionAvailability =
   | { available: true }
@@ -32,6 +33,11 @@ export type CmdJQuickActionContext = {
   openCreateWorkspace: () => void
   deleteActiveWorkspace: () => void
   openAddQuickCommand: () => void
+  /** Code-intel flag on and the active worktree is addressable (optional: older callers omit). */
+  codeIntelEnabled?: boolean
+  /** True only for lenses that are released (and not quality-gated off). */
+  reviewLensAvailable?: (lens: string) => boolean
+  openReviewChanges?: (options?: { lens?: string }) => void
 }
 
 export function resolveCmdJActiveGroupId(
@@ -125,6 +131,29 @@ export function getCurrentWorkspaceActionAvailability(
   return { available: true }
 }
 
+/** Review actions: workspace availability, then the code-intel flag, then lens release. */
+export function getReviewActionAvailability(
+  ctx: Pick<
+    CmdJQuickActionContext,
+    | 'activeView'
+    | 'activeWorktreeId'
+    | 'isLoading'
+    | 'sshStatus'
+    | 'codeIntelEnabled'
+    | 'reviewLensAvailable'
+  >,
+  lens: string
+): CmdJQuickActionAvailability {
+  const base = getCurrentWorkspaceActionAvailability(ctx)
+  if (!base.available) {
+    return base
+  }
+  if (ctx.codeIntelEnabled !== true || ctx.reviewLensAvailable?.(lens) !== true) {
+    return { available: false, reason: 'code-intel-disabled' }
+  }
+  return { available: true }
+}
+
 export function buildCmdJQuickActionContext(args: {
   state: AppState
   activeGroupSnapshot: CmdJActiveGroupSnapshot | null
@@ -134,6 +163,9 @@ export function buildCmdJQuickActionContext(args: {
   openCreateWorkspace: () => void
   deleteActiveWorkspace: () => void
   openAddQuickCommand: () => void
+  codeIntelEnabled?: boolean
+  reviewLensAvailable?: (lens: string) => boolean
+  openReviewChanges?: (options?: { lens?: string }) => void
 }): CmdJQuickActionContext {
   const activeWorktreeId = args.state.activeWorktreeId
   const activeWorktree = activeWorktreeId
@@ -165,7 +197,10 @@ export function buildCmdJQuickActionContext(args: {
     openNewTerminalTab: args.openNewTerminalTab,
     openCreateWorkspace: args.openCreateWorkspace,
     deleteActiveWorkspace: args.deleteActiveWorkspace,
-    openAddQuickCommand: args.openAddQuickCommand
+    openAddQuickCommand: args.openAddQuickCommand,
+    codeIntelEnabled: args.codeIntelEnabled ?? false,
+    reviewLensAvailable: args.reviewLensAvailable ?? (() => false),
+    openReviewChanges: args.openReviewChanges ?? (() => {})
   }
 }
 
@@ -182,5 +217,7 @@ export function getUnavailableQuickActionMessage(
       return `Can't ${actionTitle.toLowerCase()} — workspace is disconnected.`
     case 'no-active-group':
       return `Can't ${actionTitle.toLowerCase()} — no tab group is available.`
+    case 'code-intel-disabled':
+      return `Can't ${actionTitle.toLowerCase()} — Code review isn't enabled for this workspace.`
   }
 }

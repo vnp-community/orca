@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/request-artifact-types.ts`, `request-artifact-parsers.ts` (mới); `frontend/src/shared/request-types.ts`, `request-flow-registry.ts`, `request-rpc-methods.ts`, `request-errors.ts` (sửa, tạo ở FE-REQ-TASK-018-01/018-02); test cùng tên
 **Depends on:** FE-REQ-TASK-018-01 (kiểu, registry, parser nền), 018-02 (`classifyRequestRpcError`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest shared/request-artifact-parsers (14), request-errors, request-flow-registry pass; oxlint+tsc clean)
 
 ## Context
 
@@ -71,3 +71,7 @@
 - Tên trường backend qua gateway (`displayId`, `resumeStatus`, `suggestedDefault`) là suy ra từ proto camelCase; đối chiếu CONTRACT khi nhóm kênh được thêm.
 - `options_json` là chuỗi hay đối tượng chưa rõ; parser nhận cả hai là có chủ đích.
 - Hai `kind` lỗi mới (`pending`, `no_dev_server`) cần cập nhật `FE-REQ-TASK-018-02` hoặc bảng `kind` ở SOL-018: ghi chú trong PR.
+
+## Ghi chú triển khai (2026-10-07)
+
+`awaiting_information` đã có sẵn trong `RequestStatus`/`REQUEST_STATUS_ORDER` (đợt trước). Thêm `request-artifact-types.ts`, `request-artifact-parsers.ts`, `isInterruptStatus`, hằng kênh clarification/decision/impact/readiness/execution, ánh xạ mã lỗi (`REQUEST_CLARIFICATION_*`, `REQUEST_DECISION_*`, `REQUEST_RISK_*`...) và 3 `kind` mới `expired|pending|no_dev_server`. `Approval.stage` thêm (additive) cho `drift_review`. Chưa chạy `pnpm run lint:switch-exhaustiveness`.

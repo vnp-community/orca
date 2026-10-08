@@ -5,7 +5,7 @@
 **Area:** frontend (hooks, tiếp cận)
 **File:** `frontend/src/renderer/src/hooks/useRowListKeyboardNavigation.ts` (mới), `useRowListKeyboardNavigation.test.tsx` (mới)
 **Depends on:** không (độc lập); được CR-REQ-023 (FE-REQ-TASK-023-04) dùng lại
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: useRowListKeyboardNavigation.test.tsx 4/4; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -45,3 +45,7 @@ Chạy (chưa chạy): `pnpm --filter orca-frontend test frontend/src/renderer/s
 
 - `j`/`k` có thể trùng với phím của trình đọc màn hình ở chế độ duyệt; mũi tên cũng được hỗ trợ để không phụ thuộc `j`/`k`.
 - Hook dùng chung nên đặt tên theo khái niệm "danh sách hàng" (đã tránh `utils`/`helpers`).
+
+## Ghi chú triển khai (2026-10-07)
+
+- `isTypingTarget` xuất cùng file; thêm `ArrowUp/ArrowDown/Home/End`; `shiftKey` cũng bị bỏ qua.

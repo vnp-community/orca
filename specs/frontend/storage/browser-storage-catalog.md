@@ -39,6 +39,7 @@ mentioning storage, no executable call (listed at the bottom).
 | `orca-floating-terminal-panel-bounds-v1` | localStorage | Floating terminal panel size/position | `FloatingTerminalPanelBounds` \| `FloatingTerminalAnchoredPanelBounds` JSON | `components/floating-terminal/floating-terminal-panel-bounds.ts:12,63-65` | Annoying to lose, but cosmetic | Sole copy — no store slice for this geometry |
 | `orca-floating-terminal-trigger-position-v2` | localStorage | Floating-terminal launcher button's dragged position | `{left,top}` \| anchored variant JSON | `components/floating-terminal/floating-terminal-trigger-position.ts:7-8,51-53` | Cosmetic | Sole copy |
 | `pet-overlay-position` (current) / `sidekick-overlay-position` (legacy, migration source) | localStorage | Desktop-pet overlay's dragged screen position | `{x,y}` JSON, clamped to viewport | `components/pet/PetOverlay.tsx:209-210,242,245,257,341` | Purely cosmetic | **Split-persistence feature**: `petSize` (a different attribute of the same pet) IS a Zustand field (`store/slices/ui.ts:957,2280-2284`) synced to backend via `uiSet`; only `position` is local-only |
+| `orca.review.layout.v1` | localStorage | Review workspace panel geometry (reading-order / drawer sizes, reading-order column open) | `{leftSize,rightSize,leftOpen}` JSON, sizes clamped to 16-35 / 20-40 % | `components/review-map/review-layout-storage.ts` | Purely cosmetic; every access in try/catch, workspace works with storage blocked | Sole copy — no store slice |
 
 ## 3. GitHub project board UI state
 

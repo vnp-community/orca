@@ -1,6 +1,6 @@
 # FE-CV-SOL-061: Điểm vào Review (hàng agent, Source Control, Cmd+K, tab right sidebar)
 
-> 📋 Proposed. Chưa triển khai. Priority P0 (đợt 3). Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> **Status:** [~] PARTIAL (2026-10-07) — 6/7 task DONE (có test PASS), 061-07 thiếu e2e web. Chưa kiểm bằng mắt/chạy ứng dụng. Priority P0 (đợt 3). Sai lệch ghi ở cuối từng task.
 
 **CR:** [CR-CV-061](../../../../../../docs/crs/v7/review-frontend/CR-CV-061-review-entry-points.md)
 **Area:** frontend (`components/review-map/entry/`, dashboard, sidebar, right-sidebar, cmd-j, store route)

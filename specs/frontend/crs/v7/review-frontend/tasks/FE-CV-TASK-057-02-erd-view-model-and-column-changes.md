@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/erd/erd-view-model.ts`, `erd-column-changes.ts` (mới) + `*.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `ErdModel`, `ErdChange`, `ChangeOverlay` ở `shared/code-intel-types.ts`), FE-CV-TASK-057-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: erd-view-model.test.ts 11/11 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -35,3 +35,8 @@
 ## Rủi ro
 
 - `ErdChange` không mô tả thay đổi quan hệ; cạnh đổi chưa tô được (câu hỏi mở 1 của SOL-057).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tạo `erd/erd-view-model.ts`, `erd/erd-column-changes.ts`, `erd/erd-model.fixture.ts` (fixture dùng chung cho test) + `erd-view-model.test.ts`.
+- Sai lệch nhỏ: bảng DROP được thêm vào `tables[]` với cờ `dropped:true` (không đặt trong `ghosts`, vì `ghosts` chỉ dành cho bảng của service khác). `adjacent` tính ở đây (không chỉ ở bước lọc). Bảng/cột lạ (`kind:'unknown'`) bị bỏ qua, không tô.

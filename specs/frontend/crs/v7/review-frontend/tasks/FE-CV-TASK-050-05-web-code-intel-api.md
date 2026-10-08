@@ -5,7 +5,7 @@
 **Area:** frontend / renderer web
 **File:** `frontend/src/renderer/src/web/web-code-intel-api.ts` (mới), `web/web-preload-api.ts` (sửa đúng **một dòng** cạnh `mcp:` :797), test `web-code-intel-api.test.ts`
 **Depends on:** FE-CV-TASK-050-04
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: web-code-intel-api.test 7 pass; fixed wrong import depth and stream adapter (promise handle, onResponse); preload block resolves the env per call)
 
 ## Context
 

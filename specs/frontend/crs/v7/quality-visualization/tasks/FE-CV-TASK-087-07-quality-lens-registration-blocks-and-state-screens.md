@@ -5,7 +5,7 @@
 **Area:** frontend / review shell
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityLens.tsx`, `QualityStateScreen.tsx`, `quality-lens-blocks.ts` (mới); sửa nhỏ ở file CR-051: `ReviewLensId`, `REVIEW_LENS_DEFINITIONS`, khe `trailing` của `ReviewHeaderBar`
 **Depends on:** 087-03..087-06; FE-CV-SOL-051-review-workspace-shell
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: QualityLens.test.tsx 8/8, review-lens-registry.test.ts + shell tests pass; oxlint + tsc sạch)
 
 ## Context
 
@@ -32,3 +32,9 @@ Tab ẩn khi `disabled|unsupported`; lens lazy (module không import ở khởi 
 ## Rủi ro
 
 - Phụ thuộc tên/registry của CR-051 chưa tồn tại.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Đăng ký `qualityLensDefinition` (order 80, `requiresQuality`, lazy) trong `review-lens-registry.ts`; thêm prop `trailing` ở `ReviewHeaderBar` và một dòng truyền `QualityGateChip` trong `ReviewWorkspace` (file chung, sửa tối thiểu).
+- Danh sách phát hiện nằm ở dock qua `registerReviewDockPanel` (không còn ToggleGroup nguồn), xem 087-13.
+- Bốn khối nạp lazy khi mở (`QualityLensBlockHost`), trạng thái mở lưu ở `ui.openBlocks`.

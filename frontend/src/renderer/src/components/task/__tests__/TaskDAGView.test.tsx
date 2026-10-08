@@ -9,6 +9,9 @@ import type { OrcaTask } from '../../../../../shared/task-types'
 
 // Mock ReactFlow since it requires a real DOM size and ResizeObserver to render properly —
 // same approach as DAGPreview.test.tsx. Exposes onConnect so tests can simulate a drag-connect.
+let capturedNodes: Node[] = []
+let capturedEdges: Edge[] = []
+let capturedColorMode: string | undefined
 let capturedOnConnect: ((c: { source: string | null; target: string | null }) => void) | null = null
 
 type MockReactFlowProps = {
@@ -16,11 +19,15 @@ type MockReactFlowProps = {
   edges: Edge[]
   onNodeClick: (event: unknown, node: Node) => void
   onConnect: (c: { source: string | null; target: string | null }) => void
+  colorMode?: string
 }
 
 vi.mock('@xyflow/react', () => ({
-  ReactFlow: ({ nodes, edges, onNodeClick, onConnect }: MockReactFlowProps) => {
+  ReactFlow: ({ nodes, edges, onNodeClick, onConnect, colorMode }: MockReactFlowProps) => {
     capturedOnConnect = onConnect
+    capturedNodes = nodes
+    capturedEdges = edges
+    capturedColorMode = colorMode
     return (
       <div data-testid="mock-react-flow">
         <div data-testid="nodes-count">{nodes.length}</div>
@@ -223,5 +230,18 @@ describe('TaskDAGView', () => {
     // addingFor was not reset on failure — the "to" dropdown (rendered only while addingFor
     // is set) is still present, letting the user retry.
     expect(screen.getByTestId('dag-add-dependency-select-to')).toBeInTheDocument()
+  })
+
+  it('styles nodes with tokens (no hex) and shows the status as text and icon', () => {
+    const tasks = [makeTask('a', { status: 'done' }), makeTask('b', { status: 'blocked' })]
+    const edges: TaskEdgeMap = new Map([['b', { blockedBy: ['a'], blocks: [] }]]) as TaskEdgeMap
+    render(<TaskDAGView tasks={tasks} dependencyEdges={edges} onSelect={vi.fn()} />)
+
+    expect(JSON.stringify(capturedNodes.map((n) => n.style))).not.toMatch(/#[0-9a-fA-F]{3,6}/)
+    expect(capturedNodes.find((n) => n.id === 'a')?.className).toContain('status-success')
+    expect(capturedNodes.find((n) => n.id === 'b')?.className).toContain('border-destructive')
+    expect(capturedNodes.find((n) => n.id === 'a')?.ariaLabel).toContain('Done')
+    expect(capturedEdges[0].style?.stroke).toBe('var(--border)')
+    expect(capturedColorMode).toBe('light')
   })
 })

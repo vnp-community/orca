@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + i18n + tests
 **File:** `frontend/src/renderer/src/components/review-map/storage/StorageNodeDetail.tsx` (mới) + test; `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`); `tests/e2e/code-intel-web/lenses.web.e2e.ts` (phần Storage)
 **Depends on:** FE-CV-TASK-058-04; FE-CV-TASK-057-04 (`setErdService`); FE-CV-SOL-053-impact-lens-and-symbol-detail; FE-CV-TASK-073-02, 073-03
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — thiếu e2e Playwright (không có `tests/e2e/code-intel-web`). Phần còn lại đã xác minh 2026-10-07: StorageLens.test.tsx 10/10 + review-erd-storage-locale-coverage.test.ts PASS
 
 ## Context
 
@@ -31,3 +31,9 @@
 ## Rủi ro
 
 - Phụ thuộc SOL-053 cho mở diff; thiếu thì nút ẩn.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Đã làm: `StorageNodeDetail` (nút "Mở ERD của service" → `setErdService` + `setReviewLens('erd')`, "Xem diff" chỉ khi tệp đổi, topic liệt kê pub/sub bấm được), khoá `auto.components.reviewMap.Storage*` đủ 5 locale (kiểm bởi `i18n/review-erd-storage-locale-coverage.test.ts`).
+- "Mở tệp" cho evidence không đổi chưa có (khung không cung cấp action mở tệp): chỉ hiển thị đường dẫn.
+- Còn thiếu: e2e web.

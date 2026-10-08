@@ -25,6 +25,8 @@ import { buildAgentRowLineageTree } from '@/components/dashboard/agent-row-linea
 import { DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE } from '../../../../shared/constants'
 import { revealElementInScrollContainer } from './worktree-sidebar-reveal'
 import { translate } from '@/i18n/i18n'
+import { useReviewEntryAvailability } from '@/components/review-map/entry/useReviewEntryAvailability'
+import { openReviewFromEntryPoint } from '@/components/review-map/entry/open-review-entry'
 
 export const SUPPRESS_WORKTREE_LIST_SCROLL_ADJUSTMENT_EVENT =
   'orca-suppress-worktree-list-scroll-adjustment'
@@ -120,6 +122,17 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
     }
     return out
   }, [agents, acknowledgedAgentsByPaneKey])
+
+  const reviewEntry = useReviewEntryAvailability(worktreeId)
+  const handleReviewAgent = useCallback(
+    (agent: DashboardAgentRowData) => {
+      openReviewFromEntryPoint(worktreeId, 'agent-row', {
+        completionId: `${agent.paneKey}:${agent.entry.stateStartedAt}`
+      })
+    },
+    [worktreeId]
+  )
+  const onReview = reviewEntry.visible ? handleReviewAgent : undefined
 
   const handleDismissAgent = useCallback(
     (paneKey: string) => {
@@ -311,6 +324,7 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
           // useAutoAckViewedAgent acks automatically when the user
           // focuses the agent's tab, which mutes the row in lockstep.
           isUnvisited={unvisitedByPaneKey[agent.paneKey] ?? false}
+          onReview={onReview}
           // Why: inline rows pack tighter than a full-panel layout;
           // 'md' reads as a second ~12px glyph users confuse with the
           // agent identity icon right next to it. 'sm' keeps the two
@@ -392,6 +406,8 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
           reserveDisclosureGutter={isRootAgent && anyRootHasChildren && !hasChildAgents}
           isFocusedPane={agent.paneKey === focusedAgentPaneKey}
           cacheTimerActive={cacheTimerActive}
+          onReview={onReview}
+          isUnvisited={unvisitedByPaneKey[agent.paneKey] ?? false}
         />
         {hasChildAgents ? (
           <CompactAgentExpansion expanded={expanded}>

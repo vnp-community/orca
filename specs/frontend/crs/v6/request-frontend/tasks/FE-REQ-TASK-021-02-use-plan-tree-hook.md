@@ -5,7 +5,9 @@
 **Area:** frontend / hooks
 **File:** `frontend/src/renderer/src/hooks/usePlanTree.ts` (mới), `frontend/src/shared/task-hierarchy.ts` (sửa: `buildPlanSubtree`), `frontend/src/renderer/src/components/request/plan/plan-approval-model.ts` (mới); test `usePlanTree.test.ts`, `plan-approval-model.test.ts`, `task-hierarchy.test.ts`
 **Depends on:** FE-REQ-TASK-021-01, 018-03 (`useApprovals`), 018-02 (event bus)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest hooks/usePlanTree (6), plan-approval-model (4), task-hierarchy buildPlanSubtree pass)
+
+**Ghi chú:** `usePlanTree` gọi `callRuntimeRpc` `task.list` trực tiếp (không qua `callRequestRpc` vì `task.list` không thuộc `REQUEST_RPC_METHODS`); thêm `resolveProgress`, `listPlanWorkTasks`, `computeExecutionGates` vào `plan-approval-model.ts`. Lưu ý: `useApprovals({requestId})` vẫn ghi đè `pendingApprovalCount` toàn cục bằng danh sách của một Request (hành vi có sẵn, chưa sửa).
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/review-map/quality/findings/QualityFindingsList.tsx`, `QualityFindingRow.tsx`, `QualityFindingsToolbar.tsx`, `quality-finding-filter.ts`, `quality-finding-sort.ts`; `hooks/useQualityFindings.ts` (mới) và `*.test.ts(x)`
 **Depends on:** 087-02, 087-03, FE-CV-TASK-088-03
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: QualityFindingsList.test.tsx + quality-finding-sort.test.ts + useQualityFindings.test.tsx, 20/20 pass; oxlint + tsc sạch)
 
 ## Context
 
@@ -31,3 +31,7 @@ Filter/sort thuần; list: số hàng DOM < tổng, `getItemKey`, loadMore, tr�
 ## Rủi ro
 
 - Hiệu năng 5 000 hàng chưa đo.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Hook `useQualityFindings` nạp lại khi `epoch` đổi; trần 5000 hiển thị "X/Y" và `outsideScopeCount`. Hiệu năng 5000 hàng chưa đo.

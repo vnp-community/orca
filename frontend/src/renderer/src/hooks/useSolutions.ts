@@ -41,7 +41,7 @@ export function useSolutions(requestId: string | null): UseSolutionsResult {
     setError(null)
 
     callRequestRpc<{ solutions: unknown[] }>(REQUEST_RPC_METHODS.SOLUTION_LIST, { requestId }).then((result) => {
-      if (cancelled) return
+      if (cancelled) {return}
       setIsLoading(false)
 
       if (!result.ok) {
@@ -68,6 +68,7 @@ export function useSolutions(requestId: string | null): UseSolutionsResult {
     solutionId: string
     optionId: string
     comment?: string
+    rationale?: string
   }): Promise<Result<unknown>> => {
     return callRequestRpc(REQUEST_RPC_METHODS.SOLUTION_CHOOSE, { requestId, ...params })
   }, [requestId])

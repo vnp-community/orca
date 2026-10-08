@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityRunControl.tsx`, `QualityRunProgress.tsx`, `QualityLensToolbar.tsx` (mới) và `*.test.tsx`
 **Depends on:** 087-03, 087-04
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: QualityRunControl.test.tsx 14/14 + store slice tests; oxlint + tsc sạch)
 
 ## Context
 
@@ -33,3 +33,8 @@ Khoá ngay khi bấm đúp; spinner trễ (fake timers, hai mức local/remote);
 ## Rủi ro
 
 - Phân biệt "mục tiêu từ xa" cho độ trễ: dùng cùng hàm CR-050 (chưa có code).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tách `QualityRunControl` (trình bày), `QualityRunProgress`, `QualityRunNotice` (lỗi bắt đầu + run kết thúc không hoàn tất), `QualityLensToolbar` (nối hook), `use-delayed-flag.ts` (spinner trễ 100 ms cục bộ / 200 ms từ xa).
+- `PROFILE_UNKNOWN`: slice tự bỏ lựa chọn và nạp lại danh sách. Không dựng spinner "tĩnh": spinner quay và tắt khi `prefers-reduced-motion` (`motion-reduce:animate-none`).

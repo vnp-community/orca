@@ -1,123 +1,83 @@
-/**
- * review-report-html.test.ts — FE-CV-TASK-090-04
- */
+import { describe, expect, it } from 'vitest'
+import { buildReviewReportHtml, escapeHtml } from './review-report-html'
+import { reviewReportFixture } from './review-report-model.fixture'
+import type { ReportThemeTokens } from './review-report-theme-tokens'
 
-import { describe, it, expect } from 'vitest'
-import { buildReviewReportHtml } from './review-report-html'
-import type { ReviewReportModel } from './review-report-model-parser'
+const t = (_key: string, fallback: string, opts?: Record<string, unknown>) =>
+  fallback.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => String(opts?.[name] ?? ''))
 
-const BASE_MODEL: ReviewReportModel = {
-  title: 'Test Report',
-  description: 'A description',
-  summary: {
-    overallRisk: 'LOW',
-    testedBehavior: ['Login flow'],
-    untestedBehavior: ['Error recovery'],
-    checklistItems: [
-      { id: '1', text: 'Code reviewed', checked: true },
-      { id: '2', text: 'Tests pass', checked: false },
-    ],
-  },
-  sections: [
-    { id: 's1', title: 'Coverage', body: 'Coverage is 85%', severity: 'info', diagram: null },
-    {
-      id: 's2',
-      title: 'Security',
-      body: 'No issues',
-      severity: 'warn',
-      diagram: 'graph TD\n  A --> B',
-    },
-  ],
-  overlay: [],
-  headCommit: 'abc123',
-  generatedAt: '2026-10-07T10:00:00Z',
-  modelVersion: 1,
+const tokens: ReportThemeTokens = {
+  light: { background: 'Canvas', foreground: 'CanvasText', muted: 'Canvas', mutedForeground: 'GrayText', border: 'GrayText', destructive: 'CanvasText' },
+  dark: { background: 'Canvas', foreground: 'CanvasText', muted: 'Canvas', mutedForeground: 'GrayText', border: 'GrayText', destructive: 'CanvasText' }
+}
+
+function html(model = reviewReportFixture(), svg: (string | null)[] = [null]) {
+  return buildReviewReportHtml(model, { t, locale: 'es', tokens, svgByDiagram: svg })
 }
 
 describe('buildReviewReportHtml', () => {
-  it('produces valid HTML structure', () => {
-    const html = buildReviewReportHtml(BASE_MODEL)
-    expect(html).toContain('<!DOCTYPE html>')
-    expect(html).toContain('<html lang="en">')
-    expect(html).toContain('</html>')
-    expect(html).toContain('<title>Test Report</title>')
+  it('is self-contained: strict CSP, no script, no external URL', () => {
+    const out = html()
+    expect(out).toContain(`content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"`)
+    expect(out).not.toMatch(/<script/i)
+    expect(out).not.toMatch(/\bsrc\s*=|\bhref\s*=|url\(|@import/i)
+    expect(out).not.toMatch(/https?:\/\//i)
+    expect(out).toContain('<html lang="es">')
   })
 
-  it('includes CSP meta tag with no script/external sources', () => {
-    const html = buildReviewReportHtml(BASE_MODEL)
-    expect(html).toContain("Content-Security-Policy")
-    expect(html).toContain("default-src 'none'")
-    expect(html).not.toContain('<script')
+  it('escapes model text (XSS)', () => {
+    const out = html(
+      reviewReportFixture({
+        subject: { branch: '"><svg onload=alert(1)>', baseRef: '<script>x</script>', headCommit: 'abc' },
+        findings: {
+          counts: {},
+          top: [{ ruleId: '<b>r</b>', severity: 'error', file: '<img src=x onerror=alert(1)>', line: 1, message: '<script>alert(1)</script>' }]
+        },
+        readingOrder: [{ n: 1, file: '</code><script>', reason: '<iframe>', symbols: [] }],
+        diagrams: [{ kind: 'flow', mermaid: 'graph TD', alt: ['<img onerror=1>'], truncated: false }]
+      })
+    )
+    expect(out).not.toMatch(/<script/i)
+    expect(out).not.toContain('<img')
+    expect(out).not.toContain('<svg onload')
+    expect(out).not.toContain('<iframe')
+    expect(out).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
   })
 
-  it('escapes XSS in title', () => {
-    const model: ReviewReportModel = { ...BASE_MODEL, title: '<script>alert(1)</script>' }
-    const html = buildReviewReportHtml(model)
-    expect(html).not.toContain('<script>')
-    expect(html).toContain('&lt;script&gt;')
+  it('has table captions and header scopes for accessibility', () => {
+    const out = html()
+    expect(out).toContain('<caption>Top findings</caption>')
+    expect(out).toContain('<th scope="col">Severity</th>')
   })
 
-  it('escapes XSS in section body', () => {
-    const model: ReviewReportModel = {
-      ...BASE_MODEL,
-      sections: [
-        { id: 'xss', title: 'XSS Test', body: '<img src=x onerror=alert(1)>', severity: 'info', diagram: null }
-      ],
-    }
-    const html = buildReviewReportHtml(model)
-    expect(html).not.toContain('onerror=alert')
-    expect(html).toContain('&lt;img')
+  it('embeds pre-sanitized SVG inside a labelled image role', () => {
+    const out = html(reviewReportFixture(), ['<svg><title>x</title></svg>'])
+    expect(out).toContain('role="img"')
+    expect(out).toContain('<svg><title>x</title></svg>')
+    expect(out).toContain('A calls B')
   })
 
-  it('renders valid mermaid as pre/code block', () => {
-    const html = buildReviewReportHtml(BASE_MODEL)
-    expect(html).toContain('mermaid-pre')
-    expect(html).toContain('graph TD')
+  it('writes light and dark token blocks and contains no color literals', () => {
+    const out = html()
+    expect(out).toContain('--bg:Canvas;')
+    expect(out).toContain('prefers-color-scheme: dark')
+    expect(out).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(/)
   })
 
-  it('skips invalid mermaid diagram', () => {
-    const model: ReviewReportModel = {
-      ...BASE_MODEL,
-      sections: [
-        {
-          id: 'bad',
-          title: 'Bad Diagram',
-          body: 'Content',
-          severity: 'info',
-          diagram: '<script>bad()</script>',
-        }
-      ],
-    }
-    const html = buildReviewReportHtml(model)
-    expect(html).not.toContain('<script>')
+  it('neutralizes token values that could break out of the style block', () => {
+    const evil = { ...tokens, light: { ...tokens.light, background: 'red;}</style><script>x</script>' } }
+    const out = buildReviewReportHtml(reviewReportFixture(), { t, locale: 'en', tokens: evil, svgByDiagram: [] })
+    expect(out).not.toMatch(/<script/i)
+    expect(out).toContain('--bg:inherit;')
   })
 
-  it('does not contain external URL references', () => {
-    const html = buildReviewReportHtml(BASE_MODEL)
-    expect(html).not.toMatch(/src\s*=\s*["']https?:/)
-    expect(html).not.toMatch(/href\s*=\s*["']https?:/)
+  it('states unknown gates as not enough data', () => {
+    const out = html(reviewReportFixture({ gate: { verdict: 'unknown' } }))
+    expect(out).toContain('Not enough data to conclude.')
+    expect(out).not.toContain('checks that ran passed')
   })
 
-  it('includes checklist items', () => {
-    const html = buildReviewReportHtml(BASE_MODEL)
-    expect(html).toContain('Code reviewed')
-    expect(html).toContain('Tests pass')
-    expect(html).toContain('checked')
-  })
-
-  it('includes overview risk', () => {
-    const html = buildReviewReportHtml(BASE_MODEL)
-    expect(html).toContain('LOW')
-  })
-
-  it('handles empty optional fields', () => {
-    const model: ReviewReportModel = {
-      ...BASE_MODEL,
-      description: '',
-      generatedAt: null,
-      summary: { ...BASE_MODEL.summary, testedBehavior: [], untestedBehavior: [], checklistItems: [] },
-      sections: [],
-    }
-    expect(() => buildReviewReportHtml(model)).not.toThrow()
+  it('escapeHtml handles all five characters', () => {
+    expect(escapeHtml(`<>&"'`)).toBe('&lt;&gt;&amp;&quot;&#39;')
   })
 })

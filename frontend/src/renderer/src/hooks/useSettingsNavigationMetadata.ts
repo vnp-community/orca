@@ -38,6 +38,7 @@ import { OrcaLogoSettingsIcon } from '@/components/settings/orca-logo-settings-i
 import type { Repo } from '../../../shared/types'
 import { getRepoKindLabel } from '../../../shared/repo-kind'
 import { useAppStore } from '@/store'
+import { selectCodeIntelSettingsVisible } from '@/lib/code-intel-settings-visibility'
 import { isMacUserAgent, isWindowsUserAgent } from '@/components/terminal-pane/pane-helpers'
 import type { SettingsNavSection } from '@/lib/settings-navigation-types'
 import { getGeneralPaneSearchEntries } from '@/components/settings/general-search'
@@ -118,7 +119,8 @@ export function buildSettingsNavigationMetadata({
   isDev = import.meta.env.DEV,
   repos,
   isAdmin = false,
-  isMcpEnabled = false
+  isMcpEnabled = false,
+  isCodeIntelVisible = false
 }: {
   isMac: boolean
   isWindows: boolean
@@ -130,6 +132,8 @@ export function buildSettingsNavigationMetadata({
   isAdmin?: boolean
   /** True when MCP is enabled for the tenant, or an admin can turn it on. */
   isMcpEnabled?: boolean
+  /** Code-intel tenant switches (read-only for non-admins); hidden when the backend lacks it. */
+  isCodeIntelVisible?: boolean
 }): SettingsNavSection[] {
   const showDesktopOnlySettings = !isWebClient
   const terminalPaneSearchEntries = getTerminalPaneSearchEntries({
@@ -605,6 +609,24 @@ export function buildSettingsNavigationMetadata({
           }
         ]
       : []),
+    ...(isCodeIntelVisible
+      ? [
+          {
+            id: 'code-intel',
+            title: translate(
+              'auto.hooks.useSettingsNavigationMetadata.codeIntelTitle',
+              'Code intelligence'
+            ),
+            description: translate(
+              'auto.hooks.useSettingsNavigationMetadata.codeIntelDesc',
+              'Turn code review maps and the quality gate on or off for your organization.'
+            ),
+            icon: ShieldCheck,
+            searchEntries: [],
+            group: 'capabilities'
+          }
+        ]
+      : []),
     ...repos.map((repo) => ({
       id: `repo-${repo.id}`,
       title: repo.displayName,
@@ -629,6 +651,7 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
   const settings = useAppStore((state) => state.settings)
   const isAdmin = useAppStore((state) => state.currentUser?.role === 'admin')
   const isMcpEnabled = useAppStore(selectMcpSectionVisible)
+  const isCodeIntelVisible = useAppStore(selectCodeIntelSettingsVisible)
   const isMac = isMacUserAgent()
   const isWindows = isWindowsUserAgent()
   const isWebClient = isWebClientLocation()
@@ -657,7 +680,8 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
         isDev: import.meta.env.DEV,
         repos,
         isAdmin,
-        isMcpEnabled
+        isMcpEnabled,
+        isCodeIntelVisible
       }),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- activeLocale is read implicitly by the translate() calls inside buildSettingsNavigationMetadata; without it the memo keeps the previous language's sections.
     [
@@ -668,7 +692,8 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
       repos,
       activeLocale,
       isAdmin,
-      isMcpEnabled
+      isMcpEnabled,
+      isCodeIntelVisible
     ]
   )
 }

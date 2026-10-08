@@ -1,6 +1,6 @@
 # FE-REQ-SOL-036: UI Clarification, Decision, Readiness, thẻ rủi ro, RiskAcceptance, lệch kế hoạch, kết quả thực thi
 
-> 🔴 **Not Started.** Rà soát 2026-10-07: chưa có `ClarificationPanel`, `useClarifications`, `RiskSummaryCard`, `ReadinessBadge`, `ExecutionResultPanel`. Viết ngày 2026-10-06 từ CR-REQ-036 và đối chiếu CR-REQ-028, 029, 030, CONTRACT backend; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress (3/8 tasks DONE: 036-01, 02, 04; PARTIAL: 036-03, 05, 06, 07, 08).** Triển khai và kiểm 2026-10-07: kiểu + parser + mã lỗi, 5 hook dữ liệu, `ClarificationPanel`, Decision (lý do, xác nhận gõ tên, lịch sử), thẻ rủi ro/bảng chiều/phát hiện/bằng chứng, cổng duyệt theo mức (chỉ ở `SolutionDecisionBar`), Readiness + lệch kế hoạch, `ExecutionResultPanel`, i18n 5 locale. Còn: cổng rủi ro ở Plan/Phase bar, nút "Trả lời"/bộ lọc "Chờ bổ sung", chip "Lệch", test TaskDetail, e2e thật. Kênh/trường `impact.*`, `readiness.*`, `execution.get` vẫn "tạm" chờ CONTRACT.
 
 **CR:** [CR-REQ-036](../../../../../../docs/crs/v6/request-frontend/CR-REQ-036-clarification-decision-readiness-impact-ui.md), [ADDENDUM-2026-10-06](../../../../../../docs/crs/v6/request-frontend/ADDENDUM-2026-10-06.md)
 **Area:** frontend (`frontend/src/shared`, `components/request/{clarification,decision,readiness,impact,execution}/`, `hooks/`)

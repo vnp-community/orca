@@ -52,6 +52,9 @@ import { DepartmentGate } from './components/DepartmentGate'
 import { ActivityTitlebarControls } from './components/activity/ActivityTitlebarControls'
 import Sidebar from './components/Sidebar'
 import { shutdownBufferCaptures } from './components/terminal-pane/shutdown-buffer-captures'
+import { useRequestEvents } from './hooks/useRequestEvents'
+import { useCodeIntelEvents } from './hooks/useCodeIntelEvents'
+import { useAppAgentTurnRecorders } from './components/review-map/turns/use-app-agent-turn-recorders'
 import { dispatchWindowCloseRequest } from './components/window-close-request-coordinator'
 import {
   getSystemPrefersDarkSnapshot,
@@ -494,6 +497,9 @@ function App(): React.JSX.Element {
     }))
   )
 
+  useRequestEvents()
+  useCodeIntelEvents()
+  useAppAgentTurnRecorders()
   const activeView = useAppStore((s) => s.activeView)
   const activeModal = useAppStore((s) => s.activeModal)
   const featureTipsSeenIds = useAppStore((s) => s.featureTipsSeenIds)

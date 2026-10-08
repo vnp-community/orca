@@ -1,8 +1,10 @@
-import { ArrowDownUp, Check, ChevronDown, Sparkles, TriangleAlert } from 'lucide-react'
+import { ArrowDownUp, Check, ChevronDown, FileText, Loader2, Sparkles, TriangleAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { Button } from '@/components/ui/button'
 import type { LocalizedHostedReviewCopy } from '@/i18n/hosted-review-localized-copy'
 import { stripBaseRef } from './useCreatePullRequestDialogFields'
+import { useState } from 'react'
 
 type CreateHostedReviewComposerFieldsProps = {
   copy: LocalizedHostedReviewCopy
@@ -26,6 +28,8 @@ type CreateHostedReviewComposerFieldsProps = {
   normalizedBase: string
   strippedBranch: string
   baseSameAsBranch: boolean
+  /** Inserts the review report into the description; absent when the quality flag is off. */
+  onInsertReviewReport?: () => Promise<void>
 }
 
 export function CreateHostedReviewComposerFields({
@@ -49,8 +53,10 @@ export function CreateHostedReviewComposerFields({
   generating,
   normalizedBase,
   strippedBranch,
-  baseSameAsBranch
+  baseSameAsBranch,
+  onInsertReviewReport
 }: CreateHostedReviewComposerFieldsProps): React.JSX.Element {
+  const [insertingReport, setInsertingReport] = useState(false)
   return (
     <>
       {/* Why: a single line that shows the head->base flow plain-language so
@@ -105,6 +111,30 @@ export function CreateHostedReviewComposerFields({
           )}
           className="min-h-[7.5rem] w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 scrollbar-sleek"
         />
+
+        {onInsertReviewReport ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            // Why: inserting while AI generation rewrites the fields would race its field revisions.
+            disabled={fieldsLocked || generating || insertingReport}
+            onClick={() => {
+              setInsertingReport(true)
+              void onInsertReviewReport().finally(() => setInsertingReport(false))
+            }}
+          >
+            {insertingReport ? (
+              <Loader2 className="animate-spin" aria-hidden="true" />
+            ) : (
+              <FileText aria-hidden="true" />
+            )}
+            {translate(
+              'auto.components.reviewMap.report.insert.label',
+              'Insert review report'
+            )}
+          </Button>
+        ) : null}
 
         {generating ? (
           // Why: visible scrim + status row so the user understands the title

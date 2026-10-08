@@ -5,7 +5,7 @@
 **Area:** frontend (components/task, i18n, docs)
 **File:** `frontend/src/renderer/src/components/task/TaskBoardView.tsx` (sửa), `components/task/__tests__/TaskBoardView.test.tsx` (sửa), `i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `i18n/request-backlog-locale-coverage.test.ts` (mới), `docs/ui/pages/requests.md` (thêm mục Backlog)
 **Depends on:** FE-REQ-TASK-023-04, 023-05, 023-06 (danh sách khoá thật); FE-REQ-SOL-018 (đã gỡ `backlog` khỏi `STATUS_ORDER`, có `requestFlowSupport`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: TaskBoardView.test.tsx 10/10, request-backlog-locale-coverage.test.ts 10/10; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -41,3 +41,7 @@
 - Dịch máy cần người bản ngữ rà (ghi rõ trong PR).
 - Khoá `TaskBoardView.backlogMoved` thêm vào component cũ; chạy `rg "'backlog'" frontend/src/renderer/src/components/task` để chắc chắn không còn tham chiếu trạng thái `backlog` (ngoài test chuẩn hoá của SOL-018).
 - Người dùng quen kéo task vào cột `backlog` sẽ bối rối; dòng gợi ý chỉ giảm nhẹ (CR-023 mục 6).
+
+## Ghi chú triển khai (2026-10-07)
+
+- `openRequestPage` còn gọi `setActiveView('requests')` để dùng được từ Board. Khoá `BacklogEmptyState.*` dùng `requests/tasks/execute`. `pnpm verify:localization-*` chưa chạy. Mục Backlog đã thêm vào `docs/ui/pages/requests.md` và `page-tree.md`.

@@ -1,150 +1,105 @@
 /**
  * agent-turn-verification-view-model.ts — FE-CV-TASK-089-05
  *
- * Pure view model for agent turn verification/reconciliation display.
- * Maps agreement values to neutral i18n keys — no attribution language.
- *
- * Language rules:
- * - NEVER use: "lying", "deceiving", "faking", "consistent" (for unverified)
- * - "unverified" must NOT map to "consistent"
- * - "basis:stated" → "Inferred from agent statement"
+ * Pure view model for the "what the agent ran / what a re-run found" lines.
+ * Wording stays neutral: the agent process self-reports, so we only compare
+ * against an independent re-run and never attribute intent.
  *
  * @module components/review-map/turns/agent-turn-verification-view-model
  */
 
-import type { NormalizedCommand } from './agent-tool-use-command-summarizer'
+import type { AgentTurnCommandsSummary, CommandCategory } from './agent-tool-use-command-summarizer'
 
-// ---------------------------------------------------------------------------
-// Input types
-// ---------------------------------------------------------------------------
+const BASE = 'auto.components.reviewMap.turns.verification'
 
-export type ClaimAgreement = 'verified' | 'unverified' | 'contradicted' | 'partial' | 'unknown'
+export type ClaimAgreement = 'consistent' | 'contradicted' | 'unverified' | 'not_claimed' | 'unknown'
 
-export type AgentClaim = {
-  id: string
-  text: string
-  agreement: ClaimAgreement | string
-  basis?: 'stated' | 'observed' | 'inferred' | string
+export type AgentTurnClaimItem = {
+  kind: string
+  basis: string
+  confidence?: string
+  agreement?: string
+  agreementReason?: string
+  verifyingRunId?: string
 }
 
 export type AgentTurnVerificationInput = {
-  claims: AgentClaim[]
-  commandsSummary?: {
-    commands: NormalizedCommand[]
-    toolCounts: Record<string, number>
-    truncated: boolean
-  } | null
+  commandsSummary?: AgentTurnCommandsSummary | null
+  claims?: { items: AgentTurnClaimItem[] } | null
 }
 
-// ---------------------------------------------------------------------------
-// Output types
-// ---------------------------------------------------------------------------
+export type RanLinePart = { categoryKey: string; count: number }
 
-export type ClaimViewModel = {
+export type VerificationCheckViewModel = {
   id: string
-  text: string
-  /** Neutral i18n key */
+  kind: string
+  agreement: Exclude<ClaimAgreement, 'not_claimed'>
   labelKey: string
-  /** Optional basis label key */
-  basisLabelKey?: string
-  agreement: ClaimAgreement
+  kindKey: string
+  basisKey: string | null
+  reasonKey: string | null
+  verifyingRunId: string | null
 }
 
 export type AgentTurnVerificationViewModel = {
-  /** Human-readable summary of commands run (i18n key + params) */
-  ranLineKey: string
-  ranLineParams: Record<string, unknown>
-  claims: ClaimViewModel[]
-  hasClaims: boolean
+  ranLine: { parts: RanLinePart[]; truncated: boolean } | null
+  checks: VerificationCheckViewModel[]
+  hasContradiction: boolean
 }
 
-// ---------------------------------------------------------------------------
-// Agreement mapping
-// ---------------------------------------------------------------------------
+const KNOWN_AGREEMENTS = new Set(['consistent', 'contradicted', 'unverified', 'not_claimed'])
+const KNOWN_KINDS = new Set(['tests_pass', 'tests_fail', 'lint_clean', 'typecheck_clean', 'build_ok', 'all_done'])
+const KNOWN_REASONS = new Set(['tree_may_differ', 'no_run', 'run_failed'])
+const CATEGORY_ORDER: CommandCategory[] = ['test', 'lint', 'typecheck', 'build', 'install', 'git', 'other']
+const AGREEMENT_RANK: Record<string, number> = { contradicted: 0, unverified: 1, unknown: 2, consistent: 3 }
 
-const AGREEMENT_KEY_MAP: Record<ClaimAgreement, string> = {
-  verified: 'auto.components.reviewMap.turns.verification.agreement.verified',
-  unverified: 'auto.components.reviewMap.turns.verification.agreement.unverified',
-  contradicted: 'auto.components.reviewMap.turns.verification.agreement.contradicted',
-  partial: 'auto.components.reviewMap.turns.verification.agreement.partial',
-  unknown: 'auto.components.reviewMap.turns.verification.agreement.unknown'
+function toAgreement(raw: string | undefined): ClaimAgreement {
+  // Why: an absent or unrecognized value must read as "unknown", never as a pass.
+  return raw && KNOWN_AGREEMENTS.has(raw) ? (raw as ClaimAgreement) : 'unknown'
 }
 
-function toAgreement(raw: string): ClaimAgreement {
-  if (['verified', 'unverified', 'contradicted', 'partial'].includes(raw)) {
-    return raw as ClaimAgreement
+function buildRanLine(summary: AgentTurnCommandsSummary | null | undefined) {
+  if (!summary || summary.commands.length === 0) {
+    return null
   }
-  return 'unknown'
+  const counts = new Map<CommandCategory, number>()
+  for (const command of summary.commands) {
+    counts.set(command.category, (counts.get(command.category) ?? 0) + command.count)
+  }
+  const parts = CATEGORY_ORDER.filter((c) => counts.has(c)).map((category) => ({
+    categoryKey: `${BASE}.category.${category}`,
+    count: counts.get(category) ?? 0
+  }))
+  return { parts, truncated: summary.truncated }
 }
 
-const BASIS_STATED_KEY = 'auto.components.reviewMap.turns.verification.basis.stated'
-
-function basisLabelKey(basis?: string): string | undefined {
-  if (basis === 'stated') return BASIS_STATED_KEY
-  return undefined
-}
-
-// ---------------------------------------------------------------------------
-// Command summary line builder
-// ---------------------------------------------------------------------------
-
-/**
- * Build a localized "Agent ran: test (3 times), lint" display summary.
- */
-function buildRanLine(
-  commandsSummary: AgentTurnVerificationInput['commandsSummary']
-): { ranLineKey: string; ranLineParams: Record<string, unknown> } {
-  if (!commandsSummary || Object.keys(commandsSummary.toolCounts).length === 0) {
-    return {
-      ranLineKey: 'auto.components.reviewMap.turns.verification.ranNothing',
-      ranLineParams: {}
-    }
-  }
-
-  // Build a short list from commands: "test (3x), lint, git"
-  const countsByCategory: Record<string, number> = {}
-  for (const cmd of commandsSummary.commands) {
-    countsByCategory[cmd.category] = (countsByCategory[cmd.category] ?? 0) + 1
-  }
-
-  const parts = Object.entries(countsByCategory)
-    .slice(0, 4)
-    .map(([cat, count]) => ({ cat, count }))
-
-  return {
-    ranLineKey: 'auto.components.reviewMap.turns.verification.ran',
-    ranLineParams: { parts, truncated: commandsSummary.truncated }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Builder
-// ---------------------------------------------------------------------------
-
-/**
- * Build the verification view model for an agent turn.
- * Pure function — no side effects.
- */
 export function buildAgentTurnVerificationViewModel(
   input: AgentTurnVerificationInput
 ): AgentTurnVerificationViewModel {
-  const { ranLineKey, ranLineParams } = buildRanLine(input.commandsSummary)
-
-  const claims: ClaimViewModel[] = input.claims.map((c) => {
-    const agreement = toAgreement(c.agreement)
-    return {
-      id: c.id,
-      text: c.text,
-      labelKey: AGREEMENT_KEY_MAP[agreement],
-      basisLabelKey: basisLabelKey(c.basis),
-      agreement
+  const checks: VerificationCheckViewModel[] = []
+  for (const [index, item] of (input.claims?.items ?? []).entries()) {
+    const agreement = toAgreement(item.agreement)
+    if (agreement === 'not_claimed') {
+      continue
     }
-  })
-
+    checks.push({
+      id: `${item.kind}:${index}`,
+      kind: item.kind,
+      agreement,
+      labelKey: `${BASE}.agreement.${agreement}`,
+      kindKey: `${BASE}.kind.${KNOWN_KINDS.has(item.kind) ? item.kind : 'other'}`,
+      basisKey: item.basis === 'stated' ? `${BASE}.basis.stated` : null,
+      reasonKey:
+        item.agreementReason && KNOWN_REASONS.has(item.agreementReason)
+          ? `${BASE}.reason.${item.agreementReason}`
+          : null,
+      verifyingRunId: item.verifyingRunId ?? null
+    })
+  }
+  checks.sort((a, b) => AGREEMENT_RANK[a.agreement] - AGREEMENT_RANK[b.agreement])
   return {
-    ranLineKey,
-    ranLineParams,
-    claims,
-    hasClaims: claims.length > 0
+    ranLine: buildRanLine(input.commandsSummary),
+    checks,
+    hasContradiction: checks.some((c) => c.agreement === 'contradicted')
   }
 }

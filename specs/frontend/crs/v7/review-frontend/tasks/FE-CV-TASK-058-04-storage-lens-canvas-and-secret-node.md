@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/storage/{StorageLens,StorageToolbar,StorageCanvas,StorageLegend,StorageInferenceNotice,StorageSecretNode}.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-058-01, 058-02, 058-03; FE-CV-SOL-051-review-workspace-shell
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: storage/*.test.ts(x) 25/25 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -36,3 +36,8 @@
 ## Rủi ro
 
 - Che quá tay có thể làm tên khoá khó đọc (kiểm khi tinh chỉnh mẫu ở 057-01).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tạo `StorageLens`, `StorageToolbar`, `StorageCanvas`, `StorageLegend`, `StorageInferenceNotice`, `StorageSecretNode`, `StorageTextView` (bảng văn bản thay thế, thêm so với spec); đăng ký `load` cho lens `storage`.
+- Test bảo mật: dữ liệu giả nhét giá trị vào trường lạ (`value`, `payload`, `via`), DSN và token không xuất hiện trong DOM, `localStorage` hay spy `console`. Nút secret chỉ có "Sao chép tên khoá".

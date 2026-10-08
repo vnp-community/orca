@@ -5,7 +5,7 @@
 **Area:** frontend (hooks)
 **File:** `frontend/src/renderer/src/hooks/useBacklog.ts` (SOL-018 tạo, task này chốt chữ ký; nếu chưa có thì tạo mới), `hooks/useBacklog.test.tsx` (mới)
 **Depends on:** FE-REQ-TASK-023-01; FE-REQ-SOL-018 (`callRequestRpc`, `RequestRpcError`, `subscribeRequestEvents`, `setRequestFlowSupport`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: useBacklog.test.tsx 9/9; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -50,3 +50,7 @@ Chạy (chưa chạy): `pnpm --filter orca-frontend test frontend/src/renderer/s
 - Chữ ký này thay đổi hợp đồng của SOL-018 (`useBacklog(view, filters)` trả `{items, ...}` phẳng); báo người điều phối để SOL-018 cập nhật.
 - Polling 30 s nhân với số cửa sổ; chỉ hoạt động khi tab hiển thị.
 - Khoá lọc `type`/`q` không đi qua hook (lọc client ở task 04).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Chữ ký: `useBacklog(view, filters, {active})` có overload theo view, kèm ba hook mỏng `useRequestBacklog/useTaskBacklog/useExecuteBacklog`. Đã sửa lỗi cũ `nextPage()` bỏ qua page token (nay `loadMore` gửi `pageToken`). Sự kiện qua bus `useRequestSubscription`.

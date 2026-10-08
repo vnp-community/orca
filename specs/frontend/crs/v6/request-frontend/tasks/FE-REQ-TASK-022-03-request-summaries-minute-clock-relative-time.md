@@ -5,7 +5,7 @@
 **Area:** frontend (hooks, lib)
 **File:** `frontend/src/renderer/src/hooks/useRequestSummaries.ts` (mới), `hooks/useMinuteClock.ts` (mới), `lib/request-relative-time.ts` (mới), tests `.test.ts(x)` cùng tên (mới)
 **Depends on:** FE-REQ-SOL-018 (`callRequestRpc`, `parseRequest`, slice `requestsById`, `upsertRequests`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: request-relative-time.test.ts 7/7, useMinuteClock.test.tsx 2/2, useRequestSummaries.test.tsx 3/3; oxlint sạch, không thêm lỗi tsc ở file của task)
 
 ## Context
 
@@ -47,3 +47,7 @@ Chạy (chưa chạy): `pnpm --filter orca-frontend test frontend/src/renderer/s
 - N+1 là hệ quả của việc backend chưa nhúng tóm tắt (CR-022 Q1). Nếu backend nhúng sau, `useRequestSummaries` vẫn hữu ích cho CR-REQ-023 (nhóm Task/Execute chỉ có `requestId`).
 - Hạn tính theo giờ máy chủ, nhưng so với đồng hồ máy khách (`Date.now()`); lệch đồng hồ làm sai "quá hạn" vài phút. Chỉ hiển thị; backend vẫn là nguồn thật khi duyệt (`REQUEST_APPROVAL_EXPIRED`).
 - Cache `requestsById` dùng chung với `RequestsTab` (CR-REQ-019); không xoá phần tử ở đây.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `lib/request-relative-time.ts` đã có `formatRequestRelativeTime` từ đợt 019 (dùng ở RequestRow/History/Banner); giữ nguyên và thêm các hàm mới. `useRequestSummaries` trả thêm `notFoundIds`.

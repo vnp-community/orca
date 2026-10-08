@@ -56,6 +56,10 @@ import { createMcpSlice } from './slices/mcp-slice'
 import { createMcpApprovalSlice } from './slices/mcp-approval-slice'
 import { createMcpTerminalOriginSlice } from './slices/mcp-terminal-origin'
 import { createRequestSlice } from './slices/request'
+import { createCodeIntelSlice } from './slices/code-intel'
+import { createCodeIntelQualitySlice } from './slices/code-intel-quality-state'
+import { createReviewUiSlice } from './slices/review-ui'
+import { createReviewProgressSlice } from './slices/review-progress'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
 import { registerClientStateSettingsAccessor } from '@/runtime/runtime-client-state-client'
@@ -125,7 +129,12 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createMcpSlice(...a),
   ...createMcpApprovalSlice(...a),
   ...createMcpTerminalOriginSlice(...a),
-  ...createRequestSlice(...a)
+  ...createRequestSlice(...a),
+  // Why: code-intel slice takes a narrower set/get than StateCreator, so adapt here.
+  ...createCodeIntelSlice(a[0] as never, a[1] as never),
+  ...createCodeIntelQualitySlice(a[0] as never, a[1] as never),
+  ...createReviewUiSlice(...a),
+  ...createReviewProgressSlice(...a)
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())

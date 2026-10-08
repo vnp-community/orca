@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/ai-summary/ai-summary-report-section.ts` (mới) + test
 **Depends on:** FE-CV-TASK-093-01; FE-CV-SOL-090-review-report-export (`extraSections`)
-**Status:** [x] DONE — `ai-summary-report-section.ts` chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 3 tests)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - Chưa có điểm gọi.
+
+## Ghi chú triển khai (2026-10-07)
+
+`buildAiSummaryReportSection(summary, t)` trả `{id, markdown}` cho `extraSections` (nằm ngoài mục "Quality gate"); không có nút chèn AI vào composer (theo spec).

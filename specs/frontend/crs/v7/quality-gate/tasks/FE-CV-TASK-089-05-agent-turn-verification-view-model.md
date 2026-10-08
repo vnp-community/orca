@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-turn-verification-view-model.ts` (mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 5 tests)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - `ran_command` chỉ chứng minh đã chạy, không chứng minh đạt.
+
+## Ghi chú triển khai (2026-10-07)
+
+Viết lại theo `AgentTurn` hợp đồng (agreement consistent/contradicted/unverified/not_claimed/unknown). Bản cũ dùng `verified/partial`.

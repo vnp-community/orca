@@ -5,7 +5,7 @@
 **Area:** frontend / pure functions
 **File:** `frontend/src/renderer/src/components/review-map/quality/quality-gate-copy.ts`, `quality-stale-model.ts`, `quality-run-scope-model.ts`, `quality-view-state.ts`, `quality-profile-selection.ts` (mới) và `*.test.ts`
 **Depends on:** 087-01 (kiểu); không cần backend
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: quality-gate-copy / profile-selection / stale-model / run-scope-model / view-state tests, 33/33 pass; oxlint + tsc sạch)
 
 ## Context
 
@@ -33,3 +33,9 @@ Bốn verdict × mode; quét chuỗi mặc định không chứa `an toàn|sạc
 ## Rủi ro
 
 - Tên `ReviewScope` có thể khác ở CR-051; điều chỉnh khi 051 chốt.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Thêm `quality-scorecard-copy.ts` + `quality-copy-factory.ts` (bảng chuỗi tiếng Anh đọc theo tên, nhóm `scorecard`) và `quality-scorecard-model.ts` (+ test, 9 test).
+- `splitProfileRef` theo D5: `RunnableProfile.id` = phần trước `@`.
+- `ReviewScope` thật (branch/range/hostedReview) đã có ở CR-051 nên ánh xạ dùng đúng kiểu đó.

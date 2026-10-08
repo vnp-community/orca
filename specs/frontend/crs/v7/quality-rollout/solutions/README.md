@@ -1,12 +1,12 @@
 # Solutions: quality-rollout (frontend, v7)
 
-> 🔴 **Not Started (mostly).** Rà soát 2026-10-07: integration test (073-01) done. Fake backend `createFakeCodeIntelBackend` (073-02) chưa tồn tại — blocker cho mọi lens. Soạn 2026-10-06 từ [docs/crs/v7/quality-rollout](../../../../../../docs/crs/v7/quality-rollout/README.md).
+> 🟡 **Partial.** 2026-10-07: 073-02 fake backend và 073-06 thẻ admin DONE; 073-01/03/04/07 PARTIAL; 073-05 TODO. Soạn 2026-10-06 từ [docs/crs/v7/quality-rollout](../../../../../../docs/crs/v7/quality-rollout/README.md).
 
 ## Bảng CR → Solution
 
 | CR | Solution | Nội dung | Trạng thái |
 |---|---|---|---|
-| CR-CV-073 | [FE-CV-SOL-073](./FE-CV-SOL-073-flag-gating-and-web-e2e.md) | Gating cờ `codeIntelEnabled`/`qualityGateEnabled`/AI ở frontend (ma trận kiểm), thẻ cài đặt admin, fake backend G4, e2e Playwright web (project `code-intel-web`), Electron smoke tối thiểu | ✅ |
+| CR-CV-073 | [FE-CV-SOL-073](./FE-CV-SOL-073-flag-gating-and-web-e2e.md) | Gating cờ `codeIntelEnabled`/`qualityGateEnabled`/AI ở frontend (ma trận kiểm), thẻ cài đặt admin, fake backend G4, e2e Playwright web (project `code-intel-web`), Electron smoke tối thiểu | [~] PARTIAL |
 
 CR-070, 071, 072 không có việc frontend (§8.2). Phần BE/AG của CR-073: `BE-CV-SOL-073-settings-flag-and-rollout`, `AG-CV-SOL-073-agent-kill-switch`.
 

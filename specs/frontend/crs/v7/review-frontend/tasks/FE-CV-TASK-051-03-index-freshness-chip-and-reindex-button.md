@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/IndexFreshnessChip.tsx`, `ReindexButton.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-050-14, FE-CV-TASK-051-02
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: IndexFreshnessChip.test 9 overall + ReindexButton cases; full-rebuild confirm is inline instead of `useConfirmationDialog`, see note)
 
 ## Context
 

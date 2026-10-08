@@ -5,7 +5,7 @@
 **Area:** frontend / test-support + i18n
 **File:** `frontend/src/renderer/src/test-support/code-intel-fake-backend.ts` (CR-050; sửa: kịch bản quality), `i18n/code-intel-quality-locale-coverage.test.ts` (từ 088-09; thêm khoá), `i18n/locales/{en,es,ja,ko,zh}.json` (khoá `auto.components.reviewQuality.*`, `auto.hooks.codeIntelQuality.*`), `tests/e2e/quality-gate-scorecard.spec.ts` (mới, kế hoạch)
 **Depends on:** 087-01..087-07, 088-09
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — fake scenarios, integration test và khoá i18n 5 locale đã xong và pass (code-intel-quality-scenarios.test.ts 18 + quality-scorecard-locale-coverage.test.ts 17); thiếu spec e2e Playwright (`tests/e2e/quality-gate-scorecard.spec.ts`) vì không chạy được trình duyệt ở môi trường này
 
 ## Context
 
@@ -31,3 +31,9 @@ Chạy `pnpm --filter orca-frontend test -- src/renderer/src/i18n/code-intel-qua
 ## Rủi ro
 
 - Bản dịch cần người duyệt; fake backend thuộc CR-050 nên cần phối hợp merge.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Không sửa lõi `code-intel-fake-backend.ts` (đã có `setChannelData/setHandler/failNext/pushQuality`); kịch bản nằm ở `test-support/code-intel-quality-scenarios.ts` (+ `createFakeQualityCall` đưa fake vào slice thật).
+- i18n: nhóm `auto.components.reviewQuality.scorecard.*` (130 khoá) + `auto.components.reviewMap.lens.quality.label`; test riêng `i18n/quality-scorecard-locale-coverage.test.ts` (dùng `test-support/quality-copy-locale-assertions.ts`) thay vì thêm vào `code-intel-quality-locale-coverage.test.ts`.
+- Bản dịch es/ja/ko/zh do máy soạn, cần người duyệt.

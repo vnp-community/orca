@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/hooks/useQualityFeatureFlags.ts` (mới), `useQualityFeatureFlags.test.ts` (mới)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks (slice settings, `useCodeIntelSupport`); fake backend G4
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 8 tests useQualityFeatureFlags.test.ts)
 
 ## Context
 
@@ -32,3 +32,7 @@
 ## Rủi ro
 
 - Tên selector của 050 chưa chốt (chưa kiểm chứng).
+
+## Ghi chú triển khai (2026-10-07)
+
+Selector tách thành 4 selector nguyên thuỷ (zustand v5 lặp vô hạn nếu trả object mới). Hình dạng `state` giữ `unknown|enabled|disabled|unsupported` (lệch spec `unknown|ready`).

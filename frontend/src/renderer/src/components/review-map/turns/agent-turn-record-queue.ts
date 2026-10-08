@@ -1,136 +1,87 @@
 /**
  * agent-turn-record-queue.ts — FE-CV-TASK-089-03
  *
- * Deduplicating retry queue for quality.turn.record submissions.
- * Rules:
- * - Idempotent by clientTurnId (backend guarantees idempotency)
- * - Retry up to 3 times with backoff 2/6/18s for transient errors
- * - Drop immediately for permanent errors (disabled/forbidden/validation/etc.)
- * - Never throws into caller; never blocks UI
+ * In-memory dedupe + retry queue for `quality.turn.record`. Never throws into the
+ * caller and never blocks the UI; a lost turn is acceptable (not persisted).
  *
  * @module components/review-map/turns/agent-turn-record-queue
  */
 
-import type { CodeIntelErrorKind } from '../../../../../shared/code-intel-parsers'
 import type { AgentTurnRecordParams } from './agent-turn-record-params'
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 export type TurnRecordSender = (params: AgentTurnRecordParams) => Promise<void>
 
-type QueueEntry = {
-  params: AgentTurnRecordParams
-  attempts: number
-  timerId: ReturnType<typeof setTimeout> | null
-}
-
-// ---------------------------------------------------------------------------
-// Error classification
-// ---------------------------------------------------------------------------
-
-// Errors that should not be retried (permanent / misconfigured)
-const DROP_IMMEDIATELY_KINDS = new Set<CodeIntelErrorKind>([
-  'disabled', 'unsupported', 'forbidden', 'validation', 'not_found'
+// Permanent conditions: retrying cannot help, so drop silently.
+const DROP_KINDS: ReadonlySet<string> = new Set([
+  'disabled', 'unsupported', 'forbidden', 'validation', 'not-found', 'quality-disabled', 'no-binding'
 ])
-
-// Errors that should be retried with backoff
-const RETRYABLE_KINDS = new Set<CodeIntelErrorKind>([
-  'offline', 'rate_limited', 'unknown'
-])
-
 const BACKOFF_MS = [2000, 6000, 18000] as const
-const MAX_ATTEMPTS = 3
 
-function isRetryable(kind: CodeIntelErrorKind): boolean {
-  return RETRYABLE_KINDS.has(kind)
+type Entry = {
+  params: AgentTurnRecordParams
+  retries: number
+  timer: ReturnType<typeof setTimeout> | null
 }
 
-function isDrop(kind: CodeIntelErrorKind): boolean {
-  return DROP_IMMEDIATELY_KINDS.has(kind)
-}
-
-// ---------------------------------------------------------------------------
-// Queue factory
-// ---------------------------------------------------------------------------
-
-/**
- * Create a submission queue.
- *
- * @param sender - async function that sends the turn record; throws CodeIntelRpcError-like on failure
- * @param classifyError - extracts `kind` from a caught error
- */
 export function createAgentTurnRecordQueue(
   sender: TurnRecordSender,
-  classifyError: (err: unknown) => { kind: CodeIntelErrorKind }
+  classifyError: (err: unknown) => { kind: string }
 ): {
   enqueue(params: AgentTurnRecordParams): void
+  pending(): number
   dispose(): void
 } {
-  const queue = new Map<string, QueueEntry>()
+  const entries = new Map<string, Entry>()
+  // Why: a turn already sent in this session must not be re-sent when the same completion replays.
+  const sent = new Set<string>()
   let disposed = false
 
-  function scheduleRetry(entry: QueueEntry): void {
-    if (disposed || entry.attempts >= MAX_ATTEMPTS) {
-      queue.delete(entry.params.clientTurnId)
+  async function attempt(entry: Entry): Promise<void> {
+    if (disposed) {
       return
     }
-
-    const delay = BACKOFF_MS[entry.attempts - 1] ?? BACKOFF_MS[BACKOFF_MS.length - 1]
-    entry.timerId = setTimeout(() => {
-      void send(entry)
-    }, delay)
-  }
-
-  async function send(entry: QueueEntry): Promise<void> {
-    if (disposed) return
+    const id = entry.params.clientTurnId
     try {
       await sender(entry.params)
-      // Success — remove from queue
-      queue.delete(entry.params.clientTurnId)
-    } catch (err) {
-      const { kind } = classifyError(err)
-
-      if (isDrop(kind) || disposed) {
-        queue.delete(entry.params.clientTurnId)
+      entries.delete(id)
+      sent.add(id)
+    } catch (error) {
+      let kind = 'unknown'
+      try {
+        kind = classifyError(error).kind
+      } catch {
+        // Classifier failure is treated as a transient unknown error.
+      }
+      if (disposed || DROP_KINDS.has(kind) || entry.retries >= BACKOFF_MS.length) {
+        entries.delete(id)
         return
       }
-
-      if (isRetryable(kind) && entry.attempts < MAX_ATTEMPTS) {
-        entry.attempts++
-        scheduleRetry(entry)
-      } else {
-        // Non-retryable or exhausted
-        queue.delete(entry.params.clientTurnId)
-      }
+      entry.timer = setTimeout(() => {
+        entry.timer = null
+        void attempt(entry)
+      }, BACKOFF_MS[entry.retries])
+      entry.retries++
     }
   }
 
   return {
     enqueue(params) {
-      if (disposed) return
-
-      const existing = queue.get(params.clientTurnId)
-      if (existing) {
-        // Already queued — deduplication: update params and reset attempts if pending
-        existing.params = params
+      if (disposed || entries.has(params.clientTurnId) || sent.has(params.clientTurnId)) {
         return
       }
-
-      const entry: QueueEntry = { params, attempts: 0, timerId: null }
-      queue.set(params.clientTurnId, entry)
-
-      // First attempt immediately (not via retry delay)
-      void send(entry)
+      const entry: Entry = { params, retries: 0, timer: null }
+      entries.set(params.clientTurnId, entry)
+      void attempt(entry)
     },
-
+    pending: () => entries.size,
     dispose() {
       disposed = true
-      for (const entry of queue.values()) {
-        if (entry.timerId !== null) clearTimeout(entry.timerId)
+      for (const entry of entries.values()) {
+        if (entry.timer) {
+          clearTimeout(entry.timer)
+        }
       }
-      queue.clear()
+      entries.clear()
     }
   }
 }

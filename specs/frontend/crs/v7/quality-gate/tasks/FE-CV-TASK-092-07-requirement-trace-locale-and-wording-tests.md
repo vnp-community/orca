@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/i18n/requirement-trace-locale-coverage.test.ts` (mới), `frontend/src/renderer/src/i18n/locales/*.json`
 **Depends on:** FE-CV-TASK-092-01, 092-05
-**Status:** [x] DONE — locale và wording test file chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 8 tests requirement-trace-locale-coverage.test.ts (gồm quét từ cấm))
 
 ## Context
 
@@ -26,3 +26,7 @@
 ## Rủi ro
 
 - Dịch cần duyệt; kiểm cụm cấm ở locale khác là thủ công.
+
+## Ghi chú triển khai (2026-10-07)
+
+38 khoá locale năm ngôn ngữ.

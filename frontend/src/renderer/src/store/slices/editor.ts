@@ -340,6 +340,15 @@ function resolveDiffRuntimeEnvironmentId(
   return getRuntimeEnvironmentIdForWorktree(state, worktreeId) ?? undefined
 }
 
+/** Review-lens request to scroll a diff tab to a line; consumed by DiffViewer (never persisted). */
+export type PendingDiffReveal = {
+  fileId: string
+  line: number
+  side: 'original' | 'modified'
+  /** Distinguishes repeated requests for the same line. */
+  nonce: number
+}
+
 export type PendingEditorReveal = {
   filePath: string
   fileId?: string
@@ -739,6 +748,8 @@ export type EditorSlice = {
   // Editor navigation (for search result → go-to-line)
   pendingEditorReveal: PendingEditorReveal | null
   setPendingEditorReveal: (reveal: PendingEditorReveal | null) => void
+  pendingDiffReveal: PendingDiffReveal | null
+  setPendingDiffReveal: (reveal: PendingDiffReveal | null) => void
 
   // Session hydration — restore editor files from persisted workspace session
   hydrateEditorSession: (
@@ -4162,6 +4173,8 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
   // Editor navigation
   pendingEditorReveal: null,
   setPendingEditorReveal: (reveal) => set({ pendingEditorReveal: reveal }),
+  pendingDiffReveal: null,
+  setPendingDiffReveal: (reveal) => set({ pendingDiffReveal: reveal }),
 
   activateMarkdownLink: async (rawHref, ctx) => {
     const initialState = get()

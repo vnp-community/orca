@@ -5,7 +5,9 @@
 **Area:** frontend / request / plan + task
 **File:** `frontend/src/renderer/src/components/request/plan/{RequestPlanTab,PlanStates}.tsx` (mới); `components/request/RequestDetailPane.tsx` (sửa: cắm tab); `store/slices/request.ts` (sửa: `executionGateByTaskId`, `setTaskExecutionGates`); `components/task/TaskDetail.tsx` (sửa quanh dòng 123-125); test cùng tên và `TaskDetail.test.tsx`
 **Depends on:** FE-REQ-TASK-021-03, 021-04, 018-04
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest RequestPlanTab.test.tsx (12), TaskDetail-execution-gate (2), slices/request-execution-gates (1) pass; oxlint+tsc clean)
+
+**Ghi chú:** tab đã được 019 mount trong `RequestDetailPane`. Tab trả `null` khi flow `plan==="none"`. Gate chỉ có khi tab đã mở (backend vẫn chặn).
 
 ## Context
 

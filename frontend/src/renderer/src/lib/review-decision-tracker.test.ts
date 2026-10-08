@@ -1,133 +1,89 @@
-/**
- * review-decision-tracker.test.ts — FE-CV-TASK-095-04
- */
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+const trackDecision = vi.hoisted(() => vi.fn())
+vi.mock('./review-telemetry', () => ({ trackReviewDecisionMade: trackDecision }))
+
 import {
-  registerCompletion,
-  noteReviewOpened,
   decide,
-  _resetTrackerForTest,
+  hasPendingTurn,
+  noteReviewOpened,
+  registerCompletion,
+  resetReviewDecisionTracker
 } from './review-decision-tracker'
 
-vi.mock('./telemetry', () => ({ track: vi.fn() }))
-vi.mock('./review-telemetry', () => ({
-  bucketDwellMs: vi.fn((ms: number) => (ms < 5000 ? '<5s' : '>=5s')),
-  bucketLarge: vi.fn((n: number) => String(n)),
-  trackReviewQualityGateViewed: vi.fn(),
-}))
-
-import { track } from './telemetry'
-import { trackReviewQualityGateViewed } from './review-telemetry'
-
-const mockTrack = track as ReturnType<typeof vi.fn>
-const mockGateViewed = trackReviewQualityGateViewed as ReturnType<typeof vi.fn>
+const ctx = { gate: 'warn', openFindings: 3 } as const
 
 beforeEach(() => {
-  _resetTrackerForTest()
-  mockTrack.mockClear()
-  mockGateViewed.mockClear()
-  vi.useFakeTimers()
+  resetReviewDecisionTracker()
+  trackDecision.mockClear()
 })
 
-afterEach(() => {
-  vi.useRealTimers()
-})
-
-describe('registerCompletion', () => {
-  it('registers a new entry without emitting', () => {
-    registerCompletion('fp1')
-    expect(mockTrack).not.toHaveBeenCalled()
+describe('review decision tracker', () => {
+  it('registering a turn emits nothing', () => {
+    registerCompletion('w1', 0)
+    expect(trackDecision).not.toHaveBeenCalled()
+    expect(hasPendingTurn('w1')).toBe(true)
   })
 
-  it('abandon-emits prior undecided entry when re-registered', async () => {
-    registerCompletion('fp1')
-    registerCompletion('fp1') // second call: abandons first
-    await Promise.resolve()
-    const calls = mockTrack.mock.calls
-    expect(calls.some(([event]: [string]) => event === 'review_decision')).toBe(true)
-    const [, payload] = calls.find(([event]: [string]) => event === 'review_decision')!
-    expect(payload.outcome).toBe('abandon')
+  it('emits exactly one decision with latency, gate and findings', () => {
+    registerCompletion('w1', 1000)
+    decide('w1', 'commit', ctx, 1000 + 90_000)
+    expect(trackDecision).toHaveBeenCalledTimes(1)
+    expect(trackDecision).toHaveBeenCalledWith({
+      decision: 'commit',
+      latencyMs: 90_000,
+      usedReview: false,
+      gate: 'warn',
+      openFindings: 3
+    })
+    expect(hasPendingTurn('w1')).toBe(false)
   })
 
-  it('does not abandon if previous entry was already decided', async () => {
-    registerCompletion('fp1')
-    decide('fp1', 'commit')
-    await Promise.resolve()
-    mockTrack.mockClear()
-    registerCompletion('fp1') // second call: prior already decided
-    await Promise.resolve()
-    // No new abandon event
-    expect(mockTrack.mock.calls.filter(([e]: [string]) => e === 'review_decision').length).toBe(0)
-  })
-})
-
-describe('noteReviewOpened', () => {
-  it('does nothing for unknown fingerprint', () => {
-    expect(() => noteReviewOpened('unknown-fp')).not.toThrow()
+  it('ignores a second decision for the same turn', () => {
+    registerCompletion('w1', 0)
+    decide('w1', 'commit', ctx, 10)
+    decide('w1', 'create_review', ctx, 20)
+    expect(trackDecision).toHaveBeenCalledTimes(1)
   })
 
-  it('records reviewOpenedAt once', () => {
-    registerCompletion('fp1')
-    vi.advanceTimersByTime(1000)
-    noteReviewOpened('fp1')
-    vi.advanceTimersByTime(1000)
-    noteReviewOpened('fp1') // second call ignored
-    // Should not throw; verify decide still works
-    expect(() => decide('fp1', 'commit')).not.toThrow()
-  })
-})
-
-describe('decide', () => {
-  it('emits decision event with correct outcome', async () => {
-    registerCompletion('fp1')
-    decide('fp1', 'commit')
-    await Promise.resolve()
-    const [, payload] = mockTrack.mock.calls.find(([e]: [string]) => e === 'review_decision')!
-    expect(payload.outcome).toBe('commit')
-    expect(payload.worktree_fingerprint).toBe('fp1')
+  it('ignores decisions when no agent turn is pending (no event for manual commits)', () => {
+    decide('w1', 'commit', ctx, 10)
+    expect(trackDecision).not.toHaveBeenCalled()
   })
 
-  it('used_review=false when review not opened', async () => {
-    registerCompletion('fp1')
-    decide('fp1', 'no_action')
-    await Promise.resolve()
-    const [, payload] = mockTrack.mock.calls.find(([e]: [string]) => e === 'review_decision')!
-    expect(payload.used_review).toBe(false)
+  it('records used_review once review was opened after the turn', () => {
+    registerCompletion('w1', 0)
+    noteReviewOpened('w1', 5)
+    noteReviewOpened('w1', 6_000_000) // second open does not change anything
+    decide('w1', 'mark_reviewed', ctx, 100)
+    expect(trackDecision.mock.calls[0][0]).toMatchObject({ usedReview: true, decision: 'mark_reviewed' })
   })
 
-  it('used_review=true when review opened', async () => {
-    registerCompletion('fp1')
-    noteReviewOpened('fp1')
-    decide('fp1', 'commit')
-    await Promise.resolve()
-    const [, payload] = mockTrack.mock.calls.find(([e]: [string]) => e === 'review_decision')!
-    expect(payload.used_review).toBe(true)
+  it('ignores review opens for worktrees without a pending turn', () => {
+    noteReviewOpened('w9')
+    registerCompletion('w9', 0)
+    decide('w9', 'commit', ctx, 1)
+    expect(trackDecision.mock.calls[0][0].usedReview).toBe(false)
   })
 
-  it('second decide is a no-op', async () => {
-    registerCompletion('fp1')
-    decide('fp1', 'commit')
-    await Promise.resolve()
-    mockTrack.mockClear()
-    decide('fp1', 'pr') // should be ignored
-    await Promise.resolve()
-    expect(mockTrack).not.toHaveBeenCalled()
+  it('a new turn replaces an undecided one and reports abandon for the old one', () => {
+    registerCompletion('w1', 0)
+    noteReviewOpened('w1', 1)
+    registerCompletion('w1', 50_000)
+    expect(trackDecision).toHaveBeenCalledTimes(1)
+    expect(trackDecision).toHaveBeenCalledWith({
+      decision: 'abandon', latencyMs: 50_000, usedReview: true, gate: 'none', openFindings: 0
+    })
+    decide('w1', 'commit', ctx, 60_000)
+    expect(trackDecision).toHaveBeenCalledTimes(2)
+    expect(trackDecision.mock.calls[1][0]).toMatchObject({ decision: 'commit', usedReview: false, latencyMs: 10_000 })
   })
 
-  it('emits gate viewed when gate result provided', async () => {
-    registerCompletion('fp1', { overallRisk: 'HIGH', openFindings: 3 })
-    decide('fp1', 'commit')
-    await Promise.resolve()
-    expect(mockGateViewed).toHaveBeenCalledOnce()
-    expect(mockGateViewed.mock.calls[0][0].overallRisk).toBe('HIGH')
-  })
-
-  it('gate=none when no gate result', async () => {
-    registerCompletion('fp1')
-    decide('fp1', 'no_action')
-    await Promise.resolve()
-    const [, payload] = mockTrack.mock.calls.find(([e]: [string]) => e === 'review_decision')!
-    expect(payload.gate).toBe('none')
+  it('keeps worktrees independent', () => {
+    registerCompletion('a', 0)
+    registerCompletion('b', 0)
+    decide('a', 'commit', ctx, 1)
+    expect(hasPendingTurn('b')).toBe(true)
+    expect(trackDecision).toHaveBeenCalledTimes(1)
   })
 })

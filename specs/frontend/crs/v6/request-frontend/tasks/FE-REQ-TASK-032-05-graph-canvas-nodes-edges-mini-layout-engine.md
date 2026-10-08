@@ -5,7 +5,7 @@
 **Area:** frontend / graph (canvas)
 **File:** `frontend/src/renderer/src/components/graph/{GraphCanvas,GraphNodeCard,GraphGroupNode,GraphEdgeLine,GraphMini}.tsx`, `graph-layout-engine.ts` (mới); test cùng tên
 **Depends on:** FE-REQ-TASK-032-01 (`RiskBadge`, `riskPresentation`), 032-03 (kiểu), 032-04 (hàm thuần); FE-REQ-TASK-032-02 khuyến nghị (dùng `useDocumentColorMode`)
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — vitest GraphCanvas (7), GraphNodeCard, GraphEdgeLine (2), GraphMini (3), graph-layout-engine (5) pass — thiếu: mức thu phóng ngữ nghĩa chưa áp vào hiển thị
 
 ## Context
 
@@ -75,3 +75,7 @@
 - Node lồng (`parentId`) khó hơn dự kiến; bản đầu dùng nhóm phẳng.
 - `GraphEdgeLine` với `EdgeLabelRenderer` có thể cần `pointer-events: none`; kiểm tay.
 - Cổng 2.000 node là đề xuất chưa đo; nếu vẽ chậm, hạ `VISIBLE_NODE_LIMIT` hoặc bật `onlyRenderVisibleElements` sớm hơn.
+
+## Ghi chú triển khai (2026-10-07)
+
+`levelForZoom` chạy (ref + debounce 100 ms, `data-zoom-level`) nhưng `collapseToLevel` chưa được dùng để vẽ lại nút theo cấp service/module; chưa đo hiệu năng 50/500/2000 node và bundle. `GraphMini` vẽ SVG thuần (không xyflow) và dùng `computeWaveLayout` đồng bộ. Nhóm đóng/mở bằng cách đưa thành viên vào `visible` (không lồng node).

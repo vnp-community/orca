@@ -1,6 +1,6 @@
 # FE-CV-SOL-054-structure-lens: Lens Cấu trúc (treemap SVG squarified + cây thư mục ảo hoá)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> ✅ Triển khai 2026-10-07: 6/6 task DONE (054-01..06). Test structure/* và i18n coverage xanh. Còn mở: `color-mix()` trong SVG ở Electron, hiệu năng kéo panel, câu hỏi 1-2 (BE).
 
 **CR:** [CR-CV-054](../../../../../../docs/crs/v7/review-frontend/CR-CV-054-structure-lens.md)
 **Area:** frontend (`components/review-map`, `hooks`)
@@ -109,3 +109,7 @@ Thứ tự: 054-01, 054-02, 054-03 song song → 054-04, 054-05 → 054-06.
 ## 12. Tham chiếu
 
 `/opt/repos/orca/docs/crs/v7/review-frontend/CR-CV-054-structure-lens.md`, `/opt/repos/orca/specs/backend-go/crs/v7/CONTRACT-codeintel-ui-api.md`, `/opt/repos/orca/frontend/src/renderer/src/components/status-bar/workspace-space-layout.ts`, `/opt/repos/orca/frontend/src/renderer/src/components/editor/CsvViewer.tsx`, `/opt/repos/orca/guides/STYLEGUIDE.md`.
+
+## 13. Ghi chú triển khai (2026-10-07)
+
+Xem ghi chú cuối `tasks/FE-CV-TASK-054-06-*.md` (sai lệch so với spec).

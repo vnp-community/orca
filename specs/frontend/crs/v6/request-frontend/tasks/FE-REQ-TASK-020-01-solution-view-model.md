@@ -5,8 +5,7 @@
 **Area:** frontend / request / solution
 **File:** `frontend/src/renderer/src/components/request/solution/solution-view-model.ts` (mới), test `solution-view-model.test.ts`
 **Depends on:** FE-REQ-TASK-018-01
-**Status:** [x] DONE
-
+**Status:** [x] DONE (verified 2026-10-08: components/request/solution 8 file, 103 test pass)
 ## Context
 
 - Kiểu `Solution`, `SolutionOption`, `Approval` ở `shared/request-types.ts` (018-01). Cổng theo README v6 3.4: `solution` (cho `solution` và `diagnosis`), `findings` (spike), `answer` (question), `hotfix` không cổng.

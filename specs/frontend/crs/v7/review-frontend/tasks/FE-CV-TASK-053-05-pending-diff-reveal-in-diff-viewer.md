@@ -5,7 +5,7 @@
 **Area:** frontend / editor
 **File:** `store/slices/editor.ts` (:740-741 mẫu), `components/editor/diff-viewer-props.ts`, `EditorContent.tsx` (:963-981 theo CR), `DiffViewer.tsx` (:166-245, :318-383), `components/editor/use-diff-line-reveal.ts` (mới), tests
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: editor/use-diff-line-reveal.test 3/3 pass; full components/editor suite 875 pass, 1 pre-existing unrelated fail MarkdownPreview.link-routing 'shell.openUrl')
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / task
 **File:** `frontend/src/shared/task-types.ts` (sửa: dòng 14, 24, 151), `frontend/src/shared/task-status-normalization.ts` (mới), `components/task/TaskBoardView.tsx` (dòng 11), `TaskDetail.tsx` (dòng 31), `TaskStatusBadge.tsx` (dòng 9), `TaskDAGView.tsx` (dòng 32), `hooks/useTasks.ts`, `hooks/useTask.ts`; test `task-status-normalization.test.ts`, `components/task/__tests__/{TaskBoardView,TaskStatusBadge,TaskDAGView,TaskDetail}.test.tsx`
 **Depends on:** không (không cần backend; có thể làm sớm nhất)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: task-status-normalization + components/task/__tests__ pass (19 files, 160 tests))
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + hooks
 **File:** `c4-container-default.ts`, `hooks/useC4Architecture.ts` (mới), `store/slices/review-ui.ts` (thêm `c4ContainerId`, `c4Drafts`), tests
 **Depends on:** FE-CV-TASK-050-13, FE-CV-TASK-051-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest c4-pure-models.test.ts, useC4Architecture.test.tsx 4/4, review-ui.test.ts 12/12)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - Hai lời gọi `architecture` nối tiếp qua SSH (~200 ms mỗi lần); chấp nhận.
+
+## Ghi chú triển khai (2026-10-07)
+
+`c4/c4-container-default.ts`, `hooks/useC4Architecture.ts` trên bộ tải chung mới `hooks/useCodeIntelViewLoad.ts` (gọi thẳng `callEnvelope`, cache LRU 24 theo worktree+method+tham số; không dùng `useCodeIntelQuery`). `review-ui.ts` thêm `c4ContainerId`, `c4Drafts` (≤8, ≤64 KiB, loại bản cũ nhất), `dataFlowId` + action; dọn khi xoá worktree nhờ khoá `reviewUiByWorktree` sẵn có.

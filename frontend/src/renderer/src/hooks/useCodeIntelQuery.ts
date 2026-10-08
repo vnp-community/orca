@@ -1,20 +1,25 @@
 /**
  * useCodeIntelQuery.ts — FE-CV-TASK-050-13
  *
- * Generic data-fetching hook for code-intel RPC calls.
- * Features:
- * - Cache-first reads (LRU via 050-10 slice)
- * - Auto-retry for TIMEOUT+inProgress up to 90s
- * - AbortController cleanup on unmount or param change
- * - Stale signal / applyNow pattern
- * - No-op when support !== 'enabled' or selector 'unsupported'
+ * The one data-fetching hook for code-intel views (lenses never call RPC themselves).
+ * - Cache-first reads (per-worktree LRU from the code-intel slice)
+ * - Envelope channels (`Env<...>` in the contract) return `data` + `meta` + `truncated`
+ * - `CODEINTEL_TIMEOUT {inProgress}` auto-retries up to 90 s; abort on unmount / param change
+ * - A plain `changed` push only sets `staleSignal`; `applyNow()` reloads. `resync` reloads at once
+ * - No-op unless support is 'enabled' and the worktree selector is addressable
  *
  * @module hooks/useCodeIntelQuery
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
-import type { CodeIntelSupportState } from '../store/slices/code-intel'
+import { useCodeIntelSelector } from '@/lib/code-intel-worktree-selector'
+import {
+  CODE_INTEL_ENVELOPE_METHODS,
+  toCodeIntelMethod
+} from '../../../shared/code-intel-rpc-methods'
+import type { CodeIntelEnvelope } from '../../../shared/code-intel-types'
+import type { CodeIntelErrorKind } from '../../../shared/code-intel-parsers'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,17 +28,24 @@ import type { CodeIntelSupportState } from '../store/slices/code-intel'
 export type CodeIntelQueryStatus = 'idle' | 'loading' | 'success' | 'error'
 
 export type CodeIntelQueryError = {
-  kind: string
+  kind: CodeIntelErrorKind
   code: string | null
   message: string
   retryable: boolean
+  /** Parsed error `data` (e.g. retryAfterMs, inProgress for CODEINTEL_TIMEOUT) */
+  data?: Record<string, unknown> | null
 }
+
+export type CodeIntelQueryMeta = Omit<CodeIntelEnvelope<unknown>, 'data'>
 
 export type CodeIntelQueryResult<T> = {
   data: T | null
+  /** Envelope metadata (etag, sources, nextPageToken...) for envelope channels, else null */
+  meta: CodeIntelQueryMeta | null
   status: CodeIntelQueryStatus
   error: CodeIntelQueryError | null
   stale: boolean
+  truncated: boolean
   staleSignal: boolean
   refetch: () => void
   applyNow: () => void
@@ -42,38 +54,72 @@ export type CodeIntelQueryResult<T> = {
 export type CodeIntelQueryOpts = {
   /** Disable the query (skip all calls) */
   enabled?: boolean
-  /** Scope key — included in cache key to avoid cross-scope collisions */
+  /** Scope key included in the cache key so different scopes never share entries */
   scopeKey?: string
-  /** Method to call */
+  /** Channel; `quality.trace` and `codeIntel.quality.trace` are equivalent */
   method: string
-  /** Params to pass */
   params: Record<string, unknown>
-  /** Parse / validate result shape */
+  /** Validate/shape the result; throwing yields error.kind 'tool-failed' */
   parseResult?: (raw: unknown) => unknown
 }
 
-type CallFn = (
+export type CodeIntelCallOutcome =
+  | { ok: true; result: unknown; meta?: CodeIntelQueryMeta | null }
+  | { ok: false; error: CodeIntelQueryError }
+
+export type CodeIntelCallFn = (
   worktreeId: string,
   method: string,
   params: Record<string, unknown>,
   signal: AbortSignal,
   environmentId: string | null
-) => Promise<{ ok: true; result: unknown } | { ok: false; error: CodeIntelQueryError }>
+) => Promise<CodeIntelCallOutcome>
+
+type CachedEntry = { data: unknown; meta: CodeIntelQueryMeta | null }
 
 // ---------------------------------------------------------------------------
-// Retry constants
+// Constants and helpers
 // ---------------------------------------------------------------------------
 
-const MAX_RETRY_DURATION_MS = 90_000
-const DEFAULT_RETRY_DELAY_MS = 3_000
+export const MAX_RETRY_DURATION_MS = 90_000
+export const DEFAULT_RETRY_DELAY_MS = 3_000
 
-// ---------------------------------------------------------------------------
-// Cache key builder
-// ---------------------------------------------------------------------------
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {return `[${value.map(stableStringify).join(',')}]`}
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`
+  }
+  return JSON.stringify(value) ?? 'null'
+}
 
-function buildCacheKey(method: string, params: Record<string, unknown>, scopeKey?: string): string {
-  const paramsKey = JSON.stringify(params, Object.keys(params).sort())
-  return scopeKey ? `${method}|${scopeKey}|${paramsKey}` : `${method}|${paramsKey}`
+export function buildCodeIntelCacheKey(
+  method: string,
+  params: Record<string, unknown>,
+  scopeKey?: string
+): string {
+  return `${toCodeIntelMethod(method)}|${scopeKey ?? ''}|${stableStringify(params)}`
+}
+
+export async function defaultCodeIntelCall(
+  worktreeId: string,
+  method: string,
+  params: Record<string, unknown>,
+  signal: AbortSignal,
+  environmentId: string | null
+): Promise<CodeIntelCallOutcome> {
+  // Lazy import keeps the client (and the store it reads) out of this module's load graph.
+  const { getCodeIntelClient } = await import('../runtime/code-intel-client')
+  const client = getCodeIntelClient()
+  if (CODE_INTEL_ENVELOPE_METHODS.has(method)) {
+    const res = await client.callEnvelope(worktreeId, method, params, (d) => d, { environmentId, signal })
+    if (!res.ok) {return res}
+    const { data, ...meta } = res.envelope
+    return { ok: true, result: data, meta }
+  }
+  return client.call(worktreeId, method, params, { environmentId, signal })
 }
 
 // ---------------------------------------------------------------------------
@@ -84,162 +130,146 @@ export function useCodeIntelQuery<T = unknown>(
   worktreeId: string | null,
   environmentId: string | null,
   opts: CodeIntelQueryOpts,
-  callFn?: CallFn
+  callFn: CodeIntelCallFn = defaultCodeIntelCall
 ): CodeIntelQueryResult<T> {
-  const { enabled = true, scopeKey, method, params, parseResult } = opts
+  const { enabled = true, scopeKey, params, parseResult } = opts
+  const method = toCodeIntelMethod(opts.method)
 
-  const supportState = useAppStore((s) => {
-    const state = s as Record<string, unknown>
-    return (state.codeIntelSupportState as CodeIntelSupportState | undefined)?.state ?? 'unknown'
-  })
-
-  const getCacheResult = useAppStore((s) => (s as Record<string, unknown>).getCacheResult as ((wt: string, key: string) => unknown) | undefined)
-  const setCacheResult = useAppStore((s) => (s as Record<string, unknown>).setCacheResult as ((wt: string, key: string, val: unknown) => void) | undefined)
-  const resyncCounter = useAppStore((s) => {
-    const state = s as Record<string, unknown>
-    return (state.codeIntelResyncCounter as number | undefined) ?? 0
-  })
+  const supportState = useAppStore((s) => s.codeIntelSupportState.state)
+  const resyncCounter = useAppStore((s) => s.codeIntelResyncCounter)
+  const worktreeStale = useAppStore((s) =>
+    worktreeId ? (s.codeIntelWorktreeState[worktreeId]?.stale ?? false) : false
+  )
+  const selector = useCodeIntelSelector(worktreeId ?? '')
 
   const [data, setData] = useState<T | null>(null)
+  const [meta, setMeta] = useState<CodeIntelQueryMeta | null>(null)
   const [status, setStatus] = useState<CodeIntelQueryStatus>('idle')
   const [error, setError] = useState<CodeIntelQueryError | null>(null)
-  const [staleSignal, setStaleSignal] = useState(false)
 
   const abortRef = useRef<AbortController | null>(null)
-  const retryStartRef = useRef<number>(0)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Latest values for the effect without re-running it on every render.
+  const paramsRef = useRef(params)
+  paramsRef.current = params
+  const parseRef = useRef(parseResult)
+  parseRef.current = parseResult
+  const callRef = useRef(callFn)
+  callRef.current = callFn
 
-  const isQueryEnabled = enabled && Boolean(worktreeId) && supportState === 'enabled'
-  const cacheKey = buildCacheKey(method, params, scopeKey)
+  const isQueryEnabled =
+    enabled && Boolean(worktreeId) && supportState === 'enabled' && selector.state === 'ready'
+  const cacheKey = buildCodeIntelCacheKey(method, params, scopeKey)
 
-  const executeQuery = useCallback(async (signal: AbortSignal) => {
-    if (!worktreeId || !isQueryEnabled) return
+  const execute = useCallback(
+    async (signal: AbortSignal, useCache: boolean): Promise<void> => {
+      if (!worktreeId) {return}
+      const store = useAppStore.getState()
 
-    // Check cache first
-    const cached = getCacheResult?.(worktreeId, cacheKey)
-    if (cached !== undefined) {
-      setData(cached as T)
-      setStatus('success')
-      setStaleSignal(false)
-      return
-    }
-
-    setStatus('loading')
-    retryStartRef.current = Date.now()
-
-    const doCall = async (): Promise<void> => {
-      if (signal.aborted) return
-
-      let callResult: { ok: true; result: unknown } | { ok: false; error: CodeIntelQueryError }
-
-      try {
-        if (callFn) {
-          callResult = await callFn(worktreeId, method, params, signal, environmentId)
-        } else {
-          const { getCodeIntelClient } = await import('../runtime/code-intel-client')
-          const client = getCodeIntelClient()
-          callResult = await client.call(worktreeId, method, params, { environmentId, signal })
-        }
-      } catch {
-        if (signal.aborted) return
-        setStatus('error')
-        setError({ kind: 'unknown', code: null, message: 'Unexpected error', retryable: false })
-        return
-      }
-
-      if (signal.aborted) return
-
-      if (!callResult.ok) {
-        const err = callResult.error
-
-        // Retry for timeout+inProgress within 90s
-        const isTimeoutRetryable =
-          (err.kind === 'unknown' || err.kind === 'rate_limited') &&
-          err.message.includes('inProgress') &&
-          Date.now() - retryStartRef.current < MAX_RETRY_DURATION_MS
-
-        if (isTimeoutRetryable) {
-          const retryAfterMs = extractRetryAfterMs(err.message) ?? DEFAULT_RETRY_DELAY_MS
-          retryTimerRef.current = setTimeout(() => void doCall(), retryAfterMs)
+      if (useCache) {
+        const cached = store.getCacheResult(worktreeId, cacheKey) as CachedEntry | undefined
+        if (cached !== undefined) {
+          setData(cached.data as T)
+          setMeta(cached.meta)
+          setStatus('success')
+          setError(null)
           return
         }
-
-        setStatus('error')
-        setError(err)
-        return
       }
 
-      const raw = callResult.result
-      let parsed: unknown = raw
-      if (parseResult) {
+      setStatus('loading')
+      const startedAt = Date.now()
+
+      const attempt = async (): Promise<void> => {
+        if (signal.aborted) {return}
+        let outcome: CodeIntelCallOutcome
         try {
-          parsed = parseResult(raw)
+          outcome = await callRef.current(worktreeId, method, paramsRef.current, signal, environmentId)
         } catch {
+          if (signal.aborted) {return}
           setStatus('error')
-          setError({ kind: 'tool_failed', code: null, message: 'Result shape mismatch', retryable: false })
+          setError({ kind: 'unknown', code: null, message: 'Unexpected error', retryable: false })
           return
         }
+        if (signal.aborted) {return}
+
+        if (!outcome.ok) {
+          const err = outcome.error
+          const canRetry =
+            err.kind === 'timeout' &&
+            err.data?.inProgress === true &&
+            Date.now() - startedAt < MAX_RETRY_DURATION_MS
+          if (canRetry) {
+            const delay =
+              typeof err.data?.retryAfterMs === 'number' ? err.data.retryAfterMs : DEFAULT_RETRY_DELAY_MS
+            retryTimerRef.current = setTimeout(() => void attempt(), delay)
+            return
+          }
+          setStatus('error')
+          setError(err)
+          return
+        }
+
+        let parsed: unknown = outcome.result
+        if (parseRef.current) {
+          try {
+            parsed = parseRef.current(outcome.result)
+          } catch {
+            setStatus('error')
+            setError({ kind: 'tool-failed', code: null, message: 'Result shape mismatch', retryable: false })
+            return
+          }
+        }
+
+        const entry: CachedEntry = { data: parsed, meta: outcome.meta ?? null }
+        useAppStore.getState().setCacheResult(worktreeId, cacheKey, entry)
+        useAppStore.getState().markCodeIntelWorktreeFresh(worktreeId)
+        setData(parsed as T)
+        setMeta(entry.meta)
+        setError(null)
+        setStatus('success')
       }
 
-      setCacheResult?.(worktreeId, cacheKey, parsed)
-      setData(parsed as T)
-      setStatus('success')
-      setError(null)
-      setStaleSignal(false)
-    }
-
-    await doCall()
-  }, [worktreeId, environmentId, method, cacheKey, isQueryEnabled, callFn, getCacheResult, setCacheResult])
+      await attempt()
+    },
+    [worktreeId, environmentId, method, cacheKey]
+  )
 
   useEffect(() => {
     if (!isQueryEnabled) {
       setStatus('idle')
       return
     }
-
-    abortRef.current?.abort()
-    if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
-
     const ctrl = new AbortController()
     abortRef.current = ctrl
-
-    void executeQuery(ctrl.signal)
-
+    void execute(ctrl.signal, true)
     return () => {
       ctrl.abort()
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+      if (retryTimerRef.current) {clearTimeout(retryTimerRef.current)}
     }
-  }, [isQueryEnabled, resyncCounter, cacheKey, executeQuery])
+    // resyncCounter forces a reload (the push stream bumps it on resync / reconnect).
+  }, [isQueryEnabled, resyncCounter, execute])
 
   const refetch = useCallback(() => {
-    if (!worktreeId || !isQueryEnabled) return
+    if (!isQueryEnabled) {return}
     abortRef.current?.abort()
+    if (retryTimerRef.current) {clearTimeout(retryTimerRef.current)}
     const ctrl = new AbortController()
     abortRef.current = ctrl
-    void executeQuery(ctrl.signal)
-  }, [worktreeId, isQueryEnabled, executeQuery])
+    void execute(ctrl.signal, false)
+  }, [isQueryEnabled, execute])
 
-  const applyNow = useCallback(() => {
-    setStaleSignal(false)
-    refetch()
-  }, [refetch])
+  const staleSignal = worktreeStale && status === 'success'
 
   return {
     data,
+    meta,
     status,
     error,
-    stale: staleSignal,
+    stale: staleSignal || meta?.stale === true,
+    truncated: meta?.truncated === true,
     staleSignal,
     refetch,
-    applyNow
+    applyNow: refetch
   }
-}
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function extractRetryAfterMs(message: string): number | null {
-  const match = message.match(/"retryAfterMs"\s*:\s*(\d+)/)
-  return match ? parseInt(match[1], 10) : null
 }

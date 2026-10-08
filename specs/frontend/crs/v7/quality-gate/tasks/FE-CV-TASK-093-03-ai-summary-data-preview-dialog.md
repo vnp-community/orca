@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/ai-summary/AiSummaryDataPreviewDialog.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-093-02
-**Status:** [x] DONE — `AiSummaryDataPreviewDialog.tsx` chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 6 tests)
 
 ## Context
 
@@ -29,3 +29,7 @@
 ## Rủi ro
 
 - Đường dẫn trong manifest hiển thị thuần.
+
+## Ghi chú triển khai (2026-10-07)
+
+Focus mặc định vào Hủy.

@@ -1,6 +1,6 @@
 # FE-CV-SOL-050-review-tab-wiring: Loại tab `review`, `ensureReviewTab`, vị trí tab group, token `--review-*`, i18n
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ khảo sát `frontend/src`; chưa chạy build, test hay ứng dụng.
+> Trạng thái (2026-10-07): 15-20: 4 DONE, 2 PARTIAL (17,18). Lệch: hằng kênh/kiểu/mã lỗi ban đầu không khớp CONTRACT-codeintel-ui-api và đã được viết lại theo hợp đồng.
 
 **CR:** [CR-CV-050](../../../../../../docs/crs/v7/review-frontend/CR-CV-050-review-frontend-foundation.md) (phần 2.8, 2.9, 2.10 và quyết định tab ở README feature)
 **Area:** frontend (`frontend/src/shared`, `frontend/src/renderer/src/{store,components/tab-group,components/tab-bar,lib,hooks,i18n,assets}`)

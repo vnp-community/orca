@@ -209,6 +209,14 @@ export type Approval = {
   /** Used for optimistic-update conflict detection */
   version?: number
   expiresAt?: string
+  /** Approval deadline (CONTRACT `dueAt`); the inbox sorts and flags overdue rows by it. */
+  dueAt?: string
+  /** Who raised the approval; 'system' when the state machine did. */
+  requestedBy?: string
+  /** Wire subject type before aliasing (findings/answer/task_list/request_type are folded in subjectType). */
+  rawSubjectType?: string
+  /** Approval stage when the backend names one (e.g. `drift_review` for plan-drift phase approvals). */
+  stage?: string
   createdAt: string
   updatedAt: string
 }

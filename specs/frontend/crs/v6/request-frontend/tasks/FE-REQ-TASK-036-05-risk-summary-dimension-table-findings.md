@@ -5,7 +5,7 @@
 **Area:** frontend / request / impact
 **File:** `frontend/src/renderer/src/components/request/impact/{RiskSummaryCard,SolutionDimensionTable,ImpactFindingList,ImpactEvidenceSheet}.tsx`, `impact-dimension-model.ts` (mới); `components/request/solution/SolutionOptionCard.tsx`, `SolutionComparisonTable.tsx` (sửa, FE-REQ-TASK-020-02/020-03); test cùng tên
 **Depends on:** FE-REQ-TASK-032-01 (`RiskBadge`), 032-05 (`GraphMini`), 032-06 (`GraphPanel`), FE-REQ-TASK-036-01, 036-02; FE-REQ-TASK-020-02, 020-03
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — vitest impact/impact-dimension-model (6), impact-components (10), SolutionImpactSection (3) pass — thiếu: nút "Xem đồ thị" trên thẻ, gộp hàng Effort/Quay lui, GraphPanel cho finding
 
 ## Context
 
@@ -68,3 +68,7 @@
 - Độ tin cậy tối đa `medium` ở Option: không gán nhãn "Cao" cho độ tin cậy khi backend đã cắt.
 - Bảng nhiều cột trên màn hẹp: cuộn ngang; mobile mặc định danh sách phát hiện (chưa kiểm tra).
 - `SolutionOptionCard` và `SolutionComparisonTable` do 020 sở hữu: chỉ thêm khối mới, không đổi hành vi chọn.
+
+## Ghi chú triển khai (2026-10-07)
+
+`RiskSummaryCard`, `SolutionDimensionTable`, `ImpactFindingList`, `ImpactEvidenceSheet` xong; `SolutionImpactSection` gắn dưới `SolutionOptionCompare` (cho option đang chọn) thay vì trong từng `SolutionOptionCard` (thẻ là `button role=radio`, không lồng điều khiển). `ImpactFindingList.onViewOnGraph` có nhưng chưa nối với `GraphPanel`. `SolutionDimensionTable` chỉ hiện 9 chiều tác động (Effort/Quay lui vẫn ở `SolutionComparisonTable`). Nút kết nối dev server chỉ hiện khi truyền `onConnectDevServer`.

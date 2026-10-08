@@ -2021,6 +2021,11 @@ function Terminal(): React.JSX.Element | null {
                 ? (useAppStore.getState().getActiveTab(renderedActiveWorktreeId)?.id ?? null)
                 : null
             }
+            activeReviewTabId={
+              activeTabType === 'review' && renderedActiveWorktreeId
+                ? (useAppStore.getState().getActiveTab(renderedActiveWorktreeId)?.id ?? null)
+                : null
+            }
             activeTabType={activeTabType}
             onActivateFile={(fileId) => {
               const unifiedTabs =
@@ -2029,6 +2034,11 @@ function Terminal(): React.JSX.Element | null {
               if (unifiedTab?.contentType === 'simulator') {
                 setActiveTab(fileId)
                 setActiveTabType('simulator')
+                return
+              }
+              if (unifiedTab?.contentType === 'review') {
+                setActiveTab(fileId)
+                setActiveTabType('review')
                 return
               }
               setActiveFile(fileId)
@@ -2125,7 +2135,8 @@ function Terminal(): React.JSX.Element | null {
               // as a fallback until another surface is ready.
               (activeTabType === 'editor' && worktreeFiles.length > 0) ||
               (activeTabType === 'browser' && worktreeBrowserTabs.length > 0) ||
-              activeTabType === 'simulator'
+              activeTabType === 'simulator' ||
+              activeTabType === 'review'
                 ? 'hidden'
                 : ''
             }`}

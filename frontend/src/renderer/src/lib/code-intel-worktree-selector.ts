@@ -10,6 +10,7 @@
  * @module lib/code-intel-worktree-selector
  */
 
+import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'
 import type { AppState } from '@/store/types'
@@ -42,7 +43,7 @@ export type CodeIntelSelector =
  * O-1: projectId is required on the worktree (or its repo); absence → no-project.
  */
 export function resolveCodeIntelSelector(
-  state: Pick<AppState, 'worktrees' | 'repos' | 'preflightStatus'>,
+  state: Pick<AppState, 'worktreesByRepo' | 'repos'>,
   rawWorktreeId: string
 ): CodeIntelSelector {
   // Strip legacy 'id:' prefix if present
@@ -60,7 +61,10 @@ export function resolveCodeIntelSelector(
   }
 
   // Find the worktree
-  const worktree = state.worktrees.find((wt) => wt.id === worktreeId)
+  // Why: the store indexes worktrees by repo, there is no flat list.
+  const worktree = Object.values(state.worktreesByRepo ?? {})
+    .flat()
+    .find((wt) => wt.id === worktreeId)
   if (!worktree) {
     return { state: 'unsupported', reason: 'unknown-worktree' }
   }
@@ -74,7 +78,7 @@ export function resolveCodeIntelSelector(
   }
 
   // Resolve environment id (null means local execution)
-  const environmentId = getRuntimeEnvironmentIdForWorktree(state as AppState, worktreeId)
+  const environmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
 
   return {
     state: 'ready',
@@ -102,12 +106,19 @@ const SENTINELS: Record<string, CodeIntelSelector> = {
  * The returned object reference is stable for unsupported states.
  */
 export function useCodeIntelSelector(worktreeId: string): CodeIntelSelector {
-  return useAppStore((state) => {
+  // Why: Zustand v5 treats a fresh object per call as a changed snapshot (render loop), so select
+  // a primitive key and rebuild the object with useMemo.
+  const key = useAppStore((state) => {
     const result = resolveCodeIntelSelector(state, worktreeId)
-    if (result.state === 'unsupported') {
-      // Return sentinel to avoid new object on every render
-      return SENTINELS[result.reason] ?? result
-    }
-    return result
+    return result.state === 'ready'
+      ? JSON.stringify([result.worktreeId, result.projectId, result.environmentId])
+      : `!${result.reason}`
   })
+  return useMemo((): CodeIntelSelector => {
+    if (key.startsWith('!')) {
+      return SENTINELS[key.slice(1)]
+    }
+    const [id, projectId, environmentId] = JSON.parse(key) as [string, string, string | null]
+    return { state: 'ready', worktreeId: id, projectId, environmentId }
+  }, [key])
 }

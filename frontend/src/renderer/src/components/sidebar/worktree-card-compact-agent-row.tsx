@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, ScanSearch } from 'lucide-react'
 import { AgentStateDot, agentStateLabel } from '@/components/AgentStateDot'
 import type { DashboardAgentRow as DashboardAgentRowData } from '@/components/dashboard/useDashboardData'
 import { AgentIcon } from '@/lib/agent-catalog'
@@ -99,6 +99,9 @@ type CompactAgentRowProps = {
   isFocusedPane?: boolean
   hideIdentityIcon?: boolean
   cacheTimerActive?: boolean
+  /** Opens Review for this finished agent's worktree; omitted => no Review button. */
+  onReview?: (agent: DashboardAgentRowData) => void
+  isUnvisited?: boolean
 }
 
 export const CompactAgentRow = React.memo(function CompactAgentRow({
@@ -114,7 +117,9 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
   reserveDisclosureGutter = false,
   isFocusedPane = false,
   hideIdentityIcon = false,
-  cacheTimerActive = true
+  cacheTimerActive = true,
+  onReview,
+  isUnvisited = false
 }: CompactAgentRowProps) {
   const hasChildDisclosure =
     typeof childAgentCount === 'number' &&
@@ -159,6 +164,26 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
       }
     },
     [agent.paneKey, onSendTargetClick, sendTargetStatus]
+  )
+  const showReview =
+    onReview !== undefined &&
+    !sendTargetStatus &&
+    agent.state === 'done' &&
+    agent.rowSource !== 'subagent'
+  const reviewLabel =
+    agent.entry.interrupted === true
+      ? translate(
+          'auto.components.reviewMap.EntryButton.interrupted',
+          'Review changes (agent was interrupted)'
+        )
+      : translate('auto.components.reviewMap.EntryButton.label', 'Review changes')
+  const handleReview = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      onReview?.(agent)
+    },
+    [agent, onReview]
   )
   const handleToggleChildren = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -227,6 +252,24 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
         >
           +{childAgentCount}
         </span>
+      )}
+      {showReview && (
+        <button
+          type="button"
+          className={cn(
+            'compact-agent-review-button flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-worktree-sidebar-ring',
+            !isUnvisited &&
+              'can-hover:opacity-0 group-hover/compact-agent-row:opacity-100 focus-visible:opacity-100'
+          )}
+          aria-label={reviewLabel}
+          title={reviewLabel}
+          onClick={handleReview}
+          onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={stopActivationKeyPropagation}
+          data-agent-review-button
+        >
+          <ScanSearch className="size-3" aria-hidden />
+        </button>
       )}
       {cacheTimer && <CacheTimer startedAt={cacheTimer.startedAt} ttlMs={cacheTimer.ttlMs} />}
       {shortTime && (

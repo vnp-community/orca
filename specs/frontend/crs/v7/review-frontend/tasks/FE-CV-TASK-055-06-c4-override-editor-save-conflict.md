@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `C4OverrideEditor.tsx` (mới), `hooks/useC4Override.ts` (mới), tests
 **Depends on:** FE-CV-TASK-055-05, 055-02, FE-CV-TASK-050-07
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest C4OverrideEditor.test.tsx 9/9, hooks/useC4Override.test.tsx 6/6)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Ngữ nghĩa YAML (đổi tên/gộp/ẩn) chưa có schema (O-12).
+
+## Ghi chú triển khai (2026-10-07)
+
+`c4/C4OverrideEditor.tsx` + `hooks/useC4Override.ts`. Xác nhận xoá/ghi đè làm inline (không `useConfirmationDialog`, tránh phụ thuộc provider): "Ghi đè" cần bấm xác nhận lần hai (destructive). `not-found` của `c4.get` được coi là bản ghi `version:0`. Chưa kiểm tay trên Electron/SSH; không chặn `Tab` (không xử lý riêng). Phím Ctrl/Cmd+Enter lưu.

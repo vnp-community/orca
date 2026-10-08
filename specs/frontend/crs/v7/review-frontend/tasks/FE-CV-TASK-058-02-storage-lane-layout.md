@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/storage/storage-layout.ts` (mới) + `storage-layout.test.ts`
 **Depends on:** FE-CV-TASK-058-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: storage/storage-pure.test.ts 15/15 PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Số cạnh dày (nhiều service dùng chung một kho) vẫn có thể cắt nhau; chấp nhận ở MVP.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tạo `storage/storage-layout.ts` (`layoutStorageLanes`); hỗ trợ `filter`, làn rỗng không chiếm chỗ, barycenter theo hàng xóm ở làn service. Test nằm chung trong `storage-pure.test.ts`.

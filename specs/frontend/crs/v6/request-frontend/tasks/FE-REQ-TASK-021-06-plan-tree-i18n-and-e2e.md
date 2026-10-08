@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + e2e
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `frontend/src/renderer/src/i18n/request-locale-coverage.test.ts` (sửa), `tests/e2e/request-plan-tree.spec.ts` (mới), `docs/ui/pages/requests.md` và `docs/ui/pages/tasks.md` (sửa: công tắc Plan/Phase)
 **Depends on:** FE-REQ-TASK-021-01 đến 021-05
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — i18n 47 khoá x 5 locale + `plan-locale-coverage.test.ts` pass; e2e `tests/e2e/request-plan-tree.spec.ts` viết nhưng `test.skip` (cần backend/mock WS, chưa chạy); chưa cập nhật `docs/ui/pages/{requests,tasks}.md` (file chưa tồn tại); bản dịch cần người bản ngữ review
 
 ## Context
 

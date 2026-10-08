@@ -5,7 +5,7 @@
 **Area:** frontend / request / clarification
 **File:** `frontend/src/renderer/src/components/request/clarification/{ClarificationPanel,ClarificationQuestionList,ClarificationQuestionField,ClarificationDeadlineNote}.tsx`, `clarification-answer-validation.ts` (mới); `components/request/RequestDetailPane.tsx`, `RequestStageTimeline.tsx`, `RequestDetailHeader.tsx` (sửa, FE-REQ-TASK-019-03); test cùng tên
 **Depends on:** FE-REQ-TASK-036-01, 036-02; FE-REQ-TASK-019-01 (`RequestStageTimeline`), 019-03 (`RequestDetailPane`)
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — vitest clarification/ClarificationPanel (9), clarification-answer-validation (8) pass — thiếu: nút "Trả lời" ở header, bộ lọc "Chờ bổ sung", định vị bước theo `resumeStatus`
 
 ## Context
 
@@ -75,3 +75,7 @@
 - `RequestStageTimeline` và `RequestListToolbar` do 019 sở hữu: chỉ thêm đúng dòng cần thiết, tránh xung đột.
 - Tên người trả lời có thể không có (chỉ id); không tự tra cứu thêm để khỏi thêm N+1.
 - Mọi chuỗi UI qua i18n; không emoji.
+
+## Ghi chú triển khai (2026-10-07)
+
+`ClarificationPanel` gắn vào `RequestDetailPane`; `RequestStageTimeline` chỉ thêm dòng "Đang chờ bổ sung thông tin" (bước hiện tại vẫn là `analysis` theo `STATUS_TO_CURRENT_STEP`, chưa dùng `resumeStatus`). Chưa thêm nút "Trả lời" vào `RequestDetailHeader` và bộ lọc nhanh vào `RequestListToolbar`. Tên người được chỉ định chưa có (chỉ id) nên dùng dòng chung.

@@ -5,7 +5,7 @@
 **Area:** mobile / session (hàm thuần)
 **File:** `mobile/src/session/mobile-review-summary-rpc.ts` (mới) + `mobile-review-summary-rpc.test.ts`
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest mobile-review-summary-rpc.test.ts 8/8 PASS; oxlint clean)
 
 ## Context
 
@@ -29,3 +29,8 @@
 ## Rủi ro
 
 - Lệch hình dạng với host cài sau; sửa ở một file.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Test chạy bằng `npx vitest run --config <cấu hình tạm>` từ `desktop/` vì `mobile/` chưa cài phụ thuộc (tsconfig kế thừa `expo/tsconfig.base.json` không tìm thấy). Lệnh `pnpm --dir mobile test` chưa kiểm chứng được.
+- Sai lệch: `startLine` ≤ 0 bị bỏ; mục thiếu `key` bị loại.

@@ -5,7 +5,7 @@
 **Area:** frontend / review shell
 **File:** sửa nhỏ `FindingsToolbar`/dock của FE-CV-SOL-059; `frontend/src/renderer/src/components/review-map/quality/findings/QualityFindingsDockSource.tsx` (mới); liên kết từ lens ("Xem {n} phát hiện") và từ `QualityGateReasonRow`
 **Depends on:** 087-12, 087-07; FE-CV-SOL-059, FE-CV-SOL-053
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: QualityFindingsDockPanel.test.tsx 4/4 pass; oxlint + tsc sạch)
 
 ## Context
 
@@ -32,3 +32,8 @@ Chuyển nguồn giữ bộ lọc từng nguồn; số đếm tách; `selectedFi
 ## Rủi ro
 
 - Khoá/hành vi `FindingsToolbar` của 059 có thể đổi: phối hợp khi 059 triển khai.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Sai lệch: dock thật dùng `registerReviewDockPanel` (mỗi nguồn một panel, không trộn) nên KHÔNG có ToggleGroup nguồn và KHÔNG sửa `FindingsToolbar`. Panel `quality-findings` (order 15, `requiresQuality`, nhãn "Checks") đăng ký trong `quality-lens-registration.tsx`. `ui.source` vẫn được lens đặt nhưng dock không có API mở panel từ ngoài.
+- Mở diff/mở tệp qua `quality-finding-open.ts` (chặn đường dẫn thoát worktree).

@@ -16,17 +16,17 @@
  * @module components/right-sidebar/source-control-quality-gate-notice
  */
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ShieldAlert,
   ShieldX,
-  ShieldCheck,
   HelpCircle,
   Loader2,
   ChevronRight,
   Play
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { translateCatalogKey } from '@/i18n/catalog-key-translate'
 import type { QualityGateNoticeViewModel } from './source-control-quality-gate-view-model'
 
 // ---------------------------------------------------------------------------
@@ -40,8 +40,8 @@ export type SourceControlQualityGateNoticeProps = {
   canRunChecks: boolean
   onRunChecks: () => void
   onOpenReason: (checkName: string) => void
-  /** i18n translate function */
-  translate: (key: string, params?: Record<string, unknown>) => string
+  /** Override for tests; defaults to the app i18n catalog. */
+  translate?: (key: string, params?: Record<string, unknown>) => string
   /** Git provider — affects copy ('pull request' vs 'merge request') */
   provider?: 'github' | 'gitlab' | 'other' | null
 }
@@ -56,7 +56,7 @@ function DelayedSpinner({ delayMs = 200 }: { delayMs?: number }) {
     const t = setTimeout(() => setVisible(true), delayMs)
     return () => clearTimeout(t)
   }, [delayMs])
-  if (!visible) return null
+  if (!visible) {return null}
   return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden />
 }
 
@@ -85,11 +85,11 @@ export function SourceControlQualityGateNotice({
   canRunChecks,
   onRunChecks,
   onOpenReason,
-  translate,
+  translate = translateCatalogKey,
   provider
 }: SourceControlQualityGateNoticeProps) {
   // pass → hidden
-  if (!viewModel.visible) return null
+  if (!viewModel.visible) {return null}
 
   const { severity, stale, unavailable, reasons, reasonCount } = viewModel
 
@@ -176,7 +176,6 @@ export function SourceControlQualityGateNotice({
             {translate('auto.components.right.sidebar.qualityGateNotice.runChecks')}
           </Button>
         )}
-        <ShieldCheck className="sr-only" aria-hidden />
       </div>
     </div>
   )

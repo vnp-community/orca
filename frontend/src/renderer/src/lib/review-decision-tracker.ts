@@ -1,151 +1,74 @@
 /**
  * review-decision-tracker.ts — FE-CV-TASK-095-04
  *
- * Tracks the "agent turn completed → user decision" lifecycle for telemetry.
- * State is in-memory only; not persisted across sessions.
- *
- * Lifecycle:
- *   1. registerCompletion(worktreeId) — agent turn finishes
- *   2. noteReviewOpened(worktreeId)   — user opens Review workspace
- *   3. decide(worktreeId, outcome)    — user commits, creates PR, etc.
- *
- * A new registerCompletion before decide() emits an "abandon" event for the
- * previous turn, then resets.
+ * Measures "agent finished -> what the user decided", one `review_decision_made` per
+ * turn. In memory only (lost on quit, which is acceptable): a new completion for the
+ * same worktree replaces the previous undecided one and reports it as `abandon`.
  *
  * @module lib/review-decision-tracker
  */
 
-import {
-  bucketDwellMs,
-  bucketLarge,
-  trackReviewQualityGateViewed,
-} from './review-telemetry'
+import { trackReviewDecisionMade } from './review-telemetry'
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+export type ReviewDecision = 'commit' | 'create_review' | 'send_to_agent' | 'mark_reviewed'
+export type ReviewDecisionGate = 'pass' | 'warn' | 'fail' | 'unknown' | 'none'
+export type ReviewDecisionContext = { gate: ReviewDecisionGate; openFindings: number }
 
-export type ReviewDecisionOutcome =
-  | 'commit'
-  | 'pr'
-  | 'no_action'
-  | 'abandon'
+type PendingTurn = { doneAt: number; reviewOpenedAt: number | null }
 
-export type GateResultForDecision = {
-  overallRisk: string
-  openFindings: number
-}
+const pending = new Map<string, PendingTurn>()
 
-type TrackerEntry = {
-  worktreeFingerprint: string
-  /** When the agent turn completed */
-  completedAt: number
-  /** When user opened Review (if they did) */
-  reviewOpenedAt: number | null
-  gateResult: GateResultForDecision | null
-  /** Whether this entry has already emitted a decision event */
-  decided: boolean
-}
-
-// ---------------------------------------------------------------------------
-// Module-level tracker state (not persisted)
-// ---------------------------------------------------------------------------
-
-const entries = new Map<string, TrackerEntry>()
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/**
- * Register that an agent turn completed for the given worktree.
- * If a prior entry exists and hasn't decided, emit an "abandon" event.
- */
-export function registerCompletion(
-  worktreeFingerprint: string,
-  gateResult?: GateResultForDecision
-): void {
-  const existing = entries.get(worktreeFingerprint)
-  if (existing && !existing.decided) {
-    _emitDecision(existing, 'abandon')
+export function registerCompletion(worktreeId: string, doneAt: number = Date.now()): void {
+  const previous = pending.get(worktreeId)
+  if (previous) {
+    emit(previous, 'abandon', { gate: 'none', openFindings: 0 }, doneAt)
   }
-
-  entries.set(worktreeFingerprint, {
-    worktreeFingerprint,
-    completedAt: Date.now(),
-    reviewOpenedAt: null,
-    gateResult: gateResult ?? null,
-    decided: false,
-  })
+  pending.set(worktreeId, { doneAt, reviewOpenedAt: null })
 }
 
-/**
- * Record that the user opened the Review workspace after an agent turn.
- */
-export function noteReviewOpened(worktreeFingerprint: string): void {
-  const entry = entries.get(worktreeFingerprint)
-  if (!entry || entry.decided) return
-  if (!entry.reviewOpenedAt) {
-    entry.reviewOpenedAt = Date.now()
+export function noteReviewOpened(worktreeId: string, at: number = Date.now()): void {
+  const turn = pending.get(worktreeId)
+  // Why: only the first open after the turn counts as "used review".
+  if (turn && turn.reviewOpenedAt === null) {
+    turn.reviewOpenedAt = at
   }
 }
 
-/**
- * Emit a decision event. Subsequent calls for the same entry are no-ops.
- */
+/** Emits exactly one decision for the pending turn; later calls (no pending turn) are ignored. */
 export function decide(
-  worktreeFingerprint: string,
-  outcome: Exclude<ReviewDecisionOutcome, 'abandon'>
+  worktreeId: string,
+  decision: ReviewDecision,
+  context: ReviewDecisionContext,
+  at: number = Date.now()
 ): void {
-  const entry = entries.get(worktreeFingerprint)
-  if (!entry || entry.decided) return
-  _emitDecision(entry, outcome)
+  const turn = pending.get(worktreeId)
+  if (!turn) {
+    return
+  }
+  pending.delete(worktreeId)
+  emit(turn, decision, context, at)
 }
 
-// ---------------------------------------------------------------------------
-// Internal emit
-// ---------------------------------------------------------------------------
-
-function _emitDecision(
-  entry: TrackerEntry,
-  outcome: ReviewDecisionOutcome
+function emit(
+  turn: PendingTurn,
+  decision: ReviewDecision | 'abandon',
+  context: ReviewDecisionContext,
+  at: number
 ): void {
-  entry.decided = true
-
-  const dwellMs = entry.reviewOpenedAt != null ? Date.now() - entry.reviewOpenedAt : 0
-  const latencyMs = Date.now() - entry.completedAt
-
-  // Emit gate viewed event (if gate data is available)
-  if (entry.gateResult) {
-    trackReviewQualityGateViewed({
-      worktreeFingerprint: entry.worktreeFingerprint,
-      overallRisk: entry.gateResult.overallRisk,
-    })
-  }
-
-  // Decision telemetry: coarse payload only
-  // NOTE: track() is fire-and-forget, never throws
-  void Promise.resolve().then(() => {
-    try {
-      const { track } = require('./telemetry') as { track: (event: string, payload: Record<string, unknown>) => void }
-      track('review_decision', {
-        worktree_fingerprint: entry.worktreeFingerprint,
-        outcome,
-        used_review: entry.reviewOpenedAt != null,
-        dwell_bucket: bucketDwellMs(dwellMs),
-        latency_bucket: bucketDwellMs(latencyMs),
-        open_findings: bucketLarge(entry.gateResult?.openFindings ?? 0),
-        gate: entry.gateResult?.overallRisk ?? 'none',
-      })
-    } catch {
-      // Telemetry failure is non-fatal
-    }
+  trackReviewDecisionMade({
+    decision,
+    latencyMs: at - turn.doneAt,
+    usedReview: turn.reviewOpenedAt !== null,
+    gate: context.gate,
+    openFindings: context.openFindings
   })
 }
 
-/**
- * Clear tracker state (for testing).
- */
-export function _resetTrackerForTest(): void {
-  entries.clear()
+export function hasPendingTurn(worktreeId: string): boolean {
+  return pending.has(worktreeId)
+}
+
+/** Test seam: clears all pending turns without emitting. */
+export function resetReviewDecisionTracker(): void {
+  pending.clear()
 }

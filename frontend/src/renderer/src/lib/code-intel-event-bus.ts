@@ -15,9 +15,26 @@
 export type CodeIntelPushEvent =
   | { event: 'changed'; worktreeId: string; reason?: string; resync?: boolean }
   | { event: 'reindexProgress'; worktreeId: string; percent: number | null; overall: string }
-  | { event: 'qualityProgress'; worktreeId: string; runId: string; percent: number | null }
-  | { event: 'qualityFinished'; worktreeId: string; runId: string; success: boolean; error: string | null }
-  | { event: 'gateChanged'; worktreeId: string; gate?: unknown }
+  | {
+      event: 'qualityProgress'
+      worktreeId: string
+      runId: string
+      percent: number | null
+      stage?: string
+      stepIndex?: number
+      stepCount?: number
+      message?: string
+    }
+  | {
+      event: 'qualityFinished'
+      worktreeId: string
+      runId: string
+      success: boolean
+      error: string | null
+      status?: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
+      headCommit?: string
+    }
+  | { event: 'gateChanged'; worktreeId: string; gate?: unknown; headCommit?: string; profile?: string }
 
 export type CodeIntelEventListener = (event: CodeIntelPushEvent) => void
 

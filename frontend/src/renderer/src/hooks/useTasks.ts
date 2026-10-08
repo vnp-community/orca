@@ -2,6 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
 import type { OrcaTask } from '../../../shared/task-types'
+import { normalizeTask } from '../../../shared/task-status-normalization'
+import { hidePlanningTasks, isPlanningTask } from '../../../shared/task-hierarchy'
 
 export function useTasks(projectId: string) {
   // Use Option B: flat filter since store doesn't have tasksByProject index yet.
@@ -23,6 +25,8 @@ export function useTasks(projectId: string) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [filterStatus, setFilterStatus] = useState<'all' | string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  // Plan/Phase nodes are structure, not work: hidden from Tree/Board/DAG unless toggled on.
+  const [showPlanningTasks, setShowPlanningTasks] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   // FE-TASK-001 (task-graph v4): bumped by refetch() to force the fetch effect below to
   // re-run — there is no other trigger for a manual reload (e.g. right after task.create).
@@ -65,7 +69,7 @@ export function useTasks(projectId: string) {
         if (typeof setTasks === 'function') {
           // Since our setTasks currently replaces all tasks in the store (as per Option B flat approach),
           // We only set the tasks for the current project for now. Real world we'd append or use tasksByProject
-          setTasks(response.tasks ?? [])
+          setTasks((response.tasks ?? []).map(normalizeTask))
         }
       })
       .catch(() => {
@@ -75,8 +79,9 @@ export function useTasks(projectId: string) {
   }, [projectId, setTasks, refetchTrigger])
 
   // Filter + search
+  const hasPlanningTasks = useMemo(() => allTasks.some(isPlanningTask), [allTasks])
   const filteredTasks = useMemo(() => {
-    return allTasks.filter((task) => {
+    const visible = allTasks.filter((task) => {
       if (filterStatus !== 'all' && task.status !== filterStatus) {
         return false
       }
@@ -86,7 +91,8 @@ export function useTasks(projectId: string) {
       }
       return true
     })
-  }, [allTasks, filterStatus, searchQuery])
+    return hidePlanningTasks(visible, allTasks, hasPlanningTasks && !showPlanningTasks)
+  }, [allTasks, filterStatus, searchQuery, hasPlanningTasks, showPlanningTasks])
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedNodes((prev) => {
@@ -134,6 +140,9 @@ export function useTasks(projectId: string) {
 
   return {
     filteredTasks,
+    hasPlanningTasks,
+    showPlanningTasks,
+    setShowPlanningTasks,
     expandedNodes,
     toggleExpanded,
     setActiveTask: setActiveTask ?? (() => {}),

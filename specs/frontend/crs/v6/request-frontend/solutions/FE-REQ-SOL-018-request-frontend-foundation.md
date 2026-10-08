@@ -1,6 +1,6 @@
 # FE-REQ-SOL-018: Nền frontend Request (kiểu, RPC, hook, store, định tuyến; gỡ `backlog`)
 
-> ✅ **Done.** Rà soát ngày 2026-10-07: tất cả 6 tasks đã implement. Files: `shared/request-types.ts`, `request-flow-registry.ts`, `request-rpc-methods.ts`, `request-errors.ts`, `request-wire-parsers.ts`, `task-status-normalization.ts`; `runtime/request-rpc-client.ts`; `lib/request-event-bus.ts`; hooks `useRequests`, `useRequest`, `useRequestActions`, `useSolutions`, `useApprovals`, `useBacklog`, `useRequestFlowSupport`, `useRequestSubscription`; `store/slices/request.ts`; components `RequestPage`, badges, `RequestUnsupportedNotice`, `SidebarRequestNavButton`. `task-types.ts` và `types.ts` đã sửa.
+> 🚧 **Mostly done.** Verified 2026-10-07: 018-01/02/04/06 DONE, 018-03 and 018-05 PARTIAL (useBacklog test/pagination -> 023-02; e2e request-page.spec.ts missing). Deviation: wire parsers/hooks accept both CR-016-draft and CONTRACT-request-ui-api shapes (`new` status, flat `sourceProvider`, `{request}`, `changes`/`at`, approval `id`, spawnChild `linkReason`/`typeHint`); useRequestSubscription now only listens to the bus, the single stream is owned by useRequestEvents.
 
 **CR:** [CR-REQ-018](../../../../../../docs/crs/v6/request-frontend/CR-REQ-018-request-frontend-foundation.md)
 **Area:** frontend (`frontend/src/shared`, `frontend/src/renderer/src`)

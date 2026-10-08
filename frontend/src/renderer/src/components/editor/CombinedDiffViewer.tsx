@@ -1959,6 +1959,8 @@ export default function CombinedDiffViewer({
                         settings={settings}
                         sectionHeight={sectionHeights[virtualItem.index]}
                         worktreeId={file.worktreeId}
+                        diffSource={file.diffSource}
+                        compareHeadOid={file.branchCompare?.headOid}
                         loadSection={loadSection}
                         retrySection={retrySection}
                         toggleSection={toggleSection}

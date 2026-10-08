@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/review-report-model-parser.ts` (mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 9 tests)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - `generatedFor` chưa có kiểu.
+
+## Ghi chú triển khai (2026-10-07)
+
+Viết lại theo `ReviewReportModel` hợp đồng 4.7 (bản cũ dùng mô hình tự bịa title/sections).

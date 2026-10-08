@@ -40,6 +40,22 @@ export type EffectiveParentEntry = {
   trail: string[]
 }
 
+function isInParentCycle(task: OrcaTask, byId: Map<string, OrcaTask>): boolean {
+  const seen = new Set<string>([task.id])
+  let cur = task.parentId ? byId.get(task.parentId) : undefined
+  while (cur) {
+    if (cur.id === task.id) {
+      return true
+    }
+    if (seen.has(cur.id)) {
+      return false
+    }
+    seen.add(cur.id)
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined
+  }
+  return false
+}
+
 /**
  * For each task in `tasks`, compute the effective parent id after
  * removing all plan/phase intermediate nodes.
@@ -53,12 +69,23 @@ export type EffectiveParentEntry = {
  */
 export function computeEffectiveParents(tasks: OrcaTask[]): Map<string, EffectiveParentEntry> {
   const byId = new Map<string, OrcaTask>()
-  for (const t of tasks) byId.set(t.id, t)
+  for (const t of tasks) {
+    byId.set(t.id, t)
+  }
 
   const result = new Map<string, EffectiveParentEntry>()
 
   for (const task of tasks) {
-    if (result.has(task.id)) continue // already resolved
+    if (result.has(task.id)) {
+      continue
+    } // already resolved
+
+    // A task that is its own ancestor is malformed data: surface it at root
+    // rather than hanging it under a node that hangs back under it.
+    if (isInParentCycle(task, byId)) {
+      result.set(task.id, { parentId: null, trail: [] })
+      continue
+    }
 
     // Walk up the ancestor chain to find first visible ancestor
     const visited = new Set<string>()
@@ -99,6 +126,47 @@ export function computeEffectiveParents(tasks: OrcaTask[]): Map<string, Effectiv
 }
 
 // ---------------------------------------------------------------------------
+// Hide plan/phase nodes from work views
+// ---------------------------------------------------------------------------
+
+/** A work task that remembers which Plan / Phase it was lifted out of. */
+export type TaskWithPlanPath = OrcaTask & { planPath?: string[] }
+
+/**
+ * Drop plan/phase nodes and re-parent their children onto the nearest visible
+ * ancestor. Returns the SAME array when there are no plan/phase nodes so
+ * projects that don't use Requests keep identical references and behavior.
+ */
+export function hidePlanningTasks(
+  visible: OrcaTask[],
+  allTasks: OrcaTask[],
+  hasPlanning: boolean
+): TaskWithPlanPath[] {
+  if (!hasPlanning) {
+    return visible
+  }
+  const effective = computeEffectiveParents(allTasks)
+  const out: TaskWithPlanPath[] = []
+  for (const t of visible) {
+    if (isPlanningTask(t)) {
+      continue
+    }
+    const entry = effective.get(t.id)
+    if (!entry || (entry.parentId === (t.parentId ?? null) && entry.trail.length === 0)) {
+      out.push(t)
+      continue
+    }
+    out.push({
+      ...t,
+      parentId: entry.parentId ?? undefined,
+      // trail is nearest-first; the chip reads Plan / Phase
+      planPath: entry.trail.length > 0 ? [...entry.trail].toReversed() : undefined
+    })
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
 // Plan subtree builder — CR-REQ-021-02
 // ---------------------------------------------------------------------------
 
@@ -128,7 +196,9 @@ export function buildPlanSubtree(tasks: OrcaTask[], planTaskId: string): PlanSub
   }
 
   const plan = byId.get(planTaskId) ?? null
-  if (!plan) return { plan: null, phases: [], tasksByPhase: {}, flatTasks: [] }
+  if (!plan) {
+    return { plan: null, phases: [], tasksByPhase: {}, flatTasks: [] }
+  }
 
   const phases: OrcaTask[] = []
   const tasksByPhase: Record<string, OrcaTask[]> = {}
@@ -138,7 +208,9 @@ export function buildPlanSubtree(tasks: OrcaTask[], planTaskId: string): PlanSub
   const directChildren = childrenOf.get(planTaskId) ?? []
 
   for (const child of directChildren) {
-    if (visited.has(child.id)) continue
+    if (visited.has(child.id)) {
+      continue
+    }
     visited.add(child.id)
 
     if (child.type === 'phase') {
@@ -151,7 +223,9 @@ export function buildPlanSubtree(tasks: OrcaTask[], planTaskId: string): PlanSub
         const curr = queue.shift()!
         const phaseChildren = childrenOf.get(curr.id) ?? []
         for (const pc of phaseChildren) {
-          if (visited.has(pc.id)) continue
+          if (visited.has(pc.id)) {
+            continue
+          }
           visited.add(pc.id)
           if (pc.type === 'phase') {
             phases.push(pc)

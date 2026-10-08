@@ -107,6 +107,9 @@ import {
 } from './settings-load-performance'
 import { translate } from '@/i18n/i18n'
 import { selectMcpSectionVisible } from '@/store/slices/mcp-slice'
+import { selectCodeIntelSettingsVisible } from '@/lib/code-intel-settings-visibility'
+import { CodeIntelSettingsCard } from './code-intel/CodeIntelSettingsCard'
+import { createCodeIntelSettingsApi } from './code-intel/code-intel-settings-api'
 import { McpPaneSkeleton } from './mcp/McpPaneSkeleton'
 import { getProjectHostSetupProjectionFromState } from '../../store/selectors'
 
@@ -285,6 +288,8 @@ function Settings(): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const isAdmin = useAppStore((s) => s.currentUser?.role === 'admin')
   const isMcpVisible = useAppStore(selectMcpSectionVisible)
+  const isCodeIntelVisible = useAppStore(selectCodeIntelSettingsVisible)
+  const codeIntelSettingsApi = useMemo(() => createCodeIntelSettingsApi(), [])
   const keybindings = useAppStore((s) => s.keybindings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const switchRuntimeEnvironment = useAppStore((s) => s.switchRuntimeEnvironment)
@@ -1631,6 +1636,25 @@ function Settings(): React.JSX.Element {
                       <Suspense fallback={<McpPaneSkeleton />}>
                         <McpPane />
                       </Suspense>
+                    ) : null}
+                  </SettingsSection>
+                ) : null}
+
+                {isCodeIntelVisible ? (
+                  <SettingsSection
+                    id="code-intel"
+                    title={translate(
+                      'auto.components.settings.Settings.codeIntelTitle',
+                      'Code intelligence'
+                    )}
+                    description={translate(
+                      'auto.components.settings.Settings.codeIntelDesc',
+                      'Turn code review maps and the quality gate on or off for your organization.'
+                    )}
+                    searchEntries={getSectionSearchEntries('code-intel')}
+                  >
+                    {isSectionMounted('code-intel') ? (
+                      <CodeIntelSettingsCard isAdmin={isAdmin} api={codeIntelSettingsApi} />
                     ) : null}
                   </SettingsSection>
                 ) : null}

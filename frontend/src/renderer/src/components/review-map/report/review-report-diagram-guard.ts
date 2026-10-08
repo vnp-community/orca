@@ -1,72 +1,34 @@
 /**
  * review-report-diagram-guard.ts — FE-CV-TASK-090-03
  *
- * Validates and sanitizes Mermaid diagram strings from the backend.
- * Returns null when the diagram is invalid or potentially unsafe.
- *
- * Safety rules:
- * - Max 8 KiB length
- * - Must start with a recognized Mermaid diagram type keyword
- * - No HTML tags, script tags, or onerror attributes
- * - No URL-encoded or unicode-escaped payloads (basic check)
+ * The backend returns Mermaid source; we only vet it before it goes into a Markdown
+ * fence or `mermaid.render`. Anything that could break out of the fence or smuggle
+ * HTML / init directives is rejected (the diagram's `alt[]` text is kept by callers).
  *
  * @module components/review-map/report/review-report-diagram-guard
  */
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
+export const MAX_MERMAID_BYTES = 6 * 1024
 
-const MAX_DIAGRAM_BYTES = 8 * 1024
+export type MermaidGuardResult =
+  | { ok: true; src: string }
+  | { ok: false; reason: 'too_large' | 'fence' | 'init_directive' | 'html' | 'control_chars' | 'empty' }
 
-/** Recognized Mermaid diagram type keywords (per Mermaid docs) */
-const VALID_DIAGRAM_TYPES = new Set([
-  'graph', 'flowchart', 'sequencediagram', 'classDiagram', 'statediagram',
-  'erDiagram', 'gantt', 'pie', 'gitgraph', 'mindmap', 'timeline',
-  'xychart', 'block', 'sankey', 'quadrantchart', 'requirementdiagram',
-  'c4diagram', 'journey'
-])
+// Control characters other than tab / newline / carriage return.
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/
+const FENCE = /(`{3,}|~{3,})/
+const INIT_DIRECTIVE = /%%\s*\{/
+const HTML_TAG = /<\s*\/?\s*[a-z!][^>]*>?/i
+const SCRIPT_URL = /javascript\s*:/i
 
-const HTML_TAG_PATTERN = /<[a-z][a-z0-9]*[\s>\/]/i
-const SCRIPT_PATTERN = /<script/i
-const ONERROR_PATTERN = /\bonerror\b/i
-const JAVASCRIPT_PATTERN = /javascript\s*:/i
-const PERCENT_ENCODED_HTML = /%3c%73%63%72%69%70%74/i // %3C%73...
-
-// ---------------------------------------------------------------------------
-// Guard
-// ---------------------------------------------------------------------------
-
-/**
- * Validate a Mermaid diagram string.
- * Returns the (trimmed) diagram if valid, null otherwise.
- */
-export function guardMermaidDiagram(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null
-  const trimmed = raw.trim()
-
-  if (!trimmed) return null
-
-  // Size check
-  if (new TextEncoder().encode(trimmed).length > MAX_DIAGRAM_BYTES) return null
-
-  // Must start with a recognized diagram type (case-insensitive on first word)
-  const firstToken = trimmed.split(/[\s\-({[]/)[0]?.toLowerCase()
-  if (!firstToken || !VALID_DIAGRAM_TYPES.has(firstToken)) return null
-
-  // Block HTML injection patterns
-  if (HTML_TAG_PATTERN.test(trimmed)) return null
-  if (SCRIPT_PATTERN.test(trimmed)) return null
-  if (ONERROR_PATTERN.test(trimmed)) return null
-  if (JAVASCRIPT_PATTERN.test(trimmed)) return null
-  if (PERCENT_ENCODED_HTML.test(trimmed)) return null
-
-  return trimmed
-}
-
-/**
- * Check if a string is a valid Mermaid diagram without modifying it.
- */
-export function isValidMermaidDiagram(raw: unknown): boolean {
-  return guardMermaidDiagram(raw) !== null
+export function guardMermaidSource(src: string): MermaidGuardResult {
+  const text = typeof src === 'string' ? src.trim() : ''
+  if (!text) {return { ok: false, reason: 'empty' }}
+  if (new TextEncoder().encode(text).length > MAX_MERMAID_BYTES) {return { ok: false, reason: 'too_large' }}
+  if (CONTROL_CHARS.test(text)) {return { ok: false, reason: 'control_chars' }}
+  if (FENCE.test(text)) {return { ok: false, reason: 'fence' }}
+  if (INIT_DIRECTIVE.test(text)) {return { ok: false, reason: 'init_directive' }}
+  if (HTML_TAG.test(text) || SCRIPT_URL.test(text)) {return { ok: false, reason: 'html' }}
+  return { ok: true, src: text }
 }

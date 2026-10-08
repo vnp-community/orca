@@ -5,17 +5,19 @@ import ja from './locales/ja.json'
 import ko from './locales/ko.json'
 import zh from './locales/zh.json'
 
-// Keys enumerated from agent-turn-verification-view-model.ts (089-05) i18n key mappings.
+// Keys enumerated from agent-turn-verification-view-model.ts (089-05) and AgentTurnVerificationLine.tsx (089-06).
 // Read-by-name, so this test prevents silent English fallbacks in non-English locales.
+const BASE = 'auto.components.reviewMap.turns.verification'
 const KEYS = [
-  'auto.components.reviewMap.turns.verification.agreement.verified',
-  'auto.components.reviewMap.turns.verification.agreement.unverified',
-  'auto.components.reviewMap.turns.verification.agreement.contradicted',
-  'auto.components.reviewMap.turns.verification.agreement.partial',
-  'auto.components.reviewMap.turns.verification.agreement.unknown',
-  'auto.components.reviewMap.turns.verification.basis.stated',
-  'auto.components.reviewMap.turns.verification.ranNothing',
-  'auto.components.reviewMap.turns.verification.ran',
+  ...['consistent', 'contradicted', 'unverified', 'unknown'].map((k) => `${BASE}.agreement.${k}`),
+  ...['tests_pass', 'tests_fail', 'lint_clean', 'typecheck_clean', 'build_ok', 'all_done', 'other'].map(
+    (k) => `${BASE}.kind.${k}`
+  ),
+  ...['tree_may_differ', 'no_run', 'run_failed'].map((k) => `${BASE}.reason.${k}`),
+  ...['test', 'lint', 'typecheck', 'build', 'install', 'git', 'other'].map((k) => `${BASE}.category.${k}`),
+  ...['basis.stated', 'ran', 'ranItemMany', 'ranMore', 'recordedNote', 'viewRun', 'runChecks'].map(
+    (k) => `${BASE}.${k}`
+  )
 ]
 
 const CATALOGS: Record<string, unknown> = { en, es, ja, ko, zh }

@@ -5,7 +5,7 @@
 **Area:** frontend / graph (panel)
 **File:** `frontend/src/renderer/src/components/graph/{GraphPanel,GraphToolbar,GraphLensChips,GraphViewToggle,GraphBeforeAfterToggle,GraphSearchButton,GraphLegend,GraphListView,GraphSearchPalette,GraphNodeSheet,GraphEmptyState,GraphErrorState,GraphSkeleton,GraphStatusBanner}.tsx` (mới); `graph-panel-state.ts` (mới, thuần); test cùng tên
 **Depends on:** FE-REQ-TASK-032-03, 032-04, 032-05; FE-REQ-TASK-018-03 (hook), 018-05 (shell)
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — vitest GraphPanel (6), graph-panel-state (8), GraphListView (4), GraphSearchPalette (2), GraphNodeSheet (2) pass — thiếu: nút kết nối dev server, cờ trình đọc màn hình
 
 ## Context
 
@@ -69,3 +69,7 @@
 - `GraphPanel` trong `Sheet` mặc định `mode='sheet'`: tiêu điểm phải bị giữ trong sheet (Radix lo), nhưng `/` toàn cục không được rò rỉ ra ngoài khi sheet đóng.
 - `impact.request` chạy bất đồng bộ (CR-030: khởi chạy, trả `assessmentId`); `GraphPanel` chỉ hiện "Đang chạy đánh giá" và chờ sự kiện, không tự lặp vô hạn.
 - Giữ file dưới ngưỡng `max-lines`; nếu `GraphPanel.tsx` vượt, tách hook `useGraphPanelState` thay vì thêm disable.
+
+## Ghi chú triển khai (2026-10-07)
+
+Chưa có nút "Kết nối dev server" ở trạng thái `noDevServer` (chưa tìm được điều hướng sẵn có); cờ trình đọc màn hình không tồn tại nên `initialView` bỏ qua tham số. Sai lệch: `unsupported` không trả `null` mà hiện trạng thái "chưa đánh giá" (không nút chạy) để vẫn dùng được lens `flow`; lens mặc định = `impact` nếu đã có đánh giá, ngược lại `flow` (không có tóm tắt các lens để `pickDefaultLens`). GraphToolbar gom chip lens, công tắc, tìm, chú giải vào một file.

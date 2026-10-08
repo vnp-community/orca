@@ -1,23 +1,13 @@
 /**
  * ai-summary-consent-state.ts — FE-CV-TASK-093-02
  *
- * Session-scoped consent tracking for AI summary generation.
- * No persistence — resets on reload.
- *
- * Per spec: consent is once per session AND once per level.
+ * Which data levels the user already agreed to send to the LLM provider in this
+ * session. In memory only: a reload asks again, and so does switching level.
  *
  * @module components/review-map/ai-summary/ai-summary-consent-state
  */
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type AiSummaryLevel = 'brief' | 'standard' | 'detailed'
-
-// ---------------------------------------------------------------------------
-// Session-scoped state
-// ---------------------------------------------------------------------------
+import type { AiSummaryLevel } from './ai-summary-wire-parser'
 
 const confirmedLevels = new Set<AiSummaryLevel>()
 
@@ -29,7 +19,6 @@ export function recordConsentForLevel(level: AiSummaryLevel): void {
   confirmedLevels.add(level)
 }
 
-/** For testing only */
-export function _resetConsentForTest(): void {
+export function resetAiSummaryConsent(): void {
   confirmedLevels.clear()
 }

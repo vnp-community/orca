@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/structure-treemap-layout.ts` (mới), test
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: structure/structure-treemap-layout.test 7/7 pass; reuses quality-charts `squarify`, status-bar bisecting layout not used)
 
 ## Context
 

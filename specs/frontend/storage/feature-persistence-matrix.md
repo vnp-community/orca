@@ -52,6 +52,7 @@ outside `slices/`.
 | `repos.ts` | Repo list (multi-host) | `window.api.repos.list()`, host-scoped; per-repo `executionHostId` via `getRuntimeTargetHostId` | `repos.ts:1336`, host logic `repos.ts:243-282` |
 | `diffComments.ts` | PR/diff review comments | Stored **inside worktree metadata**: local `window.api.worktrees.updateMeta`, remote `callRuntimeRpc('worktree.set', ...)`, via internal `persist()` on every add/edit/delete | `diffComments.ts:98-117` |
 | `editor.ts` | File open/edit/save, git push/pull/rebase from editor | Real disk/git I/O on active host via `runtime-git-client`/`runtime-file-client`: `fetchRuntimeGit`, `pushRuntimeGit`, `pullRuntimeGit`, `rebaseRuntimeGitFromBase`, `deleteRuntimePath` | `editor.ts:50-62,4239` |
+| `review-progress.ts` | Review reading progress (which changed files the reviewer marked read) | Persisted in the backend only via `codeIntel.reviewState.get` / `codeIntel.reviewState.save` (`expectedVersion`, LWW merge by `at`, debounce 800 ms); deliberately NOT mirrored to localStorage (cleared on logout) | `store/slices/review-progress.ts` |
 | `hosted-review.ts` | Hosted PR/MR review creation | `window.api.hostedReview.*`: `getCreationEligibility`, `create`, `forBranch` on explicit action | `hosted-review.ts:262,288,368` |
 | `github.ts` | GitHub issues/PRs/projects | **Mixed**: live data via `window.api.gh.*` (proxies GitHub's own API — GitHub is source of truth) + local cache `window.api.cache.setGitHub/getGitHub` | `github.ts:390,412,1746,2123-2525,2909` |
 

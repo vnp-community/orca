@@ -135,6 +135,7 @@ type TabBarProps = {
   activeFileId?: string | null
   activeBrowserTabId?: string | null
   activeSimulatorTabId?: string | null
+  activeReviewTabId?: string | null
   activeTabType?: WorkspaceVisibleTabType
   onActivateFile?: (fileId: string) => void
   onCloseFile?: (fileId: string) => void
@@ -179,6 +180,13 @@ type TabItem =
       isPinned: boolean
       data: Tab
     }
+  | {
+      type: 'review'
+      id: string
+      unifiedTabId: string
+      isPinned: boolean
+      data: Tab
+    }
 
 function getTabDragLabel(item: TabItem, generatedTitlesEnabled: boolean): string {
   if (item.type === 'terminal') {
@@ -189,6 +197,9 @@ function getTabDragLabel(item: TabItem, generatedTitlesEnabled: boolean): string
   }
   if (item.type === 'simulator') {
     return item.data.label || 'Mobile Emulator'
+  }
+  if (item.type === 'review') {
+    return item.data.label || translate('auto.lib.ensure.review.tab.title', 'Review')
   }
   return getEditorDisplayLabel(item.data)
 }
@@ -260,6 +271,7 @@ function TabBarInner({
   activeFileId,
   activeBrowserTabId,
   activeSimulatorTabId,
+  activeReviewTabId,
   activeTabType,
   onActivateFile,
   onCloseFile,
@@ -865,6 +877,14 @@ function TabBarInner({
     [unifiedTabs, resolvedGroupId]
   )
 
+  const reviewTabIds = useMemo(
+    () =>
+      (unifiedTabs ?? [])
+        .filter((t) => t.groupId === resolvedGroupId && t.contentType === 'review')
+        .map((t) => t.id),
+    [unifiedTabs, resolvedGroupId]
+  )
+
   // Build the unified ordered list, reconciling stored order with current items
   const orderedItems = useMemo(() => {
     const ids = reconcileTabOrder(
@@ -872,7 +892,8 @@ function TabBarInner({
       terminalIds,
       editorFileIds,
       browserTabIds,
-      simulatorTabIds
+      simulatorTabIds,
+      reviewTabIds
     )
     const items: TabItem[] = []
     for (const id of ids) {
@@ -923,6 +944,16 @@ function TabBarInner({
         })
         continue
       }
+      if (simUnified && simUnified.contentType === 'review') {
+        items.push({
+          type: 'review',
+          id,
+          unifiedTabId: simUnified.id,
+          isPinned: simUnified.isPinned === true,
+          data: simUnified
+        })
+        continue
+      }
     }
     return items
   }, [
@@ -931,6 +962,7 @@ function TabBarInner({
     editorFileIds,
     browserTabIds,
     simulatorTabIds,
+    reviewTabIds,
     terminalMap,
     editorMap,
     browserMap,
@@ -965,6 +997,9 @@ function TabBarInner({
       if (item.type === 'simulator') {
         return activeTabType === 'simulator' && item.id === activeSimulatorTabId
       }
+      if (item.type === 'review') {
+        return activeTabType === 'review' && item.id === activeReviewTabId
+      }
       return (
         (activeTabType === 'editor' || activeTabType === 'simulator') && activeFileId === item.id
       )
@@ -973,6 +1008,7 @@ function TabBarInner({
   }, [
     activeBrowserTabId,
     activeFileId,
+    activeReviewTabId,
     activeSimulatorTabId,
     activeTabId,
     activeTabType,
@@ -1198,6 +1234,41 @@ function TabBarInner({
                     key={item.id}
                     file={simFile}
                     isActive={activeTabType === 'simulator' && item.id === activeSimulatorTabId}
+                    isPinned={item.isPinned}
+                    hasTabsToRight={index < orderedItems.length - 1}
+                    statusByRelativePath={statusByRelativePath}
+                    onActivate={() => onActivateFile?.(item.id)}
+                    onClose={() => onCloseFile?.(item.id)}
+                    onCloseToRight={() => onCloseToRight(item.id)}
+                    onCloseAll={() => onCloseAllFiles?.()}
+                    onMakePermanent={() => {}}
+                    onTogglePin={() => togglePinned(item)}
+                    dragData={dragData}
+                    dropIndicator={dropIndicatorByVisibleId.get(item.id) ?? null}
+                    includeTopTabBorder={includeTopTabBorder}
+                  />
+                )
+              }
+              if (item.type === 'review') {
+                // Why: like simulator, the review tab reuses EditorFileTab chrome with a
+                // synthetic file; language 'review' selects the ScanSearch icon.
+                const reviewLabel = item.data.label || translate('auto.lib.ensure.review.tab.title', 'Review')
+                const reviewFile: OpenFile & { tabId: string } = {
+                  id: item.id,
+                  tabId: item.id,
+                  filePath: reviewLabel,
+                  relativePath: reviewLabel,
+                  worktreeId,
+                  language: 'review',
+                  isPreview: false,
+                  isDirty: false,
+                  mode: 'edit'
+                }
+                return (
+                  <EditorFileTab
+                    key={item.id}
+                    file={reviewFile}
+                    isActive={activeTabType === 'review' && item.id === activeReviewTabId}
                     isPinned={item.isPinned}
                     hasTabsToRight={index < orderedItems.length - 1}
                     statusByRelativePath={statusByRelativePath}

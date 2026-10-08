@@ -61,7 +61,7 @@ export const CHILD_REQUEST_RULES: Partial<Record<Exclude<RequestType, 'unknown'>
 // ---------------------------------------------------------------------------
 
 export function isLowConfidence(confidence: number | undefined): boolean {
-  if (confidence === undefined) return true
+  if (confidence === undefined) {return true}
   return confidence < LOW_CONFIDENCE_THRESHOLD
 }
 
@@ -118,16 +118,18 @@ export function buildStageTimeline({ type, size, status, returnedFromStage }: Bu
     const returnedStep = returnedFromStage ? RETURNED_STAGE_TO_STEP[returnedFromStage] : null
     currentStepId = returnedStep ?? 'classification'
   } else if (status === 'cancelled') {
-    currentStepId = STATUS_TO_CURRENT_STEP[status] ?? null
+    // Why: the wire carries no "stage at cancel" except returnedFromStage; fall back to the first step.
+    const cancelledAt = returnedFromStage ? RETURNED_STAGE_TO_STEP[returnedFromStage] : null
+    currentStepId = cancelledAt ?? 'classification'
   } else {
     currentStepId = STATUS_TO_CURRENT_STEP[status] ?? null
   }
 
   // Build ordered steps
   const stepOrder: StepId[] = ['classification']
-  if (includeAnalysis) stepOrder.push('analysis')
-  if (includePlan) stepOrder.push('plan')
-  if (includePhase) stepOrder.push('phase')
+  if (includeAnalysis) {stepOrder.push('analysis')}
+  if (includePlan) {stepOrder.push('plan')}
+  if (includePhase) {stepOrder.push('phase')}
   stepOrder.push('execution')
 
   const currentIndex = currentStepId !== null ? stepOrder.indexOf(currentStepId) : -1

@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `frontend/src/renderer/src/i18n/quality-gate-notice-locale-coverage.test.ts` (mới)
 **Depends on:** FE-CV-TASK-085-02, 085-04
-**Status:** [x] DONE — `quality-gate-notice-locale-coverage.test.ts` chưa tồn tại. i18n keys `qualityGateNotice` đã có trong `en.json` (dữ liệu nguồn). Cần tạo file test và thêm 4 locale còn lại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 5 tests quality-gate-notice-locale-coverage.test.ts + 7 notice tests)
 
 ## Context
 

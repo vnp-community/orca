@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/useRovingListKeys.ts` (mới), test `.test.tsx`
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: useRovingListKeys.test 7 cases)
 
 ## Context
 

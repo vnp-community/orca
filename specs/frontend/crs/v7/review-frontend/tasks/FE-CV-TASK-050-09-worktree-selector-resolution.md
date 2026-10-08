@@ -5,7 +5,7 @@
 **Area:** frontend / renderer lib
 **File:** `frontend/src/renderer/src/lib/code-intel-worktree-selector.ts` (mới), test `code-intel-worktree-selector.test.ts`
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: selector.test 8 pass; resolver fixed to use worktreesByRepo (state.worktrees never existed); useCodeIntelSelector returns a stable reference)
 
 ## Context
 

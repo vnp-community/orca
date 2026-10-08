@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/data-flow-mermaid.ts` (mới), test
 **Depends on:** FE-CV-TASK-050-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest data-flow-mermaid.test.ts 12/12)
 
 ## Context
 
@@ -28,3 +28,7 @@
 ## Rủi ro
 
 - Thực thể `#59;` chưa chạy trên bản cài.
+
+## Ghi chú triển khai (2026-10-07)
+
+`dataflow/data-flow-mermaid.ts`. `escapeMermaidLabel` thoát một lượt bằng bảng thực thể (`#35; #59; #37; #lt; #gt; #quot; #96;`), bỏ ký tự điều khiển/U+2028/2029/NEL, cắt 48 ký tự trước khi thoát. Tiền tố "đổi" là tham số `changedPrefix` (UI truyền chuỗi đã dịch). CHƯA kiểm tay hiển thị thực thể `#59;` trên Mermaid 11.15 (test chuỗi không chứng minh).

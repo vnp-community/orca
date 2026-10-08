@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks + store
 **File:** `frontend/src/renderer/src/hooks/useCodeIntelErd.ts` (mới) + test; `frontend/src/renderer/src/store/slices/code-intel.ts` (sửa nhỏ: khoá `selectedErdTable`, `erdService`, `erdServiceHistory` và action `selectErdTable`, `setErdService`, `goBackErdService`); `frontend/src/renderer/src/store/slices/*worktree-purge*.test.ts` (mẫu rò rỉ)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelQuery`, `CODE_INTEL_WORKTREE_KEYED_STATE_KEYS`, `store-test-helpers.ts`); G4 fake backend (FE-CV-TASK-073-02) hoặc mock `codeIntelClient.call`
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: useCodeIntelErd.test.tsx 6/6 + review-ui*.test.ts PASS, tsc/oxlint sạch)
 
 ## Context
 
@@ -36,3 +36,9 @@
 ## Rủi ro
 
 - `projectId` (O-1) phải có; nếu SOL-050 trả `null` thì hook giữ `idle` và lens hiện "chưa gắn dự án".
+
+## Ghi chú triển khai (2026-10-07)
+
+- Tạo `hooks/useCodeIntelErd.ts` (+ test). Dùng `useCodeIntelQuery(worktreeId, environmentId, opts, callFn)` (chữ ký thật khác bản trong spec); hook nhận `callFn` tuỳ chọn để test.
+- Sai lệch: khoá `erdService`, `erdServiceHistory`, `selectedErdTable` và action `setErdService`/`goBackErdService`/`selectErdTable` đặt trong **`store/slices/review-ui.ts`** (trường tuỳ chọn của `ReviewUiState`, như `c4ContainerId`) thay vì `code-intel.ts`: slice này đã được dọn ở cả `removeWorktree` và `buildWorktreePurgeState` và đã có test rò rỉ (`review-ui-worktree-removal-leak`, `review-ui-bulk-purge-leak`), nên không cần thêm vào `CODE_INTEL_WORKTREE_KEYED_STATE_KEYS`. Test mới: `store/slices/review-ui-erd-storage.test.ts`.
+- Dữ liệu mô hình bị ẩn (null) trong lúc tải service khác; `changed` push chỉ bật `isStale`.

@@ -5,7 +5,7 @@
 **Area:** frontend / editor
 **File:** `frontend/src/renderer/src/components/editor/DiffViewer.tsx`, `DiffSectionItem.tsx` (sửa: mỗi file một lời gọi hook), `frontend/src/renderer/src/assets/main.css` (lớp `.orca-quality-glyph-*`), công tắc "Chú thích kiểm tra" (nơi đặt: thanh công cụ diff hoặc lens; chốt khi đọc code)
 **Depends on:** 087-10, FE-CV-TASK-088-01
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — DiffViewer và DiffSectionItem đã gắn (QualityAnnotationStrip.test + ChangesModeView.test + toàn bộ test thư mục editor pass, trừ 1 test MarkdownPreview có sẵn lỗi); `MonacoEditor` (soạn thảo thường) CHƯA gắn theo đúng sai lệch #5 của solution (MVP)
 
 ## Context
 
@@ -32,3 +32,9 @@ Test `DiffViewer`/`DiffSectionItem` hiện có phải xanh; test mới: hook đ�
 ## Rủi ro
 
 - Truyền `diffSource` qua nhiều tầng có thể chạm `EditorContent` (file lớn); ưu tiên selector từ store nếu có.
+
+## Ghi chú triển khai (2026-10-07)
+
+- Mỗi file chỉ thêm một lời gọi hook + prop `diffSource`/`compareHeadOid` + `QualityAnnotationStrip` (công tắc `annotationsOn` và ghi chú ẩn/lệch). Để `DiffSectionItem.tsx` không vượt 400 dòng, tách logic dọn model Monaco có sẵn sang `useDiffSectionModelDisposal.ts` (nguyên văn, không đổi hành vi).
+- CSS `.orca-quality-glyph-*` trong `main.css`. GitNexus impact: DiffViewer/DiffSectionItem/MonacoEditor đều LOW.
+- Chưa làm: gắn `MonacoEditor` (plain editor); kiểm tay sáng/tối.

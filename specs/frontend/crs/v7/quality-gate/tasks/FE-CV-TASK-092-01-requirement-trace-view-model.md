@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/requirements/requirement-trace-view-model.ts` (mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `RequirementTrace`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 16 tests)
 
 ## Context
 
@@ -30,3 +30,7 @@
 ## Rủi ro
 
 - Thứ tự nhóm cần người dùng xác nhận.
+
+## Ghi chú triển khai (2026-10-07)
+
+Viết lại theo `RequirementTrace` hợp đồng; inferred-only => "no evidence" + gợi ý, `unknown` != `no_evidence`.

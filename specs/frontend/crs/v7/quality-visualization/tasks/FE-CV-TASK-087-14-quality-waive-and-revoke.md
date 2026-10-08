@@ -5,7 +5,7 @@
 **Area:** frontend / components + hook
 **File:** `frontend/src/renderer/src/components/review-map/quality/findings/QualityWaivePopover.tsx`, `quality-waive-expiry-options.ts`; `hooks/useQualityWaive.ts` (mới) và `*.test.ts(x)`
 **Depends on:** 087-12, 087-02
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: QualityWaivePopover.test.tsx + quality-waive-expiry-options.test.ts, 14/14 pass; oxlint + tsc sạch)
 
 ## Context
 
@@ -32,3 +32,7 @@ Bắt buộc lý do/hạn; kẹp 30 ngày; lạc quan + hoàn nguyên; `Mod+Ente
 ## Rủi ro
 
 - `scope` mặc định của backend chưa rõ; không gửi.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `useQualityWaive`: lạc quan + hoàn nguyên, khoá đồng bộ chống bấm đúp, revoke thật, không gửi `scope`. Toast chỉ xác nhận thoáng.

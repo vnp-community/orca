@@ -5,7 +5,7 @@
 **Area:** frontend / request / solution
 **File:** `frontend/src/renderer/src/components/request/solution/SolutionOptionCompare.tsx`, `SolutionOptionCard.tsx`, `SolutionComparisonTable.tsx` (mới); test cùng tên
 **Depends on:** FE-REQ-TASK-020-01, 020-02
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: SolutionOptionCompare.test.tsx pass, tsc/oxlint sạch)
 
 ## Context
 
@@ -37,3 +37,7 @@
 
 - Số tiêu chí chung của phương án phụ thuộc schema chưa chốt.
 - Màn hẹp: bảng cuộn ngang trong khung (`scrollbar-sleek` theo `check-styled-scrollbars`, kiểm quy ước ở `guides/STYLEGUIDE.md`).
+
+## Ghi chú triển khai (2026-10-07)
+
+- Cards dùng container query (`@container`, `@xl`, `@4xl`); `risk`/`recommended` đọc từ `option.raw` (parser đặt `raw.recommended` từ `recommendation`).

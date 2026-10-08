@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-tool-use-command-summarizer.ts` (mới) + test
 **Depends on:** FE-CV-TASK-089-01 (kiểu `AgentTurnCommandsSummary`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 16 tests)
 
 ## Context
 
@@ -31,3 +31,7 @@
 ## Rủi ro
 
 - Đếm có thể lệch (chưa kiểm chứng ping hook).
+
+## Ghi chú triển khai (2026-10-07)
+
+Viết lại: allowlist sub-command (không rò `echo <secret>`), dạng `commandsSummary` đúng hợp đồng 4.7 (`v:1`, `count`), collector theo paneKey.

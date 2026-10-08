@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/lib/review-telemetry.ts` (mới) + test
 **Depends on:** FE-CV-TASK-095-01
-**Status:** [x] DONE — `review-telemetry-wrappers.ts` và buckets chưa tồn tại. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: 34 tests review-telemetry.test.ts)
 
 ## Context
 
@@ -29,3 +29,7 @@
 ## Rủi ro
 
 - Ánh xạ `tool` cần cập nhật khi thêm công cụ.
+
+## Ghi chú triển khai (2026-10-07)
+
+Tám wrapper + bucket; payload kiểm bằng schema thật.

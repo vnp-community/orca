@@ -1,6 +1,7 @@
 # FE-CV-SOL-088: Nền đồ hoạ chất lượng (token, mã hoá không chỉ dựa vào màu, primitive biểu đồ tự viết SVG)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ khảo sát code `frontend/src`; chưa chạy test, build hay ứng dụng. Các con số tương phản đã **tính lại độc lập bằng script đọc-chỉ** (không phải công cụ a11y), khớp bảng của CR.
+> ✅ Implemented & verified 2026-10-07: 088-01..09 DONE (25 file / 165 test PASS; oxlint sạch ở file mới; tsc không thêm lỗi). Sai lệch ghi ở mục "Ghi chú triển khai" của từng task. Bản đề xuất gốc:
+> 📋 Proposed. Viết ngày 2026-10-06 từ khảo sát code `frontend/src`; chưa chạy test, build hay ứng dụng. Các con số tương phản đã **tính lại độc lập bằng script đọc-chỉ** (không phải công cụ a11y), khớp bảng của CR.
 
 **CR:** [CR-CV-088](../../../../../../docs/crs/v7/quality-visualization/CR-CV-088-graphics-foundation-and-chart-primitives.md)
 **Area:** frontend (`frontend/src/renderer/src/assets/main.css`, `components/quality-charts/`, `test-support/`, `i18n/`)

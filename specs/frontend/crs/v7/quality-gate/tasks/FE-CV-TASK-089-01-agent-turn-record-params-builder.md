@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-turn-record-params.ts`, `frontend/src/renderer/src/lib/agent-turn-digest.ts` (đều mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `AgentTurn`)
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: 10 + 3 tests (agent-turn-record-params.test.ts, agent-turn-digest.test.ts))
 
 ## Context
 
@@ -33,3 +33,7 @@
 ## Rủi ro
 
 - Digest trên prompt đã cắt 200 ký tự.
+
+## Ghi chú triển khai (2026-10-07)
+
+Viết lại theo hợp đồng 3.2 (camelCase, endHeadCommit, treeDirtyEnd, promptDigest, filesChangedCount...); bản cũ dùng tên trường tự đặt và hash FNV giả. sha256 dùng lib/sha256.ts.

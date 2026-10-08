@@ -344,6 +344,11 @@
           "tab": {
             "372d21d428": "手机模拟器"
           }
+        },
+        "review": {
+          "tab": {
+            "title": "代码审查"
+          }
         }
       },
       "fix": {
@@ -698,7 +703,9 @@
         "devSearchKeywordToast": "toast",
         "devSearchKeywordSonner": "sonner",
         "devSearchKeywordError": "error",
-        "devSearchKeywordNotification": "notification"
+        "devSearchKeywordNotification": "notification",
+        "codeIntelTitle": "代码智能",
+        "codeIntelDesc": "为您的组织开启或关闭代码评审图和质量门禁。"
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "粘贴内容过大。"
@@ -6384,7 +6391,9 @@
           "2309068a6f": "destructive",
           "65358016ea": "放弃",
           "dev": "开发工具",
-          "devDescription": "仅用于调试 UI 状态的开发工具。"
+          "devDescription": "仅用于调试 UI 状态的开发工具。",
+          "codeIntelTitle": "代码智能",
+          "codeIntelDesc": "为您的组织开启或关闭代码评审图和质量门禁。"
         },
         "SettingsFormControls": {
           "42a4d15a30": "没有匹配的字体。",
@@ -12783,6 +12792,26 @@
         "GenerateAgentPromptButton": {
           "confirmReplace": "要用生成的提示词替换当前提示词吗？",
           "label": "使用 AI 生成"
+        },
+        "TaskGraph": {
+          "showPlanning": "显示计划/阶段"
+        },
+        "TaskDetail": {
+          "phaseNotApproved": "运行此任务前请先批准阶段或计划"
+        },
+        "TaskDAGView": {
+          "status": {
+            "done": "已完成",
+            "in_progress": "进行中",
+            "blocked": "已阻塞",
+            "review": "评审中",
+            "open": "待办",
+            "cancelled": "已取消"
+          }
+        },
+        "TaskBoardView": {
+          "backlogMoved": "尚未开始的任务位于 请求 > 待办",
+          "openBacklog": "打开待办"
         }
       },
       "taskPageEmptyState": {
@@ -13038,7 +13067,8 @@
             "requests": "请求",
             "approvals": "审批",
             "backlog": "待办"
-          }
+          },
+          "close": "关闭请求页面"
         },
         "RequestUnsupportedNotice": {
           "title": "不支持请求管理",
@@ -13047,6 +13077,2667 @@
         "SidebarRequestNavButton": {
           "label": "请求",
           "badge": "待审批"
+        },
+        "RequestType": {
+          "bug": {
+            "label": "缺陷",
+            "description": "某处出错,需要修复。"
+          },
+          "task": {
+            "label": "任务",
+            "description": "定义明确的工作项。"
+          },
+          "docs": {
+            "label": "文档",
+            "description": "编写或更新文档。"
+          },
+          "question": {
+            "label": "问题",
+            "description": "需要答复,而不是修改代码。"
+          },
+          "hotfix": {
+            "label": "热修复",
+            "description": "走快速通道的紧急生产修复。"
+          },
+          "security": {
+            "label": "安全",
+            "description": "安全问题或加固。"
+          },
+          "ops_request": {
+            "label": "运维请求",
+            "description": "运维或基础设施变更。"
+          },
+          "change_request": {
+            "label": "变更请求",
+            "description": "功能或行为变更。"
+          },
+          "refactor": {
+            "label": "重构",
+            "description": "在不改变行为的前提下重构代码。"
+          },
+          "spike": {
+            "label": "探索",
+            "description": "限定时间的调研。"
+          },
+          "performance": {
+            "label": "性能",
+            "description": "提升速度或资源使用效率。"
+          },
+          "unknown": {
+            "label": "未知",
+            "description": "当前版本无法识别的类型。"
+          }
+        },
+        "ApprovalStatus": {
+          "pending": "待审批",
+          "approved": "已批准",
+          "rejected": "已拒绝",
+          "expired": "已过期",
+          "unknown": "未知"
+        },
+        "RequestSource": {
+          "jira": "Jira",
+          "github": "GitHub",
+          "gitlab": "GitLab",
+          "linear": "Linear",
+          "mcp": "智能体 (MCP)",
+          "manual": "手动",
+          "webhook": "Webhook",
+          "unknown": "未知来源"
+        },
+        "RequestPageHeader": {
+          "project": "项目",
+          "allProjects": "所有项目",
+          "createRequest": "创建请求"
+        },
+        "error": {
+          "forbidden": "你没有执行此操作的权限。",
+          "notFound": "该项目已不存在。",
+          "conflict": "此项已被他人修改,请刷新后重试。",
+          "invalidState": "当前状态下不允许此操作。",
+          "network": "网络错误,请检查连接。",
+          "unavailable": "请求服务不可用,请稍后重试。",
+          "rateLimited": "尝试次数过多,请稍候重试。",
+          "validation": "请检查输入后重试。",
+          "unknown": "出现了问题。",
+          "retry": "重试"
+        },
+        "AnswerView": {
+          "answer": "答复",
+          "citations": "引用"
+        },
+        "DiagnosisView": {
+          "rootCause": "根本原因",
+          "impact": "影响范围",
+          "baseline": "实测基线"
+        },
+        "FindingsView": {
+          "question": "问题",
+          "findings": "发现",
+          "sources": "来源",
+          "conclusion": "结论"
+        },
+        "RejectReasonDialog": {
+          "title": "拒绝",
+          "description": "请说明原因。原因将被记录并展示给团队。",
+          "placeholder": "为什么拒绝?",
+          "required": "必须填写原因(至少 {{min}} 个字符)。",
+          "regenerate": "根据此反馈重新生成",
+          "cancel": "取消",
+          "submit": "拒绝"
+        },
+        "RequestMarkdownContent": {
+          "viewFull": "查看全文",
+          "fullTitle": "完整内容"
+        },
+        "SolutionComparisonTable": {
+          "criterion": "标准",
+          "differs": "各方案之间存在差异",
+          "row": {
+            "summary": "摘要",
+            "pros": "优点",
+            "cons": "缺点",
+            "effort": "工作量",
+            "risk": "风险"
+          }
+        },
+        "SolutionDecisionBar": {
+          "accept": "接受",
+          "approve": "批准",
+          "approveOption": "批准此方案",
+          "reject": "拒绝",
+          "alreadyDecided": "此项已有结论。",
+          "chooseOne": "请选择要批准的方案。",
+          "expired": "已过期",
+          "generatePlan": "生成计划",
+          "noPermission": "您无权批准",
+          "partial": "已选择方案但尚未批准,请再次尝试批准。"
+        },
+        "SolutionGenerationState": {
+          "analyzing": "AI 正在分析此请求",
+          "drafting": "AI 正在撰写分析",
+          "failed": "无法生成分析。",
+          "regenerate": "重新生成"
+        },
+        "SolutionOptionCard": {
+          "chosen": "已选",
+          "cons": "缺点",
+          "pros": "优点",
+          "effort": "工作量",
+          "risk": "风险",
+          "recommended": "推荐"
+        },
+        "SolutionOptionCompare": {
+          "cards": "卡片",
+          "compare": "对比",
+          "needTwo": "至少需要 2 个方案。",
+          "options": "方案"
+        },
+        "SolutionPanel": {
+          "banner": {
+            "awaitingApproval": "等待批准",
+            "chosen": "已批准",
+            "generating": "AI 正在撰写此分析",
+            "readOnly": "分析为只读",
+            "ready": "可供审阅",
+            "rejected": "已拒绝",
+            "superseded": "旧版本",
+            "unknown": "状态不可用"
+          },
+          "empty": "暂无分析。",
+          "forbidden": "您无权查看该分析。",
+          "noData": "无数据",
+          "retry": "重试"
+        },
+        "SolutionStatusBanner": {
+          "dueAt": "截止 {{date}}",
+          "updated": "此方案刚刚已更新。"
+        },
+        "SolutionVersionSwitcher": {
+          "label": "版本",
+          "old": "旧版本",
+          "version": "v{{n}}"
+        },
+        "RequestReasonDialog": {
+          "cancel": "取消"
+        },
+        "CancelRequestDialog": {
+          "title": "取消此请求?",
+          "description": "进行中的工作将停止,之后仍可查看该请求。",
+          "reason": "原因(可选)",
+          "confirm": "取消请求",
+          "reasonRequired": "原因（必填）"
+        },
+        "ReturnToBacklogDialog": {
+          "title": "退回待办",
+          "description": "请求将退出当前流程,之后可重新打开。",
+          "reason": "退回的原因是什么?",
+          "stage": "退回自哪个阶段",
+          "confirm": "退回待办"
+        },
+        "ChangeTypeConfirmDialog": {
+          "title": "更改请求类型",
+          "description": "现有的方案、计划和任务将作为参考保留,请求返回类型确认步骤。",
+          "reason": "为什么要更改类型?",
+          "confirm": "更改类型",
+          "newType": "新类型",
+          "placeholder": "选择类型",
+          "done": "类型已更改",
+          "useChild": "此类型变更必须通过子请求完成。",
+          "spawnChild": "创建子请求"
+        },
+        "RequestBacklogBanner": {
+          "title": "已退回待办",
+          "titleFrom": "从“{{stage}}”退回待办",
+          "reopen": "重新打开"
+        },
+        "RequestDetailHeader": {
+          "backToList": "返回列表",
+          "reopen": "重新打开",
+          "returnToBacklog": "退回待办",
+          "changeType": "更改类型",
+          "spawnChild": "创建子请求",
+          "cancel": "取消请求"
+        },
+        "RequestDetailPane": {
+          "backToList": "返回列表",
+          "notFound": "该请求已不存在。",
+          "reopened": "请求已重新打开",
+          "tab": {
+            "overview": "概览",
+            "analysis": "分析",
+            "plan": "计划",
+            "history": "历史",
+            "related": "相关"
+          }
+        },
+        "RequestOverviewTab": {
+          "noBody": "没有描述。",
+          "source": "来源",
+          "reporter": "报告人",
+          "size": "规模",
+          "urgencyLabel": "紧急程度",
+          "urgency": {
+            "normal": "普通",
+            "urgent": "紧急"
+          }
+        },
+        "StageTimeline": {
+          "step": {
+            "classification": "分类",
+            "analysis": "分析",
+            "plan": "计划",
+            "phase": "阶段",
+            "execution": "执行"
+          },
+          "state": {
+            "done": "已完成",
+            "current": "当前",
+            "pending": "待处理",
+            "skipped": "已中止"
+          },
+          "note": {
+            "hotfix": "热修复:快速诊断,计划前无需审批。"
+          }
+        },
+        "RequestsTab": {
+          "selectPrompt": "选择一个请求以查看详情。"
+        },
+        "RequestRow": {
+          "unclassified": "未分类",
+          "urgent": "紧急"
+        },
+        "RequestList": {
+          "label": "请求",
+          "loadMore": "加载更多"
+        },
+        "RequestListToolbar": {
+          "count": "{{count}} 个请求",
+          "refresh": "刷新"
+        },
+        "RequestListStates": {
+          "emptyNone": "还没有请求。",
+          "emptyFiltered": "没有符合筛选条件的请求。",
+          "clearFilters": "清除筛选",
+          "create": "创建请求"
+        },
+        "RequestFilterBar": {
+          "chip": {
+            "needsMyConfirmation": "待我确认",
+            "running": "进行中"
+          },
+          "status": "状态",
+          "type": "类型",
+          "source": "来源",
+          "anySource": "任何来源",
+          "clear": "清除筛选"
+        },
+        "TypeConfirmationCard": {
+          "title": "确认请求类型",
+          "classifying": "AI 正在对此请求分类",
+          "reclassify": "重新分类",
+          "classifyLimit": "已达到重新分类上限(5 次)。",
+          "confidence": "置信度",
+          "lowConfidence": "AI 对此类型把握不大,请核对。",
+          "showMore": "展开",
+          "showLess": "收起",
+          "editedByHuman": "由你修改",
+          "type": "类型",
+          "typePlaceholder": "选择类型",
+          "typeRequired": "请选择类型以继续。",
+          "size": "规模",
+          "urgency": "紧急程度",
+          "reason": "原因",
+          "reasonPlaceholder": "为什么选此类型?(可选)",
+          "confirm": "确认类型",
+          "confirmed": "类型已确认",
+          "flow": {
+            "analysis": "分析",
+            "noAnalysis": "无分析",
+            "plan": "计划",
+            "noPlan": "无计划",
+            "phase": "阶段",
+            "gates": "{{count}} 个审批关口",
+            "noGates": "无审批关口"
+          }
+        },
+        "RequestHistoryTab": {
+          "empty": "类型尚未更改过。",
+          "ai": "AI"
+        },
+        "RequestRelatedTab": {
+          "group": {
+            "parent": "父请求",
+            "child": "子请求",
+            "followUp": "后续"
+          },
+          "empty": "没有相关请求。",
+          "unsupported": "此运行时暂不支持查看请求链接。",
+          "unreadable": "无法查看此请求",
+          "loading": "加载中..."
+        },
+        "SpawnChildRequestDialog": {
+          "title": "创建子请求",
+          "titleLabel": "标题",
+          "body": "描述",
+          "type": "类型",
+          "letAi": "由 AI 分类",
+          "submit": "创建",
+          "created": "子请求已创建",
+          "backToParent": "返回父请求",
+          "reason": {
+            "spawned_by_spike": "来自探索",
+            "spawned_by_question": "来自问题",
+            "followup_hotfix": "热修复后续",
+            "escalation": "升级"
+          }
+        },
+        "CreateRequestDialog": {
+          "title": "创建请求",
+          "titleLabel": "标题",
+          "body": "描述",
+          "project": "项目",
+          "projectPlaceholder": "选择项目",
+          "projectRequired": "请选择此请求所属的项目。",
+          "urgency": "紧急程度",
+          "typeHint": "类型提示",
+          "letAi": "由 AI 分类",
+          "submit": "创建",
+          "duplicate": "此问题已有对应请求",
+          "open": "打开",
+          "pendingLimit": "等待分类的请求过多,请稍后再试。"
+        },
+        "CreateRequestIssueButton": {
+          "label": "创建请求",
+          "tooltip": "将此问题送入分析流程。与“开始工作区”不同,不会立即打开工作树。"
+        },
+        "plan": {
+          "PhaseNode": {
+            "blocked": "{{count}} 个被阻塞",
+            "empty": "此阶段没有任务。",
+            "running": "{{count}} 个进行中",
+            "summary": "已完成 {{done}}/{{total}} 个任务"
+          },
+          "PhaseApprovalBar": {
+            "approve": "批准阶段",
+            "reject": "拒绝",
+            "rejectTitle": "拒绝阶段",
+            "notApproved": "阶段尚未获批",
+            "start": "开始阶段",
+            "rejectedNote": "阶段已被拒绝。请求可能会退回规划阶段。",
+            "notApprover": "您无权批准此项。"
+          },
+          "PlanApprovalBar": {
+            "regenerate": "重新生成计划",
+            "rejected": "此计划已被拒绝。",
+            "approveTaskList": "批准任务列表",
+            "approve": "批准计划",
+            "reject": "拒绝",
+            "rejectTitle": "拒绝计划",
+            "notApprover": "您无权批准此项。",
+            "conflict": "您审阅期间内容已变更。已加载最新版本,请重新审阅。",
+            "alreadyDecided": "此项已有决定。",
+            "expired": "此审批已过期。已加载最新版本。"
+          },
+          "PlanGateChips": {
+            "plan": "计划",
+            "phases": "已批准阶段 {{approved}}/{{total}}",
+            "preDeploy": "部署前",
+            "preDeployPending": "需要部署前审批",
+            "approvePreDeploy": "批准部署前",
+            "reject": "拒绝",
+            "rejectTitle": "拒绝部署前"
+          },
+          "PlanStates": {
+            "generate": "生成计划",
+            "generating": "AI 正在起草计划...",
+            "retry": "重试",
+            "forbidden": "您无权查看此请求的任务。",
+            "notYet": "尚无计划。",
+            "notFound": "未找到计划。",
+            "empty": "计划为空。",
+            "currentStep": "当前步骤:{{step}}"
+          },
+          "PlanSummaryHeader": {
+            "counts": "{{phases}} 个阶段,{{tasks}} 个任务",
+            "estimated": "估算",
+            "progress": "计划进度"
+          },
+          "PlanTaskRow": {
+            "blocked": "已阻塞",
+            "estimate": "{{hours}} 小时"
+          },
+          "PlanTree": {
+            "taskSheetDescription": "任务详情",
+            "taskSheetTitle": "任务"
+          },
+          "RequestPlanTab": {
+            "reload": "重新加载",
+            "truncated": "任务列表已被截断,部分任务可能缺失。"
+          }
+        },
+        "approval": {
+          "ApprovalInboxTab": {
+            "title": "审批",
+            "empty": "没有等待你审批的事项。",
+            "emptyFiltered": "没有符合这些筛选条件的审批。",
+            "clearFilters": "清除筛选",
+            "loadMore": "加载更多"
+          },
+          "ApprovalSubjectFilter": {
+            "all": "全部",
+            "requestType": "请求类型",
+            "solution": "方案",
+            "plan": "计划",
+            "phase": "阶段",
+            "preDeploy": "部署前",
+            "other": "其他"
+          },
+          "OverdueToggle": {
+            "label": "仅逾期"
+          },
+          "ApprovalRow": {
+            "open": "打开",
+            "approve": "快速批准",
+            "reject": "驳回",
+            "dueIn": "截止 {{relative}}",
+            "overdueBy": "已逾期 {{relative}}",
+            "requestedBy": "申请人：{{name}}",
+            "systemActor": "AI / 系统",
+            "alreadyDecided": "已有其他人处理。",
+            "changed": "该项在列出后已发生变化，请打开查看。",
+            "requestGone": "该请求已不存在。",
+            "decided": "已记录决定。",
+            "confirmApprove": {
+              "request_type": "将确认请求类型，请求进入分析阶段。",
+              "findings": "将采纳调查结果作为本请求的结论。",
+              "answer": "将采纳该答复并关闭请求。",
+              "task_list": "将批准任务清单，任务可开始准备。",
+              "phase": "将批准该阶段，其任务可开始执行。",
+              "pre_deploy": "将批准部署前检查，发布可继续进行。"
+            }
+          },
+          "ApprovalInboxErrorState": {
+            "network": "无法加载审批，请检查网络连接。",
+            "forbidden": "你无权查看这些审批。",
+            "retry": "重试"
+          },
+          "ApprovalSubjectType": {
+            "request_type": "请求类型",
+            "solution": "方案",
+            "findings": "调查结果",
+            "answer": "答复",
+            "plan": "计划",
+            "phase": "阶段",
+            "task_list": "任务清单",
+            "pre_deploy": "部署前",
+            "unknown": "其他"
+          }
+        },
+        "backlog": {
+          "BacklogSegmentControl": {
+            "request": "请求",
+            "task": "任务",
+            "execute": "执行"
+          },
+          "BacklogToolbar": {
+            "search": "搜索标题或 #编号",
+            "type": "类型",
+            "category": "类别",
+            "refresh": "刷新",
+            "allTypes": "所有类型",
+            "allCategories": "所有类别"
+          },
+          "RequestBacklogTable": {
+            "col": {
+              "request": "请求",
+              "source": "来源",
+              "type": "类型",
+              "stage": "退回自",
+              "category": "类别",
+              "reason": "原因",
+              "by": "退回人",
+              "at": "时间",
+              "actions": "操作"
+            },
+            "actorSystem": "AI / 系统",
+            "reopen": "重新打开",
+            "cancel": "取消"
+          },
+          "TaskBacklogTable": {
+            "col": {
+              "task": "任务",
+              "estimate": "预估",
+              "dependencies": "等待"
+            }
+          },
+          "ExecuteBacklogTable": {
+            "col": {
+              "task": "任务",
+              "blockedBy": "被阻塞于",
+              "lastError": "最近错误",
+              "failedAttempts": "失败次数",
+              "engine": "引擎"
+            },
+            "noErrorDetail": "已失败，未记录错误详情"
+          },
+          "ReturnedFromStage": {
+            "classification": "分类",
+            "analysis": "分析",
+            "plan": "计划",
+            "phase": "阶段",
+            "task": "任务"
+          },
+          "ReturnedCategory": {
+            "missing_info": "信息不足",
+            "infeasible": "不可行",
+            "blocked_dependency": "被依赖项阻塞",
+            "rejected": "已驳回",
+            "other": "其他"
+          },
+          "GateStatus": {
+            "approved": "已批准",
+            "pending": "待审批",
+            "rejected": "已驳回",
+            "none": "无审批",
+            "unknown": "未知"
+          },
+          "BacklogEngineBadge": {
+            "workflow": "工作流",
+            "orchestration": "编排",
+            "direct_agent": "直接代理"
+          },
+          "ReopenRequestDialog": {
+            "title": "重新打开此请求？",
+            "body": "请求 #{{number}} 已从{{stage}}退回，将重新分类。原有方案、计划和任务将保留作参考。",
+            "cancel": "暂不",
+            "confirm": "重新打开",
+            "viewRequest": "查看请求"
+          },
+          "BacklogEmptyState": {
+            "requests": "没有请求被退回到待办。",
+            "tasks": "所有任务都已有已批准的计划。",
+            "execute": "没有等待执行或已失败的任务。",
+            "filtered": "没有符合这些筛选条件的内容。",
+            "clearFilters": "清除筛选"
+          },
+          "BacklogErrorState": {
+            "network": "无法加载待办，请检查网络连接。",
+            "forbidden": "你无权查看此项目的待办。",
+            "retry": "重试"
+          },
+          "BacklogRow": {
+            "reopened": "请求已重新打开，将重新分类。",
+            "alreadyHandled": "该请求已被处理。"
+          },
+          "BacklogTab": {
+            "loadMore": "加载更多"
+          },
+          "BacklogGroupHeaderRow": {
+            "openPlan": "打开计划"
+          },
+          "TaskBacklogRow": {
+            "planNotSplit": "尚未拆分为阶段"
+          },
+          "BacklogTaskSheet": {
+            "title": "任务详情",
+            "description": "所选任务的详情"
+          }
+        },
+        "clarification": {
+          "title": "需要补充信息",
+          "round": "第 {{round}} 轮",
+          "submit": "提交回答",
+          "submitHint": "提交",
+          "answeredResume": "已收到。AI 正在重新执行“{{step}}”步骤。",
+          "stillMissing": "仍缺少部分信息，已开启新一轮。",
+          "required": "必填",
+          "suggested": "建议",
+          "useSuggested": "使用建议",
+          "editInstead": "改为编辑",
+          "readOnlyWaiting": "正在等待指定人员回答",
+          "dueIn": "还剩 {{count}} 天",
+          "expired": "已逾期。请求将退回待办（缺少信息）。",
+          "leaveWarning": "您有未提交的回答。",
+          "fileTooLarge": "文件超过 64 KB",
+          "fileBinary": "仅支持文本文件",
+          "textTooLong": "回答过长",
+          "invalidChoice": "请从选项中选择",
+          "yes": "是",
+          "no": "否",
+          "retry": "重试",
+          "waitingForInfo": "正在等待提供信息",
+          "timelineWaiting": "正在等待补充信息",
+          "source": {
+            "readiness": "就绪检查",
+            "solution_open_question": "方案待决问题",
+            "plan_assumption": "计划假设",
+            "task_blocked": "任务受阻"
+          }
+        },
+        "decision": {
+          "rationaleLabel": "选择理由",
+          "rationaleRequired": "选择非推荐方案时必须填写理由",
+          "rationaleOptional": "可选",
+          "confirmTitle": "确认高风险选择",
+          "confirmBody": "此选择被标记为高风险。请查看原因并输入方案名称以确认。",
+          "confirmInputLabel": "输入“{{title}}”以确认",
+          "confirmMismatch": "输入内容与方案名称不匹配",
+          "cancel": "取消",
+          "confirmSubmit": "确认选择",
+          "pendingConfirmation": "正在等待对此高风险选择的二次确认",
+          "digestChanged": "内容刚刚发生变化，请在批准前重新查看。",
+          "selfChoiceForbidden": "报告人不能自行选择自己的请求",
+          "history": {
+            "title": "决策历史",
+            "empty": "尚无决策记录"
+          },
+          "status": {
+            "open": "待决",
+            "chosen": "已选择",
+            "effective": "已生效",
+            "superseded": "已被取代",
+            "unknown": "未知"
+          },
+          "planBlocked": "尚未记录所选方案的决策"
+        },
+        "impact": {
+          "forbidden": "您无权查看评估",
+          "noDevServer": "未连接开发服务器",
+          "connectDevServer": "连接",
+          "collecting": "正在查询代码图",
+          "run": "运行评估",
+          "score": "评分 {{score}}",
+          "advisory": "仅供参考",
+          "raisedBy": "提升原因：{{rules}}",
+          "caption": "评估于 {{at}}，基于 {{tool}}",
+          "confidence": {
+            "low": "置信度低",
+            "medium": "置信度中",
+            "high": "置信度高"
+          },
+          "stale": "索引已过期，评估不完整",
+          "narrative": "AI 生成的说明",
+          "title": "影响与风险",
+          "notAssessed": "未评估",
+          "dimension": "维度",
+          "recommended": "推荐",
+          "differs": "方案之间存在差异",
+          "evidence": "证据",
+          "evidenceDescription": "此发现的原始证据",
+          "loading": "加载中...",
+          "evidenceError": "无法加载证据",
+          "truncated": "已截断",
+          "copy": "复制",
+          "noFindings": "没有中等及以上级别的发现",
+          "viewOnGraph": "在图中查看",
+          "dim": {
+            "architecture": "架构",
+            "contract": "契约",
+            "data": "数据",
+            "blast_radius": "影响范围",
+            "security": "安全",
+            "operations": "运维",
+            "quality": "质量",
+            "uncertainty": "不确定性",
+            "size": "规模"
+          },
+          "findings": "发现",
+          "acceptance": {
+            "title": "接受剩余风险",
+            "reasonLabel": "接受理由",
+            "reasonRequired": "至少 {{min}} 个字符",
+            "record": "记录接受",
+            "recorded": "已接受",
+            "invalidated": "评估已变化，请重新确认。",
+            "secondApprover": "等待第二位审批人",
+            "splitPhase": "建议拆分为更小的阶段并演练回滚。",
+            "error": "无法记录接受"
+          },
+          "gate": {
+            "viewImpact": "查看影响",
+            "viewImpactFirst": "批准前请先查看影响部分",
+            "needsAcceptance": "批准前请先接受剩余的高风险",
+            "approverNotAllowed": "需要指定团队的审批人"
+          },
+          "override": {
+            "menu": "更多关卡选项",
+            "title": "绕过关卡",
+            "description": "将连同您的理由记录到审计日志。",
+            "reasonLabel": "理由",
+            "reasonRequired": "至少 {{min}} 个字符",
+            "cancel": "取消",
+            "submit": "绕过关卡"
+          }
+        },
+        "readiness": {
+          "badge": {
+            "ready": "就绪",
+            "needs_info": "需要信息",
+            "spec_defect": "规格缺陷",
+            "env_defect": "环境问题"
+          },
+          "title": "任务就绪状态",
+          "notChecked": "尚未检查",
+          "tier": {
+            "structure": "结构",
+            "semantic": "语义",
+            "environment": "环境"
+          },
+          "envVarNames": "仅显示变量名，不显示值。",
+          "notCounted": "不计入尝试次数",
+          "action": {
+            "run": "运行",
+            "answer": "回答问题",
+            "regenerate": "退回计划步骤以重新生成任务",
+            "connect": "连接开发服务器",
+            "notify": "通知运维人员"
+          },
+          "runHint": "准备好后请使用任务上的“运行”。",
+          "checking": "检查中...",
+          "check": "检查就绪状态",
+          "runBlocked": "此任务尚未就绪，详情请打开就绪报告。",
+          "phase": {
+            "ready": "{{count}} 个就绪",
+            "needsInfo": "{{count}} 个需要信息",
+            "specDefect": "{{count}} 个规格缺陷",
+            "envDefect": "{{count}} 个环境问题"
+          },
+          "drift": {
+            "shadow": "仅供参考：实际变更超出计划。",
+            "banner": "实际变更超出计划，阶段 {{name}} 已暂停。",
+            "review": "查看并决定",
+            "loadError": "无法加载偏差详情",
+            "task": "任务",
+            "expected": "预期",
+            "actual": "实际",
+            "noDetails": "未提供详细行",
+            "runningNote": "正在运行的任务会继续运行直至完成。",
+            "accept": "接受偏差并继续",
+            "return": "退回",
+            "returnNote": "退回后，请求将按策略回到待办。"
+          }
+        },
+        "execution": {
+          "tab": "结果",
+          "error": "无法加载结果",
+          "legacy": "此结果没有结构化数据",
+          "noOutput": "无输出",
+          "malformed": "结果格式不符合预期",
+          "status": {
+            "done": "已完成",
+            "failed": "失败",
+            "blocked": "已阻塞",
+            "needs_info": "需要信息"
+          },
+          "attempt": "第 {{n}} 次尝试",
+          "files": {
+            "title": "变更的文件",
+            "none": "没有文件变更",
+            "inScope": "范围内",
+            "outOfScope": "超出范围"
+          },
+          "checks": {
+            "check": "检查",
+            "agent": "代理报告",
+            "orca": "Orca 重新运行",
+            "compare": "对比",
+            "notRerun": "尚未重新运行",
+            "passed": "通过",
+            "failed": "失败",
+            "mismatch": "不一致",
+            "note": "Orca 不依赖代理的自述。"
+          },
+          "secrets": {
+            "label": "密钥扫描",
+            "passed": "通过",
+            "failed": "失败",
+            "notRun": "未运行"
+          },
+          "outputs": {
+            "title": "输出",
+            "view": "查看",
+            "preview": "以纯文本显示，截断于 16 KB"
+          },
+          "toQuestion": "回答问题",
+          "route": {
+            "retryable": "将最多再重试 {{count}} 次",
+            "spec_defect": "已退回计划步骤",
+            "needs_info": "已转为问题",
+            "env_defect": "不计入尝试次数",
+            "agent_defect": "将附带格式提醒重试一次",
+            "unknown": "未分类的失败"
+          }
+        }
+      },
+      "reviewMap": {
+        "turns": {
+          "verification": {
+            "agreement": {
+              "consistent": "重新运行 {{kind}} 的结果与代理的陈述一致",
+              "contradicted": "重新运行 {{kind}} 的结果与代理的陈述不同",
+              "unverified": "{{kind}}：尚未核对",
+              "unknown": "{{kind}}：数据不足，无法得出结论"
+            },
+            "kind": {
+              "tests_pass": "测试",
+              "tests_fail": "失败的测试",
+              "lint_clean": "Lint 检查",
+              "typecheck_clean": "类型检查",
+              "build_ok": "构建",
+              "all_done": "整体完成情况",
+              "other": "检查"
+            },
+            "basis": {
+              "stated": "根据代理的文字推断（置信度低）"
+            },
+            "reason": {
+              "tree_may_differ": "工作区可能与代理完成时不同。",
+              "no_run": "尚无独立运行。",
+              "run_failed": "重新运行未完成。"
+            },
+            "category": {
+              "test": "测试",
+              "lint": "Lint",
+              "typecheck": "类型检查",
+              "build": "构建",
+              "install": "安装",
+              "git": "git",
+              "other": "其他"
+            },
+            "ran": "代理已运行：{{commands}}",
+            "ranItemMany": "{{name}}（{{count}} 次）",
+            "ranMore": "等",
+            "recordedNote": "仅为记录，未经验证：代理进程可能报告不准确。",
+            "viewRun": "查看运行",
+            "runChecks": "重新运行检查"
+          }
+        },
+        "report": {
+          "md": {
+            "gate": {
+              "pass": "已运行的必需检查均已通过。",
+              "warn": "质量门禁有警告。",
+              "fail": "质量门禁未通过。",
+              "unknown": "数据不足，无法得出结论。",
+              "heading": "质量门禁",
+              "moreReasons": "……另有 {{count}} 项。",
+              "waivers": "{{count}} 项有效豁免。"
+            },
+            "summary": {
+              "heading": "变更",
+              "counts": "{{files}} 个文件，+{{added}} / -{{removed}}，{{symbols}} 个符号，{{flows}} 个流程。",
+              "components": "组件：{{list}}。"
+            },
+            "findings": {
+              "heading": "发现",
+              "counts": "{{error}} 个错误，{{warning}} 个警告，{{info}} 条信息。",
+              "colSeverity": "严重程度",
+              "colRule": "规则",
+              "colLocation": "位置",
+              "colMessage": "消息",
+              "truncated": "仅列出主要发现。"
+            },
+            "contracts": {
+              "heading": "契约与数据",
+              "breaking": "破坏性",
+              "channel": "通道",
+              "table": "表"
+            },
+            "reading": {
+              "heading": "建议阅读顺序"
+            },
+            "diagrams": {
+              "heading": "图表",
+              "alt": "文字说明"
+            },
+            "warnings": {
+              "heading": "说明"
+            },
+            "warning": {
+              "no_gate": "没有可用的质量门禁结果。",
+              "index_stale": "代码索引可能比 HEAD 旧。",
+              "overlay_partial": "变更数据可能不完整。"
+            },
+            "footer": "由 Orca 根据配置 {{profile}}（模型 {{digest}}）生成。这是已运行检查的记录，不代表批准。",
+            "title": "此 {{review}} 的 Orca 审查",
+            "subject": "分支 {{branch}}，基准 {{base}}，head {{head}}。",
+            "risk": {
+              "heading": "风险",
+              "level": {
+                "LOW": "风险级别：低。",
+                "MEDIUM": "风险级别：中。",
+                "HIGH": "风险级别：高。",
+                "CRITICAL": "风险级别：严重。",
+                "UNKNOWN": "风险级别：数据不足，无法得出结论。"
+              }
+            },
+            "truncated": "已精简；请在 Orca 中查看完整报告。"
+          },
+          "html": {
+            "gate": {
+              "pass": "已运行的必需检查均已通过。",
+              "warn": "质量门禁有警告。",
+              "fail": "质量门禁未通过。",
+              "unknown": "数据不足，无法得出结论。",
+              "heading": "质量门禁"
+            },
+            "summary": {
+              "heading": "变更",
+              "counts": "{{files}} 个文件，+{{added}} / -{{removed}}，{{symbols}} 个符号，{{flows}} 个流程。"
+            },
+            "findings": {
+              "heading": "发现",
+              "counts": "{{error}} 个错误，{{warning}} 个警告，{{info}} 条信息。",
+              "colSeverity": "严重程度",
+              "colRule": "规则",
+              "colLocation": "位置",
+              "colMessage": "消息",
+              "caption": "主要发现"
+            },
+            "contracts": {
+              "heading": "契约与数据"
+            },
+            "reading": {
+              "heading": "建议阅读顺序"
+            },
+            "diagrams": {
+              "heading": "图表"
+            },
+            "warnings": {
+              "heading": "说明"
+            },
+            "warning": {
+              "no_gate": "没有可用的质量门禁结果。",
+              "index_stale": "代码索引可能比 HEAD 旧。",
+              "overlay_partial": "变更数据可能不完整。"
+            },
+            "footer": "由 Orca 根据配置 {{profile}}（模型 {{digest}}）生成。这是已运行检查的记录，不代表批准。",
+            "title": "Orca 审查报告",
+            "breaking": "破坏性"
+          },
+          "menu": {
+            "label": "导出报告",
+            "copyMarkdown": "复制 Markdown",
+            "copyForDescription": "复制用于 {{review}} 描述",
+            "saveHtml": "保存 HTML",
+            "copied": "报告已复制。",
+            "copiedShortened": "已复制精简版报告。",
+            "copyError": "无法复制到剪贴板。",
+            "saved": "报告已保存为 HTML。",
+            "saveError": "无法保存报告。",
+            "fetchError": "无法加载审查报告。"
+          },
+          "insert": {
+            "label": "插入审查报告"
+          }
+        },
+        "requirements": {
+          "trace": {
+            "state": {
+              "has_evidence": "已找到依据（未确认）",
+              "partial": "已找到部分依据",
+              "no_evidence": "未找到依据",
+              "manual_pending": "需要手动确认",
+              "unknown": "数据不足，无法得出结论"
+            },
+            "group": {
+              "noEvidence": "未找到依据",
+              "partial": "部分依据",
+              "manualPending": "需要手动确认",
+              "hasEvidence": "已找到依据",
+              "unknown": "数据不足",
+              "unlinked": "未关联到需求的变更"
+            },
+            "suggestions": "建议",
+            "inferred": "推断",
+            "confirm": "确认",
+            "dismiss": "忽略",
+            "manualConfirm": "我已核对",
+            "loading": "正在加载需求…",
+            "error": "无法加载需求。",
+            "retry": "重试",
+            "label": "需求",
+            "showInferred": "显示推断的建议",
+            "stale": "自加载以来索引已变化。",
+            "readOnly": "您可以查看需求，但无法修改。",
+            "actionError": "更改未保存，请重试。",
+            "empty": "没有可显示的需求。",
+            "link": {
+              "explicit": "已明确关联任务",
+              "derived": "已根据分支或提交关联任务",
+              "inferred": "任务关联为推断",
+              "none": "未关联任务"
+            },
+            "warning": {
+              "no_structured_criteria": "此任务没有结构化的验收标准。",
+              "index_stale": "代码索引可能比 HEAD 旧。",
+              "generic": "部分数据可能不完整。"
+            }
+          },
+          "taskPicker": {
+            "link": "关联任务…",
+            "change": "更换任务…",
+            "unlink": "取消关联",
+            "searchPlaceholder": "搜索任务…",
+            "noResults": "未找到任务。"
+          }
+        },
+        "lens": {
+          "requirements": {
+            "label": "需求"
+          },
+          "impact": {
+            "label": "影响"
+          },
+          "architecture": {
+            "label": "架构"
+          },
+          "dataflow": {
+            "label": "流程"
+          },
+          "erd": {
+            "label": "ERD"
+          },
+          "storage": {
+            "label": "存储"
+          },
+          "structure": {
+            "label": "结构"
+          },
+          "contract": {
+            "label": "契约"
+          },
+          "quality": {
+            "label": "质量"
+          }
+        },
+        "shell": {
+          "lens": {
+            "unavailable": "{{lens}}暂不可用。"
+          },
+          "index": {
+            "ready": "索引已就绪",
+            "stale": "索引已过期 {{sha}}",
+            "overlay": "主检出索引 + 差异",
+            "overlayNote": "基于主检出索引和差异,行号可能有偏差。",
+            "buildingPercent": "正在建立索引 {{percent}}%",
+            "building": "正在建立索引",
+            "missing": "暂无索引",
+            "notInstalled": "工具未安装",
+            "degraded": "索引部分可用",
+            "offline": "离线",
+            "unknown": "未知",
+            "aria": "索引状态:{{label}}"
+          },
+          "header": {
+            "title": "评审"
+          },
+          "banner": {
+            "stale": "索引落后于 HEAD({{indexed}} 至 {{head}}),结果可能缺少最近的更改。",
+            "truncated": "显示 {{total}} 个文件中的 {{shown}} 个。",
+            "scopeMismatch": "索引对应的检出与此工作树不同。",
+            "offline": "离线:显示上次加载的数据。",
+            "retry": "重试",
+            "errorCached": "无法刷新:{{message}}",
+            "newData": "有新数据可用。",
+            "apply": "立即更新"
+          },
+          "reindex": {
+            "refresh": "刷新索引",
+            "fullConfirm": "全部重建",
+            "full": "重建整个索引",
+            "cooldown": "{{seconds}} 秒后可再次使用"
+          },
+          "scope": {
+            "current": "对比 {{label}}",
+            "choose": "范围",
+            "branch": "基准分支",
+            "range": "提交范围",
+            "hosted": "已提交的评审",
+            "basePlaceholder": "origin/main",
+            "baseAria": "基准分支",
+            "uncommitted": "包含未提交的更改",
+            "fromCommit": "起始提交",
+            "toCommit": "结束提交",
+            "apply": "应用"
+          },
+          "screen": {
+            "unsupported": {
+              "title": "此处无法使用评审",
+              "body": "此工作区或后端不提供代码评审数据。"
+            },
+            "closeTab": "关闭标签页",
+            "disabled": {
+              "title": "代码评审已关闭",
+              "body": "管理员已在此工作区禁用代码智能。"
+            },
+            "chooseScope": "选择比较对象",
+            "noBinding": {
+              "title": "此工作树未连接到代码索引",
+              "body": "请将仓库连接到其开发服务器,然后重试。",
+              "action": "尝试重新连接"
+            },
+            "forbidden": {
+              "title": "你无权访问此评审",
+              "body": "请向工作区管理员申请代码智能的读取权限。"
+            },
+            "loading": {
+              "title": "正在加载更改"
+            },
+            "toolUnavailable": {
+              "title": "未安装代码索引工具",
+              "body": "请在存放此仓库的机器上安装 GitNexus 或 CodeGraph。"
+            },
+            "retry": "重试",
+            "notRegistered": {
+              "title": "此仓库尚未在索引工具中注册",
+              "body": "构建索引即可完成注册。"
+            },
+            "buildIndex": "构建索引",
+            "pathNotAllowed": {
+              "title": "文件路径被拒绝",
+              "body": "后端拒绝了此更改集中的一个路径。"
+            },
+            "indexMissing": {
+              "title": "此仓库尚无索引",
+              "body": "评审需要索引来关联符号和影响范围。"
+            },
+            "indexBuilding": {
+              "title": "正在构建索引",
+              "unknown": "这可能需要几分钟。",
+              "percent": "已完成 {{percent}}%"
+            },
+            "offline": {
+              "title": "无法连接到代码索引",
+              "body": "连接已断开,恢复后此视图会自动重试。"
+            },
+            "error": {
+              "title": "无法加载评审"
+            },
+            "noChanges": {
+              "unborn": "此分支还没有提交",
+              "title": "此范围内没有更改",
+              "body": "选择其他基准或范围以查看更改。"
+            },
+            "copied": "已复制",
+            "copyDetails": "复制详情",
+            "scope": {
+              "invalid-base": {
+                "title": "找不到基准分支",
+                "body": "请选择另一个基准分支进行比较。"
+              },
+              "unborn-head": {
+                "title": "此分支还没有提交",
+                "body": "请先提交一些内容,再评审更改。"
+              },
+              "no-merge-base": {
+                "title": "与基准没有共同祖先",
+                "body": "请选择其他基准分支或提交范围。"
+              },
+              "error": {
+                "title": "无法计算比较结果",
+                "body": "请尝试其他基准。"
+              }
+            }
+          },
+          "chip": {
+            "aria": "更改摘要",
+            "files": "{{count}} 个文件",
+            "symbols": "{{count}} 个符号",
+            "flows": "{{count}} 个流程",
+            "tables": "{{count}} 张表",
+            "contracts": "{{count}} 个契约",
+            "untested": "{{count}} 个未测试",
+            "violations": "{{count}} 个违规"
+          },
+          "risk": {
+            "incomplete": "数据不足",
+            "incompleteNote": "索引缺少数据,因此不做结论。",
+            "noReasons": "未报告原因。",
+            "low": "按索引判断风险较低",
+            "medium": "中等风险",
+            "high": "高风险",
+            "critical": "严重风险"
+          },
+          "ambiguous": {
+            "title": "哪个符号?",
+            "body": "匹配到多个符号,请选择你要的那个。",
+            "search": "搜索匹配项",
+            "empty": "无匹配"
+          },
+          "drawer": {
+            "unavailable": "详情暂不可用。",
+            "title": "详情",
+            "close": "关闭详情"
+          },
+          "pane": {
+            "reading": "阅读顺序",
+            "lens": "视图"
+          },
+          "cancel": "取消",
+          "host": {
+            "loading": "正在加载评审"
+          },
+          "dock": {
+            "label": "评审面板",
+            "findings": "发现",
+            "notes": "备注",
+            "collapse": "收起面板",
+            "expand": "展开面板",
+            "qualityFindings": "检查"
+          },
+          "turnFilter": "自上一轮以来"
+        },
+        "readingOrder": {
+          "noOrder": "无法根据索引生成阅读顺序。",
+          "empty": "此范围内没有更改。",
+          "progressLoadFailed": "无法加载已保存的进度。",
+          "retry": "重试",
+          "filtering": "正在筛选 {{label}}:{{total}} 个中的 {{shown}} 个",
+          "clearFilter": "清除筛选",
+          "aria": "阅读顺序",
+          "overflow": "已列出 {{total}} 个文件中的 {{shown}} 个",
+          "keys": "j/k 移动 · 空格 标记已读 · Enter 打开差异",
+          "markFile": "将 {{file}} 标记为已读",
+          "cycle": "依赖循环",
+          "after": "在前面的步骤之后阅读",
+          "viewDiff": "查看差异",
+          "otherGroup": "其他",
+          "markGroup": "将 {{group}} 标记为已读",
+          "progress": "已读 {{seen}}/{{total}}",
+          "localOnly": "未保存(只读权限)",
+          "notSaved": "未保存",
+          "saved": "已保存",
+          "saving": "正在保存",
+          "progressAria": "阅读进度",
+          "oversize": "进度过大,部分内容不会保存。",
+          "reason": {
+            "contract": "契约变更",
+            "dependencyOf": "后续步骤的依赖",
+            "leaf": "叶子节点变更",
+            "cycle": "处于依赖循环中",
+            "noEdges": "没有已知依赖",
+            "test": "测试",
+            "doc": "文档",
+            "generated": "生成的文件",
+            "overflow": "还有未列出的文件"
+          }
+        },
+        "aiSummary": {
+          "preview": {
+            "title": "查看将发送的内容",
+            "description": "以下数据将发送给开发服务器使用的 LLM 提供商（{{provider}}）。在您确认之前不会发送任何内容。",
+            "defaultProvider": "已配置的提供商",
+            "counts": "{{files}} 个文件，{{redactions}} 处遮盖，约 {{tokens}} 个 token。",
+            "level": {
+              "metadata": "数据级别：仅元数据（不含代码）",
+              "diff": "数据级别：diff（已更改的代码）",
+              "unknown": "数据级别：未知"
+            },
+            "withheld": "{{count}} 个文件未包含在请求中。",
+            "fileWithheld": "已排除",
+            "moreFiles": "……另有 {{count}} 个文件。",
+            "injectionWarning": "部分内容看起来像是针对 AI 模型的指令，可能影响摘要，请仔细核对。",
+            "cancel": "取消",
+            "confirm": "发送并生成摘要"
+          },
+          "card": {
+            "title": "AI 推断的摘要",
+            "generate": "生成摘要（AI）",
+            "regenerate": "重新生成",
+            "cancel": "取消",
+            "levelLabel": "要发送的数据",
+            "level": {
+              "metadata": "元数据",
+              "diff": "Diff"
+            },
+            "preparing": "正在准备数据预览…",
+            "generating": "正在生成摘要……可能需要一些时间。",
+            "error": {
+              "no-relay": "没有已连接的开发服务器。",
+              "bad-output": "无法生成有效的摘要。",
+              "rate-limited": "请求过多，请在 {{seconds}} 秒后重试。",
+              "timeout": "生成摘要耗时过长。",
+              "forbidden": "您无权生成摘要。",
+              "unknown": "无法生成摘要。"
+            },
+            "retry": "重试",
+            "disclaimer": "可能有误或不完整，请对照 diff 核实。",
+            "meta": "模型：{{model}}。已发送数据：{{level}}。",
+            "risks": "风险",
+            "readFirst": "优先阅读",
+            "refsDropped": "已丢弃 {{count}} 个无效引用。",
+            "helpful": "有帮助",
+            "incorrect": "不正确",
+            "idleHint": "生成摘要即可获得 AI 推断的概览。在您确认之前不会发送任何内容。"
+          },
+          "report": {
+            "heading": "AI 推断的摘要",
+            "disclaimer": "可能有误或不完整，请对照 diff 核实。模型：{{model}}。已发送数据：{{level}}。",
+            "risks": "风险",
+            "readFirst": "优先阅读"
+          }
+        },
+        "c4": {
+          "error": "无法加载架构视图。",
+          "retry": "重试",
+          "loading": "正在加载架构",
+          "noContainers": "未推断出任何容器；请检查目录约定。",
+          "noView": "此容器暂无组件视图。",
+          "toolbar": "架构选项",
+          "mode": {
+            "graph": "图",
+            "list": "列表"
+          },
+          "includeHidden": "显示隐藏组件",
+          "viewYaml": "查看 c4.yaml",
+          "editYaml": "编辑 c4.yaml",
+          "container": "容器",
+          "evidence": "依据",
+          "viewDiff": "查看差异",
+          "showMore": "显示更多 ({{count}})",
+          "detail": "详情",
+          "close": "关闭",
+          "copyPath": "复制路径",
+          "noDescription": "暂无描述",
+          "addDescription": "添加描述",
+          "symbols": "{{count}} 个符号",
+          "flag": {
+            "changed": "已更改",
+            "untested": "未测试",
+            "violation": "分层违规",
+            "lowConfidence": "低置信度"
+          },
+          "outgoing": "出向",
+          "incoming": "入向",
+          "violationNote": "此依赖以错误方向跨越了六边形分层边界。",
+          "legend": "图例",
+          "diagramLabel": "组件图；文字等价内容请使用列表视图",
+          "editor": {
+            "title": "编辑 c4.yaml",
+            "description": "{{container}} 的手动覆盖。保存后由服务器重新生成图。",
+            "loading": "正在加载...",
+            "loadError": "无法加载 c4.yaml。",
+            "readOnly": "你没有编辑 c4.yaml 的权限。",
+            "seed": "模板来源：{{source}}",
+            "label": "c4.yaml 源码",
+            "size": "{{bytes}} / 65536 字节",
+            "semanticsNote": "此处不检查语义；保存时由服务器检查。",
+            "issues": "问题",
+            "warnings": "服务器警告",
+            "offline": "未保存：连接失败。草稿已保留。",
+            "tooLarge": "未保存：文档过大。",
+            "failed": "未保存：{{message}}",
+            "conflictTitle": "版本冲突",
+            "conflict": "其他人保存了更新的 c4.yaml。",
+            "loadLatest": "加载最新版本",
+            "copyMine": "复制我的版本",
+            "confirmOverwrite": "确认：替换较新的版本",
+            "overwrite": "用我的版本覆盖",
+            "discardTitle": "放弃更改",
+            "discard": "不保存更改就关闭吗？",
+            "keepEditing": "继续编辑",
+            "discardAction": "放弃",
+            "savingSlow": "正在等待服务器...",
+            "saving": "正在保存...",
+            "savedAt": "已于 {{time}} 保存",
+            "unsaved": "未保存",
+            "close": "关闭",
+            "save": "保存"
+          },
+          "showingCount": "显示 {{shown}}/{{total}}",
+          "col": {
+            "from": "来源",
+            "kind": "类型",
+            "to": "目标",
+            "count": "次数",
+            "flags": "标记"
+          },
+          "origin": {
+            "merged": "部分已编辑",
+            "declared": "已声明",
+            "derived": "推断"
+          },
+          "notice": {
+            "withOverrides": "推断结果，含 {{by}} 的覆盖{{at}}",
+            "withOverridesAnon": "推断结果，含手动覆盖",
+            "inferred": "此图由目录结构和六边形规则推断而来，可能与预期设计不符。"
+          },
+          "layer": {
+            "grpc-server": "gRPC 服务端",
+            "usecase": "用例",
+            "domain": "领域",
+            "adapter": "适配器",
+            "external": "外部",
+            "support": "支撑"
+          },
+          "relation": {
+            "uses": "使用",
+            "implements": "实现",
+            "calls-rpc": "调用 RPC",
+            "reads": "读取",
+            "writes": "写入",
+            "publishes": "发布",
+            "subscribes": "订阅",
+            "unknown": "未知"
+          },
+          "descSource": {
+            "c4_yaml": "c4.yaml",
+            "package-doc": "包文档",
+            "none": "无"
+          }
+        },
+        "dataflow": {
+          "toolbar": "流程选项",
+          "detail": {
+            "service": "服务",
+            "component": "组件"
+          },
+          "zoomOut": "缩小",
+          "zoomReset": "重置缩放",
+          "zoomIn": "放大",
+          "copied": "已复制",
+          "copy": "复制 Mermaid",
+          "stepDetail": "步骤详情",
+          "col": {
+            "step": "步骤",
+            "route": "来源 → 目标",
+            "confidence": "置信度",
+            "stores": "存储"
+          },
+          "request": "请求",
+          "response": "响应",
+          "changedTag": "已改",
+          "notFound": "暂无与「{{label}}」匹配的数据流。",
+          "detailError": "无法加载此流程。",
+          "retry": "重试",
+          "loading": "正在加载流程...",
+          "partialBanner": "此流程不完整：部分步骤无法解析。缺口已在步骤列表中标出。",
+          "diagramLabel": "{{label}} 的时序图；文字等价内容请见步骤列表",
+          "search": "搜索流程",
+          "touchOnly": "仅显示涉及更改的流程",
+          "touchUnknown": "暂时无法判断哪些流程涉及更改。",
+          "error": "无法加载流程。",
+          "empty": "此仓库暂时无法构建任何数据流。",
+          "list": "流程",
+          "hops": "{{count}} 跳",
+          "partialTag": "不完整",
+          "count": "共 {{total}} 项，已显示 {{shown}} 项",
+          "loadMore": "加载更多",
+          "diagramLoading": "正在加载图",
+          "diagram": {
+            "empty": "此流程没有可绘制的消息。",
+            "tooManyParticipants": "参与者过多无法绘制；请使用下方的步骤列表。",
+            "tooLong": "图过大无法绘制；请使用下方的步骤列表。",
+            "truncated": "显示 {{rendered}}/{{total}} 条消息；完整内容见步骤列表。"
+          },
+          "pick": "选择一个流程以查看其时序。",
+          "gapAfter": "步骤 {{n}} 之后缺少数据",
+          "async": "异步",
+          "inferred": "推断",
+          "changed": "已更改",
+          "untested": "未测试",
+          "unimplemented": "未实现",
+          "steps": "流程步骤"
+        },
+        "impact": {
+          "direction": "方向",
+          "upstream": "调用方",
+          "both": "两者",
+          "downstream": "依赖",
+          "depth": "深度",
+          "view": "视图",
+          "viewGraph": "图",
+          "viewList": "列表",
+          "columnCenter": "所选符号",
+          "columnUp": "上游，第 {{level}} 层",
+          "columnDown": "下游，第 {{level}} 层",
+          "more": "另有 {{count}} 项",
+          "direct": "直接",
+          "openPathBlocked": "该路径在工作树之外，未打开。",
+          "errTimeout": "影响查询超时。",
+          "errTooLarge": "结果过大。请降低深度或选择其他符号。",
+          "errNotFound": "索引中未找到该符号；索引可能已过期。",
+          "errFailed": "影响查询失败。",
+          "pick": "选择一个已更改的符号以查看其影响。",
+          "noEdges": "数据没有边信息；符号按层级显示。",
+          "truncated": "仅显示部分结果。",
+          "none": "索引中未找到该符号的依赖。",
+          "openUnavailable": "无法打开此文件的差异。",
+          "risk": {
+            "low": "低风险",
+            "medium": "中风险",
+            "high": "高风险",
+            "critical": "严重风险",
+            "unknown": "数据不足"
+          }
+        },
+        "symbolDetail": {
+          "testsError": "无法加载测试。",
+          "retry": "重试",
+          "testsEmpty": "索引中未找到覆盖的测试。",
+          "sourceError": "无法加载源码。",
+          "sourceCut": "显示前 {{count}} 行。",
+          "sourceMasked": "已隐藏可能的敏感信息。",
+          "viewDiff": "查看差异",
+          "setCenter": "设为中心",
+          "openEditor": "在编辑器中打开",
+          "copyKey": "复制键",
+          "notFound": "索引中未找到该符号；索引可能已过期。",
+          "loadError": "无法加载符号详情。",
+          "back": "返回",
+          "incoming": "被调用方",
+          "outgoing": "调用",
+          "flows": "相关流程",
+          "tests": "覆盖的测试",
+          "source": "源码",
+          "relationsEmpty": "索引中未找到。",
+          "showMore": "再显示 {{count}} 项",
+          "flowsEmpty": "索引中未找到流程。",
+          "flowStep": "第 {{step}}/{{total}} 步",
+          "copyPath": "复制路径",
+          "omitted": {
+            "gitignored": "已省略源码：该文件被 git 忽略。",
+            "binary": "已省略源码：二进制文件。",
+            "sensitive": "已省略源码：该路径可能包含敏感信息。",
+            "notRequested": "未请求源码。",
+            "unavailable": "没有可用的源码。"
+          },
+          "indexLines": "行号以 {{commit}} 处的索引为准。"
+        },
+        "structure": {
+          "rootError": "无法加载仓库结构。",
+          "empty": "索引中没有此路径的结构信息。",
+          "up": "上一级",
+          "deleted": "{{count}} 个已删除的文件不显示",
+          "capReached": "已在 {{count}} 个节点处停止加载。打开文件夹查看更多。",
+          "paneTreemap": "树图",
+          "paneTree": "树",
+          "treemapLabel": "包含 {{count}} 项的树图；键盘操作请使用树。",
+          "small": "另有 {{count}} 个小项",
+          "tipSymbols": "{{count}} 个符号",
+          "changedCount": "{{count}} 项已更改",
+          "sizeBy": "大小依据",
+          "sizeSymbols": "符号",
+          "noLoc": "索引中没有此文件夹的行数。",
+          "sizeLoc": "行数",
+          "colorBy": "着色依据",
+          "colorArea": "区域",
+          "colorLanguage": "语言",
+          "breadcrumb": "路径",
+          "root": "仓库",
+          "colorLegend": "颜色",
+          "treeLabel": "文件和文件夹",
+          "loading": "加载中...",
+          "folderError": "无法加载此文件夹。",
+          "shown": "已显示 {{count}} 项",
+          "loadMore": "加载更多",
+          "fileDetail": "文件详情",
+          "closeDetail": "关闭文件详情",
+          "changedSymbols": "此文件中已更改的符号"
+        },
+        "overlay": {
+          "legend": {
+            "title": "图例"
+          },
+          "changed": {
+            "label": "已更改",
+            "description": "在此审查范围内已更改"
+          },
+          "affected": {
+            "label": "受影响",
+            "description": "按索引可由已更改符号到达"
+          },
+          "untested": {
+            "label": "未找到测试",
+            "description": "索引中未找到覆盖的测试"
+          },
+          "violation": {
+            "label": "规则发现",
+            "description": "所在文件有规则发现"
+          }
+        },
+        "ErdWarningsStrip": {
+          "summary": "{{count}} 条解析警告，{{tables}} 张表可能不完整",
+          "degraded": "{{table}} 的 ER 图可能不完整"
+        },
+        "ErdLens": {
+          "error": {
+            "offline": "与工作区的连接已断开。",
+            "forbidden": "你没有访问此仓库的权限。",
+            "tooLarge": "ER 图过大，无法一次性加载。",
+            "timeout": "生成 ER 图耗时过长。",
+            "unavailable": "此仓库暂不支持 ER 图。",
+            "generic": "无法加载 ER 图。"
+          },
+          "retry": "重试",
+          "noMigrations": "此仓库中未找到包含迁移的服务。",
+          "building": "正在生成 ER 图...",
+          "emptyService": "此服务的迁移中没有表。",
+          "newData": "有新数据，点击刷新",
+          "backendTruncated": "后端已限制此结果。",
+          "showingCount": "显示 {{total}} 张表中的 {{shown}} 张，其余在列表中。",
+          "tableLevelOnly": "暂无列详情，已高亮变更的表。",
+          "noCodeLinks": "暂无与代码的关联（可能缺少代码索引）。",
+          "noMatches": "没有符合当前筛选条件的表。",
+          "clearFilters": "清除筛选",
+          "label": "实体关系图",
+          "back": "返回上一个服务"
+        },
+        "ErdCanvas": {
+          "label": "实体关系图；可使用列表视图查看文字版本"
+        },
+        "ErdGhostTableNode": {
+          "owner": "归 {{service}} 所有 — 打开其 ER 图"
+        },
+        "ErdTableList": {
+          "summary": "{{columns}} 列 · 读 {{reads}} · 写 {{writes}}",
+          "label": "表"
+        },
+        "ErdToolbar": {
+          "label": "ER 图控件",
+          "service": "服务",
+          "dialect": "SQL 方言",
+          "schemas": "模式",
+          "search": "搜索表、列、代码 (/)",
+          "searchLabel": "在 ER 图中搜索",
+          "scope": "显示的表",
+          "focus": "变更 + 相关",
+          "all": "全部",
+          "view": "视图",
+          "graph": "图",
+          "list": "列表",
+          "asOf": "截至迁移 {{migration}}"
+        },
+        "ErdColumnRow": {
+          "primaryKey": "主键",
+          "foreignKey": "外键",
+          "masked": "已遮蔽敏感文本"
+        },
+        "ErdTableDetail": {
+          "changedSymbol": "已变更",
+          "openSymbol": "打开",
+          "viewDiff": "查看差异",
+          "label": "表详情：{{name}}",
+          "close": "关闭详情",
+          "degraded": "此表的 ER 图可能不完整。",
+          "tenantScoped": "租户范围：{{value}}",
+          "yes": "是",
+          "no": "否",
+          "rlsState": "行级安全：{{state}}",
+          "columns": "列",
+          "colName": "名称",
+          "colType": "类型",
+          "colDefault": "默认值",
+          "colKey": "键",
+          "indexes": "索引",
+          "unique": "唯一",
+          "partialUnique": "模拟部分唯一索引",
+          "rules": "检查约束与行级安全",
+          "relations": "关系",
+          "anomaly": "异常数据",
+          "openService": "打开 {{service}}",
+          "accessors": "读写此表的代码（{{count}}）",
+          "accessFilter": "访问筛选",
+          "filterAll": "全部",
+          "filterWrite": "写",
+          "filterRead": "读",
+          "accessHint": "这是通过搜索表名得到的提示，动态拼接的查询可能被遗漏。",
+          "staleAccessWarning": "仅为提示，可能有误：此变更修改了变更范围之外的代码仍在使用的列。",
+          "noAccessors": "未找到与代码的关联。可能缺少索引，或查询是动态构建的。",
+          "migrations": "此变更中的迁移",
+          "viewMigration": "查看迁移差异"
+        },
+        "ErdRelationEdge": {
+          "source": {
+            "ddl": "在 DDL 中声明",
+            "declared": "在 erd-links 中声明",
+            "comment": "来自 SQL 注释",
+            "naming": "根据命名推断",
+            "unknown": "来源未知"
+          }
+        },
+        "ErdLegend": {
+          "added": "新增",
+          "modified": "修改",
+          "removed": "删除",
+          "label": "图例",
+          "foreignKey": "外键",
+          "logicalLink": "逻辑关联"
+        },
+        "ErdTableNode": {
+          "adjacent": "相关",
+          "ariaLabel": "表 {{name}}，{{count}} 列{{state}}",
+          "dropped": "此变更删除的表",
+          "noColumnDetail": "暂无列详情",
+          "fewerColumns": "显示更少列",
+          "moreColumns": "另有 {{count}} 列",
+          "change": {
+            "added": "新增",
+            "modified": "修改",
+            "removed": "删除"
+          }
+        },
+        "StorageToolbar": {
+          "label": "存储控件",
+          "env": "环境",
+          "legacy": "显示旧版",
+          "onlyChanged": "仅变更与相关项",
+          "kinds": "存储类型",
+          "asOf": "截至提交 {{commit}}"
+        },
+        "StorageInferenceNotice": {
+          "inferred": "{{count}} 项是根据配置推断的，并非显式声明。",
+          "redacted": "后端已隐去 {{count}} 个值。"
+        },
+        "StorageNodeDetail": {
+          "label": "详情：{{name}}",
+          "close": "关闭详情",
+          "vaultPath": "Vault 路径：{{path}}",
+          "neverShown": "值不会被显示或复制。",
+          "copyKey": "复制键名",
+          "owner": "所有者",
+          "schemas": "模式",
+          "delivery": "投递",
+          "stream": "流",
+          "payload": "载荷",
+          "status": "状态",
+          "deployed": "已部署",
+          "openErd": "打开 {{service}} 的 ER 图",
+          "connections": "连接",
+          "evidence": "依据",
+          "viewDiff": "查看差异"
+        },
+        "StorageCanvas": {
+          "notDeployed": "未部署",
+          "noCodeSupport": "代码未支持",
+          "external": "外部",
+          "label": "存储图；可使用文字视图查看等价内容",
+          "mark": {
+            "added": "新增",
+            "modified": "修改",
+            "removed": "删除",
+            "related": "相关"
+          },
+          "confidence": {
+            "inferred": "推断",
+            "derived": "派生"
+          }
+        },
+        "StorageSecretNode": {
+          "ariaLabel": "密钥引用 {{name}}",
+          "masked": "界面已遮蔽敏感文本",
+          "neverShown": "值不会显示",
+          "copyKey": "复制键名"
+        },
+        "StorageTextView": {
+          "summary": "文字视图",
+          "from": "来源",
+          "relation": "关系",
+          "to": "目标"
+        },
+        "StorageLens": {
+          "error": {
+            "offline": "与工作区的连接已断开。",
+            "forbidden": "你没有访问此仓库的权限。",
+            "generic": "无法加载存储图。"
+          },
+          "unavailable": "此后端暂不支持存储图。",
+          "retry": "重试",
+          "building": "正在读取存储配置...",
+          "empty": "此仓库中未找到存储配置。",
+          "newData": "有新数据，点击刷新",
+          "truncated": "后端已限制此结果。",
+          "unknownChange": "无法判断哪些组件发生了变化：后端未提供来源依据。",
+          "noStorageChange": "在已索引范围内未检测到存储配置的变更。",
+          "label": "存储图"
+        },
+        "StorageLegend": {
+          "label": "图例",
+          "added": "新增",
+          "modified": "修改",
+          "removed": "删除",
+          "related": "与变更相关",
+          "binding": "读写 (rw) 或只读 (ro)",
+          "topic": "发布 / 订阅",
+          "configKey": "密钥引用"
+        },
+        "contract": {
+          "migration": {
+            "label": "迁移 {{service}}",
+            "files": "个文件",
+            "dialectOnly": "仅 {{dialect}}",
+            "title": "迁移 · {{service}}"
+          },
+          "detail": {
+            "openErd": "在 ERD 中打开",
+            "label": "契约变更详情",
+            "files": "文件",
+            "noFiles": "未报告任何文件",
+            "viewDiff": "查看差异",
+            "notInChange": "不在此变更中",
+            "consumers": "使用方",
+            "noConsumersBreaking": "未找到使用方（可能在此仓库之外或尚未建立索引）",
+            "noConsumers": "未找到使用方"
+          },
+          "change": {
+            "added": "新增",
+            "removed": "删除",
+            "modified": "修改",
+            "unknown": "已变更（未分类）"
+          },
+          "table": {
+            "noDetails": "无详细信息",
+            "label": "契约变更",
+            "col": {
+              "contract": "契约",
+              "before": "变更前",
+              "after": "变更后",
+              "compat": "兼容性"
+            }
+          },
+          "compat": {
+            "breaking": "破坏性",
+            "risky": "有风险",
+            "compatible": "兼容",
+            "unknown": "未分类"
+          },
+          "kind": {
+            "proto": "Proto",
+            "wsChannel": "WS 通道",
+            "route": "路由",
+            "migration": "迁移",
+            "unknown": "其他"
+          },
+          "loading": "正在加载契约变更...",
+          "error": {
+            "noIndex": "代码索引不可用，暂时无法列出契约变更。",
+            "load": "无法加载契约变更。"
+          },
+          "retry": "重试",
+          "filter": {
+            "kind": "契约类型",
+            "service": "服务",
+            "allServices": "所有服务",
+            "onlyBreaking": "仅破坏性",
+            "onlyChanged": "仅来自此变更",
+            "search": "搜索契约"
+          },
+          "summary": {
+            "label": "兼容性概览"
+          },
+          "truncated": "显示 {{total}} 项变更中的 {{shown}} 项。请缩小筛选范围查看其余部分。",
+          "empty": "在此范围内未检测到契约变更（proto、WS 通道、路由、迁移）。",
+          "emptyFiltered": "没有符合当前筛选条件的变更。",
+          "group": {
+            "noService": "（未知服务）"
+          },
+          "signature": {
+            "absent": "（无）"
+          }
+        },
+        "findings": {
+          "reason": {
+            "not_applicable": "不适用",
+            "accepted_risk": "接受风险",
+            "false_positive": "误报",
+            "later": "稍后修复"
+          },
+          "dismiss": {
+            "reasonLegend": "为什么忽略此发现？",
+            "notePlaceholder": "可选备注",
+            "noteLabel": "备注",
+            "scopeNote": "适用于整个仓库。不会豁免错误级发现的质量门禁。",
+            "confirm": "忽略"
+          },
+          "kind": {
+            "layer_violation": "分层违规",
+            "dependency_cycle": "依赖循环",
+            "hotspot": "热点",
+            "missing_tenant_id": "缺少 tenant_id",
+            "dead_code": "可能未使用的代码",
+            "rls_removed": "已移除 RLS",
+            "unknown": "其他"
+          },
+          "filter": {
+            "onlyIntroduced": "仅来自此变更",
+            "showDismissed": "显示已忽略 ({{count}})",
+            "search": "搜索发现"
+          },
+          "freshness": {
+            "stale": "数据可能已过期"
+          },
+          "severity": {
+            "error": "错误",
+            "warning": "警告",
+            "info": "信息",
+            "unknown": "未分类"
+          },
+          "origin": {
+            "introduced": "由此变更引入",
+            "touched": "位于已变更文件中",
+            "preexisting": "已存在",
+            "unknown": "来源未知"
+          },
+          "error": {
+            "forbidden": "你没有忽略发现的权限。",
+            "offline": "已离线。该发现未被更改。",
+            "notFound": "此发现已不存在。列表已重新加载。",
+            "conflict": "此发现已被他人修改。列表已重新加载。",
+            "reasonRequired": "请先选择原因。",
+            "generic": "无法更新该发现。",
+            "noIndex": "代码索引不可用，暂时无法列出结构性发现。",
+            "load": "无法加载发现。"
+          },
+          "confidence": "置信度：{{level}}",
+          "state": {
+            "resolved": "已标记为已解决",
+            "ignored": "已忽略：{{reason}}"
+          },
+          "saving": "保存中",
+          "action": {
+            "viewInGraph": "在图中查看",
+            "note": "备注",
+            "restore": "重新打开",
+            "ignore": "忽略",
+            "resolve": "标记为已解决",
+            "viewDiff": "查看差异",
+            "openFile": "打开文件"
+          },
+          "retry": "重试",
+          "loading": "正在加载发现...",
+          "label": "结构性发现",
+          "empty": "在已索引范围内未发现问题。",
+          "emptyIndexed": "索引：{{commit}}（{{date}}）。",
+          "list": {
+            "partial": "正在显示已加载的 {{count}} 条发现。请缩小筛选范围或加载更多。",
+            "loadMore": "加载更多"
+          },
+          "title": {
+            "layer_violation": "分层违规：{{from}} 依赖 {{to}}",
+            "dependency_cycle": "依赖循环",
+            "hotspot": "热点：频繁变更且复杂",
+            "missing_tenant_id": "查询可能缺少 tenant_id 过滤",
+            "dead_code": "可能未使用的代码",
+            "rls_removed": "已移除行级安全"
+          }
+        },
+        "ReviewSent": {
+          "hint": {
+            "changed": "发送后文件已变更（估计）",
+            "unchanged": "此文件未见变更（估计）"
+          },
+          "empty": "尚未发送任何内容。",
+          "title": "在之前的轮次中已发送",
+          "count": "{{count}} 条备注",
+          "recordFailed": "已发送，但未能保存批次历史。"
+        },
+        "ReviewNote": {
+          "scope": {
+            "all": "所有未发送的备注",
+            "lens": "此视图中的备注",
+            "selection": "所选备注"
+          },
+          "previewButton": "预览",
+          "badge": "{{count}} 条未发送备注",
+          "lens": {
+            "findings": "发现"
+          },
+          "sent": "已发送",
+          "label": "备注",
+          "saveFailed": "无法保存备注。你的文字已保留。",
+          "save": "保存备注",
+          "cancel": "取消",
+          "jump": "前往",
+          "edit": "编辑",
+          "delete": "删除",
+          "panel": "评审备注",
+          "persistFailed": "无法保存备注历史。备注已保留在本地。",
+          "empty": "还没有备注。请在节点或发现上使用“备注”。",
+          "attachesTo": "将附加到 {{where}}",
+          "noFile": "此项没有可附加备注的文件。",
+          "placeholder": "为 agent 写一条备注",
+          "button": "备注",
+          "noFileReason": "没有可附加的文件",
+          "preview": {
+            "title": "提示预览",
+            "description": "将按下方内容发送 {{count}} 条备注。",
+            "tooMany": "这是一个很大的批次。建议先发送较小的范围。"
+          }
+        },
+        "ReviewTurn": {
+          "label": {
+            "new": "本轮新增",
+            "changed": "本轮已变更",
+            "unchanged": "自上一轮起无变化",
+            "reverted": "不再是变更"
+          },
+          "groupLabel": "轮次对比",
+          "mode": {
+            "all": "全部变更",
+            "since": "自上一轮起",
+            "previous": "查看上一轮"
+          },
+          "turns": "轮次 ({{count}})",
+          "agent": "Agent",
+          "interrupted": "已中断",
+          "sentNotes": "已发送 {{count}} 条备注",
+          "noPrevious": "还没有可对比的上一轮。",
+          "estimate": "估计：基于每个文件的变更行数，因此行数相同的修改可能被漏掉。",
+          "readOnly": "上一轮的只读视图。不会重建其差异。",
+          "saveFailed": "无法保存轮次标记。",
+          "retry": "重试"
+        },
+        "EntryButton": {
+          "label": "审查变更",
+          "interrupted": "审查变更(智能体已被中断)",
+          "short": "审查",
+          "unreviewed": "智能体已完成,尚未审查"
+        },
+        "QuickActions": {
+          "review": {
+            "title": "审查变更",
+            "description": "打开当前工作树的代码审查。",
+            "verbs": {
+              "review": "审查变更",
+              "open": "打开审查",
+              "impact": "影响"
+            }
+          },
+          "architecture": {
+            "title": "打开架构图",
+            "description": "打开代码审查的架构视图。",
+            "verbs": {
+              "architecture": "架构图",
+              "c4": "c4"
+            }
+          },
+          "erd": {
+            "title": "打开 ERD",
+            "description": "打开代码审查的数据模型(ERD)视图。",
+            "verbs": {
+              "erd": "erd",
+              "schema": "数据库模式"
+            }
+          }
+        },
+        "ReviewSummaryPanel": {
+          "title": "审查",
+          "openFull": "打开完整视图",
+          "vs": "对比",
+          "index": "索引",
+          "files": "文件",
+          "symbols": "符号",
+          "flows": "流程",
+          "tables": "表",
+          "contracts": "契约",
+          "untested": "未测试",
+          "findings": "发现",
+          "errors": "错误",
+          "warnings": "警告",
+          "progress": "已读",
+          "loading": "正在加载摘要…",
+          "unavailable": "审查摘要不可用。",
+          "retry": "重试",
+          "disabled": "此工作区未启用代码审查。"
+        }
+      },
+      "qualityCharts": {
+        "severity": {
+          "error": "错误",
+          "warning": "警告",
+          "info": "信息",
+          "unknown": "未知"
+        },
+        "verdict": {
+          "pass": "通过",
+          "warn": "有警告",
+          "fail": "未通过",
+          "unknown": "未知",
+          "unknownLong": "数据不足，无法下结论"
+        },
+        "stale": "已过期",
+        "frame": {
+          "viewTable": "以表格查看",
+          "viewChart": "查看图表",
+          "retry": "重试",
+          "showing": "显示 {{shown}}/{{total}}",
+          "stale": "数据已过期",
+          "loading": "正在加载图表",
+          "emptyDefault": "此范围内没有可绘制的数据。",
+          "errorDefault": "无法绘制图表。"
+        },
+        "summary": {
+          "rangeUp": "{{label}}：在 {{count}} 个点上从 {{first}} 升至 {{last}}",
+          "rangeDown": "{{label}}：在 {{count}} 个点上从 {{first}} 降至 {{last}}",
+          "rangeFlat": "{{label}}：在 {{count}} 个点上保持为 {{last}}",
+          "single": "{{label}}：只有一个值，{{value}}",
+          "noValues": "{{label}}：没有记录到值",
+          "missing": "{{count}} 个点没有值",
+          "coverage": "已覆盖 {{percent}}% 的变更行（{{covered}}/{{total}}）",
+          "coverageNone": "此范围没有覆盖率数据",
+          "coverageEstimated": "估算",
+          "grid": "{{rows}} 行 × {{columns}} 列，共 {{total}} 项，显示 {{shown}} 项",
+          "treemap": "{{count}} 个方块，大小按{{size}}，深浅按{{intensity}}",
+          "matrix": "{{nodes}} 个节点，{{cells}} 个已填充单元格，{{blocks}} 个循环组"
+        },
+        "stackedBar": {
+          "noData": "暂无数据",
+          "noFindings": "已运行的检查中没有发现",
+          "total": "{{count}} 项发现"
+        },
+        "sparkline": {
+          "needTwo": "至少需要两个点"
+        },
+        "trend": {
+          "verdictChange": "结论发生变化",
+          "axis": "横轴：轮次，从旧到新",
+          "point": "点",
+          "turn": "轮次",
+          "verdict": "结论"
+        },
+        "gauge": {
+          "value": "{{percent}}%（已覆盖 {{covered}}/{{total}} 个变更行）",
+          "estimated": "根据测试关联估算，并非实测覆盖率",
+          "measured": "实测",
+          "partial": "部分范围",
+          "none": "此范围暂无覆盖率数据",
+          "warnBelow": "低于 {{value}}% 时警告",
+          "failBelow": "低于 {{value}}% 时未通过",
+          "belowFail": "低于未通过阈值",
+          "belowWarn": "低于警告阈值",
+          "clamped": "已覆盖行数超过总数，数值已限制为 100%",
+          "source": "来源",
+          "covered": "已覆盖行数",
+          "total": "变更行数",
+          "percent": "覆盖率",
+          "scope": "范围"
+        },
+        "treemap": {
+          "more": "另有 {{count}} 项",
+          "moreLabel": "另有 {{count}} 项未绘制，请查看表格",
+          "tileLabel": "{{label}}，{{sizeLabel}}：{{size}}，{{intensityLabel}}：{{intensity}}",
+          "empty": "此范围内没有可显示的项目。",
+          "overlay": "标记：{{tags}}"
+        },
+        "grid": {
+          "hint": "方向键移动，Enter 选择，Esc 离开图表。"
+        },
+        "heatmap": {
+          "empty": "此范围内没有可显示的行。"
+        },
+        "matrix": {
+          "cycleGroup": "循环组",
+          "other": "其他（{{count}}）",
+          "readHint": "行是依赖方，列是被依赖方。",
+          "backEdge": "反向依赖",
+          "empty": "此范围内没有可显示的依赖。",
+          "cellLabel": "{{from}} 依赖 {{to}}，权重 {{weight}}"
+        },
+        "table": {
+          "label": "标签",
+          "value": "值",
+          "size": "大小",
+          "intensity": "强度",
+          "from": "来源",
+          "to": "目标",
+          "weight": "权重",
+          "note": "备注",
+          "metric": "指标",
+          "severity": "严重程度",
+          "count": "数量"
+        }
+      },
+      "graph": {
+        "RiskLevel": {
+          "low": "低",
+          "medium": "中",
+          "high": "高",
+          "critical": "严重",
+          "unknown": "未评估"
+        },
+        "RiskTooltip": "风险 {{level}}，评估于 {{assessedAt}}，基于 {{tool}}",
+        "RiskTooltipUnassessed": "风险 {{level}}，无评估时间记录",
+        "Edge": {
+          "added": "新增",
+          "removed": "移除"
+        },
+        "Entry": {
+          "description": "以图或列表浏览请求流程、计划和影响",
+          "planGraph": "图",
+          "planView": "计划视图",
+          "title": "请求图",
+          "tree": "树",
+          "viewGraph": "查看图"
+        },
+        "GroupSummary": "另有 {{count}} 项未受影响（{{kinds}}）",
+        "Legend": {
+          "added": "新增连接（实线）",
+          "removed": "移除的连接（虚线）",
+          "title": "图例"
+        },
+        "List": {
+          "shown": "显示 {{shown}} / {{total}}",
+          "Change": {
+            "added": "新增",
+            "removed": "移除",
+            "unchanged": "无变化"
+          },
+          "col": {
+            "kind": "类型",
+            "label": "名称",
+            "group": "分组",
+            "risk": "风险",
+            "status": "状态",
+            "change": "变更",
+            "relations": "关联数"
+          }
+        },
+        "Mini": {
+          "addedEdges": "新增 {{count}} 条连接",
+          "breaking": "{{count}} 项破坏性变更",
+          "empty": "未评估",
+          "nodes": "{{count}} 个节点",
+          "removedEdges": "移除 {{count}} 条连接"
+        },
+        "Node": {
+          "ariaLabel": "{{label}}，{{kind}}，风险 {{risk}}{{status}}"
+        },
+        "Search": {
+          "description": "按名称、类型或分组查找节点",
+          "empty": "没有匹配的节点",
+          "placeholder": "搜索节点...",
+          "title": "搜索图"
+        },
+        "Sheet": {
+          "findings": "发现",
+          "incoming": "入边",
+          "open": "打开",
+          "outgoing": "出边"
+        },
+        "State": {
+          "empty": "此视图中没有受影响的项目",
+          "error": "无法加载图",
+          "forbidden": "您无权查看评估",
+          "loading": "正在加载图",
+          "noAssessment": "尚无影响评估",
+          "noDevServer": "未连接开发服务器",
+          "retry": "重试",
+          "runAssessment": "运行评估",
+          "stale": "分析索引已过期，结果可能不完整",
+          "truncated": "显示 {{shown}} / {{total}} 个节点",
+          "connectDevServer": "连接开发服务器"
+        },
+        "Status": {
+          "added": "新增",
+          "blocked": "已阻塞",
+          "breaking": "破坏性变更",
+          "cancelled": "已取消",
+          "done": "已完成",
+          "in_progress": "进行中",
+          "irreversible": "不可逆",
+          "modified": "已修改",
+          "open": "待办",
+          "removed": "移除",
+          "review": "评审中"
+        },
+        "Toolbar": {
+          "after": "变更后",
+          "before": "变更前",
+          "changeView": "变更前后",
+          "graph": "图",
+          "lens": "视角",
+          "list": "列表",
+          "search": "搜索",
+          "view": "视图"
+        },
+        "LensDisabled": {
+          "noAssessment": "尚无影响评估",
+          "noPlan": "尚无计划",
+          "notExecuting": "尚未执行",
+          "unsupported": "此运行时不支持"
+        },
+        "lens": {
+          "flow": "流程",
+          "architecture": "架构",
+          "contract": "契约",
+          "data": "数据",
+          "impact": "影响",
+          "plan": "计划",
+          "execution": "执行"
+        }
+      },
+      "reviewQuality": {
+        "visualization": {
+          "block": {
+            "refresh": "刷新",
+            "unavailable": "此视图需要代码智能可寻址的工作树。",
+            "stale": "上次刷新失败,正在显示之前加载的数据。"
+          },
+          "error": {
+            "generic": "无法加载此数据。",
+            "timeout": "分析耗时过长,请稍后重试。",
+            "tooLarge": "结果过大无法显示,请缩小范围后重试。"
+          },
+          "coverage": {
+            "title": "测试覆盖率",
+            "description": "变更行及各文件的覆盖率。颜色越深的区块,未覆盖语句占比越高。",
+            "diffTitle": "差异覆盖率",
+            "treemapTitle": "按文件的覆盖率",
+            "sizeLabel": "语句",
+            "intensityLabel": "未覆盖 %",
+            "estimatedBanner": "根据测试关联估算,并非实测覆盖率。",
+            "measuredLine": "实测覆盖率。",
+            "totals": "整份报告:{{stmts}} 条语句中 {{percent}}% 已覆盖。",
+            "dirty": "测量时工作树存在未提交的更改。",
+            "noReport": "此范围暂无覆盖率数据。",
+            "noReportReason": "此范围暂无覆盖率数据。原因:{{reason}}",
+            "noDiff": "此范围无法提供差异覆盖率。",
+            "noDiffReason": "此范围无法提供差异覆盖率。原因:{{reason}}",
+            "noChangedLines": "此范围内没有已更改的可执行行。",
+            "runCheck": "运行检查",
+            "partial": "部分范围:部分已更改文件未被测量。",
+            "excluded": "已排除的文件({{count}})",
+            "excludedItem": "{{path}}:{{reason}}",
+            "noStatements": "{{count}} 个没有语句的文件未绘制。",
+            "uncoveredTitle": "未覆盖的行",
+            "uncoveredNone": "未报告任何未覆盖的行范围。",
+            "uncoveredFile": "{{path}}({{count}} 行)",
+            "uncoveredRange": "第 {{from}}-{{to}} 行",
+            "uncoveredLine": "第 {{line}} 行",
+            "openDiff": "在 {{path}} 的第 {{line}} 行打开差异",
+            "uncoveredMore": "显示未覆盖行最多的 {{shown}} 个文件(共 {{total}} 个)。"
+          },
+          "trend": {
+            "title": "按轮次的趋势",
+            "titleCommit": "按提交的趋势",
+            "description": "每个数据点的发现项数量。线条断开表示该点没有记录数值。",
+            "groupBy": "分组方式",
+            "groupTurn": "轮次",
+            "groupCommit": "提交",
+            "empty": "此工作树尚无质量运行记录。",
+            "needTwo": "至少需要两个轮次才能显示趋势。",
+            "latest": "最新数据点:{{error}} 个错误,{{warning}} 个警告,{{info}} 个提示。",
+            "clickHint": "选择一个轮次,即可与上一轮次比较。",
+            "diffCoverage": "差异覆盖率",
+            "diffCoverageMissing": "{{count}} 个数据点没有差异覆盖率数值。",
+            "sourceLocal": "本地",
+            "sourceCi": "CI",
+            "sourceUnknown": "来源未知",
+            "details": "逐点详情",
+            "colPoint": "数据点",
+            "colSource": "来源",
+            "colVerdict": "结论",
+            "colCoverage": "差异覆盖率",
+            "headNote": "HEAD {{commit}} 处的数据 · {{source}}"
+          },
+          "hotspot": {
+            "title": "热点",
+            "description": "在配置的历史窗口内,由结构分析(规则 hotspot.file)标记的文件。这不是质量评分。",
+            "empty": "暂无热点数据。",
+            "emptyReason": "暂无热点数据。结构分析开启且历史足够时才会出现。",
+            "moreRows": "后端还有 {{count}} 个文件尚未加载。",
+            "allMetrics": "全部指标({{count}})",
+            "colFile": "文件",
+            "selected": "已选择:{{path}}",
+            "owner": "负责人:{{owner}}",
+            "openDiff": "打开差异"
+          },
+          "dependency": {
+            "title": "依赖关系",
+            "description": "行是导入方模块,列是被导入模块。带边框的区块和 ▲ 标示循环依赖组。",
+            "emptyReason": "此范围暂无依赖数据。",
+            "backendTruncated": "后端返回了 {{total}} 个模块中的 {{shown}} 个。",
+            "edgesTitle": "{{from}} 与 {{to}} 之间的边",
+            "edgeLine": "{{from}} 导入 {{to}}({{count}})",
+            "noEdge": "这些模块之间没有导入边。",
+            "openStructure": "在“结构”视图中打开",
+            "close": "关闭"
+          }
+        },
+        "scorecard": {
+          "lens": {
+            "title": "质量",
+            "findingsLink": "查看 {{count}} 条发现",
+            "findingsLinkNone": "查看发现"
+          },
+          "blocks": {
+            "coverage": "测试覆盖率",
+            "trend": "按轮次趋势",
+            "hotspot": "热点",
+            "dependency": "依赖关系",
+            "loading": "加载中"
+          },
+          "verdict": {
+            "pass": "配置文件 {{profile}} 的检查全部通过",
+            "warn": "存在警告",
+            "fail": "未通过",
+            "unknown": "数据不足,无法下结论",
+            "unknownNoReason": "后端没有给出原因",
+            "profileMissing": "未命名配置文件"
+          },
+          "mode": {
+            "inform": "提示模式:不会阻止创建评审",
+            "block": "已配置为阻止;此界面仅作警告",
+            "unknown": "未知的门禁模式"
+          },
+          "reasons": {
+            "title": "此结论所依据的检查",
+            "none": "后端未返回各项检查的原因"
+          },
+          "reason": {
+            "pass": "通过",
+            "warn": "警告",
+            "fail": "失败",
+            "unknown": "未知",
+            "values": "观测值 {{observed}},阈值 {{threshold}}",
+            "waived": "已豁免 {{count}} 项",
+            "show": "显示发现",
+            "noFilter": "无法按此检查筛选发现"
+          },
+          "steps": {
+            "title": "已执行的步骤 ({{count}})",
+            "none": "此次运行没有记录任何步骤"
+          },
+          "step": {
+            "passed": "通过",
+            "findings": "有发现",
+            "failed": "失败",
+            "timeout": "超时",
+            "cancelled": "已取消",
+            "skipped": "已跳过",
+            "env_not_ready": "环境未就绪",
+            "unknown": "未知",
+            "failure": {
+              "format_drift": "输出格式已变化",
+              "output_too_large": "输出过大",
+              "exit_unexpected": "意外退出",
+              "parser_error": "无法解析输出",
+              "env": "环境问题"
+            },
+            "noResult": "此步骤未完成,因此没有提供发现,其结果未知",
+            "counts": "{{errors}} 个错误,{{warnings}} 个警告,{{infos}} 条信息",
+            "duration": "{{seconds}} 秒",
+            "truncated": "输出已截断",
+            "outside": "变更范围之外 {{count}} 项"
+          },
+          "source": {
+            "local": "本地",
+            "ci": "CI",
+            "unknown": "未知来源"
+          },
+          "provenance": {
+            "line": "{{source}} · 运行于 {{time}} · HEAD {{head}} · 索引 {{index}}",
+            "lineNoRun": "{{source}} · HEAD {{head}} · 索引 {{index}}",
+            "indexBehind": "代码索引与 HEAD 不在同一提交",
+            "unknownValue": "未知"
+          },
+          "stale": {
+            "title": "此结果已过期",
+            "headMoved": "计算此结果之后 HEAD 已发生移动。",
+            "backend": "后端已将此结果标记为过期。",
+            "cache": "获取此结果之后仓库发生了变化,正在刷新。",
+            "rerun": "重新运行",
+            "label": "已过期"
+          },
+          "banner": {
+            "dirty": "运行期间工作树存在未提交的更改;行号可能有偏差。",
+            "changedDuringRun": "运行期间工作树发生了变化;行号可能有偏差。",
+            "scopeWidened": "范围比请求时有所扩大。",
+            "outsideScope": "有 {{count}} 条发现位于变更范围之外,不计入门禁",
+            "truncated": "后端截断了此次运行的发现。"
+          },
+          "counts": {
+            "title": "按严重程度统计的发现",
+            "description": "此结论所依据的运行中的错误、警告和信息数量。"
+          },
+          "ci": {
+            "title": "本地与 CI 对比",
+            "agree_pass": "本地和 CI 均通过",
+            "agree_fail": "本地和 CI 均失败",
+            "local_pass_ci_fail": "本地通过但 CI 未通过;不能视为通过",
+            "local_fail_ci_pass": "本地失败但 CI 通过",
+            "local_only": "仅存在本地运行",
+            "ci_only": "仅存在 CI 运行",
+            "ci_pending": "CI 仍在运行",
+            "sha_mismatch": "CI 运行在与 HEAD 不同的提交上",
+            "not_comparable": "本地与 CI 的结果无法比较",
+            "unknown": "对比结果未知",
+            "open": "打开 CI 运行",
+            "hints": "可能的原因"
+          },
+          "chip": {
+            "label": "质量",
+            "open": "打开质量视图"
+          },
+          "run": {
+            "profile": "配置文件",
+            "scopeLabel": "范围",
+            "scope": {
+              "changed": "已更改的文件",
+              "worktree": "整个工作树",
+              "commitRange": "提交范围"
+            },
+            "start": "运行检查",
+            "starting": "启动中",
+            "heavy": "较重",
+            "notReady": "未就绪",
+            "missing": "缺少:{{check}}({{reason}})",
+            "missingHint": "提示:{{hint}}",
+            "noProfiles": "没有可运行的配置文件",
+            "cancel": "取消",
+            "cancelling": "正在取消,等待确认",
+            "queued": "排队中",
+            "running": "运行中",
+            "stage": "阶段:{{stage}}",
+            "step": "第 {{index}} 步,共 {{count}} 步",
+            "percent": "{{percent}}%",
+            "progressUnknown": "进度未知",
+            "finished": {
+              "succeeded": "运行已结束",
+              "failed": "运行未完成",
+              "interrupted": "运行被中断,未能完成",
+              "cancelled": "运行已取消",
+              "unknown": "运行以未知状态结束"
+            },
+            "dismiss": "关闭",
+            "copyDetails": "复制详情",
+            "details": "运行 {{runId}} · {{status}}"
+          },
+          "error": {
+            "envNotReady": "环境尚未准备好运行这些检查",
+            "recheck": "重新检查",
+            "profileUnknown": "该配置文件已不可用;列表已刷新",
+            "profileAvailable": "可用:{{names}}",
+            "rateLimited": "请求的运行次数过多",
+            "rateLimitedIn": "请在 {{seconds}} 秒后重试",
+            "forbidden": "你没有运行检查的权限;结果仍可查看",
+            "offline": "已离线:显示缓存的结果,无法运行",
+            "generic": "无法启动检查"
+          },
+          "state": {
+            "loading": "正在加载质量结果",
+            "notRun": {
+              "title": "此范围尚未运行检查",
+              "body": "运行检查以获得结论。在此之前不会做出任何判断。"
+            },
+            "empty": "已运行的检查中没有发现({{profile}})",
+            "error": "无法加载质量结果",
+            "retry": "重试",
+            "forbidden": "你无权访问质量结果",
+            "offline": "已离线:显示上次缓存的结果",
+            "indexStale": "代码索引落后于 HEAD;结构检查可能遗漏最近的更改",
+            "runFailed": "上次运行未完成,因此无法据此得出结论",
+            "cancelled": "上次运行已取消"
+          }
+        },
+        "annotations": {
+          "toggleLabel": "检查注释",
+          "toggleOn": "隐藏检查注释",
+          "toggleOff": "显示检查注释",
+          "noticeContentChanged": "内容已更改，检查注释已隐藏。重新运行检查即可更新。",
+          "noticeDirty": "检查注释可能偏移几行：运行时存在未提交的更改。",
+          "noticeChangedDuringRun": "检查注释可能不准确：检查运行期间文件发生了更改。",
+          "glyphCount": "此行有 {{count}} 条检查发现",
+          "glyphMore": "另有 {{count}} 条"
+        },
+        "findings": {
+          "toolbarSeverity": "按严重程度筛选",
+          "toolbarCategory": "类别",
+          "toolbarCategoryCount": "类别（{{count}}）",
+          "toolbarOnlyInScope": "仅已更改的文件",
+          "toolbarShowWaived": "显示已豁免（{{count}}）",
+          "toolbarSearchPlaceholder": "搜索消息、规则或文件",
+          "categoryLint": "代码风格检查",
+          "categoryTypecheck": "类型检查",
+          "categoryTest": "测试",
+          "categoryCoverage": "覆盖率",
+          "categoryComplexity": "复杂度",
+          "categorySecurity": "安全",
+          "categoryDependency": "依赖",
+          "categoryConvention": "约定",
+          "categoryArchitecture": "架构",
+          "categoryAi": "AI 审查",
+          "loading": "加载中…",
+          "loadError": "无法加载检查发现。",
+          "retry": "重试",
+          "loadMore": "加载更多",
+          "emptyNoRun": "尚未运行任何检查。运行检查后可在此查看发现。",
+          "emptyNone": "已运行检查的范围内没有发现。",
+          "emptyFiltered": "没有符合当前筛选条件的发现。",
+          "footerShowing": "显示 {{shown}} / {{total}}",
+          "footerOutsideScope": "{{count}} 条在更改范围之外（不计入门禁）",
+          "footerCapped": "仅显示前 5,000 条发现。请缩小筛选范围查看其余内容。",
+          "footerTruncated": "工具输出被截断，此列表可能不完整。",
+          "rowTool": "{{tool}} {{version}}",
+          "rowViewDiff": "查看差异",
+          "rowOpenFile": "打开文件",
+          "rowFixHint": "修复提示",
+          "rowWaived": "{{by}} 已豁免至 {{date}}",
+          "rowWaivedNoBy": "已豁免至 {{date}}",
+          "waiveOpen": "豁免",
+          "waiveRevoke": "撤销豁免",
+          "waiveReasonLabel": "原因",
+          "waiveReasonPlaceholder": "为什么可以接受这条发现？",
+          "waiveReasonCount": "{{count}}/{{max}}",
+          "waiveExpiryLabel": "豁免到期",
+          "waiveExpiryDays": "{{days}} 天",
+          "waiveExpiryDate": "到期日期",
+          "waiveCancel": "取消",
+          "waiveSubmit": "豁免此发现",
+          "waiveSaving": "保存中…",
+          "waiveToastWaived": "已豁免该发现",
+          "waiveToastRevoked": "已撤销豁免",
+          "waiveErrReasonRequired": "请输入原因（最多 1000 个字符）。",
+          "waiveErrExpiryRequired": "请选择豁免的到期时间。",
+          "waiveErrExpiryPast": "到期日期必须在将来。",
+          "waiveErrExpiry": "豁免最长可持续 {{maxDays}} 天。",
+          "waiveErrForbidden": "你没有豁免发现的权限。",
+          "waiveErrOffline": "当前离线，豁免未保存。",
+          "waiveErrConflict": "该发现已更改。请刷新列表后重试。",
+          "waiveErrValidation": "豁免被拒绝。请检查原因和到期时间。",
+          "waiveErrUnknown": "无法保存豁免。"
         }
       }
     },
@@ -13085,6 +15776,17 @@
           "disabled": "代码智能已禁用",
           "unsupported": "此环境不支持"
         }
+      }
+    },
+    "settings": {
+      "codeIntel": {
+        "loading": "正在加载代码智能设置",
+        "notAuthorized": "只有管理员可以更改这些开关。",
+        "codeIntelLabel": "代码智能",
+        "qualityLabel": "质量门禁",
+        "needsMaster": "请先开启代码智能。",
+        "serverOff": "您的组织已开启此项，但服务器开关当前处于关闭状态。",
+        "readOnly": "请联系管理员更改这些开关。"
       }
     }
   },

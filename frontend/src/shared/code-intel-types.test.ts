@@ -1,202 +1,179 @@
 /**
  * Tests for code-intel-types.ts (FE-CV-TASK-050-01)
  *
- * Type-level tests using expectTypeOf and fixture assignment.
- * Verifies: §4.1-§4.6 shapes compile correctly, SymbolKind has 13 members.
+ * Fixture assignment + expectTypeOf: the shapes follow CONTRACT-codeintel-ui-api §2.2/§4.
  */
 
-import { describe, it, expectTypeOf } from 'vitest'
+import { describe, it, expect, expectTypeOf } from 'vitest'
 import type {
-  WorktreeSel,
-  CodeIntelEnvelope,
-  IndexStatus,
-  IndexOverall,
-  SymbolKind,
   ChangeOverlay,
-  ReviewState,
-  Finding,
-  FindingSeverity,
-  PushChanged,
-  PushReindexProgress,
-  PushQualityProgress,
-  PushQualityFinished,
-  PushGateChanged,
+  CodeIntelEnvelope,
   CodeIntelPushEvent,
+  ContractDiff,
+  Finding,
+  IndexOverall,
+  IndexStatus,
+  PushChanged,
+  PushGateChanged,
+  PushQualityFinished,
+  PushQualityProgress,
+  PushReindexProgress,
+  ReviewState,
+  SymbolKind,
   WithUnknown,
-  ContractDiff
+  WorktreeSel
 } from './code-intel-types'
+import {
+  CHANGE_OVERLAY_EMPTY_UNBORN,
+  CHANGE_OVERLAY_SMALL,
+  INDEX_STATUS_FIXTURES,
+  REVIEW_STATE_INITIAL
+} from '../renderer/src/test-support/code-intel-fixtures'
 
-describe('code-intel-types §4.1 WorktreeSel', () => {
-  it('accepts valid fixture', () => {
-    const sel: WorktreeSel = { worktreeId: 'wt-1', environmentId: 'env-1' }
-    expectTypeOf(sel.worktreeId).toBeString()
-  })
-
-  it('environmentId is optional', () => {
-    const sel: WorktreeSel = { worktreeId: 'wt-1' }
-    expectTypeOf(sel.environmentId).toEqualTypeOf<string | null | undefined>()
+describe('§2.1 WorktreeSel', () => {
+  it('requires projectId and worktreeId (PQ-04)', () => {
+    const sel: WorktreeSel = { projectId: 'p-1', worktreeId: 'repo::/wt' }
+    expectTypeOf(sel).toEqualTypeOf<{ projectId: string; worktreeId: string }>()
   })
 })
 
-describe('code-intel-types §4.2 CodeIntelEnvelope', () => {
-  it('accepts full fixture', () => {
+describe('§2.2 CodeIntelEnvelope', () => {
+  it('accepts a full fixture; data is optional', () => {
     const env: CodeIntelEnvelope<{ value: number }> = {
       worktreeId: 'wt-1',
-      view: 'main',
-      sources: ['src/'],
-      headCommit: 'abc123',
+      view: 'structure',
+      sources: [{ tool: 'gitnexus', version: '1', indexedAt: null, commit: 'abc' }],
+      headCommit: 'abc',
       stale: false,
       truncated: false,
       totalCount: 10,
-      etag: 'etag-1',
+      etag: '"e1"',
+      fromCache: false,
+      generatedAt: '2026-10-07T00:00:00Z',
       data: { value: 42 }
     }
     expectTypeOf(env.data).toEqualTypeOf<{ value: number } | undefined>()
+    expect(env.data?.value).toBe(42)
   })
 
-  it('notModified envelope has no data required', () => {
-    const env: CodeIntelEnvelope<string> = {
-      worktreeId: 'wt-1',
-      view: 'main',
-      sources: [],
-      headCommit: null,
-      stale: false,
-      truncated: false,
-      totalCount: 0,
-      etag: null,
-      notModified: true
-    }
-    expectTypeOf(env.notModified).toEqualTypeOf<boolean | undefined>()
+  it('notModified is the literal true and carries no data', () => {
+    expectTypeOf<CodeIntelEnvelope<string>['notModified']>().toEqualTypeOf<true | undefined>()
   })
 })
 
-describe('code-intel-types §4.3 IndexStatus', () => {
-  it('overall accepts all valid values', () => {
-    const valids: IndexOverall[] = ['READY', 'INDEXING', 'PARTIAL', 'ERROR', 'UNKNOWN']
-    expect(valids.length).toBe(5)
+describe('§4.1 IndexStatus', () => {
+  it('overall has exactly the 9 uppercase values', () => {
+    const all: IndexOverall[] = [
+      'OFFLINE',
+      'UNKNOWN',
+      'NOT_INSTALLED',
+      'BUILDING',
+      'MISSING',
+      'DEGRADED',
+      'OVERLAY',
+      'STALE',
+      'READY'
+    ]
+    expect(new Set(all).size).toBe(9)
+    expect(Object.values(INDEX_STATUS_FIXTURES).map((s) => s.overall).sort()).toEqual([...all].sort())
   })
 
-  it('accepts full fixture', () => {
-    const status: IndexStatus = {
-      worktreeId: 'wt-1',
-      overall: 'READY',
-      lastIndexedAt: '2024-01-01T00:00:00Z',
-      fileCoverage: 0.95,
-      linesIndexed: 50000,
-      running: false,
-      percent: null,
-      error: null
-    }
-    expectTypeOf(status.overall).toEqualTypeOf<IndexOverall>()
+  it('status is flat: tools[] and indexBasis[] (not an array of statuses)', () => {
+    const status: IndexStatus = INDEX_STATUS_FIXTURES.ready
+    expectTypeOf(status.tools).toBeArray()
+    expectTypeOf(status.indexBasis).toBeArray()
+    expect(status.tools[0]?.tool).toBe('gitnexus')
+  })
+
+  it('activeJob.percent may be null', () => {
+    expectTypeOf<NonNullable<IndexStatus['activeJob']>['percent']>().toEqualTypeOf<number | null>()
   })
 })
 
-describe('code-intel-types §4.4 SymbolKind', () => {
+describe('§4.1 SymbolKind', () => {
   it('has exactly 13 values', () => {
     const kinds: SymbolKind[] = [
-      'file', 'namespace', 'module', 'class', 'interface', 'method',
-      'function', 'variable', 'constant', 'property', 'enum_member',
-      'type_alias', 'constructor'
+      'function',
+      'method',
+      'type',
+      'value',
+      'file',
+      'folder',
+      'route',
+      'component',
+      'namespace',
+      'import',
+      'cluster',
+      'flow',
+      'doc'
     ]
-    expect(kinds.length).toBe(13)
+    expect(new Set(kinds).size).toBe(13)
   })
 })
 
-describe('code-intel-types §4.5 ReviewState', () => {
-  it('ChangeOverlay accepts unknown changeType', () => {
-    const o: ChangeOverlay = { path: 'foo.ts', changeType: 'unknown' }
-    expect(o.changeType).toBe('unknown')
+describe('§4.3 ChangeOverlay', () => {
+  it('summary fixture compiles and exposes risk + limits', () => {
+    const overlay: ChangeOverlay = CHANGE_OVERLAY_SMALL
+    expect(overlay.risk.level).toBe('MEDIUM')
+    expect(overlay.limits.totalCounts.files).toBe(3)
   })
 
-  it('ReviewState shape compiles with all fields', () => {
-    const state: ReviewState = {
-      id: 'rv-1',
-      worktreeId: 'wt-1',
-      headCommit: 'abc',
-      overlay: [],
-      impactGraph: [],
-      comments: [],
-      checklist: [],
-      overallRisk: 'HIGH',
-      approved: false,
-      approvedAt: null,
-      approvedBy: null
-    }
-    expectTypeOf(state.approved).toBeBoolean()
+  it('emptyReason is only "unborn-head"', () => {
+    expectTypeOf<ChangeOverlay['emptyReason']>().toEqualTypeOf<'unborn-head' | undefined>()
+    expect(CHANGE_OVERLAY_EMPTY_UNBORN.emptyReason).toBe('unborn-head')
+  })
+
+  it('changed file status admits unknown', () => {
+    expectTypeOf<ChangeOverlay['changedFiles'][number]['status']>().toEqualTypeOf<
+      WithUnknown<'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'untracked'>
+    >()
   })
 })
 
-describe('code-intel-types §4.6 Finding', () => {
-  it('severity includes unknown', () => {
-    const s: FindingSeverity = 'unknown'
-    expect(s).toBe('unknown')
-  })
-
-  it('Finding shape compiles', () => {
-    const f: Finding = {
-      id: 'f-1', ruleId: 'rule-001', ruleName: 'No console',
-      severity: 'high', path: 'src/a.ts', startLine: 1, endLine: 1,
-      startColumn: 0, endColumn: null, message: 'msg', snippet: null,
-      category: 'quality', waived: false, waivedAt: null,
-      waivedBy: null, waivedReason: null, autoFixAvailable: false
-    }
-    expectTypeOf(f.severity).toEqualTypeOf<FindingSeverity>()
+describe('§4.5 Finding', () => {
+  it('severity admits unknown (U4)', () => {
+    expectTypeOf<Finding['severity']>().toEqualTypeOf<'error' | 'warning' | 'info' | 'unknown'>()
   })
 })
 
-describe('code-intel-types §5 Push events', () => {
-  it('PushChanged has resync boolean', () => {
-    const e: PushChanged = { event: 'changed', worktreeId: 'wt-1', reason: 'commit', resync: false }
-    expectTypeOf(e.resync).toBeBoolean()
+describe('§4.5 ContractDiff', () => {
+  it('uses changes[] + summary (not the legacy breakingChanges)', () => {
+    expectTypeOf<ContractDiff['summary']>().toEqualTypeOf<{
+      breaking: number
+      risky: number
+      compatible: number
+      unknown: number
+    }>()
+    expectTypeOf<ContractDiff>().toHaveProperty('changes')
   })
+})
 
-  it('PushReindexProgress percent can be null', () => {
-    const e: PushReindexProgress = { event: 'reindexProgress', worktreeId: 'wt-1', percent: null, running: true }
-    expectTypeOf(e.percent).toEqualTypeOf<number | null>()
+describe('§4.6 ReviewState', () => {
+  it('version 0 means no record yet', () => {
+    const state: ReviewState = REVIEW_STATE_INITIAL
+    expect(state.version).toBe(0)
+    expect(state.readingProgress.version).toBe(1)
   })
+})
 
-  it('PushQualityProgress has phase', () => {
-    const e: PushQualityProgress = { event: 'qualityProgress', worktreeId: 'wt-1', runId: 'r-1', percent: 50, phase: 'analyze' }
-    expect(e.phase).toBe('analyze')
-  })
-
-  it('PushQualityFinished has error null', () => {
-    const e: PushQualityFinished = { event: 'qualityFinished', worktreeId: 'wt-1', runId: 'r-1', success: true, error: null }
-    expectTypeOf(e.error).toEqualTypeOf<string | null>()
+describe('§5 push events (normalized internal names)', () => {
+  it('PushQualityProgress carries percent: number | null', () => {
+    expectTypeOf<PushQualityProgress['percent']>().toEqualTypeOf<number | null>()
   })
 
   it('PushGateChanged gate can be unknown', () => {
-    const e: PushGateChanged = { event: 'gateChanged', worktreeId: 'wt-1', gate: 'unknown' }
-    expect(e.gate).toBe('unknown')
+    expectTypeOf<PushGateChanged['gate']>().toEqualTypeOf<'pass' | 'warn' | 'fail' | 'unknown'>()
   })
 
-  it('CodeIntelPushEvent is union of all 5', () => {
-    const events: CodeIntelPushEvent[] = [
-      { event: 'changed', worktreeId: 'wt-1', reason: 'commit', resync: false },
-      { event: 'reindexProgress', worktreeId: 'wt-1', percent: null, running: false },
-      { event: 'qualityProgress', worktreeId: 'wt-1', runId: 'r', percent: null, phase: 'collect' },
-      { event: 'qualityFinished', worktreeId: 'wt-1', runId: 'r', success: false, error: 'err' },
-      { event: 'gateChanged', worktreeId: 'wt-1', gate: 'fail' }
-    ]
-    expect(events.length).toBe(5)
+  it('CodeIntelPushEvent is the union of all 5', () => {
+    expectTypeOf<CodeIntelPushEvent>().toEqualTypeOf<
+      PushChanged | PushReindexProgress | PushQualityProgress | PushQualityFinished | PushGateChanged
+    >()
   })
 })
 
-describe('code-intel-types WithUnknown helper', () => {
-  it('accepts unknown in addition to literal type', () => {
-    const v: WithUnknown<'foo' | 'bar'> = 'unknown'
-    expect(v).toBe('unknown')
-  })
-})
-
-describe('code-intel-types ContractDiff', () => {
-  it('ContractDiff shape compiles', () => {
-    const diff: ContractDiff = {
-      breakingChanges: [],
-      addedEndpoints: [],
-      removedEndpoints: [],
-      modifiedSchemas: []
-    }
-    expect(diff.breakingChanges).toHaveLength(0)
+describe('WithUnknown helper', () => {
+  it('adds unknown to a literal union', () => {
+    expectTypeOf<WithUnknown<'a' | 'b'>>().toEqualTypeOf<'a' | 'b' | 'unknown'>()
   })
 })

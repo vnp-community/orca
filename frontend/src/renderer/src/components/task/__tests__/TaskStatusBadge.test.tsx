@@ -34,11 +34,9 @@ describe('TaskStatusBadge', () => {
 
   // FE-TASK-003 (task-graph v4): STATUS_CONFIG was missing 3 of 7 real TaskStatus values —
   // these used to silently fall back to "Todo" (STATUS_CONFIG[status] || STATUS_CONFIG.todo).
-  it("renders backlog with label 'Backlog', not a Todo fallback", () => {
-    render(<TaskStatusBadge status="backlog" />)
-    expect(screen.getByText('Backlog')).toBeInTheDocument()
-    expect(screen.getByText('📋')).toBeInTheDocument()
-    expect(screen.queryByText('Todo')).not.toBeInTheDocument()
+  it("falls back to 'Open' for a legacy backlog status (CR-REQ-018-06)", () => {
+    render(<TaskStatusBadge status={'backlog' as never} />)
+    expect(screen.getByText('Open')).toBeInTheDocument()
   })
 
   it("renders review with label 'Review'", () => {

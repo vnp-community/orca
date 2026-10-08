@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/impact-column-layout.ts` (mới), test
 **Depends on:** FE-CV-TASK-050-01
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: impact/impact-column-layout.test 7/7 pass)
 
 ## Context
 

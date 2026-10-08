@@ -5,7 +5,7 @@
 **Area:** frontend / request / readiness
 **File:** `frontend/src/renderer/src/components/request/readiness/{ReadinessBadge,ReadinessReportSheet,PlanDriftBanner,PlanDriftReviewSheet,PhaseReadinessSummary}.tsx`, `readiness-action-rules.ts` (mới); `components/request/plan/PlanTaskRow.tsx`, `PhaseNode.tsx`, `RequestPlanTab.tsx` (sửa, FE-REQ-TASK-021-03/021-05); `components/task/TaskDetail.tsx` (sửa); test cùng tên
 **Depends on:** FE-REQ-TASK-036-01, 036-02, 036-03 (mở `ClarificationPanel`), FE-REQ-TASK-032-06 (`GraphPanel` lens `execution`), FE-REQ-TASK-021-03, 021-05, 021-04
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — vitest readiness/readiness-action-rules (5), readiness-components (9) pass — thiếu: test tích hợp TaskDetail, chip "Lệch", điều hướng dev server
 
 ## Context
 
@@ -68,3 +68,7 @@
 - Hình dạng `impact.drift` chưa chốt; parser chịu thiếu; bảng dự kiến so với thực tế hiển thị trường có; thiếu thì "Chưa có dữ liệu".
 - Khoá nút Chạy cứng hay chỉ cảnh báo là câu hỏi mở 7 của CR-036; bản này khoá khi backend hỗ trợ, không khoá khi `unsupported`.
 - `TaskDetail`, `PlanTaskRow`, `PhaseNode`, `RequestPlanTab` thuộc SOL-021: chỉ thêm điểm cắm cần thiết.
+
+## Ghi chú triển khai (2026-10-07)
+
+`ReadinessBadge`/`ReadinessReportSheet`/`PhaseReadinessSummary` xong và gắn vào `PlanTaskRow`, `PhaseNode`, `TaskDetail` (badge, nút "Kiểm tra sẵn sàng", khoá Chạy qua `isRunBlockedByReadiness`; chỉ cho task có `requestId`). `PlanDriftSection` (banner + sheet) gắn vào `RequestPlanTab`; hành động chỉ "chấp nhận" (approve) và "trả về" (reject), không "huỷ Phase". Chưa: chip "Lệch" trên `PlanTaskRow`, test render `TaskDetail` với báo cáo readiness, đường dẫn tới màn dev server (nút chỉ hiện khi host truyền `onConnectDevServer`).

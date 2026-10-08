@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/data-flow-export.ts` (mới), test
 **Depends on:** không
-**Status:** [x] DONE
+**Status:** [x] DONE (verified 2026-10-07: vitest data-flow-overlay-export.test.ts)
 
 ## Context
 
@@ -27,3 +27,7 @@
 ## Rủi ro
 
 - `<a download>` trong Electron đóng gói chưa kiểm ngoài tiền lệ CSV.
+
+## Ghi chú triển khai (2026-10-07)
+
+`dataflow/data-flow-export.ts`. Tải SVG từ chối nếu có `<script>` hoặc thuộc tính `on*`; `revokeObjectURL` trễ 1 s. Chưa kiểm tải tệp trong Electron đóng gói.

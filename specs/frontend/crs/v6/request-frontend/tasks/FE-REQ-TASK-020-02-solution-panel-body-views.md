@@ -5,7 +5,7 @@
 **Area:** frontend / request / solution
 **File:** `frontend/src/renderer/src/components/request/solution/{RequestAnalysisTab,SolutionPanel,SolutionVersionSwitcher,SolutionStatusBanner,SolutionBody,DiagnosisView,FindingsView,AnswerView,SolutionGenerationState,RequestMarkdownContent}.tsx` (mới); `components/request/RequestDetailPane.tsx` (sửa: cắm `RequestAnalysisTab`); test cùng tên
 **Depends on:** FE-REQ-TASK-020-01, 019-03, 018-03
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest components/request/solution 90 pass, tsc/oxlint sạch ở file solution/)
 
 ## Context
 
@@ -41,3 +41,11 @@
 
 - Cách lấy nội dung đầy đủ (`content_ref`) chưa có kênh: nút "Xem đầy đủ" chỉ hiện với nội dung đã có.
 - Markdown rất dài làm chậm: cắt hiển thị đầu, tải đủ trong `Sheet`.
+
+## Ghi chú triển khai (2026-10-07)
+
+- `RequestAnalysisTab` giữ props `{request,onChanged}`; việc cắm vào `RequestDetailPane` thuộc agent 019 (không sửa ở đây).
+- Trạng thái Solution theo parser hiện tại (`generating|ready|chosen|rejected|superseded`); `parseSolution` được mở rộng khoan dung để nhận `draft|proposed|approved`, `options` dạng object và `chosenOption` số (test `shared/request-solution-wire-parser.test.ts`).
+- Nội dung diagnosis/findings/answer đọc từ `content` (JSON snake/camel) hoặc fallback Markdown; schema AI chưa chốt.
+- `useApprovals({requestId})` ghi đè `pendingApprovalCount` toàn cục bằng số của riêng request: rủi ro cần agent hook xử lý.
+- Bản dài > 4000 ký tự cắt đầu + `Sheet` xem đầy đủ.

@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/AgentTurnVerificationLine.tsx` (mới) + test; chỗ gắn trong `ReviewTurnSwitcher` (FE-CV-SOL-060)
 **Depends on:** FE-CV-TASK-089-05
-**Status:** [x] DONE — `AgentTurnVerificationLine.tsx` chưa tồn tại. Chỗ gắn trong SOL-060 `ReviewTurnSwitcher` cũng chưa có. Rà soát 2026-10-07.
+**Status:** [x] DONE (verified 2026-10-07: ReviewTurnSwitcher.test 9/9, AgentTurnVerificationLine.test, ReviewWorkspace.companions.test 8/8; review-map 130 file PASS)
 
 ## Context
 
@@ -29,3 +29,11 @@
 ## Rủi ro
 
 - Chỗ đặt trong 060 chưa tồn tại.
+
+## Ghi chú triển khai (2026-10-07)
+
+Component hoàn chỉnh + test, nhưng chưa gắn vào `ReviewTurnSwitcher` (SOL-060 chưa tồn tại).
+
+## Ghi chú tích hợp (W6, 2026-10-07)
+
+Dòng được gắn vào `ReviewTurnSwitcher` (prop `verificationByTurn`) cho lượt đang xem; dữ liệu từ `turns/use-agent-turn-verification.ts` gọi `quality.turns` (limit 20, chỉ khi cờ quality bật và có mốc lượt), khoá theo `clientTurnId` = `turnId`. Chưa truyền `canRun`/`onRunChecks`/`onViewRun` nên nút "Chạy lại kiểm tra" và liên kết "Xem lần chạy" chưa hiện (chờ lens quality của W5-A).

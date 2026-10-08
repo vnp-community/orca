@@ -5,7 +5,7 @@
 **Area:** frontend / request / execution / i18n / tests
 **File:** `frontend/src/renderer/src/components/request/execution/{ExecutionResultPanel,ExecutionChecksTable}.tsx`, `execution-result-comparison.ts` (mới); `components/task/TaskDetail.tsx` (sửa: tab "Kết quả"); `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa); `frontend/src/renderer/src/i18n/request-artifact-locale-coverage.test.ts` (mới); `tests/e2e/request-clarification-risk.spec.ts` (mới); `docs/ui/pages/requests.md` (sửa); test cùng tên
 **Depends on:** FE-REQ-TASK-036-02 (`useExecutionResult`), 036-03 đến 036-07 (nguồn khoá i18n), FE-REQ-TASK-019-07 (`request-locale-coverage.test.ts`, mẫu)
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — vitest execution/execution-result-comparison (5), execution-components (6), i18n/request-artifact-locale-coverage (13) pass — thiếu: e2e chạy thật, `verify:localization-*`, test TaskDetail tab Kết quả
 
 ## Context
 
@@ -70,3 +70,7 @@
 - Bản dịch máy `es`, `ja`, `ko`, `zh` cho thuật ngữ rủi ro cần người duyệt.
 - `stdoutTail` có thể chứa dữ liệu nhạy cảm: hiển thị văn bản thuần, không chuyển tiếp ra ngoài, không ghi vào `localStorage`.
 - Bộ e2e cần mock runtime thận trọng; không hứa chạy được cho tới khi backend 028, 029, 030 có.
+
+## Ghi chú triển khai (2026-10-07)
+
+`ExecutionResultPanel` + `ExecutionChecksTable` + tab "Kết quả" trong `TaskDetail` (ẩn khi `unsupported` hoặc task không thuộc Request). `legacy` hiện `legacyOutput` nếu truyền (TaskDetail chưa truyền vì `OrcaTask` không có trường stdout). `tests/e2e/request-clarification-risk.spec.ts` chưa tạo; docs đã cập nhật. Bản dịch es/ja/ko/zh là bản dịch thật nhưng chưa qua người dịch duyệt.

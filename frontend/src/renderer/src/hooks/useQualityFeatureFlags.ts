@@ -29,48 +29,48 @@ const CLOSED_FLAGS: QualityFeatureFlags = {
   ai: false,
 }
 
+type SupportSnapshot = {
+  state: string
+  effective?: {
+    codeIntelEnabled?: boolean
+    qualityGateEnabled?: boolean
+    aiReviewEnabled?: boolean
+  } | null
+}
+
+function readSupport(state: unknown): SupportSnapshot | undefined {
+  return (state as Record<string, unknown>).codeIntelSupportState as SupportSnapshot | undefined
+}
+
 /**
- * Returns aggregated feature flags.
- * All flags are false when state === 'unknown' or === 'disabled' or === 'unsupported'.
+ * Returns aggregated feature flags; every flag is false unless support is 'enabled'.
  * Does NOT call codeIntelClient directly.
- *
- * Note: relies on slice selectors written by FE-CV-TASK-050-10/12.
- * When that slice is absent, falls back to fail-closed defaults.
  */
 export function useQualityFeatureFlags(): QualityFeatureFlags {
-  return useAppStore((state) => {
-    // Read from code-intel slice (added by 050-10/12)
-    // The selector path may not exist yet if 050-10 is not done;
-    // optional chaining provides a safe fallback until then.
-    const support = (state as Record<string, unknown>).codeIntelSupportState as
-      | { state: string; effective?: { codeIntelEnabled?: boolean; qualityGateEnabled?: boolean; aiReviewEnabled?: boolean } }
-      | undefined
-
-    if (!support) {
-      // 050-10 slice not present yet → fail closed
-      return CLOSED_FLAGS
-    }
-
-    const { state: supportState, effective } = support
-
-    if (supportState !== 'enabled' || !effective) {
-      return {
-        state: supportState as QualityFeatureFlags['state'],
-        codeIntel: false,
-        quality: false,
-        ai: false,
-      }
-    }
-
-    const codeIntel = effective.codeIntelEnabled === true
-    const quality = codeIntel && effective.qualityGateEnabled === true
-    const ai = quality && effective.aiReviewEnabled === true
-
-    return {
-      state: 'enabled',
-      codeIntel,
-      quality,
-      ai,
-    }
+  // Why: primitive selectors keep each store snapshot referentially stable
+  // (zustand v5 loops on selectors that return a fresh object every call).
+  const supportState = useAppStore((s) => readSupport(s)?.state ?? CLOSED_FLAGS.state)
+  const codeIntel = useAppStore((s) => {
+    const support = readSupport(s)
+    return support?.state === 'enabled' && support.effective?.codeIntelEnabled === true
   })
+  const quality = useAppStore((s) => {
+    const support = readSupport(s)
+    return (
+      support?.state === 'enabled' &&
+      support.effective?.codeIntelEnabled === true &&
+      support.effective.qualityGateEnabled === true
+    )
+  })
+  const ai = useAppStore((s) => {
+    const support = readSupport(s)
+    return (
+      support?.state === 'enabled' &&
+      support.effective?.codeIntelEnabled === true &&
+      support.effective.qualityGateEnabled === true &&
+      support.effective.aiReviewEnabled === true
+    )
+  })
+
+  return { state: supportState as QualityFeatureFlags['state'], codeIntel, quality, ai }
 }

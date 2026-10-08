@@ -25,6 +25,9 @@ export type CodeIntelSupportState = {
   lastPolledAt?: string | null
 }
 
+/** idle: no stream wanted; streaming: push stream open; polling: stream unsupported, poll instead */
+export type CodeIntelEventsState = 'idle' | 'streaming' | 'polling'
+
 // ---------------------------------------------------------------------------
 // LRU cache types
 // ---------------------------------------------------------------------------
@@ -41,7 +44,7 @@ class LruCache<T> {
 
   get(key: string): T | undefined {
     const entry = this.map.get(key)
-    if (!entry) return undefined
+    if (!entry) {return undefined}
     // Move to end (most recently used)
     this.map.delete(key)
     this.map.set(key, { ...entry, ts: Date.now() })
@@ -53,7 +56,7 @@ class LruCache<T> {
     if (this.map.size >= this.capacity) {
       // Evict oldest
       const firstKey = this.map.keys().next().value
-      if (firstKey !== undefined) this.map.delete(firstKey)
+      if (firstKey !== undefined) {this.map.delete(firstKey)}
     }
     this.map.set(key, { key, value, ts: Date.now() })
   }
@@ -102,9 +105,15 @@ export type CodeIntelSlice = {
   /** Resync counter: increment triggers a re-fetch */
   codeIntelResyncCounter: number
 
+  /** Transport mode of the push stream (polling fallback when unsupported) */
+  codeIntelEventsState: CodeIntelEventsState
+
   // Actions
   setCodeIntelSupportState: (state: CodeIntelSupportState) => void
+  setCodeIntelEventsState: (state: CodeIntelEventsState) => void
   invalidateCodeIntelWorktree: (worktreeId: string) => void
+  /** Clears the stale signal after a fresh load (cache entries are left alone). */
+  markCodeIntelWorktreeFresh: (worktreeId: string) => void
   setCacheResult: (worktreeId: string, cacheKey: string, value: unknown) => void
   getCacheResult: (worktreeId: string, cacheKey: string) => unknown
   pruneCodeIntelWorktrees: (liveWorktreeIds: string[]) => void
@@ -122,7 +131,7 @@ const worktreeAccessOrder: string[] = []
 
 function touchWorktree(worktreeId: string): void {
   const idx = worktreeAccessOrder.indexOf(worktreeId)
-  if (idx !== -1) worktreeAccessOrder.splice(idx, 1)
+  if (idx !== -1) {worktreeAccessOrder.splice(idx, 1)}
   worktreeAccessOrder.push(worktreeId)
 }
 
@@ -141,14 +150,24 @@ function getOrCreateWorktreeState(
 // Factory
 // ---------------------------------------------------------------------------
 
+type SliceData = Pick<
+  CodeIntelSlice,
+  'codeIntelSupportState' | 'codeIntelWorktreeState' | 'codeIntelResyncCounter' | 'codeIntelEventsState'
+>
+
 export function createCodeIntelSlice(
-  set: (fn: (prev: { codeIntelSupportState: CodeIntelSupportState; codeIntelWorktreeState: Record<string, CodeIntelWorktreeState>; codeIntelResyncCounter: number }) => Partial<{ codeIntelSupportState: CodeIntelSupportState; codeIntelWorktreeState: Record<string, CodeIntelWorktreeState>; codeIntelResyncCounter: number }>) => void,
-  get: () => { codeIntelSupportState: CodeIntelSupportState; codeIntelWorktreeState: Record<string, CodeIntelWorktreeState>; codeIntelResyncCounter: number }
+  set: (fn: (prev: SliceData) => Partial<SliceData>) => void,
+  get: () => SliceData
 ): CodeIntelSlice {
   return {
     codeIntelSupportState: { state: 'unknown' },
     codeIntelWorktreeState: {},
     codeIntelResyncCounter: 0,
+    codeIntelEventsState: 'idle',
+
+    setCodeIntelEventsState(newState) {
+      set(() => ({ codeIntelEventsState: newState }))
+    },
 
     setCodeIntelSupportState(newState) {
       set(() => ({ codeIntelSupportState: newState }))
@@ -167,6 +186,19 @@ export function createCodeIntelSlice(
       })
     },
 
+    markCodeIntelWorktreeFresh(worktreeId) {
+      set((prev) => {
+        const current = prev.codeIntelWorktreeState[worktreeId]
+        if (!current?.stale) {return {}}
+        return {
+          codeIntelWorktreeState: {
+            ...prev.codeIntelWorktreeState,
+            [worktreeId]: { ...current, stale: false }
+          }
+        }
+      })
+    },
+
     setCacheResult(worktreeId, cacheKey, value) {
       touchWorktree(worktreeId)
 
@@ -176,7 +208,7 @@ export function createCodeIntelSlice(
         // Prune excess worktrees (oldest first from worktreeAccessOrder)
         while (worktreeAccessOrder.length > MAX_CACHED_WORKTREES) {
           const oldest = worktreeAccessOrder.shift()
-          if (oldest) delete state[oldest]
+          if (oldest) {delete state[oldest]}
         }
 
         const worktreeState = getOrCreateWorktreeState(state, worktreeId)
@@ -200,7 +232,7 @@ export function createCodeIntelSlice(
       set((prev) => {
         const next: Record<string, CodeIntelWorktreeState> = {}
         for (const [id, s] of Object.entries(prev.codeIntelWorktreeState)) {
-          if (liveSet.has(id)) next[id] = s
+          if (liveSet.has(id)) {next[id] = s}
         }
         // Clean up access order tracking
         for (let i = worktreeAccessOrder.length - 1; i >= 0; i--) {

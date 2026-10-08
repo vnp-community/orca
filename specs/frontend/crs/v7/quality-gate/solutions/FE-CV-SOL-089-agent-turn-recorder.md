@@ -1,6 +1,6 @@
 # FE-CV-SOL-089-agent-turn-recorder: Ghi lượt agent lên backend và hiển thị đối chiếu "agent tự báo"
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ việc ĐỌC code `frontend/src` và hợp đồng v7; chưa chạy test, build hay ứng dụng.
+> Trạng thái (2026-10-07): 6/7 task DONE, 1 PARTIAL (089-04; W6: 089-06 đã gắn vào ReviewTurnSwitcher), 0 BLOCKED, 0 TODO. Xem mục "Ghi chú triển khai" của từng task; code thật lệch spec ở các điểm đã ghi.
 
 **CR:** [CR-CV-089 mục 2.8 và 2.4](../../../../../../docs/crs/v7/quality-gate/CR-CV-089-agent-provenance-and-claim-reconciliation.md) (phần frontend; `BE-CV-SOL-089-agent-turn-provenance` lo kho `agent_turns`)
 **Area:** frontend (`frontend/src/renderer/src/components/review-map/turns/`, `hooks`, `lib`)

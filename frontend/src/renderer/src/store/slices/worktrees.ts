@@ -2273,6 +2273,12 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
     // Why: keyed by worktreeId; re-keyed on rename but missed by both removal
     // paths, leaking an upstream-status entry per removed worktree.
     remoteStatusesByWorktree: omitByWorktree(s.remoteStatusesByWorktree),
+    // Why: code-intel result caches are keyed by worktree id and hold large payloads.
+    codeIntelWorktreeState: omitByWorktree(s.codeIntelWorktreeState ?? {}),
+    codeIntelQualityByWorktree: omitByWorktree(s.codeIntelQualityByWorktree ?? {}),
+    // Why: review shell UI/progress state is keyed by worktree id.
+    reviewUiByWorktree: omitByWorktree(s.reviewUiByWorktree ?? {}),
+    reviewProgressByWorktree: omitByWorktree(s.reviewProgressByWorktree ?? {}),
     gitStatusHeadByWorktree: omitByWorktree(s.gitStatusHeadByWorktree),
     gitIgnoredPathsByWorktree: omitByWorktree(s.gitIgnoredPathsByWorktree),
     gitConflictOperationByWorktree: omitByWorktree(s.gitConflictOperationByWorktree),
@@ -3667,6 +3673,27 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           })(),
           // Why: these worktree-keyed maps are re-keyed on rename but were missed
           // by both removal paths, leaking one entry per removed worktree.
+          codeIntelWorktreeState: (() => {
+            const next = { ...(s.codeIntelWorktreeState ?? {}) }
+            delete next[worktreeId]
+            return next
+          })(),
+          // Why: quality findings/run output are keyed by worktree id and must not outlive it.
+          codeIntelQualityByWorktree: (() => {
+            const next = { ...s.codeIntelQualityByWorktree }
+            delete next[worktreeId]
+            return next
+          })(),
+          reviewUiByWorktree: (() => {
+            const next = { ...(s.reviewUiByWorktree ?? {}) }
+            delete next[worktreeId]
+            return next
+          })(),
+          reviewProgressByWorktree: (() => {
+            const next = { ...(s.reviewProgressByWorktree ?? {}) }
+            delete next[worktreeId]
+            return next
+          })(),
           remoteStatusesByWorktree: (() => {
             const next = { ...s.remoteStatusesByWorktree }
             delete next[worktreeId]

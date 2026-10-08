@@ -39,6 +39,13 @@ export default function MobileDiffReviewScreen() {
     )
   }, [hostId, name, router, worktreeId])
 
+  const openReviewSummary = useCallback(() => {
+    const query = name ? `?${new URLSearchParams({ name }).toString()}` : ''
+    router.push(
+      `/h/${encodeURIComponent(hostId)}/review-summary/${encodeURIComponent(worktreeId)}${query}` as never
+    )
+  }, [hostId, name, router, worktreeId])
+
   const controller = useMobileDiffReviewController({
     client,
     connState,
@@ -48,6 +55,7 @@ export default function MobileDiffReviewScreen() {
     initialFilter,
     initialTarget,
     onOpenSession: openSession,
+    onOpenReviewSummary: openReviewSummary,
     onReconnect: forceReconnect
   })
 

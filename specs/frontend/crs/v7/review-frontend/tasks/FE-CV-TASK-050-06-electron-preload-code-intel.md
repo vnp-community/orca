@@ -5,7 +5,7 @@
 **Area:** desktop (ngoài `frontend/`, cần chủ sở hữu desktop duyệt)
 **File:** `desktop/src/preload/index.ts` (sửa), `desktop/src/preload/api-types.ts` (sửa)
 **Depends on:** FE-CV-TASK-050-04
-**Status:** [x] DONE
+**Status:** [~] PARTIAL — desktop/src/preload/index.ts uses createCodeIntelBridge (local=method_not_found, env=runtimeEnvironments:call) but has no test and the subscribeRuntimeEnvironmentFromPreload frame shape was not verified against the new raw-frame callbacks; needs desktop owner review
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / graph (layout) / dependencies
 **File:** `frontend/package.json` (sửa, chỉ sau duyệt); `frontend/src/renderer/src/components/graph/elk-layout-engine.ts`, `elk-layout.worker.ts`, `graph-layout-selector.ts` (mới); test cùng tên; `guides/STYLEGUIDE.md` không đổi
 **Depends on:** FE-REQ-TASK-032-05 (`LayoutEngine`); **quyết định duyệt** (người có thẩm quyền phụ thuộc; pháp chế cho EPL-2.0)
-**Status:** [ ] TODO (blocked: chưa được duyệt)
+**Status:** [!] BLOCKED — chặn bởi quyết định duyệt phụ thuộc `elkjs` (README v7 O5 cấm thêm ở MVP); `package.json` không đổi
 
 ## Context
 
@@ -69,3 +69,7 @@
 - `elkjs` bundle lớn có thể làm chậm khởi động nếu bị kéo vào chunk chính: dùng `import()` động và `React.lazy` cho `GraphCanvas` (đã có).
 - SSH/remote: bố cục chạy phía client nên không thêm vòng khứ hồi; dữ liệu lớn phải cắt ở backend (`maxNodes`).
 - Nếu v7 cần bố cục khác (treemap), không dùng task này.
+
+## Ghi chú triển khai (2026-10-07)
+
+Đóng bằng ghi chú theo spec: `LayoutEngine` cắm được đã có (032-05) nên có thể thêm `elk-layout-engine.ts` sau khi duyệt mà không đổi `GraphCanvas`. Mọi lens chạy bằng `waveLayoutEngine`.

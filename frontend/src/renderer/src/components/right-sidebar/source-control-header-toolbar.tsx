@@ -17,6 +17,7 @@ import {
   SourceControlBranchContextRow
 } from './source-control-branch-context-row'
 import { SourceControlHeaderOverflowMenu } from './source-control-header-overflow-menu'
+import { useSourceControlReviewEntry } from './source-control-review-entry'
 
 type SourceControlHeaderToolbarProps = {
   filterQuery: string
@@ -41,6 +42,8 @@ type SourceControlHeaderToolbarProps = {
   compareBaseRef: string | null
   upstreamStatus?: GitUpstreamStatus
   manualReviewUrl?: string | null
+  /** Worktree whose Review entry this toolbar offers; hidden when the flag is off. */
+  reviewWorktreeId?: string | null
 }
 
 function HostedReviewToolbarLink({
@@ -118,7 +121,7 @@ function renderOverflowMenu(
     | 'branchCompareRefreshDisabled'
     | 'diffCommentCount'
     | 'onExpandNotes'
-  >
+  > & { onReviewChanges?: () => void }
 ): React.JSX.Element {
   return <SourceControlHeaderOverflowMenu {...props} />
 }
@@ -145,8 +148,11 @@ export function SourceControlHeaderToolbar({
   branchSummary,
   compareBaseRef,
   upstreamStatus,
-  manualReviewUrl
+  manualReviewUrl,
+  reviewWorktreeId
 }: SourceControlHeaderToolbarProps): React.JSX.Element {
+  const reviewEntry = useSourceControlReviewEntry({ worktreeId: reviewWorktreeId })
+  const onReviewChanges = reviewEntry.visible ? reviewEntry.open : undefined
   const filterInputRef = useRef<HTMLInputElement>(null)
   const normalizedFilter = filterQuery.trim()
   const showCollapsedToolbar = !filterExpanded
@@ -158,7 +164,8 @@ export function SourceControlHeaderToolbar({
     onRefreshBranchCompare,
     branchCompareRefreshDisabled,
     diffCommentCount,
-    onExpandNotes
+    onExpandNotes,
+    onReviewChanges
   }
 
   const expandFilter = useCallback(() => {
@@ -291,6 +298,7 @@ export function SourceControlHeaderToolbar({
             compareBaseRef={compareBaseRef}
             upstreamStatus={upstreamStatus}
             manualReviewUrl={manualReviewUrl}
+            onReviewChanges={onReviewChanges}
             onChangeBaseRef={onChangeBaseRef}
             onRetry={onRefreshBranchCompare}
           />

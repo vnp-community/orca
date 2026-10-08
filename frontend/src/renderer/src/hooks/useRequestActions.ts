@@ -11,6 +11,8 @@
 import { useRef, useCallback } from 'react'
 import { callRequestRpc } from '../runtime/request-rpc-client'
 import { REQUEST_RPC_METHODS } from '../../../shared/request-rpc-methods'
+import { generatePlanProposeCommit } from './request-plan-generation'
+import { parseRequest } from '../../../shared/request-wire-parsers'
 import type { Result } from '../runtime/request-rpc-client'
 import type { RequestRpcError } from '../../../shared/request-errors'
 import type { OrcaRequest, RequestType, RequestSize, RequestUrgency } from '../../../shared/request-types'
@@ -28,7 +30,7 @@ export function useRequestActions() {
 
   function guard(action: string, id: string): boolean {
     const key = `${action}:${id}`
-    if (inFlight.current.get(key)) return false
+    if (inFlight.current.get(key)) {return false}
     inFlight.current.set(key, true)
     return true
   }
@@ -38,7 +40,7 @@ export function useRequestActions() {
   }
 
   const classify = useCallback(async (id: string): Promise<Result<unknown>> => {
-    if (!guard('classify', id)) return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already classifying' } as RequestRpcError }
+    if (!guard('classify', id)) {return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already classifying' } as RequestRpcError }}
     try { return await callRequestRpc(REQUEST_RPC_METHODS.CLASSIFY, { id }) }
     finally { release('classify', id) }
   }, [])
@@ -49,8 +51,9 @@ export function useRequestActions() {
     size?: RequestSize
     urgency?: RequestUrgency
     reason?: string
+    expectedVersion?: number
   }): Promise<Result<unknown>> => {
-    if (!guard('confirmType', params.id)) return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already confirming' } as RequestRpcError }
+    if (!guard('confirmType', params.id)) {return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already confirming' } as RequestRpcError }}
     try { return await callRequestRpc(REQUEST_RPC_METHODS.CONFIRM_TYPE, params) }
     finally { release('confirmType', params.id) }
   }, [])
@@ -59,9 +62,10 @@ export function useRequestActions() {
     id: string
     toType: RequestType
     reason: string
+    expectedVersion?: number
   }): Promise<Result<unknown>> => {
-    if (!params.reason.trim()) return validationError('Reason is required')
-    if (!guard('changeType', params.id)) return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already changing type' } as RequestRpcError }
+    if (!params.reason.trim()) {return validationError('Reason is required')}
+    if (!guard('changeType', params.id)) {return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already changing type' } as RequestRpcError }}
     try { return await callRequestRpc(REQUEST_RPC_METHODS.CHANGE_TYPE, params) }
     finally { release('changeType', params.id) }
   }, [])
@@ -71,14 +75,14 @@ export function useRequestActions() {
     stage: string
     reason: string
   }): Promise<Result<unknown>> => {
-    if (!params.reason.trim()) return validationError('Reason is required')
-    if (!guard('returnToBacklog', params.id)) return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already returning' } as RequestRpcError }
+    if (!params.reason.trim()) {return validationError('Reason is required')}
+    if (!guard('returnToBacklog', params.id)) {return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already returning' } as RequestRpcError }}
     try { return await callRequestRpc(REQUEST_RPC_METHODS.RETURN_TO_BACKLOG, params) }
     finally { release('returnToBacklog', params.id) }
   }, [])
 
   const reopen = useCallback(async (id: string): Promise<Result<unknown>> => {
-    if (!guard('reopen', id)) return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already reopening' } as RequestRpcError }
+    if (!guard('reopen', id)) {return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already reopening' } as RequestRpcError }}
     try { return await callRequestRpc(REQUEST_RPC_METHODS.REOPEN, { id }) }
     finally { release('reopen', id) }
   }, [])
@@ -87,7 +91,7 @@ export function useRequestActions() {
     id: string
     reason?: string
   }): Promise<Result<unknown>> => {
-    if (!guard('cancel', params.id)) return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already cancelling' } as RequestRpcError }
+    if (!guard('cancel', params.id)) {return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already cancelling' } as RequestRpcError }}
     try { return await callRequestRpc(REQUEST_RPC_METHODS.CANCEL, params) }
     finally { release('cancel', params.id) }
   }, [])
@@ -98,23 +102,34 @@ export function useRequestActions() {
     title: string
     body?: string
     type?: RequestType
+    clientRequestId?: string
   }): Promise<Result<{ request: OrcaRequest }>> => {
-    if (!guard('spawnChild', params.id)) return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already spawning' } as RequestRpcError }
-    try { return await callRequestRpc(REQUEST_RPC_METHODS.SPAWN_CHILD, params) }
+    if (!guard('spawnChild', params.id)) {return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already spawning' } as RequestRpcError }}
+    try {
+      // Why: CONTRACT names these linkReason/typeHint and answers {child, created}; the
+      // draft names (reason/type, {request}) are sent too and the result is normalised.
+      const result = await callRequestRpc<{ request?: OrcaRequest; child?: OrcaRequest }>(
+        REQUEST_RPC_METHODS.SPAWN_CHILD,
+        { ...params, linkReason: params.reason, typeHint: params.type }
+      )
+      if (!result.ok) {return result}
+      const child = result.value.child ?? result.value.request
+      return child ? { ok: true, value: { request: parseRequest(child) } } : result as Result<{ request: OrcaRequest }>
+    }
     finally { release('spawnChild', params.id) }
   }, [])
 
   const generatePlan = useCallback(async (id: string): Promise<Result<unknown>> => {
-    if (!guard('generatePlan', id)) return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already generating plan' } as RequestRpcError }
-    try { return await callRequestRpc(REQUEST_RPC_METHODS.GENERATE_PLAN, { id }) }
+    if (!guard('generatePlan', id)) {return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already generating plan' } as RequestRpcError }}
+    try { return await generatePlanProposeCommit(id) }
     finally { release('generatePlan', id) }
   }, [])
 
   const startPhase = useCallback(async (params: {
     id: string
-    phaseId: string
+    phaseTaskId?: string
   }): Promise<Result<unknown>> => {
-    if (!guard('startPhase', params.id)) return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already starting phase' } as RequestRpcError }
+    if (!guard('startPhase', params.id)) {return { ok: false, error: { kind: 'unknown', code: 'IN_FLIGHT', message: 'Already starting phase' } as RequestRpcError }}
     try { return await callRequestRpc(REQUEST_RPC_METHODS.START_PHASE, params) }
     finally { release('startPhase', params.id) }
   }, [])

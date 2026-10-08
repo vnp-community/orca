@@ -4,7 +4,7 @@ This is the **UI/visual design** doc for Orca — color tokens, typography, comp
 
 ## Overview
 
-Orca is an Electron desktop app for orchestrating coding agents across git worktrees. The visual identity is **monochrome and quiet** — neutral grays carry the chrome, color is reserved for state (selection ring, destructive, git decorations). The product spends most of its time hosting other people's tools (Monaco, xterm, Markdown previews), so Orca's own UI should recede and frame.
+Orca is an Electron desktop app for orchestrating coding agents across git worktrees. The visual identity is **monochrome and quiet** — neutral grays carry the chrome, color is reserved for state (selection ring, destructive, git decorations, risk level). The product spends most of its time hosting other people's tools (Monaco, xterm, Markdown previews), so Orca's own UI should recede and frame.
 
 When in doubt:
 
@@ -80,6 +80,14 @@ background: color-mix(in srgb, var(--primary) 12%, var(--background));
 ```
 
 This keeps light/dark parity automatic.
+
+## Risk tokens
+
+Risk levels (`low`, `medium`, `high`, `critical`) use `--risk-*` (each with `-background` at 10% and `-border` at 25%), plus `--graph-edge-added` / `--graph-edge-removed` for graph diffs. Use them via `text-risk-high`, `bg-risk-high-background`, `border-risk-high-border`.
+
+- Order of signal: text first, shape/icon second, color third. Risk is never conveyed by color alone (`RiskBadge`, `riskPresentation`).
+- `unknown` (not assessed) is its own level: dashed border, `text-muted-foreground`, never the `low` style. UI copy never says "safe".
+- Do not reuse `--git-decoration-*` for risk.
 
 ## Typography
 

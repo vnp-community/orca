@@ -5,7 +5,7 @@
 **Area:** frontend / graph (logic thuần)
 **File:** `frontend/src/renderer/src/components/graph/graph-grouping.ts`, `graph-zoom-levels.ts`, `graph-focus-state.ts`, `graph-before-after.ts`, `graph-client-lens-adapters.ts` (mới); test cùng tên (`*.test.ts`)
 **Depends on:** FE-REQ-TASK-032-03 (kiểu `GraphPayload`), FE-REQ-TASK-018-01 (`REQUEST_FLOW_REGISTRY`), FE-REQ-TASK-021-01 và 021-02 (`task-hierarchy.ts`, `usePlanTree` cho adapter `plan`/`execution`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (verified 2026-10-07: vitest graph-grouping (7), graph-zoom-levels (8), graph-focus-state (3), graph-before-after (3), graph-client-lens-adapters (5) pass)
 
 ## Context
 
@@ -68,3 +68,7 @@
 - Với repo cỡ nghìn symbol, 50 có thể quá ít hoặc quá nhiều; hằng nằm một chỗ để chỉnh sau khi đo.
 - `buildFlowGraph` phụ thuộc hình dạng `REQUEST_FLOW_REGISTRY` của 018-01: đọc lại file đó trước khi viết và dùng đúng tên trường.
 - `heatmap` có hình dạng chưa chốt: parser của 036/032-03 phải chịu thiếu; ở đây nhận `Record<taskId, GraphRisk>` đã chuẩn hoá.
+
+## Ghi chú triển khai (2026-10-07)
+
+Hàm thuần đủ theo spec. `buildFlowGraph` dùng `buildStageTimeline` sẵn có (nhãn qua tham số `label`). `PlanHeatmap`/`ExecutionDrift` là dạng tạm (hình dạng `impact.heatmap`/`impact.drift` chưa chốt).

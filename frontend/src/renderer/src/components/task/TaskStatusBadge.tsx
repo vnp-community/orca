@@ -3,10 +3,9 @@ import type { TaskStatus, TaskPriority } from '../../../../shared/task-types'
 // Colors kept in sync with TaskDAGView.tsx's STATUS_COLORS (review=purple, blocked=red) so
 // the DAG and Board views agree on a color per status — see AGENTS.md's Design System.
 // FE-TASK-003 (task-graph v4): previously covered only 4 of 7 TaskStatus values and fell
-// back to "Todo" for backlog/review/blocked — fixed below to cover all 7.
+// back to "Todo"; CR-REQ-018-06 removed 'backlog' (never a backend status).
 const STATUS_CONFIG = {
   open: { label: 'Open', icon: '🆕', className: 'text-slate-500' },
-  backlog: { label: 'Backlog', icon: '📋', className: 'text-slate-400' },
   todo: { label: 'Todo', icon: '⏳', className: 'text-gray-500' },
   in_progress: { label: 'In Progress', icon: '🔄', className: 'text-blue-600' },
   review: { label: 'Review', icon: '👀', className: 'text-purple-600' },
@@ -23,7 +22,7 @@ const PRIORITY_CONFIG = {
 }
 
 export function TaskStatusBadge({ status }: { status: TaskStatus }) {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG.todo
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.open
   return (
     <span
       className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border ${config.className}`}
