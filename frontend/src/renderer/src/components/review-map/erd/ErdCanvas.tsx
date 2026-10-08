@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useMemo } from 'react'
+import { useReviewNodeNoteCounts } from '../notes/use-review-node-note-counts'
 import {
   Background,
   Controls,
@@ -50,6 +51,8 @@ export type ErdCanvasProps = {
   onSelect: (key: string) => void
   onToggleExpand: (key: string) => void
   onOpenService: (service: string) => void
+  /** Owner of the review notes shown as node badges; null hides them. */
+  worktreeId?: string | null
 }
 
 export const ghostNodeId = (g: { service: string; table: string }): string =>
@@ -61,6 +64,7 @@ function CanvasInner(props: ErdCanvasProps): React.JSX.Element {
   const colorMode = useDocumentColorMode()
   const reduceMotion = usePrefersReducedMotion()
   const flow = useReactFlow()
+  const noteCounts = useReviewNodeNoteCounts(props.worktreeId ?? null)
 
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = layout.groups.map((g) => ({
@@ -85,7 +89,8 @@ function CanvasInner(props: ErdCanvasProps): React.JSX.Element {
         query,
         dimmed: dimmed.has(t.key),
         onSelect: props.onSelect,
-        onToggleExpand: props.onToggleExpand
+        onToggleExpand: props.onToggleExpand,
+        noteCount: noteCounts[t.key] ?? 0
       }
       nodes.push({
         id: t.key,
@@ -128,7 +133,18 @@ function CanvasInner(props: ErdCanvasProps): React.JSX.Element {
     return { nodes, edges }
     // Callbacks are stable props from the lens; the rest drives layout.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tables, relations, ghosts, layout, expandedTables, query, dimmed, selectedKey, service])
+  }, [
+    tables,
+    relations,
+    ghosts,
+    layout,
+    expandedTables,
+    query,
+    dimmed,
+    selectedKey,
+    service,
+    noteCounts
+  ])
 
   useEffect(() => {
     if (!selectedKey) {

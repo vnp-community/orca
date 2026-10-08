@@ -8,6 +8,7 @@ import React from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
+import { ApprovalRiskGateSection, useApprovalRiskGate } from '../impact/ApprovalRiskGate'
 import { planDecisionErrorMessage } from './plan-decision-error-message'
 import { PlanDecisionButtons } from './PlanDecisionButtons'
 import type { PlanDecision } from '../../../hooks/usePlanDecision'
@@ -23,7 +24,11 @@ type Props = {
   approveBlockedReason?: string | null
 }
 
-export function PlanApprovalBar({ approval, decision, approveBlockedReason = null }: Props): React.JSX.Element | null {
+export function PlanApprovalBar({
+  approval,
+  decision,
+  approveBlockedReason = null
+}: Props): React.JSX.Element | null {
   const failure =
     decision.failure &&
     (decision.failure.scope === approval?.id || decision.failure.scope === 'plan')
@@ -31,6 +36,7 @@ export function PlanApprovalBar({ approval, decision, approveBlockedReason = nul
       : null
   const regenerating = decision.isBusy('generatePlan')
   const isTaskList = (approval?.subjectType as string | undefined) === 'task_list'
+  const risk = useApprovalRiskGate(approval, failure?.error ?? null)
 
   // Approved plans are read-only: changing one means regenerating, which needs a new approval.
   if (approval?.status === 'approved') {
@@ -69,13 +75,23 @@ export function PlanApprovalBar({ approval, decision, approveBlockedReason = nul
           )}
         </div>
       )}
+      {approval?.status === 'pending' && (
+        <ApprovalRiskGateSection
+          api={risk}
+          approval={approval}
+          gateName="plan"
+          disabled={decision.isBusy(`approve:${approval.id}`)}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {approval?.status === 'pending' && (
           <PlanDecisionButtons
             approval={approval}
             decision={decision}
             testIdPrefix="plan"
-            approveBlockedReason={approveBlockedReason}
+            approveBlockedReason={approveBlockedReason ?? risk.blockedReason}
+            approveExtras={risk.gate.approveExtras}
+            hideApprove={risk.approverNotAllowed}
             approveLabel={
               isTaskList
                 ? translate(`${P}approveTaskList`, 'Approve task list')

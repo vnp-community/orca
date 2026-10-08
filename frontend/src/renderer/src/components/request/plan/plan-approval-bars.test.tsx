@@ -4,8 +4,12 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callRequestRpc = vi.fn()
+// Why: the risk gate (036-06) reads impact.* on mount; keep those calls apart so the
+// approval/plan assertions below still see only their own RPCs.
+const impactRpc = vi.fn()
 vi.mock('../../../runtime/request-rpc-client', () => ({
-  callRequestRpc: (...a: unknown[]) => callRequestRpc(...a)
+  callRequestRpc: (m: string, ...a: unknown[]) =>
+    String(m).startsWith('impact.') ? impactRpc(m, ...a) : callRequestRpc(m, ...a)
 }))
 const platform = vi.hoisted(() => ({ value: 'linux' }))
 vi.mock('@/lib/shortcut-platform', () => ({ getShortcutPlatform: () => platform.value }))
@@ -48,6 +52,11 @@ function GateHarness({ approvals }: { approvals: Approval[] }): React.JSX.Elemen
 beforeEach(() => {
   callRequestRpc.mockReset()
   callRequestRpc.mockResolvedValue({ ok: true, value: {} })
+  impactRpc.mockReset()
+  impactRpc.mockResolvedValue({
+    ok: false,
+    error: { kind: 'unsupported', code: 'method_not_found', message: 'm' }
+  })
   settled.mockReset()
   platform.value = 'linux'
 })
@@ -59,6 +68,7 @@ describe('PlanApprovalBar', () => {
     fireEvent.click(screen.getByTestId('plan-approve'))
     await waitFor(() => expect(settled).toHaveBeenCalled())
     expect(callRequestRpc).toHaveBeenCalledWith('approval.approve', {
+      id: 'ap1',
       approvalId: 'ap1',
       expectedVersion: 2,
       expectedDigest: 'dg',
@@ -85,6 +95,7 @@ describe('PlanApprovalBar', () => {
     await waitFor(() => expect(callRequestRpc).toHaveBeenCalled())
     expect(callRequestRpc.mock.calls[0][0]).toBe('approval.reject')
     expect(callRequestRpc.mock.calls[0][1]).toMatchObject({
+      id: 'ap1',
       approvalId: 'ap1',
       comment: 'The scope is far too large.'
     })
@@ -106,7 +117,10 @@ describe('PlanApprovalBar', () => {
     render(<PlanHarness approval={planApproval('ap1')} />)
     fireEvent.click(screen.getByTestId('plan-regenerate'))
     await waitFor(() =>
-      expect(callRequestRpc).toHaveBeenCalledWith('request.generatePlan', { id: 'r1', mode: 'propose' })
+      expect(callRequestRpc).toHaveBeenCalledWith('request.generatePlan', {
+        id: 'r1',
+        mode: 'propose'
+      })
     )
   })
 
@@ -265,5 +279,116 @@ describe('PlanGateChips', () => {
   it('renders nothing without any gate', () => {
     const { container } = render(<GateHarness approvals={[]} />)
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('risk gate on plan / phase approval (FE-REQ-TASK-036-06)', () => {
+  const summary = (level: string) => ({
+    assessment_id: 'as1',
+    digest: 'dg1',
+    level,
+    status: 'ready',
+    mode: 'enforce'
+  })
+  function serveImpact(level: string, findings: unknown[] = []) {
+    impactRpc.mockImplementation(async (m: string) => {
+      if (m === 'impact.get') {
+        return { ok: true, value: summary(level) }
+      }
+      if (m === 'impact.findings') {
+        return { ok: true, value: { findings } }
+      }
+      if (m === 'impact.accept') {
+        return { ok: true, value: { acceptance: { acceptedBy: 'u1' } } }
+      }
+      return { ok: false, error: { kind: 'unsupported', code: 'x', message: 'm' } }
+    })
+  }
+
+  it('plan: medium risk locks Approve until the impact is opened, then sends viewedImpactDigest', async () => {
+    serveImpact('medium')
+    render(<PlanHarness approval={planApproval('ap1')} />)
+    const trigger = await screen.findByTestId('plan-view-impact-trigger')
+    expect(impactRpc).toHaveBeenCalledWith('impact.get', {
+      subjectType: 'plan',
+      subjectId: 'plan1'
+    })
+    expect(screen.getByTestId('plan-approve')).toBeDisabled()
+    fireEvent.click(trigger)
+    await waitFor(() => expect(screen.getByTestId('plan-approve')).toBeEnabled())
+    fireEvent.click(screen.getByTestId('plan-approve'))
+    await waitFor(() =>
+      expect(callRequestRpc).toHaveBeenCalledWith(
+        'approval.approve',
+        expect.objectContaining({ approvalId: 'ap1', viewedImpactDigest: 'dg1' })
+      )
+    )
+  })
+
+  it('phase: high finding must be accepted with a reason; approve sends acceptedFindingIds', async () => {
+    serveImpact('high', [{ id: 'f1', dimension: 'data', level: 'high', title: 'Column removed' }])
+    render(
+      <PhaseHarness approval={planApproval('ap2', { subjectType: 'phase', subjectId: 'ph1' })} />
+    )
+    const reason = await screen.findByLabelText('Reason for accepting')
+    expect(screen.getByTestId('phase-ph1-approve')).toBeDisabled()
+    fireEvent.change(reason, { target: { value: 'rollback rehearsed in staging' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Record acceptance' }))
+    await waitFor(() => expect(screen.getByTestId('phase-ph1-approve')).toBeEnabled())
+    expect(impactRpc).toHaveBeenCalledWith(
+      'impact.accept',
+      expect.objectContaining({ findingId: 'f1', assessmentDigest: 'dg1' })
+    )
+    fireEvent.click(screen.getByTestId('phase-ph1-approve'))
+    await waitFor(() =>
+      expect(callRequestRpc).toHaveBeenCalledWith(
+        'approval.approve',
+        expect.objectContaining({ approvalId: 'ap2', acceptedFindingIds: ['f1'] })
+      )
+    )
+  })
+
+  it('REQUEST_RISK_APPROVER_NOT_ALLOWED hides Approve; ACCEPTANCE_REQUIRED reloads the assessment', async () => {
+    serveImpact('low')
+    callRequestRpc.mockResolvedValue({
+      ok: false,
+      error: {
+        kind: 'forbidden',
+        code: 'REQUEST_RISK_APPROVER_NOT_ALLOWED',
+        message: 'REQUEST_RISK_APPROVER_NOT_ALLOWED: team'
+      }
+    })
+    render(<PlanHarness approval={planApproval('ap1')} />)
+    await waitFor(() => expect(impactRpc).toHaveBeenCalledWith('impact.get', expect.anything()))
+    fireEvent.click(screen.getByTestId('plan-approve'))
+    expect(await screen.findByTestId('plan-risk-approver-not-allowed')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-approve')).toBeNull()
+    expect(screen.getByTestId('plan-reject')).toBeInTheDocument()
+    cleanup()
+
+    callRequestRpc.mockResolvedValue({
+      ok: false,
+      error: {
+        kind: 'invalid_state',
+        code: 'REQUEST_RISK_ACCEPTANCE_REQUIRED',
+        message: 'REQUEST_RISK_ACCEPTANCE_REQUIRED: f1'
+      }
+    })
+    render(<PlanHarness approval={planApproval('ap3')} />)
+    await waitFor(() => expect(impactRpc).toHaveBeenCalledWith('impact.get', expect.anything()))
+    const before = impactRpc.mock.calls.filter((c) => c[0] === 'impact.get').length
+    fireEvent.click(screen.getByTestId('plan-approve'))
+    await waitFor(() =>
+      expect(impactRpc.mock.calls.filter((c) => c[0] === 'impact.get').length).toBeGreaterThan(
+        before
+      )
+    )
+  })
+
+  it('unsupported impact keeps the SOL-021 behaviour (no gate, Approve enabled)', async () => {
+    render(<PlanHarness approval={planApproval('ap1')} />)
+    await waitFor(() => expect(impactRpc).toHaveBeenCalled())
+    expect(screen.queryByTestId('risk-gate-plan')).toBeNull()
+    expect(screen.getByTestId('plan-approve')).toBeEnabled()
   })
 })

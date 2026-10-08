@@ -79,16 +79,27 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
   )
 
   const approve = useCallback(
-    (approval: Approval, comment?: string) =>
+    (
+      approval: Approval,
+      comment?: string,
+      risk?: { viewedImpactDigest?: string; acceptedFindingIds?: string[] }
+    ) =>
       run(
         `approve:${approval.id}`,
         approval.id,
         () =>
           callRequestRpc(REQUEST_RPC_METHODS.APPROVAL_APPROVE, {
+            // Why: CONTRACT 2.3 keys the approval as `id`; `approvalId` kept like useApprovals for older gateways.
+            id: approval.id,
             approvalId: approval.id,
             expectedVersion: approval.version,
             expectedDigest: approval.subjectDigest,
-            comment
+            comment,
+            // Why: CR-030 risk gate fields (camelCase names are provisional); omitted when empty.
+            ...(risk?.viewedImpactDigest ? { viewedImpactDigest: risk.viewedImpactDigest } : {}),
+            ...(risk?.acceptedFindingIds?.length
+              ? { acceptedFindingIds: risk.acceptedFindingIds }
+              : {})
           }),
         approval
       ),
@@ -96,10 +107,7 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
   )
 
   const regeneratePlan = useCallback(
-    () =>
-      run('generatePlan', 'plan', () =>
-        generatePlanProposeCommit(request.id)
-      ),
+    () => run('generatePlan', 'plan', () => generatePlanProposeCommit(request.id)),
     [run, request.id]
   )
 
@@ -125,6 +133,7 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
         approval.id,
         () =>
           callRequestRpc(REQUEST_RPC_METHODS.APPROVAL_REJECT, {
+            id: approval.id,
             approvalId: approval.id,
             expectedVersion: approval.version,
             expectedDigest: approval.subjectDigest,

@@ -587,6 +587,9 @@
             "de50bef680": "macOS가 Orca 알림을 차단하고 있습니다"
           }
         }
+      },
+      "workspaceTabPalette": {
+        "reviewTab": "리뷰 탭"
       }
     },
     "hooks": {
@@ -13076,7 +13079,10 @@
         },
         "SidebarRequestNavButton": {
           "label": "요청",
-          "badge": "보류 중인 승인"
+          "badge": "보류 중인 승인 {{count}}건"
+        },
+        "RequestSourceBadge": {
+          "opensInNewTab": "{{label}}: {{ref}} (새 탭에서 열림)"
         },
         "RequestType": {
           "bug": {
@@ -13198,7 +13204,8 @@
             "pros": "장점",
             "cons": "단점",
             "effort": "공수",
-            "risk": "위험"
+            "risk": "위험",
+            "rollback": "롤백"
           }
         },
         "SolutionDecisionBar": {
@@ -13297,7 +13304,8 @@
           "returnToBacklog": "백로그로 되돌리기",
           "changeType": "유형 변경",
           "spawnChild": "하위 요청 만들기",
-          "cancel": "요청 취소"
+          "cancel": "요청 취소",
+          "answerClarification": "답변"
         },
         "RequestDetailPane": {
           "backToList": "목록으로",
@@ -13364,7 +13372,8 @@
         "RequestFilterBar": {
           "chip": {
             "needsMyConfirmation": "내 확인 필요",
-            "running": "진행 중"
+            "running": "진행 중",
+            "awaitingInfo": "정보 대기 중"
           },
           "status": "상태",
           "type": "유형",
@@ -13505,7 +13514,8 @@
           },
           "PlanTaskRow": {
             "blocked": "차단됨",
-            "estimate": "{{hours}}시간"
+            "estimate": "{{hours}}시간",
+            "drifted": "계획 이탈"
           },
           "PlanTree": {
             "taskSheetDescription": "작업 상세",
@@ -14289,7 +14299,9 @@
             "tables": "테이블 {{count}}",
             "contracts": "계약 {{count}}",
             "untested": "테스트 없음 {{count}}",
-            "violations": "위반 {{count}}"
+            "violations": "위반 {{count}}",
+            "findings": "발견 {{count}}건",
+            "findingsMore": "발견 {{count}}+건"
           },
           "risk": {
             "incomplete": "데이터 부족",
@@ -14579,7 +14591,19 @@
           "changed": "변경됨",
           "untested": "테스트 없음",
           "unimplemented": "구현되지 않음",
-          "steps": "플로 단계"
+          "steps": "플로 단계",
+          "trigger": {
+            "http": "HTTP",
+            "grpc": "gRPC",
+            "event": "이벤트",
+            "cron": "예약",
+            "ws": "WebSocket"
+          },
+          "triggerFilter": "트리거",
+          "serviceFilter": "서비스",
+          "allTriggers": "모든 트리거",
+          "allServices": "모든 서비스",
+          "pickShort": "흐름 선택"
         },
         "impact": {
           "direction": "방향",

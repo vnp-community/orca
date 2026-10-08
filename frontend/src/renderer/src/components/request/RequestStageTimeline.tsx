@@ -28,14 +28,24 @@ const STEP_TONE: Record<StepState, string> = {
   skipped: 'text-destructive'
 }
 
-export function RequestStageTimeline({ request }: { request: OrcaRequest }): React.JSX.Element | null {
+export function RequestStageTimeline({
+  request,
+  resumeStatus
+}: {
+  request: OrcaRequest
+  /** From the open Clarification; places the waiting marker on the step that will resume. */
+  resumeStatus?: string
+}): React.JSX.Element | null {
   const timeline = buildStageTimeline({
     type: request.type,
     size: request.size,
     status: request.status,
-    returnedFromStage: request.returnedFromStage
+    returnedFromStage: request.returnedFromStage,
+    resumeStatus
   })
-  if (timeline.steps.length === 0) {return null}
+  if (timeline.steps.length === 0) {
+    return null
+  }
 
   return (
     <div data-testid="request-stage-timeline">
@@ -52,20 +62,31 @@ export function RequestStageTimeline({ request }: { request: OrcaRequest }): Rea
             >
               <Icon className="size-3.5" aria-hidden />
               <span>{label}</span>
-              <span className="sr-only">{translate(`auto.components.request.StageTimeline.state.${step.state}`, step.state)}</span>
+              <span className="sr-only">
+                {translate(`auto.components.request.StageTimeline.state.${step.state}`, step.state)}
+              </span>
             </li>
           )
         })}
       </ol>
       {request.status === 'awaiting_information' && (
-        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground" data-testid="timeline-awaiting-information">
+        <p
+          className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"
+          data-testid="timeline-awaiting-information"
+        >
           <MessageCircleQuestion className="size-3.5" aria-hidden />
-          {translate('auto.components.request.clarification.timelineWaiting', 'Waiting for additional information')}
+          {translate(
+            'auto.components.request.clarification.timelineWaiting',
+            'Waiting for additional information'
+          )}
         </p>
       )}
       {timeline.note === 'hotfix_fast_diagnosis' && (
         <p className="mt-1 text-xs text-muted-foreground">
-          {translate('auto.components.request.StageTimeline.note.hotfix', 'Hotfix: fast diagnosis, no approval before the plan.')}
+          {translate(
+            'auto.components.request.StageTimeline.note.hotfix',
+            'Hotfix: fast diagnosis, no approval before the plan.'
+          )}
         </p>
       )}
     </div>

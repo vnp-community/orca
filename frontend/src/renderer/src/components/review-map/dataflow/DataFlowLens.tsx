@@ -5,13 +5,15 @@
  * flows are always labeled as such.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import type { ReviewLensProps } from '../review-lens-registry'
 import { useDataFlows } from '../../../hooks/useDataFlows'
 import { DataFlowDetailPane } from './DataFlowDetailPane'
+import { DataFlowFilters } from './DataFlowFilters'
 import { DataFlowListPane } from './DataFlowListPane'
+import { usePaneWidthBelow } from './use-pane-width-below'
 import { filterFlowsTouchingChange } from './data-flow-overlay'
 
 export default function DataFlowLens(props: ReviewLensProps): React.JSX.Element {
@@ -22,14 +24,25 @@ export default function DataFlowLens(props: ReviewLensProps): React.JSX.Element 
   // Arriving from the "flows" chip means "show me what my change touches".
   const [touchOnly, setTouchOnly] = useState(chipFilter === 'flows')
 
-  const list = useDataFlows(worktreeId, environmentId, { query, triggerKind: null, service: null })
+  const [triggerKind, setTriggerKind] = useState<string | null>(null)
+  const [service, setService] = useState<string | null>(null)
+  const sectionRef = useRef<HTMLElement>(null)
+  const compact = usePaneWidthBelow(sectionRef, 720)
+
+  const list = useDataFlows(worktreeId, environmentId, { query, triggerKind, service })
+  const services = useMemo(
+    () => [...new Set(list.flows.map((f) => f.entryService).filter(Boolean))],
+    [list.flows]
+  )
   const touch = useMemo(() => filterFlowsTouchingChange(list.flows, overlay), [list.flows, overlay])
   const selected = list.flows.find((f) => f.id === flowId)
 
   return (
     <section
+      ref={sectionRef}
+      data-compact={compact}
       aria-label={translate('auto.components.reviewMap.lens.dataflow.label', 'Flows')}
-      className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:flex-row"
+      className={`flex min-h-0 flex-1 flex-col gap-2 p-2 ${compact ? '' : 'md:flex-row'}`}
     >
       <DataFlowListPane
         status={list.status}
@@ -47,6 +60,16 @@ export default function DataFlowLens(props: ReviewLensProps): React.JSX.Element 
         onSelect={(id) => setFlowId(worktreeId, id)}
         onLoadMore={list.loadMore}
         onRetry={list.refetch}
+        compact={compact}
+        filters={
+          <DataFlowFilters
+            triggerKind={triggerKind}
+            onTriggerKindChange={setTriggerKind}
+            service={service}
+            services={services}
+            onServiceChange={setService}
+          />
+        }
       />
       {flowId ? (
         <DataFlowDetailPane

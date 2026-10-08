@@ -14,7 +14,13 @@ import type { OrcaRequest } from '../../../../shared/request-types'
 
 const T = 'auto.components.request.RequestOverviewTab.'
 
-function Field({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
+function Field({
+  label,
+  children
+}: {
+  label: string
+  children: React.ReactNode
+}): React.JSX.Element {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -29,15 +35,23 @@ export function RequestOverviewTab({ request }: { request: OrcaRequest }): React
       {request.body ? (
         <p className="whitespace-pre-wrap break-words text-sm text-foreground">{request.body}</p>
       ) : (
-        <p className="text-sm text-muted-foreground">{translate(`${T}noBody`, 'No description.')}</p>
+        <p className="text-sm text-muted-foreground">
+          {translate(`${T}noBody`, 'No description.')}
+        </p>
       )}
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {request.source && (
           <Field label={translate(`${T}source`, 'Source')}>
-            <RequestSourceBadge provider={request.source.provider} ref={request.source.ref} url={request.source.url} />
+            <RequestSourceBadge
+              provider={request.source.provider}
+              sourceRef={request.source.ref}
+              url={request.source.url}
+            />
           </Field>
         )}
-        {request.reporterId && <Field label={translate(`${T}reporter`, 'Reporter')}>{request.reporterId}</Field>}
+        {request.reporterId && (
+          <Field label={translate(`${T}reporter`, 'Reporter')}>{request.reporterId}</Field>
+        )}
         {request.size && <Field label={translate(`${T}size`, 'Size')}>{request.size}</Field>}
         {request.urgency && request.urgency !== 'unknown' && (
           <Field label={translate(`${T}urgencyLabel`, 'Urgency')}>

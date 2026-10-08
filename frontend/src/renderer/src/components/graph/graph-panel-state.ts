@@ -34,23 +34,50 @@ export type GraphPanelAction =
   | { type: 'sheet'; id: string | null }
   | { type: 'searchPick'; node: GraphNode }
 
-export function createGraphPanelState(lens: GraphLens, view: GraphPanelView = 'graph'): GraphPanelState {
+export function createGraphPanelState(
+  lens: GraphLens,
+  view: GraphPanelView = 'graph',
+  selectedId: string | null = null
+): GraphPanelState {
   return {
-    lens, view, changeView: 'after', selectedId: null, focusId: null,
-    openGroups: new Set(), searchOpen: false, sheetNodeId: null, fitViewSignal: 0
+    lens,
+    view,
+    changeView: 'after',
+    selectedId,
+    focusId: null,
+    openGroups: new Set(),
+    searchOpen: false,
+    sheetNodeId: null,
+    fitViewSignal: 0
   }
 }
 
-export function initialView(input: { truncated: boolean; narrow: boolean; screenReaderMode?: boolean }): GraphPanelView {
+export function initialView(input: {
+  truncated: boolean
+  narrow: boolean
+  screenReaderMode?: boolean
+}): GraphPanelView {
   return input.truncated || input.narrow || input.screenReaderMode === true ? 'list' : 'graph'
 }
 
-export function graphPanelReducer(state: GraphPanelState, action: GraphPanelAction): GraphPanelState {
+export function graphPanelReducer(
+  state: GraphPanelState,
+  action: GraphPanelAction
+): GraphPanelState {
   switch (action.type) {
     case 'lens':
-      if (action.lens === state.lens) {return state}
+      if (action.lens === state.lens) {
+        return state
+      }
       // Why: node ids differ per lens, so selection, focus and open groups would dangle.
-      return { ...state, lens: action.lens, selectedId: null, focusId: null, openGroups: new Set(), sheetNodeId: null }
+      return {
+        ...state,
+        lens: action.lens,
+        selectedId: null,
+        focusId: null,
+        openGroups: new Set(),
+        sheetNodeId: null
+      }
     case 'view':
       return { ...state, view: action.view }
     case 'changeView':
@@ -61,7 +88,11 @@ export function graphPanelReducer(state: GraphPanelState, action: GraphPanelActi
       return { ...state, focusId: action.id }
     case 'toggleGroup': {
       const next = new Set(state.openGroups)
-      if (next.has(action.id)) {next.delete(action.id)} else {next.add(action.id)}
+      if (next.has(action.id)) {
+        next.delete(action.id)
+      } else {
+        next.add(action.id)
+      }
       return { ...state, openGroups: next }
     }
     case 'search':
@@ -75,33 +106,66 @@ export function graphPanelReducer(state: GraphPanelState, action: GraphPanelActi
 
 export function selectNodeFromSearch(state: GraphPanelState, node: GraphNode): GraphPanelState {
   const next = new Set(state.openGroups)
-  if (node.group !== null) {next.add(node.group)}
-  return { ...state, openGroups: next, selectedId: node.id, searchOpen: false, fitViewSignal: state.fitViewSignal + 1 }
+  if (node.group !== null) {
+    next.add(node.group)
+  }
+  return {
+    ...state,
+    openGroups: next,
+    selectedId: node.id,
+    searchOpen: false,
+    fitViewSignal: state.fitViewSignal + 1
+  }
 }
 
 function fold(s: string): string {
-  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
 }
 
 export const GRAPH_SEARCH_RESULT_LIMIT = 50
 
-export function filterGraphNodes(nodes: readonly GraphNode[], query: string, limit = GRAPH_SEARCH_RESULT_LIMIT): GraphNode[] {
+export function filterGraphNodes(
+  nodes: readonly GraphNode[],
+  query: string,
+  limit = GRAPH_SEARCH_RESULT_LIMIT
+): GraphNode[] {
   const q = fold(query.trim())
   const out: GraphNode[] = []
   for (const n of nodes) {
-    if (q === '' || fold(n.label).includes(q) || fold(n.kind).includes(q) || fold(n.group ?? '').includes(q)) {
+    if (
+      q === '' ||
+      fold(n.label).includes(q) ||
+      fold(n.kind).includes(q) ||
+      fold(n.group ?? '').includes(q)
+    ) {
       out.push(n)
-      if (out.length >= limit) {break}
+      if (out.length >= limit) {
+        break
+      }
     }
   }
   return out
 }
 
 /** True when a `/` key press should open search: not while typing in a field. */
-export function shouldOpenSearchOnKey(event: { key: string; target: EventTarget | null; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }): boolean {
-  if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) {return false}
+export function shouldOpenSearchOnKey(event: {
+  key: string
+  target: EventTarget | null
+  metaKey?: boolean
+  ctrlKey?: boolean
+  altKey?: boolean
+}): boolean {
+  if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) {
+    return false
+  }
   const el = event.target as HTMLElement | null
-  if (!el || typeof el.closest !== 'function') {return true}
+  if (!el || typeof el.closest !== 'function') {
+    return true
+  }
   return !el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
 }
 
@@ -116,7 +180,10 @@ export type LensAvailabilityContext = {
 }
 
 /** Why: chips are never hidden; a disabled chip carries the reason in its tooltip. */
-export function lensDisabledReason(lens: GraphLens, ctx: LensAvailabilityContext): LensDisabledReason | null {
+export function lensDisabledReason(
+  lens: GraphLens,
+  ctx: LensAvailabilityContext
+): LensDisabledReason | null {
   switch (lens) {
     case 'flow':
       return null
@@ -125,7 +192,9 @@ export function lensDisabledReason(lens: GraphLens, ctx: LensAvailabilityContext
     case 'execution':
       return ctx.executing ? null : 'notExecuting'
     default:
-      if (ctx.backendUnsupported) {return 'unsupported'}
+      if (ctx.backendUnsupported) {
+        return 'unsupported'
+      }
       return ctx.impactAssessed === false ? 'noAssessment' : null
   }
 }

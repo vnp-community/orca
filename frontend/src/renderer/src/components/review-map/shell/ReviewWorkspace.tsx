@@ -25,6 +25,7 @@ import { QualityGateChip } from '../quality/QualityGateChip'
 import { ReviewBottomDock } from './ReviewBottomDock'
 import { ReviewCompanionStrip } from './ReviewCompanionStrip'
 import { ReviewDetailDrawer } from './ReviewDetailDrawer'
+import { ReviewFindingsChip } from './ReviewFindingsChip'
 import { ReviewHeaderBar } from './ReviewHeaderBar'
 import { ReviewLensTabs } from './ReviewLensTabs'
 import { ReviewStateBanners } from './ReviewStateBanners'
@@ -148,7 +149,9 @@ export default function ReviewWorkspace({
       overlay={data.overlay}
       status={data.status}
       reindex={reindexProps}
-      trailing={<QualityGateChip worktreeId={worktreeId} currentHead={m.summary?.headOid ?? null} />}
+      trailing={
+        <QualityGateChip worktreeId={worktreeId} currentHead={m.summary?.headOid ?? null} />
+      }
       scopePicker={{
         scope,
         open: ui.scopePickerOpen,
@@ -350,7 +353,14 @@ export default function ReviewWorkspace({
       {header}
       <div className="space-y-1.5 px-3 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <ReviewSummaryBar overlay={overlay} active={ui.chipFilter} onChipClick={m.onChipClick} />
+          <ReviewSummaryBar overlay={overlay} active={ui.chipFilter} onChipClick={m.onChipClick}>
+            {m.selector.state === 'ready' ? (
+              <ReviewFindingsChip
+                worktreeId={worktreeId}
+                environmentId={m.selector.environmentId}
+              />
+            ) : null}
+          </ReviewSummaryBar>
           <ReviewCompanionStrip worktreeId={worktreeId} m={m} c={c} onOpenDiff={onOpenDiff} />
         </div>
         <ReviewStateBanners

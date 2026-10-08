@@ -6,6 +6,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../../task/TaskDetail', () => ({
   TaskDetail: () => <div data-testid="task-detail-stub" />
 }))
+const rpc = vi.hoisted(() => ({ drift: null as unknown }))
+vi.mock('../../../runtime/request-rpc-client', () => ({
+  callRequestRpc: async (method: string) =>
+    method === 'impact.drift' && rpc.drift
+      ? { ok: true, value: rpc.drift }
+      : { ok: false, error: { kind: 'unsupported', code: 'method_not_found', message: 'm' } }
+}))
 
 import { useAppStore } from '../../../store'
 import { PlanTree } from './PlanTree'
@@ -14,6 +21,7 @@ import { attachApprovals } from './plan-approval-model'
 import { planApproval, planTask, twoPhaseTree } from './plan-test-fixtures'
 
 afterEach(() => {
+  rpc.drift = null
   cleanup()
   useAppStore.setState({ tasks: [], activeTaskId: null })
 })
@@ -81,6 +89,22 @@ describe('PlanTree', () => {
       />
     )
     expect(screen.getByTestId('slot-ph2')).toBeInTheDocument()
+  })
+})
+
+describe('PlanTree drift chip (FE-REQ-TASK-036-07)', () => {
+  it('marks drifted tasks of a running phase with a text chip; phases not started are not queried', async () => {
+    rpc.drift = {
+      phase_id: 'ph1',
+      drifted: true,
+      items: [{ task_id: 'a2', expected: 'svc-a', actual: 'svc-a, svc-b' }]
+    }
+    const tree = twoPhaseTree()
+    tree.phases[0] = { ...tree.phases[0], status: 'in_progress', requestId: 'r1' }
+    render(<PlanTree tree={tree} approvals={attachApprovals(tree, [])} />)
+    expect(await screen.findByTestId('plan-task-drift-a2')).toHaveTextContent('Drifted')
+    expect(screen.queryByTestId('plan-task-drift-a1')).toBeNull()
+    expect(screen.queryByTestId('plan-task-drift-b1')).toBeNull()
   })
 })
 

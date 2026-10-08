@@ -318,6 +318,7 @@ export default function ErdLens(props: ReviewLensProps): React.JSX.Element {
               onSelect={(key) => selectErdTable(worktreeId, key)}
               onToggleExpand={toggleExpand}
               onOpenService={openService}
+              worktreeId={worktreeId}
             />
           ) : (
             <ErdTableList

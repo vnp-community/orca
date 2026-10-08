@@ -16,15 +16,35 @@ import { useClarifications } from '../../../hooks/useClarifications'
 import { requestErrorMessage } from '../request-error-message'
 import { ClarificationDeadlineNote } from './ClarificationDeadlineNote'
 import { ClarificationQuestionList } from './ClarificationQuestionList'
-import { canSubmit, dueState, missingRequired, toAnswerPayload } from './clarification-answer-validation'
+import {
+  canSubmit,
+  dueState,
+  missingRequired,
+  toAnswerPayload
+} from './clarification-answer-validation'
 import type { OrcaRequest } from '../../../../../shared/request-types'
 
 const T = 'auto.components.request.clarification.'
 const WAIT_NOTE_DELAY_MS = 3000
 
-const RESUME_STEP: Record<string, string> = { analyzing: 'analysis', planning: 'plan', executing: 'execution' }
+/** Header "Answer" scrolls here. */
+export const CLARIFICATION_PANEL_DOM_ID = 'request-clarification-panel'
 
-type Props = { request: OrcaRequest; currentUserId: string | null; isAdmin: boolean }
+const RESUME_STEP: Record<string, string> = {
+  analyzing: 'analysis',
+  planning: 'plan',
+  executing: 'execution'
+}
+
+export type ClarificationPanelState = { answerable: boolean; resumeStatus?: string }
+
+type Props = {
+  request: OrcaRequest
+  currentUserId: string | null
+  isAdmin: boolean
+  /** Lets the host show the header "Answer" button and the resume step on the timeline. */
+  onStateChange?: (state: ClarificationPanelState) => void
+}
 
 /** Server messages may name the offending question: `... question_id=q1 ...`. */
 function questionIdFromMessage(message: string, known: readonly string[]): string | null {
@@ -32,7 +52,12 @@ function questionIdFromMessage(message: string, known: readonly string[]): strin
   return m && known.includes(m[1]) ? m[1] : null
 }
 
-export function ClarificationPanel({ request, currentUserId, isAdmin }: Props): React.JSX.Element | null {
+export function ClarificationPanel({
+  request,
+  currentUserId,
+  isAdmin,
+  onStateChange
+}: Props): React.JSX.Element | null {
   const awaiting = request.status === 'awaiting_information'
   const c = useClarifications(awaiting ? request.id : null)
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set())
@@ -65,7 +90,9 @@ export function ClarificationPanel({ request, currentUserId, isAdmin }: Props): 
 
   // Why: answers may be sensitive and live only in memory, so warn before a reload drops them.
   useEffect(() => {
-    if (!c.hasDraft) {return}
+    if (!c.hasDraft) {
+      return
+    }
     const onBeforeUnload = (e: BeforeUnloadEvent): void => {
       e.preventDefault()
       e.returnValue = ''
@@ -75,18 +102,38 @@ export function ClarificationPanel({ request, currentUserId, isAdmin }: Props): 
   }, [c.hasDraft])
 
   const assignees = open?.assigneeIds
-  const notAssignee = Boolean(assignees && assignees.length > 0 && !isAdmin && (!currentUserId || !assignees.includes(currentUserId)))
+  const notAssignee = Boolean(
+    assignees &&
+    assignees.length > 0 &&
+    !isAdmin &&
+    (!currentUserId || !assignees.includes(currentUserId))
+  )
   const overdue = dueState(open?.dueAt, Date.now()).kind === 'overdue'
   const readOnly = notAssignee || lockedReadOnly
 
-  const ready = useMemo(() => (open ? canSubmit(open, c.draft, accepted) : false), [open, c.draft, accepted])
+  const answerable = Boolean(open) && !readOnly && !overdue
+  const resumeStatus = open?.resumeStatus
+  useEffect(() => {
+    onStateChange?.({ answerable, resumeStatus })
+  }, [answerable, resumeStatus, onStateChange])
+
+  const ready = useMemo(
+    () => (open ? canSubmit(open, c.draft, accepted) : false),
+    [open, c.draft, accepted]
+  )
 
   const submit = useCallback(async () => {
-    if (!open || readOnly || overdue || c.submitting) {return}
+    if (!open || readOnly || overdue || c.submitting) {
+      return
+    }
     if (!canSubmit(open, c.draft, accepted)) {
       setShowErrors(true)
       const first = missingRequired(open, c.draft, accepted)[0]
-      document.querySelector<HTMLElement>(`[data-question-id="${CSS.escape(first)}"] textarea, [data-question-id="${CSS.escape(first)}"] input, [data-question-id="${CSS.escape(first)}"] button`)?.focus()
+      document
+        .querySelector<HTMLElement>(
+          `[data-question-id="${CSS.escape(first)}"] textarea, [data-question-id="${CSS.escape(first)}"] input, [data-question-id="${CSS.escape(first)}"] button`
+        )
+        ?.focus()
       return
     }
     setBanner(null)
@@ -105,17 +152,28 @@ export function ClarificationPanel({ request, currentUserId, isAdmin }: Props): 
     } else if (kind === 'expired' || kind === 'invalid_state' || kind === 'forbidden') {
       setLockedReadOnly(true)
       c.refetch()
-      setBanner({ text: requestErrorMessage(kind === 'expired' ? 'invalid_state' : kind), retry: false })
+      setBanner({
+        text: requestErrorMessage(kind === 'expired' ? 'invalid_state' : kind),
+        retry: false
+      })
     } else if (kind === 'validation') {
-      const qid = questionIdFromMessage(message, open.questions.map((q) => q.id))
-      if (qid) {setFieldErrors({ [qid]: message })}
-      else {setBanner({ text: requestErrorMessage('validation'), retry: false })}
+      const qid = questionIdFromMessage(
+        message,
+        open.questions.map((q) => q.id)
+      )
+      if (qid) {
+        setFieldErrors({ [qid]: message })
+      } else {
+        setBanner({ text: requestErrorMessage('validation'), retry: false })
+      }
     } else {
       setBanner({ text: requestErrorMessage(kind), retry: true })
     }
   }, [open, readOnly, overdue, c, accepted])
 
-  if (!awaiting) {return null}
+  if (!awaiting) {
+    return null
+  }
 
   if (!open) {
     if (c.loading || !showWaitNote) {
@@ -126,25 +184,34 @@ export function ClarificationPanel({ request, currentUserId, isAdmin }: Props): 
       )
     }
     return (
-      <p className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground" data-testid="clarification-waiting">
+      <p
+        className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground"
+        data-testid="clarification-waiting"
+      >
         {translate(`${T}waitingForInfo`, 'Waiting for the information to be provided')}
       </p>
     )
   }
 
   const resumeStep = open.resumeStatus ? RESUME_STEP[open.resumeStatus] : undefined
-  const stepLabel = resumeStep ? translate(`auto.components.request.StageTimeline.step.${resumeStep}`, resumeStep) : ''
+  const stepLabel = resumeStep
+    ? translate(`auto.components.request.StageTimeline.step.${resumeStep}`, resumeStep)
+    : ''
 
   return (
     <section
       className="flex flex-col gap-3 rounded-md border border-border bg-card px-4 py-3"
       aria-label={translate(`${T}title`, 'Information needed')}
       data-testid="clarification-panel"
+      id={CLARIFICATION_PANEL_DOM_ID}
+      tabIndex={-1}
     >
       <header className="flex items-center gap-2">
         <MessageCircleQuestion className="size-4 text-muted-foreground" aria-hidden />
         <h3 className="text-sm font-semibold">{translate(`${T}title`, 'Information needed')}</h3>
-        <span className="text-xs text-muted-foreground">{open.displayId} · {translate(`${T}round`, 'Round {{round}}', { round: open.round })}</span>
+        <span className="text-xs text-muted-foreground">
+          {open.displayId} · {translate(`${T}round`, 'Round {{round}}', { round: open.round })}
+        </span>
       </header>
       <ClarificationDeadlineNote dueAt={open.dueAt} now={Date.now()} />
       {readOnly ? (
@@ -153,10 +220,19 @@ export function ClarificationPanel({ request, currentUserId, isAdmin }: Props): 
         </p>
       ) : null}
       {submitted ? (
-        <p role="status" className="text-xs text-muted-foreground" data-testid="clarification-submitted">
+        <p
+          role="status"
+          className="text-xs text-muted-foreground"
+          data-testid="clarification-submitted"
+        >
           {stillMissing
-            ? translate(`${T}stillMissing`, 'Some information is still missing; a new round was opened.')
-            : translate(`${T}answeredResume`, 'Received. The AI is re-running the {{step}} step.', { step: stepLabel })}
+            ? translate(
+                `${T}stillMissing`,
+                'Some information is still missing; a new round was opened.'
+              )
+            : translate(`${T}answeredResume`, 'Received. The AI is re-running the {{step}} step.', {
+                step: stepLabel
+              })}
         </p>
       ) : null}
       {banner ? (
@@ -177,7 +253,11 @@ export function ClarificationPanel({ request, currentUserId, isAdmin }: Props): 
         onAcceptDefault={(id, on) =>
           setAccepted((prev) => {
             const next = new Set(prev)
-            if (on) {next.add(id)} else {next.delete(id)}
+            if (on) {
+              next.add(id)
+            } else {
+              next.delete(id)
+            }
             return next
           })
         }
@@ -188,7 +268,11 @@ export function ClarificationPanel({ request, currentUserId, isAdmin }: Props): 
       />
       {!readOnly ? (
         <div className="flex justify-end">
-          <Button size="sm" disabled={!ready || overdue || c.submitting} onClick={() => void submit()}>
+          <Button
+            size="sm"
+            disabled={!ready || overdue || c.submitting}
+            onClick={() => void submit()}
+          >
             {translate(`${T}submit`, 'Submit answers')}
           </Button>
         </div>

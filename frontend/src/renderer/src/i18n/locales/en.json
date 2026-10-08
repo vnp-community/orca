@@ -587,6 +587,9 @@
             "de50bef680": "macOS is blocking Orca notifications"
           }
         }
+      },
+      "workspaceTabPalette": {
+        "reviewTab": "Review tab"
       }
     },
     "hooks": {
@@ -13076,7 +13079,10 @@
         },
         "SidebarRequestNavButton": {
           "label": "Requests",
-          "badge": "pending approvals"
+          "badge": "{{count}} pending approvals"
+        },
+        "RequestSourceBadge": {
+          "opensInNewTab": "{{label}}: {{ref}} (opens in new tab)"
         },
         "RequestType": {
           "bug": {
@@ -13198,7 +13204,8 @@
             "pros": "Pros",
             "cons": "Cons",
             "effort": "Effort",
-            "risk": "Risk"
+            "risk": "Risk",
+            "rollback": "Rollback"
           }
         },
         "SolutionDecisionBar": {
@@ -13297,7 +13304,8 @@
           "returnToBacklog": "Return to backlog",
           "changeType": "Change type",
           "spawnChild": "Create child request",
-          "cancel": "Cancel request"
+          "cancel": "Cancel request",
+          "answerClarification": "Answer"
         },
         "RequestDetailPane": {
           "backToList": "Back to list",
@@ -13364,7 +13372,8 @@
         "RequestFilterBar": {
           "chip": {
             "needsMyConfirmation": "Needs my confirmation",
-            "running": "Running"
+            "running": "Running",
+            "awaitingInfo": "Awaiting information"
           },
           "status": "Status",
           "type": "Type",
@@ -13505,7 +13514,8 @@
           },
           "PlanTaskRow": {
             "blocked": "Blocked",
-            "estimate": "{{hours}}h"
+            "estimate": "{{hours}}h",
+            "drifted": "Drifted"
           },
           "PlanTree": {
             "taskSheetDescription": "Task details",
@@ -14289,7 +14299,9 @@
             "tables": "{{count}} tables",
             "contracts": "{{count}} contracts",
             "untested": "{{count}} untested",
-            "violations": "{{count}} violations"
+            "violations": "{{count}} violations",
+            "findings": "{{count}} findings",
+            "findingsMore": "{{count}}+ findings"
           },
           "risk": {
             "incomplete": "Not enough data",
@@ -14579,7 +14591,19 @@
           "changed": "changed",
           "untested": "untested",
           "unimplemented": "not implemented",
-          "steps": "Flow steps"
+          "steps": "Flow steps",
+          "trigger": {
+            "http": "HTTP",
+            "grpc": "gRPC",
+            "event": "Event",
+            "cron": "Schedule",
+            "ws": "WebSocket"
+          },
+          "triggerFilter": "Trigger",
+          "serviceFilter": "Service",
+          "allTriggers": "All triggers",
+          "allServices": "All services",
+          "pickShort": "Pick a flow"
         },
         "impact": {
           "direction": "Direction",

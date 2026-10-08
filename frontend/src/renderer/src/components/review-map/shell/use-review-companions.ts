@@ -18,9 +18,12 @@ import type { ReviewDataApi } from '../review-shell-data'
 import { useAgentTurnVerification } from '../turns/use-agent-turn-verification'
 import { useReviewTurnMarkers } from '../turns/use-review-turn-markers'
 import { useReviewTurnRecorderChannel } from '../turns/use-review-turn-recorder-channel'
+import { setReviewTurnOverlay } from '../turns/review-turn-overlay-store'
 import type { ReviewTurnViewMode } from '../turns/review-turn-selection'
 import type { TurnCompareResult } from '../turns/turn-compare-model'
 import { useReviewSurfaceTelemetry } from './use-review-surface-telemetry'
+import { useReviewBranchCompareFetch } from './use-review-branch-compare-fetch'
+import { useStorageLensProbe } from './use-storage-lens-probe'
 import type { useReviewWorkspaceModel } from './useReviewWorkspaceModel'
 
 type WorkspaceModel = ReturnType<typeof useReviewWorkspaceModel>
@@ -30,6 +33,16 @@ export function useReviewCompanions(worktreeId: string, api: ReviewDataApi, m: W
   const flags = useQualityFeatureFlags()
   const supported = m.selector.state === 'ready' && flags.codeIntel
   const turnMarkers = useReviewTurnMarkers(worktreeId, api, supported)
+  useReviewBranchCompareFetch(worktreeId, supported)
+  // After the overlay so the probe does not compete with the first paint.
+  useStorageLensProbe(
+    worktreeId,
+    m.selector.state === 'ready' ? m.selector.environmentId : null,
+    supported &&
+      data.overlay !== null &&
+      activeLensId !== 'storage' &&
+      m.lenses.some((l) => l.id === 'storage')
+  )
   // Why: recording runs at App level (use-app-agent-turn-recorders) so closed-tab turns are kept;
   // the workspace only feeds it symbol keys and reads the result.
   const turnRecorder = useReviewTurnRecorderChannel(
@@ -46,6 +59,11 @@ export function useReviewCompanions(worktreeId: string, api: ReviewDataApi, m: W
   const [turnMode, setTurnMode] = useState<ReviewTurnViewMode>('all')
   const [selectedTurnId, setSelectedTurnId] = useState<string | null>(null)
   const [turnCompare, setTurnCompare] = useState<TurnCompareResult | null>(null)
+  // Lens canvases label nodes from this; cleared when the view or the tab goes away.
+  useEffect(() => {
+    setReviewTurnOverlay(worktreeId, turnCompare)
+    return () => setReviewTurnOverlay(worktreeId, null)
+  }, [worktreeId, turnCompare])
   // "Since previous turn" narrows the reading order to files the last turn added or changed.
   const turnFiles = useMemo(
     () =>

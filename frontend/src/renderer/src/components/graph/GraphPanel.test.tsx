@@ -4,31 +4,75 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const useGraphLens = vi.fn()
-vi.mock('../../hooks/useGraphLens', () => ({ useGraphLens: (...a: unknown[]) => useGraphLens(...a) }))
-vi.mock('../../hooks/usePlanTree', () => ({ usePlanTree: () => ({ tree: null, approvals: [], isLoading: false, error: null, truncated: false, refetch: vi.fn() }) }))
-vi.mock('../../hooks/useTaskDependencyEdges', () => ({ useTaskDependencyEdges: () => ({ edges: new Map(), loading: false, error: false, refetch: vi.fn() }) }))
-vi.mock('../../hooks/usePlanHeatmap', () => ({ usePlanHeatmap: () => ({ heatmap: null, unsupported: false }) }))
-vi.mock('../../runtime/request-rpc-client', () => ({ callRequestRpc: vi.fn().mockResolvedValue({ ok: true, value: {} }) }))
+vi.mock('../../hooks/useGraphLens', () => ({
+  useGraphLens: (...a: unknown[]) => useGraphLens(...a)
+}))
+vi.mock('../../hooks/usePlanTree', () => ({
+  usePlanTree: () => ({
+    tree: null,
+    approvals: [],
+    isLoading: false,
+    error: null,
+    truncated: false,
+    refetch: vi.fn()
+  })
+}))
+vi.mock('../../hooks/useTaskDependencyEdges', () => ({
+  useTaskDependencyEdges: () => ({
+    edges: new Map(),
+    loading: false,
+    error: false,
+    refetch: vi.fn()
+  })
+}))
+vi.mock('../../hooks/usePlanHeatmap', () => ({
+  usePlanHeatmap: () => ({ heatmap: null, unsupported: false })
+}))
+vi.mock('../../runtime/request-rpc-client', () => ({
+  callRequestRpc: vi.fn().mockResolvedValue({ ok: true, value: {} })
+}))
 vi.mock('./GraphCanvas', () => ({
   default: (p: { payload: { nodes: unknown[] }; onSelect: (id: string) => void }) => (
-    <div data-testid="mock-canvas" onClick={() => p.onSelect('b')}>{p.payload.nodes.length} nodes</div>
+    <div data-testid="mock-canvas" onClick={() => p.onSelect('b')}>
+      {p.payload.nodes.length} nodes
+    </div>
   )
 }))
 
+import { useAppStore } from '@/store'
 import { GraphPanel } from './GraphPanel'
 import { gEdge, gNode, gPayload } from './graph-test-fixtures'
 import type { OrcaRequest } from '../../../../shared/request-types'
 
-const request = { id: 'r1', type: 'bug', size: 'M', status: 'analyzing', projectId: 'p', planTaskId: undefined } as unknown as OrcaRequest
+const request = {
+  id: 'r1',
+  type: 'bug',
+  size: 'M',
+  status: 'analyzing',
+  projectId: 'p',
+  planTaskId: undefined
+} as unknown as OrcaRequest
 const subject = { type: 'plan' as const, id: 'p1' }
 
 function ready(payload: ReturnType<typeof gPayload>, extra: Record<string, unknown> = {}) {
-  useGraphLens.mockReturnValue({ payload, status: 'ready', error: null, showSkeleton: false, refetch: vi.fn(), ...extra })
+  useGraphLens.mockReturnValue({
+    payload,
+    status: 'ready',
+    error: null,
+    showSkeleton: false,
+    refetch: vi.fn(),
+    ...extra
+  })
 }
 
 beforeEach(() => {
   useGraphLens.mockReset()
-  window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as never
+  window.matchMedia = ((q: string) => ({
+    matches: false,
+    media: q,
+    addEventListener() {},
+    removeEventListener() {}
+  })) as never
   ready(gPayload([gNode('a'), gNode('b')], [gEdge('a', 'b', { change: 'added' })]))
 })
 afterEach(cleanup)
@@ -47,7 +91,13 @@ describe('GraphPanel', () => {
     render(<GraphPanel request={request} subject={subject} impactAssessed lensInitial="flow" />)
     expect(screen.queryByRole('radio', { name: 'Before' })).toBeNull()
     fireEvent.click(screen.getByRole('radio', { name: 'Impact' }))
-    await waitFor(() => expect(useGraphLens.mock.calls.at(-1)?.[0]).toMatchObject({ lens: 'impact', enabled: true, subjectId: 'p1' }))
+    await waitFor(() =>
+      expect(useGraphLens.mock.calls.at(-1)?.[0]).toMatchObject({
+        lens: 'impact',
+        enabled: true,
+        subjectId: 'p1'
+      })
+    )
     expect(screen.getByRole('radio', { name: 'Before' })).toBeInTheDocument()
   })
 
@@ -60,11 +110,25 @@ describe('GraphPanel', () => {
   })
 
   it('shows a no-assessment state with a run button, but not when unsupported', () => {
-    useGraphLens.mockReturnValue({ payload: null, status: 'idle', error: null, showSkeleton: false, refetch: vi.fn() })
-    const { unmount } = render(<GraphPanel request={request} subject={subject} lensInitial="impact" />)
+    useGraphLens.mockReturnValue({
+      payload: null,
+      status: 'idle',
+      error: null,
+      showSkeleton: false,
+      refetch: vi.fn()
+    })
+    const { unmount } = render(
+      <GraphPanel request={request} subject={subject} lensInitial="impact" />
+    )
     expect(screen.getByText('Run assessment')).toBeInTheDocument()
     unmount()
-    useGraphLens.mockReturnValue({ payload: null, status: 'idle', error: { kind: 'unsupported', code: 'x', message: 'm' }, showSkeleton: false, refetch: vi.fn() })
+    useGraphLens.mockReturnValue({
+      payload: null,
+      status: 'idle',
+      error: { kind: 'unsupported', code: 'x', message: 'm' },
+      showSkeleton: false,
+      refetch: vi.fn()
+    })
     render(<GraphPanel request={request} subject={subject} lensInitial="impact" />)
     expect(screen.queryByText('Run assessment')).toBeNull()
   })
@@ -80,10 +144,77 @@ describe('GraphPanel', () => {
   })
 
   it('shows a retry banner on network error and keeps the previous payload', () => {
-    ready(gPayload([gNode('a')]), { status: 'error', error: { kind: 'network', code: 'NETWORK_ERROR', message: 'x' } })
+    ready(gPayload([gNode('a')]), {
+      status: 'error',
+      error: { kind: 'network', code: 'NETWORK_ERROR', message: 'x' }
+    })
     render(<GraphPanel request={request} subject={subject} lensInitial="impact" impactAssessed />)
     expect(screen.getByRole('alert')).toBeInTheDocument()
     expect(screen.getByText('Retry')).toBeInTheDocument()
     expect(screen.getByTestId('graph-panel')).toBeInTheDocument()
+  })
+
+  it('switching to a lens whose payload is truncated moves to the list, unless the user already picked a view', async () => {
+    const flow = gPayload([gNode('a')])
+    const truncated = { ...gPayload([gNode('x'), gNode('y')]), truncated: true, totalNodes: 300 }
+    useGraphLens.mockImplementation((p: { lens: string }) => ({
+      payload: p.lens === 'impact' ? truncated : flow,
+      status: 'ready',
+      error: null,
+      showSkeleton: false,
+      refetch: vi.fn()
+    }))
+    const first = render(
+      <GraphPanel request={request} subject={subject} impactAssessed lensInitial="flow" />
+    )
+    expect(await screen.findByTestId('mock-canvas')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: 'Impact' }))
+    expect(await screen.findByTestId('graph-list')).toBeInTheDocument()
+    first.unmount()
+
+    render(<GraphPanel request={request} subject={subject} impactAssessed lensInitial="flow" />)
+    fireEvent.click(screen.getByRole('radio', { name: 'List' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Graph' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Impact' }))
+    expect(await screen.findByTestId('mock-canvas')).toBeInTheDocument()
+    expect(screen.queryByTestId('graph-list')).toBeNull()
+  })
+
+  it('REQUEST_IMPACT_NO_CONNECTION offers "Connect dev server", which opens Settings > Servers', () => {
+    const openSettingsTarget = vi.fn()
+    const openSettingsPage = vi.fn()
+    useAppStore.setState({ openSettingsTarget, openSettingsPage } as never)
+    ready(gPayload([gNode('a')]), {
+      status: 'error',
+      error: {
+        kind: 'invalid_state',
+        code: 'REQUEST_IMPACT_NO_CONNECTION',
+        message: 'REQUEST_IMPACT_NO_CONNECTION: none'
+      }
+    })
+    render(<GraphPanel request={request} subject={subject} lensInitial="impact" impactAssessed />)
+    expect(screen.getByRole('alert')).toHaveTextContent('No dev server connected')
+    fireEvent.click(screen.getByRole('button', { name: 'Connect dev server' }))
+    expect(openSettingsTarget).toHaveBeenCalledWith({ pane: 'servers', repoId: null })
+    expect(openSettingsPage).toHaveBeenCalled()
+  })
+
+  it('initialSelectedId preselects the node (finding "View on graph")', async () => {
+    ready({ ...gPayload([gNode('a'), gNode('b')]), truncated: true, totalNodes: 400 })
+    render(
+      <GraphPanel
+        request={request}
+        subject={subject}
+        lensInitial="impact"
+        impactAssessed
+        initialSelectedId="b"
+      />
+    )
+    await screen.findByTestId('graph-list')
+    const selected = screen
+      .getAllByRole('row')
+      .filter((r) => r.getAttribute('aria-selected') === 'true')
+    expect(selected).toHaveLength(1)
+    expect(selected[0]).toHaveTextContent('b')
   })
 })

@@ -10,46 +10,100 @@ let hasMiniMap = false
 let fitView = vi.fn()
 let emitMove: ((zoom: number) => void) | null = null
 
-vi.mock('@xyflow/react', () => ({
-  ReactFlow: ({ nodes, edges, children, onInit, onNodeClick, onMove }: { onMove?: (e: unknown, v: { zoom: number }) => void; nodes: Node[]; edges: Edge[]; children: React.ReactNode; onInit?: (i: unknown) => void; onNodeClick?: (e: unknown, n: Node) => void }) => {
-    lastNodes = nodes
-    lastEdges = edges
-    onInit?.({ fitView })
-    emitMove = (zoom) => onMove?.(null, { zoom })
-    return (
-      <div data-testid="flow">
-        {nodes.map((n) => (
-          <button key={n.id} data-testid={`n-${n.id}`} onClick={() => onNodeClick?.(null, n)}>{n.id}</button>
-        ))}
-        {children}
-      </div>
-    )
-  },
-  Background: () => null,
-  Controls: () => null,
-  MiniMap: () => { hasMiniMap = true; return null },
-  Handle: () => null,
-  Position: { Left: 'left', Right: 'right' },
-  BaseEdge: () => null,
-  EdgeLabelRenderer: () => null,
-  getBezierPath: () => ['', 0, 0]
-}))
+vi.mock('@xyflow/react', async () => {
+  const { useEffect } = await import('react')
+  return {
+    ReactFlow: ({
+      nodes,
+      edges,
+      children,
+      onInit,
+      onNodeClick,
+      onMove,
+      onNodesChange
+    }: {
+      onMove?: (e: unknown, v: { zoom: number }) => void
+      nodes: Node[]
+      edges: Edge[]
+      children: React.ReactNode
+      onInit?: (i: unknown) => void
+      onNodeClick?: (e: unknown, n: Node) => void
+      onNodesChange?: (c: unknown[]) => void
+    }) => {
+      // Like xyflow's ResizeObserver: report a size for every node that has none yet.
+      useEffect(() => {
+        const unmeasured = nodes.filter((n) => !n.measured)
+        if (unmeasured.length > 0) {
+          onNodesChange?.(
+            unmeasured.map((n) => ({
+              type: 'dimensions',
+              id: n.id,
+              dimensions: { width: 200, height: 60 }
+            }))
+          )
+        }
+      })
+      lastNodes = nodes
+      lastEdges = edges
+      onInit?.({ fitView })
+      emitMove = (zoom) => onMove?.(null, { zoom })
+      return (
+        <div data-testid="flow">
+          {nodes.map((n) => (
+            <button key={n.id} data-testid={`n-${n.id}`} onClick={() => onNodeClick?.(null, n)}>
+              {n.id}
+            </button>
+          ))}
+          {children}
+        </div>
+      )
+    },
+    Background: () => null,
+    Controls: () => null,
+    MiniMap: () => {
+      hasMiniMap = true
+      return null
+    },
+    Handle: () => null,
+    Position: { Left: 'left', Right: 'right' },
+    BaseEdge: () => null,
+    EdgeLabelRenderer: () => null,
+    getBezierPath: () => ['', 0, 0]
+  }
+})
 vi.mock('@xyflow/react/dist/style.css', () => ({}))
 
 import { GraphCanvas, type GraphCanvasProps } from './GraphCanvas'
+import type { LayoutEngine } from './graph-layout-engine'
 import { gEdge, gNode, gPayload } from './graph-test-fixtures'
 
-afterEach(() => { cleanup(); hasMiniMap = false; fitView = vi.fn() })
+afterEach(() => {
+  cleanup()
+  hasMiniMap = false
+  fitView = vi.fn()
+})
 
 function props(over: Partial<GraphCanvasProps> = {}): GraphCanvasProps {
   return {
     payload: gPayload([gNode('a'), gNode('b')], [gEdge('a', 'b')]),
-    selectedId: null, onSelect: vi.fn(), onOpenNode: vi.fn(), openGroups: new Set(), onToggleGroup: vi.fn(),
-    changeView: 'after', focusId: null, onFocus: vi.fn(), ...over
+    selectedId: null,
+    onSelect: vi.fn(),
+    onOpenNode: vi.fn(),
+    openGroups: new Set(),
+    onToggleGroup: vi.fn(),
+    changeView: 'after',
+    focusId: null,
+    onFocus: vi.fn(),
+    ...over
   }
 }
 
-const big = (n: number) => gPayload(Array.from({ length: n }, (_, i) => gNode(`n${String(i).padStart(3, '0')}`, { group: `g${i % 4}` })))
+const big = (n: number) =>
+  gPayload(
+    Array.from({ length: n }, (_, i) =>
+      gNode(`n${String(i).padStart(3, '0')}`, { group: `g${i % 4}` })
+    )
+  )
 
 describe('GraphCanvas semantic zoom', () => {
   it('applies zoom level to node detail and edge presentation', async () => {
@@ -58,14 +112,22 @@ describe('GraphCanvas semantic zoom', () => {
       render(<GraphCanvas {...props()} />)
       expect(screen.getByTestId('graph-canvas')).toHaveAttribute('data-zoom-level', 'module')
       expect((lastNodes[0].data as { detail: string }).detail).toBe('compact')
-      act(() => { emitMove?.(0.3); vi.advanceTimersByTime(150) })
+      act(() => {
+        emitMove?.(0.3)
+        vi.advanceTimersByTime(150)
+      })
       expect(screen.getByTestId('graph-canvas')).toHaveAttribute('data-zoom-level', 'service')
       expect((lastNodes[0].data as { detail: string }).detail).toBe('minimal')
       expect((lastEdges[0].data as { showSign: boolean }).showSign).toBe(false)
-      act(() => { emitMove?.(2); vi.advanceTimersByTime(150) })
+      act(() => {
+        emitMove?.(2)
+        vi.advanceTimersByTime(150)
+      })
       expect((lastNodes[0].data as { detail: string }).detail).toBe('full')
       expect((lastEdges[0].data as { showSign: boolean }).showSign).toBe(true)
-    } finally { vi.useRealTimers() }
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -85,7 +147,10 @@ describe('GraphCanvas', () => {
   })
 
   it('changes the edge set between before and after views', async () => {
-    const payload = gPayload([gNode('a'), gNode('b'), gNode('c')], [gEdge('a', 'b', { change: 'removed' }), gEdge('a', 'c', { change: 'added' })])
+    const payload = gPayload(
+      [gNode('a'), gNode('b'), gNode('c')],
+      [gEdge('a', 'b', { change: 'removed' }), gEdge('a', 'c', { change: 'added' })]
+    )
     const { rerender } = render(<GraphCanvas {...props({ payload, changeView: 'after' })} />)
     await waitFor(() => expect(lastEdges).toHaveLength(2))
     rerender(<GraphCanvas {...props({ payload, changeView: 'before' })} />)
@@ -105,7 +170,9 @@ describe('GraphCanvas', () => {
     const payload = gPayload([gNode('a'), gNode('b'), gNode('z')], [gEdge('a', 'b')])
     render(<GraphCanvas {...props({ payload, focusId: 'a' })} />)
     await waitFor(() => expect(lastNodes).toHaveLength(3))
-    const dimmed = Object.fromEntries(lastNodes.map((n) => [n.id, (n.data as { dimmed: boolean }).dimmed]))
+    const dimmed = Object.fromEntries(
+      lastNodes.map((n) => [n.id, (n.data as { dimmed: boolean }).dimmed])
+    )
     expect(dimmed).toEqual({ a: false, b: false, z: true })
   })
 
@@ -116,12 +183,46 @@ describe('GraphCanvas', () => {
     const before = lastNodes.filter((n) => n.type === 'graphNode').length
     closed.unmount()
     render(<GraphCanvas {...props({ payload, openGroups: new Set(['g0']) })} />)
-    await waitFor(() => expect(lastNodes.filter((n) => n.type === 'graphNode').length).toBeGreaterThan(before))
+    await waitFor(() =>
+      expect(lastNodes.filter((n) => n.type === 'graphNode').length).toBeGreaterThan(before)
+    )
+  })
+
+  it('feeds measured sizes back into the controlled nodes (otherwise xyflow keeps them hidden)', async () => {
+    render(<GraphCanvas {...props()} />)
+    await waitFor(() => expect(lastNodes.every((n) => n.measured?.width === 200)).toBe(true))
   })
 
   it('fits the view when the layout is ready', async () => {
     render(<GraphCanvas {...props()} />)
     await act(async () => {})
     await waitFor(() => expect(fitView).toHaveBeenCalled())
+  })
+
+  it('accepts a pluggable async LayoutEngine (032-07 seam): nodes start at the origin, then take its positions; cached per key', async () => {
+    let release: (() => void) | null = null
+    const engine = vi.fn<LayoutEngine>(
+      (nodes) =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve(Object.fromEntries(nodes.map((n, i) => [n.id, { x: 1000 + i, y: 7 }])))
+        })
+    )
+    const p = props({ layout: engine })
+    const { rerender } = render(<GraphCanvas {...p} />)
+    await waitFor(() => expect(engine).toHaveBeenCalledTimes(1))
+    expect(engine.mock.calls[0][2]).toMatchObject({ direction: 'LR' })
+    expect(lastNodes.every((n) => n.position.x === 0 && n.position.y === 0)).toBe(true)
+    await act(async () => {
+      release?.()
+    })
+    await waitFor(() =>
+      expect(lastNodes.map((n) => n.position)).toEqual([
+        { x: 1000, y: 7 },
+        { x: 1001, y: 7 }
+      ])
+    )
+    rerender(<GraphCanvas {...p} selectedId="a" />)
+    expect(engine).toHaveBeenCalledTimes(1)
   })
 })

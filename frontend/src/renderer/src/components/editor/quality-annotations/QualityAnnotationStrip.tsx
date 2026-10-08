@@ -19,12 +19,15 @@ export type QualityAnnotationStripProps = {
   worktreeId: string | null | undefined
   notice: QualityAnnotationNoticeKind | null
   toggleVisible: boolean
+  /** Overrides the default under-header row styling (the plain editor floats it instead). */
+  className?: string
 }
 
 export function QualityAnnotationStrip({
   worktreeId,
   notice,
-  toggleVisible
+  toggleVisible,
+  className
 }: QualityAnnotationStripProps): React.JSX.Element | null {
   const annotationsOn = useAppStore((s) =>
     worktreeId
@@ -37,7 +40,10 @@ export function QualityAnnotationStrip({
   }
   return (
     <div
-      className="flex items-center justify-between gap-2 border-b border-border/60 bg-muted/40 px-3 py-1 text-xs text-muted-foreground"
+      className={
+        className ??
+        'flex items-center justify-between gap-2 border-b border-border/60 bg-muted/40 px-3 py-1 text-xs text-muted-foreground'
+      }
       data-testid="quality-annotation-strip"
     >
       <span className="min-w-0 truncate" role="status">

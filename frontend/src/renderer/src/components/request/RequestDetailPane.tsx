@@ -25,7 +25,11 @@ import { RequestHistoryTab } from './RequestHistoryTab'
 import { RequestOverviewTab } from './RequestOverviewTab'
 import { RequestRelatedTab } from './RequestRelatedTab'
 import { RequestStageTimeline } from './RequestStageTimeline'
-import { ClarificationPanel } from './clarification/ClarificationPanel'
+import {
+  CLARIFICATION_PANEL_DOM_ID,
+  ClarificationPanel,
+  type ClarificationPanelState
+} from './clarification/ClarificationPanel'
 import { ReturnToBacklogDialog } from './ReturnToBacklogDialog'
 import { SpawnChildRequestDialog } from './SpawnChildRequestDialog'
 import { TypeConfirmationCard } from './TypeConfirmationCard'
@@ -50,17 +54,21 @@ function detailTabForFocus(focus: 'type_confirmation' | 'analysis' | 'plan' | un
 }
 
 export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX.Element {
-  const { request, history, links, linksSupported, isLoading, error, refetch } = useRequest(requestId)
+  const { request, history, links, linksSupported, isLoading, error, refetch } =
+    useRequest(requestId)
   const actions = useRequestActions()
   const currentUser = useAppStore((st) => st.currentUser)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [busy, setBusy] = useState(false)
+  const [clarification, setClarification] = useState<ClarificationPanelState>({ answerable: false })
   // Why: the approval inbox / backlog deep-link to the tab that holds the gate being decided.
   const [tab, setTab] = useState(() => detailTabForFocus(useAppStore.getState().requestPage.focus))
 
   // Why: focus is a one-shot hint; clear it so selecting another request does not reuse it.
   useEffect(() => {
-    if (useAppStore.getState().requestPage.focus) {useAppStore.getState().setRequestPageData({ focus: undefined })}
+    if (useAppStore.getState().requestPage.focus) {
+      useAppStore.getState().setRequestPageData({ focus: undefined })
+    }
   }, [])
 
   useRequestSubscription({ requestId, onEvent: refetch })
@@ -71,12 +79,19 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
   }, [onBackToList])
 
   const run = useCallback(
-    async (action: () => Promise<{ ok: boolean; error?: Parameters<typeof notifyRequestActionFailure>[0] }>): Promise<boolean> => {
+    async (
+      action: () => Promise<{
+        ok: boolean
+        error?: Parameters<typeof notifyRequestActionFailure>[0]
+      }>
+    ): Promise<boolean> => {
       setBusy(true)
       const result = await action()
       setBusy(false)
       if (!result.ok) {
-        if (result.error) {notifyRequestActionFailure(result.error, refetch)}
+        if (result.error) {
+          notifyRequestActionFailure(result.error, refetch)
+        }
         return false
       }
       refetch()
@@ -88,7 +103,11 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
   if (!request) {
     if (isLoading || !error) {
       return (
-        <div className="flex flex-col gap-3 p-4" aria-busy="true" data-testid="request-detail-skeleton">
+        <div
+          className="flex flex-col gap-3 p-4"
+          aria-busy="true"
+          data-testid="request-detail-skeleton"
+        >
           <Skeleton className="h-6 w-2/3" />
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-24 w-full" />
@@ -96,7 +115,11 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
       )
     }
     return (
-      <div role="alert" className="flex flex-col items-start gap-2 p-4 text-sm" data-testid="request-detail-error">
+      <div
+        role="alert"
+        className="flex flex-col items-start gap-2 p-4 text-sm"
+        data-testid="request-detail-error"
+      >
         <span>
           {error === 'not_found'
             ? translate(`${T}notFound`, 'This request no longer exists.')
@@ -126,12 +149,23 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
         onCancel={() => setDialog('cancel')}
         onReopen={() =>
           void run(() => actions.reopen(request.id)).then((ok) => {
-            if (ok) {toast.success(translate(`${T}reopened`, 'Request reopened'))}
+            if (ok) {
+              toast.success(translate(`${T}reopened`, 'Request reopened'))
+            }
           })
         }
         onReturnToBacklog={() => setDialog('return')}
         onChangeType={() => setDialog('changeType')}
         onSpawnChild={() => setDialog('spawnChild')}
+        onAnswerClarification={
+          clarification.answerable
+            ? () => {
+                const panel = document.getElementById(CLARIFICATION_PANEL_DOM_ID)
+                panel?.scrollIntoView({ block: 'start' })
+                panel?.focus({ preventScroll: true })
+              }
+            : undefined
+        }
       />
       <div className="flex-1 overflow-y-auto">
         <div className="flex flex-col gap-3 px-4 pt-3">
@@ -142,23 +176,36 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
               onReopen={() => void run(() => actions.reopen(request.id))}
             />
           )}
-          <RequestStageTimeline request={request} />
+          <RequestStageTimeline
+            request={request}
+            resumeStatus={
+              request.status === 'awaiting_information' ? clarification.resumeStatus : undefined
+            }
+          />
           {request.status === 'awaiting_information' && (
             <ClarificationPanel
               request={request}
               currentUserId={currentUser?.id ?? null}
               isAdmin={currentUser?.role === 'admin'}
+              onStateChange={setClarification}
             />
           )}
-          {(request.status === 'awaiting_type_confirmation' || request.status === 'classifying') && (
+          {(request.status === 'awaiting_type_confirmation' ||
+            request.status === 'classifying') && (
             <TypeConfirmationCard request={request} onChanged={refetch} />
           )}
         </div>
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
           <TabsList className="mx-4">
             <TabsTrigger value="overview">{translate(`${T}tab.overview`, 'Overview')}</TabsTrigger>
-            {tabs.analysis && <TabsTrigger value="analysis">{translate(`${T}tab.analysis`, 'Analysis')}</TabsTrigger>}
-            {tabs.plan && <TabsTrigger value="plan">{translate(`${T}tab.plan`, 'Plan')}</TabsTrigger>}
+            {tabs.analysis && (
+              <TabsTrigger value="analysis">
+                {translate(`${T}tab.analysis`, 'Analysis')}
+              </TabsTrigger>
+            )}
+            {tabs.plan && (
+              <TabsTrigger value="plan">{translate(`${T}tab.plan`, 'Plan')}</TabsTrigger>
+            )}
             <TabsTrigger value="history">{translate(`${T}tab.history`, 'History')}</TabsTrigger>
             <TabsTrigger value="related">{translate(`${T}tab.related`, 'Related')}</TabsTrigger>
           </TabsList>
@@ -176,10 +223,19 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
             </TabsContent>
           )}
           <TabsContent value="history">
-            <RequestHistoryTab entries={history} isLoading={isLoading} error={error} onRetry={refetch} />
+            <RequestHistoryTab
+              entries={history}
+              isLoading={isLoading}
+              error={error}
+              onRetry={refetch}
+            />
           </TabsContent>
           <TabsContent value="related">
-            <RequestRelatedTab requestId={request.id} links={links} linksSupported={linksSupported} />
+            <RequestRelatedTab
+              requestId={request.id}
+              links={links}
+              linksSupported={linksSupported}
+            />
           </TabsContent>
         </Tabs>
       </div>
@@ -188,7 +244,9 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
         <CancelRequestDialog
           open
           onOpenChange={(open) => !open && setDialog(null)}
-          onConfirm={(reason) => run(() => actions.cancel({ id: request.id, reason: reason || undefined }))}
+          onConfirm={(reason) =>
+            run(() => actions.cancel({ id: request.id, reason: reason || undefined }))
+          }
         />
       )}
       {dialog === 'return' && (

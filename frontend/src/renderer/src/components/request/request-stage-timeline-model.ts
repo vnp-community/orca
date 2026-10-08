@@ -14,7 +14,13 @@ import {
   flowHasPhase,
   LOW_CONFIDENCE_THRESHOLD
 } from '../../../../shared/request-flow-registry'
-import type { RequestType, RequestStatus, RequestSize, ReturnedFromStage, RequestLinkReason } from '../../../../shared/request-types'
+import type {
+  RequestType,
+  RequestStatus,
+  RequestSize,
+  ReturnedFromStage,
+  RequestLinkReason
+} from '../../../../shared/request-types'
 
 // ---------------------------------------------------------------------------
 // Step types
@@ -47,7 +53,9 @@ export type ChildRequestRule = {
   suggestedTypes: RequestType[]
 }
 
-export const CHILD_REQUEST_RULES: Partial<Record<Exclude<RequestType, 'unknown'>, ChildRequestRule>> = {
+export const CHILD_REQUEST_RULES: Partial<
+  Record<Exclude<RequestType, 'unknown'>, ChildRequestRule>
+> = {
   spike: { reason: 'spawned_by_spike', suggestedTypes: ['task', 'change_request', 'refactor'] },
   question: { reason: 'spawned_by_question', suggestedTypes: ['task', 'docs'] },
   hotfix: { reason: 'followup_hotfix', suggestedTypes: ['bug', 'task'] },
@@ -61,7 +69,9 @@ export const CHILD_REQUEST_RULES: Partial<Record<Exclude<RequestType, 'unknown'>
 // ---------------------------------------------------------------------------
 
 export function isLowConfidence(confidence: number | undefined): boolean {
-  if (confidence === undefined) {return true}
+  if (confidence === undefined) {
+    return true
+  }
   return confidence < LOW_CONFIDENCE_THRESHOLD
 }
 
@@ -74,6 +84,8 @@ type BuildInput = {
   size?: RequestSize
   status: RequestStatus
   returnedFromStage?: ReturnedFromStage
+  /** Clarification.resumeStatus: while awaiting_information, the step the request resumes at. */
+  resumeStatus?: string
 }
 
 // Map: which status is 'current' for which step
@@ -99,7 +111,13 @@ const RETURNED_STAGE_TO_STEP: Partial<Record<ReturnedFromStage, StepId>> = {
   task: 'execution'
 }
 
-export function buildStageTimeline({ type, size, status, returnedFromStage }: BuildInput): StageTimeline {
+export function buildStageTimeline({
+  type,
+  size,
+  status,
+  returnedFromStage,
+  resumeStatus
+}: BuildInput): StageTimeline {
   // Gracefully handle unknown type/status
   if (type === 'unknown' || status === 'unknown') {
     return { steps: [], current: null }
@@ -121,15 +139,27 @@ export function buildStageTimeline({ type, size, status, returnedFromStage }: Bu
     // Why: the wire carries no "stage at cancel" except returnedFromStage; fall back to the first step.
     const cancelledAt = returnedFromStage ? RETURNED_STAGE_TO_STEP[returnedFromStage] : null
     currentStepId = cancelledAt ?? 'classification'
+  } else if (status === 'awaiting_information' && resumeStatus) {
+    // Why: a clarification can pause planning/execution too; the open Clarification knows which step.
+    currentStepId =
+      STATUS_TO_CURRENT_STEP[resumeStatus as RequestStatus] ??
+      STATUS_TO_CURRENT_STEP[status] ??
+      null
   } else {
     currentStepId = STATUS_TO_CURRENT_STEP[status] ?? null
   }
 
   // Build ordered steps
   const stepOrder: StepId[] = ['classification']
-  if (includeAnalysis) {stepOrder.push('analysis')}
-  if (includePlan) {stepOrder.push('plan')}
-  if (includePhase) {stepOrder.push('phase')}
+  if (includeAnalysis) {
+    stepOrder.push('analysis')
+  }
+  if (includePlan) {
+    stepOrder.push('plan')
+  }
+  if (includePhase) {
+    stepOrder.push('phase')
+  }
   stepOrder.push('execution')
 
   const currentIndex = currentStepId !== null ? stepOrder.indexOf(currentStepId) : -1

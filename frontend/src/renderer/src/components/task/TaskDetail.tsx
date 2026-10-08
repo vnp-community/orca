@@ -27,6 +27,7 @@ import { ReadinessBadge } from '../request/readiness/ReadinessBadge'
 import { ReadinessReportSheet } from '../request/readiness/ReadinessReportSheet'
 import { isRunBlockedByReadiness } from '../request/readiness/readiness-action-rules'
 import { ExecutionResultPanel } from '../request/execution/ExecutionResultPanel'
+import { useOpenDevServerSettings } from '../request/use-open-dev-server-settings'
 import type { OrcaTask, TaskPriority, TaskStatus } from '../../../../shared/task-types'
 
 // Right-panel detail view for active task
@@ -52,9 +53,9 @@ export function TaskDetail() {
   const setActiveWorkspaceTab = useAppStore((s) => s.setActiveWorkspaceTab)
   const [openingInGit, setOpeningInGit] = useState(false)
   const [localTitle, setLocalTitle] = useState(task?.title ?? '')
-  const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'ai' | 'comments' | 'access' | 'result'>(
-    'details'
-  )
+  const [activeTab, setActiveTab] = useState<
+    'details' | 'subtasks' | 'ai' | 'comments' | 'access' | 'result'
+  >('details')
   // Polling fallback (FE-TASK-003) — no push channel for task activity exists yet, see
   // useTaskActivity.ts's header comment. `polledTask` reflects status changes (e.g.
   // 'in_progress' → 'done') without the user needing to F5.
@@ -104,10 +105,20 @@ export function TaskDetail() {
   const executionGate = useAppStore((s) => s.executionGateByTaskId?.[activeTaskId ?? ''])
   // Why: readiness and structured results only exist for tasks created by a Request.
   const requestOwned = Boolean(task?.requestId)
-  const readinessApi = useTaskReadiness({ requestId: task?.requestId ?? null, taskId: requestOwned ? task?.id : undefined })
-  const execApi = useExecutionResult(requestOwned ? (task?.id ?? null) : null, task?.requestId ?? null)
+  const readinessApi = useTaskReadiness({
+    requestId: task?.requestId ?? null,
+    taskId: requestOwned ? task?.id : undefined
+  })
+  const execApi = useExecutionResult(
+    requestOwned ? (task?.id ?? null) : null,
+    task?.requestId ?? null
+  )
   const [readinessOpen, setReadinessOpen] = useState(false)
-  const readinessBlocked = isRunBlockedByReadiness(readinessApi.report, readinessApi.status !== 'unsupported')
+  const openDevServerSettings = useOpenDevServerSettings()
+  const readinessBlocked = isRunBlockedByReadiness(
+    readinessApi.report,
+    readinessApi.status !== 'unsupported'
+  )
   const { level: myLevel, isSupported: permissionSupported } = useTaskPermission(
     task?.id ?? '',
     currentUserId
@@ -224,7 +235,12 @@ export function TaskDetail() {
           <ReadinessBadge report={readinessApi.report} onOpen={() => setReadinessOpen(true)} />
         )}
         {requestOwned && readinessApi.status !== 'unsupported' && (
-          <Button variant="outline" size="sm" onClick={() => setReadinessOpen(true)} data-testid="check-readiness-btn">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setReadinessOpen(true)}
+            data-testid="check-readiness-btn"
+          >
             {translate('auto.components.request.readiness.check', 'Check readiness')}
           </Button>
         )}
@@ -387,6 +403,10 @@ export function TaskDetail() {
           canWrite={canExecute}
           hasDevServer={Boolean(task.worktreeId)}
           onCheck={() => readinessApi.check(task.id)}
+          onConnectDevServer={() => {
+            setReadinessOpen(false)
+            openDevServerSettings()
+          }}
         />
       )}
     </div>

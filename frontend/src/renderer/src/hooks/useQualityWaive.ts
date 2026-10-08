@@ -11,6 +11,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
+import { trackQualityFindingTriaged } from '@/lib/review-telemetry'
 import { getCodeIntelClient } from '../runtime/code-intel-client'
 import type { CodeIntelRpcError } from '../runtime/code-intel-client'
 import { CODE_INTEL_RPC_METHODS } from '../../../shared/code-intel-rpc-methods'
@@ -87,6 +88,18 @@ export function useQualityWaive(
           message: outcome ? describeQualityWaiveError(outcome.error) : qf('waiveErrUnknown')
         }
       }
+      trackQualityFindingTriaged({
+        action: params.action,
+        // Why: waiver reasons are free text; only the enum bucket may leave the client.
+        reason: 'other',
+        severity:
+          finding.severity === 'error' || finding.severity === 'warning'
+            ? finding.severity
+            : 'info',
+        tool: finding.tool,
+        // An in-scope error is what the gate blocks on.
+        blocking: finding.severity === 'error' && finding.inScope
+      })
       const store = useAppStore.getState()
       store.invalidateQuality(worktreeId)
       void store.loadQualityGate(worktreeId, { force: true })

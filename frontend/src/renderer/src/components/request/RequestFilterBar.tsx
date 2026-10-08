@@ -16,7 +16,13 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import {
@@ -27,7 +33,8 @@ import {
   clearListFilters,
   hasActiveListFilters,
   isQuickFilterActive,
-  toggleFilterValue
+  toggleFilterValue,
+  type QuickFilterId
 } from './request-list-filters'
 import type { RequestListFilters } from '../../store/slices/request'
 
@@ -58,7 +65,9 @@ function MultiFilter<V extends string>({
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="xs" aria-label={label}>
           {label}
-          {count > 0 && <span className="rounded bg-primary/15 px-1 text-[10px] text-primary">{count}</span>}
+          {count > 0 && (
+            <span className="rounded bg-primary/15 px-1 text-[10px] text-primary">{count}</span>
+          )}
           <ChevronDown className="size-3" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
@@ -79,7 +88,7 @@ function MultiFilter<V extends string>({
 }
 
 export function RequestFilterBar({ filters, onChange }: Props): React.JSX.Element {
-  const chip = (id: 'needsMyConfirmation' | 'running', label: string): React.JSX.Element => {
+  const chip = (id: QuickFilterId, label: string): React.JSX.Element => {
     const active = isQuickFilterActive(filters, id)
     return (
       <Button
@@ -95,9 +104,16 @@ export function RequestFilterBar({ filters, onChange }: Props): React.JSX.Elemen
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-2" data-testid="request-filter-bar">
-      {chip('needsMyConfirmation', translate(`${T}chip.needsMyConfirmation`, 'Needs my confirmation'))}
+    <div
+      className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-2"
+      data-testid="request-filter-bar"
+    >
+      {chip(
+        'needsMyConfirmation',
+        translate(`${T}chip.needsMyConfirmation`, 'Needs my confirmation')
+      )}
       {chip('running', translate(`${T}chip.running`, 'Running'))}
+      {chip('awaitingInfo', translate(`${T}chip.awaitingInfo`, 'Awaiting information'))}
       <MultiFilter
         label={translate(`${T}status`, 'Status')}
         values={filters.status}
@@ -114,9 +130,15 @@ export function RequestFilterBar({ filters, onChange }: Props): React.JSX.Elemen
       />
       <Select
         value={filters.sourceProvider ?? ANY_SOURCE}
-        onValueChange={(v) => onChange({ ...filters, sourceProvider: v === ANY_SOURCE ? undefined : v })}
+        onValueChange={(v) =>
+          onChange({ ...filters, sourceProvider: v === ANY_SOURCE ? undefined : v })
+        }
       >
-        <SelectTrigger size="sm" className="h-6 w-auto gap-1 px-2 text-xs" aria-label={translate(`${T}source`, 'Source')}>
+        <SelectTrigger
+          size="sm"
+          className="h-6 w-auto gap-1 px-2 text-xs"
+          aria-label={translate(`${T}source`, 'Source')}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

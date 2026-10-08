@@ -12,6 +12,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/store'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { ensureReviewTab } from '@/lib/ensure-review-tab'
+import { setReviewOpenSource } from '@/lib/review-open-source'
+import { countOpenGateFindings } from '@/lib/review-surface-decision'
 import { useQualityFeatureFlags } from '../../hooks/useQualityFeatureFlags'
 import { getCodeIntelClient } from '../../runtime/code-intel-client'
 import { subscribeCodeIntelEvents } from '../../lib/code-intel-event-bus'
@@ -42,6 +44,8 @@ export type UseSourceControlQualityGateResult = {
   /** Verdict for telemetry; 'none' when no gate result is known. */
   verdict: 'pass' | 'warn' | 'fail' | 'unknown' | 'none'
   reasonCount: number
+  /** Failing or warning gate reasons: the `open_findings` of review decisions. */
+  openFindingCount: number
 }
 
 // Why: these kinds mean "feature not available here"; the notice hides silently, no toast.
@@ -201,7 +205,10 @@ export function useSourceControlQualityGate({
     }
     viewedGateKeys.add(key)
     trackQualityGateViewed({
-      verdict: gate.result === 'pass' || gate.result === 'warn' || gate.result === 'fail' ? gate.result : 'unknown',
+      verdict:
+        gate.result === 'pass' || gate.result === 'warn' || gate.result === 'fail'
+          ? gate.result
+          : 'unknown',
       reasonCount: gate.reasons.length,
       stale: gate.stale === true,
       surface: 'source_control',
@@ -225,8 +232,11 @@ export function useSourceControlQualityGate({
           opts
         )
         const profiles = profileResponse.ok
-          ? ((profileResponse.result as { runnableProfiles?: { name: string; ready?: boolean; heavy?: boolean }[] })
-              .runnableProfiles ?? [])
+          ? ((
+              profileResponse.result as {
+                runnableProfiles?: { name: string; ready?: boolean; heavy?: boolean }[]
+              }
+            ).runnableProfiles ?? [])
           : []
         const chosen = profiles.find((p) => p.ready !== false && !p.heavy)
         if (!chosen) {
@@ -253,6 +263,7 @@ export function useSourceControlQualityGate({
     (_checkName: string) => {
       if (worktreeId) {
         // Why: the 'quality' lens may not be registered yet; opening Review without a lens is the fallback.
+        setReviewOpenSource(worktreeId, { source: 'source_control', afterAgentTurn: false })
         ensureReviewTab(worktreeId)
       }
     },
@@ -283,6 +294,7 @@ export function useSourceControlQualityGate({
     timedOut,
     running,
     verdict,
-    reasonCount: gate?.reasons.length ?? 0
+    reasonCount: gate?.reasons.length ?? 0,
+    openFindingCount: countOpenGateFindings(gate?.reasons)
   }
 }
