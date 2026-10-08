@@ -55,6 +55,15 @@ Unsupported runtime shows `RequestUnsupportedNotice` (no error styling); unknown
 
 Search, Request type and category filter the loaded pages client side. Counts are for loaded rows (`+` when more pages exist). `j`/`k`/`Enter` navigate rows (Enter opens the Request, or the task in a side sheet). Refresh happens on `request.returned`, `request.status_changed`, `plan.generated`, `phase.started`, `phase.completed`, `approval.decided` events and every 30 s while visible. The Task board no longer has a `backlog` column; it shows a hint with a link to this tab when the request flow is supported.
 
+## Analysis (Solution review)
+`RequestAnalysisTab` > `SolutionPanel` (`components/request/solution/`) reads `solution.list` and the Request's approvals. Types without analysis (e.g. `task`) render nothing; `hotfix` shows the result without a decision bar. A `change_request` solution shows its options as a radio group of `SolutionOptionCard`s ("Recommended" marked) with a **Compare** switch to `SolutionComparisonTable`. `SolutionDecisionBar`: pick an option, then **Approve this option** sends `solution.choose` and then `approval.approve` with the fresh `approvalDigest` from choose; **Reject** opens `RejectReasonDialog` (10+ chars, `Cmd+Enter` / `Ctrl+Enter` submits, plain Enter adds a line). Older versions collapse under "Older version" and are read only; expired approvals only offer Regenerate.
+
+## Plan
+`RequestPlanTab` (`components/request/plan/`) builds Plan > Phase > Task from `task.list` (`usePlanTree`; no `plan.*` channels) plus `approval.list`. `PlanSummaryHeader` shows progress and "N phases, M tasks"; `PlanApprovalBar` approves/rejects/regenerates the Plan (`request.generatePlan` runs `mode: 'propose'` then `mode: 'commit'` with the returned proposal); each `PhaseNode` has `PhaseApprovalBar`, where **Start phase** stays disabled until the phase approval is `approved` and then sends `request.startPhase {id, phaseTaskId}`. Approve/reject send `{id, expectedVersion, expectedDigest}`. A runtime without the task channel shows a neutral notice, never a red error. Tree | Graph switch: see Graph above.
+
+## Tests
+Vitest next to each component (`components/request/**`, `i18n/request-locale-coverage.test.ts`). Browser e2e against a mocked gateway WebSocket: `tests/e2e/request-web/*.web.e2e.ts` (support: `tests/e2e/request-web/support/mock-request-ws.ts`), run with `npx playwright test -c tests/playwright.web.config.ts --project=mcp-web tests/e2e/request-web` (set `MCP_E2E_BASE_URL` to reuse an already running Vite server).
+
 ## Clarification, decisions, risk, readiness, results
 - **Clarification:** a Request in `awaiting_information` shows `ClarificationPanel` in the detail pane. Answers are submitted once for the whole round (`Mod+Enter` in a text area submits when valid); suggested defaults are only sent after "Use suggestion"; drafts live in memory only. Non-assignees see it read-only.
 - **Decisions:** choosing an option other than the recommendation needs a reason (10+ chars). A high-risk Decision (server-assessed) asks to retype the option name before Approve. Plan Approve is locked until a solution Decision is effective.

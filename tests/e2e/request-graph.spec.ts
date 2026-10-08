@@ -1,8 +1,9 @@
 /**
  * E2E for the Request graph (CR-REQ-032).
  *
- * Skipped: needs request-service and impact-service (CR-REQ-030) or a mocked WS that
- * serves `impact.graph`. Not run in this environment.
+ * Skipped in the Electron project: needs request-service and impact-service (CR-REQ-030).
+ * The same scenarios run against a mocked WS in the web SPA:
+ * tests/e2e/request-web/request-graph.web.e2e.ts (FE-REQ-TASK-032-08).
  */
 
 import { test } from './helpers/orca-app'
