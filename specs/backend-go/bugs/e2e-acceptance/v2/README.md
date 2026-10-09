@@ -1,6 +1,6 @@
 # Bug nghiệm thu e2e, vòng 2 (v2)
 
-Vòng này là bước "chạy e2e → thu bug" sau khi triển khai checklist của [v1](../e2e-acceptance-v1/tasks/README.md). Bộ test: `tests/stages/e2e/orca-flows` (suite mới `notfound`), chạy trên stack Docker local với dev server là máy Mac thật và Claude thật qua phiên đăng nhập CLI (không có khoá API).
+Vòng này là bước "chạy e2e → thu bug" sau khi triển khai checklist của [v1](../v1/tasks/README.md). Bộ test: `tests/stages/e2e/orca-flows` (suite mới `notfound`), chạy trên stack Docker local với dev server là máy Mac thật và Claude thật qua phiên đăng nhập CLI (không có khoá API).
 
 Trước khi sửa: **85 PASS / 2 FAIL / 4 BLOCKED / 1 SKIP** (AIS-02 là lỗi của test, AIS-04 là lỗi sản phẩm). Sau khi sửa: **103 PASS / 0 FAIL / 4 BLOCKED / 1 SKIP**.
 

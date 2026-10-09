@@ -1,7 +1,7 @@
 # SOL-E2E-001: Khoá hợp đồng giữa service, gateway, agent và frontend bằng kiểm tra tự động
 
 **Resolves:** BUG-E2E-001, BUG-E2E-004, OBS-D (một phần) · **Nguyên nhân gốc:** RC-A
-**Service:** `api-gateway`, `agent`, `request-service` (đọc), `frontend` (xem [SOL-FE-E2E-001](../../../../frontend/bugs/e2e-acceptance-v1/solutions/SOL-FE-E2E-001-rpc-contract-and-dead-end.md))
+**Service:** `api-gateway`, `agent`, `request-service` (đọc), `frontend` (xem [SOL-FE-E2E-001](../../../../../frontend/bugs/e2e-acceptance-v1/solutions/SOL-FE-E2E-001-rpc-contract-and-dead-end.md))
 **Tasks:** TASK-E2E-001 đến 005
 
 ## Vấn đề

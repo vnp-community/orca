@@ -1,4 +1,4 @@
-# Handoff: nghiệm thu e2e các luồng ORCA (Request flow CR v6)
+# Handoff + chỉ mục đợt triển khai: nghiệm thu e2e các luồng ORCA (Request flow CR v6)
 
 Dành cho agent hoặc người nhận việc tiếp. Đọc hết file này trước khi sửa mã. Ngày chốt: 2026-10-09. Nhánh: `feat/e2e-acceptance-fixes` (tách từ `main`, một commit).
 
@@ -12,12 +12,12 @@ Mục tiêu của công việc: làm cho luồng Request (CR v6), workflow, task
 
 | Tài liệu | Dùng để |
 |---|---|
-| [tests/ORCA-E2E-ACCEPTANCE-REPORT.md](../../../tests/ORCA-E2E-ACCEPTANCE-REPORT.md) | báo cáo gốc + mục 9 (kết quả sau sửa) |
-| [bugs/e2e-acceptance-v1/](./e2e-acceptance-v1/) | đánh giá ảnh hưởng, giải pháp theo nhóm nguyên nhân gốc, **checklist 35 task** (`tasks/README.md`, mỗi file task có mục "Kết quả thực thi") |
-| [bugs/e2e-acceptance-v2/](./e2e-acceptance-v2/) | lỗi tìm thêm khi chạy lại, giải pháp giai đoạn Plan, checklist v2 |
-| [specs/frontend/bugs/e2e-acceptance-v1/tasks/](../../frontend/bugs/e2e-acceptance-v1/tasks/README.md) | 8 task frontend, **chưa bắt đầu** |
-| [CONTRACT-request-ui-api.md](../crs/v6/gateway-and-mcp/CONTRACT-request-ui-api.md) | hợp đồng kênh WS (đã thêm mục 2.6 `clarification.*`, `valueType`, `retryAfterMs`, mã lỗi) |
-| [tests/stages/e2e/orca-flows/README.md](../../../tests/stages/e2e/orca-flows/README.md) | cách chạy và thêm test e2e |
+| [tests/ORCA-E2E-ACCEPTANCE-REPORT.md](../../../../tests/ORCA-E2E-ACCEPTANCE-REPORT.md) | báo cáo gốc + mục 9 (kết quả sau sửa) |
+| [v1/](./v1/) | đánh giá ảnh hưởng, giải pháp theo nhóm nguyên nhân gốc, **checklist 35 task** (`tasks/README.md`, mỗi file task có mục "Kết quả thực thi") |
+| [v2/](./v2/) | lỗi tìm thêm khi chạy lại, giải pháp giai đoạn Plan, checklist v2 |
+| [specs/frontend/bugs/e2e-acceptance-v1/tasks/](../../../frontend/bugs/e2e-acceptance-v1/tasks/README.md) | 8 task frontend, **chưa bắt đầu** |
+| [CONTRACT-request-ui-api.md](../../crs/v6/gateway-and-mcp/CONTRACT-request-ui-api.md) | hợp đồng kênh WS (đã thêm mục 2.6 `clarification.*`, `valueType`, `retryAfterMs`, mã lỗi) |
+| [tests/stages/e2e/orca-flows/README.md](../../../../tests/stages/e2e/orca-flows/README.md) | cách chạy và thêm test e2e |
 
 Ký hiệu checklist: `[x]` xong, `[~]` một phần, `[ ]` chưa làm, `[-]` không áp dụng.
 

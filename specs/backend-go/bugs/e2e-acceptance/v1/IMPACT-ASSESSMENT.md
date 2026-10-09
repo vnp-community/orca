@@ -1,7 +1,7 @@
 # Đánh giá ảnh hưởng của các bug phát hiện qua e2e nghiệm thu
 
-**Nguồn:** [`tests/ORCA-E2E-ACCEPTANCE-REPORT.md`](../../../../tests/ORCA-E2E-ACCEPTANCE-REPORT.md) (lượt chạy 2026-10-09, `main` tại `98e451354` cộng thay đổi chưa commit) và bộ test [`tests/stages/e2e/orca-flows`](../../../../tests/stages/e2e/orca-flows/README.md).
-**Phạm vi tài liệu:** đánh giá ảnh hưởng, gom nguyên nhân gốc. Giải pháp ở [`solutions/`](./solutions/README.md), checklist ở [`tasks/`](./tasks/README.md). Phần giao diện ở [`specs/frontend/bugs/e2e-acceptance-v1`](../../../frontend/bugs/e2e-acceptance-v1/IMPACT-ASSESSMENT-FRONTEND.md).
+**Nguồn:** [`tests/ORCA-E2E-ACCEPTANCE-REPORT.md`](../../../../../tests/ORCA-E2E-ACCEPTANCE-REPORT.md) (lượt chạy 2026-10-09, `main` tại `98e451354` cộng thay đổi chưa commit) và bộ test [`tests/stages/e2e/orca-flows`](../../../../../tests/stages/e2e/orca-flows/README.md).
+**Phạm vi tài liệu:** đánh giá ảnh hưởng, gom nguyên nhân gốc. Giải pháp ở [`solutions/`](./solutions/README.md), checklist ở [`tasks/`](./tasks/README.md). Phần giao diện ở [`specs/frontend/bugs/e2e-acceptance-v1`](../../../../frontend/bugs/e2e-acceptance-v1/IMPACT-ASSESSMENT-FRONTEND.md).
 
 > **Trung thực về bằng chứng.** Mức ảnh hưởng dưới đây suy ra từ mã, log và kết quả test đã chạy trên một stack local một người dùng (admin), một tenant, Postgres. Chưa có số đo lưu lượng thật. Chỗ nào là suy luận được ghi "suy luận".
 

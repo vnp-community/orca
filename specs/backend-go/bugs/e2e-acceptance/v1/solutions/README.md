@@ -54,4 +54,4 @@ Giai đoạn 1 đặt trước giai đoạn 2 có chủ đích: lan can được
 
 ## Quan hệ với frontend
 
-Solution phía frontend ở [`specs/frontend/bugs/e2e-acceptance-v1`](../../../../frontend/bugs/e2e-acceptance-v1/solutions/README.md). Hai phía chia sẻ: tệp vàng kênh (TASK-E2E-003 ↔ TASK-FE-E2E-001), trường `value_type` (TASK-E2E-032 ↔ TASK-FE-E2E-003), mã lỗi mới (TASK-E2E-015, 024, 031 ↔ TASK-FE-E2E-004, 005).
+Solution phía frontend ở [`specs/frontend/bugs/e2e-acceptance-v1`](../../../../../frontend/bugs/e2e-acceptance-v1/solutions/README.md). Hai phía chia sẻ: tệp vàng kênh (TASK-E2E-003 ↔ TASK-FE-E2E-001), trường `value_type` (TASK-E2E-032 ↔ TASK-FE-E2E-003), mã lỗi mới (TASK-E2E-015, 024, 031 ↔ TASK-FE-E2E-004, 005).

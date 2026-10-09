@@ -16,7 +16,7 @@ Chạy `python3 tests/stages/e2e/orca-flows/run_acceptance.py` trên stack Docke
 | Cuối đợt v1, trước khi sửa Plan | 85 | 2 | 4 | 1 |
 | **Cuối vòng (có suite `notfound`, `plan`)** | **103** | **0** | **4** | **1** |
 
-BLOCKED còn lại không phải lỗi sản phẩm: MCP-01/02 (`MCP_ENABLED` tắt), AIS-01/03 (đường "không có AI" không dựng được khi dev server có phiên Claude). SKIP: TSK-08 (tuỳ chọn, tốn lượt AI). Chi tiết lỗi phát hiện thêm và đã sửa ở [vòng v2](../../e2e-acceptance-v2/README.md).
+BLOCKED còn lại không phải lỗi sản phẩm: MCP-01/02 (`MCP_ENABLED` tắt), AIS-01/03 (đường "không có AI" không dựng được khi dev server có phiên Claude). SKIP: TSK-08 (tuỳ chọn, tốn lượt AI). Chi tiết lỗi phát hiện thêm và đã sửa ở [vòng v2](../../v2/README.md).
 
 Đã chạy xanh: `go test ./...` ở `api-gateway`, `request-service`, `project-service`, `task-service`, `workflow-service`; agent vitest cho `ai-complete*`; tích hợp Postgres và MySQL của hợp đồng Solution (có run loại `plan`). Lỗi có sẵn, không do thay đổi này: `common/tracing` (`TestTraceEventSpanProcessor_OnEnd_ErrorStatusPublishesFailLevel`) và hai test socket unix của infra-fleet (đường dẫn quá dài trên macOS). Chưa chạy: `buf lint/breaking` (không có `buf`), test tích hợp `project-service` Postgres (thiếu CLI `migrate`).
 
@@ -118,4 +118,4 @@ Giai đoạn 4  Ổn định:               028, 029, 030, 031, 032
 - [ ] Mọi PR có kết quả `gitnexus impact` và `detect_changes` (G10).
 - [x] Không có prompt, khoá hay nội dung xác thực trong log/argv (TASK 033: prompt qua stdin, stderr bỏ, env whitelist; TASK 025: test không log khoá).
 - [x] Kiểm với tài khoản Claude thật trên dev server: phân loại (RQL-09), Solution (AIS-02), Plan (AIS-04, PLN-01..08) đều PASS.
-- [ ] Phần frontend tương ứng xong ([tasks](../../../../frontend/bugs/e2e-acceptance-v1/tasks/README.md)).
+- [ ] Phần frontend tương ứng xong ([tasks](../../../../../frontend/bugs/e2e-acceptance-v1/tasks/README.md)).

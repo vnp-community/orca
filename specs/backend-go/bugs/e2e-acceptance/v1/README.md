@@ -1,6 +1,6 @@
 # Bug nghiệm thu e2e các luồng ORCA (v1)
 
-Các bug được phát hiện khi viết và chạy bộ e2e nghiệm thu [`tests/stages/e2e/orca-flows`](../../../../tests/stages/e2e/orca-flows/README.md) trên stack Docker local, dev server là máy của người dùng. Báo cáo gốc: [`tests/ORCA-E2E-ACCEPTANCE-REPORT.md`](../../../../tests/ORCA-E2E-ACCEPTANCE-REPORT.md).
+Các bug được phát hiện khi viết và chạy bộ e2e nghiệm thu [`tests/stages/e2e/orca-flows`](../../../../../tests/stages/e2e/orca-flows/README.md) trên stack Docker local, dev server là máy của người dùng. Báo cáo gốc: [`tests/ORCA-E2E-ACCEPTANCE-REPORT.md`](../../../../../tests/ORCA-E2E-ACCEPTANCE-REPORT.md).
 
 **Mục tiêu của đợt này:** thông luồng Request → Workflow → Task trên dev server thật và dùng ổn định, bằng cách sửa theo **nguyên nhân gốc** thay vì từng bug rời, không phá vỡ kiến trúc hiện có.
 
@@ -14,7 +14,7 @@ Các bug được phát hiện khi viết và chạy bộ e2e nghiệm thu [`tes
 1. [IMPACT-ASSESSMENT.md](./IMPACT-ASSESSMENT.md): đánh giá ảnh hưởng của từng bug, gom theo nguyên nhân gốc, ảnh hưởng theo luồng.
 2. [solutions/](./solutions/README.md): sáu solution, mỗi solution xử lý một nguyên nhân gốc và mọi bug của nó; ràng buộc kiến trúc G1–G10.
 3. [tasks/](./tasks/README.md): 35 task có checklist, phụ thuộc và định nghĩa "xong".
-4. Phía giao diện: [`specs/frontend/bugs/e2e-acceptance-v1`](../../../frontend/bugs/e2e-acceptance-v1/README.md).
+4. Phía giao diện: [`specs/frontend/bugs/e2e-acceptance-v1`](../../../../frontend/bugs/e2e-acceptance-v1/README.md).
 
 ## Chỉ mục bug
 

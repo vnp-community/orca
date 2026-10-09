@@ -11,7 +11,7 @@ Frontend gọi `clarification.list/get/answer/cancel` nhưng không có test nà
 
 ### 1. Kiểm tra hợp đồng kênh (P2 phía frontend)
 
-Backend xuất tệp vàng `channel_inventory.json` (../../../../backend-go/bugs/e2e-acceptance-v1/tasks/TASK-E2E-003-channel-inventory-golden-file.md). Thêm một test vitest đọc tệp đó và khẳng định: mọi giá trị trong `REQUEST_RPC_METHODS` (và các bảng tên kênh Request/Approval/Solution/Backlog/Clarification khác) có mặt trong danh mục. Báo tên kênh thiếu. Kênh chỉ dùng ở chế độ Electron cục bộ được liệt kê vào danh sách cho phép có lý do.
+Backend xuất tệp vàng `channel_inventory.json` (../../../../backend-go/bugs/e2e-acceptance/v1/tasks/TASK-E2E-003-channel-inventory-golden-file.md). Thêm một test vitest đọc tệp đó và khẳng định: mọi giá trị trong `REQUEST_RPC_METHODS` (và các bảng tên kênh Request/Approval/Solution/Backlog/Clarification khác) có mặt trong danh mục. Báo tên kênh thiếu. Kênh chỉ dùng ở chế độ Electron cục bộ được liệt kê vào danh sách cho phép có lý do.
 
 Không import code backend vào bundle: chỉ test đọc tệp JSON ở thời điểm test.
 

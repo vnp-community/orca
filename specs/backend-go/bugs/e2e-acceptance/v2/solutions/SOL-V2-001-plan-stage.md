@@ -1,7 +1,7 @@
 # SOL-V2-001: Hoàn thiện giai đoạn Plan của request-service (CR-REQ-012, tasks 03 đến 07)
 
 **Giải quyết:** BUG-V2-001 · **Service:** request-service, api-gateway (đã có kênh), task-service (đã có `CreatePlanTree`)
-**Tham chiếu:** [BE-REQ-SOL-012](../../../crs/v6/plan-phase-task/solutions/BE-REQ-SOL-012-plan-phase-task-generation-from-solution.md), [CONTRACT-request-ui-api.md](../../../crs/v6/gateway-and-mcp/CONTRACT-request-ui-api.md)
+**Tham chiếu:** [BE-REQ-SOL-012](../../../../crs/v6/plan-phase-task/solutions/BE-REQ-SOL-012-plan-phase-task-generation-from-solution.md), [CONTRACT-request-ui-api.md](../../../../crs/v6/gateway-and-mcp/CONTRACT-request-ui-api.md)
 
 ## 1. Hiện trạng đã đọc lại (2026-10-09)
 
@@ -38,7 +38,7 @@
 ## 3. Ngoài phạm vi vòng này (ghi rõ để không bị hiểu là xong)
 
 - **Hotfix (`single_task`)**: tạo task sửa ngay trong `analyzing`, nằm trong luồng ghi kết quả chẩn đoán và cổng `pre_deploy` (CR-REQ-014). Chưa làm; hotfix vẫn dừng ở `analyzing`/`awaiting_plan_approval` như trước. Ghi thành TASK-V2-011.
-- Tối ưu hiển thị Plan ở frontend (xem [tasks frontend](../../../frontend/bugs/e2e-acceptance-v1/tasks/README.md)).
+- Tối ưu hiển thị Plan ở frontend (xem [tasks frontend](../../../../../frontend/bugs/e2e-acceptance-v1/tasks/README.md)).
 
 ## 4. Kiểm thử
 

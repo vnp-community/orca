@@ -6,7 +6,7 @@
 | [SOL-FE-E2E-002](./SOL-FE-E2E-002-typed-clarification-inputs.md) | ô nhập câu hỏi theo `valueType` | 003 | P2 |
 | [SOL-FE-E2E-003](./SOL-FE-E2E-003-error-taxonomy-and-rate-limit.md) | bảng mã lỗi, thử lại, thông báo AI, task rỗng/lỗi | 004–008 | P1 |
 
-Backend tương ứng: [`../../../../backend-go/bugs/e2e-acceptance-v1/solutions`](../../../../backend-go/bugs/e2e-acceptance-v1/solutions/README.md). Phụ thuộc chéo:
+Backend tương ứng: [`../../../../backend-go/bugs/e2e-acceptance-v1/solutions`](../../../../backend-go/bugs/e2e-acceptance/v1/solutions/README.md). Phụ thuộc chéo:
 - TASK-FE-E2E-001 ← TASK-E2E-003 (tệp vàng kênh)
 - TASK-FE-E2E-002 ← TASK-E2E-001 (kênh `clarification.*`)
 - TASK-FE-E2E-003 ← TASK-E2E-032 (`valueType`)

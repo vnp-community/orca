@@ -1,6 +1,6 @@
 # Đánh giá ảnh hưởng lên frontend của các bug nghiệm thu e2e
 
-**Nguồn:** [IMPACT-ASSESSMENT backend](../../../backend-go/bugs/e2e-acceptance-v1/IMPACT-ASSESSMENT.md) và [báo cáo e2e](../../../../tests/ORCA-E2E-ACCEPTANCE-REPORT.md). Tài liệu này chỉ nêu **ảnh hưởng nhìn thấy ở giao diện** và những chỗ mã frontend góp phần làm lỗi khó thấy.
+**Nguồn:** [IMPACT-ASSESSMENT backend](../../../backend-go/bugs/e2e-acceptance/v1/IMPACT-ASSESSMENT.md) và [báo cáo e2e](../../../../tests/ORCA-E2E-ACCEPTANCE-REPORT.md). Tài liệu này chỉ nêu **ảnh hưởng nhìn thấy ở giao diện** và những chỗ mã frontend góp phần làm lỗi khó thấy.
 
 > **Phạm vi bằng chứng:** đọc mã `frontend/src` (`useClarifications.ts`, `request-errors.ts`, `ClarificationQuestionField.tsx`, `request-rpc-client.ts`). **Chưa chạy UI** trên stack thật và chưa chạy các suite Playwright `request-web`; vì vậy hành vi hiển thị bên dưới là suy ra từ mã, ghi rõ "suy luận".
 

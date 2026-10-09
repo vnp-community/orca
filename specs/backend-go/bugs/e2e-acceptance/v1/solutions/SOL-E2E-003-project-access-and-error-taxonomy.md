@@ -55,7 +55,7 @@ Proto chỉ thêm RPC. `ListMembers` vẫn dùng ở nơi khác. Client cũ khô
 |---|---|
 | Thêm một lời gọi vào đường tạo Request (độ trễ, phụ thuộc) | cache TTL 30 giây; timeout 2 giây; fail-closed có thông báo rõ |
 | Webhook từ nguồn tin cậy bị chặn vì project đã xoá | trả `NotFound` có mã, nguồn thấy lỗi rõ ràng; không thử lại vô hạn |
-| Đổi mã lỗi `GetProject` ảnh hưởng frontend | frontend đã ánh xạ theo `code`; thêm trường hợp trong [SOL-FE-E2E-003](../../../../frontend/bugs/e2e-acceptance-v1/solutions/SOL-FE-E2E-003-error-taxonomy-and-rate-limit.md) |
+| Đổi mã lỗi `GetProject` ảnh hưởng frontend | frontend đã ánh xạ theo `code`; thêm trường hợp trong [SOL-FE-E2E-003](../../../../../frontend/bugs/e2e-acceptance-v1/solutions/SOL-FE-E2E-003-error-taxonomy-and-rate-limit.md) |
 
 ## Tiêu chí hoàn thành
 

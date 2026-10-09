@@ -123,7 +123,7 @@ Ngoài ra có các thay đổi chưa commit **không phải của lượt này**
 ## 9. Kế hoạch sửa và điều kiện nghiệm thu
 
 Đánh giá ảnh hưởng, solution theo nguyên nhân gốc và checklist task nằm ở:
-- Backend: [`specs/backend-go/bugs/e2e-acceptance-v1`](../specs/backend-go/bugs/e2e-acceptance-v1/README.md)
+- Backend: [`specs/backend-go/bugs/e2e-acceptance/v1`](../specs/backend-go/bugs/e2e-acceptance/v1/README.md)
 - Frontend: [`specs/frontend/bugs/e2e-acceptance-v1`](../specs/frontend/bugs/e2e-acceptance-v1/README.md)
 
 Điều kiện nghiệm thu đề xuất:
@@ -155,4 +155,4 @@ Chạy lại bộ `orca-flows` trên cùng stack sau khi sửa: **103 PASS, 0 FA
 
 Còn BLOCKED (không phải lỗi sản phẩm): `MCP-01/02` (`MCP_ENABLED` tắt trong `deploy/dev/.env`), `AIS-01/03` (đường "không có AI" không dựng được khi dev server có phiên Claude). SKIP: `TSK-08`.
 
-Lỗi mới tìm thấy khi chạy lại và đã sửa nằm ở [bugs/e2e-acceptance-v2](../specs/backend-go/bugs/e2e-acceptance-v2/README.md). Trạng thái từng task: [v1](../specs/backend-go/bugs/e2e-acceptance-v1/tasks/README.md), [v2](../specs/backend-go/bugs/e2e-acceptance-v2/tasks/README.md).
+Lỗi mới tìm thấy khi chạy lại và đã sửa nằm ở [bugs/e2e-acceptance-v2](../specs/backend-go/bugs/e2e-acceptance/v2/README.md). Trạng thái từng task: [v1](../specs/backend-go/bugs/e2e-acceptance/v1/tasks/README.md), [v2](../specs/backend-go/bugs/e2e-acceptance/v2/tasks/README.md).
