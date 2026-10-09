@@ -37,7 +37,9 @@
 
 ## 3. Ngoài phạm vi vòng này (ghi rõ để không bị hiểu là xong)
 
-- **Hotfix (`single_task`)**: tạo task sửa ngay trong `analyzing`, nằm trong luồng ghi kết quả chẩn đoán và cổng `pre_deploy` (CR-REQ-014). Chưa làm; hotfix vẫn dừng ở `analyzing`/`awaiting_plan_approval` như trước. Ghi thành TASK-V2-011.
+- **Hotfix (`single_task`)** (TASK-V2-011): **đã làm sau vòng này** (2026-10-09, chưa commit). Khi chẩn đoán hotfix ghi xong (`AnalysisResultWriter.Persist`), `EnsureHotfixFixTask` dựng task sửa duy nhất từ chẩn đoán (`domain.HotfixFixProposal`, qua `ValidatePlanProposal` + `hotfixPolicy.PlanPreconditions` như CommitPlan), gọi task-service **trước** giao dịch (`TaskClient.CreateFixTask`, tức `CreateTask` có `request_id`, không `parent_id`), rồi trong giao dịch chuyển `analysis_ready` -> `awaiting_plan_approval` và mở Approval `pre_deploy` với `subject_id` là task (`PreDeployArtifacts` đã có). `plan_task_id` giữ NULL. Chạy lại an toàn: dùng lại task giống hệt (tên + mô tả), huỷ task cũ lệch nội dung, không đụng task đã chạy/xong; Request chuyển hướng giữa chừng thì huỷ task vừa tạo. Lỗi tạo task hoặc mở Approval làm run `failed` (`REQUEST_HOTFIX_FIX_TASK_FAILED`, `REQUEST_HOTFIX_APPROVAL_FAILED`), Request ở lại `analyzing`. Nối dây ở `bindHotfixFixTask` (`wire_plan.go`), chỉ khi Approval bật.
+  - Test: `domain/hotfix_fix_task_test.go`, `usecase/ensure_hotfix_fix_task_test.go`, `usecase/analysis_result_writer_hotfix_test.go`, `adapter/grpcclient/task_fix_task_test.go`, hợp đồng DB `SolutionContract/HotfixFixTaskAndPreDeployApproval` (Postgres và MySQL, qua Approve của admin tới `executing`), e2e E10 (cả hai dialect).
+  - Chưa làm: hotfix cũ đã kẹt ở `awaiting_plan_approval` không có task/Approval (tạo trước bản sửa) không tự phục hồi; cần huỷ hoặc trả về backlog rồi mở lại.
 - Tối ưu hiển thị Plan ở frontend (xem [tasks frontend](../../../../../frontend/bugs/e2e-acceptance-v1/tasks/README.md)).
 
 ## 4. Kiểm thử

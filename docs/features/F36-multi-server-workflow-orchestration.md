@@ -280,14 +280,36 @@ interface StepState {
 
 ---
 
-## Provider Selection trong Workflow
+## Chọn server cho step (`target`)
+
+Một step `agent`, `shell` hoặc `notification` chọn nơi chạy bằng trường **`target`** (cấu hình step; trong ví dụ YAML ở trên trường này viết là `server:`).
+`workflow-service` đổi `target` thành một `connectionId` của infra-fleet-service trước khi relay
+(`backend-go/services/workflow-service/internal/adapter/serverresolver/resolver.go`). Có **bốn dạng** cộng hai dạng đặc biệt:
+
+| `target` | Cách resolve | Lỗi khi |
+|---|---|---|
+| `connection:<connectionId>` | dùng thẳng `connectionId` (dạng cũ `connectionId` vẫn được hiểu là `connection:<id>`) | không kiểm gì ở bước resolve; lỗi nếu kết nối không còn khi relay |
+| `server:<devServerId>` | `infra-fleet-service.ResolveConnection(devServerId)` lấy kết nối đang hoạt động | dev server không có kết nối đang hoạt động |
+| `project:<projectId>` | `project-service.GetProject(projectId)` lấy `dev_server_id` rồi như `server:` | xem điều kiện dưới |
+| `fleet:tag:<tag>` | chọn luân phiên (round-robin theo từng bản sao service) trong các dev server **khoẻ** mang tag, rồi như `server:` | không có dev server khoẻ nào mang tag |
+| (rỗng) | chạy cục bộ, không relay | |
+| chuỗi trần không có tiền tố | coi là `connectionId` kiểu cũ | |
+
+**Điều kiện của `project:`**
+
+1. Project tồn tại và đã **gắn dev server** (`dev_server_id` khác rỗng); thiếu thì lỗi `project <id> has no dev_server_id bound`.
+2. `GetProject` kiểm thành viên nên execution phải mang **người chạy**: workflow lưu `started_by` lúc bắt đầu (migration `0013`) và khôi phục khi
+   service khởi động lại, rồi chuyển tenant và user sang project-service qua metadata gRPC. Người chạy không phải thành viên project thì bị từ chối.
+3. Dev server đó phải **đang kết nối**; không thì lỗi `dev server <id> has no active connection`. Lỗi này **không** rơi về chạy cục bộ: target được đặt
+   tên rõ thì không có đường lùi im lặng.
+
+Kiểm bằng e2e (`tests/stages/e2e/orca-flows`, suite `workflow`): `WFL-12` (step `shell` với `server:<devServerId>`) và `WFL-13` (step `shell` với
+`project:<projectId>`) chạy `echo` trên agent của dev server và đọc lại kết quả từng step. `connection:` và `fleet:tag:` có test đơn vị của resolver
+nhưng chưa có e2e.
+
+Cú pháp chọn **provider** vẫn như thiết kế ban đầu:
 
 ```typescript
-// Syntax trong workflow YAML:
-server: "project:vnp-blc"           // lấy devServer từ project binding
-server: "server:server-alpha"        // hardcode server ID
-server: "fleet:tag:backend"          // chọn server có tag 'backend' (load balance)
-
 provider: "server:anthropic-default" // default Anthropic account trên server đó
 provider: "project:vnp-blc:openai"   // project-scope OpenAI account
 provider: "user:personal-ollama"     // user's personal Ollama
@@ -321,7 +343,7 @@ Workflow Running: "Full-Stack Feature Dev"
 
 - [ ] Workflow YAML/JSON schema validation
 - [ ] Step types: agent, shell, action, webhook, parallel, condition
-- [ ] `server:` resolution: project binding, direct ID, fleet tag
+- [x] `target` resolution: `project:` (project binding), `server:` (direct ID), `fleet:tag:`, `connection:` — `serverresolver`; e2e `WFL-12/13` cho `server:` và `project:`
 - [ ] `provider:` resolution: server/project/user scope, model-based auto-select
 - [ ] DAG builder + topological sort cho depends_on
 - [ ] Parallel step execution (concurrent across multiple servers)
@@ -350,7 +372,7 @@ Workflow Running: "Full-Stack Feature Dev"
 | Step executor (parallel) | `src/main/workflow/executors/parallel-step-executor.ts` |
 | Template registry | `src/main/workflow/template-registry.ts` |
 | Template resolver | `src/main/workflow/template-resolver.ts` |
-| Server resolver | `src/main/workflow/server-resolver.ts` |
+| Server resolver | `src/main/workflow/server-resolver.ts` (bản backend-go: `backend-go/services/workflow-service/internal/adapter/serverresolver/resolver.go`) |
 | Provider resolver | `src/main/workflow/workflow-provider-resolver.ts` |
 | Execution store | `src/main/workflow/execution-store.ts` |
 | DB migration | `src/main/db/migrations/0009_workflows.ts` |

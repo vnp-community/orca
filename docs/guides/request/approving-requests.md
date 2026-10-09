@@ -1,6 +1,6 @@
 # Phê duyệt Request
 
-**Cập nhật:** 2026-10-08 · Đối chiếu với: `internal/domain/approval_policy.go`, `approval_policy_validation.go`, `approval_errors.go`,
+**Cập nhật:** 2026-10-09 · Đối chiếu với: `internal/domain/approval_policy.go`, `approval_policy_validation.go`, `approval_errors.go`,
 `approval_subject.go`, `cmd/server/wire_approval.go`, `internal/config/config.go`.
 
 ## Cổng nào dùng được
@@ -9,8 +9,13 @@ Có 8 loại chủ thể (`subject_type`): `request_type`, `solution`, `findings
 
 | Cổng | Tình trạng |
 |---|---|
-| `request_type` (xác nhận loại) | **có handler thật** |
-| `solution`, `findings`, `answer`, `plan`, `phase`, `task_list`, `pre_deploy` | **chưa có**: `approvalSubjectArtifacts()` ở `cmd/server/wire_approval.go` còn rỗng, mở Approval cho các chủ thể này bị từ chối (`REQUEST_APPROVAL_SUBJECT_UNAVAILABLE`). Mở được khi CR-REQ-007, 008, 012, 013, 014 nối handler |
+| `request_type` (xác nhận loại) | **có handler thật**; e2e `RQL-12..13` |
+| `solution`, `findings`, `answer` | **có handler thật** (`wireSolution`); `solution` được e2e mở, chọn option và duyệt (`PLN-08`); `findings`, `answer` chưa được e2e chạy |
+| `plan`, `task_list` | **có**: `PlanArtifacts` (`wire_execution.go`) tính digest cây con; e2e mở Approval và từ chối (`PLN-04..06`, `PLN-08`); bộ e2e không duyệt vì duyệt thì agent AI chạy trên máy dev |
+| `phase`, `pre_deploy` | **có**: `PhaseArtifacts`, `PreDeployArtifacts`; mở trong lúc thực thi; chưa được e2e chạy |
+
+Khi `REQUEST_APPROVAL_ENABLED=true`, `request-service` **không khởi động** nếu một chủ thể thiếu handler thật (trừ khi đặt
+`REQUEST_ALLOW_NOOP_APPROVAL_HANDLERS=true`, chỉ cho dev), nên cả 8 cổng đều có handler trên cấu hình chuẩn.
 
 Khung `ApprovalService` (8 RPC), `ApprovalPolicyAdminService` (3 RPC) và bộ quét hết hạn/nhắc là thật.
 
@@ -70,7 +75,7 @@ cờ luồng tắt.
 | `REQUEST_APPROVAL_PENDING_EXISTS` | đã có Approval `pending` cho chủ thể này |
 | `REQUEST_APPROVAL_COMMENT_REQUIRED`, `..._COMMENT_TOO_LONG` | bình luận bắt buộc / quá dài |
 | `REQUEST_APPROVAL_NO_ELIGIBLE_APPROVER` | không có ai đủ điều kiện duyệt |
-| `REQUEST_APPROVAL_SUBJECT_UNAVAILABLE` | chủ thể chưa có dịch vụ nền (xem bảng cổng) |
+| `REQUEST_APPROVAL_SUBJECT_UNAVAILABLE` | chủ thể chưa gắn dịch vụ nền; không gặp trên cấu hình chuẩn (xem bảng cổng) |
 | `REQUEST_APPROVAL_DIRECTORY_UNAVAILABLE` | không tra được team/admin |
 | `REQUEST_FLOW_DISABLED` | cờ luồng tắt; `Approve`, `RequestApproval`, `ExtendApproval` bị chặn, còn `Reject` và `Cancel` vẫn chạy |
 

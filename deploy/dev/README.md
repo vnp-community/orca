@@ -46,6 +46,7 @@ full rationale.
 ```
 deploy/dev/
 ├── docker-compose.yml           # postgres, nats, 17 backend-go services, frontend, 14 migrate-* one-shots (Vault is external — see below)
+├── docker-compose.local.yml     # OVERLAY cho chạy local: Vault dev-mode (in-memory) + vault-init; dùng chung với .env có VAULT_ADDR=http://vault:8200
 ├── .env.example / .env          # config (backend-go + frontend only — agent config is deploy/agent/.env.example)
 ├── orca-policy.hcl              # Vault policy applied to the SHARED vnp-domain Vault (172.20.2.21), not run by this compose file
 ├── VAULT-SHARED-MIGRATION.md    # migration record: throwaway local Vault -> shared persistent Vault
@@ -53,9 +54,12 @@ deploy/dev/
 │   ├── postgres/init-databases.sh   # creates the 14 per-service databases on first boot
 │   └── nginx/orca.conf              # frontend: serves the SPA + reverse-proxies /v1/* to api-gateway
 └── scripts/
-    ├── build-local.sh           # [LOCAL] cross-compile all 17 Go binaries + vite-build frontend
+    ├── build-local.sh           # [LOCAL] cross-compile all 17 Go binaries + vite-build frontend (GOARCH mặc định amd64; máy arm64: GOARCH=arm64)
     ├── sync-to-server.sh        # [LOCAL] build, rsync, pull images, migrate, up -d — the whole flow in one command
     ├── migrate.sh               # [LOCAL or --remote] create missing databases, then run golang-migrate for one/all services
+    ├── ensure-request-env.sh    # [LOCAL or --remote] sinh 3 token nội bộ của luồng Request còn thiếu trong .env (không ghi đè, không in giá trị)
+    ├── redeploy-local.sh        # [LOCAL] build + migrate + restart đúng service đã đổi, restart cả nhóm khi container bị tạo lại, rồi smoke test
+    ├── start-local-agent.sh     # [LOCAL] chạy Dev Server Agent trên máy này, nối vào stack local, KHÔNG có khoá API trong env của agent
     ├── ensure-mcp-env.sh        # [LOCAL or --remote] fill in missing MCP secrets in .env (never overwrites a set value)
     └── provision-vapid-key.sh   # [on server, or --remote] per-tenant Vault ecdsa-p256 key + public-key row for Web Push
 ```
@@ -73,16 +77,36 @@ nano deploy/dev/.env    # set POSTGRES_PASSWORD, SERVER_HOST, SERVER_KEY
 bash deploy/dev/scripts/sync-to-server.sh 0.1.0
 ```
 
-### Local-only (no remote server — test the stack on your own machine)
+### Local-only (không có server từ xa: chạy cả stack trên máy bạn)
+
+Cần: Docker (Colima hoặc Docker Desktop, xem "Docker daemon" bên dưới), Go, Node + pnpm, `openssl`, `rsync`, Python 3.
 
 ```bash
-cp deploy/dev/.env.example deploy/dev/.env   # POSTGRES_PASSWORD is enough locally
-bash deploy/dev/scripts/build-local.sh
+cd /path/to/orca
+cp deploy/dev/.env.example deploy/dev/.env
+# Sửa deploy/dev/.env:
+#   POSTGRES_PASSWORD=<tuỳ ý>
+#   VAULT_ADDR=http://vault:8200       # Vault dev-mode của docker-compose.local.yml, KHÔNG phải Vault dùng chung 172.20.2.21
+#   VAULT_TOKEN=dev-root-token
+#   ORCA_AGENT_API_SECRET=<chuỗi ngẫu nhiên>          # cần cho start-local-agent.sh
+#   BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD  # tài khoản admin tạo ở lần khởi động đầu
+#   REQUEST_FLOW_ENABLED=true  REQUEST_APPROVAL_ENABLED=true   # xem "Luồng Request" bên dưới
+bash deploy/dev/scripts/ensure-request-env.sh        # sinh các token nội bộ của luồng Request còn thiếu (không in giá trị)
+GOARCH=arm64 bash deploy/dev/scripts/build-local.sh  # máy Intel/amd64: bỏ GOARCH=arm64
+
 cd deploy/dev
-docker compose up -d postgres vault nats
-../../deploy/dev/scripts/migrate.sh
-docker compose up -d
+COMPOSE="docker compose -f docker-compose.yml -f docker-compose.local.yml"   # luôn kèm overlay, nếu không service sẽ tìm Vault ở 172.20.2.21
+$COMPOSE up -d postgres nats vault
+$COMPOSE up -d vault-init                            # bật transit và credential-secrets trong Vault dev-mode
+bash scripts/migrate.sh                              # tạo DB còn thiếu rồi migrate mọi service
+$COMPOSE up -d                                       # mọi service + frontend
 ```
+
+Frontend ở `http://localhost:${FRONTEND_HTTP_PORT}`, api-gateway ở `http://localhost:${API_GATEWAY_PUBLIC_PORT}`. Đăng nhập bằng tài khoản
+`BOOTSTRAP_ADMIN_*`.
+
+**Vault local là dev-mode, nằm trong bộ nhớ**: tạo lại hoặc khởi động lại container `vault` là mất sạch khoá. Không bao giờ `down`/`--force-recreate`
+`vault`, `postgres`, `nats` trên stack đang dùng; `redeploy-local.sh` từ chối khởi động lại ba service này.
 
 ### Redeploy after a code change
 
@@ -96,6 +120,99 @@ there's no per-service incremental-build machinery here. If that stops
 being true at some point (build time becomes a real bottleneck),
 `build-local.sh <service-name>` already supports building one service only
 — wire that into `sync-to-server.sh` as an optional argument then.
+
+### Redeploy một vài service trên stack local
+
+```bash
+bash deploy/dev/scripts/redeploy-local.sh request-service api-gateway      # build, migrate, up -d, restart, smoke
+BUILD_FRONTEND=1 bash deploy/dev/scripts/redeploy-local.sh frontend api-gateway
+SKIP_MIGRATE=1 SKIP_SMOKE=1 bash deploy/dev/scripts/redeploy-local.sh task-service
+```
+
+Tên là tên service trong compose (`request-service`, `project-service`, `issue-status-sync`, ...). Script tự chọn `GOARCH` theo kiến trúc Docker (arm64 trên
+Apple Silicon), áp migration mới của service trước khi khởi động lại, và cuối cùng chạy suite `platform` của `orca-flows` làm smoke test.
+Hai bẫy nó đã xử lý sẵn, đừng tự làm tay: (1) binary được bind-mount nên chỉ nhận bản mới khi container khởi động lại; (2) container bị **tạo lại** nhận IP mới
+trên mạng bridge và các service khác vẫn giữ IP cũ ("unknown service ...", `REQUEST_NOT_IMPLEMENTED`), nên khi thấy "Recreate" script khởi động lại mọi
+service Go (không đụng service có trạng thái). Nếu tự chạy `docker compose up -d` thì hãy tự `restart` các service Go sau đó.
+
+## Luồng Request trên stack local
+
+### Cờ hai tầng
+
+Luồng Request (CR v6) chỉ chạy khi **cả hai** cờ bật; thiếu một cái hoặc không đọc được cờ tenant là tắt (fail closed):
+
+| Tầng | Đặt ở đâu | Mặc định |
+|---|---|---|
+| Tổng | `REQUEST_FLOW_ENABLED` trong `deploy/dev/.env` (compose: `${REQUEST_FLOW_ENABLED:-false}`), đọc lúc `request-service` khởi động | `false` |
+| Tenant | admin gửi kênh WS `request.flowSet {enabled:true}` (đọc lại bằng `request.flowStatus`); suite `orca-flows` tự bật ở `RQL-01` | không có dòng = tắt |
+
+`REQUEST_APPROVAL_ENABLED=true` bật `ApprovalService` (cổng duyệt loại, Solution, Plan...). Đổi hai biến này cần `redeploy-local.sh request-service`
+(hoặc `docker compose up -d request-service` rồi khởi động lại các service Go). Chi tiết vận hành: [Bật luồng Request](../../docs/guides/request/admin-enable-request-flow.md).
+
+### Token nội bộ
+
+Không có mTLS trong stack này, nên bốn token chia sẻ là kiểm tra caller duy nhất của các RPC nội bộ. Rỗng thì `request-service` từ chối mọi RPC bằng
+`REQUEST_FORBIDDEN` và `/readyz` báo chưa sẵn sàng, mà triệu chứng lại xa nguyên nhân. `ensure-request-env.sh` chỉ điền chỗ thiếu, không bao giờ ghi đè hay in giá trị:
+
+| Biến trong `.env` | Bên gửi → bên nhận | `request-service` đọc là |
+|---|---|---|
+| `REQUEST_INTERNAL_CALLER_TOKEN` | api-gateway → request-service | `GATEWAY_INTERNAL_TOKEN` |
+| `REQUEST_SERVICE_INTERNAL_TOKEN` | issue-status-sync → request-service | `SERVICE_INTERNAL_TOKEN` |
+| `PROJECT_INTERNAL_CALLER_TOKEN` | request-service → project-service (`ResolveProjectAccess`) | (cùng tên, project-service so khớp) |
+| `AUTH_DIRECTORY_CALLER_TOKEN` | request-service → auth-service (`ListActiveTenantAdmins`, mở rộng approver `role:admin` khi phát thông báo duyệt) | (cùng tên, auth-service so khớp). Rỗng thì auth-service từ chối RPC và `/readyz` của request-service đỏ khi `REQUEST_APPROVAL_ENABLED=true` |
+
+```bash
+bash deploy/dev/scripts/ensure-request-env.sh            # .env cục bộ
+bash deploy/dev/scripts/ensure-request-env.sh --remote   # .env trên server qua SSH (bí mật không rời server)
+```
+
+### Dev server là chính máy này, AI qua Claude Code đã đăng nhập
+
+Luồng Request gọi AI (phân loại, Solution, Plan) qua dev server của project, không cần khoá API. Trên máy chạy agent:
+
+```bash
+claude auth login                                         # một lần; không dùng `claude --bare` (bỏ qua OAuth/keychain)
+node agent/build.mjs                                      # tạo agent/out/agent.js
+bash deploy/dev/scripts/start-local-agent.sh              # DEV_SERVER_ID mặc định dev-local-mac; AGENT_WORK_DIR, AGENT_LOG đổi được
+```
+
+- Script gỡ `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` khỏi môi trường agent, nên nguồn AI luôn là phiên Claude đã đăng nhập
+  (`claude -p --output-format json --tools ""` trong thư mục tạm rỗng, prompt qua stdin). `ORCA_AI_CLI_SESSION=off` tắt nguồn này. Log mặc định ở `/tmp/orca-local-agent.log`.
+- Lần đầu dev server hiện ở trạng thái chờ duyệt: admin duyệt trong Admin Console (kênh `devServer.approve`). Agent đăng ký dưới tenant
+  `ORCA_AGENT_DEFAULT_TENANT_ID` (mặc định tenant sentinel `00000000-0000-0000-0000-000000000001`); nếu tenant của admin khác, đặt biến này trong `.env` rồi recreate `infra-fleet-service`
+  và khởi động lại các service Go.
+- Agent mất kết nối khi `infra-fleet-service` khởi động lại; build agent mới tự nối lại sau khoảng 6 giây, build cũ thì thoát hẳn (chạy lại script).
+- AI không dùng được thì Request và run đứng yên kèm mã `REQUEST_AI_NOT_CONFIGURED`, `REQUEST_AI_AGENT_UNAVAILABLE`, `REQUEST_AI_SESSION_EXPIRED`,
+  `REQUEST_AI_QUOTA_EXHAUSTED` hoặc `REQUEST_AI_BUSY`.
+
+### Chạy bộ e2e nghiệm thu
+
+```bash
+python3 tests/stages/e2e/orca-flows/run_acceptance.py                  # toàn bộ, Claude thật (khoảng 8 phút)
+python3 tests/stages/e2e/orca-flows/run_acceptance.py request matrix   # một phần
+python3 tests/stages/e2e/orca-flows/run_acceptance.py --strict --ai-stub --allow-blocked MCP-01,MCP-02   # claude giả, như CI
+```
+
+`--ai-stub` tạm đổi agent sang bản thấy `claude` giả trước, chạy xong khôi phục agent như cũ (cùng thư mục làm việc, dev server và log). Chi tiết:
+[`tests/stages/e2e/orca-flows/README.md`](../../tests/stages/e2e/orca-flows/README.md). CI: `.github/workflows/orca-flows-e2e.yml`.
+
+### Docker daemon (Colima, Docker Desktop, Linux)
+
+Lệnh `docker`/`docker compose` dùng context hiện hành nên chạy được với Colima. Test Go dùng testcontainers thì không đọc context, cần `DOCKER_HOST`:
+
+```bash
+export DOCKER_HOST="$(docker context inspect --format '{{.Endpoints.docker.Host}}')"   # Colima: unix://$HOME/.colima/default/docker.sock
+export TESTCONTAINERS_RYUK_DISABLED=true                                                # cần trên Colima để testcontainers chạy được
+```
+
+Docker Desktop trên macOS: socket là `unix://$HOME/.docker/run/docker.sock` (hoặc `/var/run/docker.sock` khi bật tuỳ chọn mặc định); Linux: không cần đặt.
+Colima trên Apple Silicon chạy container arm64 nên binary phải build `GOARCH=arm64`.
+
+### Bẫy đã gặp
+
+- Stack nói chuyện với Vault ở `VAULT_ADDR`; quên overlay `docker-compose.local.yml` (hoặc quên `VAULT_ADDR=http://vault:8200`) thì các service dùng Vault (`auth-service`, `credential-broker-service`) tìm Vault ở địa chỉ mặc định `172.20.2.21` và không tới được.
+- `request-service` giới hạn ghi 5 lần/giây, burst 10 (`REQUEST_RATE_<READ|WRITE|AI|WEBHOOK>_PER_SECOND` và `_BURST`); client của `orca-flows` tự thử lại theo `retryAfterMs`.
+- macOS không có `timeout` và `sha256sum`; zsh không tách từ biến `$var`. Các script trong thư mục này dùng bash và công cụ có sẵn trên macOS/Linux.
 
 ## Networking
 

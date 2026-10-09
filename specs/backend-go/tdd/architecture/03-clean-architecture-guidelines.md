@@ -102,6 +102,49 @@ anything from an outer layer.
   and third-party HTTP clients live — see
   [`04-tech-stack.md`](./04-tech-stack.md).
 
+### Quy ước "không có -> NotFound" (repo, usecase, test)
+
+Một id lạ phải ra `NotFound` (404), không bao giờ là 5xx; một lỗi hạ tầng (DB sập, timeout) phải ra
+`Internal`, không bao giờ là 404. Hai lớp chia việc như sau (TASK-E2E-017):
+
+1. **`domain/`** khai báo sentinel cụ thể cho từng thực thể (`ErrTaskNotFound`, `ErrShareLinkNotFound`).
+   Không dùng một `ErrNotFound` chung cho cả service.
+2. **Repo (`adapter/postgres`, `adapter/mysql`)** trả sentinel bọc `%w` ở **cả hai dialect** khi
+   `sql.ErrNoRows`/`pgx.ErrNoRows` hoặc `RowsAffected() == 0` (Update/Delete/Revoke/Set). Cấm
+   `fmt.Errorf("... not found")` hoặc `errors.New("... not found")` không có sentinel, và cấm bọc
+   `ErrNoRows` thành lỗi chung: lớp trên không phân loại được nên id lạ thành 5xx.
+3. **Usecase** ánh xạ bằng `errors.Is` (không dùng `==`, không dùng "mọi lỗi -> NotFound"):
+   sentinel -> `apperrors.KindNotFound` với mã lỗi riêng của service, còn lại -> `apperrors.KindInternal`.
+4. **Postgres, cột `uuid`**: id sai định dạng (ví dụ `"abc"`) bị server từ chối với SQLSTATE `22P02`
+   (hoặc FK `23503` khi insert tham chiếu tới id không tồn tại). Id đó không trỏ tới hàng nào nên repo
+   coi như not-found. MySQL lưu id dạng chuỗi nên chỉ cần nhánh `ErrNoRows`/`affected == 0`.
+5. Ngoại lệ có chủ ý (ví dụ `MarkAsRead`, `Revoke` grant, `DeleteByEndpoint`) là idempotent: 0 hàng
+   không phải lỗi. Ghi rõ trong doc comment của port để không bị "sửa" nhầm.
+
+```go
+// repo (cả postgres và mysql)
+if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+    return domain.Task{}, fmt.Errorf("postgres: task %s: %w", id, domain.ErrTaskNotFound)
+}
+
+// usecase
+if errors.Is(err, domain.ErrTaskNotFound) {
+    return apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+}
+return apperrors.New(apperrors.KindInternal, "TASK_FETCH_FAILED", "failed to fetch task", err)
+```
+
+**Cách test** (mỗi chỗ sửa có một test hồi quy):
+
+- `usecase/`: bọc repo fake bằng một struct trả lỗi cố định rồi kiểm hai nhánh -- sentinel bọc `%w`
+  -> `KindNotFound` đúng mã, lỗi khác (`errors.New("connection refused")`) -> `KindInternal`. Mẫu:
+  `task-service/internal/usecase/task_not_found_contract_test.go`.
+- `adapter/*`: test tích hợp (`-tags=integration`, testcontainers) gọi từng phương thức Get/Update/
+  Delete/Revoke với một id hợp lệ-nhưng-không-tồn-tại và một id sai định dạng, khẳng định
+  `errors.Is(err, domain.ErrXxxNotFound)`. Mẫu: `task-service/internal/adapter/{postgres,mysql}/
+  not_found_integration_test.go`.
+- Hợp đồng xuyên service (id lạ qua gateway -> 404): suite `notfound` trong `tests/stages/e2e/orca-flows`.
+
 ### `cmd/server/main.go`
 
 - The only place allowed to know about *every* layer at once: reads config,

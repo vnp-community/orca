@@ -1,17 +1,18 @@
 # Backlog của Request và Task
 
-**Cập nhật:** 2026-10-08 · Đối chiếu với: `internal/domain/request_return_category.go`, `request_return_stage.go`, `backlog_view.go`,
-`internal/adapter/grpc/server.go` (ghi chú `ListBacklog`), [CR v6 mục 3.8](../../crs/v6/README.md).
+**Cập nhật:** 2026-10-09 · Đối chiếu với: `internal/domain/request_return_category.go`, `request_return_stage.go`, `backlog_view.go`,
+`internal/adapter/grpc/server_backlog.go` (`ListBacklog`), `cmd/server/wire_execution.go`, [CR v6 mục 3.8](../../crs/v6/README.md).
 
 Backlog là **view tính toán**, không phải trạng thái backend riêng của Task (Task không có status `backlog`). Có ba view:
 
 | View | Định nghĩa | Tình trạng |
 |---|---|---|
-| Request backlog | Request ở trạng thái `request_backlog` | trạng thái và các lệnh có; **RPC `ListBacklog` chưa có handler** (trả `Unimplemented`, CR-REQ-006/015) |
-| Task backlog | Task dưới Plan chưa được duyệt, hoặc Plan chưa chia Phase | **chưa có**: không tìm thấy trong mã `task-service` hay `request-service`; thuộc CR-REQ-015 |
-| Execute backlog | Task dưới Phase đã duyệt ở `open`/`blocked`, hoặc `execution_link` gần nhất `failed` | **chưa có**, như trên (CR-REQ-015) |
+| Request backlog | Request ở trạng thái `request_backlog` | **có**: `ListBacklog` view request, kênh WS `backlog.requests` |
+| Task backlog | Task dưới Plan chưa được duyệt, hoặc Plan chưa chia Phase | **có**: `ListBacklog` view task (nhóm theo Request và Plan), kênh `backlog.tasks` |
+| Execute backlog | Task dưới Phase đã duyệt ở `open`/`blocked`, hoặc `execution_link` gần nhất `failed` | **có**: `ListBacklog` view execute (nhóm theo Phase), kênh `backlog.execute` |
 
-Trong domain đã có kiểu `BacklogView` (request, task, execute) và `BacklogRequestRow`, nhưng chỉ là kiểu dữ liệu.
+`ListBacklog` được nối ở `wire_execution.go` và cần `task-service` (`TASK_SERVICE_ADDR`) cho hai view task; không có địa chỉ thì các view đó báo lỗi.
+Bộ e2e (`AIS-06`) mới kiểm hai kênh `backlog.requests` và `backlog.tasks` trả lời được, chưa kiểm nội dung từng view.
 
 ## Request backlog
 
@@ -35,9 +36,8 @@ Giai đoạn (`returned_from_stage`): `classification`, `analysis`, `plan`, `pha
 `ReopenRequest` mở lại Request và **phân loại lại** (bộ đếm `classification_attempts` được đặt lại). `CancelRequest` huỷ hẳn.
 Jira không bị đổi khi Request vào `request_backlog` hoặc `cancelled` ([Jira ↔ Orca](../jira/jira-orca-mapping.md)).
 
-### Xem danh sách tạm thời
+### Xem danh sách
 
-Cho tới khi `ListBacklog` có, dùng `ListRequests` (kênh `request.list`) rồi lọc theo trạng thái `request_backlog` ở phía gọi; `GetRequest`
-trả lý do trả về. Các lệnh `ReturnToBacklog`, `ReopenRequest`, `CancelRequest` có kênh WS `request.returnToBacklog`, `request.reopen`, `request.cancel`.
+Dùng kênh `backlog.requests` (hoặc `ListRequests`, kênh `request.list`, lọc `status=request_backlog`); `GetRequest` trả lý do trả về. Các lệnh `ReturnToBacklog`, `ReopenRequest`, `CancelRequest` có kênh WS `request.returnToBacklog`, `request.reopen`, `request.cancel`.
 
 Khi cờ luồng tắt: `ReturnToBacklog` và `CancelRequest` vẫn chạy (thoát an toàn); `ReopenRequest` bị chặn.

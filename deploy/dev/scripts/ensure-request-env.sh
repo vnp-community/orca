@@ -12,6 +12,7 @@
 #   REQUEST_INTERNAL_CALLER_TOKEN   api-gateway   -> request-service   (request-service reads it as GATEWAY_INTERNAL_TOKEN)
 #   REQUEST_SERVICE_INTERNAL_TOKEN  issue-status-sync -> request-service (request-service reads it as SERVICE_INTERNAL_TOKEN)
 #   PROJECT_INTERNAL_CALLER_TOKEN   request-service -> project-service  (ResolveProjectAccess)
+#   AUTH_DIRECTORY_CALLER_TOKEN     request-service -> auth-service     (ListActiveTenantAdmins, approval notifications)
 #
 # Usage:
 #   ./deploy/dev/scripts/ensure-request-env.sh            # local deploy/dev/.env
@@ -46,7 +47,7 @@ set_if_missing() { # key, value
   echo "  + $key"
 }
 
-for k in REQUEST_INTERNAL_CALLER_TOKEN REQUEST_SERVICE_INTERNAL_TOKEN PROJECT_INTERNAL_CALLER_TOKEN; do
+for k in REQUEST_INTERNAL_CALLER_TOKEN REQUEST_SERVICE_INTERNAL_TOKEN PROJECT_INTERNAL_CALLER_TOKEN AUTH_DIRECTORY_CALLER_TOKEN; do
   if [ -z "$(value_of "$k")" ]; then set_if_missing "$k" "$(openssl rand -hex 32)"; fi
 done
 

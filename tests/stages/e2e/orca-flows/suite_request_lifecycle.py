@@ -6,6 +6,7 @@ import threading
 import request_flow_driver as drv
 from acceptance_context import AcceptanceContext, wait_until
 from acceptance_recorder import Blocked
+from expected_request_flows import EXPECTED
 from ws_rpc_client import RpcError
 
 
@@ -100,7 +101,12 @@ def run(ctx: AcceptanceContext) -> None:
             ctx.state["ai_available"] = False
             raise Blocked(f"the AI classifier produced no proposal (reason={reason!r}); needs an AI provider/API key on the dev server")
         ctx.state["ai_available"] = True
-        assert cur.get("size") and cur.get("urgency"), "AI proposal lacks size/urgency"
+        # The proposal parser already rejects values outside the enums; checking again keeps the oracle independent of it.
+        assert cur["type"] in EXPECTED, f"AI proposed type {cur['type']!r}, which is not one of the 11 request types"
+        assert cur.get("size") in ("S", "M", "L"), f"AI proposed size {cur.get('size')!r}"
+        assert cur.get("urgency") in ("normal", "urgent"), f"AI proposed urgency {cur.get('urgency')!r}"
+        if ctx.state.get("ai_stub"):
+            assert "fake-claude" in reason, f"with --ai-stub the proposal must come from the fake claude, got reason {reason!r}"
     rec.run("RQL-09", "AI classifier proposes a type, size and urgency", ai_proposes_type)
 
     def invalid_type():

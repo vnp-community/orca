@@ -4,6 +4,7 @@ from __future__ import annotations
 import request_flow_driver as drv
 from acceptance_context import AcceptanceContext, wait_until
 from acceptance_recorder import Blocked
+from ai_artifact_contracts import check_plan_contract, check_solution_contract
 from ws_rpc_client import RpcError
 
 RUN_TIMEOUT = 240  # the AI call plus one corrective retry
@@ -55,6 +56,7 @@ def run(ctx: AcceptanceContext) -> None:
         after = drv.get(ctx, req["id"])
         assert after["status"] == "planning" and not after.get("planTaskId"), "proposing must not change the Request or write a Plan"
         assert tasks_of(held["view"]["proposal"]), "the proposal has no tasks"
+        check_plan_contract(held["view"]["proposal"], phased=False)  # a task list is not split into Phases
     rec.run("PLN-01", "Proposing a Plan runs the AI in the background and writes nothing", propose_writes_nothing)
 
     def proposal_is_well_formed():
@@ -139,6 +141,10 @@ def run(ctx: AcceptanceContext) -> None:
         listed = wait_until(solved, timeout=RUN_TIMEOUT, interval=2.0, what="the Solution run to finish")
         assert listed.get("solutions"), "the Solution run produced no Solution"
         solution = listed["solutions"][-1]
+        check_solution_contract(solution, expected_kind="solution")
+        blocking = [q for q in (solution["options"].get("open_questions") or []) if isinstance(q, dict) and q.get("blocking")]
+        if blocking:  # a real AI sometimes asks; answering a Solution's questions is outside this test
+            raise Blocked(f"the AI's Solution has {len(blocking)} blocking open question(s), which must be answered before it can be approved")
         option_id = solution["options"]["options"][0]["id"]
         chosen = ws.call("solution.choose", {"requestId": cur["id"], "solutionId": solution["id"], "optionId": option_id, "comment": "e2e"})
         assert not chosen.get("requiresConfirmation"), "the chosen option needs a Decision confirmation; the suite cannot approve it"
@@ -149,6 +155,7 @@ def run(ctx: AcceptanceContext) -> None:
         view = propose_and_wait(ctx, cur["id"])
         proposal = view["proposal"]
         assert proposal.get("phases") and not proposal.get("tasks"), f"a change_request is planned in Phases: {list(proposal)}"
+        check_plan_contract(proposal, phased=True)
         done = ws.call("request.generatePlan", {"id": cur["id"], "mode": "commit", "proposal": proposal}, timeout=90)
         assert done.get("planTaskId") and len(done.get("phaseTaskIds") or []) == len(proposal["phases"]), f"commit: {done!r}"
         pending = ws.call("approval.list", {"requestId": cur["id"], "status": "pending"})["approvals"]

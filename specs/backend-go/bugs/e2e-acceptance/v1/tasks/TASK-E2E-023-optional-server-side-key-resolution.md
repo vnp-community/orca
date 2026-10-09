@@ -8,7 +8,7 @@
 - backend-go/services/request-service/internal/usecase (cổng `AICredentialResolver`)
 - backend-go/services/request-service/cmd/server (wiring: aiprovider, credentialbroker)
 **Depends on:** TASK-E2E-006, 033
-**Status:** `[ ]` CHƯA LÀM (cập nhật 2026-10-09, chưa commit)
+**Status:** `[-]` KHÔNG LÀM (cố ý, 2026-10-09): tuỳ chọn P2; đường mặc định là phiên Claude đã đăng nhập trên dev server, đã thông luồng và kiểm bằng e2e. Làm khi có đội cần khoá AI quản trị tập trung
 
 ---
 

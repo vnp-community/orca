@@ -1,12 +1,12 @@
 # Handoff + chỉ mục đợt triển khai: nghiệm thu e2e các luồng ORCA (Request flow CR v6)
 
-Dành cho agent hoặc người nhận việc tiếp. Đọc hết file này trước khi sửa mã. Ngày chốt: 2026-10-09. Nhánh: `feat/e2e-acceptance-fixes` (tách từ `main`, một commit).
+Dành cho agent hoặc người nhận việc tiếp. Đọc hết file này trước khi sửa mã. Ngày chốt: 2026-10-09 (đã cập nhật sau đợt hoàn thiện cuối ngày). Nhánh: `feat/e2e-acceptance-fixes`.
 
 ## 1. Bối cảnh một đoạn
 
 Mục tiêu của công việc: làm cho luồng Request (CR v6), workflow, task và dev-server/agent chạy ổn định trên stack Docker local, với máy Mac của người dùng làm dev server và **Claude Code đã đăng nhập** làm nguồn AI (không dùng khoá API). Quy trình đã áp dụng: viết bộ e2e nghiệm thu, chạy, thu lỗi, viết đánh giá + giải pháp + checklist, rồi sửa. Đã đi hai vòng (v1, v2).
 
-**Kết quả cuối:** `python3 tests/stages/e2e/orca-flows/run_acceptance.py` cho **103 PASS, 0 FAIL, 4 BLOCKED, 1 SKIP** (lúc đầu 84 PASS, 3 FAIL). BLOCKED/SKIP không phải lỗi sản phẩm: MCP tắt (`MCP-01/02`), đường "không có AI" không dựng được khi dev server có Claude (`AIS-01/03`), `TSK-08` tuỳ chọn.
+**Kết quả cuối:** Claude thật: **103 PASS, 0 FAIL, 4 BLOCKED, 1 SKIP**; `run_acceptance.py --strict --ai-stub --allow-blocked MCP-01,MCP-02`: **110 PASS, 0 FAIL, 2 BLOCKED (MCP-01/02, vì `MCP_ENABLED` tắt), 1 SKIP (TSK-08 tuỳ chọn)**. Lúc đầu là 84 PASS, 3 FAIL. Với Claude thật `AIS-01/03` BLOCKED vì không dựng được đường "không có AI"; chế độ stub phủ chúng.
 
 ## 2. Bản đồ tài liệu (đọc theo thứ tự)
 
@@ -53,25 +53,30 @@ Bẫy đã gặp, đừng đạp lại:
 
 ## 5. Việc còn lại, theo thứ tự nên làm
 
+Đợt hoàn thiện cuối ngày đã xong: 016, 017, 020, 026, 028, 030, 035, V2-011, và các lỗi V2-018..021 (xem [v2/tasks/README.md](./v2/tasks/README.md)). Còn lại:
+
 1. **Frontend (8 task, 0 làm)**: `specs/frontend/bugs/e2e-acceptance-v1/tasks/`. Backend đã sẵn sàng (xem ghi chú đầu `README.md` ở đó). Bắt đầu từ FE-E2E-001 (test hợp đồng đọc `channel_inventory.json`).
-2. **CI** (029, 035, 026): chưa có workflow nào cho `orca-flows`, `check-agent-methods-called.sh`, `check-grpc-dials.sh` (đã có target Make `check-agent-methods-called`, `check-grpc-dials`, chưa gọi trong `.github/workflows`). TASK-035 cần stub `claude` xác định để e2e chạy được khi không có tài khoản Claude; sau đó mở khoá `AIS-01/03` và chạy `--strict`.
-3. **Hotfix `single_task` (TASK-V2-011)**: hotfix chưa có Plan (task sửa phải được tạo trong `analyzing`, trong luồng ghi kết quả chẩn đoán, cổng `pre_deploy`). Xem `SOL-V2-001` mục 3.
-4. **Stage e2e Go còn skip (TASK-E2E-028)**: giờ Plan đã có nên viết được các stage Solution/Plan/CommitPlan/ReportTaskOutcome trong `backend-go/services/request-service/e2e`.
-5. **Phần một phần**: 016 (metric `orca_request_orphan_total` + runbook), 017 (rà mọi repo `Delete/Update/Get` tìm lỗi "not found" không dùng sentinel), 020 (healthcheck compose, kiểm OPA bundle/DB trong `/readyz`, rà guard rỗng ở service khác), 022 và 030 (cập nhật `deploy/dev/README.md`, `docs/guides/request/*`, ghi `DOCKER_HOST` Colima, bảng trạng thái giai đoạn).
-6. **Thực thi sau khi duyệt Plan chưa được kiểm trên stack thật**: các test `PLN-*` cố ý *từ chối* Approval để không chạy agent AI trên máy dev. Nên có một lượt kiểm tay có chủ đích (`ORCA_E2E_EXECUTE_AGENT=1` cho `TSK-08`) và kiểm `StartPhase` với Plan có Phase.
-7. **Dọn dữ liệu local**: ~27 Request mở trỏ project đã xoá (từ các lượt thử cũ). Người dùng chưa quyết định; chạy `python3 tests/stages/e2e/orca-flows/report_orphan_requests.py` để xem, `--cancel` chỉ khi được phép.
+2. **CI chạy thật (TASK-029, một phần)**: `.github/workflows/orca-flows-e2e.yml` và `backend-go-request-contracts.yml` đã viết, `actionlint` sạch, nhưng **chưa chạy trên runner GitHub**. Cần `workflow_dispatch` thử, rồi 5 đêm xanh liên tiếp trước khi thành cổng chặn. Chưa qua shellcheck.
+3. **README triển khai từ máy sạch (TASK-022)**: `deploy/dev/README.md` đã viết lại và từng lệnh đã kiểm không phá stack, nhưng chưa ai dựng stack theo README từ máy sạch.
+4. **Thực thi sau khi duyệt Plan với agent AI thật**: các test `PLN-*` cố ý *từ chối* Approval để không chạy agent AI trên máy dev. Cần một lượt kiểm tay có chủ đích (`ORCA_E2E_EXECUTE_AGENT=1` cho `TSK-08`) và `StartPhase` với Plan có Phase; hotfix `single_task` mới kiểm bằng stub AI.
+5. **Điểm có chủ đích còn mở của TASK-017**: scm-integration trả 404 của API provider thành `Internal` (cần sentinel "upstream not found" xuyên 5 adapter); git-gateway gộp lỗi hạ tầng project-service thành `WORKTREE_REPO_NOT_FOUND` vì frontend dùng mã đó làm đường lùi mềm — chốt với frontend trước khi đổi.
+6. **Script T2 hỏng sẵn**: `backend-go/ci/request-e2e/run-request-e2e.sh` gọi `tests/request/check_request_flow_types.py` đã bị xoá ở commit `8beb6703d`. `orca-flows` thay phần việc này; nên bỏ script và `request-e2e.yml` hoặc viết lại.
+7. **Bật MCP**: `deploy/dev/.env` đang để trống `AUTH_MCP_PRINCIPAL_CALLER_TOKEN`, `MCP_INTERNAL_CALLER_TOKEN`, `OAUTH_INTERNAL_CALLER_TOKEN`; sau TASK-020 `auth-service`/`mcp-service` fail-closed khi token rỗng. Khi bật MCP (và để mở khoá `MCP-01/02`) phải chạy `deploy/dev/scripts/ensure-mcp-env.sh`. `code-intel-service` không lắp guard dù gateway gửi token (đã ghi, chưa sửa).
+8. **Hotfix đã tạo trước bản sửa V2-011** đang kẹt ở `awaiting_plan_approval` không tự phục hồi: huỷ hoặc trả về backlog rồi mở lại.
+9. **Metric `orca_request_orphan_total`** chưa thấy trên stack thật (chỉ test đơn vị); lô 100 dòng toàn lỗi vĩnh viễn của outbox thông báo chưa có metric đếm dòng bị giữ (chỉ log ERROR).
 
 ## 6. Chưa được kiểm chứng (nói thẳng)
 
-- `gitnexus impact` / `detect_changes`: **chưa chạy** (không có công cụ trong phiên). Quy tắc của repo bắt buộc trước khi merge; agent nhận việc có công cụ nên chạy `detect_changes({scope:"compare", base_ref:"main"})` và ghi blast radius vào PR. Điểm chạm lớn: `common/grpcmw` (mọi service), `registerRequestChannels`, `AnalysisRunner`, `ProjectService` proto.
-- `buf lint` / `buf breaking`: chưa chạy (máy không có `buf`). Proto chỉ cộng thêm (RPC `ResolveProjectAccess`, trường `ClarificationQuestion.value_type`); mã sinh bằng `protoc` + `protoc-gen-go v1.36.11` / `protoc-gen-go-grpc 1.6.1` nên header khác vài file cũ (v1.36.12). Nên sinh lại bằng `buf generate` khi có.
-- Test tích hợp `project-service` Postgres (`TestRepository_MalformedIDIsNotFound`) biên dịch được nhưng **chưa chạy** (thiếu CLI `migrate`); đã kiểm gián tiếp bằng e2e `NFC-03/08`. Test tích hợp request-service (Postgres + MySQL) đã chạy.
-- Migration MySQL `workflow 0013`, `infra-fleet 0040` chỉ kiểm cú pháp/ngữ nghĩa nhẹ; `0093` (request) đã chạy up/down trên MySQL 8 thật và qua hợp đồng cả hai dialect.
-- Lỗi có sẵn, không do thay đổi này: `common/tracing` (`TestTraceEventSpanProcessor_OnEnd_ErrorStatusPublishesFailLevel`), hai test socket unix của infra-fleet (đường dẫn quá dài trên macOS), nhiều lỗi `tsc` trong `agent/` (kiểm bằng `grep` đã chắc không thuộc file mới).
+- `gitnexus impact` / `detect_changes`: **chưa chạy** (không có công cụ trong phiên). Quy tắc của repo bắt buộc trước khi merge; agent có công cụ nên chạy `detect_changes({scope:"compare", base_ref:"main"})` và ghi blast radius vào PR. Điểm chạm lớn: `common/grpcmw`, `registerRequestChannels`, `AnalysisRunner`, proto `ProjectService`/`AuthService`, `ProposeRequestClassification`, `StartExecution`/`completePhases`, guard `internalcaller` của auth/mcp. Blast radius đã rà tay bằng grep, ghi trong từng file task.
+- Đã kiểm lại ở đợt hoàn thiện: `buf breaking` xanh so với `main`; `buf lint` không tăng cảnh báo (307 có sẵn, giống `main`); `buf generate` cho mã khớp bản commit (chỉ khác header `protoc`). `buf` và CLI `migrate` cài vào thư mục scratchpad của phiên (`go install`), không nằm trong repo.
+- Test tích hợp `project-service` Postgres chạy được: not-found PASS; **14 test worktree FAIL giống hệt trên `main`** (có sẵn).
+- Lỗi có sẵn trên `main`, không do đợt này: `common/tracing` (`TestTraceEventSpanProcessor_OnEnd_ErrorStatusPublishesFailLevel`), test ssh agent/socket của `infra-fleet-service`, `git-gateway-service/localgit` (symlink `/private/var`), nhiều lỗi `tsc` trong `agent/`.
+- Healthcheck compose: dương (`healthy` sau redeploy) đã thấy trên stack thật; âm (tắt token → unhealthy ~50 giây) chỉ có test đơn vị.
+- Migration MySQL `workflow 0013`, `infra-fleet 0040` chỉ kiểm cú pháp/ngữ nghĩa nhẹ; `0093` (request) đã chạy up/down trên MySQL 8 thật.
 
 ### Commit đã bỏ qua hook pre-commit (có sự đồng ý của người dùng)
 
-Commit dùng `--no-verify` vì hook `lint-staged` (oxlint + oxfmt) đỏ do lỗi **có sẵn ở HEAD** trong hai file agent: `agent/src/relay/ai-complete-handler.ts` và `agent-capability-report.ts` (vượt `max-lines` 300, biến thừa `now`/`memInfo`, kiểu `Array<T>`/`ReadonlyArray<T>`, `import()` type), cộng `oxfmt` bị SIGKILL trên máy này. Lỗi do mã mới đã được sửa (oxlint sạch trên các file mới). Việc nên làm: tách hai file trên dưới 300 dòng (theo `AGENTS.md`, không tắt `max-lines`, không thêm vào baseline) rồi chạy lại hook.
+Commit `c57abd28c` dùng `--no-verify` vì hook `lint-staged` (oxlint + oxfmt) đỏ do lỗi **có sẵn ở HEAD** trong hai file agent: `agent/src/relay/ai-complete-handler.ts` và `agent-capability-report.ts` (vượt `max-lines` 300, biến thừa, kiểu `Array<T>`, `import()` type), cộng `oxfmt` bị SIGKILL trên máy này. Việc nên làm: tách hai file trên dưới 300 dòng (theo `AGENTS.md`, không tắt `max-lines`, không thêm vào baseline) rồi chạy lại hook.
 
 ## 7. Quy ước dự án cần giữ (AGENTS.md)
 
@@ -80,3 +85,5 @@ Comment ngắn giải thích "vì sao"; không đặt tên file chung chung (`he
 ## 8. Những gì cố ý KHÔNG nằm trong commit này
 
 Thuộc một luồng việc khác (workflow-engine v7), để nguyên ở working tree của người chủ: `docs/crs/v7/workflow-engine/`, `specs/backend-go/crs/v7/workflow-engine/`, `tests/backend/`, `tests/client/`, `tests/e2e/`, `tests/playwright.workflow-web.config.ts`, thay đổi `package.json` (script `test:e2e:workflow-web`) và `tests/shared/orca_route_catalog.py`. Cũng không commit `agent/tsconfig.tsbuildinfo` (sản phẩm build).
+
+Bẫy mới khi redeploy: cần `AUTH_DIRECTORY_CALLER_TOKEN` (cùng giá trị ở auth-service và request-service; `ensure-request-env.sh` sinh khi thiếu) và build/dựng lại `auth-service` trước `request-service` (`redeploy-local.sh auth-service request-service`).

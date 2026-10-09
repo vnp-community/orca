@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import request_flow_driver as drv
+from ai_artifact_contracts import check_plan_contract, check_solution_contract
 from acceptance_context import AcceptanceContext, wait_until
 from acceptance_recorder import Blocked
 from ws_rpc_client import RpcError
@@ -46,6 +47,8 @@ def run(ctx: AcceptanceContext) -> None:
             return (run, listed) if run and run["status"] != "running" else None
         run, listed = wait_until(finished, timeout=60, what="the generation run to finish")
         assert run["status"] == "failed" and run.get("errorCode"), f"run ended as {run['status']!r} with {run.get('errorCode')!r}; it must fail with an error code"
+        if ctx.state.get("ai_stub"):  # the stub is logged out here, so the cause is known exactly
+            assert run["errorCode"] == "REQUEST_AI_NOT_CONFIGURED", f"a logged-out claude produced {run['errorCode']!r}, expected REQUEST_AI_NOT_CONFIGURED"
         assert not listed.get("solutions"), "a failed run left a Solution behind"
         after = drv.get(ctx, req["id"])
         assert after["status"] == "analyzing", f"a failed generation moved the Request to {after['status']!r}"
@@ -66,20 +69,27 @@ def run(ctx: AcceptanceContext) -> None:
         run, listed = wait_until(finished, timeout=240, what="the AI generation run to finish")
         assert run["status"] != "failed", f"AI generation failed with {run.get('errorCode')!r}: {str(run.get('errorMessage', ''))[:200]}"
         assert listed.get("solutions"), f"run ended as {run['status']!r} but solution.list is empty"
+        check_solution_contract(listed["solutions"][-1], expected_kind="solution")
     rec.run("AIS-02", "With an AI available, a Solution is generated and listed", solution_with_ai)
 
     def plan_fails_safely_without_ai():
         if ai_known():
             raise Blocked("AI is available; the failure path cannot be exercised (see AIS-04)")
         req = plan_request()
-        try:
-            ws.call("request.generatePlan", {"id": req["id"]}, timeout=45)
-        except RpcError as exc:
-            assert exc.message, "empty error"
-        else:
-            raise AssertionError("request.generatePlan reported success although no AI provider is available")
+        # Plan generation is a background run (CR-REQ-012): the call returns a run id and the failure shows on the run.
+        started = ws.call("request.generatePlan", {"id": req["id"]}, timeout=45)
+        assert started.get("runId"), f"generatePlan returned no run id: {started!r}"
+
+        def finished():
+            view = ws.call("request.planProposal", {"id": req["id"], "runId": started["runId"]})
+            return view if view.get("status") != "running" else None
+        view = wait_until(finished, timeout=60, interval=1.0, what="the Plan run to finish")
+        assert view["status"] == "failed" and view.get("errorCode"), f"run ended as {view['status']!r} with {view.get('errorCode')!r}; it must fail with an error code"
+        assert not view.get("proposal"), "a failed run left a proposal behind"
+        if ctx.state.get("ai_stub"):  # the stub is logged out here, so the cause is known exactly
+            assert view["errorCode"] == "REQUEST_AI_NOT_CONFIGURED", f"a logged-out claude produced {view['errorCode']!r}, expected REQUEST_AI_NOT_CONFIGURED"
         after = drv.get(ctx, req["id"])
-        assert after["status"] == "planning", f"a failed plan generation moved the Request to {after['status']!r}"
+        assert after["status"] == "planning" and not after.get("planTaskId"), f"a failed plan generation moved the Request to {after['status']!r}"
     rec.run("AIS-03", "Plan generation fails safely when no AI is available (Request stays in planning)", plan_fails_safely_without_ai)
 
     def plan_with_ai():
@@ -95,6 +105,7 @@ def run(ctx: AcceptanceContext) -> None:
         view = wait_until(finished, timeout=240, interval=2.0, what="the Plan run to finish")
         assert view["status"] == "succeeded", f"plan run ended {view['status']!r}: {view.get('errorCode')}"
         assert view.get("proposal"), "plan generated but request.planProposal is empty"
+        check_plan_contract(view["proposal"], phased=False)
     rec.run("AIS-04", "With an AI available, a Plan proposal is generated", plan_with_ai)
 
     def approval_gate_listing():

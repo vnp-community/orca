@@ -156,3 +156,14 @@ Chạy lại bộ `orca-flows` trên cùng stack sau khi sửa: **103 PASS, 0 FA
 Còn BLOCKED (không phải lỗi sản phẩm): `MCP-01/02` (`MCP_ENABLED` tắt trong `deploy/dev/.env`), `AIS-01/03` (đường "không có AI" không dựng được khi dev server có phiên Claude). SKIP: `TSK-08`.
 
 Lỗi mới tìm thấy khi chạy lại và đã sửa nằm ở [bugs/e2e-acceptance-v2](../specs/backend-go/bugs/e2e-acceptance/v2/README.md). Trạng thái từng task: [v1](../specs/backend-go/bugs/e2e-acceptance/v1/tasks/README.md), [v2](../specs/backend-go/bugs/e2e-acceptance/v2/tasks/README.md).
+
+## 10. Cập nhật đợt hoàn thiện (2026-10-09, cuối ngày)
+
+Sau khi hoàn tất các task còn lại và dựng lại mọi service đã sửa trên stack local:
+
+| Chế độ | PASS | FAIL | BLOCKED | SKIP |
+|---|---|---|---|---|
+| Claude thật (phiên CLI đã đăng nhập) | 103 | 0 | 4 (MCP-01/02, AIS-01/03) | 1 (TSK-08) |
+| `--strict --ai-stub --allow-blocked MCP-01,MCP-02` (báo cáo ghi `AI: STUB, wiring only`) | 110 | 0 | 2 (MCP-01/02) | 1 (TSK-08) |
+
+Lỗi sản phẩm mới tìm thấy và đã sửa trong đợt này: thông báo duyệt làm kẹt outbox (`AUTH_NO_ACTOR`), Approval của Phase đầu không bao giờ mở, phân loại kẹt khi không có người duyệt hợp lệ (`AST-05`), panic `GetRequest` thiếu token. Chi tiết và trạng thái từng task: [v1](../specs/backend-go/bugs/e2e-acceptance/v1/tasks/README.md), [v2](../specs/backend-go/bugs/e2e-acceptance/v2/tasks/README.md).

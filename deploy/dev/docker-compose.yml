@@ -253,6 +253,9 @@ services:
       OAUTH_INTERNAL_CALLER_TOKEN: ${OAUTH_INTERNAL_CALLER_TOKEN:-}
       AUTH_MCP_PRINCIPAL_CALLER_TOKEN: ${AUTH_MCP_PRINCIPAL_CALLER_TOKEN:-}
       OAUTH_DCR_ENABLED: ${OAUTH_DCR_ENABLED:-true}
+      # Guards the internal-only ListActiveTenantAdmins (request-service expands role:admin approvers with it);
+      # empty refuses every such call (fail closed). request-service gets the same value.
+      AUTH_DIRECTORY_CALLER_TOKEN: ${AUTH_DIRECTORY_CALLER_TOKEN:-}
     depends_on:
       postgres: { condition: service_healthy }
       tenant-service: { condition: service_started } # bootstrap.go now calls tenant-service.CreateCompany at startup
@@ -461,6 +464,17 @@ services:
       GATEWAY_INTERNAL_TOKEN: ${REQUEST_INTERNAL_CALLER_TOKEN:-}
       # Presented to project-service's internal ResolveProjectAccess; empty falls back to the member-list check.
       PROJECT_INTERNAL_CALLER_TOKEN: ${PROJECT_INTERNAL_CALLER_TOKEN:-}
+      # Presented to auth-service's internal ListActiveTenantAdmins; empty leaves role:admin approvers without
+      # notifications and turns /readyz red while REQUEST_APPROVAL_ENABLED is on.
+      AUTH_DIRECTORY_CALLER_TOKEN: ${AUTH_DIRECTORY_CALLER_TOKEN:-}
+    # The image is distroless (no wget/curl), so the binary probes its own /readyz: internal tokens, OPA bundle and
+    # database. A missing token turns the container unhealthy after start_period + 3 failed probes (about 50 seconds).
+    healthcheck:
+      test: ["CMD", "/app/bin/orca", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       postgres: { condition: service_healthy }
       nats: { condition: service_healthy }

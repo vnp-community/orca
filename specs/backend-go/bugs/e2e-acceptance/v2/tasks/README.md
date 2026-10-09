@@ -22,17 +22,32 @@ Ký hiệu: `[x]` xong và đã kiểm chứng, `[~]` làm một phần, `[ ]` c
 - [x] TASK-V2-015 · `PlanArtifacts` cho `plan` và `task_list` (digest cây con), nối vào registry duyệt
 - [x] TASK-V2-016 · `wire_plan.go`, `REQUEST_PLAN_MAX_*`, mã lỗi vào CONTRACT; ghi chú: CommitPlan tắt khi Approval tắt (có cảnh báo)
 - [x] TASK-V2-017 · E2E với Claude thật: `AIS-04` PASS; suite `plan` PLN-01..08 PASS (task_list và change_request có Phase đi từ Solution đã duyệt; commit, lặp lại, từ chối, sai trạng thái, vòng phụ thuộc)
-- [ ] TASK-V2-011 · (ngoài phạm vi, theo dõi) Hotfix `single_task`: tạo task sửa trong `analyzing`. Chưa làm: hotfix vẫn không có Plan
+- [x] TASK-V2-011 · Hotfix `single_task`: `EnsureHotfixFixTask` tạo task sửa duy nhất khi chẩn đoán ghi xong (`AnalysisResultWriter.Persist`), chuyển `analysis_ready` và mở Approval `pre_deploy` trên task trong cùng giao dịch; idempotent, bật cùng Approval. Test đơn vị/domain, hợp đồng Postgres+MySQL (`HotfixFixTaskAndPreDeployApproval`), e2e Go E10. Kết quả chi tiết ở mục 3 của [SOL-V2-001](./../solutions/SOL-V2-001-plan-stage.md). Chưa kiểm với Claude/agent thật; hotfix tạo trước bản sửa đang kẹt ở `awaiting_plan_approval` phải huỷ hoặc trả về backlog rồi mở lại
+
+## Lỗi tìm thêm trong đợt hoàn thiện (đã sửa)
+
+- [x] TASK-V2-018 · [Thông báo duyệt làm kẹt outbox: `ListUsers` không có actor](./TASK-V2-018-approval-notification-directory-without-actor.md). RPC nội bộ `AuthService.ListActiveTenantAdmins` (token `AUTH_DIRECTORY_CALLER_TOKEN`, fail-closed), lỗi vĩnh viễn không chặn sự kiện khác. Sau redeploy: 0 dòng `AUTH_NO_ACTOR` trong log request-service
+- [x] TASK-V2-019 · Với `change_request` có cổng Phase, Approval của Phase đầu không bao giờ được mở nên Request kẹt ở `executing`: `StartExecution` gọi `EvaluateExecution` và `completePhases` mở Approval Phase kế (idempotent). Test `TestStatusConsumer_GatedFlowOpensTheFirstPhaseApprovalOnce`, e2e Go E01 cả hai dialect (ghi trong TASK-E2E-028)
+- [x] TASK-V2-020 · `AST-05`: AI đề xuất `hotfix`/`security` trong tenant một người dùng → `REQUEST_APPROVAL_NO_ELIGIBLE_APPROVER` huỷ giao dịch phân loại, Request kẹt ở `classifying`. `ProposeRequestClassification` chấp nhận lỗi này (người báo xác nhận loại trực tiếp), lỗi khác vẫn huỷ. Test `TestPropose_NoEligibleApprover_DoesNotStrandTheRequest`, `AST-05` PASS (ghi trong TASK-E2E-026)
+- [x] TASK-V2-021 · Con trỏ nil `*ProjectAccessLookup` gắn vào interface làm panic `GetRequest` khi thiếu `PROJECT_INTERNAL_CALLER_TOKEN`: `projectAccess.existence()` + `wire_project_access_test.go`
 
 ## Kết quả thực thi (2026-10-09)
 
 - e2e đầy đủ: **103 PASS, 0 FAIL, 4 BLOCKED, 1 SKIP** (460 giây, Claude thật). BLOCKED/SKIP: MCP tắt (2), AIS-01/03 (không dựng được đường "không có AI" khi AI sẵn có), TSK-08 tuỳ chọn.
 - `go test ./...` xanh ở `request-service` (kể cả `-race` cho test Plan), `api-gateway`, `project-service`, `task-service`, `workflow-service`; `infra-fleet-service` xanh trừ hai test socket unix có sẵn.
 - Tích hợp Postgres và MySQL: hợp đồng Solution (gồm run `plan`) PASS.
-- Chưa kiểm chứng: test tích hợp `project-service` Postgres (thiếu CLI `migrate`); `buf lint/breaking`; việc thực thi sau khi duyệt Plan (cố ý không duyệt trong e2e để không chạy agent AI trên máy dev; PLN từ chối Approval thay vì duyệt); Plan có Phase chạy `StartPhase` thật.
-- Dữ liệu: 27 Request mồ côi trên môi trường local do các lượt thử cũ; cần người quyết định có chạy `report_orphan_requests.py --cancel` không.
+- Chưa kiểm chứng (bản đầu vòng 2): việc thực thi sau khi duyệt Plan và `StartPhase` thật với agent AI; xem mục "Đợt hoàn thiện" bên dưới cho phần đã được kiểm lại (`buf`, `migrate`).
+- Dữ liệu: 27 Request mồ côi (toàn dữ liệu thăm dò của các lượt e2e cũ) đã được huỷ bằng `report_orphan_requests.py --cancel` theo quyết định của người dùng; chạy lại cho `0 orphaned`.
+
+### Đợt hoàn thiện (cùng ngày, sau redeploy mọi service đã sửa)
+
+- e2e đầy đủ với Claude thật: **103 PASS, 0 FAIL, 4 BLOCKED, 1 SKIP**; `--strict --ai-stub --allow-blocked MCP-01,MCP-02`: **110 PASS, 0 FAIL, 2 BLOCKED, 1 SKIP**.
+- e2e Go `-tags e2e`: xanh Postgres (33 giây) và MySQL (39 giây), 0 skip; `-tags integration` request-service xanh cả hai dialect.
+- `buf breaking` xanh, `buf lint` không tăng cảnh báo, mã sinh khớp; test tích hợp `project-service` Postgres chạy được với CLI `migrate` (not-found PASS; 14 test worktree fail giống hệt trên `main`).
+- Lỗi có sẵn, không do đợt này: `common/tracing` (1), `infra-fleet-service` (test ssh agent/socket), `git-gateway-service/localgit` (symlink macOS).
+- Chưa kiểm: workflow CI trên runner GitHub thật; thực thi sau khi duyệt Plan với agent AI thật (`ORCA_E2E_EXECUTE_AGENT=1`); metric `orca_request_orphan_total` trên stack thật (mới test đơn vị); healthcheck âm (tắt token → unhealthy trong ~50 giây) chỉ kiểm bằng test đơn vị, healthcheck dương (`healthy` sau redeploy) đã thấy trên stack thật.
 
 ## Định nghĩa "xong" của vòng
 
 - [x] `run_acceptance.py` không còn FAIL (BLOCKED chỉ còn MCP và hai đường lỗi AI).
-- [~] `go test ./...` xanh ở các service sửa; `infra-fleet-service` còn 2 test socket unix và `common/tracing` còn 1 test lỗi có sẵn.
+- [x] `go test ./...` xanh ở các service sửa; còn lại là các test lỗi có sẵn trên `main` (xem trên).
