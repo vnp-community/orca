@@ -67,6 +67,13 @@ func (uc *GetSubtree) Execute(ctx context.Context, in GetSubtreeInput) (GetSubtr
 	visible := make([]domain.Task, 0, len(nodes))
 	visibleIDs := make(map[string]bool, len(nodes))
 	for _, n := range nodes {
+		// The creator owns the task without any stored grant (ResolvePermission treats OwnerID the same way); without
+		// this a task created before grants were minted showed an empty tree to its own owner.
+		if userID != "" && n.OwnerID == userID {
+			visible = append(visible, n)
+			visibleIDs[n.ID] = true
+			continue
+		}
 		chain := chainOf(n.ID, byID) // n, parent, grandparent, ... root — no extra query, walks already-fetched ParentID pointers
 		if _, ok := domain.ResolveGrant(chain, grantsByTask, caller, uc.maxDepth, uc.clock.Now()); ok {
 			visible = append(visible, n)

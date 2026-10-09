@@ -40,7 +40,7 @@ func (uc *RecoverInterruptedAnalysisRuns) RunOnce(ctx context.Context) (int, err
 			if err != nil || !ok {
 				return err
 			}
-			return uc.solutions.DeleteDraft(tctx, run.SolutionID)
+			return deleteDraftIfAny(tctx, uc.solutions, run)
 		})
 		if err != nil {
 			slog.WarnContext(ctx, "could not fail interrupted analysis run", slog.String("run_id", run.ID), slog.Any("error", err))

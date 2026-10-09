@@ -36,6 +36,16 @@ func wireRequestIntake(cfg config.Config, log *slog.Logger, stores *requestStore
 	}
 	w.createRequest = usecase.NewCreateRequest(stores.requests, stores.idempotency, stores.tx, stores.outboxWriter, transition, fetcher).
 		WithSecurityFlags(stores.secFlags)
+	pa, err := dialProjectAccess(cfg, log)
+	if err != nil {
+		return nil, err
+	}
+	if pa != nil {
+		w.closers = append(w.closers, pa.Close)
+		if pa.Lookup != nil {
+			w.createRequest.WithProjectExistence(pa.Lookup)
+		}
+	}
 	w.lookup = usecase.NewLookupRequestBySource(stores.requests, stores.idempotency)
 	return w, nil
 }

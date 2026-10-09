@@ -746,3 +746,22 @@ func TestCloseAfterGracePeriodExpiry_ClosesAllTerminalSessionsForConnection(t *t
 // drive Connection.MarkDegraded/Reestablish, not an inline status
 // assignment — the precondition TestDegradedConnectionDoesNotTripCircuitBreaker
 // will need once orchestration-service's side exists.
+
+func TestPollFleetHealth_PollDevServerSamplesOnlyTheNamedServer(t *testing.T) {
+	ds1 := devServerForPollTest(t, "ds-1")
+	ds2 := devServerForPollTest(t, "ds-2")
+	repo := &fakePollerRepository{devServers: []domain.DevServer{ds1, ds2}}
+	writer := &fakeFleetHealthWriter{}
+	agent := &fakeDevServerAgentClient{healthy: true}
+
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
+	if err := uc.PollDevServer(context.Background(), "ds-2"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(writer.written) != 1 || writer.written[0].DevServerID != "ds-2" || !writer.written[0].Reachable {
+		t.Fatalf("want one reachable sample for ds-2, got %+v", writer.written)
+	}
+	if err := uc.PollDevServer(context.Background(), "unknown"); err != nil || len(writer.written) != 1 {
+		t.Fatalf("unknown id must be a no-op, err=%v written=%d", err, len(writer.written))
+	}
+}

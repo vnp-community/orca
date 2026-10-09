@@ -1,0 +1,100 @@
+package domain
+
+import (
+	"fmt"
+
+	"github.com/stablyai/orca-go/common/apperrors"
+)
+
+func planInvalid(code, msg string) error {
+	return apperrors.New(apperrors.KindFailedPrecondition, code, msg, nil)
+}
+
+func ErrPlanNotApplicable(t RequestType) error {
+	return planInvalid("REQUEST_PLAN_NOT_APPLICABLE", fmt.Sprintf("request type %q has no Plan", t))
+}
+
+func ErrPlanWrongState(status RequestStatus) error {
+	return planInvalid("REQUEST_STATE_STALE", fmt.Sprintf("request in status %s cannot generate or commit a Plan (needs planning)", status))
+}
+
+func ErrPlanSolutionNotApproved(id string) error {
+	return planInvalid("REQUEST_PLAN_SOLUTION_NOT_APPROVED", fmt.Sprintf("request %s has no approved Solution to plan from", id))
+}
+
+func ErrPlanPhasesNotAllowed() error {
+	return planInvalid("REQUEST_PLAN_PHASES_NOT_ALLOWED", "this request type and size is planned without Phases")
+}
+
+func ErrPlanPhasesRequired() error {
+	return planInvalid("REQUEST_PLAN_PHASES_REQUIRED", "this request type and size is planned in Phases; the proposal has none")
+}
+
+func ErrPlanMixedChildren() error {
+	return planInvalid("REQUEST_PLAN_MIXED_CHILDREN", "a Plan holds Phases or tasks directly, not both")
+}
+
+func ErrPlanEmpty(where string) error {
+	return planInvalid("REQUEST_PLAN_EMPTY", fmt.Sprintf("%s has no tasks", where))
+}
+
+func ErrPlanTooLarge(detail string) error {
+	return planInvalid("REQUEST_PLAN_TOO_LARGE", detail)
+}
+
+func ErrPlanInvalidDependency(detail string) error {
+	return planInvalid("REQUEST_PLAN_INVALID_DEPENDENCY", detail)
+}
+
+func ErrPlanRegressionTestMissing() error {
+	return planInvalid("REQUEST_PLAN_REGRESSION_TEST_MISSING", "a bug or security fix plan needs a task labelled "+PlanLabelTestRegression)
+}
+
+func ErrPlanInvalidTaskType(t string) error {
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_PLAN_INVALID_TASK_TYPE", fmt.Sprintf("task_type %q is not one of task, bug, feature, epic", t), nil)
+}
+
+func ErrPlanInvalidTitle(detail string) error {
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_PLAN_INVALID_TITLE", detail, nil)
+}
+
+func ErrPlanInvalidField(detail string) error {
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_PLAN_INVALID_FIELD", detail, nil)
+}
+
+// ErrPlanAIInvalidJSON is what a person sees when the model's answer is not a usable Plan; the raw text stays on the run.
+func ErrPlanAIInvalidJSON(detail string) error {
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_PLAN_AI_INVALID_JSON", detail, nil)
+}
+
+func ErrPlanRunNotFound(id string) error {
+	return apperrors.New(apperrors.KindNotFound, "REQUEST_PLAN_RUN_NOT_FOUND", fmt.Sprintf("plan run not found: %s", id), nil)
+}
+
+func ErrPlanTaskServiceUnavailable(cause error) error {
+	return apperrors.New(apperrors.KindUnavailable, "REQUEST_PLAN_TASK_SERVICE_UNAVAILABLE", "task-service could not store the Plan", cause)
+}
+
+func ErrPlanForbidden() error {
+	return apperrors.New(apperrors.KindPermissionDenied, "REQUEST_PLAN_FORBIDDEN", "only the reporter or an administrator may generate or commit a Plan", nil)
+}
+
+func ErrPlanFeedbackTooLong() error {
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_PLAN_FEEDBACK_TOO_LONG", "feedback is limited to 2000 characters", nil)
+}
+
+func ErrPlanAIUnavailable() error {
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_PLAN_AI_UNAVAILABLE", "project has no connected dev server to run the AI call that writes the Plan", nil)
+}
+
+func ErrPlanHasRunningTasks() error {
+	return planInvalid("REQUEST_PLAN_HAS_RUNNING_TASKS", "the current Plan has running tasks and cannot be replaced")
+}
+
+func ErrPlanSupersedeMismatch() error {
+	return planInvalid("REQUEST_PLAN_SUPERSEDE_MISMATCH", "the Request's recorded Plan is not the active Plan in task-service")
+}
+
+func ErrPlanNotCommitted(requestID string) error {
+	return planInvalid("REQUEST_PLAN_NOT_COMMITTED", "request "+requestID+" has no committed Plan to approve")
+}

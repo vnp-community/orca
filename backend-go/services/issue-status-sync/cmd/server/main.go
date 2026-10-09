@@ -28,6 +28,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stablyai/orca-go/common/grpcmw"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -143,21 +144,21 @@ func run() error {
 	// Outbound clients — issue-tracking-service/scm-integration-service for
 	// the actual status write, project-service for the BR-PI-07 opt-out
 	// re-check.
-	issueTrackingConn, err := grpc.NewClient(cfg.IssueTrackingServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	issueTrackingConn, err := grpcmw.NewClient(cfg.IssueTrackingServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing issue-tracking-service: %w", err)
 	}
 	defer func() { _ = issueTrackingConn.Close() }()
 	issueTrackingClient := grpcclient.NewIssueTrackingClient(issuetrackingv1.NewIssueTrackingServiceClient(issueTrackingConn))
 
-	scmConn, err := grpc.NewClient(cfg.SCMIntegrationServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	scmConn, err := grpcmw.NewClient(cfg.SCMIntegrationServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing scm-integration-service: %w", err)
 	}
 	defer func() { _ = scmConn.Close() }()
 	scmClient := grpcclient.NewScmClient(scmintegrationv1.NewScmIntegrationServiceClient(scmConn))
 
-	projectConn, err := grpc.NewClient(cfg.ProjectServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	projectConn, err := grpcmw.NewClient(cfg.ProjectServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing project-service: %w", err)
 	}
@@ -177,7 +178,7 @@ func run() error {
 		if cfg.RequestServiceInternalToken == "" {
 			logger.Warn("REQUEST_SERVICE_INTERNAL_TOKEN is empty: request-service refuses LookupRequestBySource, so worktree/PR events will retry and then be dropped")
 		}
-		requestConn, err := grpc.NewClient(cfg.RequestServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()),
+		requestConn, err := grpcmw.NewClient(cfg.RequestServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithChainUnaryInterceptor(internalcaller.ClientInterceptor(cfg.RequestServiceInternalToken)))
 		if err != nil {
 			return fmt.Errorf("dialing request-service: %w", err)

@@ -32,6 +32,9 @@ func TestExecTimeoutForMethod_Table(t *testing.T) {
 		{"codeintel.reindexCancel", 0},
 		{"codeintel.watch", 0},
 
+		// ai.complete outlives the agent's own 120s bound
+		{"ai.complete", 150 * time.Second},
+
 		// Quality methods
 		{"quality.listProfiles", 45 * time.Second},
 		{"quality.run", 0},

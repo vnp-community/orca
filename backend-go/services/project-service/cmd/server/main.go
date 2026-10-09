@@ -31,6 +31,7 @@ import (
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
+	"github.com/stablyai/orca-go/common/internalcaller"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/policy"
@@ -228,7 +229,7 @@ func run() error {
 	// already-constructed client rather than dialing their own connection
 	// (unlike DevServerRelay/InfraFleetDevServerLister above), so one shared
 	// *grpc.ClientConn backs all three.
-	infraFleetConn, err := grpc.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	infraFleetConn, err := grpcmw.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing infra-fleet-service (health/hostname/tags): %w", err)
 	}
@@ -237,7 +238,7 @@ func run() error {
 
 	// NEW — tenant-service dial for ProfileResolver's GetResolvedProfile
 	// call (ListProjects's fleet.allowedServerTags visibility filter).
-	tenantConn, err := grpc.NewClient(cfg.TenantServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	tenantConn, err := grpcmw.NewClient(cfg.TenantServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing tenant-service: %w", err)
 	}
@@ -275,7 +276,7 @@ func run() error {
 	// every OPA allow/deny decision to auth-service's audit_log. Lazy dial
 	// (grpc.NewClient doesn't block on connect), same convention as every
 	// other outbound client above.
-	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	authConn, err := grpcmw.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing auth-service: %w", err)
 	}
@@ -368,7 +369,14 @@ func run() error {
 	saveSparsePresetUC := usecase.NewSaveSparsePreset(sparsePresetRepo, repoRepo, repo, opa)
 	removeSparsePresetUC := usecase.NewRemoveSparsePreset(sparsePresetRepo, repoRepo, repo, opa)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
+	if cfg.InternalCallerToken == "" {
+		logger.Warn("PROJECT_INTERNAL_CALLER_TOKEN is empty: internal-only RPCs (ResolveProjectAccess) refuse every call")
+	}
+	grpcServer := grpc.NewServer(
+		grpcmw.ChainUnary(logger),
+		grpc.ChainUnaryInterceptor(internalcaller.Guard(cfg.InternalCallerToken, projectv1.ProjectService_ResolveProjectAccess_FullMethodName)),
+		grpcmw.StatsHandler(),
+	)
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
 		CreateProject:       createProjectUC,
 		GetProject:          getProjectUC,
@@ -424,6 +432,7 @@ func run() error {
 		SetupExistingFolder: setupExistingFolderUC,
 
 		GetProjectContext:       getProjectContextUC,
+		ResolveProjectAccess:    usecase.NewResolveProjectAccess(repo),
 		GetMobileWorktreeStatus: getMobileWorktreeStatusUC,
 
 		LinkSourceProject:    linkSourceProjectUC,

@@ -88,8 +88,8 @@ func gateStatusOf(a *Approval) GateStatus {
 	return GateStatusNone // cancelled and expired leave the subject unapproved
 }
 
-// startGateSubject is the Approval that releases the Plan itself for this flow.
-func startGateSubject(g GateSubject) (SubjectType, bool) {
+// StartGateSubject is the Approval that releases the Plan itself for this flow (plan, task_list or pre_deploy).
+func StartGateSubject(g GateSubject) (SubjectType, bool) {
 	switch g {
 	case GatePlan:
 		return SubjectPlan, true
@@ -109,7 +109,7 @@ func ResolveTaskGate(in TaskGateInput) GateResolution {
 	}
 	var statuses []GateStatus
 	planGate := func(plan *TaskView) {
-		subject, ok := startGateSubject(flow.StartGate)
+		subject, ok := StartGateSubject(flow.StartGate)
 		if !ok || plan == nil {
 			statuses = append(statuses, GateStatusNone)
 			return

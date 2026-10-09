@@ -151,7 +151,45 @@ func (k *kit) confirm(r *requestv1.Request, typ, size string) *requestv1.Request
 	if err != nil {
 		k.t.Fatalf("ConfirmRequestType: %v", err)
 	}
-	return resp.GetRequest()
+	return k.answerReadiness(resp.GetRequest())
+}
+
+// answerReadiness completes the readiness Clarification (CR-REQ-028) that confirming a type opens when required
+// fields such as acceptance criteria are missing, so scenarios continue from the stage they actually test.
+func (k *kit) answerReadiness(r *requestv1.Request) *requestv1.Request {
+	k.t.Helper()
+	if r.GetStatus() != "awaiting_information" {
+		return r
+	}
+	list, err := k.req.ListClarifications(k.asReporter(), &requestv1.ListClarificationsRequest{RequestId: r.GetId(), Status: requestv1.ClarificationStatus_CLARIFICATION_STATUS_OPEN})
+	if err != nil || len(list.GetClarifications()) == 0 {
+		k.t.Fatalf("Request is awaiting_information but ListClarifications gave %v, %v", list, err)
+	}
+	c := list.GetClarifications()[0]
+	items := make([]*requestv1.AnswerItem, 0, len(c.GetQuestions()))
+	for _, q := range c.GetQuestions() {
+		item := &requestv1.AnswerItem{QuestionId: q.GetId()}
+		switch {
+		case q.GetSuggestedDefaultJson() != "":
+			item.ValueJson, item.AcceptDefault = q.GetSuggestedDefaultJson(), true
+		case q.GetKind() == requestv1.QuestionKind_QUESTION_KIND_BOOLEAN:
+			item.ValueJson = "true"
+		case strings.Contains(q.GetQuestionKey(), "hours"):
+			item.ValueJson = `"8"` // text kind, numeric content
+		default:
+			item.ValueJson = `"answered by the e2e scenario"`
+		}
+		items = append(items, item)
+	}
+	if _, err := k.req.AnswerClarification(k.asReporter(), &requestv1.AnswerClarificationRequest{
+		ClarificationId: c.GetId(), Answers: items, Complete: true, ExpectedVersion: c.GetVersion()}); err != nil {
+		k.t.Fatalf("AnswerClarification: %v", err)
+	}
+	got, err := k.req.GetRequest(k.asReporter(), &requestv1.GetRequestRequest{Id: r.GetId()})
+	if err != nil {
+		k.t.Fatalf("GetRequest after the Clarification: %v", err)
+	}
+	return got.GetRequest()
 }
 
 func (k *kit) outbox(subject string) []string {

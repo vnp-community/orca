@@ -57,6 +57,7 @@ func toProtoClarification(v usecase.ClarificationView) *requestv1.Clarification 
 		pq := &requestv1.ClarificationQuestion{
 			Id: q.ID, Seq: int32(q.Seq), QuestionKey: q.QuestionKey, Kind: questionKindToProto[q.Kind], Prompt: q.Prompt, Reason: q.Reason,
 			SuggestedDefaultJson: string(q.SuggestedDefault), Required: q.Required, TargetPath: q.TargetPath,
+			ValueType: domain.ClarificationValueType(q.Kind, q.TargetPath),
 		}
 		if len(q.Options) > 0 {
 			b, _ := json.Marshal(q.Options)

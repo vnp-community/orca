@@ -1419,9 +1419,15 @@ func (s *session) handshakeInfoSnapshot() (HandshakeInfo, bool) {
 	return s.handshakeInfo, true
 }
 
-// close tears down the session — used when a devServer is removed or the
-// service shuts down.
-func (s *session) close() {
+// close tears down the session — used when a devServer is removed or its token revoked.
+func (s *session) close() { s.closeWith(false) }
+
+// shutdown closes the session because this service is stopping. The agent exits on a normal
+// close (1000), so a redeploy would otherwise take every connected agent down with it; 1001
+// tells it to reconnect.
+func (s *session) shutdown() { s.closeWith(true) }
+
+func (s *session) closeWith(goingAway bool) {
 	s.closeMu.Lock()
 	defer s.closeMu.Unlock()
 	s.mu.Lock()
@@ -1436,6 +1442,10 @@ func (s *session) close() {
 		close(s.closeCh)
 	}
 	if t != nil {
+		if g, ok := t.(goingAwayCloser); ok && goingAway {
+			_ = g.CloseGoingAway("service shutting down")
+			return
+		}
 		_ = t.Close("session closed")
 	}
 }

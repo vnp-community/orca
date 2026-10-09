@@ -78,6 +78,7 @@ type Server struct {
 	setupExistingFolder *usecase.SetupExistingFolder
 
 	getProjectContext       *usecase.GetProjectContext
+	resolveProjectAccess    *usecase.ResolveProjectAccess
 	getMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 
 	linkSourceProject    *usecase.LinkSourceProject
@@ -148,6 +149,7 @@ type Deps struct {
 	SetupExistingFolder *usecase.SetupExistingFolder
 
 	GetProjectContext       *usecase.GetProjectContext
+	ResolveProjectAccess    *usecase.ResolveProjectAccess
 	GetMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 
 	LinkSourceProject    *usecase.LinkSourceProject
@@ -216,6 +218,7 @@ func New(deps Deps) *Server {
 		setupExistingFolder: deps.SetupExistingFolder,
 
 		getProjectContext:       deps.GetProjectContext,
+		resolveProjectAccess:    deps.ResolveProjectAccess,
 		getMobileWorktreeStatus: deps.GetMobileWorktreeStatus,
 
 		linkSourceProject:    deps.LinkSourceProject,
@@ -1126,6 +1129,15 @@ func (s *Server) GetProjectContext(ctx context.Context, req *projectv1.GetProjec
 		ProjectId: pc.ProjectID, ProjectName: pc.ProjectName, Description: pc.Description,
 		RepoUrl: pc.RepoURL, DevServerId: pc.DevServerID, DevServerHostname: pc.DevServerHostname,
 	}, nil
+}
+
+// ResolveProjectAccess is an internal RPC (guarded by the service token in cmd/server).
+func (s *Server) ResolveProjectAccess(ctx context.Context, req *projectv1.ResolveProjectAccessRequest) (*projectv1.ResolveProjectAccessResponse, error) {
+	access, err := s.resolveProjectAccess.Execute(ctx, req.GetProjectId(), req.GetUserId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.ResolveProjectAccessResponse{Exists: access.Exists, Role: access.Role}, nil
 }
 
 // GetMobileWorktreeStatus is BL-MB-04's ONE composed-read call — tenant_id/

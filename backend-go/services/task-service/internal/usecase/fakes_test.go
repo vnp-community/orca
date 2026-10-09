@@ -389,7 +389,7 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 	}
 	existing, ok := f.tasks[id]
 	if !ok || existing.TenantID != tenantID {
-		return errNotFound
+		return fmt.Errorf("fake: %w", domain.ErrTaskNotFound)
 	}
 	delete(f.tasks, id)
 	return nil

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stablyai/orca-go/common/grpcmw"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -56,7 +57,7 @@ func (s *devServerSemaphores) acquire(ctx context.Context, devServerID string) (
 
 // Dial constructs a gRPC client connection to infra-fleet-service.
 func Dial(addr string) (*grpc.ClientConn, error) {
-	return grpc.NewClient(
+	return grpcmw.NewClient(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),

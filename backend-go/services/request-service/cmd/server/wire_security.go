@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,7 +14,6 @@ import (
 	"github.com/stablyai/orca-go/common/auditclient"
 	"github.com/stablyai/orca-go/common/tenant"
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
-	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 	"github.com/stablyai/orca-go/services/request-service/internal/adapter/auditdelivery"
 	requestgrpc "github.com/stablyai/orca-go/services/request-service/internal/adapter/grpc"
@@ -46,6 +46,8 @@ func (w *securityWiring) close() {
 type securityHooks struct {
 	AfterGuard []grpc.UnaryServerInterceptor // feature flag gate
 	AfterAuthz []grpc.UnaryServerInterceptor // RPC audit
+	// OnRateLimited feeds orca_request_rate_limited_total.
+	OnRateLimited func(class string)
 }
 
 func wireSecurity(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, log *slog.Logger, stores *requestStores, hooks securityHooks) (*securityWiring, error) {
@@ -63,13 +65,11 @@ func wireSecurity(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	}
 
 	var roles usecase.ProjectRoleResolver = unavailableProjectRoles{}
-	if cfg.ProjectServiceAddr != "" {
-		conn, err := grpcclient.Dial(cfg.ProjectServiceAddr)
-		if err != nil {
-			return nil, err
-		}
-		w.closers = append(w.closers, func() { _ = conn.Close() })
-		roles = grpcclient.NewProjectRoleResolver(projectv1.NewProjectServiceClient(conn))
+	if pa, err := dialProjectAccess(cfg, log); err != nil {
+		return nil, err
+	} else if pa != nil {
+		w.closers = append(w.closers, pa.Close)
+		roles = grpcclient.NewProjectRoleResolver(pa.Client).WithAccessLookup(pa.Lookup)
 	} else {
 		log.Warn("PROJECT_SERVICE_ADDR unset: only global admins pass the project-role check")
 	}
@@ -94,14 +94,20 @@ func wireSecurity(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 
 	authorize := usecase.NewAuthorizeRequestAction(stores.requests, usecase.NewApprovalRequestLocator(stores.approvals), roles, policy, audit)
 	w.authorize = authorize
+	limits, warnings := domain.LimitsFromEnv(os.Getenv)
+	for _, msg := range warnings {
+		log.Warn("rate limit override ignored", slog.String("detail", msg))
+	}
 	w.options = requestgrpc.SecurityChain(requestgrpc.SecurityChainConfig{
 		GatewayToken: cfg.GatewayInternalToken,
 		ServiceToken: cfg.ServiceInternalToken,
 		Authorize:    authorize,
-		Limiter:      usecase.NewRateLimiter(domain.DefaultLimits, nil),
+		Limiter:      usecase.NewRateLimiter(limits, nil),
 		Gate:         usecase.NewConcurrencyGate(domain.DefaultConcurrencyCaps, stores.concurrency),
 		AfterGuard:   hooks.AfterGuard,
 		AfterAuthz:   hooks.AfterAuthz,
+
+		OnRateLimited: hooks.OnRateLimited,
 	})
 
 	key := []byte(cfg.EraseHMACKey)

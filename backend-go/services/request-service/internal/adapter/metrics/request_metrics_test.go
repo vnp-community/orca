@@ -41,7 +41,7 @@ var allSeries = []string{
 	"orca_request_created_total", "orca_request_transitions_total", "orca_request_classification_total",
 	"orca_request_classification_confidence", "orca_request_approvals_total", "orca_request_approval_wait_seconds",
 	"orca_request_approvals_pending", "orca_request_stuck", "orca_request_returned_total",
-	"orca_request_ai_generation_seconds", "orca_request_task_outcome_total", "orca_request_outbox_pending",
+	"orca_request_ai_generation_seconds", "orca_request_task_outcome_total", "orca_request_rate_limited_total", "orca_request_outbox_pending",
 }
 
 type fakeSamples struct {
@@ -71,6 +71,7 @@ func TestRequestMetrics_ServesAllTwelveSeries(t *testing.T) {
 	s.OnEvent(ctx, event(t, domain.SubjectRequestReturned, map[string]any{"stage": "plan"}))
 	s.ObserveAIGeneration("classification", "ok", 2*time.Second)
 	s.ObserveTaskOutcome("succeeded")
+	s.ObserveRateLimited("write")
 	s.SampleOnce(ctx, &fakeSamples{pending: map[string]int{"plan": 2}, stuck: map[string]int{"classifying": 1}, outbox: 4},
 		StuckThresholds{"classifying": time.Minute}, time.Now(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 
@@ -89,6 +90,7 @@ func TestRequestMetrics_ServesAllTwelveSeries(t *testing.T) {
 		`orca_request_stuck{status="classifying"} 1`,
 		`orca_request_returned_total{returned_from_stage="plan"} 1`,
 		`orca_request_task_outcome_total{outcome="succeeded"} 1`,
+		`orca_request_rate_limited_total{class="write"} 1`,
 		`orca_request_outbox_pending 4`,
 	} {
 		if !strings.Contains(out, want) {

@@ -175,7 +175,7 @@ func run() error {
 	// architecture/07-security-architecture.md. See
 	// internal/adapter/grpcclient's package doc comment for the
 	// SECURITY-CRITICAL constraint this client must uphold.
-	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	brokerConn, err := grpcmw.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}
@@ -185,7 +185,7 @@ func run() error {
 	// infra-fleet-service connection — mediates TestConnection's relay to
 	// the execution plane (TASK-028); same insecure-transport-credentials
 	// local-dev/scaffold convenience as brokerConn above.
-	infraFleetConn, err := grpc.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	infraFleetConn, err := grpcmw.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing infra-fleet-service at %s: %w", cfg.InfraFleetServiceAddr, err)
 	}

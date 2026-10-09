@@ -25,6 +25,7 @@ type AnalysisRunner struct {
 	tx        TxRunner
 	complete  AnalysisWorker
 	agent     AnalysisWorker
+	plan      AnalysisWorker
 	settings  AnalysisSettings
 	owner     string
 
@@ -38,6 +39,12 @@ var _ AnalysisSpawner = (*AnalysisRunner)(nil)
 func NewAnalysisRunner(runs AnalysisRunStore, solutions SolutionStore, tx TxRunner, complete, agent AnalysisWorker, settings AnalysisSettings, owner string) *AnalysisRunner {
 	stopCtx, stop := context.WithCancel(context.Background())
 	return &AnalysisRunner{runs: runs, solutions: solutions, tx: tx, complete: complete, agent: agent, settings: settings.withDefaults(), owner: owner, stopCtx: stopCtx, stop: stop}
+}
+
+// WithPlanWorker adds the worker for kind=plan runs; they share the lease, heartbeat and recovery of the others.
+func (r *AnalysisRunner) WithPlanWorker(w AnalysisWorker) *AnalysisRunner {
+	r.plan = w
+	return r
 }
 
 // Close stops workers and the sweeper and waits for them. Runs cut short stay running and are failed by the next sweep.
@@ -64,6 +71,9 @@ func (r *AnalysisRunner) runCtx(run domain.AnalysisRun) context.Context {
 }
 
 func (r *AnalysisRunner) worker(run domain.AnalysisRun) AnalysisWorker {
+	if run.Kind == domain.RunKindPlan && r.plan != nil {
+		return r.plan
+	}
 	if run.Mode == domain.AnalysisModeAgentReadonly {
 		return r.agent
 	}
@@ -125,9 +135,17 @@ func (r *AnalysisRunner) failRun(ctx context.Context, run domain.AnalysisRun, f 
 		if !ok {
 			return ErrLeaseLost // someone else finished or took over the run; leave the draft to them
 		}
-		return r.solutions.DeleteDraft(ctx, run.SolutionID)
+		return deleteDraftIfAny(ctx, r.solutions, run)
 	})
 	if err != nil && !errors.Is(err, ErrLeaseLost) {
 		slog.Warn("could not record analysis failure; the sweeper will", slog.String("run_id", run.ID), slog.Any("error", err))
 	}
+}
+
+// deleteDraftIfAny drops the draft Solution of a failed run; plan runs never had one.
+func deleteDraftIfAny(ctx context.Context, store SolutionStore, run domain.AnalysisRun) error {
+	if run.SolutionID == "" {
+		return nil
+	}
+	return store.DeleteDraft(ctx, run.SolutionID)
 }

@@ -47,7 +47,9 @@ type Config struct {
 	RequireEnforcedReadonly   bool
 	GatewayInternalToken      string
 	ServiceInternalToken      string
-	OPABundlePath             string
+	// ProjectInternalCallerToken authenticates this service to project-service's internal-only RPCs (ResolveProjectAccess).
+	ProjectInternalCallerToken string
+	OPABundlePath              string
 	// StuckThresholds says how long a Request may sit in a status before orca_request_stuck counts it
 	// (REQUEST_STUCK_THRESHOLD_<STATUS>, Go duration). Proposed values, not yet tuned on real traffic.
 	StuckThresholds map[string]time.Duration
@@ -190,6 +192,9 @@ func Load() Config {
 	}
 	if tok := os.Getenv("SERVICE_INTERNAL_TOKEN"); tok != "" {
 		c.ServiceInternalToken = tok
+	}
+	if tok := os.Getenv("PROJECT_INTERNAL_CALLER_TOKEN"); tok != "" {
+		c.ProjectInternalCallerToken = tok
 	}
 	if p := os.Getenv("OPA_BUNDLE_PATH"); p != "" {
 		c.OPABundlePath = p

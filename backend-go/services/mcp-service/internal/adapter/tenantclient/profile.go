@@ -22,7 +22,7 @@ import (
 const DefaultTimeout = 3 * time.Second
 
 func Dial(addr string) (*grpc.ClientConn, error) {
-	return grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return grpcmw.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
 type Client struct {

@@ -1,7 +1,6 @@
 package devserveragent
 
 // Agent methods always self-expire before Go-side timeouts.
-// ai.complete = 120s will be added by BE-CV-SOL-093.
 
 import (
 	"strings"
@@ -9,12 +8,16 @@ import (
 )
 
 const (
-	execPromptTimeout    = 15 * time.Minute
+	execPromptTimeout = 15 * time.Minute
+	// ai.complete may run a model for a minute or more (a Solution or Plan is a long structured answer). The agent bounds
+	// its own call at 120s, so this must be longer or the Go side gives up on a call that was about to succeed.
+	aiCompleteTimeout    = 150 * time.Second
 	codeIntelReadTimeout = 90 * time.Second
 )
 
 var execTimeoutOverrides = map[string]time.Duration{
 	"agent.execPrompt":     execPromptTimeout,
+	"ai.complete":          aiCompleteTimeout,
 	"quality.listProfiles": 45 * time.Second,
 }
 

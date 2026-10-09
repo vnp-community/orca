@@ -431,17 +431,12 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 // in-process, so an in-process goroutine plays the same role, with no
 // external callback RPC needed.
 //
-// dispatchCtx is deliberately NOT ctx: ctx dies with this RPC (the very
-// problem being fixed here). dispatchCtx rebuilds only the identity values
-// SimpleExecutor.Execute and its downstream resolvers actually read from
-// context (tenant id, user id) onto a fresh context.Background() — no
-// deadline, no tie to the client connection, the same shape a real
-// completion callback's own fresh inbound request would carry.
+// dispatchCtx is deliberately NOT ctx itself: ctx dies with this RPC (the very
+// problem being fixed here). tenant.Detach keeps every identity value (tenant,
+// user, role, actor type) that downstream calls forward, and drops only the
+// cancellation, so an agent-initiated run is still an agent downstream.
 func (uc *ExecuteTask) dispatchDirectAgentAsync(ctx context.Context, tenantID, userID string, in ExecuteTaskInput, task domain.Task, worktreePath, linkID string, previousStatus domain.Status, dispatchStart time.Time) (ExecuteResult, error) {
-	dispatchCtx := tenant.WithTenantID(context.Background(), tenantID)
-	if userID != "" {
-		dispatchCtx = tenant.WithUserID(dispatchCtx, userID)
-	}
+	dispatchCtx := tenant.Detach(ctx)
 	uc.runAsync(func() {
 		stopHeartbeat := uc.startHeartbeat(dispatchCtx, tenantID, linkID)
 		defer stopHeartbeat()

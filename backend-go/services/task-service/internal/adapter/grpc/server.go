@@ -143,7 +143,7 @@ func (s *Server) GenerateAgentPrompt(ctx context.Context, req *taskv1.GenerateAg
 func (s *Server) CreateTask(ctx context.Context, req *taskv1.CreateTaskRequest) (*taskv1.CreateTaskResponse, error) {
 	// No ID field on CreateTaskRequest — the usecase assigns one (uuid) when
 	// Input.ID is left empty.
-	task, err := s.createTask.Execute(ctx, toCreateTaskInput(req))
+	task, err := s.createTask.Execute(ctx, toCreateTaskInput(ctx, req))
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}

@@ -36,7 +36,8 @@ func TestMetricsEndpointServesRequestSeries(t *testing.T) {
 		out := scrapeMetrics(t)
 		for _, want := range []string{
 			`orca_request_created_total{source_provider="manual"}`,
-			`orca_request_transitions_total{from="awaiting_type_confirmation",to="analyzing",type="bug"}`,
+			// Confirming the type opens the readiness Clarification (CR-REQ-028); answering it resumes the Request into analyzing.
+			`orca_request_transitions_total{from="awaiting_information",to="analyzing",type="bug"}`,
 			`orca_request_classification_total{outcome="confirmed_as_proposed"}`,
 			`orca_request_classification_confidence_count`,
 			`orca_request_ai_generation_seconds_count{kind="classification",outcome="ok"}`,

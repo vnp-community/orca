@@ -189,6 +189,9 @@ var errClassificationLimit = errors.New("classification limit")
 
 func failureReason(err error) string {
 	var s string
+	if code, ok := AIUnavailableCode(err); ok {
+		return code // machine-stable so the UI can show the remedy for this exact cause
+	}
 	switch {
 	case errors.Is(err, errClassificationLimit):
 		s = "classification limit"
@@ -208,6 +211,9 @@ func failureReason(err error) string {
 }
 
 func failureCode(err error) string {
+	if code, ok := AIUnavailableCode(err); ok {
+		return code
+	}
 	switch {
 	case errors.Is(err, errClassificationLimit):
 		return "CLASSIFICATION_LIMIT"

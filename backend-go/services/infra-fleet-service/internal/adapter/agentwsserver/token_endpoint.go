@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
@@ -265,6 +267,10 @@ func (t *TokenIssuer) handlePost(w http.ResponseWriter, r *http.Request) {
 // pattern immediately above this call site.
 func (t *TokenIssuer) linkEphemeralVmRuntime(ctx context.Context, devServerID, devServerDbID string) {
 	if t.EphemeralVmRuntimes == nil {
+		return
+	}
+	// Runtime ids are UUIDs; a hand-named agent id such as "dev-local-mac" can never match and would only fail the uuid cast.
+	if _, parseErr := uuid.Parse(devServerID); parseErr != nil {
 		return
 	}
 	_, err := t.EphemeralVmRuntimes.SetEnvironmentID(ctx, t.Cfg.DefaultTenantID, devServerID, devServerDbID)

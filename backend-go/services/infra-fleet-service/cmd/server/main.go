@@ -307,7 +307,7 @@ func run() error {
 	// lazily inside sshrelay.deploy rather than here, since it's still worth
 	// constructing the provisioner (so config wiring is visibly complete)
 	// even if deploy will fail until an operator sets the bundle path.
-	credentialBrokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	credentialBrokerConn, err := grpcmw.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}
@@ -428,7 +428,7 @@ func run() error {
 	// uses this to record every "ssh.connect" allow/deny outcome to
 	// auth-service's audit_log. Lazy dial (grpc.NewClient doesn't block on
 	// connect), same convention as every other outbound client above.
-	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	authConn, err := grpcmw.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing auth-service: %w", err)
 	}
@@ -814,6 +814,14 @@ func run() error {
 	agentWSServer := infraagentwsserver.New(slotRegistry, agentClient, agentWSCfg, logger)
 	agentWSServer.Sessions = agentClient                              // TASK-AWS-02-03: agentClient already implements LiveSessionCount
 	agentWSServer.Tokens = agentTokenValidator{repo: agentTokenStore} // TASK-AWS-03-06: persistent-token handshake fallback
+	// Without this, project-service reads a stale "unreachable" for up to one poll interval after the agent connects.
+	agentWSServer.OnAttached = func(devServerID string) {
+		pollCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		defer cancel()
+		if err := pollFleetHealthUC.PollDevServer(pollCtx, devServerID); err != nil {
+			logger.WarnContext(pollCtx, "fleet health refresh after agent connect failed", slog.String("devServerId", devServerID), slog.Any("error", err))
+		}
+	}
 	agentTokenIssuer := infraagentwsserver.NewTokenIssuer(slotRegistry, agentWSCfg, logger, resolveDirectWebSocketDevServerUC, ephemeralVmRuntimeStore)
 
 	mux := http.NewServeMux()

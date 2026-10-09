@@ -131,6 +131,7 @@ func run() error {
 		usecase.GrantRepository
 		usecase.CommentRepository
 		usecase.ExecutionLinkRepository
+		usecase.ExecutionStateReader
 		usecase.ExecutionLeaseRepository
 		usecase.TaskExecutionClaimer
 		usecase.TaskSourceRepository
@@ -307,7 +308,7 @@ func run() error {
 	// uses this to record every OPA allow/deny decision to auth-service's
 	// audit_log. Lazy dial (grpc.NewClient doesn't block on connect), same
 	// convention as every other outbound client above.
-	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	authConn, err := grpcmw.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing auth-service: %w", err)
 	}

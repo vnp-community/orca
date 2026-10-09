@@ -1,0 +1,2130 @@
+[
+  {
+    "name": "accounts.removeClaude",
+    "kind": "unary"
+  },
+  {
+    "name": "accounts.removeCodex",
+    "kind": "unary"
+  },
+  {
+    "name": "accounts.resolveDevServerConnection",
+    "kind": "unary"
+  },
+  {
+    "name": "accounts.selectClaude",
+    "kind": "unary"
+  },
+  {
+    "name": "accounts.selectCodex",
+    "kind": "unary"
+  },
+  {
+    "name": "accounts.subscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "admin.createPolicy",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.createUser",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.deactivateUser",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.deletePolicy",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.forceRevokeAllSessions",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.forceRevokeSession",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.getPolicy",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.listPolicies",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.listSessions",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.listUsers",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.queryAuditLog",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.reactivateUser",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.updatePolicy",
+    "kind": "unary"
+  },
+  {
+    "name": "admin.updateUserRole",
+    "kind": "unary"
+  },
+  {
+    "name": "agent.kill",
+    "kind": "unary"
+  },
+  {
+    "name": "agent.resume",
+    "kind": "streamChannel"
+  },
+  {
+    "name": "agent.start",
+    "kind": "streamChannel"
+  },
+  {
+    "name": "agent.stop",
+    "kind": "unary"
+  },
+  {
+    "name": "agent.subscribeStatus",
+    "kind": "stream"
+  },
+  {
+    "name": "agent.switchAccount",
+    "kind": "streamChannel"
+  },
+  {
+    "name": "agentSession.listActive",
+    "kind": "unary"
+  },
+  {
+    "name": "aiProvider.create",
+    "kind": "unary"
+  },
+  {
+    "name": "aiProvider.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "aiProvider.list",
+    "kind": "unary"
+  },
+  {
+    "name": "aiProvider.resolve",
+    "kind": "unary"
+  },
+  {
+    "name": "aiProvider.testConnection",
+    "kind": "unary"
+  },
+  {
+    "name": "aiProvider.update",
+    "kind": "unary"
+  },
+  {
+    "name": "aiProvider.writeCredential",
+    "kind": "unary"
+  },
+  {
+    "name": "annotation.composeReviewPrompt",
+    "kind": "unary"
+  },
+  {
+    "name": "annotation.create",
+    "kind": "unary"
+  },
+  {
+    "name": "annotation.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "annotation.list",
+    "kind": "unary"
+  },
+  {
+    "name": "annotation.markSent",
+    "kind": "unary"
+  },
+  {
+    "name": "annotation.sendToAgent",
+    "kind": "unary"
+  },
+  {
+    "name": "annotation.update",
+    "kind": "unary"
+  },
+  {
+    "name": "apiGateway.rateLimits.get",
+    "kind": "unary"
+  },
+  {
+    "name": "approval.approve",
+    "kind": "unary"
+  },
+  {
+    "name": "approval.cancel",
+    "kind": "unary"
+  },
+  {
+    "name": "approval.get",
+    "kind": "unary"
+  },
+  {
+    "name": "approval.list",
+    "kind": "unary"
+  },
+  {
+    "name": "approval.listPending",
+    "kind": "unary"
+  },
+  {
+    "name": "approval.reject",
+    "kind": "unary"
+  },
+  {
+    "name": "auth.listTenantMemberDirectory",
+    "kind": "unary"
+  },
+  {
+    "name": "automation.create",
+    "kind": "unary"
+  },
+  {
+    "name": "automation.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "automation.list",
+    "kind": "unary"
+  },
+  {
+    "name": "automation.runNow",
+    "kind": "unary"
+  },
+  {
+    "name": "automation.runs",
+    "kind": "unary"
+  },
+  {
+    "name": "automation.update",
+    "kind": "unary"
+  },
+  {
+    "name": "backlog.execute",
+    "kind": "unary"
+  },
+  {
+    "name": "backlog.requests",
+    "kind": "unary"
+  },
+  {
+    "name": "backlog.tasks",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.click",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.eval",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.goto",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.keypress",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.mouseDown",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.mouseMove",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.mouseUp",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.mouseWheel",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.profileClearDefaultCookies",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.profileCreate",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.profileDelete",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.profileDetectBrowsers",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.profileImportFromBrowser",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.profileList",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.screencast",
+    "kind": "binaryStream"
+  },
+  {
+    "name": "browser.snapshot",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.tabClose",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.tabCreate",
+    "kind": "unary"
+  },
+  {
+    "name": "browser.viewport",
+    "kind": "unary"
+  },
+  {
+    "name": "clarification.answer",
+    "kind": "unary"
+  },
+  {
+    "name": "clarification.cancel",
+    "kind": "unary"
+  },
+  {
+    "name": "clarification.get",
+    "kind": "unary"
+  },
+  {
+    "name": "clarification.list",
+    "kind": "unary"
+  },
+  {
+    "name": "clientState.get",
+    "kind": "unary"
+  },
+  {
+    "name": "clientState.set",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.architecture",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.bindRepo",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.c4.get",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.c4.save",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.changeOverlay",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.contractDiff",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.dataFlow",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.dataFlows",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.dismissFinding",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.erd",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.findings",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.impact",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.cancel",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.ci",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.coverage",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.findings",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.gate",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.profile.get",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.profile.save",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.report",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.run",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.runs",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.start",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.summary",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.trace",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.trace.confirm",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.trace.link",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.trend",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.turn",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.turn.record",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.turns",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.quality.waive",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.readingOrder",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.reindex",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.reindexStatus",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.reviewState.get",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.reviewState.save",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.routes",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.settings.get",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.settings.set",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.status",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.storage",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.structure",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.subgraph",
+    "kind": "unary"
+  },
+  {
+    "name": "codeIntel.subscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "codeIntel.symbol",
+    "kind": "unary"
+  },
+  {
+    "name": "connection.teardown",
+    "kind": "unary"
+  },
+  {
+    "name": "connectivity.getSummary",
+    "kind": "unary"
+  },
+  {
+    "name": "crashReports.getLatestPending",
+    "kind": "unary"
+  },
+  {
+    "name": "credentials.list",
+    "kind": "unary"
+  },
+  {
+    "name": "credentials.revoke",
+    "kind": "unary"
+  },
+  {
+    "name": "credentials.set",
+    "kind": "unary"
+  },
+  {
+    "name": "credentials.status",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.add",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.agentTokens.create",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.agentTokens.list",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.agentTokens.revoke",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.approve",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.assignGroup",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.browseDir",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.list",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.listForUser",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.listPendingAccessRequests",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.listSshTargets",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.reject",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.requestAccess",
+    "kind": "unary"
+  },
+  {
+    "name": "devServer.resolveAccessRequest",
+    "kind": "unary"
+  },
+  {
+    "name": "devServerGroup.create",
+    "kind": "unary"
+  },
+  {
+    "name": "devServerGroup.grant",
+    "kind": "unary"
+  },
+  {
+    "name": "devServerGroup.list",
+    "kind": "unary"
+  },
+  {
+    "name": "devServerGroup.listGrants",
+    "kind": "unary"
+  },
+  {
+    "name": "devServerGroup.revoke",
+    "kind": "unary"
+  },
+  {
+    "name": "emulator.attach",
+    "kind": "unary"
+  },
+  {
+    "name": "emulator.availability",
+    "kind": "unary"
+  },
+  {
+    "name": "emulator.button",
+    "kind": "unary"
+  },
+  {
+    "name": "emulator.gesture",
+    "kind": "unary"
+  },
+  {
+    "name": "emulator.listDevices",
+    "kind": "unary"
+  },
+  {
+    "name": "emulator.rotate",
+    "kind": "unary"
+  },
+  {
+    "name": "emulator.shutdown",
+    "kind": "unary"
+  },
+  {
+    "name": "emulator.tap",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.attachWorkspace",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.cancelProvision",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.cleanup",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.doctor",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.getCleanupCommand",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.listRecipeCatalog",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.listRecipes",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.listRuntimes",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.provision",
+    "kind": "streamChannel"
+  },
+  {
+    "name": "ephemeralVm.resumeWorkspace",
+    "kind": "unary"
+  },
+  {
+    "name": "ephemeralVm.suspendWorkspace",
+    "kind": "unary"
+  },
+  {
+    "name": "files.browseServerDir",
+    "kind": "unary"
+  },
+  {
+    "name": "files.commitUpload",
+    "kind": "unary"
+  },
+  {
+    "name": "files.copy",
+    "kind": "unary"
+  },
+  {
+    "name": "files.createDir",
+    "kind": "unary"
+  },
+  {
+    "name": "files.createDirNoClobber",
+    "kind": "unary"
+  },
+  {
+    "name": "files.createFile",
+    "kind": "unary"
+  },
+  {
+    "name": "files.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "files.listAll",
+    "kind": "unary"
+  },
+  {
+    "name": "files.listMarkdownDocuments",
+    "kind": "unary"
+  },
+  {
+    "name": "files.read",
+    "kind": "unary"
+  },
+  {
+    "name": "files.readChunk",
+    "kind": "unary"
+  },
+  {
+    "name": "files.readDir",
+    "kind": "unary"
+  },
+  {
+    "name": "files.readPreview",
+    "kind": "unary"
+  },
+  {
+    "name": "files.rename",
+    "kind": "unary"
+  },
+  {
+    "name": "files.search",
+    "kind": "unary"
+  },
+  {
+    "name": "files.stat",
+    "kind": "unary"
+  },
+  {
+    "name": "files.unwatch",
+    "kind": "unary"
+  },
+  {
+    "name": "files.watch",
+    "kind": "streamChannel"
+  },
+  {
+    "name": "files.write",
+    "kind": "unary"
+  },
+  {
+    "name": "files.writeBase64",
+    "kind": "unary"
+  },
+  {
+    "name": "files.writeBase64Chunk",
+    "kind": "unary"
+  },
+  {
+    "name": "fleet.health.checkAll",
+    "kind": "unary"
+  },
+  {
+    "name": "folderWorkspace.create",
+    "kind": "unary"
+  },
+  {
+    "name": "folderWorkspace.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "folderWorkspace.getPathStatus",
+    "kind": "unary"
+  },
+  {
+    "name": "folderWorkspace.list",
+    "kind": "unary"
+  },
+  {
+    "name": "folderWorkspace.update",
+    "kind": "unary"
+  },
+  {
+    "name": "git.abortMerge",
+    "kind": "unary"
+  },
+  {
+    "name": "git.abortRebase",
+    "kind": "unary"
+  },
+  {
+    "name": "git.branch.create",
+    "kind": "unary"
+  },
+  {
+    "name": "git.branch.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "git.branchCompare",
+    "kind": "unary"
+  },
+  {
+    "name": "git.branchDiff",
+    "kind": "unary"
+  },
+  {
+    "name": "git.bulkDiscard",
+    "kind": "unary"
+  },
+  {
+    "name": "git.bulkStage",
+    "kind": "unary"
+  },
+  {
+    "name": "git.bulkUnstage",
+    "kind": "unary"
+  },
+  {
+    "name": "git.cancelGenerateCommitMessage",
+    "kind": "unary"
+  },
+  {
+    "name": "git.cancelGeneratePullRequestFields",
+    "kind": "unary"
+  },
+  {
+    "name": "git.checkIgnored",
+    "kind": "unary"
+  },
+  {
+    "name": "git.checkout",
+    "kind": "unary"
+  },
+  {
+    "name": "git.commit",
+    "kind": "unary"
+  },
+  {
+    "name": "git.commitCompare",
+    "kind": "unary"
+  },
+  {
+    "name": "git.commitDiff",
+    "kind": "unary"
+  },
+  {
+    "name": "git.conflictOperation",
+    "kind": "unary"
+  },
+  {
+    "name": "git.diff",
+    "kind": "unary"
+  },
+  {
+    "name": "git.discard",
+    "kind": "unary"
+  },
+  {
+    "name": "git.discoverCommitMessageModels",
+    "kind": "unary"
+  },
+  {
+    "name": "git.fastForward",
+    "kind": "unary"
+  },
+  {
+    "name": "git.fetch",
+    "kind": "unary"
+  },
+  {
+    "name": "git.forkSync",
+    "kind": "unary"
+  },
+  {
+    "name": "git.generateCommitMessage",
+    "kind": "unary"
+  },
+  {
+    "name": "git.generatePullRequestFields",
+    "kind": "unary"
+  },
+  {
+    "name": "git.history",
+    "kind": "unary"
+  },
+  {
+    "name": "git.localBranches",
+    "kind": "unary"
+  },
+  {
+    "name": "git.merge",
+    "kind": "unary"
+  },
+  {
+    "name": "git.pull",
+    "kind": "unary"
+  },
+  {
+    "name": "git.pull.progress",
+    "kind": "stream"
+  },
+  {
+    "name": "git.push",
+    "kind": "unary"
+  },
+  {
+    "name": "git.push.progress",
+    "kind": "stream"
+  },
+  {
+    "name": "git.rebaseFromBase",
+    "kind": "unary"
+  },
+  {
+    "name": "git.remoteCommitUrl",
+    "kind": "unary"
+  },
+  {
+    "name": "git.remoteFileUrl",
+    "kind": "unary"
+  },
+  {
+    "name": "git.resolveConflict",
+    "kind": "unary"
+  },
+  {
+    "name": "git.stage",
+    "kind": "unary"
+  },
+  {
+    "name": "git.stash.pop",
+    "kind": "unary"
+  },
+  {
+    "name": "git.stash.push",
+    "kind": "unary"
+  },
+  {
+    "name": "git.status",
+    "kind": "unary"
+  },
+  {
+    "name": "git.submoduleStatus",
+    "kind": "unary"
+  },
+  {
+    "name": "git.unstage",
+    "kind": "unary"
+  },
+  {
+    "name": "git.upstreamStatus",
+    "kind": "unary"
+  },
+  {
+    "name": "github.checkAuthStatus",
+    "kind": "unary"
+  },
+  {
+    "name": "github.checkOrcaStarred",
+    "kind": "unary"
+  },
+  {
+    "name": "github.issueComments",
+    "kind": "unary"
+  },
+  {
+    "name": "github.issues",
+    "kind": "unary"
+  },
+  {
+    "name": "github.listWorkItems",
+    "kind": "unary"
+  },
+  {
+    "name": "github.mergePR",
+    "kind": "unary"
+  },
+  {
+    "name": "github.prForBranch",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.addIssueCommentBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.clearItemField",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.deleteIssueCommentBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.listAccessible",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.listAssignableUsersBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.listIssueTypesBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.listLabelsBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.listViews",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.resolveRef",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.updateIssueBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.updateIssueCommentBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.updateIssueTypeBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.updateItemField",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.updatePullRequestBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.viewTable",
+    "kind": "unary"
+  },
+  {
+    "name": "github.project.workItemDetailsBySlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.rateLimit",
+    "kind": "unary"
+  },
+  {
+    "name": "github.removePRReviewers",
+    "kind": "unary"
+  },
+  {
+    "name": "github.repoSlug",
+    "kind": "unary"
+  },
+  {
+    "name": "github.requestPRReviewers",
+    "kind": "unary"
+  },
+  {
+    "name": "github.revokeAuth",
+    "kind": "unary"
+  },
+  {
+    "name": "github.setPRAutoMerge",
+    "kind": "unary"
+  },
+  {
+    "name": "github.starOrca",
+    "kind": "unary"
+  },
+  {
+    "name": "github.startAuthLogin",
+    "kind": "unary"
+  },
+  {
+    "name": "github.updateIssue",
+    "kind": "unary"
+  },
+  {
+    "name": "github.updatePRTitle",
+    "kind": "unary"
+  },
+  {
+    "name": "gitlab.checkAuthStatus",
+    "kind": "unary"
+  },
+  {
+    "name": "gitlab.issues",
+    "kind": "unary"
+  },
+  {
+    "name": "gitlab.listMRs",
+    "kind": "unary"
+  },
+  {
+    "name": "gitlab.rateLimit",
+    "kind": "unary"
+  },
+  {
+    "name": "gitlab.resolveMRDiscussion",
+    "kind": "unary"
+  },
+  {
+    "name": "gitlab.revokeAuth",
+    "kind": "unary"
+  },
+  {
+    "name": "gitlab.startAuthLogin",
+    "kind": "unary"
+  },
+  {
+    "name": "gitlab.workItemDetails",
+    "kind": "unary"
+  },
+  {
+    "name": "host.gitBash.isAvailable",
+    "kind": "unary"
+  },
+  {
+    "name": "host.pwsh.isAvailable",
+    "kind": "unary"
+  },
+  {
+    "name": "host.wsl.isAvailable",
+    "kind": "unary"
+  },
+  {
+    "name": "host.wsl.listDistros",
+    "kind": "unary"
+  },
+  {
+    "name": "hostedReview.create",
+    "kind": "unary"
+  },
+  {
+    "name": "hostedReview.forBranch",
+    "kind": "unary"
+  },
+  {
+    "name": "hostedReview.getCreationEligibility",
+    "kind": "unary"
+  },
+  {
+    "name": "hostedReview.submit",
+    "kind": "unary"
+  },
+  {
+    "name": "hostedReview.suggestReviewers",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.addIssueComment",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.connect",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.createIssue",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.disconnect",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.getIssue",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.getProjectStatusOrder",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.issueComments",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.listAssignableUsers",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.listCreateFields",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.listIssueTypes",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.listIssues",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.listPriorities",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.listProjects",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.listTransitions",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.searchIssues",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.selectSite",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.status",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.testConnection",
+    "kind": "unary"
+  },
+  {
+    "name": "jira.updateIssue",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.addIssueComment",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.connect",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.createIssue",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.createProject",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.disconnect",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.getCustomView",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.getIssue",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.getProject",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.issueComments",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.listIssues",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.listTeams",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.searchIssues",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.selectWorkspace",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.status",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.teamLabels",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.teamMembers",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.teamStates",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.testConnection",
+    "kind": "unary"
+  },
+  {
+    "name": "linear.updateIssue",
+    "kind": "unary"
+  },
+  {
+    "name": "mobile.dispatch",
+    "kind": "unary"
+  },
+  {
+    "name": "mobile.status",
+    "kind": "unary"
+  },
+  {
+    "name": "mobile.statusSubscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "nativeChat.readSession",
+    "kind": "unary"
+  },
+  {
+    "name": "notifications.subscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "onboarding.detectAgents",
+    "kind": "unary"
+  },
+  {
+    "name": "onboarding.detectAgentsAllServers",
+    "kind": "unary"
+  },
+  {
+    "name": "onboarding.detectGhosttyConfig",
+    "kind": "unary"
+  },
+  {
+    "name": "onboarding.detectWindowsCapabilities",
+    "kind": "unary"
+  },
+  {
+    "name": "onboarding.get",
+    "kind": "unary"
+  },
+  {
+    "name": "onboarding.getPreflightStatus",
+    "kind": "unary"
+  },
+  {
+    "name": "onboarding.markChecklistItem",
+    "kind": "unary"
+  },
+  {
+    "name": "onboarding.openGhAuthTerminal",
+    "kind": "streamChannel"
+  },
+  {
+    "name": "onboarding.setGitIdentity",
+    "kind": "unary"
+  },
+  {
+    "name": "onboarding.update",
+    "kind": "unary"
+  },
+  {
+    "name": "orcaProjects.getProjectData",
+    "kind": "unary"
+  },
+  {
+    "name": "orcaProjects.linkSourceProject",
+    "kind": "unary"
+  },
+  {
+    "name": "orcaProjects.list",
+    "kind": "unary"
+  },
+  {
+    "name": "orcaProjects.unlinkSourceProject",
+    "kind": "unary"
+  },
+  {
+    "name": "orchestration.dispatchShow",
+    "kind": "unary"
+  },
+  {
+    "name": "preflight.check",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.createCompany",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.createDept",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.getCompany",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.getResolved",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.getUserProfile",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.listCompanies",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.listDepts",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.updateCompany",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.updateDept",
+    "kind": "unary"
+  },
+  {
+    "name": "profile.updateUser",
+    "kind": "unary"
+  },
+  {
+    "name": "project.addMember",
+    "kind": "unary"
+  },
+  {
+    "name": "project.create",
+    "kind": "unary"
+  },
+  {
+    "name": "project.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "project.get",
+    "kind": "unary"
+  },
+  {
+    "name": "project.getMembers",
+    "kind": "unary"
+  },
+  {
+    "name": "project.list",
+    "kind": "unary"
+  },
+  {
+    "name": "project.rebindDevServer",
+    "kind": "unary"
+  },
+  {
+    "name": "project.removeMember",
+    "kind": "unary"
+  },
+  {
+    "name": "project.update",
+    "kind": "unary"
+  },
+  {
+    "name": "project.updateMemberRole",
+    "kind": "unary"
+  },
+  {
+    "name": "projectGroup.create",
+    "kind": "unary"
+  },
+  {
+    "name": "projectGroup.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "projectGroup.importNested",
+    "kind": "unary"
+  },
+  {
+    "name": "projectGroup.list",
+    "kind": "unary"
+  },
+  {
+    "name": "projectGroup.moveProject",
+    "kind": "unary"
+  },
+  {
+    "name": "projectGroup.scanNested",
+    "kind": "unary"
+  },
+  {
+    "name": "projectGroup.update",
+    "kind": "unary"
+  },
+  {
+    "name": "projectHostSetup.create",
+    "kind": "unary"
+  },
+  {
+    "name": "projectHostSetup.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "projectHostSetup.list",
+    "kind": "unary"
+  },
+  {
+    "name": "projectHostSetup.setupExistingFolder",
+    "kind": "unary"
+  },
+  {
+    "name": "projectHostSetup.update",
+    "kind": "unary"
+  },
+  {
+    "name": "rateLimits.get",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.add",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.addMember",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.assignToProject",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.baseRefDefault",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.clone",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.create",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.getMembers",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.hooksCheck",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.issueCommandRead",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.issueCommandWrite",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.list",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.rebindDevServer",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.removeMember",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.reorder",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.rm",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.searchRefs",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.setupScriptImports",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.update",
+    "kind": "unary"
+  },
+  {
+    "name": "repo.updateMemberRole",
+    "kind": "unary"
+  },
+  {
+    "name": "request.cancel",
+    "kind": "unary"
+  },
+  {
+    "name": "request.changeType",
+    "kind": "unary"
+  },
+  {
+    "name": "request.checks",
+    "kind": "unary"
+  },
+  {
+    "name": "request.classify",
+    "kind": "unary"
+  },
+  {
+    "name": "request.confirmType",
+    "kind": "unary"
+  },
+  {
+    "name": "request.create",
+    "kind": "unary"
+  },
+  {
+    "name": "request.flow",
+    "kind": "unary"
+  },
+  {
+    "name": "request.flowSet",
+    "kind": "unary"
+  },
+  {
+    "name": "request.flowStatus",
+    "kind": "unary"
+  },
+  {
+    "name": "request.generatePlan",
+    "kind": "unary"
+  },
+  {
+    "name": "request.get",
+    "kind": "unary"
+  },
+  {
+    "name": "request.links",
+    "kind": "unary"
+  },
+  {
+    "name": "request.list",
+    "kind": "unary"
+  },
+  {
+    "name": "request.planProposal",
+    "kind": "unary"
+  },
+  {
+    "name": "request.reopen",
+    "kind": "unary"
+  },
+  {
+    "name": "request.returnToBacklog",
+    "kind": "unary"
+  },
+  {
+    "name": "request.spawnChild",
+    "kind": "unary"
+  },
+  {
+    "name": "request.startPhase",
+    "kind": "unary"
+  },
+  {
+    "name": "request.subscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "request.typeHistory",
+    "kind": "unary"
+  },
+  {
+    "name": "runtime.clientEvents.subscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "session.tabs.listAll",
+    "kind": "unary"
+  },
+  {
+    "name": "session.tabs.subscribeAll",
+    "kind": "stream"
+  },
+  {
+    "name": "solution.choose",
+    "kind": "unary"
+  },
+  {
+    "name": "solution.generate",
+    "kind": "unary"
+  },
+  {
+    "name": "solution.list",
+    "kind": "unary"
+  },
+  {
+    "name": "sparsePresets.list",
+    "kind": "unary"
+  },
+  {
+    "name": "sparsePresets.remove",
+    "kind": "unary"
+  },
+  {
+    "name": "sparsePresets.save",
+    "kind": "unary"
+  },
+  {
+    "name": "ssh.connect",
+    "kind": "unary"
+  },
+  {
+    "name": "ssh.getState",
+    "kind": "unary"
+  },
+  {
+    "name": "ssh.getUserAccount",
+    "kind": "unary"
+  },
+  {
+    "name": "ssh.listTargets",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.agentValueMoment",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.complete",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.disable",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.dismiss",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.forceShow",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.later",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.onboardingCompleted",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.openWeb",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.showAgentValueMoment",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.starOrca",
+    "kind": "unary"
+  },
+  {
+    "name": "starNag.subscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "starNag.unsubscribe",
+    "kind": "unary"
+  },
+  {
+    "name": "status.get",
+    "kind": "unary"
+  },
+  {
+    "name": "task.activity.subscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "task.addComment",
+    "kind": "unary"
+  },
+  {
+    "name": "task.addEdge",
+    "kind": "unary"
+  },
+  {
+    "name": "task.aiApply",
+    "kind": "unary"
+  },
+  {
+    "name": "task.aiDecompose",
+    "kind": "unary"
+  },
+  {
+    "name": "task.create",
+    "kind": "unary"
+  },
+  {
+    "name": "task.createFromSource",
+    "kind": "unary"
+  },
+  {
+    "name": "task.delete",
+    "kind": "unary"
+  },
+  {
+    "name": "task.execute",
+    "kind": "unary"
+  },
+  {
+    "name": "task.generateAgentPrompt",
+    "kind": "unary"
+  },
+  {
+    "name": "task.get",
+    "kind": "unary"
+  },
+  {
+    "name": "task.getDependencies",
+    "kind": "unary"
+  },
+  {
+    "name": "task.getSource",
+    "kind": "unary"
+  },
+  {
+    "name": "task.getSubtree",
+    "kind": "unary"
+  },
+  {
+    "name": "task.grant",
+    "kind": "unary"
+  },
+  {
+    "name": "task.hasActiveExecutions",
+    "kind": "unary"
+  },
+  {
+    "name": "task.list",
+    "kind": "unary"
+  },
+  {
+    "name": "task.listComments",
+    "kind": "unary"
+  },
+  {
+    "name": "task.recalculateProgress",
+    "kind": "unary"
+  },
+  {
+    "name": "task.resolvePermission",
+    "kind": "unary"
+  },
+  {
+    "name": "task.update",
+    "kind": "unary"
+  },
+  {
+    "name": "team.addMember",
+    "kind": "unary"
+  },
+  {
+    "name": "team.create",
+    "kind": "unary"
+  },
+  {
+    "name": "team.list",
+    "kind": "unary"
+  },
+  {
+    "name": "team.listMembers",
+    "kind": "unary"
+  },
+  {
+    "name": "team.removeMember",
+    "kind": "unary"
+  },
+  {
+    "name": "telemetry.track",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.agentStatus",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.close",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.create",
+    "kind": "streamChannel"
+  },
+  {
+    "name": "terminal.focus",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.inspectProcess",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.isRunningAgent",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.list",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.multiplex",
+    "kind": "binaryStream"
+  },
+  {
+    "name": "terminal.reattachSend",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.resize",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.scrollback.restore",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.scrollback.save",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.send",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.stop",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.subscribe",
+    "kind": "streamChannel"
+  },
+  {
+    "name": "terminal.unsubscribe",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.updateViewport",
+    "kind": "unary"
+  },
+  {
+    "name": "terminal.wait",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.cancel",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.execute",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.executeAdHocStep",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.getExecution",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.hasActiveExecutions",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.listExecutions",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.pause",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.resume",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.template.clone",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.template.create",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.template.list",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.template.resolve",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.template.update",
+    "kind": "unary"
+  },
+  {
+    "name": "workspace.refreshFileTree",
+    "kind": "unary"
+  },
+  {
+    "name": "workspace.subscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "workspacePorts.kill",
+    "kind": "unary"
+  },
+  {
+    "name": "workspacePorts.scan",
+    "kind": "unary"
+  },
+  {
+    "name": "workspacePorts.subscribe",
+    "kind": "stream"
+  },
+  {
+    "name": "workspaceSession.get",
+    "kind": "unary"
+  },
+  {
+    "name": "workspaceSession.patch",
+    "kind": "unary"
+  },
+  {
+    "name": "workspaceSession.set",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.checkDeleteSafety",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.compare",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.create",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.createFromIssue",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.detectedList",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.fanOut",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.forceDeleteBranch",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.lineageList",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.list",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.merge",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.prefetchCreateBase",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.resolveMrBase",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.resolvePrBase",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.rm",
+    "kind": "unary"
+  },
+  {
+    "name": "worktree.set",
+    "kind": "unary"
+  }
+]

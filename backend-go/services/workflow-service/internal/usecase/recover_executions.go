@@ -169,18 +169,16 @@ func (uc *RecoverExecutions) recoverOne(ctx context.Context, exec domain.Workflo
 		return
 	}
 
-	// Detach from ctx and carry the recovered execution's own tenant id
-	// forward explicitly — same reasoning as Execute.Execute's background
-	// goroutine (see execute.go's doc comment): this dispatch must outlive
-	// Execute's own ctx (the boot-time scan's, not any RPC's), and every
-	// recovered execution needs ITS OWN tenant id, not a shared one, since
-	// this scan spans every tenant in one pass.
-	// TriggeredBy is deliberately left empty here — a boot-time recovery
-	// scan has no inbound request/acting user to capture (see
-	// ExecutionRepository.ListRunning's doc comment for this usecase's
-	// same "no single request" nature), same "no user scope" fallback
-	// ProviderResolver's chain already treats as valid.
+	// The boot-time scan has no inbound request, so the identity comes from the row itself: its own tenant (the scan
+	// spans every tenant) and the user who started it. Rows from before started_by existed resume tenant-only.
 	dispatchCtx := tenant.WithTenantID(context.Background(), exec.TenantID)
+	if exec.StartedBy != "" {
+		dispatchCtx = tenant.WithUserID(dispatchCtx, exec.StartedBy)
+	} else {
+		slog.WarnContext(dispatchCtx, "recovered execution has no started_by; steps that need the acting user will fail",
+			slog.String("execution_id", exec.ID))
+	}
+	// The wave dispatcher stamps each step's user from the ExecutionContext built in resumeToCompletion (StartedBy).
 	go uc.resumeToCompletion(dispatchCtx, exec, waves, resumeWave, byStepID)
 }
 
@@ -208,7 +206,7 @@ func (uc *RecoverExecutions) resumeToCompletion(ctx context.Context, exec domain
 	}
 	// Earlier waves' {{outputs.*}} are recoverable too, reconstructed from
 	// each already-completed step's persisted OutputJSON.
-	execCtx := newExecutionContext(domain.ExecutionContext{Inputs: inputs, ProjectID: exec.ProjectID})
+	execCtx := newExecutionContext(domain.ExecutionContext{Inputs: inputs, ProjectID: exec.ProjectID, UserID: exec.StartedBy})
 	for stepID, se := range existingRows {
 		if se.Status != domain.StepExecutionStatusCompleted {
 			continue

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/stablyai/orca-go/common/grpcmw"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -20,7 +21,7 @@ type InfraFleetTerminalStatusResolver struct {
 }
 
 func NewInfraFleetTerminalStatusResolver(addr string) (*InfraFleetTerminalStatusResolver, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpcmw.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("grpcclient: dial infra-fleet-service at %q: %w", addr, err)
 	}

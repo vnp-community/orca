@@ -727,3 +727,8 @@ func TestHandleListProjectGroups_Success(t *testing.T) {
 		t.Fatal("expected ListProjectGroups to be called")
 	}
 }
+
+// ResolveProjectAccess is an internal RPC for request-service; the HTTP gateway never calls it.
+func (f *fakeProjectServiceClient) ResolveProjectAccess(context.Context, *projectv1.ResolveProjectAccessRequest, ...grpc.CallOption) (*projectv1.ResolveProjectAccessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by the HTTP gateway")
+}

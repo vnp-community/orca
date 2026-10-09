@@ -49,6 +49,9 @@ type Config struct {
 	// (via Base) when the file doesn't exist, which is what local dev and
 	// this scaffold's testcontainers path use instead.
 	DatabaseCredentialsFile string
+	// InternalCallerToken is the shared secret a sibling service presents to call internal-only RPCs
+	// (ResolveProjectAccess). Empty denies every such call (fail closed).
+	InternalCallerToken string
 }
 
 func Load() (Config, error) {
@@ -66,5 +69,6 @@ func Load() (Config, error) {
 		AuthServiceAddr:         commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
 		OPABundlePath:           commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
+		InternalCallerToken:     commonconfig.StringEnv("PROJECT_INTERNAL_CALLER_TOKEN", ""),
 	}, nil
 }

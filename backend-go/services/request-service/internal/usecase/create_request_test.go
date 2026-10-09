@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
@@ -338,5 +339,41 @@ func TestCreate_CleanTextIsNotFlagged(t *testing.T) {
 	res, err := f.uc.Execute(tctx(), in)
 	if err != nil || res.Request.Body != in.Body || len(flags.marked) != 0 {
 		t.Fatalf("%v %q %v", err, res.Request.Body, flags.marked)
+	}
+}
+
+type fakeProjects struct {
+	exists bool
+	err    error
+}
+
+func (f fakeProjects) Exists(context.Context, string, string) (bool, error) { return f.exists, f.err }
+
+func TestCreate_UnknownProject_Rejected(t *testing.T) {
+	f := newCreateFixture()
+	f.uc.WithProjectExistence(fakeProjects{exists: false})
+	_, err := f.uc.Execute(tctx(), manualInput("orphan"))
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "REQUEST_PROJECT_NOT_FOUND" {
+		t.Fatalf("want REQUEST_PROJECT_NOT_FOUND, got %v", err)
+	}
+	if len(f.s.requests) != 0 {
+		t.Fatal("a Request was stored for a project that does not exist")
+	}
+}
+
+func TestCreate_ProjectLookupFailure_FailsClosed(t *testing.T) {
+	f := newCreateFixture()
+	f.uc.WithProjectExistence(fakeProjects{err: errors.New("project-service down")})
+	if _, err := f.uc.Execute(tctx(), manualInput("x")); err == nil {
+		t.Fatal("an unverifiable project must not be accepted")
+	}
+}
+
+func TestCreate_KnownProject_Accepted(t *testing.T) {
+	f := newCreateFixture()
+	f.uc.WithProjectExistence(fakeProjects{exists: true})
+	if _, err := f.uc.Execute(tctx(), manualInput("ok")); err != nil {
+		t.Fatalf("known project rejected: %v", err)
 	}
 }

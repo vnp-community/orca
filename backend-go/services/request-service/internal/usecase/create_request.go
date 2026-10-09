@@ -43,6 +43,19 @@ type CreateRequest struct {
 	issues     IssueFetcher
 	recorder   RequestCreationRecorder
 	flags      SecurityFlagStore
+	projects   ProjectExistence
+}
+
+// ProjectExistence tells whether a project is real. Admins skip the membership check, so without this a Request could
+// be filed under any well-formed UUID and become an orphan that still counts against the tenant's open-request cap.
+type ProjectExistence interface {
+	Exists(ctx context.Context, tenantID, projectID string) (bool, error)
+}
+
+// WithProjectExistence rejects Requests for projects that do not exist; unset keeps the UUID-shape check only.
+func (uc *CreateRequest) WithProjectExistence(p ProjectExistence) *CreateRequest {
+	uc.projects = p
+	return uc
 }
 
 func NewCreateRequest(repo RequestRepository, idem RequestIdempotencyRepository, tx TxRunner, outbox OutboxWriter, transition RequestTransitioner, issues IssueFetcher) *CreateRequest {
@@ -81,6 +94,15 @@ func (uc *CreateRequest) Execute(ctx context.Context, in CreateRequestInput) (Cr
 	}
 	if _, err := uuid.Parse(in.ProjectID); err != nil {
 		return CreateRequestResult{}, domain.ErrRequestProjectInvalid()
+	}
+	if uc.projects != nil {
+		exists, err := uc.projects.Exists(ctx, tenantID, in.ProjectID)
+		if err != nil {
+			return CreateRequestResult{}, domain.ErrProjectRoleUnavailable(err)
+		}
+		if !exists {
+			return CreateRequestResult{}, domain.ErrRequestProjectNotFound(in.ProjectID)
+		}
 	}
 	src, err := domain.NormalizeSourceRef(in.Source)
 	if err != nil {

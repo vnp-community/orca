@@ -173,7 +173,9 @@ func (f fakeRuns) StartRun(ctx context.Context, run domain.AnalysisRun, draft do
 	exp := f.w.now.Add(opts.LeaseTTL)
 	run.LeaseExpiresAt = &exp
 	f.w.runs[run.ID] = run
-	f.w.solutions[draft.ID] = draft
+	if draft.ID != "" { // plan runs have no draft Solution
+		f.w.solutions[draft.ID] = draft
+	}
 	return StartRunResult{Run: run, Created: true}, nil
 }
 

@@ -212,6 +212,21 @@ README v6 mục 8 dòng 12 thêm RPC mà CR-016 chưa có kênh. Backend dự tr
 
 `RecordRequestCheck` không có kênh WS ở v1; chỉ đường MCP hoặc nội bộ (CR-REQ-014 Q1, CR-REQ-017 Q).
 
+### 2.6 `clarification.*` (CR-REQ-028)
+
+Sau khi xác nhận loại, request-service đưa Request vào `awaiting_information` nếu thiếu thông tin. Không có bốn kênh này thì không client nào trả lời được và Request đứng yên, nên chúng là một phần bắt buộc của luồng (BUG-E2E-001). Quyền: người được giao câu hỏi hoặc người có quyền trên Request; gateway chỉ ánh xạ hình dạng.
+
+| Kênh | Tham số | Kết quả | RPC |
+|---|---|---|---|
+| `clarification.list` | `{requestId, status?, pageSize?, pageToken?}`; `status` ∈ `open`, `answered`, `expired`, `cancelled` | `{clarifications: ClarificationView[], nextPageToken}` | `ListClarifications` |
+| `clarification.get` | `{clarificationId}` | `{clarification}` | `GetClarification` |
+| `clarification.answer` | `{clarificationId, answers: [{questionId, valueJson, acceptDefault?}], complete?, expectedVersion?}` | `{clarification, requestStatus, requestRevision, stillMissing}` | `AnswerClarification` |
+| `clarification.cancel` | `{clarificationId, reason?, expectedVersion?}` | `{clarification}` | `CancelClarification` |
+
+`ClarificationView`: `{id, displayId, requestId, source, sourceRef?, status, resumeStatus?, round, questions: ClarificationQuestionView[], dueAt?, version, createdAt?}`. `ClarificationQuestionView`: `{id, seq, questionKey, kind, prompt, reason?, options?, suggestedDefault?, required, targetPath?, valueType?, answer?}`. `valueType` ∈ `string`, `number`, `boolean`, `list` suy từ cùng luật kiểm tra trường đích, để UI chọn ô nhập và cách mã hoá `valueJson` (ví dụ `time_box_hours` là `number`, `data_exposed` là `boolean`, `repro_steps` là `list`); vắng thì coi là `string`. `options`, `suggestedDefault` và `answer` là giá trị JSON đã giải mã, không phải chuỗi.
+
+`valueJson` là **chuỗi JSON** (ví dụ `"\"yes\""`, `42`, `["a","b"]`). Khi `complete=true` mà còn câu bắt buộc chưa trả lời, kết quả có `stillMissing=true` và Request chưa rời `awaiting_information`. Lỗi riêng: `REQUEST_CLARIFICATION_*` (mục 5). Không thuộc công cụ MCP: đây là việc của người (`excluded_channels.yaml`, mẫu `clarification.*`).
+
 ## 3. Sự kiện thời gian thực: `request.subscribe`
 
 - Mở: `request.subscribe {id?}`. Có `id`: chỉ sự kiện của Request đó; không `id`: mọi sự kiện Request trong tenant của người dùng, lọc thêm theo quyền đọc. Gateway gọi `GetRequest` một lần để kiểm quyền khi có `id`.
@@ -278,7 +293,12 @@ Tiền tố `REQUEST_` cho **mọi** mã (README v6 mục 8 dòng 5; CR-REQ-007 
 | `REQUEST_APPROVAL_NOT_APPROVER`, `REQUEST_APPROVAL_SELF_APPROVAL_FORBIDDEN`, `REQUEST_APPROVAL_AGENT_FORBIDDEN`, `REQUEST_APPROVAL_FORBIDDEN`, `REQUEST_APPROVAL_NO_ELIGIBLE_APPROVER` | PermissionDenied, FailedPrecondition | quyền duyệt (CR-REQ-010) | toast, ẩn nút, tải lại |
 | `REQUEST_BACKLOG_INVALID_VIEW`, `REQUEST_BACKLOG_BAD_PAGE_TOKEN`, `REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE` | InvalidArgument, Unavailable | `backlog.*` | thử lại |
 | `REQUEST_FLOW_DISABLED` | FailedPrecondition | cờ tắt | ẩn màn hình Request |
-| `REQUEST_RATE_LIMITED`, `REQUEST_PENDING_LIMIT` | ResourceExhausted | chống spam (chủ yếu nguồn MCP) | toast kèm thời gian chờ |
+| `REQUEST_RATE_LIMITED`, `REQUEST_PENDING_LIMIT` | ResourceExhausted | chống spam (chủ yếu nguồn MCP), giới hạn theo lớp đọc/ghi/AI/webhook (`REQUEST_RATE_<LỚP>_PER_SECOND`, `_BURST`) | chờ đúng `retryAfterMs` rồi thử lại; thông báo có đuôi JSON `{"retryAfterMs":N}` khi service gửi `RetryInfo` |
+| `REQUEST_CLARIFICATION_NOT_FOUND` | NotFound | id Clarification sai hoặc khác tenant | làm mới danh sách |
+| `REQUEST_CLARIFICATION_NOT_OPEN`, `REQUEST_CLARIFICATION_ALREADY_ANSWERED`, `REQUEST_CLARIFICATION_EXPIRED`, `REQUEST_CLARIFICATION_STATE_NOT_ALLOWED`, `REQUEST_CLARIFICATION_VERSION_CONFLICT` | FailedPrecondition | trả lời hoặc huỷ khi không còn mở, hoặc `expectedVersion` cũ | tải lại Clarification |
+| `REQUEST_CLARIFICATION_INVALID_ANSWER`, `REQUEST_CLARIFICATION_INCOMPLETE`, `REQUEST_CLARIFICATION_NOT_ASSIGNEE` | InvalidArgument, PermissionDenied | giá trị sai kiểu, thiếu câu bắt buộc, người trả lời không được giao | lỗi cạnh trường |
+| `REQUEST_PROJECT_NOT_FOUND` | NotFound | `request.create` với project không tồn tại hoặc khác tenant | báo project không hợp lệ |
+| `REQUEST_AI_NOT_CONFIGURED`, `REQUEST_AI_AGENT_UNAVAILABLE`, `REQUEST_AI_SESSION_EXPIRED`, `REQUEST_AI_QUOTA_EXHAUSTED`, `REQUEST_AI_BUSY`, `REQUEST_AI_COMPLETE_TIMEOUT` | FailedPrecondition, Unavailable, ResourceExhausted | dev server chưa có AI (khoá API hoặc phiên đăng nhập Claude Code), agent mất kết nối, phiên hết hạn, hết hạn mức, đang bận, quá giờ | banner hướng dẫn cấu hình AI; nút thử lại với `REQUEST_AI_BUSY` và `REQUEST_AI_QUOTA_EXHAUSTED` |
 | `REQUEST_UNAVAILABLE` | Unavailable | chưa cấu hình `REQUEST_SERVICE_ADDR` hoặc service không trả lời (do **gateway** trả) | trạng thái "không khả dụng" |
 
 Danh sách này gộp từ CR-REQ-003 đến 016; mã mới của CR sau (026 đến 036) thêm additive.

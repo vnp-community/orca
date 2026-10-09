@@ -388,6 +388,8 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"backlog.requests", "backlog.tasks", "backlog.execute",
 		// CONTRACT 2.5 and the plan proposal reader.
 		"request.links", "request.flow", "request.checks", "request.planProposal",
+		// CR-REQ-028: the channels useClarifications.ts calls.
+		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel",
 	}
 	got := map[string]ChannelKind{}
 	for _, ch := range r.Channels() {

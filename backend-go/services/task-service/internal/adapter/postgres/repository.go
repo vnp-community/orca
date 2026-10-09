@@ -542,7 +542,7 @@ func (r *Repository) Delete(ctx context.Context, tenantID, id string) error {
 		return fmt.Errorf("postgres: delete task: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: task %s not found for tenant %s", id, tenantID)
+		return fmt.Errorf("postgres: task %s for tenant %s: %w", id, tenantID, domain.ErrTaskNotFound)
 	}
 	return nil
 }

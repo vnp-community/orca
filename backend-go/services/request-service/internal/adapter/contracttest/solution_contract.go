@@ -53,6 +53,7 @@ func RunSolutionContract(t *testing.T, newEnv func(t *testing.T) SolutionEnv) {
 	}{
 		{"RunUniqueIndexes", solRunUniqueIndexes},
 		{"StartRunSemantics", solStartRunSemantics},
+		{"PlanRunNeedsNoDraftSolution", solPlanRunWithoutDraft},
 		{"ConcurrentStartsShareOneRun", solConcurrentStarts},
 		{"AgentGateAllowsExactlyTheMaximum", solAgentGate},
 		{"LeaseRenewFinishAndClaim", solLease},
@@ -455,6 +456,43 @@ func solStartRunSemantics(t *testing.T, env SolutionEnv) {
 	res4, err := startIn(t, k, run4, draft4, 0)
 	if err != nil || !res4.Created {
 		t.Fatalf("new key after finish: %+v %v", res4, err)
+	}
+}
+
+// A plan run carries no draft Solution: starting one must not insert a Solution row, must read back whole, must
+// share the one-running-per-kind rule, and must not block the request's own solution run.
+func solPlanRunWithoutDraft(t *testing.T, env SolutionEnv) {
+	k := newSolKit(t, env)
+	r := k.seed(t, domain.RequestTypeChangeRequest, domain.RequestStatusPlanning)
+	run, _ := startInput(t, k, r, domain.AnalysisModeComplete, domain.RunKindPlan, "plan-key")
+	run.SolutionID = ""
+	res, err := startIn(t, k, run, domain.Solution{}, 0)
+	if err != nil || !res.Created || res.Run.Kind != domain.RunKindPlan || res.Run.SolutionID != "" {
+		t.Fatalf("plan run start: %+v %v", res, err)
+	}
+	if got := solutionsOf(t, k, r.ID); len(got) != 0 {
+		t.Fatalf("a plan run must not create a Solution, found %d", len(got))
+	}
+	again, _ := startInput(t, k, r, domain.AnalysisModeComplete, domain.RunKindPlan, "")
+	again.SolutionID = ""
+	res2, err := startIn(t, k, again, domain.Solution{}, 0)
+	if err != nil || res2.Created || res2.Run.ID != run.ID {
+		t.Fatalf("a second plan run for the same request must return the running one: %+v %v", res2, err)
+	}
+	sol, draft := startInput(t, k, r, domain.AnalysisModeComplete, domain.RunKindSolution, "")
+	if res3, err := startIn(t, k, sol, draft, 0); err != nil || !res3.Created {
+		t.Fatalf("a solution run is independent of the plan run: %+v %v", res3, err)
+	}
+	done := res.Run
+	done.Succeed(time.Now())
+	raw := `{"title":"p"}`
+	done.RawOutput = &raw
+	if ok, err := env.AnalysisRuns.FinishOwned(k.ctx, done, "w-test"); err != nil || !ok {
+		t.Fatalf("finish plan run: %v %v", ok, err)
+	}
+	got, err := env.AnalysisRuns.Get(k.ctx, run.ID)
+	if err != nil || got.Status != domain.RunStatusSucceeded || got.RawOutput == nil || *got.RawOutput != raw {
+		t.Fatalf("plan run read back: %+v %v", got, err)
 	}
 }
 

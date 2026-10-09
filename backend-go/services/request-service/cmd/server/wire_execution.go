@@ -76,6 +76,8 @@ func dialExecutionTasks(cfg config.Config, log *slog.Logger) (*executionTasks, e
 
 func (t *executionTasks) subjectArtifacts() map[domain.SubjectType]usecase.SubjectArtifacts {
 	return map[domain.SubjectType]usecase.SubjectArtifacts{
+		domain.SubjectPlan:      &usecase.PlanArtifacts{Tasks: t.client},
+		domain.SubjectTaskList:  &usecase.PlanArtifacts{Tasks: t.client},
 		domain.SubjectPhase:     &usecase.PhaseArtifacts{Tasks: t.client},
 		domain.SubjectPreDeploy: &usecase.PreDeployArtifacts{Tasks: t.client},
 	}
@@ -88,8 +90,10 @@ func (t *executionTasks) close() {
 }
 
 type executionWiring struct {
-	Server  requestgrpc.ExecutionUseCases
-	closers []func()
+	Server requestgrpc.ExecutionUseCases
+	// Policies are shared with CommitPlan, which runs each type's plan preconditions.
+	Policies *domain.PolicyRegistry
+	closers  []func()
 }
 
 func (w *executionWiring) close() {
@@ -113,6 +117,7 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 		Checks:    &usecase.CheckReaderFromRepository{Checks: ex.checks},
 		Approvals: &usecase.ApprovalLookupFromGateReader{Approvals: ex.gateApprovals},
 	})
+	w.Policies = policies
 	var opener usecase.ApprovalOpener // nil when approval is off: gated tasks then refuse to dispatch
 	var authorizer usecase.ApprovalAuthorizer
 	if approval.Enabled {

@@ -34,7 +34,10 @@ type DevServerCapability struct {
 	ClaudeFlags     ClaudeFlags
 	EnvPresent      map[string]bool
 	EnvKnown        bool
-	ProbedAt        time.Time
+	// AISources names where ai.complete can get credentials ("env_key", "cli_session"); known only when the agent reports it.
+	AISources      []string
+	AISourcesKnown bool
+	ProbedAt       time.Time
 }
 
 func (c DevServerCapability) HasFeature(name string) bool {
@@ -112,6 +115,7 @@ func ParseCapabilityProfile(source string, degraded, connected bool, buildVersio
 			Name    string `json:"name"`
 			Present bool   `json:"present"`
 		} `json:"env"`
+		AISources []string `json:"aiSources"`
 	}
 
 	// Try minimal structural check first
@@ -165,5 +169,50 @@ func ParseCapabilityProfile(source string, degraded, connected bool, buildVersio
 		}
 	}
 
+	if _, ok := m["aiSources"]; ok {
+		c.AISourcesKnown = true
+		c.AISources = root.AISources
+	}
+
 	return c, nil
+}
+
+// AIReadiness says whether ai.complete can work on this dev server.
+type AIReadiness int
+
+const (
+	// AIReadinessUnknown: the agent did not say (older build, or a partial probe); callers should still try.
+	AIReadinessUnknown AIReadiness = iota
+	AIReady
+	// AINotConfigured: the host has neither an API key nor a usable Claude login.
+	AINotConfigured
+)
+
+// AIReadiness prefers the agent's own aiSources; for agents that predate the field it derives the same answer from
+// the claude and env probes. A login that was not probed is unknown, never "not configured".
+func (c DevServerCapability) AIReadiness() AIReadiness {
+	if c.AISourcesKnown {
+		if len(c.AISources) > 0 {
+			return AIReady
+		}
+		if c.Partial {
+			return AIReadinessUnknown
+		}
+		return AINotConfigured
+	}
+	if !c.ClaudeKnown && !c.EnvKnown {
+		return AIReadinessUnknown
+	}
+	for _, name := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"} {
+		if present, _ := c.EnvVar(name); present {
+			return AIReady
+		}
+	}
+	if c.ClaudeKnown && c.ClaudeInstalled && c.ClaudeAuth == "logged_in" && c.ClaudeFlags.Tools {
+		return AIReady
+	}
+	if c.ClaudeKnown && c.ClaudeAuth == "unknown" {
+		return AIReadinessUnknown
+	}
+	return AINotConfigured
 }

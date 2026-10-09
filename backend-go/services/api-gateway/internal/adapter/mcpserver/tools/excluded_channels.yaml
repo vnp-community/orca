@@ -610,6 +610,10 @@
   category: human_gate
   reason: "Cancelling a Request cannot be undone in the state machine; left to a person. Agents use request_returnToBacklog, which request_reopen undoes."
 
+- pattern: "clarification.*"
+  category: human_gate
+  reason: "Clarification questions are answered by the people who own the requirement; an agent must not answer or cancel them for a person."
+
 - pattern: "request.flowSet"
   category: human_gate
   reason: "Turning the Request flow on or off is tenant administration done in the UI by an admin."

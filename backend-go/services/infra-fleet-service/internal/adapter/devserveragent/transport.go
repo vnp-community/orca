@@ -73,3 +73,12 @@ func (t *wsTransport) WriteFrame(ctx context.Context, frame []byte) error {
 func (t *wsTransport) Close(reason string) error {
 	return t.conn.Close(websocket.StatusNormalClosure, reason)
 }
+
+// goingAwayCloser is implemented by transports that can signal "reconnect" (close code 1001).
+type goingAwayCloser interface {
+	CloseGoingAway(reason string) error
+}
+
+func (t *wsTransport) CloseGoingAway(reason string) error {
+	return t.conn.Close(websocket.StatusGoingAway, reason)
+}

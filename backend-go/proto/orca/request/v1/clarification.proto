@@ -39,6 +39,8 @@ message ClarificationQuestion {
   string target_path = 10;
   // Only returned to assignees, the asker or admins.
   string answer_json = 11;
+  // string | number | boolean | list: how a client should collect and encode the answer (value_json).
+  string value_type = 12;
 }
 
 message Clarification {

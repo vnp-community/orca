@@ -13,6 +13,8 @@ const (
 	RunKindDiagnosis RunKind = "diagnosis"
 	RunKindFindings  RunKind = "findings"
 	RunKindAnswer    RunKind = "answer"
+	// RunKindPlan writes a Plan proposal; unlike the others it has no draft Solution.
+	RunKindPlan RunKind = "plan"
 )
 
 type AnalysisMode string

@@ -22,6 +22,7 @@ type Server struct {
 	flowSettings   *usecase.FlowSettings
 	compliance     ComplianceUseCases
 	execution      ExecutionUseCases
+	plan           PlanUseCases
 }
 
 func NewServer(getRequest *usecase.GetRequest, listRequests *usecase.ListRequests) *Server {

@@ -103,7 +103,7 @@ var (
 	requestTypeSet  = stringSet("change_request", "bug", "hotfix", "task", "spike", "question", "refactor", "security", "performance", "docs", "ops_request")
 	requestStageSet = stringSet("classification", "analysis", "plan", "phase", "task")
 	linkReasonSet   = stringSet("spawned_by_spike", "spawned_by_question", "followup_hotfix", "escalation")
-	requestStatuses = stringSet("new", "classifying", "awaiting_type_confirmation", "analyzing", "awaiting_analysis_approval",
+	requestStatuses = stringSet("new", "classifying", "awaiting_type_confirmation", "awaiting_information", "analyzing", "awaiting_analysis_approval",
 		"planning", "awaiting_plan_approval", "executing", "completed", "request_backlog", "cancelled")
 )
 

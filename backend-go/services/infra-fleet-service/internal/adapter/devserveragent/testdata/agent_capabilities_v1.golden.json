@@ -40,6 +40,7 @@
       { "name": "OPENAI_API_KEY", "present": false },
       { "name": "GOOGLE_API_KEY", "present": false }
     ],
+    "aiSources": ["env_key", "cli_session"],
     "unknownTools": [],
     "rejectedEnvNames": []
   },
@@ -68,7 +69,10 @@
       "installed": null,
       "auth": "unknown"
     },
-    "env": [{ "name": "ANTHROPIC_API_KEY", "present": true }],
+    "env": [
+      { "name": "ANTHROPIC_API_KEY", "present": true }
+    ],
+    "aiSources": ["env_key"],
     "unknownTools": ["malicious_tool"],
     "rejectedEnvNames": ["invalid_env"]
   }

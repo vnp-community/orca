@@ -74,6 +74,7 @@ func run(ctx context.Context, cfg config.Config) error {
 	}
 
 	healthSrv := health.New()
+	registerInternalTokenReadiness(healthSrv, cfg)
 	stores, err := openStores(ctx, dsn, dialect.Dialect, healthSrv)
 	if err != nil {
 		return err
@@ -169,6 +170,10 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 	defer execution.close()
+	plan, err := wirePlan(log, stores, lifecycle, solution, approval, execution, execTasks, dirs)
+	if err != nil {
+		return err
+	}
 	artifact, err := wireArtifact(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, intake, classification, busConsumer, dirs, solution)
 	if err != nil {
 		return err
@@ -196,6 +201,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		WithClassification(requestgrpc.ClassificationUseCases{Runner: classification.runner, Confirm: classification.confirm, Change: classification.change, History: classification.history}).
 		WithLifecycle(requestgrpc.LifecycleUseCases{Flow: lifecycle.GetFlow, Return: lifecycle.Return, Reopen: lifecycle.Reopen, Cancel: lifecycle.Cancel, SpawnChild: lifecycle.SpawnChild, Links: lifecycle.ListLinks}).
 		WithSolution(solution.useCases()).
+		WithPlan(plan).
 		WithCompliance(security.compliance))
 	if approval.Enabled {
 		requestv1.RegisterApprovalServiceServer(grpcServer, requestgrpc.NewApprovalServer(approval.Server))

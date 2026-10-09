@@ -74,3 +74,34 @@ func TestGetSubtree_RequiresTenantContext(t *testing.T) {
 		t.Fatal("expected an error when no tenant is in context")
 	}
 }
+
+// A task's owner sees it (and the tasks they own below it) without any stored grant, the same rule ResolvePermission
+// applies; tasks of other owners with no grant stay hidden.
+func TestGetSubtree_OwnerSeesOwnTasksWithoutStoredGrants(t *testing.T) {
+	tenantID, userID := "tenant-1", "user-1"
+	root, _ := domain.NewTask("root", tenantID, "root", domain.StatusOpen, "", "")
+	child, _ := domain.NewTask("child", tenantID, "child", domain.StatusOpen, "root", "")
+	foreign, _ := domain.NewTask("foreign", tenantID, "foreign", domain.StatusOpen, "root", "")
+	root.OwnerID, child.OwnerID, foreign.OwnerID = userID, userID, "someone-else"
+
+	tasks := newFakeTaskRepository()
+	for _, tk := range []domain.Task{root, child, foreign} {
+		tasks.tasks[tk.ID] = tk
+	}
+	uc := NewGetSubtree(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{})
+
+	result, err := uc.Execute(withIdentity(context.Background(), tenantID, userID), GetSubtreeInput{RootID: "root"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, tk := range result.Tasks {
+		got[tk.ID] = true
+	}
+	if !got["root"] || !got["child"] {
+		t.Errorf("the owner must see their own tasks, got %v", got)
+	}
+	if got["foreign"] {
+		t.Errorf("a task owned by someone else with no grant must stay hidden, got %v", got)
+	}
+}

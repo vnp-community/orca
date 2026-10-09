@@ -78,6 +78,10 @@ func (g *RunSolutionGeneration) complete(ctx context.Context, projectID, prompt 
 }
 
 func completionFailure(run domain.AnalysisRun, err error) *AnalysisFailure {
+	var ai *AIUnavailableError
+	if errors.As(err, &ai) {
+		return newFailure(run, ai.Code, ai.Detail)
+	}
 	switch {
 	case errors.Is(err, ErrNoDevServer):
 		return newFailure(run, domain.RunErrNoConnection, "no dev server could run the AI call")

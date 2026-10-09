@@ -3,10 +3,12 @@ package wscompat
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -63,7 +65,7 @@ func requestErrorWith(err error, forbiddenCode string) error {
 		if len(msg) > maxRequestErrorMessage {
 			msg = msg[:maxRequestErrorMessage]
 		}
-		return errors.New(msg)
+		return errors.New(msg + retryAfterSuffix(err))
 	}
 	code := status.Code(err)
 	switch {
@@ -78,7 +80,7 @@ func requestErrorWith(err error, forbiddenCode string) error {
 	case code == codes.PermissionDenied, code == codes.Unauthenticated:
 		return errors.New(forbiddenCode + ": not permitted")
 	case code == codes.ResourceExhausted:
-		return errors.New("REQUEST_RATE_LIMITED: too many requests")
+		return errors.New("REQUEST_RATE_LIMITED: too many requests" + retryAfterSuffix(err))
 	case code == codes.InvalidArgument:
 		return errors.New("INVALID_ARGUMENT: invalid argument")
 	case code == codes.FailedPrecondition, code == codes.Aborted, code == codes.AlreadyExists:
@@ -86,4 +88,23 @@ func requestErrorWith(err error, forbiddenCode string) error {
 	default:
 		return errors.New("REQUEST_INTERNAL: internal error")
 	}
+}
+
+// retryAfterSuffix carries the service's RetryInfo to the client as ` {"retryAfterMs":N}`, the same trailer the
+// codeintel channels use, so the UI can wait exactly as long as the limiter asks instead of guessing.
+func retryAfterSuffix(err error) string {
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.ResourceExhausted {
+		return ""
+	}
+	for _, d := range st.Details() {
+		if info, ok := d.(*errdetails.RetryInfo); ok && info.GetRetryDelay().AsDuration() > 0 {
+			ms := info.GetRetryDelay().AsDuration().Milliseconds()
+			if ms < 1 {
+				ms = 1
+			}
+			return fmt.Sprintf(` {"retryAfterMs":%d}`, ms)
+		}
+	}
+	return ""
 }

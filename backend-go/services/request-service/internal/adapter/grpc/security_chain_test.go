@@ -197,6 +197,8 @@ func TestChain_StreamAdminOnly(t *testing.T) {
 func TestChain_AIRateLimitReturnsRetryInfo(t *testing.T) {
 	cfg := newChainConfig(t)
 	cfg.Limiter = usecase.NewRateLimiter(map[string]domain.Limit{domain.RateAI: {PerSecond: 0.1, Burst: 1}}, nil)
+	var limited []string
+	cfg.OnRateLimited = func(class string) { limited = append(limited, class) }
 	env := startChain(t, cfg)
 	c := requestv1.NewRequestServiceClient(env.conn)
 	call := func() error {
@@ -218,6 +220,9 @@ func TestChain_AIRateLimitReturnsRetryInfo(t *testing.T) {
 	}
 	if retry == nil || retry.GetRetryDelay().AsDuration() <= 0 {
 		t.Fatalf("RetryInfo with a positive delay expected, got %v", retry)
+	}
+	if len(limited) != 1 || limited[0] != domain.RateAI {
+		t.Fatalf("OnRateLimited calls = %v, want one for the ai class", limited)
 	}
 	// The read class is separate: a GetRequest is not limited by the exhausted ai bucket.
 	if _, err := c.GetRequest(withMD(gatewayToken, userOwner, "", "user"), &requestv1.GetRequestRequest{Id: testRequest}); status.Code(err) == codes.ResourceExhausted {

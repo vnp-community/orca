@@ -528,7 +528,7 @@ func (r *Repository) Delete(ctx context.Context, tenantID, id string) error {
 		return fmt.Errorf("mysql: delete task rows affected: %w", err)
 	}
 	if affected == 0 {
-		return fmt.Errorf("mysql: task %s not found for tenant %s", id, tenantID)
+		return fmt.Errorf("mysql: task %s for tenant %s: %w", id, tenantID, domain.ErrTaskNotFound)
 	}
 	return nil
 }

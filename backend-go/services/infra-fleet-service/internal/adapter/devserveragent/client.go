@@ -435,7 +435,7 @@ func (c *Client) Exec(ctx context.Context, devServer domain.DevServer, method st
 	if err != nil {
 		var rpcErr *JSONRPCError
 		if errors.As(err, &rpcErr) {
-			if IsCodeIntelMethod(method) {
+			if IsStructuredErrorMethod(method) {
 				return nil, &domain.AgentRPCError{
 					Code:    rpcErr.Code,
 					Message: rpcErr.Message,
@@ -1161,7 +1161,7 @@ func (c *Client) Close() {
 	c.sessions = make(map[string]*session)
 	c.mu.Unlock()
 	for _, sess := range sessions {
-		sess.close()
+		sess.shutdown()
 	}
 
 	c.codeIntelMu.Lock()

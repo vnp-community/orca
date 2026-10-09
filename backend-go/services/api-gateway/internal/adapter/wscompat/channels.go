@@ -522,8 +522,9 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 		if err != nil {
 			return nil, err
 		}
+		// CreatorId makes task-service mint the creator's owner grant; without it GetSubtree's per-node filter hides the creator's own tree.
 		resp, err := client.CreateTask(ctx, &taskv1.CreateTaskRequest{
-			TenantId: id.TenantID, Title: in.Title, ParentId: in.ParentID, ProjectId: in.ProjectID,
+			TenantId: id.TenantID, Title: in.Title, ParentId: in.ParentID, ProjectId: in.ProjectID, CreatorId: id.UserID,
 		})
 		if err != nil {
 			return nil, err

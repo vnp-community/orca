@@ -31,6 +31,13 @@ type solutionWiring struct {
 	opener  *lateApprovalOpener
 	stores  *requestStores
 	closers []func()
+
+	// Kept for wirePlan, which runs Plan generation on the same runner, connections and AI relay.
+	conns     usecase.AnalysisConnectionResolver
+	completer usecase.ProjectAICompleter
+	projects  usecase.ProjectContextReader
+	settings  usecase.AnalysisSettings
+	owner     string
 }
 
 // wireSolution builds solution generation and read-only analysis (CR-REQ-007/008) and starts the lease-recovery sweeper.
@@ -74,7 +81,8 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		}
 		resolver := grpcclient.NewAIConnectionResolver(infra, projectClient)
 		conns = grpcclient.NewAnalysisConnections(resolver)
-		completer = grpcclient.NewAICompletionRelay(infra, resolver, providers, settings.AICompleteTimeout)
+		completer = grpcclient.NewAICompletionRelay(infra, resolver, providers, settings.AICompleteTimeout).
+			WithCapabilities(grpcclient.NewInfraCapabilityClient(infra, 10*time.Second))
 		agent = grpcclient.NewAgentPromptRelay(infra)
 		projects = grpcclient.NewProjectContextResolver(projectClient)
 		caps = grpcclient.NewInfraCapabilityClient(infra, 10*time.Second)
@@ -105,6 +113,7 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		Projects: projects, Writer: writer, Settings: settings,
 	})
 	w.runner = usecase.NewAnalysisRunner(stores.analysisRuns, stores.solutions, stores.tx, generation, readonly, settings, owner)
+	w.conns, w.completer, w.projects, w.settings, w.owner = conns, completer, projects, settings, owner
 
 	// Reporter and admins steer analysis; whoever the pending approval's snapshot lets decide may also choose the option.
 	auth := usecase.ApproverAwareAuthorizer{

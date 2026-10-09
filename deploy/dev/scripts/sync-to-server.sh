@@ -112,6 +112,10 @@ fi
 # server, so no secret leaves it — and never touch a value that is already set.
 bash "${SCRIPT_DIR}/ensure-mcp-env.sh" --remote
 
+# Request-flow secrets (gateway/issue-status-sync/project <-> request-service tokens): without them request-service
+# refuses every call with an error that reads like a permission problem.
+bash "${SCRIPT_DIR}/ensure-request-env.sh" --remote
+
 echo "✅ Synced"
 echo ""
 

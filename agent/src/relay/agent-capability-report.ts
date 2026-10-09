@@ -7,6 +7,7 @@
 //   - env report contains only PRESENT/ABSENT booleans, never values.
 //   - claude auth: only the loggedIn boolean, no email/org fields.
 
+import { cliSessionEnabled } from './ai-complete-cli-session'
 import * as os from 'node:os'
 import { execFile as _execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -69,6 +70,26 @@ export type ClaudeEntry = {
   flags?: { tools: boolean; permissionMode: boolean; disallowedTools: boolean }
 }
 
+/** Where ai.complete can get credentials on this host (names only, never values). */
+export type AiSource = 'env_key' | 'cli_session'
+
+const AI_KEY_ENV_NAMES = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY'] as const
+
+/**
+ * `cli_session` needs a logged-in claude that can run with every tool disabled, and the kill switch on.
+ * An unknown login state (partial probe) is not claimed: absence means "not proven", not "absent".
+ */
+export function deriveAiSources(claude: ClaudeEntry, processEnv: NodeJS.ProcessEnv): AiSource[] {
+  const sources: AiSource[] = []
+  if (AI_KEY_ENV_NAMES.some(name => typeof processEnv[name] === 'string' && processEnv[name] !== '')) {
+    sources.push('env_key')
+  }
+  if (cliSessionEnabled(processEnv) && claude.installed === true && claude.auth === 'logged_in' && claude.flags?.tools === true) {
+    sources.push('cli_session')
+  }
+  return sources
+}
+
 export type CapabilityReport = {
   schemaVersion: number
   probedAt: string
@@ -76,6 +97,7 @@ export type CapabilityReport = {
   agent: { buildVersion: string; protocolVersion: number }
   tools: ToolEntry[]
   claude: ClaudeEntry
+  aiSources: AiSource[]
   host: {
     platform: string
     arch: string
@@ -382,6 +404,7 @@ async function _buildReport(
     },
     tools: tools.filter(t => t.id !== 'claude'),
     claude: claudeEntry,
+    aiSources: deriveAiSources(claudeEntry, processEnv),
     host: hostInfo,
     env: envReport,
     ...(params.unknownTools && params.unknownTools.length > 0 ? { unknownTools: params.unknownTools } : {}),

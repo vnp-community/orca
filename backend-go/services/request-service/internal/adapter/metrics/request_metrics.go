@@ -31,6 +31,7 @@ type Set struct {
 	aiGeneration    *prometheus.HistogramVec
 	taskOutcome     *prometheus.CounterVec
 	outboxPending   prometheus.Gauge
+	rateLimited     *prometheus.CounterVec
 	pendingSubjects map[string]bool
 }
 
@@ -65,11 +66,13 @@ func New() *Set {
 			Help: "AI generation latency by kind and outcome.", Buckets: []float64{1, 5, 15, 30, 60, 120, 300}}, []string{"kind", "outcome"}),
 		taskOutcome: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "orca_request_task_outcome_total",
 			Help: "Task results reported back to request-service."}, []string{"outcome"}),
+		rateLimited: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "orca_request_rate_limited_total",
+			Help: "Calls refused by the per-class rate limiter or concurrency caps."}, []string{"class"}),
 		outboxPending: prometheus.NewGauge(prometheus.GaugeOpts{Name: "orca_request_outbox_pending",
 			Help: "Outbox rows not yet published, sampled from the database."}),
 	}
 	s.reg.MustRegister(s.created, s.transitions, s.classification, s.confidence, s.approvals, s.approvalWait, s.approvalsPend,
-		s.stuck, s.returned, s.aiGeneration, s.taskOutcome, s.outboxPending,
+		s.stuck, s.returned, s.aiGeneration, s.taskOutcome, s.rateLimited, s.outboxPending,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	return s
 }
@@ -138,3 +141,6 @@ func (s *Set) ObserveAIGeneration(kind, outcome string, elapsed time.Duration) {
 }
 
 func (s *Set) ObserveTaskOutcome(outcome string) { s.taskOutcome.WithLabelValues(label(outcome)).Inc() }
+
+// ObserveRateLimited counts one refusal by rate class (not by tenant: that label would be unbounded).
+func (s *Set) ObserveRateLimited(class string) { s.rateLimited.WithLabelValues(label(class)).Inc() }

@@ -12,6 +12,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -62,13 +63,20 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Proje
 	`, tenantID, id)
 
 	out, err := scanProject(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
 		return domain.Project{}, domain.ErrProjectNotFound
 	}
 	if err != nil {
 		return domain.Project{}, fmt.Errorf("postgres: query project: %w", err)
 	}
 	return out, nil
+}
+
+// isMalformedUUID reports Postgres rejecting an id at bind time (SQLSTATE 22P02). An id that cannot be a uuid
+// names nothing, so lookups answer "not found" like any unknown id instead of an Internal failure.
+func isMalformedUUID(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
 }
 
 // List scopes to userID's own project_members rows, not just tenantID —
@@ -281,7 +289,7 @@ func (r *Repository) GetMembership(ctx context.Context, projectID, userID string
 	var m domain.ProjectMember
 	var role string
 	if err := row.Scan(&m.ProjectID, &m.UserID, &role); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
 			return domain.ProjectMember{}, domain.ErrMembershipNotFound
 		}
 		return domain.ProjectMember{}, fmt.Errorf("postgres: query project membership: %w", err)

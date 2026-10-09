@@ -49,6 +49,16 @@ export async function dispatchFsRpc(
       }
     }
 
+    case 'fs.checkPath': {
+      try {
+        const { handleFsCheckPath } = await import('./fs-agent-extensions')
+        return (await handleFsCheckPath(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `fs.checkPath unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: fs.stat ────────────────────────────────────────────────────────
     case 'fs.stat': {
       try {

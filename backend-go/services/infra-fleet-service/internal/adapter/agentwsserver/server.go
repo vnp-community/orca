@@ -108,6 +108,9 @@ type Server struct {
 	Tokens   TokenValidator // TASK-AWS-03-06 — may be nil, falls back to Registry-only (bootstrap-flow-only deployments)
 	Cfg      Config
 	Logger   *slog.Logger
+	// OnAttached runs in its own goroutine after a session is attached; the composition root
+	// uses it to refresh fleet health at once instead of waiting for the next poll tick.
+	OnAttached func(devServerID string)
 }
 
 // New constructs a Server.
@@ -231,6 +234,9 @@ func (s *Server) handleConnection(ctx context.Context, conn *websocket.Conn) {
 	// out for direct-websocket mode, see AttachInboundSession's doc
 	// comment: the agent dialed Orca, not the other way around.
 	s.Client.AttachInboundSession(devServerID, "", conn, info)
+	if s.OnAttached != nil {
+		go s.OnAttached(devServerID)
+	}
 }
 
 // rejectHandshake sends a JSON-RPC AuthFailed error frame, then closes the

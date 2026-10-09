@@ -98,7 +98,7 @@ func (r *AnalysisRunRepository) EnsureProjectGate(ctx context.Context, projectID
 func (r *AnalysisRunRepository) StartRun(ctx context.Context, run domain.AnalysisRun, draft domain.Solution, opts usecase.StartRunOptions) (usecase.StartRunResult, error) {
 	var res usecase.StartRunResult
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
-		if run.TenantID != tenantID || draft.TenantID != tenantID {
+		if run.TenantID != tenantID || (draft.ID != "" && draft.TenantID != tenantID) {
 			return domain.ErrRequestTenantRequired()
 		}
 		if existing, found, err := r.findBlocking(ctx, db, tenantID, run, false); err != nil || found {
@@ -143,8 +143,11 @@ func (r *AnalysisRunRepository) StartRun(ctx context.Context, run domain.Analysi
 			res = usecase.StartRunResult{Run: existing}
 			return nil
 		}
-		if err := insertSolutionRow(ctx, db, tenantID, draft); err != nil {
-			return err
+		// A plan run has no draft Solution to fill.
+		if draft.ID != "" {
+			if err := insertSolutionRow(ctx, db, tenantID, draft); err != nil {
+				return err
+			}
 		}
 		stored, err := scanAnalysisRun(db.QueryRowContext(ctx, `SELECT `+analysisRunColumns+` FROM analysis_runs WHERE tenant_id = ? AND id = ?`, tenantID, run.ID))
 		if err != nil {
