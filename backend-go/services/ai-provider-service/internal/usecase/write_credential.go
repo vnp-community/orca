@@ -43,7 +43,7 @@ func (uc *WriteCredential) Execute(ctx context.Context, in WriteCredentialForAcc
 
 	account, err := uc.repo.Get(ctx, tenantID, in.AccountID)
 	if err != nil {
-		return domain.ProviderAccount{}, err
+		return domain.ProviderAccount{}, accountRepoError(err, "AIPROVIDER_ACCOUNT_FETCH_FAILED", "failed to load provider account")
 	}
 
 	// Same owner_id derivation CreateAccount.Execute uses (create_account.go)
@@ -77,8 +77,12 @@ func (uc *WriteCredential) Execute(ctx context.Context, in WriteCredentialForAcc
 	// old secret" — the same invariant applies here, on first/updated write.
 	// pending, not active, until push-confirmed — mirrors CreateAccount's
 	// own "never active at creation time" rule (§9, §10).
-	return uc.repo.UpdateStatus(ctx, UpdateStatusInput{
+	updated, err := uc.repo.UpdateStatus(ctx, UpdateStatusInput{
 		TenantID: tenantID, AccountID: in.AccountID,
 		Status: domain.AccountStatusPending, CredentialRef: ref.ID,
 	})
+	if err != nil {
+		return domain.ProviderAccount{}, accountRepoError(err, "AIPROVIDER_UPDATE_STATUS_FAILED", "failed to persist credential reference")
+	}
+	return updated, nil
 }

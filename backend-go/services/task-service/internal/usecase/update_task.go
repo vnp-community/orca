@@ -90,7 +90,7 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 
 	current, err := uc.repo.Get(ctx, tenantID, in.ID)
 	if err != nil {
-		return domain.Task{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		return domain.Task{}, taskRepoError(err, "task not found", "TASK_FETCH_FAILED", "failed to fetch task")
 	}
 	previousStatus := current.Status
 	// Container status is derived from children; only cancelling is a user decision.
@@ -159,7 +159,8 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 	}
 
 	if err := uc.repo.Update(ctx, tenantID, current, events); err != nil {
-		return domain.Task{}, apperrors.New(apperrors.KindInternal, "TASK_UPDATE_FAILED", "failed to persist update", err)
+		// The task can vanish between the Get above and this write (concurrent delete).
+		return domain.Task{}, taskRepoError(err, "task not found", "TASK_UPDATE_FAILED", "failed to persist update")
 	}
 
 	// Un-block step: a task transitioning to Done may unblock direct

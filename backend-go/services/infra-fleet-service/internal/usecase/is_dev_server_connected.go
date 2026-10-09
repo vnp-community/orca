@@ -33,7 +33,7 @@ func (uc *IsDevServerConnected) Execute(ctx context.Context, devServerID string)
 
 	devServer, err := uc.devServers.Get(ctx, tenantID, devServerID)
 	if err != nil {
-		return false, apperrors.New(apperrors.KindNotFound, "INFRA_DEV_SERVER_NOT_FOUND", "dev server not found for this tenant", err)
+		return false, devServerLookupError(err)
 	}
 
 	return uc.agent.IsConnected(devServer.ID), nil

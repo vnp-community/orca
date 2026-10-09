@@ -108,7 +108,7 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (doma
 	var scope string
 	err := row.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &scope, &tmpl.ParentTemplateID, &tmpl.Version)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
+		return domain.WorkflowTemplate{}, fmt.Errorf("mysql: template %s: %w", id, domain.ErrTemplateNotFound)
 	}
 	if err != nil {
 		return domain.WorkflowTemplate{}, fmt.Errorf("mysql: query template: %w", err)
@@ -477,7 +477,7 @@ func (r *Repository) ResolveChain(ctx context.Context, tenantID, templateID stri
 		return nil, fmt.Errorf("mysql: iterate template chain rows: %w", err)
 	}
 	if len(out) == 0 {
-		return nil, domain.ErrTemplateNotFound
+		return nil, fmt.Errorf("mysql: template chain %s: %w", templateID, domain.ErrTemplateNotFound)
 	}
 	return out, nil
 }
@@ -506,7 +506,7 @@ func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (dom
 	var pausedAt sql.NullTime
 	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.OriginTaskID, &exec.InputsJSON, &exec.StartedBy)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.WorkflowExecution{}, domain.ErrExecutionNotFound
+		return domain.WorkflowExecution{}, fmt.Errorf("mysql: execution %s: %w", id, domain.ErrExecutionNotFound)
 	}
 	if err != nil {
 		return domain.WorkflowExecution{}, fmt.Errorf("mysql: query execution: %w", err)
@@ -547,7 +547,7 @@ func (r *Repository) UpdateExecution(ctx context.Context, exec domain.WorkflowEx
 	var exists int
 	err = tx.QueryRowContext(ctx, `SELECT 1 FROM executions WHERE tenant_id = ? AND id = ? FOR UPDATE`, exec.TenantID, exec.ID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.ErrExecutionNotFound
+		return fmt.Errorf("mysql: update execution %s: %w", exec.ID, domain.ErrExecutionNotFound)
 	}
 	if err != nil {
 		return fmt.Errorf("mysql: lock execution: %w", err)
@@ -741,7 +741,7 @@ func (r *Repository) UpdateStepExecution(ctx context.Context, se domain.StepExec
 	var exists int
 	err = tx.QueryRowContext(ctx, `SELECT 1 FROM step_executions WHERE id = ? FOR UPDATE`, se.ID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("mysql: update step execution: no row for id %s", se.ID)
+		return fmt.Errorf("mysql: update step execution %s: %w", se.ID, domain.ErrStepExecutionNotFound)
 	}
 	if err != nil {
 		return fmt.Errorf("mysql: lock step execution: %w", err)

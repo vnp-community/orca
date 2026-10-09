@@ -33,8 +33,9 @@ import (
 // Docker is required; the dialect comes from E2E_DIALECT (postgres, the default, or mysql).
 
 const (
-	serviceToken = "e2e-service-token"
-	e2eOwner     = "rf-roll-e2e"
+	serviceToken   = "e2e-service-token"
+	directoryToken = "e2e-directory-token"
+	e2eOwner       = "rf-roll-e2e"
 )
 
 type stack struct {
@@ -43,6 +44,9 @@ type stack struct {
 	httpPort int
 	natsURL  string
 	stubs    *stubs.Servers
+	// tasks is task-service: the in-memory fake the contract tests use, served over TCP; its events reach the
+	// service through ReportTaskOutcome (task_events_test.go).
+	tasks    *taskStub
 	db       dbReader
 	logs     *syncBuffer
 	proc     *exec.Cmd
@@ -99,6 +103,7 @@ func startStack() (*stack, error) {
 	}
 
 	st.stubs = stubs.NewServers()
+	st.stubs.Auth.DirectoryToken = directoryToken
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return st, err
@@ -108,12 +113,18 @@ func startStack() (*stack, error) {
 	stubAddr := lis.Addr().String()
 
 	st.serviceDSN, st.stubAddr, st.binary = serviceDSN, stubAddr, bin
+	if st.tasks, err = startTaskStub(); err != nil {
+		return st, err
+	}
+	st.cleanups = append(st.cleanups, st.tasks.stop)
+	installFlowAnswers(st.stubs.Script)
 	main, err := st.startInstance(map[string]string{"REQUEST_FLOW_ENABLED": "true"})
 	if err != nil {
 		return st, err
 	}
 	st.grpcAddr, st.httpPort, st.proc = main.grpcAddr, main.httpPort, main.cmd
 	st.logs = main.logs
+	st.tasks.deliverTo(st.grpcAddr)
 	return st, nil
 }
 
@@ -133,7 +144,8 @@ func (s *stack) startInstance(overrides map[string]string) (*instance, error) {
 		"GRPC_PORT": fmt.Sprint(grpcPort), "HTTP_PORT": fmt.Sprint(httpPort),
 		"DATABASE_DSN": s.serviceDSN, "NATS_URL": s.natsURL,
 		"INFRA_FLEET_SERVICE_ADDR": s.stubAddr, "PROJECT_SERVICE_ADDR": s.stubAddr, "AUTH_SERVICE_ADDR": s.stubAddr,
-		"SERVICE_INTERNAL_TOKEN": serviceToken, "GATEWAY_INTERNAL_TOKEN": serviceToken,
+		"TASK_SERVICE_ADDR":      s.tasks.addr,
+		"SERVICE_INTERNAL_TOKEN": serviceToken, "GATEWAY_INTERNAL_TOKEN": serviceToken, "AUTH_DIRECTORY_CALLER_TOKEN": directoryToken,
 		"OPA_BUNDLE_PATH":                 opaBundlePath(),
 		"REQUEST_APPROVAL_SWEEP_INTERVAL": "1s", "REQUEST_METRICS_SAMPLE_INTERVAL": "1s",
 	}

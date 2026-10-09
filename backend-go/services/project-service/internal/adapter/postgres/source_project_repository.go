@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -88,7 +86,7 @@ func (r *SourceProjectRepository) Get(ctx context.Context, containerProjectID, s
 	`, containerProjectID, sourceProjectID)
 	out, err := scanSourceProject(row)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.SourceProject{}, fmt.Errorf("postgres: get source project: %w", domain.ErrSourceProjectNotFound)
 		}
 		return domain.SourceProject{}, fmt.Errorf("postgres: get source project: %w", err)

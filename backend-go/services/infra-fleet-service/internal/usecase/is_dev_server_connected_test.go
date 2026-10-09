@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
@@ -26,7 +25,7 @@ func TestIsDevServerConnected_RequiresDevServerID(t *testing.T) {
 }
 
 func TestIsDevServerConnected_DevServerNotFound(t *testing.T) {
-	repo := &fakeDevServerRepository{getErr: errors.New("not found")}
+	repo := &fakeDevServerRepository{getErr: domain.ErrDevServerNotFound}
 	uc := NewIsDevServerConnected(repo, &fakeDevServerAgentClient{})
 	ctx := withTenant(context.Background(), "tenant-1")
 

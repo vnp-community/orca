@@ -18,6 +18,12 @@ type ProjectRoleResolver interface {
 	ProjectsOf(ctx context.Context, tenantID, userID string) ([]string, error)
 }
 
+// OrphanObserver counts operations on an existing Request whose project no longer exists (orca_request_orphan_total).
+// action is the RPC group (read|write|decide|...): a constant, never an id or text.
+type OrphanObserver interface {
+	ObserveOrphanRequest(action string)
+}
+
 // ApprovalLocator maps an approval to its Request without a row lock.
 type ApprovalLocator interface {
 	RequestIDOf(ctx context.Context, approvalID string) (string, error)

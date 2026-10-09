@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -42,7 +43,10 @@ func (uc *ImportNested) Execute(ctx context.Context, in ImportNestedInput) ([]do
 
 	if in.ParentGroupID != "" {
 		if _, err := uc.groupRepo.GetProjectGroup(ctx, tenantID, in.ParentGroupID); err != nil {
-			return nil, nil, apperrors.New(apperrors.KindNotFound, "PROJECT_GROUP_NOT_FOUND", "parent group does not exist", err)
+			if errors.Is(err, domain.ErrProjectGroupNotFound) {
+				return nil, nil, apperrors.New(apperrors.KindNotFound, "PROJECT_GROUP_NOT_FOUND", "parent group does not exist", err)
+			}
+			return nil, nil, apperrors.New(apperrors.KindInternal, "PROJECT_GROUP_FETCH_FAILED", "failed to fetch parent group", err)
 		}
 	}
 

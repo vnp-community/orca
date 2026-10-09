@@ -100,7 +100,7 @@ func scanAccessRequestRow(row rowScanner) (domain.DevServerAccessRequest, error)
 	var createdAt time.Time
 	err := row.Scan(&req.ID, &req.TenantID, &req.UserID, &req.DevServerGroupID, &status, &req.Message, &kind, &req.GranteeID, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.DevServerAccessRequest{}, fmt.Errorf("mysql: access request not found for tenant: %w", err)
+		return domain.DevServerAccessRequest{}, fmt.Errorf("mysql: access request for tenant: %w", domain.ErrDevServerAccessRequestNotFound)
 	}
 	if err != nil {
 		return domain.DevServerAccessRequest{}, fmt.Errorf("mysql: scan access request: %w", err)

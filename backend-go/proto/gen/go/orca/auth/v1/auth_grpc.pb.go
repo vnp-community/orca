@@ -72,6 +72,7 @@ const (
 	AuthService_RevokeMcpToken_FullMethodName                = "/orca.auth.v1.AuthService/RevokeMcpToken"
 	AuthService_ResolveMcpPrincipal_FullMethodName           = "/orca.auth.v1.AuthService/ResolveMcpPrincipal"
 	AuthService_SetMcpPatSuspension_FullMethodName           = "/orca.auth.v1.AuthService/SetMcpPatSuspension"
+	AuthService_ListActiveTenantAdmins_FullMethodName        = "/orca.auth.v1.AuthService/ListActiveTenantAdmins"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -230,6 +231,13 @@ type AuthServiceClient interface {
 	// ("suspended"); nothing is revoked, so clearing it restores them. tenant_id
 	// comes ONLY from gRPC metadata. Idempotent. Internal-caller guarded.
 	SetMcpPatSuspension(ctx context.Context, in *SetMcpPatSuspensionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// --- Internal directory read for background jobs (TASK-V2-018) ---
+	// ListActiveTenantAdmins returns the ids of the ACTIVE admins of the tenant carried in gRPC
+	// metadata. Unlike ListUsers it needs no acting user: request-service uses it from its outbox
+	// relay, which has a tenant but no actor. Read-only, ids only (no email/name). tenant_id comes
+	// ONLY from gRPC metadata. Internal-caller guarded (AUTH_DIRECTORY_CALLER_TOKEN); an empty
+	// configured token refuses every call.
+	ListActiveTenantAdmins(ctx context.Context, in *ListActiveTenantAdminsRequest, opts ...grpc.CallOption) (*ListActiveTenantAdminsResponse, error)
 }
 
 type authServiceClient struct {
@@ -760,6 +768,16 @@ func (c *authServiceClient) SetMcpPatSuspension(ctx context.Context, in *SetMcpP
 	return out, nil
 }
 
+func (c *authServiceClient) ListActiveTenantAdmins(ctx context.Context, in *ListActiveTenantAdminsRequest, opts ...grpc.CallOption) (*ListActiveTenantAdminsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListActiveTenantAdminsResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListActiveTenantAdmins_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -916,6 +934,13 @@ type AuthServiceServer interface {
 	// ("suspended"); nothing is revoked, so clearing it restores them. tenant_id
 	// comes ONLY from gRPC metadata. Idempotent. Internal-caller guarded.
 	SetMcpPatSuspension(context.Context, *SetMcpPatSuspensionRequest) (*emptypb.Empty, error)
+	// --- Internal directory read for background jobs (TASK-V2-018) ---
+	// ListActiveTenantAdmins returns the ids of the ACTIVE admins of the tenant carried in gRPC
+	// metadata. Unlike ListUsers it needs no acting user: request-service uses it from its outbox
+	// relay, which has a tenant but no actor. Read-only, ids only (no email/name). tenant_id comes
+	// ONLY from gRPC metadata. Internal-caller guarded (AUTH_DIRECTORY_CALLER_TOKEN); an empty
+	// configured token refuses every call.
+	ListActiveTenantAdmins(context.Context, *ListActiveTenantAdminsRequest) (*ListActiveTenantAdminsResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -1081,6 +1106,9 @@ func (UnimplementedAuthServiceServer) ResolveMcpPrincipal(context.Context, *Reso
 }
 func (UnimplementedAuthServiceServer) SetMcpPatSuspension(context.Context, *SetMcpPatSuspensionRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetMcpPatSuspension not implemented")
+}
+func (UnimplementedAuthServiceServer) ListActiveTenantAdmins(context.Context, *ListActiveTenantAdminsRequest) (*ListActiveTenantAdminsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListActiveTenantAdmins not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -2039,6 +2067,24 @@ func _AuthService_SetMcpPatSuspension_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_ListActiveTenantAdmins_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListActiveTenantAdminsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListActiveTenantAdmins(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListActiveTenantAdmins_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListActiveTenantAdmins(ctx, req.(*ListActiveTenantAdminsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2253,6 +2299,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetMcpPatSuspension",
 			Handler:    _AuthService_SetMcpPatSuspension_Handler,
+		},
+		{
+			MethodName: "ListActiveTenantAdmins",
+			Handler:    _AuthService_ListActiveTenantAdmins_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

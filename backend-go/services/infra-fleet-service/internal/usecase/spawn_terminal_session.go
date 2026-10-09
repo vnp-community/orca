@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -104,6 +105,9 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 		// straight through as connectionId for these terminals once they were
 		// given a dev-server binding at all — try it directly before failing.
 		devServerByID, devErr := uc.devServers.Get(ctx, tenantID, in.ConnectionID)
+		if devErr != nil && !errors.Is(devErr, domain.ErrDevServerNotFound) {
+			return domain.TerminalSession{}, devServerLookupError(devErr)
+		}
 		if devErr != nil {
 			// Second fallback: in.ConnectionID may actually be an ephemeral
 			// VM's environmentId (TASK-BE-EVM-007, BE-SOL-EVM-003 §2) —
@@ -124,8 +128,11 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 				return domain.TerminalSession{}, apperrors.New(apperrors.KindFailedPrecondition, "INFRA_TERMINAL_NO_COMPUTE_BOUND", "this environment has no dev server or SSH connection bound — attach compute before opening a terminal", nil)
 			}
 			devServerByID, devErr = uc.devServers.Get(ctx, tenantID, devServerID)
+			if errors.Is(devErr, domain.ErrDevServerNotFound) {
+				return domain.TerminalSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "no dev server owns this connectionId", devErr)
+			}
 			if devErr != nil {
-				return domain.TerminalSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "no dev server owns this connectionId", nil)
+				return domain.TerminalSession{}, devServerLookupError(devErr)
 			}
 		}
 		if !uc.agent.IsConnected(devServerByID.ID) {

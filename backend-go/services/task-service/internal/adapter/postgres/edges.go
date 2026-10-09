@@ -22,6 +22,9 @@ func (r *Repository) Add(ctx context.Context, tenantID string, edge domain.TaskE
 		INSERT INTO task.task_edges (tenant_id, from_task_id, to_task_id, edge_type)
 		VALUES ($1, $2, $3, $4)
 	`, tenantID, edge.FromTaskID, edge.ToTaskID, string(edge.Kind))
+	if isMissingTaskReference(err) {
+		return fmt.Errorf("postgres: task edge %s -> %s: %w", edge.FromTaskID, edge.ToTaskID, domain.ErrTaskNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: insert task edge: %w", err)
 	}

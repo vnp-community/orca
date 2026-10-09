@@ -46,7 +46,7 @@ func (s *TerminalSessionStore) CloseWithEvent(ctx context.Context, tenantID, pty
 		var one int
 		err := tx.QueryRowContext(ctx, `SELECT 1 FROM terminal_sessions WHERE tenant_id = ? AND pty_id = ?`, tenantID, ptyID).Scan(&one)
 		if errors.Is(err, sql.ErrNoRows) {
-			return false, fmt.Errorf("mysql: terminal session %q not found for tenant", ptyID)
+			return false, fmt.Errorf("mysql: close terminal session %q for tenant: %w", ptyID, domain.ErrTerminalSessionNotFound)
 		}
 		if err != nil {
 			return false, fmt.Errorf("mysql: check terminal session: %w", err)

@@ -5,9 +5,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
 
 type CreatePublicLink struct {
@@ -65,8 +67,11 @@ func (uc *ResolvePublicLink) Execute(ctx context.Context, tenantID, token string
 	sum := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(sum[:])
 	taskID, err = uc.links.ResolveActive(ctx, tenantID, tokenHash)
-	if err != nil {
+	if errors.Is(err, domain.ErrShareLinkNotFound) {
 		return "", apperrors.New(apperrors.KindNotFound, "TASK_PUBLIC_LINK_NOT_FOUND", "share link not found, expired, or revoked", err)
+	}
+	if err != nil {
+		return "", apperrors.New(apperrors.KindInternal, "TASK_PUBLIC_LINK_RESOLVE_FAILED", "failed to resolve share link", err)
 	}
 	return taskID, nil
 }
@@ -87,12 +92,22 @@ func (uc *RevokePublicLink) Execute(ctx context.Context, linkID string) error {
 		return apperrors.New(apperrors.KindUnauthenticated, "TASK_NO_TENANT", "no tenant in request context", err)
 	}
 	taskID, err := uc.links.TaskIDFor(ctx, tenantID, linkID)
-	if err != nil {
+	if errors.Is(err, domain.ErrShareLinkNotFound) {
 		return apperrors.New(apperrors.KindNotFound, "TASK_PUBLIC_LINK_NOT_FOUND", "share link not found", err)
+	}
+	if err != nil {
+		return apperrors.New(apperrors.KindInternal, "TASK_PUBLIC_LINK_LOOKUP_FAILED", "failed to look up share link", err)
 	}
 	callerID, _ := tenant.UserID(ctx)
 	if _, err := uc.resolvePermission.Execute(ctx, ResolvePermissionInput{TaskID: taskID, UserID: callerID, Action: "manage"}); err != nil {
 		return err
 	}
-	return uc.links.Revoke(ctx, tenantID, linkID)
+	// Revoke can still miss: the link may have been revoked since TaskIDFor read it.
+	if err := uc.links.Revoke(ctx, tenantID, linkID); err != nil {
+		if errors.Is(err, domain.ErrShareLinkNotFound) {
+			return apperrors.New(apperrors.KindNotFound, "TASK_PUBLIC_LINK_NOT_FOUND", "share link not found or already revoked", err)
+		}
+		return apperrors.New(apperrors.KindInternal, "TASK_PUBLIC_LINK_REVOKE_FAILED", "failed to revoke share link", err)
+	}
+	return nil
 }

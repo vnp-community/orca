@@ -371,9 +371,13 @@ type recordingApprovals struct {
 	opened, approved int
 	cancelled        []string
 	active           bool
+	openErr          error // returned by RequestTypeApproval when set
 }
 
 func (a *recordingApprovals) RequestTypeApproval(context.Context, string) error {
+	if a.openErr != nil {
+		return a.openErr
+	}
 	a.opened++
 	return nil
 }

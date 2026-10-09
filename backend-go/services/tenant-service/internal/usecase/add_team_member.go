@@ -52,7 +52,7 @@ func (uc *AddTeamMember) Execute(ctx context.Context, in AddTeamMemberInput) (do
 		return domain.TeamMember{}, apperrors.New(apperrors.KindInvalidArgument, "TENANT_INVALID_TEAM_MEMBER", err.Error(), err)
 	}
 	if err := uc.teams.AddMember(ctx, member); err != nil {
-		return domain.TeamMember{}, apperrors.New(apperrors.KindInternal, "TENANT_ADD_TEAM_MEMBER_FAILED", "failed to persist team member", err)
+		return domain.TeamMember{}, userWriteError(err, "TENANT_ADD_TEAM_MEMBER_FAILED", "failed to persist team member")
 	}
 
 	// Invalidation correctness (tenant-service.md §8): a team-membership

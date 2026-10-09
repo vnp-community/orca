@@ -28,7 +28,7 @@ func (uc *RecalculateProgress) Execute(ctx context.Context, rootID string) (int,
 
 	subtree, err := uc.tasks.GetSubtreeWithChildPercents(ctx, tenantID, rootID)
 	if err != nil {
-		return 0, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found while recalculating progress", err)
+		return 0, taskRepoError(err, "task not found while recalculating progress", "TASK_SUBTREE_FAILED", "failed to load subtree for progress")
 	}
 
 	updates := make(map[string]int, len(subtree))

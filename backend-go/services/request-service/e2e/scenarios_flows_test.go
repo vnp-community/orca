@@ -5,10 +5,9 @@ package e2e
 import (
 	"fmt"
 	"testing"
+	"time"
 
-	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
-	"google.golang.org/grpc/codes"
 )
 
 // flowScenarios are E01 to E12 of CR-REQ-025 section 2.3: one per flow family and type, built from the flow
@@ -17,6 +16,25 @@ func flowScenarios() []Scenario {
 	row := func(id string, g Group, typ domain.RequestType, size domain.RequestSize) Scenario {
 		return newFlowScenario(id, g, typ, size)
 	}
+	hotfix := row("E10", GroupHotfix, domain.RequestTypeHotfix, domain.RequestSizeS)
+	hotfix.Stages = append(hotfix.Stages, Stage{
+		Name: "the_fix_task_was_made_by_the_diagnosis_and_there_is_no_plan",
+		Run: func(t *testing.T, w *world) {
+			var fixes []string
+			for _, task := range theStack.tasks.TasksOfRequest(w.id()) {
+				if task.GetParentId() != "" || task.GetTaskType() == "plan" {
+					t.Fatalf("a hotfix has no Plan and no container, found %s %q under %q", task.GetTaskType(), task.GetTitle(), task.GetParentId())
+				}
+				fixes = append(fixes, task.GetId())
+			}
+			if len(fixes) != 1 {
+				t.Fatalf("a hotfix has exactly one fix task, found %d", len(fixes))
+			}
+			if got := w.k.get(w.id()); got.GetPlanTaskId() != "" {
+				t.Fatalf("plan_task_id = %q, want empty", got.GetPlanTaskId())
+			}
+		},
+	})
 	return []Scenario{
 		row("E01", GroupFull, domain.RequestTypeChangeRequest, domain.RequestSizeM),
 		row("E02", GroupFull, domain.RequestTypeBug, domain.RequestSizeL),
@@ -27,7 +45,7 @@ func flowScenarios() []Scenario {
 		row("E07", GroupShort, domain.RequestTypePerformance, domain.RequestSizeM),
 		row("E08", GroupShort, domain.RequestTypeSecurity, domain.RequestSizeM),
 		row("E09", GroupShort, domain.RequestTypeOpsRequest, domain.RequestSizeM),
-		row("E10", GroupHotfix, domain.RequestTypeHotfix, domain.RequestSizeS),
+		hotfix,
 		row("E11", GroupSpike, domain.RequestTypeSpike, domain.RequestSizeM),
 		row("E12", GroupSpike, domain.RequestTypeQuestion, domain.RequestSizeS),
 	}
@@ -71,66 +89,47 @@ func newFlowScenario(id string, g Group, typ domain.RequestType, size domain.Req
 	return appendRemainingPath(sc, flow, size, afterConfirm)
 }
 
-// pathStep is the next move of a Request that no human or stub can make before the delivering task exists.
+// pathStep is the next move of a Request that waits in a status: the trigger it fires and the people or agents who make it.
 type pathStep struct {
 	trigger domain.Trigger
-	probe   string // RPC that starts the move
-	needs   string
+	run     func(w *world)
 }
 
 var pathSteps = map[domain.RequestStatus]pathStep{
-	domain.RequestStatusAnalyzing:                {domain.TriggerAnalysisReady, "GenerateSolution", "CR-REQ-007/008 (GenerateSolution, analysis runs)"},
-	domain.RequestStatusAwaitingAnalysisApproval: {domain.TriggerAnalysisApproved, "ChooseSolutionOption", "CR-REQ-007/009 (ChooseSolutionOption, analysis approval)"},
-	domain.RequestStatusPlanning:                 {domain.TriggerPlanReady, "GeneratePlan", "CR-REQ-012 (GeneratePlan)"},
-	domain.RequestStatusAwaitingPlanApproval:     {domain.TriggerPlanApproved, "CommitPlan", "CR-REQ-012 (CommitPlan, plan approval)"},
-	domain.RequestStatusExecuting:                {domain.TriggerExecutionFinished, "ReportTaskOutcome", "CR-REQ-013 (StartPhase, ReportTaskOutcome)"},
+	domain.RequestStatusAnalyzing:                {domain.TriggerAnalysisReady, (*world).analyze},
+	domain.RequestStatusAwaitingAnalysisApproval: {domain.TriggerAnalysisApproved, (*world).approveAnalysis},
+	domain.RequestStatusPlanning:                 {domain.TriggerPlanReady, (*world).plan},
+	domain.RequestStatusAwaitingPlanApproval:     {domain.TriggerPlanApproved, (*world).approvePlan},
+	domain.RequestStatusExecuting:                {domain.TriggerExecutionFinished, (*world).execute},
 }
 
 // appendRemainingPath adds the stages from the first status after type confirmation to completed, derived from the
-// transition table. They wait on RPCs other tasks deliver; see Stage.Needs.
+// transition table, so the expected status of each stage cannot drift from the registry.
 func appendRemainingPath(sc Scenario, flow domain.FlowDefinition, size domain.RequestSize, from domain.RequestStatus) Scenario {
 	for from != domain.RequestStatusCompleted {
 		step, ok := pathSteps[from]
 		if !ok {
-			break
+			panic(fmt.Sprintf("%s: no step for status %s", sc.ID, from))
 		}
 		to, err := domain.NextStatus(flow, size, from, step.trigger)
 		if err != nil {
 			panic(fmt.Sprintf("%s: %v", sc.ID, err))
 		}
-		sc.Stages = append(sc.Stages, Stage{
+		st := Stage{
 			Name:       fmt.Sprintf("%s_to_%s", from, to),
-			Needs:      step.needs,
-			Run:        func(t *testing.T, w *world) { probeRPC(t, w, step.probe) },
+			Run:        func(t *testing.T, w *world) { step.run(w) },
 			WantStatus: string(to),
-		})
+		}
+		switch to {
+		case domain.RequestStatusAwaitingAnalysisApproval:
+			st.WantApprovals = []string{string(flow.AnalysisGate)}
+		case domain.RequestStatusAwaitingPlanApproval:
+			st.WantApprovals = []string{string(flow.StartGate)}
+		case domain.RequestStatusCompleted:
+			st.WantEvents, st.StatusTimeout = []string{domain.SubjectRequestCompleted}, executionBudget+30*time.Second
+		}
+		sc.Stages = append(sc.Stages, st)
 		from = to
 	}
 	return sc
-}
-
-// probeRPC calls the RPC that opens a stage with an empty message. Unimplemented blocks the stage with the
-// delivering task named; any other answer means the RPC exists now and the stage still has to be written.
-func probeRPC(t *testing.T, w *world, rpc string) {
-	t.Helper()
-	k := w.k
-	var err error
-	switch rpc {
-	case "GenerateSolution":
-		_, err = k.req.GenerateSolution(k.asReporter(), &requestv1.GenerateSolutionRequest{})
-	case "ChooseSolutionOption":
-		_, err = k.req.ChooseSolutionOption(k.asReporter(), &requestv1.ChooseSolutionOptionRequest{})
-	case "GeneratePlan":
-		_, err = k.req.GeneratePlan(k.asReporter(), &requestv1.GeneratePlanRequest{})
-	case "CommitPlan":
-		_, err = k.req.CommitPlan(k.asReporter(), &requestv1.CommitPlanRequest{})
-	case "ReportTaskOutcome":
-		_, err = k.req.ReportTaskOutcome(k.as(k.reporter, "user"), &requestv1.ReportTaskOutcomeRequest{})
-	default:
-		t.Fatalf("no probe for %s", rpc)
-	}
-	if code(err) == codes.Unimplemented {
-		panic(blocked{rpc})
-	}
-	t.Skipf("%s is implemented now (answered %v); extend this stage with its real steps (TASK-REQ-025-04)", rpc, err)
 }

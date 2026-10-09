@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
@@ -60,6 +61,10 @@ func (uc *PreviewSharedTemplate) Execute(ctx context.Context, shareToken string)
 		return SharedTemplatePreview{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_SHARE_TOKEN_REQUIRED", "share_token is required", nil)
 	}
 	tmpl, err := uc.templates.GetByShareToken(ctx, shareToken) // no tenantID param — the token IS the lookup key
+	// Only a genuine miss is "invalid link"; an infrastructure failure must stay Internal.
+	if err != nil && !errors.Is(err, domain.ErrTemplateNotFound) {
+		return SharedTemplatePreview{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_TEMPLATE_FETCH_FAILED", "failed to fetch shared template", err)
+	}
 	if err != nil || tmpl.Visibility != domain.VisibilityPublic {
 		// Same error for "no such token" and "template since unpublished" —
 		// deliberately don't leak which, so an attacker can't use response

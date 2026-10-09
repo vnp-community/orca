@@ -82,6 +82,9 @@ func (r *RequestRepository) getBy(ctx context.Context, cond string, arg any, lab
 func (r *RequestRepository) Update(ctx context.Context, req domain.Request, expectedVersion int64) (domain.Request, error) {
 	var out domain.Request
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(req.ID) {
+			return domain.ErrRequestNotFound(req.ID)
+		}
 		args := append([]any{req.ID, tenantID, expectedVersion}, requestArgs(req)...)
 		row := db.QueryRow(ctx, `
 			UPDATE request.requests SET project_id=$4, title=$5, body=$6, source_provider=$7, source_ref=$8, source_url=$9,
@@ -119,6 +122,9 @@ func (r *Repository) classifyMissing(ctx context.Context, db dbExecer, table, te
 
 func (r *RequestRepository) UpdateSolutionEngine(ctx context.Context, id string, name domain.EngineName, expectedVersion int64) error {
 	return r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return domain.ErrRequestNotFound(id)
+		}
 		tag, err := db.Exec(ctx, `UPDATE request.requests SET solution_engine = $4, version = version + 1, updated_at = now()
 			WHERE id = $1 AND tenant_id = $2 AND version = $3`, id, tenantID, expectedVersion, string(name))
 		if err != nil {
@@ -142,6 +148,10 @@ func (r *RequestRepository) List(ctx context.Context, f usecase.ListFilter) (use
 	}
 	var res usecase.ListResult
 	err = r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		// A project or reporter id that is no uuid matches nothing: empty page, like MySQL, not Internal.
+		if (f.ProjectID != "" && notUUID(f.ProjectID)) || (f.ReporterID != "" && notUUID(f.ReporterID)) {
+			return nil
+		}
 		args := []any{tenantID}
 		var where []string
 		add := func(cond string, v any) {

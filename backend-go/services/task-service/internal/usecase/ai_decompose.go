@@ -63,7 +63,7 @@ func (uc *AIDecompose) Execute(ctx context.Context, in AIDecomposeInput) (AIDeco
 
 	task, err := uc.tasks.Get(ctx, tenantID, in.TaskID)
 	if err != nil {
-		return AIDecomposeResult{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		return AIDecomposeResult{}, taskRepoError(err, "task not found", "TASK_AI_DECOMPOSE_TASK_LOAD_FAILED", "failed to load task")
 	}
 	providerCtx, err := uc.aiProvider.ResolveContext(ctx, tenantID, userID)
 	if err != nil {

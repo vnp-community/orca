@@ -31,7 +31,7 @@ func (uc *GetAgentCapabilities) Execute(ctx context.Context, devServerID string)
 
 	devServer, err := uc.devServers.Get(ctx, tenantID, devServerID)
 	if err != nil {
-		return domain.AgentCapabilities{}, apperrors.New(apperrors.KindNotFound, "INFRA_DEV_SERVER_NOT_FOUND", "dev server not found for this tenant", err)
+		return domain.AgentCapabilities{}, devServerLookupError(err)
 	}
 
 	connected := uc.agent.IsConnected(devServer.ID)

@@ -356,6 +356,13 @@ func TestRepository_MarkAsRead_WrongTenant_NoOp(t *testing.T) {
 	}
 }
 
+func TestRepository_MarkAsRead_MalformedID_NoOp(t *testing.T) {
+	repo := setupRepository(t)
+	if err := repo.MarkAsRead(context.Background(), notifTestTenant, notifTestUserA, "not-a-uuid"); err != nil {
+		t.Fatalf("mark as read with an id that is not a uuid should be a no-op, not an error: %v", err)
+	}
+}
+
 func TestRepository_MarkAsRead_Idempotent(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()

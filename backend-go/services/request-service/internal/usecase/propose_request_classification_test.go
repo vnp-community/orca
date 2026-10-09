@@ -238,3 +238,29 @@ func TestPropose_FinishesRunInSameTransaction(t *testing.T) {
 }
 
 var _ = context.Background
+
+// A tenant with a single user has no eligible approver for a hotfix/security type; the proposal must still hand over.
+func TestPropose_NoEligibleApprover_DoesNotStrandTheRequest(t *testing.T) {
+	f := newProposeFixture(okProposal(domain.RequestTypeHotfix))
+	f.appr.openErr = domain.ErrApprovalNoEligibleApprover
+	r := f.classifying(t)
+	if err := f.uc.Execute(tctx(), ProposeInput{RequestID: r.ID}); err != nil {
+		t.Fatal(err)
+	}
+	got := f.s.requests[r.ID]
+	if got.Status != domain.RequestStatusAwaitingTypeConfirmation || got.Type != domain.RequestTypeHotfix || f.appr.opened != 0 {
+		t.Fatalf("request=%+v approvals=%d", got, f.appr.opened)
+	}
+	if ev := f.classifiedEvents(); len(ev) != 1 || ev[0]["failed"] != false {
+		t.Fatalf("events=%v", ev)
+	}
+}
+
+func TestPropose_OtherApprovalError_StillFails(t *testing.T) {
+	f := newProposeFixture(okProposal(domain.RequestTypeBug))
+	f.appr.openErr = errors.New("db down")
+	r := f.classifying(t)
+	if err := f.uc.Execute(tctx(), ProposeInput{RequestID: r.ID}); err == nil {
+		t.Fatal("an unexpected approval failure must still abort the classification")
+	}
+}

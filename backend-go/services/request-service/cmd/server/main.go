@@ -36,6 +36,9 @@ func main() {
 	defer cancel()
 
 	cfg := config.Load()
+	if len(os.Args) > 1 && os.Args[1] == healthcheckArg {
+		os.Exit(runHealthcheck(cfg.HTTPPort, os.Stderr))
+	}
 
 	if err := run(ctx, cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -184,6 +187,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 	defer security.close()
+	registerPolicyBundleReadiness(healthSrv, security.policy)
 	registerEntityResolvers(security.authorize, stores.artifact)
 	httpHandler, err := intake.webhookHandler(cfg, log, healthSrv.Handler(), security.replay)
 	if err != nil {

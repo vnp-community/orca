@@ -69,8 +69,11 @@ func (uc *StartAgentSession) Execute(ctx context.Context, in StartAgentSessionIn
 	}
 
 	connected, devServer, _, err := uc.resolver.ResolveConnection(ctx, tenantID, in.ConnectionID)
-	if err != nil || !connected {
-		return domain.AgentSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "no dev server owns this connectionId", err)
+	if err != nil {
+		return domain.AgentSession{}, apperrors.New(apperrors.KindInternal, "INFRA_RESOLVE_FAILED", "failed to resolve connection", err)
+	}
+	if !connected {
+		return domain.AgentSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "no dev server owns this connectionId", nil)
 	}
 
 	// TASK-AG-03-06: lazily start (or no-op if already running) the

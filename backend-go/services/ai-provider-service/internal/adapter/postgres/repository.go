@@ -10,7 +10,6 @@ package postgres
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -183,7 +182,7 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Provi
 	`, tenantID, id)
 
 	account, err := scanAccount(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.ProviderAccount{}, domain.ErrAccountNotFound
 	}
 	if err != nil {
@@ -204,6 +203,9 @@ func (r *Repository) List(ctx context.Context, filter usecase.ListAccountsFilter
 		  AND ($5 = '' OR provider_type = $5)
 		ORDER BY created_at
 	`, filter.TenantID, string(filter.Scope), filter.ScopeRefID, filter.DevServerID, string(filter.ProviderType))
+	if isMalformedUUID(err) {
+		return nil, nil // a scope ref that cannot be a uuid owns no accounts
+	}
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query accounts: %w", err)
 	}
@@ -218,6 +220,9 @@ func (r *Repository) List(ctx context.Context, filter usecase.ListAccountsFilter
 		out = append(out, account)
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("postgres: iterate account rows: %w", err)
 	}
 	return out, nil
@@ -236,7 +241,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, in usecase.UpdateStatusIn
 	`, in.TenantID, in.AccountID, string(in.Status), in.CredentialRef, in.RotationGraceUntil, in.HealthDetail)
 
 	account, err := scanAccount(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.ProviderAccount{}, domain.ErrAccountNotFound
 	}
 	if err != nil {
@@ -257,7 +262,7 @@ func (r *Repository) Update(ctx context.Context, in usecase.UpdateFields) (domai
 	`, in.TenantID, in.AccountID, in.Label, nullableString(in.ModelHint), nullableString(in.BaseURL))
 
 	account, err := scanAccount(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.ProviderAccount{}, domain.ErrAccountNotFound
 	}
 	if err != nil {
@@ -276,6 +281,9 @@ func (r *Repository) Delete(ctx context.Context, tenantID, accountID string) err
 		SET status = 'revoked', deleted_at = now(), updated_at = now()
 		WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
 	`, tenantID, accountID)
+	if isMalformedUUID(err) {
+		return domain.ErrAccountNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: deleting provider account: %w", err)
 	}
@@ -309,7 +317,7 @@ func (r *Repository) GetToday(ctx context.Context, tenantID, accountID string, d
 
 	state := domain.QuotaState{AccountID: accountID, Date: day}
 	err := row.Scan(&state.CostUSD, &state.RequestCount, &state.TokensUsed)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return state, nil
 	}
 	if err != nil {

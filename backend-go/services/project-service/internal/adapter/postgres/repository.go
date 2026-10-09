@@ -63,7 +63,7 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Proje
 	`, tenantID, id)
 
 	out, err := scanProject(row)
-	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+	if isNoRows(err) {
 		return domain.Project{}, domain.ErrProjectNotFound
 	}
 	if err != nil {
@@ -77,6 +77,11 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Proje
 func isMalformedUUID(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
+}
+
+// isNoRows is "the query matched nothing", counting a malformed uuid as matching nothing.
+func isNoRows(err error) bool {
+	return errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err)
 }
 
 // List scopes to userID's own project_members rows, not just tenantID —
@@ -216,7 +221,7 @@ func (r *Repository) UpdateDevServerID(ctx context.Context, tenantID, projectID,
 	)
 
 	out, err := scanProject(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Project{}, domain.ErrProjectNotFound
 	}
 	if err != nil {
@@ -250,7 +255,7 @@ func (r *Repository) UpdateProject(ctx context.Context, tenantID, projectID stri
 	)
 
 	out, err := scanProject(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Project{}, domain.ErrProjectNotFound
 	}
 	if err != nil {
@@ -267,6 +272,9 @@ func (r *Repository) DeleteProject(ctx context.Context, tenantID, projectID stri
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM project.projects WHERE tenant_id = $1 AND id = $2
 	`, tenantID, projectID)
+	if isMalformedUUID(err) {
+		return domain.ErrProjectNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete project: %w", err)
 	}
@@ -289,7 +297,7 @@ func (r *Repository) GetMembership(ctx context.Context, projectID, userID string
 	var m domain.ProjectMember
 	var role string
 	if err := row.Scan(&m.ProjectID, &m.UserID, &role); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		if isNoRows(err) {
 			return domain.ProjectMember{}, domain.ErrMembershipNotFound
 		}
 		return domain.ProjectMember{}, fmt.Errorf("postgres: query project membership: %w", err)
@@ -327,6 +335,9 @@ func (r *Repository) RemoveMember(ctx context.Context, projectID, userID string)
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM project.project_members WHERE project_id = $1 AND user_id = $2
 	`, projectID, userID)
+	if isMalformedUUID(err) {
+		return domain.ErrMembershipNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete project member: %w", err)
 	}
@@ -341,6 +352,9 @@ func (r *Repository) UpdateMemberRole(ctx context.Context, projectID, userID str
 		UPDATE project.project_members SET role = $3
 		WHERE project_id = $1 AND user_id = $2
 	`, projectID, userID, string(role))
+	if isMalformedUUID(err) {
+		return domain.ProjectMember{}, domain.ErrMembershipNotFound
+	}
 	if err != nil {
 		return domain.ProjectMember{}, fmt.Errorf("postgres: update project member role: %w", err)
 	}

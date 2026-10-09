@@ -25,6 +25,9 @@ var (
 	// workflow-service.md §5: step_executions.step_id references the
 	// definition snapshot, not a foreign-keyed row).
 	ErrStepExecutionEmptyStepID = errors.New("domain: step execution requires a step id")
+	// ErrStepExecutionNotFound is the sentinel adapters return (wrapped) when an
+	// update targets a step execution row that does not exist.
+	ErrStepExecutionNotFound = errors.New("domain: step execution not found")
 )
 
 // StepExecution is one step's outcome within a WorkflowExecution's

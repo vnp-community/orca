@@ -194,7 +194,7 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 
 	task, err := uc.repo.Get(ctx, tenantID, in.TaskID)
 	if err != nil {
-		return ExecuteResult{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		return ExecuteResult{}, taskRepoError(err, "task not found", "TASK_EXECUTE_TASK_LOAD_FAILED", "failed to load task")
 	}
 
 	// Plan/phase are derived containers: one worktree and coordinator per phase would contradict

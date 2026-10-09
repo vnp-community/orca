@@ -41,7 +41,7 @@ func (uc *RecordTokenUsage) Execute(ctx context.Context, in RecordTokenUsageInpu
 
 	account, err := uc.accounts.Get(ctx, tenantID, in.AccountID)
 	if err != nil {
-		return domain.QuotaState{}, err
+		return domain.QuotaState{}, accountRepoError(err, "AIPROVIDER_ACCOUNT_FETCH_FAILED", "failed to load provider account")
 	}
 
 	today := domain.DayKey(uc.now())

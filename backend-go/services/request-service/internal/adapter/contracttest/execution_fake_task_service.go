@@ -25,6 +25,8 @@ import (
 
 // StatusChange is what the real task-service would put in an orca.task.task.statuschanged event.
 type StatusChange struct {
+	// TenantID is the tenant that created the task; empty for tasks added directly with Add.
+	TenantID                              string
 	TaskID, TaskType, ParentID, RequestID string
 	Previous, New, Cause, Error, LinkID   string
 }
@@ -46,6 +48,7 @@ type FakeTaskService struct {
 	forbidden   map[string]bool
 	executeErrs map[string][]error
 	links       map[string]string
+	tenants     map[string]string
 	// OnChange receives every status change; the test decides whether the event is delivered, delayed or lost.
 	OnChange func(StatusChange)
 	Client   *grpcclient.TaskClient
@@ -54,7 +57,7 @@ type FakeTaskService struct {
 // StartFakeTaskService serves the fake over bufconn and returns the real request-service TaskClient pointed at it.
 func StartFakeTaskService(t *testing.T) *FakeTaskService {
 	t.Helper()
-	f := &FakeTaskService{tasks: map[string]*taskv1.Task{}, deps: map[string][]string{}, forbidden: map[string]bool{}, executeErrs: map[string][]error{}, links: map[string]string{}}
+	f := NewFakeTaskService()
 	lis := bufconn.Listen(1 << 20)
 	srv := grpc.NewServer()
 	taskv1.RegisterTaskServiceServer(srv, f)
@@ -68,6 +71,15 @@ func StartFakeTaskService(t *testing.T) *FakeTaskService {
 	f.Client = grpcclient.NewTaskClient(taskv1.NewTaskServiceClient(conn))
 	return f
 }
+
+// NewFakeTaskService is the in-memory task-service without a transport: register it on any gRPC server with Register.
+func NewFakeTaskService() *FakeTaskService {
+	return &FakeTaskService{tasks: map[string]*taskv1.Task{}, deps: map[string][]string{}, forbidden: map[string]bool{}, executeErrs: map[string][]error{},
+		links: map[string]string{}, tenants: map[string]string{}}
+}
+
+// Register serves the fake on srv.
+func (f *FakeTaskService) Register(srv *grpc.Server) { taskv1.RegisterTaskServiceServer(srv, f) }
 
 func (f *FakeTaskService) next(prefix string) string {
 	f.seq++
@@ -84,6 +96,24 @@ func (f *FakeTaskService) Add(requestID, taskType, title, parent, taskStatus str
 	return id
 }
 
+// CreateTask stores a plain task as task-service does: open, the parent and request given, no idempotency of its own.
+func (f *FakeTaskService) CreateTask(ctx context.Context, req *taskv1.CreateTaskRequest) (*taskv1.CreateTaskResponse, error) {
+	if req.GetTitle() == "" || req.GetProjectId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "TASK_INVALID: title and project are required")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	id := uuid.NewString()
+	t := &taskv1.Task{
+		Id: id, Title: req.GetTitle(), Description: req.GetDescription(), TaskType: req.GetTaskType(), Status: "open", ParentId: req.GetParentId(),
+		ProjectId: req.GetProjectId(), RequestId: req.GetRequestId(), Labels: req.GetLabels(), OwnerId: callerOf(ctx),
+	}
+	f.order = append(f.order, id)
+	f.tasks[id] = t
+	f.tenants[id] = tenantOfCall(ctx)
+	return &taskv1.CreateTaskResponse{Task: clone(t)}, nil
+}
+
 func (f *FakeTaskService) DependsOn(task, on string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -94,6 +124,19 @@ func (f *FakeTaskService) Task(id string) *taskv1.Task {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return clone(f.tasks[id])
+}
+
+// TasksOfRequest lists the tasks of one Request (plans and phases included) in creation order.
+func (f *FakeTaskService) TasksOfRequest(requestID string) []*taskv1.Task {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []*taskv1.Task
+	for _, id := range f.order {
+		if t := f.tasks[id]; t.GetRequestId() == requestID {
+			out = append(out, clone(t))
+		}
+	}
+	return out
 }
 
 func clone(t *taskv1.Task) *taskv1.Task {
@@ -124,6 +167,11 @@ func (f *FakeTaskService) FailExecuteWith(taskID string, errs ...error) {
 }
 
 func (f *FakeTaskService) emit(c StatusChange) {
+	f.mu.Lock()
+	if c.TenantID == "" {
+		c.TenantID = f.tenants[c.TaskID]
+	}
+	f.mu.Unlock()
 	if f.OnChange != nil {
 		f.OnChange(c)
 	}
@@ -156,9 +204,13 @@ func (f *FakeTaskService) ReleaseUnlinkedSilently(taskID string) {
 	f.tasks[taskID].Status = "open"
 }
 
-func callerOf(ctx context.Context) string {
+func callerOf(ctx context.Context) string { return incomingMetadata(ctx, grpcmw.MetadataUserID) }
+
+func tenantOfCall(ctx context.Context) string { return incomingMetadata(ctx, grpcmw.MetadataTenantID) }
+
+func incomingMetadata(ctx context.Context, key string) string {
 	md, _ := metadata.FromIncomingContext(ctx)
-	if v := md.Get(grpcmw.MetadataUserID); len(v) > 0 {
+	if v := md.Get(key); len(v) > 0 {
 		return v[0]
 	}
 	return ""

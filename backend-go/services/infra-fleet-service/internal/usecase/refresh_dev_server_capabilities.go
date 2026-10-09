@@ -126,7 +126,7 @@ func (uc *RefreshDevServerCapabilities) Execute(ctx context.Context, tenantID, d
 func (uc *RefreshDevServerCapabilities) refresh(ctx context.Context, tenantID, devServerID string, force bool, now time.Time) (domain.CapabilityProfile, error) {
 	ds, err := uc.devServers.Get(ctx, tenantID, devServerID)
 	if err != nil {
-		return domain.CapabilityProfile{}, apperrors.New(apperrors.KindNotFound, "INFRA_DEV_SERVER_NOT_FOUND", "dev server not found for this tenant", err)
+		return domain.CapabilityProfile{}, devServerLookupError(err)
 	}
 
 	stored, hasStored, err := uc.store.Get(ctx, tenantID, devServerID)

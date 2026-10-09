@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -128,8 +129,8 @@ func (s *AgentTokenStore) Revoke(ctx context.Context, tenantID, id string) (doma
 		RETURNING ` + agentTokenColumns
 	t, err := scanAgentToken(s.pool.QueryRow(ctx, q, tenantID, id))
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return domain.AgentToken{}, fmt.Errorf("postgres: agent token %s not found or already revoked", id)
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+			return domain.AgentToken{}, fmt.Errorf("postgres: agent token %s missing or already revoked: %w", id, domain.ErrAgentTokenNotFound)
 		}
 		return domain.AgentToken{}, fmt.Errorf("postgres: revoking agent token: %w", err)
 	}

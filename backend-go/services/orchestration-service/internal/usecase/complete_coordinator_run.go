@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -49,7 +50,7 @@ func (uc *CompleteCoordinatorRun) Execute(ctx context.Context, in CompleteCoordi
 		return nil
 	})
 	if err != nil {
-		if err == ErrRunNotFound {
+		if errors.Is(err, ErrRunNotFound) {
 			return domain.CoordinatorRun{}, apperrors.New(apperrors.KindNotFound, "ORCH_RUN_NOT_FOUND", "coordinator run not found", err)
 		}
 		return domain.CoordinatorRun{}, apperrors.New(apperrors.KindInternal, "ORCH_COMPLETE_COORDINATOR_RUN_FAILED", "failed to complete coordinator run", err)

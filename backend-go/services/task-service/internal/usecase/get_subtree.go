@@ -44,7 +44,7 @@ func (uc *GetSubtree) Execute(ctx context.Context, in GetSubtreeInput) (GetSubtr
 
 	nodes, edges, err := uc.tasks.GetSubtree(ctx, tenantID, in.RootID, uc.maxDepth)
 	if err != nil {
-		return GetSubtreeResult{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found while resolving subtree", err)
+		return GetSubtreeResult{}, taskRepoError(err, "task not found while resolving subtree", "TASK_SUBTREE_FAILED", "failed to resolve subtree")
 	}
 
 	taskIDs := make([]string, 0, len(nodes))

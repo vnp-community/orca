@@ -281,6 +281,9 @@ func (r *ClarificationRepository) versionProbe(ctx context.Context, db dbExecer,
 
 func (r *ClarificationRepository) UpdateAnswers(ctx context.Context, id string, answers []usecase.AnswerRecord, expectedVersion int64) error {
 	return r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return domain.ErrClarificationNotFound(id)
+		}
 		tag, err := db.Exec(ctx, `UPDATE request.clarifications SET version = version + 1
 			WHERE tenant_id = $1 AND id = $2 AND status = 'open' AND ($3::bigint = 0 OR version = $3)`, tenantID, id, expectedVersion)
 		if err != nil {
@@ -301,6 +304,9 @@ func (r *ClarificationRepository) UpdateAnswers(ctx context.Context, id string, 
 
 func (r *ClarificationRepository) MarkAnswered(ctx context.Context, id string, answeredRevision int, at time.Time, expectedVersion int64) error {
 	return r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return domain.ErrClarificationNotFound(id)
+		}
 		tag, err := db.Exec(ctx, `UPDATE request.clarifications SET status = 'answered', answered_request_revision = $3, answered_at = $4, version = version + 1
 			WHERE tenant_id = $1 AND id = $2 AND status = 'open' AND ($5::bigint = 0 OR version = $5)`, tenantID, id, answeredRevision, at, expectedVersion)
 		if err != nil {
@@ -315,6 +321,9 @@ func (r *ClarificationRepository) MarkAnswered(ctx context.Context, id string, a
 
 func (r *ClarificationRepository) MarkCancelled(ctx context.Context, id, reason string, at time.Time, expectedVersion int64) error {
 	return r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return domain.ErrClarificationNotFound(id)
+		}
 		tag, err := db.Exec(ctx, `UPDATE request.clarifications SET status = 'cancelled', cancel_reason = $3, version = version + 1
 			WHERE tenant_id = $1 AND id = $2 AND status = 'open' AND ($4::bigint = 0 OR version = $4)`, tenantID, id, reason, expectedVersion)
 		if err != nil {
@@ -365,6 +374,9 @@ func (r *ClarificationRepository) listRefs(ctx context.Context, query string, no
 func (r *ClarificationRepository) LockOpenDue(ctx context.Context, id string, now time.Time) (*domain.Clarification, error) {
 	var out *domain.Clarification
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return nil
+		}
 		c, err := scanClarification(db.QueryRow(ctx, `SELECT `+clarificationColumns+` FROM request.clarifications
 			WHERE tenant_id = $1 AND id = $2 AND status = 'open' AND due_at <= $3 FOR UPDATE SKIP LOCKED`, tenantID, id, now))
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -384,6 +396,9 @@ func (r *ClarificationRepository) LockOpenDue(ctx context.Context, id string, no
 
 func (r *ClarificationRepository) MarkExpired(ctx context.Context, id string, at time.Time) error {
 	return r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return domain.ErrClarificationNotFound(id)
+		}
 		tag, err := db.Exec(ctx, `UPDATE request.clarifications SET status = 'expired', version = version + 1
 			WHERE tenant_id = $1 AND id = $2 AND status = 'open'`, tenantID, id)
 		if err != nil {
@@ -399,6 +414,9 @@ func (r *ClarificationRepository) MarkExpired(ctx context.Context, id string, at
 func (r *ClarificationRepository) MarkReminded(ctx context.Context, id string, at time.Time) (bool, error) {
 	claimed := false
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return nil
+		}
 		tag, err := db.Exec(ctx, `UPDATE request.clarifications SET reminded_at = $3
 			WHERE tenant_id = $1 AND id = $2 AND status = 'open' AND reminded_at IS NULL`, tenantID, id, at)
 		if err != nil {

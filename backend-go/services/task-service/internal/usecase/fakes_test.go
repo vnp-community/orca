@@ -561,11 +561,11 @@ func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id
 	return nil
 }
 
-var errNotFound = &notFoundError{}
-
-type notFoundError struct{}
-
-func (*notFoundError) Error() string { return "not found" }
+// Fakes return the same %w-wrapped domain sentinels the real repositories do, so usecase error mapping is exercised.
+var (
+	errNotFound          = fmt.Errorf("fake: %w", domain.ErrTaskNotFound)
+	errShareLinkNotFound = fmt.Errorf("fake: %w", domain.ErrShareLinkNotFound)
+)
 
 type fakeEdgeRepository struct {
 	edges   []domain.TaskEdge
@@ -837,13 +837,13 @@ func (f *fakeShareLinkRepository) ResolveActive(ctx context.Context, tenantID, t
 		}
 		return l.taskID, nil
 	}
-	return "", errNotFound
+	return "", errShareLinkNotFound
 }
 
 func (f *fakeShareLinkRepository) Revoke(ctx context.Context, tenantID, linkID string) error {
 	l, ok := f.links[linkID]
 	if !ok || l.tenantID != tenantID || l.revoked {
-		return errNotFound
+		return errShareLinkNotFound
 	}
 	l.revoked = true
 	f.links[linkID] = l
@@ -853,7 +853,7 @@ func (f *fakeShareLinkRepository) Revoke(ctx context.Context, tenantID, linkID s
 func (f *fakeShareLinkRepository) TaskIDFor(ctx context.Context, tenantID, linkID string) (string, error) {
 	l, ok := f.links[linkID]
 	if !ok || l.tenantID != tenantID {
-		return "", errNotFound
+		return "", errShareLinkNotFound
 	}
 	return l.taskID, nil
 }

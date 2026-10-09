@@ -30,6 +30,7 @@ type securityWiring struct {
 	compliance requestgrpc.ComplianceUseCases
 	replay     *usecase.WebhookReplayGuard
 	authorize  *usecase.AuthorizeRequestAction
+	policy     *opaclient.RequestPolicy
 	closers    []func()
 }
 
@@ -48,6 +49,8 @@ type securityHooks struct {
 	AfterAuthz []grpc.UnaryServerInterceptor // RPC audit
 	// OnRateLimited feeds orca_request_rate_limited_total.
 	OnRateLimited func(class string)
+	// Orphans feeds orca_request_orphan_total; nil leaves the check off.
+	Orphans usecase.OrphanObserver
 }
 
 func wireSecurity(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, log *slog.Logger, stores *requestStores, hooks securityHooks) (*securityWiring, error) {
@@ -57,6 +60,7 @@ func wireSecurity(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		return nil, fmt.Errorf("security: %w", err)
 	}
 	policy := opaclient.NewRequestPolicy(cfg.OPABundlePath)
+	w.policy = policy
 	if err := policy.Warm(ctx); err != nil {
 		return nil, fmt.Errorf("security: request policy bundle %q: %w", cfg.OPABundlePath, err)
 	}
@@ -65,11 +69,13 @@ func wireSecurity(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	}
 
 	var roles usecase.ProjectRoleResolver = unavailableProjectRoles{}
+	var projectExists usecase.ProjectExistence
 	if pa, err := dialProjectAccess(cfg, log); err != nil {
 		return nil, err
 	} else if pa != nil {
 		w.closers = append(w.closers, pa.Close)
 		roles = grpcclient.NewProjectRoleResolver(pa.Client).WithAccessLookup(pa.Lookup)
+		projectExists = pa.existence()
 	} else {
 		log.Warn("PROJECT_SERVICE_ADDR unset: only global admins pass the project-role check")
 	}
@@ -93,6 +99,9 @@ func wireSecurity(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	audit := usecase.NewAuditRecorder(sink, stores.auditOutbox, stores.tx, log)
 
 	authorize := usecase.NewAuthorizeRequestAction(stores.requests, usecase.NewApprovalRequestLocator(stores.approvals), roles, policy, audit)
+	if projectExists != nil && hooks.Orphans != nil {
+		authorize.WithOrphanObserver(projectExists, hooks.Orphans)
+	}
 	w.authorize = authorize
 	limits, warnings := domain.LimitsFromEnv(os.Getenv)
 	for _, msg := range warnings {

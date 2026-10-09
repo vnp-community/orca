@@ -30,7 +30,7 @@ func (uc *UpdateAccount) Execute(ctx context.Context, in UpdateFields) (domain.P
 	in.TenantID = tenantID
 	account, err := uc.repo.Update(ctx, in)
 	if err != nil {
-		return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_UPDATE_FAILED", "failed to update provider account", err)
+		return domain.ProviderAccount{}, accountRepoError(err, "AIPROVIDER_UPDATE_FAILED", "failed to update provider account")
 	}
 	return account, nil
 }

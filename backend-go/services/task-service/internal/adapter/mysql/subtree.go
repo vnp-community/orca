@@ -51,7 +51,7 @@ func (r *Repository) GetSubtree(ctx context.Context, tenantID, rootID string, ma
 		return nil, nil, fmt.Errorf("mysql: iterate subtree rows: %w", err)
 	}
 	if len(tasks) == 0 {
-		return nil, nil, fmt.Errorf("mysql: task %s not found while resolving subtree", rootID)
+		return nil, nil, fmt.Errorf("mysql: task %s while resolving subtree: %w", rootID, domain.ErrTaskNotFound)
 	}
 
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")

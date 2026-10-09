@@ -84,7 +84,7 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 	var tagsJSON []byte
 	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &tagsJSON, &status, &groupID, &kind, &healthStatus)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.DevServer{}, fmt.Errorf("mysql: dev server %q not found for tenant: %w", id, err)
+		return domain.DevServer{}, fmt.Errorf("mysql: dev server %q for tenant: %w", id, domain.ErrDevServerNotFound)
 	}
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("mysql: query dev server: %w", err)
@@ -272,7 +272,7 @@ func (r *Repository) selectDevServerRow(ctx context.Context, tenantID, devServer
 	var sshTargetID, groupID sql.NullString
 	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status, &groupID, &kind, &healthStatus)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.DevServer{}, fmt.Errorf("mysql: dev server not found for tenant: %w", err)
+		return domain.DevServer{}, fmt.Errorf("mysql: update dev server for tenant: %w", domain.ErrDevServerNotFound)
 	}
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("mysql: reading back updated dev server: %w", err)
@@ -372,7 +372,7 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 	`, tenantID, id)
 	target, err := scanSshTarget(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.SshTarget{}, fmt.Errorf("mysql: ssh target %q not found for tenant: %w", id, err)
+		return domain.SshTarget{}, fmt.Errorf("mysql: ssh target %q for tenant: %w", id, domain.ErrSshTargetNotFound)
 	}
 	if err != nil {
 		return domain.SshTarget{}, fmt.Errorf("mysql: query ssh target: %w", err)
@@ -605,7 +605,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, tenantID string, conn dom
 	var exists int
 	err = r.db.QueryRowContext(ctx, `SELECT 1 FROM connections WHERE id = ? AND tenant_id = ?`, conn.ID, tenantID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("mysql: update connection status: no connection %s for tenant %s", conn.ID, tenantID)
+		return fmt.Errorf("mysql: update connection status %s for tenant %s: %w", conn.ID, tenantID, domain.ErrConnectionNotFound)
 	}
 	if err != nil {
 		return fmt.Errorf("mysql: confirming connection status update: %w", err)

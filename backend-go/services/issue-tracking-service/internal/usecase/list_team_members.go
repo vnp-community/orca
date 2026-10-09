@@ -37,7 +37,7 @@ func (uc *ListTeamMembers) Execute(ctx context.Context, in ListTeamMembersInput)
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, domain.ProviderLinear, in.WorkspaceID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no linear credential available", err)
+		return nil, credentialResolveError(err, "no linear credential available")
 	}
 	members, err := provider.ListTeamMembers(ctx, cred, in.TeamID)
 	if err != nil {

@@ -65,6 +65,7 @@ func (w *rolloutWiring) SecurityHooks() securityHooks {
 		AfterAuthz: []grpc.UnaryServerInterceptor{requestgrpc.AuditRPC(w.Audit)},
 
 		OnRateLimited: w.Metrics.ObserveRateLimited,
+		Orphans:       w.Metrics,
 	}
 }
 

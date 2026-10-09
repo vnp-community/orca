@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/google/uuid"
@@ -129,8 +130,11 @@ func (uc *CreateTask) Execute(ctx context.Context, in CreateTaskInput) (domain.T
 	var parent *domain.Task
 	if task.ParentID != "" {
 		p, err := uc.repo.Get(ctx, tenantID, task.ParentID)
-		if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
 			return domain.Task{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_PARENT_NOT_FOUND", "parent task does not exist", err)
+		}
+		if err != nil {
+			return domain.Task{}, apperrors.New(apperrors.KindInternal, "TASK_PARENT_LOOKUP_FAILED", "failed to load parent task", err)
 		}
 		parent = &p
 	}

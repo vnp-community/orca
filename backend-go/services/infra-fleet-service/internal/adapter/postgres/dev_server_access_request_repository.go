@@ -92,8 +92,8 @@ func scanAccessRequestRow(row rowScanner) (domain.DevServerAccessRequest, error)
 	var status, kind string
 	var createdAt time.Time
 	err := row.Scan(&req.ID, &req.TenantID, &req.UserID, &req.DevServerGroupID, &status, &req.Message, &kind, &req.GranteeID, &createdAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.DevServerAccessRequest{}, fmt.Errorf("postgres: access request not found for tenant: %w", err)
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.DevServerAccessRequest{}, fmt.Errorf("postgres: access request for tenant: %w", domain.ErrDevServerAccessRequestNotFound)
 	}
 	if err != nil {
 		return domain.DevServerAccessRequest{}, fmt.Errorf("postgres: scan access request: %w", err)

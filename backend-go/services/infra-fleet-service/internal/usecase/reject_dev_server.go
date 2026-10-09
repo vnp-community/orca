@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -42,6 +43,9 @@ func (uc *RejectDevServer) Execute(ctx context.Context, in RejectDevServerInput)
 
 	ds, err := uc.repo.UpdateApprovalStatus(ctx, tenantID, in.DevServerID, domain.DevServerStatusRejected)
 	if err != nil {
+		if errors.Is(err, domain.ErrDevServerNotFound) {
+			return domain.DevServer{}, devServerLookupError(err)
+		}
 		return domain.DevServer{}, apperrors.New(apperrors.KindInternal, "INFRA_REJECT_DEV_SERVER_FAILED", "failed to reject dev server", err)
 	}
 	return ds, nil

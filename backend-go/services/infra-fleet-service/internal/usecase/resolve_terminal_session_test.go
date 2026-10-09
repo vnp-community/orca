@@ -51,7 +51,7 @@ func TestResolveTerminalSession_NeitherConnectionNorDevServerFound_ReturnsNotFou
 		},
 	}
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{}}
-	devServers := &fakeDevServerRepository{getErr: errors.New("not found")}
+	devServers := &fakeDevServerRepository{getErr: domain.ErrDevServerNotFound}
 
 	_, _, err := resolveTerminalSession(withTenant(context.Background(), "tenant-1"), "tenant-1", "pty-1", sessions, resolver, devServers)
 	if err == nil {

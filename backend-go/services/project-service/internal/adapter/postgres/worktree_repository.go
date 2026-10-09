@@ -3,11 +3,9 @@ package postgres
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/common/outbox"
@@ -53,7 +51,7 @@ func (r *WorktreeRepository) FindWorktreeByIdempotencyKey(ctx context.Context, p
 	`, projectID, idempotencyKey)
 
 	out, err := scanWorktree(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Worktree{}, false, nil
 	}
 	if err != nil {
@@ -67,6 +65,9 @@ func (r *WorktreeRepository) FindWorktreeByIdempotencyKey(ctx context.Context, p
 // decision.
 func (r *WorktreeRepository) RecordWorktreeRemoved(ctx context.Context, worktreeID string) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM project.worktrees WHERE id = $1`, worktreeID)
+	if isMalformedUUID(err) {
+		return domain.ErrWorktreeNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete worktree: %w", err)
 	}
@@ -114,7 +115,7 @@ func (r *WorktreeRepository) ListWorktrees(ctx context.Context, projectID string
 func (r *WorktreeRepository) GetWorktree(ctx context.Context, worktreeID string) (domain.Worktree, error) {
 	row := r.pool.QueryRow(ctx, `SELECT `+worktreeColumns+` FROM project.worktrees WHERE id = $1`, worktreeID)
 	out, err := scanWorktree(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Worktree{}, domain.ErrWorktreeNotFound
 	}
 	if err != nil {
@@ -131,7 +132,7 @@ func (r *WorktreeRepository) SetWorktreeActivation(ctx context.Context, worktree
 	)
 
 	out, err := scanWorktree(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Worktree{}, domain.ErrWorktreeNotFound
 	}
 	if err != nil {
@@ -148,7 +149,7 @@ func (r *WorktreeRepository) RenameWorktree(ctx context.Context, worktreeID, bra
 	)
 
 	out, err := scanWorktree(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Worktree{}, domain.ErrWorktreeNotFound
 	}
 	if err != nil {
@@ -173,7 +174,7 @@ func (r *WorktreeRepository) UpdateWorktreeMeta(ctx context.Context, worktreeID 
 	)
 
 	out, err := scanWorktree(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Worktree{}, domain.ErrWorktreeNotFound
 	}
 	if err != nil {
@@ -200,7 +201,7 @@ func (r *WorktreeRepository) SetWorktreeLineage(ctx context.Context, worktreeID 
 	)
 
 	out, err := scanWorktree(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Worktree{}, domain.ErrWorktreeNotFound
 	}
 	if err != nil {
@@ -319,7 +320,7 @@ func (r *WorktreeRepository) RemoveWorktreeWithEvent(ctx context.Context, worktr
 
 	row := tx.QueryRow(ctx, `DELETE FROM project.worktrees WHERE id = $1 RETURNING `+worktreeColumns, worktreeID)
 	removed, err := scanWorktree(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.ErrWorktreeNotFound
 	}
 	if err != nil {

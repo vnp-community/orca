@@ -237,7 +237,7 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Task,
 	t, err := scanTask(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return domain.Task{}, fmt.Errorf("mysql: task %s not found: %w", id, err)
+			return domain.Task{}, fmt.Errorf("mysql: task %s: %w", id, domain.ErrTaskNotFound)
 		}
 		return domain.Task{}, fmt.Errorf("mysql: query task: %w", err)
 	}
@@ -251,7 +251,7 @@ func (r *Repository) FindByNumber(ctx context.Context, tenantID, projectID strin
 	t, err := scanTask(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return domain.Task{}, fmt.Errorf("mysql: no task with number %d in project %s: %w", taskNumber, projectID, err)
+			return domain.Task{}, fmt.Errorf("mysql: task number %d in project %s: %w", taskNumber, projectID, domain.ErrTaskNotFound)
 		}
 		return domain.Task{}, fmt.Errorf("mysql: query task by number: %w", err)
 	}
@@ -299,7 +299,7 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 		return nil, fmt.Errorf("mysql: iterate ancestor rows: %w", err)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("mysql: task %s not found while resolving ancestors", id)
+		return nil, fmt.Errorf("mysql: task %s while resolving ancestors: %w", id, domain.ErrTaskNotFound)
 	}
 	return out, nil
 }
@@ -341,7 +341,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, tenantID, id string, stat
 		return fmt.Errorf("mysql: update task status rows affected: %w", err)
 	}
 	if affected == 0 {
-		return fmt.Errorf("mysql: task %s not found", id)
+		return fmt.Errorf("mysql: task %s: %w", id, domain.ErrTaskNotFound)
 	}
 	return nil
 }
@@ -364,7 +364,7 @@ func (r *Repository) SetActiveExecutionLink(ctx context.Context, tenantID, taskI
 		return fmt.Errorf("mysql: set active execution link rows affected: %w", err)
 	}
 	if affected == 0 {
-		return fmt.Errorf("mysql: task %s not found", taskID)
+		return fmt.Errorf("mysql: task %s: %w", taskID, domain.ErrTaskNotFound)
 	}
 	return nil
 }
@@ -384,7 +384,7 @@ func (r *Repository) CompleteExecution(ctx context.Context, tenantID, id, status
 		}
 		// A same-status rewrite reports 0 affected rows only when nothing changed; updated_at always moves, so 0 means missing.
 		if affected == 0 {
-			return fmt.Errorf("mysql: task %s not found", id)
+			return fmt.Errorf("mysql: task %s: %w", id, domain.ErrTaskNotFound)
 		}
 		return insertOutboxEvents(ctx, db, tenantID, events)
 	})
@@ -445,7 +445,7 @@ func (r *Repository) Update(ctx context.Context, tenantID string, t domain.Task,
 		return fmt.Errorf("mysql: update task rows affected: %w", err)
 	}
 	if affected == 0 {
-		return fmt.Errorf("mysql: task %s not found for tenant %s", t.ID, tenantID)
+		return fmt.Errorf("mysql: task %s for tenant %s: %w", t.ID, tenantID, domain.ErrTaskNotFound)
 	}
 
 	for _, event := range events {

@@ -67,7 +67,7 @@ func taskErrorCode(err error) string {
 func toTaskView(t *taskv1.Task) domain.TaskView {
 	v := domain.TaskView{
 		ID: t.GetId(), ParentID: t.GetParentId(), Type: t.GetTaskType(), Status: t.GetStatus(), RequestID: t.GetRequestId(),
-		Title: t.GetTitle(), AssigneeID: t.GetAssigneeId(), WorktreeID: t.GetWorktreeId(), Labels: t.GetLabels(),
+		Title: t.GetTitle(), Description: t.GetDescription(), AssigneeID: t.GetAssigneeId(), WorktreeID: t.GetWorktreeId(), Labels: t.GetLabels(),
 	}
 	if h := t.GetEstimatedHours(); h != nil {
 		hours := h.GetValue()

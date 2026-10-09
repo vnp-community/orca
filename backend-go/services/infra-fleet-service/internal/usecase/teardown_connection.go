@@ -2,9 +2,11 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
 // TeardownConnection now serves two purposes over one code path — see
@@ -54,6 +56,10 @@ func (uc *TeardownConnection) Execute(ctx context.Context, connectionID string) 
 
 	conn.CloseExplicitly()
 	if err := uc.conns.UpdateStatus(ctx, tenantID, conn); err != nil {
+		// Row vanished between ResolveConnection and the update.
+		if errors.Is(err, domain.ErrConnectionNotFound) {
+			return apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "connection not found for this tenant", err)
+		}
 		return apperrors.New(apperrors.KindInternal, "INFRA_UPDATE_CONNECTION_STATUS_FAILED", "failed to persist closed connection status", err)
 	}
 

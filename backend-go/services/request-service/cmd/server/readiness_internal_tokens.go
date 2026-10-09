@@ -22,6 +22,9 @@ func internalTokensConfigured(cfg config.Config) error {
 		return errors.New("GATEWAY_INTERNAL_TOKEN is empty: the api-gateway cannot call this service")
 	case cfg.ServiceInternalToken == "":
 		return errors.New("SERVICE_INTERNAL_TOKEN is empty: internal callers (issue-status-sync) are refused")
+	case cfg.ApprovalEnabled && cfg.AuthServiceAddr != "" && cfg.AuthDirectoryCallerToken == "":
+		// The outbox relay would otherwise strand every approval notification that needs the admin list.
+		return errors.New("AUTH_DIRECTORY_CALLER_TOKEN is empty: role:admin approvers cannot be expanded for approval notifications")
 	}
 	return nil
 }

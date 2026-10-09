@@ -36,8 +36,8 @@ type McpPrincipalResolver struct {
 	// inactive, error) for orca_mcp_principal_resolve_total. Set before use.
 	OnResolve func(result string)
 
-	// InternalToken, when set, is presented as the internal-caller secret that
-	// auth-service requires on ResolveMcpPrincipal. Empty = rollout-safe no-op.
+	// InternalToken is presented as the internal-caller secret that auth-service
+	// requires on ResolveMcpPrincipal. Empty sends none, and auth-service then refuses the call.
 	InternalToken string
 
 	mu    sync.Mutex

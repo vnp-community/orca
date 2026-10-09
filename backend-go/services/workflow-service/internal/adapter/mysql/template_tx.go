@@ -45,7 +45,7 @@ func (r *Repository) GetByShareToken(ctx context.Context, shareToken string) (do
 	err := row.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &scope, &tmpl.ParentTemplateID, &tmpl.Version,
 		&visibility, &tmpl.ShareToken, &tmpl.RatingSum, &tmpl.RatingCount)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
+		return domain.WorkflowTemplate{}, fmt.Errorf("mysql: template by share token: %w", domain.ErrTemplateNotFound)
 	}
 	if err != nil {
 		return domain.WorkflowTemplate{}, fmt.Errorf("mysql: query template by share token: %w", err)
@@ -72,7 +72,7 @@ func (r *Repository) SetShareToken(ctx context.Context, templateID, token string
 	var exists int
 	err = tx.QueryRowContext(ctx, `SELECT 1 FROM templates WHERE id = ? FOR UPDATE`, templateID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.ErrTemplateNotFound
+		return fmt.Errorf("mysql: set share token for template %s: %w", templateID, domain.ErrTemplateNotFound)
 	}
 	if err != nil {
 		return fmt.Errorf("mysql: lock template: %w", err)
@@ -102,7 +102,7 @@ func (t *templateTx) UpdateVisibility(ctx context.Context, tmpl domain.WorkflowT
 	var exists int
 	err := t.tx.QueryRowContext(ctx, `SELECT 1 FROM templates WHERE id = ? AND tenant_id = ? FOR UPDATE`, tmpl.ID, tmpl.TenantID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
+		return domain.WorkflowTemplate{}, fmt.Errorf("mysql: update template visibility %s: %w", tmpl.ID, domain.ErrTemplateNotFound)
 	}
 	if err != nil {
 		return domain.WorkflowTemplate{}, fmt.Errorf("mysql: lock template: %w", err)
@@ -136,7 +136,7 @@ func (t *templateTx) SetVisibility(ctx context.Context, templateID string, v dom
 	var exists int
 	err := t.tx.QueryRowContext(ctx, `SELECT 1 FROM templates WHERE id = ? FOR UPDATE`, templateID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.ErrTemplateNotFound
+		return fmt.Errorf("mysql: set visibility for template %s: %w", templateID, domain.ErrTemplateNotFound)
 	}
 	if err != nil {
 		return fmt.Errorf("mysql: lock template: %w", err)
@@ -167,7 +167,7 @@ func (t *templateTx) IncrementUsageCount(ctx context.Context, templateID string)
 	var exists int
 	err := t.tx.QueryRowContext(ctx, `SELECT 1 FROM templates WHERE id = ? FOR UPDATE`, templateID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.ErrTemplateNotFound
+		return fmt.Errorf("mysql: increment usage count for template %s: %w", templateID, domain.ErrTemplateNotFound)
 	}
 	if err != nil {
 		return fmt.Errorf("mysql: lock template: %w", err)
@@ -186,8 +186,19 @@ func (t *templateTx) IncrementUsageCount(ctx context.Context, templateID string)
 // of `ON CONFLICT DO UPDATE`, and a SELECT ... FOR UPDATE existence check
 // + UPDATE + re-SELECT in place of the single UPDATE ... RETURNING.
 func (t *templateTx) UpsertRating(ctx context.Context, templateID, userID string, stars int32) (usecase.RateTemplateResult, error) {
+	// Lock the template first: the ratings FK would otherwise surface an unknown
+	// template as a raw FK violation (Internal) instead of not-found.
+	var exists int
+	err := t.tx.QueryRowContext(ctx, `SELECT 1 FROM templates WHERE id = ? FOR UPDATE`, templateID).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return usecase.RateTemplateResult{}, fmt.Errorf("mysql: rate template %s: %w", templateID, domain.ErrTemplateNotFound)
+	}
+	if err != nil {
+		return usecase.RateTemplateResult{}, fmt.Errorf("mysql: lock template: %w", err)
+	}
+
 	var oldStars int32
-	err := t.tx.QueryRowContext(ctx, `
+	err = t.tx.QueryRowContext(ctx, `
 		SELECT stars FROM ratings WHERE template_id = ? AND user_id = ? FOR UPDATE
 	`, templateID, userID).Scan(&oldStars)
 	isNew := errors.Is(err, sql.ErrNoRows)
@@ -209,15 +220,6 @@ func (t *templateTx) UpsertRating(ctx context.Context, templateID, userID string
 		countDelta = 1
 	} else {
 		sumDelta = stars - oldStars
-	}
-
-	var exists int
-	err = t.tx.QueryRowContext(ctx, `SELECT 1 FROM templates WHERE id = ? FOR UPDATE`, templateID).Scan(&exists)
-	if errors.Is(err, sql.ErrNoRows) {
-		return usecase.RateTemplateResult{}, domain.ErrTemplateNotFound
-	}
-	if err != nil {
-		return usecase.RateTemplateResult{}, fmt.Errorf("mysql: lock template: %w", err)
 	}
 
 	if _, err := t.tx.ExecContext(ctx, `

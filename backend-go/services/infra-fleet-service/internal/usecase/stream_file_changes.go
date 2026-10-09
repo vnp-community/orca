@@ -82,7 +82,7 @@ func (uc *StreamFileChanges) resolveDevServer(ctx context.Context, tenantID stri
 	case in.DevServerID != "":
 		devServer, err := uc.devServers.Get(ctx, tenantID, in.DevServerID)
 		if err != nil {
-			return domain.DevServer{}, apperrors.New(apperrors.KindNotFound, "INFRA_DEV_SERVER_NOT_FOUND", "dev server not found for this tenant", err)
+			return domain.DevServer{}, devServerLookupError(err)
 		}
 		return devServer, nil
 	default:

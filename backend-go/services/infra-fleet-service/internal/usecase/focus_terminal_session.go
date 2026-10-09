@@ -2,10 +2,12 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
 // FocusTerminalSession is a bookkeeping touch only — per
@@ -35,6 +37,9 @@ func (uc *FocusTerminalSession) Execute(ctx context.Context, ptyID string) error
 	}
 
 	if err := uc.sessions.Touch(ctx, tenantID, ptyID, time.Now().UTC()); err != nil {
+		if errors.Is(err, domain.ErrTerminalSessionNotFound) {
+			return apperrors.New(apperrors.KindNotFound, "INFRA_TERMINAL_NOT_FOUND", "terminal session not found", err)
+		}
 		return apperrors.New(apperrors.KindInternal, "INFRA_TOUCH_TERMINAL_SESSION_FAILED", "failed to update terminal session activity", err)
 	}
 	return nil

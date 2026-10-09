@@ -2,9 +2,11 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
 // RevokeAgentToken revokes a token and closes any live session
@@ -26,8 +28,11 @@ func (uc *RevokeAgentToken) Execute(ctx context.Context, devServerID, id string)
 		return apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 	tok, err := uc.repo.Revoke(ctx, tenantID, id)
+	if errors.Is(err, domain.ErrAgentTokenNotFound) {
+		return apperrors.New(apperrors.KindNotFound, "INFRA_AGENT_TOKEN_NOT_FOUND", "agent token not found or already revoked", err)
+	}
 	if err != nil {
-		return err
+		return apperrors.New(apperrors.KindInternal, "INFRA_REVOKE_AGENT_TOKEN_FAILED", "failed to revoke agent token", err)
 	}
 	_, err = uc.sessions.CloseSessionsForDevServerToken(ctx, devServerID, tok.ID)
 	return err

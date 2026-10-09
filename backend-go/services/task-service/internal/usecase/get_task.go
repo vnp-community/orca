@@ -24,7 +24,7 @@ func (uc *GetTask) Execute(ctx context.Context, id string) (domain.Task, error) 
 
 	task, err := uc.repo.Get(ctx, tenantID, id)
 	if err != nil {
-		return domain.Task{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		return domain.Task{}, taskRepoError(err, "task not found", "TASK_FETCH_FAILED", "failed to fetch task")
 	}
 	return task, nil
 }

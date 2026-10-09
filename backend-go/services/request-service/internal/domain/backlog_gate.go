@@ -17,6 +17,7 @@ type TaskView struct {
 	Status         string
 	RequestID      string
 	Title          string
+	Description    string
 	AssigneeID     string
 	WorktreeID     string
 	EstimatedHours *float64

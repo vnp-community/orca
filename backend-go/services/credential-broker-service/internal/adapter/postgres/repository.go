@@ -83,7 +83,7 @@ func (r *Repository) Get(ctx context.Context, id string) (domain.CredentialMetad
 	var m domain.CredentialMetadata
 	var category, status string
 	err := row.Scan(&m.ID, &m.TenantID, &m.OwnerID, &category, &status, &m.VaultPath, &m.ConfigJSON, &m.CreatedAt, &m.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || isNoMatch(err) {
 		return domain.CredentialMetadata{}, domain.ErrCredentialNotFound
 	}
 	if err != nil {
@@ -114,7 +114,7 @@ func (r *Repository) GetByOwner(ctx context.Context, tenantID string, category d
 	var m domain.CredentialMetadata
 	var cat, status string
 	err := row.Scan(&m.ID, &m.TenantID, &m.OwnerID, &cat, &status, &m.VaultPath, &m.ConfigJSON, &m.CreatedAt, &m.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || isNoMatch(err) {
 		return domain.CredentialMetadata{}, domain.ErrCredentialNotFound
 	}
 	if err != nil {
@@ -157,6 +157,9 @@ func (r *Repository) UpdateStatus(ctx context.Context, id string, status domain.
 	tag, err := r.db.Exec(ctx, `
 		UPDATE credential.credential_metadata SET status = $2, updated_at = $3 WHERE id = $1
 	`, id, string(status), now)
+	if isNoMatch(err) {
+		return domain.ErrCredentialNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: update credential status: %w", err)
 	}

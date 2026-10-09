@@ -121,7 +121,7 @@ func TestServer_StreamCodeIntelEvents_RequiresTenantMetadata(t *testing.T) {
 }
 
 func TestServer_StreamCodeIntelEvents_DevServerNotFound(t *testing.T) {
-	repo := &capsFakeRepo{getErr: errors.New("not found")}
+	repo := &capsFakeRepo{getErr: domain.ErrDevServerNotFound}
 	source := newFakeStreamSource()
 	limiter := usecase.NewCodeIntelStreamLimiter(16)
 	streamUC := usecase.NewStreamCodeIntelEvents(repo, source, limiter)

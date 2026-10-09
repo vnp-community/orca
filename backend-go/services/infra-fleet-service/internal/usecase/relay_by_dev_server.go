@@ -49,7 +49,7 @@ func (uc *RelayByDevServer) Execute(ctx context.Context, in RelayByDevServerInpu
 
 	devServer, err := uc.devServers.Get(ctx, tenantID, in.DevServerID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindNotFound, "INFRA_DEV_SERVER_NOT_FOUND", "dev server not found for this tenant", err)
+		return nil, devServerLookupError(err)
 	}
 
 	if !uc.agent.IsConnected(devServer.ID) {

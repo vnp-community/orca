@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
 	"github.com/stablyai/orca-go/common/outbox"
@@ -360,6 +361,14 @@ func (r *Repository) CreateDispatchContext(ctx context.Context, tenantID, userID
 		INSERT INTO dispatch_contexts (id, tenant_id, user_id, worktree_id, handle, coordinator_run_id, orchestration_task_id, status, created_at)
 		VALUES (?,?,?,?,?,?,?,'pending',?)
 	`, id, tenantID, nullableString(userID), nullableString(worktreeID), handle, coordinatorRunID, nullableString(orchestrationTaskID), createdAt); err != nil {
+		var myErr *mysqldriver.MySQLError
+		if errors.As(err, &myErr) && myErr.Number == 1452 {
+			// Caller-supplied run/task ids that name nothing are NotFound, not Internal.
+			if strings.Contains(myErr.Message, "fk_dispatch_task") {
+				return domain.DispatchContext{}, fmt.Errorf("mysql: insert dispatch context: %w", usecase.ErrTaskNotFound)
+			}
+			return domain.DispatchContext{}, fmt.Errorf("mysql: insert dispatch context: %w", usecase.ErrRunNotFound)
+		}
 		return domain.DispatchContext{}, fmt.Errorf("mysql: insert dispatch context: %w", err)
 	}
 

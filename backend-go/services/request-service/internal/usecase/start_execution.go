@@ -32,7 +32,8 @@ func (uc *StartExecution) Execute(ctx context.Context, requestID string) (starte
 		return false, err
 	}
 	if flow.PhasesFor(req.Size) {
-		return false, nil // a person starts each Phase
+		// A person starts each Phase, but a gated flow must have the first Phase's Approval open for them to decide.
+		return false, uc.Evaluate.Run(ctx, req)
 	}
 	return true, uc.Evaluate.Run(ctx, req)
 }

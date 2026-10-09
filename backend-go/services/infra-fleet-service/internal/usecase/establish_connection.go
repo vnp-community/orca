@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -62,8 +63,11 @@ func (uc *EstablishConnection) Execute(ctx context.Context, in EstablishConnecti
 		return domain.Connection{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 	target, err := uc.sshTargets.Get(ctx, tenantID, in.SshTargetID)
+	if errors.Is(err, domain.ErrSshTargetNotFound) {
+		return domain.Connection{}, apperrors.New(apperrors.KindNotFound, "INFRA_SSH_TARGET_NOT_FOUND", "ssh target not found for this tenant", err)
+	}
 	if err != nil {
-		return domain.Connection{}, err
+		return domain.Connection{}, apperrors.New(apperrors.KindInternal, "INFRA_SSH_TARGET_LOOKUP_FAILED", "failed to look up ssh target", err)
 	}
 
 	// Find-or-create the DevServer row this SSH target backs — an SSH

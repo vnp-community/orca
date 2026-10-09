@@ -22,6 +22,8 @@ type agentKit struct {
 	conn    AnalysisConnection
 	caps    DevServerCapabilityReader
 	setting AnalysisSettings
+	// hotfix, when set, gives hotfix diagnoses their fix task and pre_deploy approval.
+	hotfix HotfixFixTasks
 }
 
 func newAgentKit(t *testing.T, reply string) *agentKit {
@@ -44,7 +46,7 @@ func (k *agentKit) build() {
 	w := k.w
 	worker := NewRunAgentReadonlyAnalysis(AgentReadonlyDeps{
 		Requests: w, Solutions: fakeSolutions{w}, Conns: fakeConns{conn: k.conn}, Agent: k.agent, Probe: k.probe, Caps: k.caps,
-		Writer: w.newWriter(w.transitioner()), Settings: k.setting,
+		Writer: w.newWriter(w.transitioner()).WithHotfixFixTasks(k.hotfix), Settings: k.setting,
 	})
 	gen := NewRunSolutionGeneration(w, fakeSolutions{w}, k.comp, nil, w.newWriter(w.transitioner()), k.setting)
 	k.runner = NewAnalysisRunner(fakeRuns{w}, fakeSolutions{w}, w, gen, worker, k.setting, testOwner)

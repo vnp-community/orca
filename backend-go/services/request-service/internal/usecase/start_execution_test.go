@@ -87,3 +87,47 @@ func TestResumeAfterGate(t *testing.T) {
 		t.Fatalf("an unknown request is ignored: %v", err)
 	}
 }
+
+func pendingPhaseApprovals(r *exRig) []string {
+	var ids []string
+	for _, a := range r.gates.approvals {
+		if a.SubjectType == domain.SubjectPhase && a.Status == domain.ApprovalStatusPending {
+			ids = append(ids, a.SubjectID)
+		}
+	}
+	return ids
+}
+
+// A gated flow (change_request) needs the first Phase's Approval open as soon as the Request is executing, or nobody can start it.
+func TestStatusConsumer_GatedFlowOpensTheFirstPhaseApprovalOnce(t *testing.T) {
+	r := newExRig(t)
+	req := r.request(domain.RequestTypeChangeRequest, domain.RequestSizeM, domain.RequestStatusExecuting)
+	plan := r.plan(req)
+	p1, p2 := r.phase(req, plan, "p1"), r.phase(req, plan, "p2")
+	r.leaf(req, p1, "t1", domain.TaskStatusOpen)
+	r.leaf(req, p2, "t2", domain.TaskStatusOpen)
+
+	for i := 0; i < 3; i++ { // the status event may be delivered more than once
+		if started, err := r.startExec.Execute(lcCtx(), req.ID); err != nil || started {
+			t.Fatalf("a phased request is not auto-started: %v %v", started, err)
+		}
+	}
+	if got := pendingPhaseApprovals(r); len(got) != 1 || got[0] != p1.ID {
+		t.Fatalf("pending phase approvals = %v, want only the first phase %s", got, p1.ID)
+	}
+	if r.tasks.count("execute:") != 0 {
+		t.Fatalf("nothing runs before a person starts the phase: %v", r.tasks.calls)
+	}
+}
+
+func TestStatusConsumer_FlowsWithoutPhaseGateOpenNoPhaseApproval(t *testing.T) {
+	r := newExRig(t)
+	bug := r.request(domain.RequestTypeBug, domain.RequestSizeL, domain.RequestStatusExecuting)
+	r.leaf(bug, r.phase(bug, r.plan(bug), "p"), "t", domain.TaskStatusOpen)
+	if _, err := r.startExec.Execute(lcCtx(), bug.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := pendingPhaseApprovals(r); len(got) != 0 {
+		t.Fatalf("the plan approval already covers a size L bug's phases, got %v", got)
+	}
+}

@@ -55,7 +55,7 @@ func (uc *ResolveProvider) Resolve(ctx context.Context, in ResolveProviderInput)
 	if in.AccountID != "" {
 		account, err := uc.repo.Get(ctx, tenantID, in.AccountID)
 		if err != nil {
-			return domain.ProviderAccount{}, err
+			return domain.ProviderAccount{}, accountRepoError(err, "AIPROVIDER_ACCOUNT_FETCH_FAILED", "failed to load provider account")
 		}
 		if !account.Resolvable() {
 			return domain.ProviderAccount{}, &domain.ErrNoProviderAvailable{Reason: domain.ReasonQuotaOrInactive}

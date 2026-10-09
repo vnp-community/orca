@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -37,7 +38,7 @@ func (uc *UpdateFleetDefinition) Execute(ctx context.Context, in UpdateFleetDefi
 
 	current, err := uc.repo.Get(ctx, tenantID, in.ID)
 	if err != nil {
-		if err == domain.ErrFleetDefinitionNotFound {
+		if errors.Is(err, domain.ErrFleetDefinitionNotFound) {
 			return domain.FleetDefinition{}, apperrors.New(apperrors.KindNotFound, "INFRA_FLEET_DEFINITION_NOT_FOUND", "fleet definition not found", err)
 		}
 		return domain.FleetDefinition{}, apperrors.New(apperrors.KindInternal, "INFRA_GET_FLEET_DEFINITION_FAILED", "failed to get fleet definition", err)
@@ -54,7 +55,7 @@ func (uc *UpdateFleetDefinition) Execute(ctx context.Context, in UpdateFleetDefi
 
 	saved, err := uc.repo.Update(ctx, next)
 	if err != nil {
-		if err == domain.ErrFleetDefinitionVersionConflict {
+		if errors.Is(err, domain.ErrFleetDefinitionVersionConflict) {
 			return domain.FleetDefinition{}, apperrors.New(apperrors.KindFailedPrecondition, "INFRA_FLEET_DEFINITION_VERSION_CONFLICT", "fleet definition was updated concurrently, refetch and retry", err)
 		}
 		return domain.FleetDefinition{}, apperrors.New(apperrors.KindInternal, "INFRA_UPDATE_FLEET_DEFINITION_FAILED", "failed to update fleet definition", err)

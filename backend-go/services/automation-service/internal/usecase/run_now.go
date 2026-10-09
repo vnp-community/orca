@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -106,7 +107,10 @@ func (uc *RunNow) Execute(ctx context.Context, in RunNowInput) (domain.Automatio
 
 	automation, err := uc.automations.Get(ctx, tenantID, in.AutomationID)
 	if err != nil {
-		return domain.AutomationRun{}, apperrors.New(apperrors.KindNotFound, "AUTOMATION_NOT_FOUND", "automation not found", err)
+		if errors.Is(err, domain.ErrAutomationNotFound) {
+			return domain.AutomationRun{}, apperrors.New(apperrors.KindNotFound, "AUTOMATION_NOT_FOUND", "automation not found", err)
+		}
+		return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_LOOKUP_FAILED", "failed to load automation", err)
 	}
 
 	// Idempotency check, per automation-service.md §8: a retried or
@@ -154,6 +158,9 @@ func (uc *RunNow) Execute(ctx context.Context, in RunNowInput) (domain.Automatio
 		return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_TRANSITION_FAILED", "failed to transition run to running", err)
 	}
 	if err := uc.runs.UpdateStatus(ctx, running); err != nil {
+		if errors.Is(err, domain.ErrAutomationRunNotFound) {
+			return domain.AutomationRun{}, apperrors.New(apperrors.KindNotFound, "AUTOMATION_RUN_NOT_FOUND", "automation run not found", err)
+		}
 		return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_UPDATE_FAILED", "failed to persist run status", err)
 	}
 
@@ -167,6 +174,9 @@ func (uc *RunNow) Execute(ctx context.Context, in RunNowInput) (domain.Automatio
 	// executing anything locally itself.
 	final, err := uc.chain.Execute(ctx, tenantID, automation, running)
 	if err != nil {
+		if errors.Is(err, domain.ErrAutomationRunNotFound) {
+			return domain.AutomationRun{}, apperrors.New(apperrors.KindNotFound, "AUTOMATION_RUN_NOT_FOUND", "automation run not found", err)
+		}
 		// Execute only returns a Go error for a failure to PERSIST the run's
 		// own state transition (see its doc comment) — a dispatched action
 		// failing is captured in the run's ActionResults instead, not here.

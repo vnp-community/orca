@@ -3,7 +3,10 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+
+	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
 
 // ShareLinkStore implements usecase.ShareLinkRepository against
@@ -40,6 +43,9 @@ func (s *ShareLinkStore) ResolveActive(ctx context.Context, tenantID, tokenHash 
 	`, tenantID, tokenHash)
 	var taskID string
 	if err := row.Scan(&taskID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("mysql: active share link: %w", domain.ErrShareLinkNotFound)
+		}
 		return "", fmt.Errorf("mysql: resolve active share link: %w", err)
 	}
 	return taskID, nil
@@ -58,7 +64,7 @@ func (s *ShareLinkStore) Revoke(ctx context.Context, tenantID, linkID string) er
 		return fmt.Errorf("mysql: revoke share link rows affected: %w", err)
 	}
 	if affected == 0 {
-		return fmt.Errorf("mysql: share link %s not found or already revoked", linkID)
+		return fmt.Errorf("mysql: share link %s not found or already revoked: %w", linkID, domain.ErrShareLinkNotFound)
 	}
 	return nil
 }
@@ -67,6 +73,9 @@ func (s *ShareLinkStore) TaskIDFor(ctx context.Context, tenantID, linkID string)
 	row := s.db.QueryRowContext(ctx, `SELECT task_id FROM task_share_links WHERE tenant_id = ? AND id = ?`, tenantID, linkID)
 	var taskID string
 	if err := row.Scan(&taskID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("mysql: share link %s: %w", linkID, domain.ErrShareLinkNotFound)
+		}
 		return "", fmt.Errorf("mysql: query share link task id: %w", err)
 	}
 	return taskID, nil

@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -103,6 +104,13 @@ func (uc *CreateDispatchContext) Execute(ctx context.Context, in CreateDispatchC
 		return nil
 	})
 	if err != nil {
+		// Dangling run/task ids from the caller are NotFound; anything else stays Internal.
+		switch {
+		case errors.Is(err, ErrRunNotFound):
+			return domain.DispatchContext{}, apperrors.New(apperrors.KindNotFound, "ORCH_RUN_NOT_FOUND", "coordinator run not found", err)
+		case errors.Is(err, ErrTaskNotFound):
+			return domain.DispatchContext{}, apperrors.New(apperrors.KindNotFound, "ORCH_TASK_NOT_FOUND", "orchestration task not found", err)
+		}
 		return domain.DispatchContext{}, apperrors.New(apperrors.KindInternal, "ORCH_CREATE_DISPATCH_FAILED", "failed to create dispatch context", err)
 	}
 	return result, nil

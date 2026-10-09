@@ -203,7 +203,10 @@ func (r *ArtifactReader) Resolve(ctx context.Context, ref string) (domain.IndexE
 	if id.Kind == domain.DisplayKindRequest || id.Kind == domain.DisplayKindAC {
 		req, err := r.requests.GetByNumber(ctx, id.ReqNum)
 		if err != nil {
-			return domain.IndexEntry{}, domain.ErrArtifactNotFound(ref)
+			if isNotFoundKind(err) {
+				return domain.IndexEntry{}, domain.ErrArtifactNotFound(ref)
+			}
+			return domain.IndexEntry{}, err
 		}
 		if id.Kind == domain.DisplayKindAC {
 			c, cerr := domain.ContentFromRequest(req)
@@ -222,7 +225,10 @@ func (r *ArtifactReader) Resolve(ctx context.Context, ref string) (domain.IndexE
 	}
 	// Same read rule as GetRequest: the request behind the id must be visible.
 	if _, err := loadReadableRequest(ctx, r.requests, entry.RequestID); err != nil {
-		return domain.IndexEntry{}, domain.ErrArtifactNotFound(ref)
+		if isNotFoundKind(err) {
+			return domain.IndexEntry{}, domain.ErrArtifactNotFound(ref)
+		}
+		return domain.IndexEntry{}, err
 	}
 	return entry, nil
 }

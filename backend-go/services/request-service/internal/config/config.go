@@ -49,7 +49,10 @@ type Config struct {
 	ServiceInternalToken      string
 	// ProjectInternalCallerToken authenticates this service to project-service's internal-only RPCs (ResolveProjectAccess).
 	ProjectInternalCallerToken string
-	OPABundlePath              string
+	// AuthDirectoryCallerToken authenticates this service to auth-service's internal ListActiveTenantAdmins (role:admin
+	// approver expansion). Without it admin approvers cannot be resolved for notifications.
+	AuthDirectoryCallerToken string
+	OPABundlePath            string
 	// StuckThresholds says how long a Request may sit in a status before orca_request_stuck counts it
 	// (REQUEST_STUCK_THRESHOLD_<STATUS>, Go duration). Proposed values, not yet tuned on real traffic.
 	StuckThresholds map[string]time.Duration
@@ -195,6 +198,9 @@ func Load() Config {
 	}
 	if tok := os.Getenv("PROJECT_INTERNAL_CALLER_TOKEN"); tok != "" {
 		c.ProjectInternalCallerToken = tok
+	}
+	if tok := os.Getenv("AUTH_DIRECTORY_CALLER_TOKEN"); tok != "" {
+		c.AuthDirectoryCallerToken = tok
 	}
 	if p := os.Getenv("OPA_BUNDLE_PATH"); p != "" {
 		c.OPABundlePath = p

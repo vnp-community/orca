@@ -106,7 +106,7 @@ func (s *FleetDefinitionStore) Get(ctx context.Context, tenantID, id string) (do
 	`, tenantID, id)
 	def, err := scanFleetDefinition(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.FleetDefinition{}, domain.ErrFleetDefinitionNotFound
+		return domain.FleetDefinition{}, fmt.Errorf("mysql: get fleet definition %s: %w", id, domain.ErrFleetDefinitionNotFound)
 	}
 	if err != nil {
 		return domain.FleetDefinition{}, fmt.Errorf("mysql: get fleet definition: %w", err)

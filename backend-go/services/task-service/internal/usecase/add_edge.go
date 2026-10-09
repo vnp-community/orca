@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -77,13 +78,17 @@ func addEdgeWithinTx(ctx context.Context, tenantID string, tasks TaskRepository,
 		}
 	}
 	if err := edges.Add(ctx, tenantID, edge); err != nil {
+		// An endpoint that names no task trips the edge FK; that is a client mistake, not a 5xx.
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			return apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "an edge endpoint task was not found", err)
+		}
 		return apperrors.New(apperrors.KindInternal, "TASK_EDGE_ADD_FAILED", "failed to persist edge", err)
 	}
 
 	if edge.Kind == domain.EdgeKindDependsOn {
 		dep, err := tasks.Get(ctx, tenantID, edge.ToTaskID)
 		if err != nil {
-			return apperrors.New(apperrors.KindInternal, "TASK_EDGE_DEP_LOOKUP_FAILED", "failed to load dependency task", err)
+			return taskRepoError(err, "dependency task not found", "TASK_EDGE_DEP_LOOKUP_FAILED", "failed to load dependency task")
 		}
 		// Plan/phase status is derived from children; blocking one would be overwritten or stick wrongly.
 		// A failed lookup keeps the old behavior (UpdateStatus below reports a missing task).

@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -95,7 +96,7 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Orche
 		WHERE id = $1 AND tenant_id = $2
 	`, id, tenantID)
 	task, err := scanTask(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.OrchestrationTask{}, usecase.ErrTaskNotFound
 	}
 	if err != nil {
@@ -131,7 +132,7 @@ func (r *Repository) UpdateStatusAndPromote(ctx context.Context, tenantID, taskI
 		          task_title, spec, status, deps, result, created_at, completed_at
 	`, string(newStatus), completedAt, taskID, tenantID)
 	task, err := scanTask(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return usecase.UpdateStatusAndPromoteResult{}, usecase.ErrTaskNotFound
 	}
 	if err != nil {
@@ -348,6 +349,16 @@ func (r *Repository) CreateDispatchContext(ctx context.Context, tenantID, userID
 		orchestrationTaskIDArg = &orchestrationTaskID
 	}
 
+	// uuid columns reject malformed ids with 22P02; those ids can only be dangling references.
+	if _, err := uuid.Parse(coordinatorRunID); err != nil {
+		return domain.DispatchContext{}, fmt.Errorf("postgres: insert dispatch context: %w", usecase.ErrRunNotFound)
+	}
+	if orchestrationTaskID != "" {
+		if _, err := uuid.Parse(orchestrationTaskID); err != nil {
+			return domain.DispatchContext{}, fmt.Errorf("postgres: insert dispatch context: %w", usecase.ErrTaskNotFound)
+		}
+	}
+
 	// Wrapped in a transaction (TASK-FT-003-01) — this method had none
 	// before, a single INSERT was trivially atomic on its own, but the
 	// outbox row must now commit atomically with the dispatch-context row.
@@ -365,6 +376,13 @@ func (r *Repository) CreateDispatchContext(ctx context.Context, tenantID, userID
 
 	var createdAt time.Time
 	if err := row.Scan(&createdAt); err != nil {
+		if constraint, ok := referencedRowMissing(err); ok {
+			// Caller-supplied run/task ids that name nothing are NotFound, not Internal.
+			if strings.Contains(constraint, "orchestration_task_id") {
+				return domain.DispatchContext{}, fmt.Errorf("postgres: insert dispatch context: %w", usecase.ErrTaskNotFound)
+			}
+			return domain.DispatchContext{}, fmt.Errorf("postgres: insert dispatch context: %w", usecase.ErrRunNotFound)
+		}
 		return domain.DispatchContext{}, fmt.Errorf("postgres: insert dispatch context: %w", err)
 	}
 
@@ -472,7 +490,7 @@ func (r *Repository) GetLatestForTask(ctx context.Context, tenantID, orchestrati
 	var status string
 	var worktreeIDCol, orchestrationTaskIDCol *string
 	if err := row.Scan(&dc.ID, &dc.TenantID, &worktreeIDCol, &orchestrationTaskIDCol, &dc.Handle, &dc.CoordinatorRunID, &status, &dc.CreatedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.DispatchContext{}, usecase.ErrDispatchContextNotFound
 		}
 		return domain.DispatchContext{}, fmt.Errorf("postgres: get latest dispatch context for task: %w", err)
@@ -500,7 +518,7 @@ func (r *Repository) GetDispatchContext(ctx context.Context, tenantID, id string
 	var status string
 	var worktreeIDCol, orchestrationTaskIDCol *string
 	if err := row.Scan(&dc.ID, &dc.TenantID, &worktreeIDCol, &orchestrationTaskIDCol, &dc.Handle, &dc.CoordinatorRunID, &status, &dc.CreatedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.DispatchContext{}, usecase.ErrDispatchContextNotFound
 		}
 		return domain.DispatchContext{}, fmt.Errorf("postgres: get dispatch context: %w", err)
@@ -539,7 +557,7 @@ func (r *Repository) RecordDispatchFailure(ctx context.Context, tenantID, dispat
 	`, dispatchContextID, tenantID).Scan(
 		&dc.ID, &dc.TenantID, &userID, &dc.Handle, &dc.CoordinatorRunID, &orchestrationTaskID, &status, &dc.FailureCount,
 	)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.DispatchContext{}, usecase.ErrDispatchContextNotFound
 	}
 	if err != nil {
@@ -593,7 +611,7 @@ func (r *Repository) CreateGate(ctx context.Context, tenantID, dispatchContextID
 		WHERE id = $1 AND tenant_id = $2
 		FOR UPDATE
 	`, dispatchContextID, tenantID).Scan(&orchestrationTaskID, &toHandle)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.DecisionGate{}, usecase.ErrDispatchContextNotFound
 	}
 	if err != nil {
@@ -694,7 +712,7 @@ func (r *Repository) ResolveGate(ctx context.Context, tenantID, gateID, resoluti
 		&gate.ID, &gate.TenantID, &gate.OrchestrationTaskID, &dispatchContextID, &gate.Question, &optionsJSON,
 		&status, &existingResolution, &gate.CreatedAt, &resolvedAt, &fromHandle,
 	)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.DecisionGate{}, nil, usecase.ErrGateNotFound
 	}
 	if err != nil {
@@ -903,7 +921,7 @@ func (r *Repository) GetRun(ctx context.Context, tenantID, id string) (domain.Co
 		WHERE id = $1 AND tenant_id = $2
 	`, id, tenantID)
 	run, err := scanCoordinatorRun(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.CoordinatorRun{}, usecase.ErrRunNotFound
 	}
 	if err != nil {
@@ -921,7 +939,7 @@ func (r *Repository) Complete(ctx context.Context, tenantID, id string, result j
 		          worktree_id, result, error_message, created_at, completed_at, reported_at
 	`, result, id, tenantID)
 	run, err := scanCoordinatorRun(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.CoordinatorRun{}, usecase.ErrRunNotFound
 	}
 	if err != nil {
@@ -939,7 +957,7 @@ func (r *Repository) Fail(ctx context.Context, tenantID, id, errMsg string) (dom
 		          worktree_id, result, error_message, created_at, completed_at, reported_at
 	`, errMsg, id, tenantID)
 	run, err := scanCoordinatorRun(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.CoordinatorRun{}, usecase.ErrRunNotFound
 	}
 	if err != nil {

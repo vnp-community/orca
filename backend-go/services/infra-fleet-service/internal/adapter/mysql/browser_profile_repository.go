@@ -88,7 +88,7 @@ func (s *BrowserProfileStore) Delete(ctx context.Context, tenantID, id string) e
 		return fmt.Errorf("mysql: rows affected: %w", err)
 	}
 	if n == 0 {
-		return fmt.Errorf("mysql: browser profile %s not found", id)
+		return fmt.Errorf("mysql: deleting browser profile %s: %w", id, domain.ErrBrowserProfileNotFound)
 	}
 	return nil
 }

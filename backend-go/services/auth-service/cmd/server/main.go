@@ -29,7 +29,6 @@ import (
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
-	"github.com/stablyai/orca-go/common/internalcaller"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/policy"
 	"github.com/stablyai/orca-go/common/secrets"
@@ -421,17 +420,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	// The mcp-service-only OAuth RPCs are guarded by a shared secret on top of
-	// the NetworkPolicy allow-list (no mesh peer identity exists yet). The
-	// guard option comes after ChainUnary so it runs inside recovery/logging.
-	guards := []grpc.UnaryServerInterceptor{
-		internalcaller.Guard(oauthCfg.InternalCallerToken, append(append([]string{}, authgrpc.OAuthInternalMethods...), authgrpc.McpSuspensionMethods...)...),
-	}
-	if oauthCfg.McpPrincipalCallerToken != "" {
-		guards = append(guards, internalcaller.Guard(oauthCfg.McpPrincipalCallerToken, authgrpc.McpPrincipalMethods...))
-	} else if oauthCfg.Enabled {
-		logger.Warn("AUTH_MCP_PRINCIPAL_CALLER_TOKEN is empty: ResolveMcpPrincipal relies on network policy alone")
-	}
+	guards := append(internalCallerGuards(oauthCfg, logger), directoryCallerGuard(svcconfig.DirectoryCallerToken(), logger))
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler(), grpc.ChainUnaryInterceptor(guards...))
 	baseServer := authgrpc.New(
 		loginUC, logoutUC, validateSessionUC,
@@ -478,6 +467,7 @@ func run() error {
 			Suspend: usecase.NewSetMcpPatSuspension(repo, repo, clock),
 		})
 	}
+	authServer = authgrpc.WithDirectory(authServer, usecase.NewListActiveTenantAdmins(repo))
 	authv1.RegisterAuthServiceServer(grpcServer, authServer)
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

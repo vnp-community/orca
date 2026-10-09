@@ -59,6 +59,9 @@ func (uc *GetPlanProposal) Execute(ctx context.Context, requestID, runID string)
 func (uc *GetPlanProposal) find(ctx context.Context, requestID, runID string) (domain.AnalysisRun, error) {
 	if runID != "" {
 		run, err := uc.runs.Get(ctx, runID)
+		if err != nil && !isNotFoundKind(err) {
+			return domain.AnalysisRun{}, err
+		}
 		if err != nil || run.RequestID != requestID || run.Kind != domain.RunKindPlan {
 			return domain.AnalysisRun{}, domain.ErrPlanRunNotFound(runID)
 		}

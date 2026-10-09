@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
@@ -42,7 +43,7 @@ func (uc *ExportFleetDefinitionYaml) Execute(ctx context.Context, id string) (st
 	}
 	def, err := uc.repo.Get(ctx, tenantID, id)
 	if err != nil {
-		if err == domain.ErrFleetDefinitionNotFound {
+		if errors.Is(err, domain.ErrFleetDefinitionNotFound) {
 			return "", apperrors.New(apperrors.KindNotFound, "INFRA_FLEET_DEFINITION_NOT_FOUND", "fleet definition not found", err)
 		}
 		return "", apperrors.New(apperrors.KindInternal, "INFRA_GET_FLEET_DEFINITION_FAILED", "failed to get fleet definition", err)

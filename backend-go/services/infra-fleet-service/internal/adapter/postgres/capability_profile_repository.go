@@ -111,7 +111,7 @@ func (s *CapabilityProfileStore) Upsert(ctx context.Context, p domain.Capability
 		if err := tx.QueryRow(ctx, `
 			SELECT 1 FROM infra.dev_servers WHERE id = $1 AND tenant_id = $2 FOR NO KEY UPDATE
 		`, p.DevServerID, p.TenantID).Scan(&one); errors.Is(err, pgx.ErrNoRows) {
-			return domain.ErrNotFound
+			return fmt.Errorf("postgres: upsert capability profile for dev server %s: %w", p.DevServerID, domain.ErrNotFound)
 		} else if err != nil {
 			return fmt.Errorf("postgres: lock dev server: %w", err)
 		}

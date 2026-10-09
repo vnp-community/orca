@@ -60,7 +60,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			return nil, fmt.Errorf("postgres connect: %w", err)
 		}
 		base := postgresadapter.New(pool)
-		healthSrv.Register("postgres", func() error { return pool.Ping(context.Background()) })
+		healthSrv.Register("postgres", func() error { return probeWithTimeout(pool.Ping) })
 		return &requestStores{
 			outbox:       base,
 			outboxWriter: base,
@@ -104,7 +104,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 		db.SetMaxIdleConns(25)
 		db.SetConnMaxLifetime(0)
 		base := mysqladapter.New(db)
-		healthSrv.Register("mysql", func() error { return db.PingContext(context.Background()) })
+		healthSrv.Register("mysql", func() error { return probeWithTimeout(db.PingContext) })
 		return &requestStores{
 			outbox:       base,
 			outboxWriter: base,

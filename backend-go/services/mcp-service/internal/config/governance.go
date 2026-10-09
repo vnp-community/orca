@@ -17,7 +17,7 @@ type GovernanceConfig struct {
 	BundlePath          string
 	Usecase             usecase.GovernanceConfig
 	ToolCallsRetention  time.Duration
-	InternalCallerToken string // guards gateway-only RPCs when set
+	InternalCallerToken string // guards gateway-only RPCs; empty refuses every call (fail closed)
 	WorkerInterval      time.Duration
 }
 

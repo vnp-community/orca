@@ -58,7 +58,7 @@ func (uc *CreateIssue) Execute(ctx context.Context, in CreateIssueInput) (domain
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, in.Provider, in.WorkspaceID)
 	if err != nil {
-		return domain.Issue{}, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no credential available for provider", err)
+		return domain.Issue{}, credentialResolveError(err, "no credential available for provider")
 	}
 
 	// Mutations are not silently retried on ambiguous failure, to avoid

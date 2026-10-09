@@ -43,6 +43,9 @@ func (r *RequestLinkRepository) ListChildren(ctx context.Context, parentID strin
 func (r *RequestLinkRepository) list(ctx context.Context, cond, id string) ([]domain.RequestLink, error) {
 	var out []domain.RequestLink
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return nil
+		}
 		rows, err := db.Query(ctx, `SELECT parent_request_id, child_request_id, reason, created_by, created_at FROM request.request_links
 			WHERE tenant_id = $1 AND `+cond+` ORDER BY parent_request_id, child_request_id`, tenantID, id)
 		if err != nil {

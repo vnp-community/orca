@@ -45,7 +45,7 @@ func TestSpawnTerminalSession_NoComputeBound_OutsideServerDeploymentMode(t *test
 
 func TestSpawnTerminalSession_UnresolvedConnection_ReturnsNotFoundError(t *testing.T) {
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{}}
-	devServers := &fakeDevServerRepository{getErr: errors.New("not found")}
+	devServers := &fakeDevServerRepository{getErr: domain.ErrDevServerNotFound}
 	agent := &fakeDevServerAgentClient{}
 	sessions := &fakeTerminalSessionRepository{}
 	uc := NewSpawnTerminalSession(resolver, devServers, agent, sessions, &fakeEphemeralVmRuntimeRepository{}, false)
@@ -265,7 +265,7 @@ func TestSpawnTerminalSession_ResolvableEnvironmentIdFallsThroughToDevServerIdPa
 // not a bug), not a raw/opaque error.
 func TestSpawnTerminalSession_UnresolvableEnvironmentIdReturnsNoComputeBound(t *testing.T) {
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{}}
-	devServers := &fakeDevServerRepository{getErr: errors.New("not found")}
+	devServers := &fakeDevServerRepository{getErr: domain.ErrDevServerNotFound}
 	agent := &fakeDevServerAgentClient{}
 	sessions := &fakeTerminalSessionRepository{}
 	ephemeralVmRuntimes := &fakeEphemeralVmRuntimeRepository{} // no environmentId bindings at all
@@ -294,7 +294,7 @@ func TestSpawnTerminalSession_UnresolvableEnvironmentIdReturnsNoComputeBound(t *
 // string or a hardcoded value that would silently defeat that scoping).
 func TestSpawnTerminalSession_EnvironmentIdScopedByTenant(t *testing.T) {
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{}}
-	devServers := &fakeDevServerRepository{getErr: errors.New("not found")}
+	devServers := &fakeDevServerRepository{getErr: domain.ErrDevServerNotFound}
 	agent := &fakeDevServerAgentClient{}
 	sessions := &fakeTerminalSessionRepository{}
 	var gotTenantID string

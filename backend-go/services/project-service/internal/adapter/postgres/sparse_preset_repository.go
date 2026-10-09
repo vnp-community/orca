@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -67,7 +65,7 @@ func (r *SparsePresetRepository) GetSparsePreset(ctx context.Context, repoID, pr
 	`, repoID, presetID)
 
 	p, err := scanSparsePreset(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.SparsePreset{}, domain.ErrSparsePresetNotFound
 	}
 	if err != nil {
@@ -102,6 +100,9 @@ func (r *SparsePresetRepository) RemoveSparsePreset(ctx context.Context, repoID,
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM project.sparse_presets WHERE repo_id = $1 AND id = $2
 	`, repoID, presetID)
+	if isMalformedUUID(err) {
+		return domain.ErrSparsePresetNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete sparse preset: %w", err)
 	}

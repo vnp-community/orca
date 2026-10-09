@@ -237,20 +237,19 @@ func (e *EvaluateExecution) allCancelledReturn(tree domain.ExecutionTree, starte
 	return nil
 }
 
-// completePhases records finished Phases and, when the flow gates Phases, opens the Approval of the next one.
+// completePhases records finished Phases and, when the flow gates Phases, opens the Approval of the next one. The first
+// Phase is opened the same way (StartExecution calls this when the Request enters executing): nothing else would.
 func (e *EvaluateExecution) completePhases(ctx context.Context, req domain.Request, tree domain.ExecutionTree, started map[string]bool, flow domain.FlowDefinition) error {
-	finishedAny := false
 	for _, p := range tree.Phases {
 		if p.Status != domain.TaskStatusDone {
 			continue
 		}
-		finishedAny = true
 		count := len(tree.LeavesOf(p.ID))
 		if err := e.recordContainerDone(ctx, req, p, domain.OutcomePhaseDone, uuid.NewString(), e.now(), count, true); err != nil {
 			return err
 		}
 	}
-	if !finishedAny || e.Open == nil || !flow.HasExecutionGate(domain.GatePhase) {
+	if e.Open == nil || !flow.HasExecutionGate(domain.GatePhase) {
 		return nil
 	}
 	for _, p := range tree.Phases {

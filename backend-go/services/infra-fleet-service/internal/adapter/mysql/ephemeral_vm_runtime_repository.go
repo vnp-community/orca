@@ -63,7 +63,7 @@ func (s *EphemeralVmRuntimeStore) Get(ctx context.Context, tenantID, id string) 
 		WHERE tenant_id = ? AND id = ? AND status <> 'destroyed'`
 	r, err := scanEphemeralVmRuntime(s.db.QueryRowContext(ctx, q, tenantID, id))
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
+		return domain.EphemeralVmRuntime{}, fmt.Errorf("mysql: get ephemeral vm runtime %s: %w", id, domain.ErrEphemeralVmRuntimeNotFound)
 	}
 	if err != nil {
 		return domain.EphemeralVmRuntime{}, fmt.Errorf("mysql: get ephemeral vm runtime: %w", err)
@@ -79,7 +79,7 @@ func (s *EphemeralVmRuntimeStore) GetByWorkspaceID(ctx context.Context, tenantID
 		WHERE tenant_id = ? AND workspace_id = ? AND status <> 'destroyed'`
 	r, err := scanEphemeralVmRuntime(s.db.QueryRowContext(ctx, q, tenantID, workspaceID))
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
+		return domain.EphemeralVmRuntime{}, fmt.Errorf("mysql: get ephemeral vm runtime by workspace %s: %w", workspaceID, domain.ErrEphemeralVmRuntimeNotFound)
 	}
 	if err != nil {
 		return domain.EphemeralVmRuntime{}, fmt.Errorf("mysql: get ephemeral vm runtime by workspace: %w", err)
@@ -98,7 +98,7 @@ func (s *EphemeralVmRuntimeStore) selectByTenantAndID(ctx context.Context, tenan
 	q := `SELECT ` + ephemeralVmRuntimeColumns + ` FROM ephemeral_vm_runtimes WHERE tenant_id = ? AND id = ?`
 	r, err := scanEphemeralVmRuntime(s.db.QueryRowContext(ctx, q, tenantID, id))
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
+		return domain.EphemeralVmRuntime{}, fmt.Errorf("mysql: read back ephemeral vm runtime %s: %w", id, domain.ErrEphemeralVmRuntimeNotFound)
 	}
 	if err != nil {
 		return domain.EphemeralVmRuntime{}, fmt.Errorf("mysql: reading back ephemeral vm runtime: %w", err)

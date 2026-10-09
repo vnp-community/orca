@@ -74,7 +74,7 @@ func (s *CapabilityProfileStore) Upsert(ctx context.Context, p domain.Capability
 	var one int
 	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM dev_servers WHERE id = ? AND tenant_id = ? FOR UPDATE`,
 		p.DevServerID, p.TenantID).Scan(&one); errors.Is(err, sql.ErrNoRows) {
-		return "", false, domain.ErrNotFound
+		return "", false, fmt.Errorf("mysql: upsert capability profile for dev server %s: %w", p.DevServerID, domain.ErrNotFound)
 	} else if err != nil {
 		return "", false, fmt.Errorf("mysql: lock dev server: %w", err)
 	}

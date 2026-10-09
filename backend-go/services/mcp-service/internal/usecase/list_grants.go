@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"github.com/stablyai/orca-go/services/mcp-service/internal/domain"
 )
 
@@ -38,6 +40,10 @@ func (uc *ListGrants) Execute(ctx context.Context, in ListGrantsInput) ([]GrantV
 			return nil, err
 		}
 		filter = in.UserID
+		// A user filter that is not a uuid can match no grant; answer empty instead of a bind error.
+		if _, perr := uuid.Parse(filter); filter != "" && perr != nil {
+			return []GrantView{}, nil
+		}
 	}
 	grants, err := uc.repo.ListActiveGrants(ctx, who.TenantID, filter)
 	if err != nil {

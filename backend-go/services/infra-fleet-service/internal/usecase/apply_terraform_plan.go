@@ -3,9 +3,11 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
 type ApplyTerraformPlanInput struct {
@@ -49,8 +51,11 @@ func (uc *ApplyTerraformPlan) Execute(ctx context.Context, in ApplyTerraformPlan
 		return ApplyTerraformPlanResult{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 	controlDevServer, err := uc.devServers.Get(ctx, tenantID, in.ControlDevServerID)
-	if err != nil {
+	if errors.Is(err, domain.ErrDevServerNotFound) {
 		return ApplyTerraformPlanResult{}, apperrors.New(apperrors.KindInvalidArgument, "INFRA_UNKNOWN_CONTROL_HOST", "control dev server not found", err)
+	}
+	if err != nil {
+		return ApplyTerraformPlanResult{}, devServerLookupError(err)
 	}
 
 	outputJSON, err := uc.runner.Apply(ctx, controlDevServer, in.WorkingDir, in.VarsFile)

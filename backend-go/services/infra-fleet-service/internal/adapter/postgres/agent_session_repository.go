@@ -64,7 +64,7 @@ func (s *AgentSessionStore) Create(ctx context.Context, session domain.AgentSess
 func (s *AgentSessionStore) Get(ctx context.Context, tenantID, sessionID string) (bool, domain.AgentSession, error) {
 	row := s.pool.QueryRow(ctx, agentSessionSelect+`WHERE tenant_id = $1 AND id = $2`, tenantID, sessionID)
 	session, err := scanAgentSession(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
 		return false, domain.AgentSession{}, nil
 	}
 	if err != nil {
@@ -91,7 +91,7 @@ func (s *AgentSessionStore) LatestForWorktree(ctx context.Context, tenantID, wor
 		agentSessionSelect+`WHERE tenant_id = $1 AND worktree_id = $2 ORDER BY started_at DESC LIMIT 1`,
 		tenantID, worktreeID)
 	session, err := scanAgentSession(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
 		return false, domain.AgentSession{}, nil
 	}
 	if err != nil {
@@ -110,7 +110,7 @@ func (s *AgentSessionStore) MostRecentActiveForWorktree(ctx context.Context, ten
 		                     ORDER BY started_at DESC LIMIT 1`,
 		tenantID, worktreeID)
 	session, err := scanAgentSession(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
 		return false, domain.AgentSession{}, nil
 	}
 	if err != nil {

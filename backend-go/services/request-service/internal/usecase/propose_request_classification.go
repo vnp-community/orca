@@ -162,7 +162,12 @@ func (uc *ProposeRequestClassification) Execute(ctx context.Context, in ProposeI
 			}
 		}
 		if !failed {
-			if err := uc.approvals.RequestTypeApproval(txCtx, cur.ID); err != nil {
+			// The approval row is only an inbox entry for a confirmation the reporter can also give directly
+			// (ConfirmRequestType). No eligible approver (e.g. a single-user tenant) must not strand the Request
+			// in classifying, so the proposal stands and the human confirms it without an Approval.
+			if err := uc.approvals.RequestTypeApproval(txCtx, cur.ID); errors.Is(err, domain.ErrApprovalNoEligibleApprover) {
+				slog.WarnContext(txCtx, "request type approval not opened: no eligible approver", slog.String("request_id", cur.ID))
+			} else if err != nil {
 				return err
 			}
 		}

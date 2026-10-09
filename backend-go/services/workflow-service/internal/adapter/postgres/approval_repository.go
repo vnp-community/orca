@@ -126,8 +126,8 @@ func (t *approvalTx) Get(ctx context.Context, approvalID string) (domain.Approva
 		WHERE id = $1
 	`, approvalID)
 	a, err := scanApproval(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Approval{}, domain.ErrApprovalNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.Approval{}, fmt.Errorf("postgres: approval %s: %w", approvalID, domain.ErrApprovalNotFound)
 	}
 	if err != nil {
 		return domain.Approval{}, fmt.Errorf("postgres: query approval: %w", err)
@@ -147,7 +147,7 @@ func (t *approvalTx) Update(ctx context.Context, approval domain.Approval) error
 		return fmt.Errorf("postgres: update approval: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrApprovalNotFound
+		return fmt.Errorf("postgres: update approval %s: %w", approval.ID, domain.ErrApprovalNotFound)
 	}
 	return nil
 }

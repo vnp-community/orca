@@ -151,7 +151,7 @@ func (r *AutomationRepository) Get(ctx context.Context, tenantID, id string) (do
 
 	a, err := scanAutomation(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Automation{}, fmt.Errorf("mysql: automation %s not found: %w", id, err)
+		return domain.Automation{}, fmt.Errorf("mysql: automation %s: %w", id, domain.ErrAutomationNotFound)
 	}
 	if err != nil {
 		return domain.Automation{}, fmt.Errorf("mysql: query automation: %w", err)
@@ -237,7 +237,7 @@ func (r *AutomationRepository) Update(ctx context.Context, tenantID string, a do
 		return fmt.Errorf("mysql: rows affected: %w", err)
 	}
 	if affected == 0 {
-		return fmt.Errorf("mysql: automation %s not found for tenant %s", a.ID, tenantID)
+		return fmt.Errorf("mysql: update automation %s for tenant %s: %w", a.ID, tenantID, domain.ErrAutomationNotFound)
 	}
 	return nil
 }
@@ -259,7 +259,7 @@ func (r *AutomationRepository) Delete(ctx context.Context, tenantID, id string) 
 		return fmt.Errorf("mysql: rows affected: %w", err)
 	}
 	if affected == 0 {
-		return fmt.Errorf("mysql: automation %s not found for tenant %s", id, tenantID)
+		return fmt.Errorf("mysql: delete automation %s for tenant %s: %w", id, tenantID, domain.ErrAutomationNotFound)
 	}
 	return nil
 }
@@ -656,7 +656,7 @@ func (r *AutomationRunRepository) UpdateStatus(ctx context.Context, run domain.A
 		return fmt.Errorf("mysql: rows affected: %w", err)
 	}
 	if affected == 0 {
-		return fmt.Errorf("mysql: automation run %s not found for tenant %s", run.ID, run.TenantID)
+		return fmt.Errorf("mysql: update status of run %s for tenant %s: %w", run.ID, run.TenantID, domain.ErrAutomationRunNotFound)
 	}
 
 	if run.Status.Terminal() {

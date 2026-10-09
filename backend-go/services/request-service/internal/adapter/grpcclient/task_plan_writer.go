@@ -121,3 +121,43 @@ func (UnavailableTaskClient) CreatePlanTree(context.Context, usecase.PlanTreeInp
 }
 
 var _ usecase.TaskPlanWriter = UnavailableTaskClient{}
+
+var _ usecase.FixTaskWriter = (*TaskClient)(nil)
+
+// CreateFixTask creates the one parentless task of a hotfix. Idempotency lives in the use case (it looks the task up
+// first), because task-service's plain CreateTask would happily create a second one.
+func (c *TaskClient) CreateFixTask(ctx context.Context, in usecase.PlanTreeInput) (string, error) {
+	if len(in.Proposal.Tasks) != 1 || len(in.Proposal.Phases) != 0 {
+		return "", domain.ErrHotfixPlanShape("a hotfix creates exactly one task")
+	}
+	ctx, cancel, err := callContext(ctx, true, taskReadTimeout)
+	if err != nil {
+		return "", err
+	}
+	defer cancel()
+	t := in.Proposal.Tasks[0]
+	req := &taskv1.CreateTaskRequest{
+		Title: t.Title, ProjectId: in.Request.ProjectID, Description: t.Description, TaskType: t.TaskType, PromptTemplate: t.PromptTemplate,
+		AiContext: planTaskContext(in), CreatorId: in.CreatorID, RequestId: in.Request.ID, Labels: domain.EffectiveLabels(t),
+	}
+	if t.EstimatedHours > 0 {
+		req.EstimatedHours = wrapperspb.Double(t.EstimatedHours)
+	}
+	resp, err := c.client.CreateTask(ctx, req)
+	if err != nil {
+		if c := status.Code(err); c == codes.Unavailable || c == codes.DeadlineExceeded {
+			return "", domain.ErrHotfixFixTaskUnavailable(err)
+		}
+		return "", fmt.Errorf("grpcclient: create hotfix fix task: %w", err)
+	}
+	if resp.GetTask().GetId() == "" {
+		return "", fmt.Errorf("grpcclient: create hotfix fix task: task-service returned no task")
+	}
+	return resp.GetTask().GetId(), nil
+}
+
+func (UnavailableTaskClient) CreateFixTask(context.Context, usecase.PlanTreeInput) (string, error) {
+	return "", domain.ErrHotfixFixTaskUnavailable(errNoTaskService)
+}
+
+var _ usecase.FixTaskWriter = UnavailableTaskClient{}

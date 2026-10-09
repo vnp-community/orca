@@ -117,6 +117,9 @@ func (r *DecisionRepository) GetLiveBySubject(ctx context.Context, kind domain.D
 func (r *DecisionRepository) Update(ctx context.Context, d domain.Decision, expectedVersion int64) (domain.Decision, error) {
 	var out domain.Decision
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(d.ID) {
+			return domain.ErrDecisionNotFound(d.ID)
+		}
 		got, err := scanDecision(db.QueryRow(ctx, `
 			UPDATE request.decisions SET subject_digest = $4, chosen_option_id = $5, chooser_id = $6, chosen_at = $7, rationale = $8, risk_level = $9,
 				confirmed_by = $10, confirmed_at = $11, status = $12, version = version + 1

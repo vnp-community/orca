@@ -72,7 +72,7 @@ func (uc *ResolvePermission) Execute(ctx context.Context, in ResolvePermissionIn
 
 	ancestors, err := uc.tasks.GetAncestors(ctx, tenantID, in.TaskID, uc.maxDepth)
 	if err != nil {
-		return domain.GrantLevelUnspecified, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found while resolving ancestors", err)
+		return domain.GrantLevelUnspecified, taskRepoError(err, "task not found while resolving ancestors", "TASK_ANCESTORS_FAILED", "failed to resolve task ancestors")
 	}
 	chain := make([]string, 0, len(ancestors))
 	for _, a := range ancestors {

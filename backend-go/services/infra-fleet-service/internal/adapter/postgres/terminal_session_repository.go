@@ -78,6 +78,10 @@ func (s *TerminalSessionStore) List(ctx context.Context, tenantID, connectionID 
 		  AND ($2 = '' OR connection_id = $2::uuid)
 		ORDER BY created_at DESC
 	`, tenantID, connectionID)
+	if isMalformedUUID(err) {
+		// A connectionId that cannot be a uuid has no sessions.
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query terminal sessions: %w", err)
 	}
@@ -92,6 +96,9 @@ func (s *TerminalSessionStore) List(ctx context.Context, tenantID, connectionID 
 		out = append(out, session)
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("postgres: iterate terminal session rows: %w", err)
 	}
 	return out, nil
@@ -107,7 +114,7 @@ func (s *TerminalSessionStore) Touch(ctx context.Context, tenantID, ptyID string
 		return fmt.Errorf("postgres: touch terminal session: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: terminal session %q not found for tenant", ptyID)
+		return fmt.Errorf("postgres: touch terminal session %q for tenant: %w", ptyID, domain.ErrTerminalSessionNotFound)
 	}
 	return nil
 }
@@ -123,7 +130,7 @@ func (s *TerminalSessionStore) Close(ctx context.Context, tenantID, ptyID string
 		return fmt.Errorf("postgres: close terminal session: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: terminal session %q not found for tenant", ptyID)
+		return fmt.Errorf("postgres: close terminal session %q for tenant: %w", ptyID, domain.ErrTerminalSessionNotFound)
 	}
 	return nil
 }

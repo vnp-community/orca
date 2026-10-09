@@ -29,6 +29,7 @@ type solutionWiring struct {
 	handlers map[domain.SubjectType]usecase.SubjectHandler
 
 	opener  *lateApprovalOpener
+	writer  *usecase.AnalysisResultWriter
 	stores  *requestStores
 	closers []func()
 
@@ -112,6 +113,7 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		Requests: stores.requests, Solutions: stores.solutions, Conns: conns, Agent: agent, Probe: probe, Caps: caps,
 		Projects: projects, Writer: writer, Settings: settings,
 	})
+	w.writer = writer
 	w.runner = usecase.NewAnalysisRunner(stores.analysisRuns, stores.solutions, stores.tx, generation, readonly, settings, owner)
 	w.conns, w.completer, w.projects, w.settings, w.owner = conns, completer, projects, settings, owner
 

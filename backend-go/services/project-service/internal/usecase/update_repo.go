@@ -69,6 +69,9 @@ func (uc *UpdateRepo) Execute(ctx context.Context, in UpdateRepoInput) (domain.R
 	}
 
 	updated, err := uc.repo.Update(ctx, repo)
+	if errors.Is(err, domain.ErrRepoNotFound) {
+		return domain.Repo{}, apperrors.New(apperrors.KindNotFound, "PROJECT_REPO_NOT_FOUND", "repo not found", err)
+	}
 	if err != nil {
 		return domain.Repo{}, apperrors.New(apperrors.KindInternal, "PROJECT_UPDATE_REPO_FAILED", "failed to persist repo update", err)
 	}

@@ -38,7 +38,7 @@ func (uc *GetCustomView) Execute(ctx context.Context, in GetCustomViewInput) (do
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, domain.ProviderLinear, in.WorkspaceID)
 	if err != nil {
-		return domain.CustomView{}, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no linear credential available", err)
+		return domain.CustomView{}, credentialResolveError(err, "no linear credential available")
 	}
 	view, err := provider.GetCustomView(ctx, cred, in.ViewID, in.Model)
 	if err != nil {

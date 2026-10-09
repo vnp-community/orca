@@ -42,7 +42,7 @@ func (uc *ListAssignableUsers) Execute(ctx context.Context, in ListAssignableUse
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, in.Provider, in.WorkspaceID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no credential available for provider", err)
+		return nil, credentialResolveError(err, "no credential available for provider")
 	}
 	users, err := provider.ListAssignableUsers(ctx, cred, in.ProjectIDOrKey, in.IssueID)
 	if err != nil {

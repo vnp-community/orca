@@ -36,7 +36,7 @@ func (r *Repository) GetByShareToken(ctx context.Context, token string) (domain.
 	t, err := scanTask(row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Task{}, fmt.Errorf("postgres: no task found for share token: %w", err)
+			return domain.Task{}, fmt.Errorf("postgres: task for share token: %w", domain.ErrTaskNotFound)
 		}
 		return domain.Task{}, fmt.Errorf("postgres: query task by share token: %w", err)
 	}

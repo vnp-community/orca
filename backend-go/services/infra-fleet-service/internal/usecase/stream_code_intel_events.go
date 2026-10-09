@@ -36,7 +36,7 @@ func (uc *StreamCodeIntelEvents) Execute(ctx context.Context, devServerID string
 
 	devServer, err := uc.devServers.Get(ctx, tenantID, devServerID)
 	if err != nil {
-		return nil, nil, apperrors.New(apperrors.KindNotFound, "INFRA_DEV_SERVER_NOT_FOUND", "dev server not found for this tenant", err)
+		return nil, nil, devServerLookupError(err)
 	}
 
 	limiterKey := fmt.Sprintf("%s|%s", tenantID, devServer.ID)

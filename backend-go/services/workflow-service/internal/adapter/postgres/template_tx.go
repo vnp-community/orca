@@ -47,7 +47,7 @@ func (r *Repository) GetByShareToken(ctx context.Context, shareToken string) (do
 	err := row.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &scope, &tmpl.ParentTemplateID, &tmpl.Version,
 		&visibility, &tmpl.ShareToken, &tmpl.RatingSum, &tmpl.RatingCount)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
+		return domain.WorkflowTemplate{}, fmt.Errorf("postgres: template by share token: %w", domain.ErrTemplateNotFound)
 	}
 	if err != nil {
 		return domain.WorkflowTemplate{}, fmt.Errorf("postgres: query template by share token: %w", err)
@@ -64,11 +64,14 @@ func (r *Repository) GetByShareToken(ctx context.Context, shareToken string) (do
 // already-confirmed-exists precondition.
 func (r *Repository) SetShareToken(ctx context.Context, templateID, token string) error {
 	tag, err := r.pool.Exec(ctx, `UPDATE workflow.templates SET share_token = $1, updated_at = now() WHERE id = $2`, token, templateID)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: set share token for template %s: %w", templateID, domain.ErrTemplateNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: set share token: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrTemplateNotFound
+		return fmt.Errorf("postgres: set share token for template %s: %w", templateID, domain.ErrTemplateNotFound)
 	}
 	return nil
 }
@@ -96,8 +99,8 @@ func (t *templateTx) UpdateVisibility(ctx context.Context, tmpl domain.WorkflowT
 	var scope, visibility string
 	err := row.Scan(&updated.ID, &updated.TenantID, &updated.Name, &updated.DAGJSON, &scope, &updated.ParentTemplateID, &updated.Version,
 		&visibility, &updated.ShareToken, &updated.RatingSum, &updated.RatingCount)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.WorkflowTemplate{}, fmt.Errorf("postgres: update template visibility %s: %w", tmpl.ID, domain.ErrTemplateNotFound)
 	}
 	if err != nil {
 		return domain.WorkflowTemplate{}, fmt.Errorf("postgres: update template visibility: %w", err)
@@ -111,11 +114,14 @@ func (t *templateTx) UpdateVisibility(ctx context.Context, tmpl domain.WorkflowT
 // usecase.TemplateRepositoryTx.SetVisibility's doc comment.
 func (t *templateTx) SetVisibility(ctx context.Context, templateID string, v domain.Visibility) error {
 	tag, err := t.tx.Exec(ctx, `UPDATE workflow.templates SET visibility = $1, updated_at = now() WHERE id = $2`, string(v), templateID)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: set visibility for template %s: %w", templateID, domain.ErrTemplateNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: set template visibility: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrTemplateNotFound
+		return fmt.Errorf("postgres: set visibility for template %s: %w", templateID, domain.ErrTemplateNotFound)
 	}
 	return nil
 }
@@ -138,11 +144,14 @@ func (t *templateTx) CreateExecution(ctx context.Context, exec domain.WorkflowEx
 // usecase.TemplateRepositoryTx.IncrementUsageCount's doc comment.
 func (t *templateTx) IncrementUsageCount(ctx context.Context, templateID string) error {
 	tag, err := t.tx.Exec(ctx, `UPDATE workflow.templates SET usage_count = usage_count + 1, updated_at = now() WHERE id = $1`, templateID)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: increment usage count for template %s: %w", templateID, domain.ErrTemplateNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: increment usage count: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrTemplateNotFound
+		return fmt.Errorf("postgres: increment usage count for template %s: %w", templateID, domain.ErrTemplateNotFound)
 	}
 	return nil
 }
@@ -157,8 +166,19 @@ func (t *templateTx) IncrementUsageCount(ctx context.Context, templateID string)
 // templates.rating_sum/rating_count in the same statement, RETURNING the
 // post-write aggregate.
 func (t *templateTx) UpsertRating(ctx context.Context, templateID, userID string, stars int32) (usecase.RateTemplateResult, error) {
+	// Lock the template first: the ratings FK would otherwise surface an unknown
+	// template as a raw 23503 (Internal) instead of not-found.
+	var exists int
+	err := t.tx.QueryRow(ctx, `SELECT 1 FROM workflow.templates WHERE id = $1 FOR UPDATE`, templateID).Scan(&exists)
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return usecase.RateTemplateResult{}, fmt.Errorf("postgres: rate template %s: %w", templateID, domain.ErrTemplateNotFound)
+	}
+	if err != nil {
+		return usecase.RateTemplateResult{}, fmt.Errorf("postgres: lock template: %w", err)
+	}
+
 	var oldStars int32
-	err := t.tx.QueryRow(ctx, `
+	err = t.tx.QueryRow(ctx, `
 		SELECT stars FROM workflow.ratings WHERE template_id = $1 AND user_id = $2 FOR UPDATE
 	`, templateID, userID).Scan(&oldStars)
 	isNew := errors.Is(err, pgx.ErrNoRows)
@@ -193,7 +213,7 @@ func (t *templateTx) UpsertRating(ctx context.Context, templateID, userID string
 	var result usecase.RateTemplateResult
 	if err := row.Scan(&result.RatingSum, &result.RatingCount); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return usecase.RateTemplateResult{}, domain.ErrTemplateNotFound
+			return usecase.RateTemplateResult{}, fmt.Errorf("postgres: rate template %s: %w", templateID, domain.ErrTemplateNotFound)
 		}
 		return usecase.RateTemplateResult{}, fmt.Errorf("postgres: update template rating aggregate: %w", err)
 	}

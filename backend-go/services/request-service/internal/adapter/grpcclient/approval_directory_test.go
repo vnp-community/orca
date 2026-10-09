@@ -12,8 +12,11 @@ import (
 	"github.com/stablyai/orca-go/common/tenant"
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
+	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type fakeTenantClient struct {
@@ -101,33 +104,89 @@ func TestDirectoryCache_ExpiresAfterTTL(t *testing.T) {
 
 type fakeAuthClient struct {
 	authv1.AuthServiceClient
-	pages map[string]*authv1.ListUsersResponse
-	seen  []*authv1.ListUsersRequest
+	resp  *authv1.ListActiveTenantAdminsResponse
+	err   error
+	calls int
+	md    metadata.MD
 }
 
-func (f *fakeAuthClient) ListUsers(_ context.Context, in *authv1.ListUsersRequest, _ ...grpc.CallOption) (*authv1.ListUsersResponse, error) {
-	f.seen = append(f.seen, in)
-	return f.pages[in.GetPageToken()], nil
+func (f *fakeAuthClient) ListActiveTenantAdmins(ctx context.Context, _ *authv1.ListActiveTenantAdminsRequest, _ ...grpc.CallOption) (*authv1.ListActiveTenantAdminsResponse, error) {
+	f.calls++
+	f.md, _ = metadata.FromOutgoingContext(ctx)
+	return f.resp, f.err
 }
 
-func TestAdminDirectoryResolver_PagesFiltersActiveAdminsAndUsesCtxTenant(t *testing.T) {
-	c := &fakeAuthClient{pages: map[string]*authv1.ListUsersResponse{
-		"":   {Users: []*authv1.User{{Id: "a1", Role: authv1.Role_ROLE_ADMIN, IsActive: true}, {Id: "u1", Role: authv1.Role_ROLE_USER, IsActive: true}}, NextPageToken: "p2"},
-		"p2": {Users: []*authv1.User{{Id: "a2", Role: authv1.Role_ROLE_ADMIN, IsActive: true}, {Id: "a3", Role: authv1.Role_ROLE_ADMIN, IsActive: false}}},
-	}}
+func TestAdminDirectoryResolver_UsesTheInternalRPCWithTenantFromCtxAndNoUser(t *testing.T) {
+	c := &fakeAuthClient{resp: &authv1.ListActiveTenantAdminsResponse{UserIds: []string{"a1", "a2"}}}
 	r := NewAdminDirectoryResolver(c, time.Minute)
+	// The relay context: tenant only, no acting user.
 	got, err := r.ListAdmins(tctx("tenant-a"), "tenant-a")
 	if err != nil || !reflect.DeepEqual(got, []string{"a1", "a2"}) {
 		t.Fatalf("%v %v", got, err)
 	}
-	if len(c.seen) != 2 || c.seen[0].GetTenantId() != "tenant-a" {
-		t.Fatalf("requests = %v", c.seen)
+	if v := c.md.Get(grpcmw.MetadataTenantID); len(v) != 1 || v[0] != "tenant-a" {
+		t.Fatalf("tenant must travel in metadata, got %v", c.md)
 	}
-	if _, err := r.ListAdmins(tctx("tenant-a"), "tenant-a"); err != nil || len(c.seen) != 2 {
-		t.Fatalf("cached: requests=%d err=%v", len(c.seen), err)
+	if v := c.md.Get(grpcmw.MetadataUserID); len(v) != 0 {
+		t.Fatalf("no user must be invented for a background call, got %v", v)
+	}
+	if _, err := r.ListAdmins(tctx("tenant-a"), "tenant-a"); err != nil || c.calls != 1 {
+		t.Fatalf("second lookup must be cached: calls=%d err=%v", c.calls, err)
 	}
 	if _, err := r.ListAdmins(tctx("tenant-a"), "tenant-b"); err == nil {
 		t.Fatal("asking for another tenant's admins must be refused")
+	}
+	if _, err := r.ListAdmins(context.Background(), "tenant-a"); err == nil {
+		t.Fatal("a call without tenant must fail")
+	}
+	if _, err := r.ListAdmins(tctx("tenant-b"), "tenant-b"); err != nil || c.calls != 2 {
+		t.Fatalf("a different tenant must not share the cache entry: calls=%d err=%v", c.calls, err)
+	}
+}
+
+func TestAdminDirectoryResolver_ClassifiesFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		err          error
+		notRetryable bool
+	}{
+		{"credential refused", status.Error(codes.PermissionDenied, "INTERNAL_CALLER_REQUIRED"), true},
+		{"no actor", status.Error(codes.Unauthenticated, "AUTH_NO_ACTOR"), true},
+		{"rpc unknown", status.Error(codes.Unimplemented, "unknown method"), true},
+		{"auth-service down", status.Error(codes.Unavailable, "connection refused"), false},
+		{"timeout", status.Error(codes.DeadlineExceeded, "slow"), false},
+		{"plain error", errors.New("boom"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := NewAdminDirectoryResolver(&fakeAuthClient{err: tc.err}, time.Minute)
+			_, err := r.ListAdmins(tctx("a"), "a")
+			var ae *apperrors.AppError
+			if !errors.As(err, &ae) || ae.Code != "REQUEST_APPROVAL_DIRECTORY_UNAVAILABLE" {
+				t.Fatalf("err = %v, want the stable directory-unavailable code", err)
+			}
+			if got := usecase.IsNotRetryable(err); got != tc.notRetryable {
+				t.Fatalf("IsNotRetryable = %v, want %v", got, tc.notRetryable)
+			}
+		})
+	}
+}
+
+func TestAdminDirectoryResolver_FailuresAreNotCached(t *testing.T) {
+	c := &fakeAuthClient{err: status.Error(codes.Unavailable, "down")}
+	r := NewAdminDirectoryResolver(c, time.Minute)
+	for i := 0; i < 2; i++ {
+		_, _ = r.ListAdmins(tctx("a"), "a")
+	}
+	if c.calls != 2 {
+		t.Fatalf("calls=%d, a failure must not be remembered", c.calls)
+	}
+}
+
+func TestMembersOfTeam_RefusedForGoodIsNotRetryable(t *testing.T) {
+	r := NewTeamMembershipResolver(&fakeTenantClient{err: status.Error(codes.NotFound, "TENANT_TEAM_NOT_FOUND")}, time.Minute)
+	_, err := r.MembersOfTeam(tctx("a"), "gone")
+	if !usecase.IsNotRetryable(err) {
+		t.Fatalf("a deleted team cannot come back by waiting: %v", err)
 	}
 }
 
@@ -136,7 +195,11 @@ func TestUnavailableDirectory_FailsClosed(t *testing.T) {
 	if v, err := u.MembersOfTeam(tctx("a"), "t"); v != nil || err == nil {
 		t.Fatal("must not answer 'nobody'")
 	}
-	if v, err := u.ListAdmins(tctx("a"), "a"); v != nil || err == nil {
+	v, err := u.ListAdmins(tctx("a"), "a")
+	if v != nil || err == nil {
 		t.Fatal("must not answer 'nobody'")
+	}
+	if !usecase.IsNotRetryable(err) {
+		t.Fatal("a missing address or token is a configuration problem; retrying cannot fix it")
 	}
 }

@@ -2,7 +2,10 @@ package mysql
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	drivermysql "github.com/go-sql-driver/mysql"
 
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
@@ -21,6 +24,10 @@ func (r *Repository) AddComment(ctx context.Context, tenantID string, c domain.T
 		INSERT INTO task_comments (id, tenant_id, task_id, author_id, content)
 		VALUES (?, ?, ?, ?, ?)
 	`, id, tenantID, c.TaskID, c.AuthorID, c.Content)
+	var myErr *drivermysql.MySQLError
+	if errors.As(err, &myErr) && myErr.Number == mysqlFKFailsChild {
+		return domain.TaskComment{}, fmt.Errorf("mysql: task %s: %w", c.TaskID, domain.ErrTaskNotFound)
+	}
 	if err != nil {
 		return domain.TaskComment{}, fmt.Errorf("mysql: insert task comment: %w", err)
 	}

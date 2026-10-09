@@ -52,6 +52,9 @@ func (uc *UpdateMemberRole) Execute(ctx context.Context, in UpdateMemberRoleInpu
 	}
 
 	member, err := uc.repo.UpdateMemberRole(ctx, in.ProjectID, in.UserID, in.Role)
+	if errors.Is(err, domain.ErrMembershipNotFound) {
+		return domain.ProjectMember{}, apperrors.New(apperrors.KindNotFound, "PROJECT_MEMBERSHIP_NOT_FOUND", "membership does not exist", err)
+	}
 	if err != nil {
 		return domain.ProjectMember{}, apperrors.New(apperrors.KindInternal, "PROJECT_UPDATE_MEMBER_ROLE_FAILED", "failed to update member role", err)
 	}

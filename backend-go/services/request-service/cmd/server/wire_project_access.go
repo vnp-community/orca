@@ -9,6 +9,7 @@ import (
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	"github.com/stablyai/orca-go/services/request-service/internal/adapter/grpcclient"
 	"github.com/stablyai/orca-go/services/request-service/internal/config"
+	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 )
 
 // projectAccess is the connection to project-service that answers "does this project exist, and what role does this user
@@ -39,4 +40,12 @@ func dialProjectAccess(cfg config.Config, log *slog.Logger) (*projectAccess, err
 		pa.Lookup = grpcclient.NewProjectAccessLookup(pa.Client)
 	}
 	return pa, nil
+}
+
+// existence is nil, not a typed nil, when the lookup is off (no PROJECT_INTERNAL_CALLER_TOKEN): callers test the interface for nil.
+func (p *projectAccess) existence() usecase.ProjectExistence {
+	if p == nil || p.Lookup == nil {
+		return nil
+	}
+	return p.Lookup
 }

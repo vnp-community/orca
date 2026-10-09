@@ -70,8 +70,8 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 	var mode, status, kind, healthStatus string
 	var sshTargetID, groupID *string
 	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags, &status, &groupID, &kind, &healthStatus)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.DevServer{}, fmt.Errorf("postgres: dev server %q not found for tenant: %w", id, err)
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.DevServer{}, fmt.Errorf("postgres: dev server %q for tenant: %w", id, domain.ErrDevServerNotFound)
 	}
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("postgres: query dev server: %w", err)
@@ -235,8 +235,8 @@ func scanDevServerRow(row pgx.Row) (domain.DevServer, error) {
 	var mode, status, kind, healthStatus string
 	var sshTargetID, groupID *string
 	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status, &groupID, &kind, &healthStatus)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.DevServer{}, fmt.Errorf("postgres: dev server not found for tenant: %w", err)
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.DevServer{}, fmt.Errorf("postgres: update dev server for tenant: %w", domain.ErrDevServerNotFound)
 	}
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("postgres: update dev server: %w", err)
@@ -333,8 +333,8 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 	var target domain.SshTarget
 	var jumpHostID *string
 	err := row.Scan(&target.ID, &target.TenantID, &target.Host, &target.Port, &target.UserName, &target.VaultSSHRole, &target.KnownHostsFingerprint, &jumpHostID, &target.Project, &target.Tags)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.SshTarget{}, fmt.Errorf("postgres: ssh target %q not found for tenant: %w", id, err)
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.SshTarget{}, fmt.Errorf("postgres: ssh target %q for tenant: %w", id, domain.ErrSshTargetNotFound)
 	}
 	if err != nil {
 		return domain.SshTarget{}, fmt.Errorf("postgres: query ssh target: %w", err)
@@ -477,6 +477,10 @@ func (r *Repository) scanConnectionRow(ctx context.Context, query string, args .
 		// error, the caller's cue to execute locally.
 		return false, domain.DevServer{}, domain.Connection{}, nil
 	}
+	if isMalformedUUID(err) {
+		// A connectionId that cannot be a uuid owns no dev server either.
+		return false, domain.DevServer{}, domain.Connection{}, nil
+	}
 	if err != nil {
 		return false, domain.DevServer{}, domain.Connection{}, fmt.Errorf("postgres: resolve connection: %w", err)
 	}
@@ -571,7 +575,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, tenantID string, conn dom
 		return fmt.Errorf("postgres: update connection status: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: update connection status: no connection %s for tenant %s", conn.ID, tenantID)
+		return fmt.Errorf("postgres: update connection status %s for tenant %s: %w", conn.ID, tenantID, domain.ErrConnectionNotFound)
 	}
 	return nil
 }

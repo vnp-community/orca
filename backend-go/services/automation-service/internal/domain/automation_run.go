@@ -58,6 +58,9 @@ func (t RunTrigger) Valid() bool {
 }
 
 var (
+	// ErrAutomationRunNotFound is what repositories return when no run
+	// matches (tenant, id); usecases map it to KindNotFound.
+	ErrAutomationRunNotFound = errors.New("domain: automation run not found")
 	// ErrEmptyAutomationID guards against an orphaned run with no owning
 	// automation.
 	ErrEmptyAutomationID = errors.New("domain: automation_id is required")

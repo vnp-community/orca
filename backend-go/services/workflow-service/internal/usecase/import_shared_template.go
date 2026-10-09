@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -33,6 +34,10 @@ func (uc *ImportSharedTemplate) Execute(ctx context.Context, shareToken string) 
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_SHARE_TOKEN_REQUIRED", "share_token is required", nil)
 	}
 	source, err := uc.templates.GetByShareToken(ctx, shareToken)
+	// Only a genuine miss is "invalid link"; an infrastructure failure must stay Internal.
+	if err != nil && !errors.Is(err, domain.ErrTemplateNotFound) {
+		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_TEMPLATE_FETCH_FAILED", "failed to fetch shared template", err)
+	}
 	if err != nil || source.Visibility != domain.VisibilityPublic {
 		// Same identical error PreviewSharedTemplate returns for the same
 		// two cases (unknown token / since-unpublished) — see that

@@ -32,12 +32,14 @@ type Set struct {
 	taskOutcome     *prometheus.CounterVec
 	outboxPending   prometheus.Gauge
 	rateLimited     *prometheus.CounterVec
+	orphans         *prometheus.CounterVec
 	pendingSubjects map[string]bool
 }
 
 var (
 	_ usecase.OutboxTap       = (*Set)(nil)
 	_ usecase.RequestObserver = (*Set)(nil)
+	_ usecase.OrphanObserver  = (*Set)(nil)
 )
 
 func New() *Set {
@@ -68,11 +70,13 @@ func New() *Set {
 			Help: "Task results reported back to request-service."}, []string{"outcome"}),
 		rateLimited: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "orca_request_rate_limited_total",
 			Help: "Calls refused by the per-class rate limiter or concurrency caps."}, []string{"class"}),
+		orphans: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "orca_request_orphan_total",
+			Help: "Operations on an existing Request whose project no longer exists, by RPC group. Counts hits, not distinct Requests."}, []string{"action"}),
 		outboxPending: prometheus.NewGauge(prometheus.GaugeOpts{Name: "orca_request_outbox_pending",
 			Help: "Outbox rows not yet published, sampled from the database."}),
 	}
 	s.reg.MustRegister(s.created, s.transitions, s.classification, s.confidence, s.approvals, s.approvalWait, s.approvalsPend,
-		s.stuck, s.returned, s.aiGeneration, s.taskOutcome, s.rateLimited, s.outboxPending,
+		s.stuck, s.returned, s.aiGeneration, s.taskOutcome, s.rateLimited, s.orphans, s.outboxPending,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	return s
 }
@@ -144,3 +148,6 @@ func (s *Set) ObserveTaskOutcome(outcome string) { s.taskOutcome.WithLabelValues
 
 // ObserveRateLimited counts one refusal by rate class (not by tenant: that label would be unbounded).
 func (s *Set) ObserveRateLimited(class string) { s.rateLimited.WithLabelValues(label(class)).Inc() }
+
+// ObserveOrphanRequest counts one operation that found its Request's project gone (by RPC group, never by tenant or id).
+func (s *Set) ObserveOrphanRequest(action string) { s.orphans.WithLabelValues(label(action)).Inc() }

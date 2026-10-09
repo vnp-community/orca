@@ -38,7 +38,7 @@ func (uc *SyncContainerStatus) Execute(ctx context.Context, changedTaskID string
 	}
 	task, err := uc.repo.Get(ctx, tenantID, changedTaskID)
 	if err != nil {
-		return apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		return taskRepoError(err, "task not found", "TASK_FETCH_FAILED", "failed to fetch task")
 	}
 	if task.ParentID == "" {
 		return nil
@@ -62,7 +62,7 @@ func (uc *SyncContainerStatus) syncChain(ctx context.Context, tenantID, startID 
 	for id := startID; id != ""; {
 		c, err := uc.repo.Get(ctx, tenantID, id)
 		if err != nil {
-			return firstChanged, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "container not found", err)
+			return firstChanged, taskRepoError(err, "container not found", "TASK_FETCH_FAILED", "failed to fetch container")
 		}
 		// A cancelled container is never re-derived, and nothing above it depends on this change.
 		if !domain.IsContainerType(c.Type) || c.Status == domain.StatusCancelled {
@@ -120,7 +120,7 @@ func (uc *SyncContainerStatus) deriveOne(ctx context.Context, tenantID string, c
 		// Lost the CAS: reload and derive again from the winner's state.
 		c, err = uc.repo.Get(ctx, tenantID, c.ID)
 		if err != nil {
-			return false, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "container not found", err)
+			return false, taskRepoError(err, "container not found", "TASK_FETCH_FAILED", "failed to fetch container")
 		}
 		if c.Status == domain.StatusCancelled {
 			return false, nil

@@ -46,7 +46,7 @@ func (uc *CreateProject) Execute(ctx context.Context, in CreateProjectInput) (do
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, in.Provider, in.WorkspaceID)
 	if err != nil {
-		return domain.ProjectRef{}, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no credential available for provider", err)
+		return domain.ProjectRef{}, credentialResolveError(err, "no credential available for provider")
 	}
 	project, err := provider.CreateProject(ctx, cred, in.WorkspaceID, in.TeamID, in.Name, in.Description)
 	if err != nil {

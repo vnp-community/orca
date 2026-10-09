@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/notification-service/internal/domain"
@@ -304,6 +305,11 @@ func (r *Repository) MarkAsRead(ctx context.Context, tenantID, userID, notificat
 		SET is_read = true, read_at = now()
 		WHERE tenant_id = $1 AND recipient_user_id = $2 AND id = $3 AND is_read = false
 	`, tenantID, userID, notificationID)
+	// An id that is not a uuid (SQLSTATE 22P02) matches no row: same idempotent no-op as an unknown id, not a 500.
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: mark notification as read: %w", err)
 	}

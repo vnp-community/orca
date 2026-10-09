@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc"
+
+	"github.com/stablyai/orca-go/common/internalcaller"
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 	requestgrpc "github.com/stablyai/orca-go/services/request-service/internal/adapter/grpc"
@@ -41,16 +44,21 @@ func dialApprovalDirectories(cfg config.Config, log *slog.Logger) (*approvalDire
 	} else {
 		log.Warn("TENANT_SERVICE_ADDR unset: team approvers cannot be resolved")
 	}
-	if cfg.AuthServiceAddr != "" {
-		conn, err := grpcclient.Dial(cfg.AuthServiceAddr)
+	switch {
+	case cfg.AuthServiceAddr == "":
+		log.Warn("AUTH_SERVICE_ADDR unset: role:admin approvers cannot be expanded to users for notifications")
+	case cfg.AuthDirectoryCallerToken == "":
+		// Dialing anyway would only earn PermissionDenied from the guard; fail closed here with a clear reason.
+		log.Error("AUTH_DIRECTORY_CALLER_TOKEN unset: role:admin approvers cannot be expanded to users for notifications")
+	default:
+		// The token interceptor sits on this connection only: it carries nothing but the guarded directory read.
+		conn, err := grpcclient.Dial(cfg.AuthServiceAddr, grpc.WithChainUnaryInterceptor(internalcaller.ClientInterceptor(cfg.AuthDirectoryCallerToken)))
 		if err != nil {
 			d.close()
 			return nil, err
 		}
 		d.closers = append(d.closers, func() { _ = conn.Close() })
 		d.admins = grpcclient.NewAdminDirectoryResolver(authv1.NewAuthServiceClient(conn), 0)
-	} else {
-		log.Warn("AUTH_SERVICE_ADDR unset: role:admin approvers cannot be expanded to users for notifications")
 	}
 	return d, nil
 }

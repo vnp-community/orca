@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/tenant-service/internal/domain"
@@ -44,7 +42,7 @@ func (r *CompanyRepository) Get(ctx context.Context, id string) (domain.Company,
 	var c domain.Company
 	var settingsJSON string
 	if err := row.Scan(&c.ID, &c.Name, &settingsJSON); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.Company{}, false, nil
 		}
 		return domain.Company{}, false, fmt.Errorf("postgres: query company: %w", err)
@@ -93,6 +91,9 @@ func (r *CompanyRepository) List(ctx context.Context) ([]domain.Company, error) 
 func (r *CompanyRepository) Exists(ctx context.Context, id string) (bool, error) {
 	var exists bool
 	err := r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM tenant.companies WHERE id = $1)`, id).Scan(&exists)
+	if isMalformedUUID(err) {
+		return false, nil
+	}
 	if err != nil {
 		return false, fmt.Errorf("postgres: check company existence: %w", err)
 	}
@@ -127,7 +128,7 @@ func (r *CompanyRepository) Update(ctx context.Context, id string, patch domain.
 	var c domain.Company
 	var settingsJSON string
 	if err := row.Scan(&c.ID, &c.Name, &settingsJSON); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.Company{}, false, nil
 		}
 		return domain.Company{}, false, fmt.Errorf("postgres: update company: %w", err)

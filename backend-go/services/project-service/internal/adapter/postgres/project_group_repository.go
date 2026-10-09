@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -46,7 +44,7 @@ func (r *ProjectGroupRepository) GetProjectGroup(ctx context.Context, tenantID, 
 	`, tenantID, id)
 
 	out, err := scanProjectGroup(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.ProjectGroup{}, domain.ErrProjectGroupNotFound
 	}
 	if err != nil {
@@ -64,7 +62,7 @@ func (r *ProjectGroupRepository) UpdateProjectGroup(ctx context.Context, tenantI
 	)
 
 	out, err := scanProjectGroup(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.ProjectGroup{}, domain.ErrProjectGroupNotFound
 	}
 	if err != nil {
@@ -77,6 +75,9 @@ func (r *ProjectGroupRepository) DeleteProjectGroup(ctx context.Context, tenantI
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM project.project_groups WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
+	if isMalformedUUID(err) {
+		return domain.ErrProjectGroupNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete project group: %w", err)
 	}

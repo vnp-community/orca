@@ -38,7 +38,7 @@ func (uc *ListIssueComments) Execute(ctx context.Context, in ListIssueCommentsIn
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, in.Provider, in.WorkspaceID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no credential available for provider", err)
+		return nil, credentialResolveError(err, "no credential available for provider")
 	}
 	comments, err := provider.ListIssueComments(ctx, cred, in.IssueID)
 	if err != nil {

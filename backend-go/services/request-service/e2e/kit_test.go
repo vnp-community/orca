@@ -47,6 +47,8 @@ type kit struct {
 	tenantID string
 	project  string
 	admin    string
+	// admin2 decides the gates that the first admin opened, because a gate never lets its own requester approve.
+	admin2   string
 	reporter string
 	approver string
 	outsider string
@@ -57,11 +59,11 @@ type kit struct {
 
 func newKit(t *testing.T) *kit {
 	t.Helper()
-	k := &kit{t: t, tenantID: uuid.NewString(), project: uuid.NewString(), admin: uuid.NewString(), reporter: uuid.NewString(),
+	k := &kit{t: t, tenantID: uuid.NewString(), project: uuid.NewString(), admin: uuid.NewString(), admin2: uuid.NewString(), reporter: uuid.NewString(),
 		approver: uuid.NewString(), outsider: uuid.NewString()}
 	c := conn(t)
 	k.req, k.appr = requestv1.NewRequestServiceClient(c), requestv1.NewApprovalServiceClient(c)
-	theStack.stubs.Auth.SetAdmins(k.tenantID, k.admin)
+	theStack.stubs.Auth.SetAdmins(k.tenantID, k.admin, k.admin2)
 	theStack.stubs.Project.SetMember(k.tenantID, k.project, k.reporter, projectv1.ProjectRole_PROJECT_ROLE_OWNER)
 	theStack.stubs.Project.SetMember(k.tenantID, k.project, k.approver, projectv1.ProjectRole_PROJECT_ROLE_MEMBER)
 	return k
@@ -76,6 +78,7 @@ func (k *kit) as(user, role string) context.Context {
 
 func (k *kit) asReporter() context.Context { return k.as(k.reporter, "user") }
 func (k *kit) asAdmin() context.Context    { return k.as(k.admin, "admin") }
+func (k *kit) asAdmin2() context.Context   { return k.as(k.admin2, "admin") }
 
 func (k *kit) enableFlow() {
 	k.t.Helper()
@@ -123,10 +126,16 @@ func (k *kit) get(id string) *requestv1.Request {
 
 // waitStatus polls until the Request reaches want; the transitions it waits for are driven by the outbox
 // relay, NATS and the classification runner, so they are asynchronous by design.
-func (k *kit) waitStatus(id, want string) *requestv1.Request {
+func (k *kit) waitStatus(id, want string) *requestv1.Request { return k.waitStatusWithin(id, want, 0) }
+
+// waitStatusWithin is waitStatus with a longer budget for stages that run a whole execution (zero means 30 seconds).
+func (k *kit) waitStatusWithin(id, want string, budget time.Duration) *requestv1.Request {
 	k.t.Helper()
+	if budget <= 0 {
+		budget = 30 * time.Second
+	}
 	var last *requestv1.Request
-	eventually(k.t, 30*time.Second, fmt.Sprintf("request %s to reach %s", id, want), func() (bool, string) {
+	eventually(k.t, budget, fmt.Sprintf("request %s to reach %s", id, want), func() (bool, string) {
 		last = k.get(id)
 		return last.GetStatus() == want, "status is " + last.GetStatus()
 	})

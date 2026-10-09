@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -122,6 +120,9 @@ func (r *RepoRepository) ReorderRepos(ctx context.Context, projectID string, ids
 		tag, err := tx.Exec(ctx, `
 			UPDATE project.repos SET position = $1 WHERE id = $2 AND project_id = $3
 		`, i, id, projectID)
+		if isMalformedUUID(err) {
+			return domain.ErrRepoNotFound
+		}
 		if err != nil {
 			return fmt.Errorf("postgres: update repo position: %w", err)
 		}
@@ -147,7 +148,7 @@ func (r *RepoRepository) GetRepo(ctx context.Context, repoID string) (domain.Rep
 	`, repoID)
 
 	out, err := scanRepo(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
 	if err != nil {
@@ -172,7 +173,7 @@ func (r *RepoRepository) Update(ctx context.Context, repo domain.Repo) (domain.R
 	)
 
 	out, err := scanRepo(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
 	if err != nil {
@@ -195,7 +196,7 @@ func (r *RepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServe
 	)
 
 	out, err := scanRepo(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
 	if err != nil {
@@ -240,6 +241,9 @@ func (r *RepoRepository) ReassignProject(ctx context.Context, repoID, fromProjec
 		    position = COALESCE((SELECT MAX(position) + 1 FROM project.repos WHERE project_id = $2), 0)
 		WHERE id = $1 AND project_id = $3
 	`, repoID, targetProjectID, fromProjectID)
+	if isMalformedUUID(err) {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
 	if err != nil {
 		return domain.Repo{}, fmt.Errorf("postgres: reassign repo project: %w", err)
 	}
@@ -272,6 +276,9 @@ func (r *RepoRepository) ReassignProject(ctx context.Context, repoID, fromProjec
 
 func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM project.repos WHERE id = $1`, repoID)
+	if isMalformedUUID(err) {
+		return domain.ErrRepoNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete repo: %w", err)
 	}
@@ -320,7 +327,7 @@ func (r *RepoRepository) GetRepoMembership(ctx context.Context, repoID, userID s
 	var m domain.RepoMember
 	var role string
 	if err := row.Scan(&m.RepoID, &m.UserID, &role); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.RepoMember{}, domain.ErrRepoMembershipNotFound
 		}
 		return domain.RepoMember{}, fmt.Errorf("postgres: query repo membership: %w", err)
@@ -361,6 +368,9 @@ func (r *RepoRepository) RemoveRepoMember(ctx context.Context, repoID, userID st
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM project.repo_members WHERE repo_id = $1 AND user_id = $2
 	`, repoID, userID)
+	if isMalformedUUID(err) {
+		return domain.ErrRepoMembershipNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete repo member: %w", err)
 	}
@@ -375,6 +385,9 @@ func (r *RepoRepository) UpdateRepoMemberRole(ctx context.Context, repoID, userI
 		UPDATE project.repo_members SET functional_role = $3
 		WHERE repo_id = $1 AND user_id = $2
 	`, repoID, userID, string(role))
+	if isMalformedUUID(err) {
+		return domain.RepoMember{}, domain.ErrRepoMembershipNotFound
+	}
 	if err != nil {
 		return domain.RepoMember{}, fmt.Errorf("postgres: update repo member role: %w", err)
 	}

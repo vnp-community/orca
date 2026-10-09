@@ -48,8 +48,12 @@ func (u *GetReindexJobUseCase) Execute(ctx context.Context, tenantID string, req
 	}
 
 	job, err := u.store.Get(ctx, tenantID, req.JobId)
-	if err != nil || job == nil {
-		return nil, apperrors.New(apperrors.KindNotFound, "CODEINTEL_NOT_FOUND", "reindex job not found", err)
+	if err != nil {
+		// A store outage must not read as "job does not exist".
+		return nil, apperrors.New(apperrors.KindInternal, "CODEINTEL_REINDEX_JOB_LOOKUP_FAILED", "failed to load reindex job", err)
+	}
+	if job == nil {
+		return nil, apperrors.New(apperrors.KindNotFound, "CODEINTEL_NOT_FOUND", "reindex job not found", nil)
 	}
 
 	// Verify the job belongs to the resolved repo binding and tenant

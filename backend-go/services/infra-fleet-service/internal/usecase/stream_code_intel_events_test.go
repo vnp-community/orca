@@ -49,7 +49,7 @@ func TestStreamCodeIntelEvents_RequiresDevServerID(t *testing.T) {
 }
 
 func TestStreamCodeIntelEvents_DevServerNotFound(t *testing.T) {
-	repo := &fakeDevServerRepository{getErr: errors.New("not found")}
+	repo := &fakeDevServerRepository{getErr: domain.ErrDevServerNotFound}
 	uc := NewStreamCodeIntelEvents(repo, &fakeCodeIntelEventSource{}, NewCodeIntelStreamLimiter(16))
 	ctx := withTenant(context.Background(), "tenant-1")
 	_, _, err := uc.Execute(ctx, "ds-missing")

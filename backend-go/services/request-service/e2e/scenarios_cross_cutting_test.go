@@ -3,6 +3,8 @@
 package e2e
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,8 +37,8 @@ func startConfirmed(typ domain.RequestType, size domain.RequestSize) []Stage {
 	}
 }
 
-// E13: a Request returned to the backlog can be reopened and is classified again. The CR's variant starts from a
-// rejected Plan; the analysis-stage return runs now, the plan rejection waits for the Plan RPCs.
+// E13: a Request returned to the backlog can be reopened and is classified again, and a rejected Plan sends it back
+// to the backlog with the reviewer's reason.
 func e13ReturnAndReopen() Scenario {
 	sc := Scenario{ID: "E13", Group: GroupCrossCut, Type: string(domain.RequestTypeBug), Size: "M", Stages: startConfirmed(domain.RequestTypeBug, domain.RequestSizeM)}
 	sc.Stages = append(sc.Stages,
@@ -65,9 +67,32 @@ func e13ReturnAndReopen() Scenario {
 			WantAudits: []string{domain.ActionRequestReopen},
 		},
 		Stage{
-			Name:  "plan_rejection_returns_to_backlog",
-			Needs: "CR-REQ-012 (GeneratePlan, plan approval)",
-			Run:   func(t *testing.T, w *world) { probeRPC(t, w, "GeneratePlan") },
+			Name:       "confirm_type_again",
+			Run:        func(t *testing.T, w *world) { w.request = w.k.confirm(w.request, w.typ, w.size) },
+			WantStatus: "analyzing",
+		},
+		Stage{Name: "analyzing_to_awaiting_analysis_approval", Run: func(t *testing.T, w *world) { w.analyze() }, WantStatus: "awaiting_analysis_approval", WantApprovals: []string{"solution"}},
+		Stage{Name: "awaiting_analysis_approval_to_planning", Run: func(t *testing.T, w *world) { w.approveAnalysis() }, WantStatus: "planning"},
+		Stage{Name: "planning_to_awaiting_plan_approval", Run: func(t *testing.T, w *world) { w.plan() }, WantStatus: "awaiting_plan_approval", WantApprovals: []string{"plan"}},
+		Stage{
+			Name: "plan_rejection_returns_to_backlog",
+			Run: func(t *testing.T, w *world) {
+				a := w.pendingApproval("plan", "plan")
+				_, err := w.k.appr.Reject(w.k.asAdmin(), &requestv1.RejectRequest{Id: a.GetId(), Comment: "split the work differently", ExpectedDigest: a.GetSubjectDigest()})
+				w.callOK(err, "Reject")
+			},
+			WantStatus: "request_backlog",
+			WantEvents: []string{domain.SubjectRequestReturned},
+		},
+		Stage{
+			Name: "rejected_plan_is_recorded_on_the_request",
+			Run: func(t *testing.T, w *world) {
+				got := w.k.get(w.id())
+				if got.GetReturnedFromStage() != "plan" || got.GetReturnedCategory() != "rejected" || got.GetReturnReason() != "split the work differently" {
+					t.Fatalf("returned from %q as %q because %q", got.GetReturnedFromStage(), got.GetReturnedCategory(), got.GetReturnReason())
+				}
+				w.request = got
+			},
 		},
 	)
 	return sc
@@ -100,24 +125,129 @@ func e14ChangeTypeMidFlight() Scenario {
 	return sc
 }
 
+// toExecuting brings a type without analysis from the first stage to executing.
+func toExecuting(typ domain.RequestType, size domain.RequestSize) []Stage {
+	return append(startConfirmedNoAnalysis(typ, size),
+		Stage{Name: "planning_to_awaiting_plan_approval", Run: func(t *testing.T, w *world) { w.plan() }, WantStatus: "awaiting_plan_approval", WantApprovals: []string{"task_list"}},
+		Stage{Name: "awaiting_plan_approval_to_executing", Run: func(t *testing.T, w *world) { w.approvePlan() }, WantStatus: "executing"},
+	)
+}
+
+// dispatched waits until task-service was asked to run the Request's only working task for the given attempt.
+func (w *world) dispatched(attempt int) string {
+	k := w.k
+	var taskID string
+	eventually(k.t, 30*time.Second, fmt.Sprintf("attempt %d to be dispatched", attempt), func() (bool, string) {
+		for _, ref := range theStack.tasks.Executed() {
+			parts := strings.Split(ref, ":") // req:<request>:<task>:<attempt>
+			if len(parts) == 4 && parts[1] == w.id() && parts[3] == fmt.Sprint(attempt) {
+				taskID = parts[2]
+				return true, ""
+			}
+		}
+		return false, fmt.Sprintf("executed so far: %v", theStack.tasks.Executed())
+	})
+	return taskID
+}
+
+// E15: a task that fails every attempt sends the Request back to the backlog with the last error.
 func e15TaskFailureReturnsToBacklog() Scenario {
-	sc := Scenario{ID: "E15", Group: GroupCrossCut, Type: string(domain.RequestTypeTask), Size: "S", Stages: startConfirmedNoAnalysis(domain.RequestTypeTask, domain.RequestSizeS)}
+	sc := Scenario{ID: "E15", Group: GroupCrossCut, Type: string(domain.RequestTypeTask), Size: "S", Stages: toExecuting(domain.RequestTypeTask, domain.RequestSizeS)}
 	sc.Stages = append(sc.Stages, Stage{
-		Name:  "failed_task_returns_request_to_backlog",
-		Needs: "CR-REQ-013 (ReportTaskOutcome with a failed outcome)",
-		Run:   func(t *testing.T, w *world) { probeRPC(t, w, "ReportTaskOutcome") },
+		Name: "failed_task_returns_request_to_backlog",
+		Run: func(t *testing.T, w *world) {
+			task := w.dispatched(1)
+			theStack.tasks.RunFailed(task, "compile error 1")
+			if again := w.dispatched(2); again != task {
+				t.Fatalf("the second attempt ran task %s, want %s again", again, task)
+			}
+			if got := w.k.get(w.id()); got.GetStatus() != "executing" {
+				t.Fatalf("one failure is not enough to give up: %s", got.GetStatus())
+			}
+			theStack.tasks.RunFailed(task, "compile error 2")
+		},
+		WantStatus: "request_backlog",
+		WantEvents: []string{domain.SubjectRequestReturned},
+	}, Stage{
+		Name: "the_backlog_entry_names_the_task_and_its_last_error",
+		Run: func(t *testing.T, w *world) {
+			got := w.k.get(w.id())
+			if got.GetReturnedFromStage() != "task" || !strings.Contains(got.GetReturnReason(), "compile error 2") || !strings.Contains(got.GetReturnReason(), "Do the work") {
+				t.Fatalf("returned from %q because %q", got.GetReturnedFromStage(), got.GetReturnReason())
+			}
+		},
 	})
 	return sc
 }
 
+// E16: a task event delivered twice, or after the Request moved on, changes nothing.
 func e16OutcomeCallbackIdempotent() Scenario {
-	sc := Scenario{ID: "E16", Group: GroupCrossCut, Type: string(domain.RequestTypeTask), Size: "S", Stages: startConfirmedNoAnalysis(domain.RequestTypeTask, domain.RequestSizeS)}
-	sc.Stages = append(sc.Stages, Stage{
-		Name:  "repeated_and_reordered_callbacks_change_nothing",
-		Needs: "CR-REQ-013 (ReportTaskOutcome)",
-		Run:   func(t *testing.T, w *world) { probeRPC(t, w, "ReportTaskOutcome") },
-	})
+	sc := Scenario{ID: "E16", Group: GroupCrossCut, Type: string(domain.RequestTypeTask), Size: "S", Stages: toExecuting(domain.RequestTypeTask, domain.RequestSizeS)}
+	sc.Stages = append(sc.Stages,
+		Stage{
+			Name: "a_repeated_start_event_dispatches_nothing_new",
+			Run: func(t *testing.T, w *world) {
+				w.dispatched(1)
+				first := theStack.tasks.eventsOf(w.id())
+				if len(first) == 0 {
+					t.Fatal("the dispatch produced no task event")
+				}
+				for i := 0; i < 2; i++ {
+					w.replay(first[0])
+				}
+				time.Sleep(500 * time.Millisecond) // a wrongly started second run would be dispatched within this time
+				if n := len(w.executions()); n != 1 {
+					t.Fatalf("task-service was asked to run the task %d times: %v", n, w.executions())
+				}
+			},
+			WantStatus: "executing",
+		},
+		Stage{
+			Name:          "the_run_finishes_and_the_request_completes",
+			Run:           func(t *testing.T, w *world) { theStack.tasks.RunSucceeded(w.dispatched(1)) },
+			WantStatus:    "completed",
+			WantEvents:    []string{domain.SubjectRequestCompleted},
+			StatusTimeout: 60 * time.Second,
+		},
+		Stage{
+			Name: "reordered_and_duplicate_events_after_completion_change_nothing",
+			Run: func(t *testing.T, w *world) {
+				events := theStack.tasks.eventsOf(w.id())
+				for i := len(events) - 1; i >= 0; i-- { // newest first: the order task-service never sends
+					w.replay(events[i])
+					w.replay(events[i])
+				}
+				time.Sleep(500 * time.Millisecond)
+				if got := w.k.get(w.id()); got.GetStatus() != "completed" {
+					t.Fatalf("replayed events moved a completed Request to %s", got.GetStatus())
+				}
+				if n := len(w.k.outbox(domain.SubjectRequestCompleted)); n != 1 {
+					t.Fatalf("request.completed was emitted %d times", n)
+				}
+				if n := len(w.executions()); n != 1 {
+					t.Fatalf("a replayed event started another run: %v", w.executions())
+				}
+			},
+		},
+	)
 	return sc
+}
+
+// replay sends a task event to the service again, as a redelivery would.
+func (w *world) replay(ev *requestv1.ReportTaskOutcomeRequest) {
+	_, err := w.k.req.ReportTaskOutcome(w.k.as(w.k.reporter, "user"), ev)
+	w.callOK(err, "ReportTaskOutcome (replay)")
+}
+
+// executions lists the runs task-service was asked to start for this Request.
+func (w *world) executions() []string {
+	var out []string
+	for _, ref := range theStack.tasks.Executed() {
+		if strings.HasPrefix(ref, "req:"+w.id()+":") {
+			out = append(out, ref)
+		}
+	}
+	return out
 }
 
 // startConfirmedNoAnalysis is startConfirmed for types with no analysis stage (they land in planning).

@@ -1,9 +1,9 @@
 package usecase
 
 import (
-	"time"
-
 	"context"
+	"errors"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
@@ -60,7 +60,10 @@ func NewUpdateAutomation(repo AutomationRepository) *UpdateAutomation {
 func (uc *UpdateAutomation) Execute(ctx context.Context, in UpdateAutomationInput) (domain.Automation, error) {
 	current, err := uc.repo.Get(ctx, in.TenantID, in.ID)
 	if err != nil {
-		return domain.Automation{}, apperrors.New(apperrors.KindNotFound, "AUTOMATION_NOT_FOUND", "automation not found", err)
+		if errors.Is(err, domain.ErrAutomationNotFound) {
+			return domain.Automation{}, apperrors.New(apperrors.KindNotFound, "AUTOMATION_NOT_FOUND", "automation not found", err)
+		}
+		return domain.Automation{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_LOOKUP_FAILED", "failed to load automation", err)
 	}
 	next := current
 	if in.Name != nil {
@@ -163,6 +166,10 @@ func (uc *UpdateAutomation) Execute(ctx context.Context, in UpdateAutomationInpu
 	}
 
 	if err := uc.repo.Update(ctx, in.TenantID, next); err != nil {
+		// Row deleted between Get and Update.
+		if errors.Is(err, domain.ErrAutomationNotFound) {
+			return domain.Automation{}, apperrors.New(apperrors.KindNotFound, "AUTOMATION_NOT_FOUND", "automation not found", err)
+		}
 		return domain.Automation{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_UPDATE_FAILED", "failed to persist update", err)
 	}
 	return next, nil

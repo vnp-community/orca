@@ -77,7 +77,7 @@ func (uc *GetDevServerCapabilities) Execute(ctx context.Context, in GetCapabilit
 		}
 		devServerID = ds.ID
 	} else if _, gerr := uc.devServers.Get(ctx, tenantID, devServerID); gerr != nil {
-		return GetCapabilitiesResult{}, apperrors.New(apperrors.KindNotFound, "INFRA_DEV_SERVER_NOT_FOUND", "dev server not found for this tenant", gerr)
+		return GetCapabilitiesResult{}, devServerLookupError(gerr)
 	}
 
 	p, found, err := uc.store.Get(ctx, tenantID, devServerID)

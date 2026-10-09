@@ -67,8 +67,8 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (doma
 	var tmpl domain.WorkflowTemplate
 	var scope string
 	err := row.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &scope, &tmpl.ParentTemplateID, &tmpl.Version)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.WorkflowTemplate{}, fmt.Errorf("postgres: template %s: %w", id, domain.ErrTemplateNotFound)
 	}
 	if err != nil {
 		return domain.WorkflowTemplate{}, fmt.Errorf("postgres: query template: %w", err)
@@ -370,6 +370,9 @@ func (r *Repository) ResolveChain(ctx context.Context, tenantID, templateID stri
 		FROM chain
 		ORDER BY depth DESC
 	`, tenantID, templateID, maxDepth)
+	if isMalformedUUID(err) {
+		return nil, fmt.Errorf("postgres: template chain %s: %w", templateID, domain.ErrTemplateNotFound)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query template chain: %w", err)
 	}
@@ -386,10 +389,14 @@ func (r *Repository) ResolveChain(ctx context.Context, tenantID, templateID stri
 		out = append(out, tmpl)
 	}
 	if err := rows.Err(); err != nil {
+		// pgx can defer the bind-time 22P02 to row iteration rather than Query.
+		if isMalformedUUID(err) {
+			return nil, fmt.Errorf("postgres: template chain %s: %w", templateID, domain.ErrTemplateNotFound)
+		}
 		return nil, fmt.Errorf("postgres: iterate template chain rows: %w", err)
 	}
 	if len(out) == 0 {
-		return nil, domain.ErrTemplateNotFound
+		return nil, fmt.Errorf("postgres: template chain %s: %w", templateID, domain.ErrTemplateNotFound)
 	}
 	return out, nil
 }
@@ -422,8 +429,8 @@ func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (dom
 	var status string
 	var pausedAt *time.Time
 	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.OriginTaskID, &exec.InputsJSON, &exec.StartedBy)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.WorkflowExecution{}, domain.ErrExecutionNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.WorkflowExecution{}, fmt.Errorf("postgres: execution %s: %w", id, domain.ErrExecutionNotFound)
 	}
 	if err != nil {
 		return domain.WorkflowExecution{}, fmt.Errorf("postgres: query execution: %w", err)
@@ -445,6 +452,10 @@ func (r *Repository) HasActiveExecutions(ctx context.Context, tenantID, projectI
 	`, tenantID, projectID)
 	var exists bool
 	if err := row.Scan(&exists); err != nil {
+		// A project id that cannot be a uuid has no executions.
+		if isMalformedUUID(err) {
+			return false, nil
+		}
 		return false, fmt.Errorf("postgres: query has-active-executions: %w", err)
 	}
 	return exists, nil
@@ -474,7 +485,7 @@ func (r *Repository) UpdateExecution(ctx context.Context, exec domain.WorkflowEx
 		return fmt.Errorf("postgres: update execution: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrExecutionNotFound
+		return fmt.Errorf("postgres: update execution %s: %w", exec.ID, domain.ErrExecutionNotFound)
 	}
 
 	if event != nil {
@@ -592,6 +603,10 @@ func (r *Repository) ListExecutions(ctx context.Context, tenantID, projectID, cu
 		ORDER BY created_at DESC, id DESC
 		LIMIT $4
 	`, tenantID, projectID, cursor, limit)
+	// A project id / cursor that cannot be a uuid matches no execution: empty page, not Internal.
+	if isMalformedUUID(err) {
+		return nil, "", nil
+	}
 	if err != nil {
 		return nil, "", fmt.Errorf("postgres: query executions: %w", err)
 	}
@@ -610,6 +625,9 @@ func (r *Repository) ListExecutions(ctx context.Context, tenantID, projectID, cu
 		out = append(out, exec)
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, "", nil
+		}
 		return nil, "", fmt.Errorf("postgres: iterate execution rows: %w", err)
 	}
 
@@ -670,7 +688,7 @@ func (r *Repository) UpdateStepExecution(ctx context.Context, se domain.StepExec
 		return fmt.Errorf("postgres: update step execution: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: update step execution: no row for id %s", se.ID)
+		return fmt.Errorf("postgres: update step execution %s: %w", se.ID, domain.ErrStepExecutionNotFound)
 	}
 
 	if event.ID != "" {

@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -9,20 +10,20 @@ import (
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 )
 
-// maxAdminPages bounds ListUsers paging for one lookup; a tenant with more admins than this gets a truncated list.
-const maxAdminPages = 20
-
-// AdminDirectoryResolver lists active admins from auth-service ListUsers. The tenant_id sent is the one already
-// validated in ctx, never a caller-supplied value.
+// AdminDirectoryResolver lists active admins through auth-service's internal ListActiveTenantAdmins. ListUsers is
+// not usable here: it demands an admin actor, and the outbox relay that enriches notifications has a tenant but no
+// user. The tenant sent is the one already validated in ctx, never a caller-supplied value. The connection must
+// carry the internal-caller token (internalcaller.ClientInterceptor).
 type AdminDirectoryResolver struct {
 	client authv1.AuthServiceClient
 	cache  *directoryCache
+	log    *slog.Logger
 }
 
 var _ usecase.AdminDirectoryResolver = (*AdminDirectoryResolver)(nil)
 
 func NewAdminDirectoryResolver(client authv1.AuthServiceClient, ttl time.Duration) *AdminDirectoryResolver {
-	return &AdminDirectoryResolver{client: client, cache: newDirectoryCache(ttl)}
+	return &AdminDirectoryResolver{client: client, cache: newDirectoryCache(ttl), log: slog.Default()}
 }
 
 func (r *AdminDirectoryResolver) ListAdmins(ctx context.Context, tenantID string) ([]string, error) {
@@ -41,22 +42,14 @@ func (r *AdminDirectoryResolver) ListAdmins(ctx context.Context, tenantID string
 	if err != nil {
 		return nil, err
 	}
-	var admins []string
-	token := ""
-	for page := 0; page < maxAdminPages; page++ {
-		resp, err := r.client.ListUsers(callCtx, &authv1.ListUsersRequest{TenantId: tenantID, PageToken: token, PageSize: 200})
-		if err != nil {
-			return nil, directoryUnavailable("list users", err)
-		}
-		for _, u := range resp.GetUsers() {
-			if u.GetRole() == authv1.Role_ROLE_ADMIN && u.GetIsActive() {
-				admins = append(admins, u.GetId())
-			}
-		}
-		if token = resp.GetNextPageToken(); token == "" {
-			break
-		}
+	resp, err := r.client.ListActiveTenantAdmins(callCtx, &authv1.ListActiveTenantAdminsRequest{})
+	if err != nil {
+		return nil, directoryUnavailable("list active tenant admins", err)
 	}
+	if resp.GetTruncated() {
+		r.log.Warn("tenant admin list truncated by auth-service; some admins will not be notified", slog.String("tenant_id", tenantID))
+	}
+	admins := resp.GetUserIds()
 	r.cache.put(key, admins)
 	return admins, nil
 }

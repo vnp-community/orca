@@ -112,7 +112,10 @@ func (f *fakeTaskServer) ListExecutionStates(ctx context.Context, req *taskv1.Li
 	return resp, nil
 }
 
-func startTaskServer(t *testing.T, f *fakeTaskServer) *TaskClient {
+func startTaskServer(t *testing.T, f *fakeTaskServer) *TaskClient { return startTaskServerFor(t, f) }
+
+// startTaskServerFor serves any task-service fake over bufconn and returns the real client pointed at it.
+func startTaskServerFor(t *testing.T, f taskv1.TaskServiceServer) *TaskClient {
 	t.Helper()
 	lis := bufconn.Listen(1 << 20)
 	srv := grpc.NewServer()

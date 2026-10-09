@@ -31,7 +31,6 @@ import (
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
-	"github.com/stablyai/orca-go/common/internalcaller"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/policy"
@@ -374,7 +373,7 @@ func run() error {
 	}
 	grpcServer := grpc.NewServer(
 		grpcmw.ChainUnary(logger),
-		grpc.ChainUnaryInterceptor(internalcaller.Guard(cfg.InternalCallerToken, projectv1.ProjectService_ResolveProjectAccess_FullMethodName)),
+		grpc.ChainUnaryInterceptor(internalCallerGuard(cfg.InternalCallerToken)),
 		grpcmw.StatsHandler(),
 	)
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{

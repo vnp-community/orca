@@ -65,6 +65,7 @@ func RunSolutionContract(t *testing.T, newEnv func(t *testing.T) SolutionEnv) {
 		{"InvalidOutputLeavesNoDraft", solFlowInvalid},
 		{"AgentQuestionCompletesWithoutPlan", solFlowQuestion},
 		{"HotfixAutoApproves", solFlowHotfix},
+		{"HotfixFixTaskAndPreDeployApproval", solHotfixFixTaskAndPreDeploy},
 		{"RecoveryFailsInterruptedRun", solRecovery},
 		{"PersistRollsBackEverything", solPersistRollback},
 		{"RPCFlow", solRPCFlow},
@@ -104,6 +105,11 @@ type solKit struct {
 	decide    *usecase.DecideApproval
 	client    requestv1.RequestServiceClient
 	approvals requestv1.ApprovalServiceClient
+	// Kept so a scenario can add the hotfix gate on top of the standard wiring.
+	writer *usecase.AnalysisResultWriter
+	admins *rigAdmins
+	tr     usecase.RequestTransitioner
+	ret    *usecase.ReturnRequestToBacklog
 }
 
 type solCompleter struct {
@@ -217,6 +223,7 @@ func newSolKitWith(t *testing.T, env SolutionEnv, artifacts bool) *solKit {
 	canceler := &usecase.CancelPendingApprovalsForRequest{Repo: env.Approvals, Tx: env.Tx, Locker: env.Locker, Registry: k.registry, Outbox: env.Outbox}
 	canceller := &usecase.PendingApprovalCanceller{Inner: canceler}
 	ret := usecase.NewReturnRequestToBacklog(env.Requests, tr, env.Returns, canceller, usecase.NoActiveExecutionGuard{}, env.Tx, env.Outbox)
+	k.tr, k.ret = tr, ret
 	deps := usecase.AnalysisApprovalHandlerDeps{Requests: env.Requests, Solutions: env.SolutionStore, Returner: ret, Transition: tr, Outbox: env.Outbox}
 	var recorder *usecase.SolutionArtifactRecorder
 	var recordDecision *usecase.RecordDecision
@@ -234,6 +241,7 @@ func newSolKitWith(t *testing.T, env SolutionEnv, artifacts bool) *solKit {
 		k.registry.Register(st, h)
 	}
 	teams, admins := &rigTeams{teamsOf: map[string][]string{}, members: map[string][]string{}}, &rigAdmins{}
+	k.admins = admins
 	open := &usecase.OpenApproval{Repo: env.Approvals, Tx: env.TxScope, Requests: env.Requests, Locker: env.Locker, Registry: k.registry,
 		Resolver: &usecase.ResolveApproverPolicy{Repo: env.Policies}, ApproverRepo: env.Approvers, Outbox: env.Outbox, Teams: teams, Admins: admins}
 	k.opened = &solOpener{inner: usecase.OpenApprovalOpener{Approvals: open}}
@@ -242,6 +250,7 @@ func newSolKitWith(t *testing.T, env SolutionEnv, artifacts bool) *solKit {
 		Authorizer: &usecase.AuthorizeApprovalDecision{ApproverRepo: env.Approvers, Teams: teams}}
 
 	writer := usecase.NewAnalysisResultWriter(env.Requests, env.SolutionStore, env.AnalysisRuns, k.opened, tr, env.Tx, env.Outbox, "worker-1")
+	k.writer = writer
 	gen := usecase.NewRunSolutionGeneration(env.Requests, env.SolutionStore, k.completer, nil, writer, settings)
 	if artifacts {
 		writer.WithArtifacts(recorder)

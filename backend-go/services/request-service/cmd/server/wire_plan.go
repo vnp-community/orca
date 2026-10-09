@@ -33,6 +33,8 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 	})
 	solution.runner.WithPlanWorker(worker)
 
+	bindHotfixFixTask(log, solution, approval, execution, tasks, limits)
+
 	out := requestgrpc.PlanUseCases{
 		Generate: usecase.NewGeneratePlan(usecase.GeneratePlanDeps{
 			Requests: stores.requests, Solutions: stores.solutions, Runs: stores.analysisRuns, Conns: solution.conns, Auth: auth,
@@ -50,4 +52,15 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 		Transition: lifecycle.Transition, Tx: stores.tx, Outbox: stores.outboxWriter, Limits: limits,
 	})
 	return out, nil
+}
+
+// bindHotfixFixTask lets a finished hotfix diagnosis create its fix task and open the pre_deploy approval
+// (CR-REQ-012 section 2.6). Like CommitPlan it needs approval on: a fix task nobody can approve would only wait.
+func bindHotfixFixTask(log *slog.Logger, solution *solutionWiring, approval *approvalWiring, execution *executionWiring, tasks *executionTasks, limits domain.PlanLimits) {
+	writer, ok := tasks.client.(usecase.FixTaskWriter)
+	if !ok || !approval.Enabled || approval.Open == nil {
+		log.Warn("approval or the task client is unavailable: a finished hotfix diagnosis will not create its fix task")
+		return
+	}
+	solution.writer.WithHotfixFixTasks(usecase.NewEnsureHotfixFixTask(tasks.client, writer, execution.Policies, limits))
 }

@@ -226,8 +226,8 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Task,
 
 	t, err := scanTask(row)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Task{}, fmt.Errorf("postgres: task %s not found: %w", id, err)
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+			return domain.Task{}, fmt.Errorf("postgres: task %s: %w", id, domain.ErrTaskNotFound)
 		}
 		return domain.Task{}, fmt.Errorf("postgres: query task: %w", err)
 	}
@@ -245,8 +245,8 @@ func (r *Repository) FindByNumber(ctx context.Context, tenantID, projectID strin
 
 	t, err := scanTask(row)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Task{}, fmt.Errorf("postgres: no task with number %d in project %s: %w", taskNumber, projectID, err)
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+			return domain.Task{}, fmt.Errorf("postgres: task number %d in project %s: %w", taskNumber, projectID, domain.ErrTaskNotFound)
 		}
 		return domain.Task{}, fmt.Errorf("postgres: query task by number: %w", err)
 	}
@@ -298,6 +298,9 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 		ORDER BY depth
 	`, tenantID, id, maxDepth)
 	if err != nil {
+		if isMalformedUUID(err) {
+			return nil, fmt.Errorf("postgres: task %s while resolving ancestors: %w", id, domain.ErrTaskNotFound)
+		}
 		return nil, fmt.Errorf("postgres: query ancestors: %w", err)
 	}
 	defer rows.Close()
@@ -311,10 +314,13 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 		out = append(out, t)
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, fmt.Errorf("postgres: task %s while resolving ancestors: %w", id, domain.ErrTaskNotFound)
+		}
 		return nil, fmt.Errorf("postgres: iterate ancestor rows: %w", err)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("postgres: task %s not found while resolving ancestors", id)
+		return nil, fmt.Errorf("postgres: task %s while resolving ancestors: %w", id, domain.ErrTaskNotFound)
 	}
 	return out, nil
 }
@@ -325,11 +331,14 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 // StatusInProgress today).
 func (r *Repository) UpdateStatus(ctx context.Context, tenantID, id string, status domain.Status) error {
 	tag, err := r.db.Exec(ctx, `UPDATE task.tasks SET status = $1, updated_at = now() WHERE tenant_id = $2 AND id = $3`, status, tenantID, id)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: task %s: %w", id, domain.ErrTaskNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: update task status: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: task %s not found", id)
+		return fmt.Errorf("postgres: task %s: %w", id, domain.ErrTaskNotFound)
 	}
 	return nil
 }
@@ -351,11 +360,14 @@ func (r *Repository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktre
 // new link, before dispatch, for every engine.
 func (r *Repository) SetActiveExecutionLink(ctx context.Context, tenantID, taskID, linkID string) error {
 	tag, err := r.db.Exec(ctx, `UPDATE task.tasks SET active_execution_link_id = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, taskID, nullableUUID(linkID))
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: task %s: %w", taskID, domain.ErrTaskNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: set active execution link: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: task %s not found", taskID)
+		return fmt.Errorf("postgres: task %s: %w", taskID, domain.ErrTaskNotFound)
 	}
 	return nil
 }
@@ -370,11 +382,14 @@ func (r *Repository) CompleteExecution(ctx context.Context, tenantID, id, status
 			UPDATE task.tasks SET status = $3, actual_hours = $4, agent_session_id = NULL, updated_at = now()
 			WHERE tenant_id = $1 AND id = $2
 		`, tenantID, id, status, actualHours)
+		if isMalformedUUID(err) {
+			return fmt.Errorf("postgres: task %s: %w", id, domain.ErrTaskNotFound)
+		}
 		if err != nil {
 			return fmt.Errorf("postgres: complete task execution: %w", err)
 		}
 		if tag.RowsAffected() == 0 {
-			return fmt.Errorf("postgres: task %s not found", id)
+			return fmt.Errorf("postgres: task %s: %w", id, domain.ErrTaskNotFound)
 		}
 		return insertOutboxEvents(ctx, db, tenantID, events)
 	})
@@ -427,11 +442,14 @@ func (r *Repository) Update(ctx context.Context, tenantID string, t domain.Task,
 		nullableUUID(t.WorktreeID), nullableString(t.PRURL), t.WorkflowTemplateID,
 		t.Labels, nullableUUID(t.ReporterID), t.WorkflowExecID,
 		t.DoneSubtasks, t.TotalSubtasks, t.ShareToken)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: task %s for tenant %s: %w", t.ID, tenantID, domain.ErrTaskNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: update task: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: task %s not found for tenant %s", t.ID, tenantID)
+		return fmt.Errorf("postgres: task %s for tenant %s: %w", t.ID, tenantID, domain.ErrTaskNotFound)
 	}
 
 	for _, event := range events {
@@ -538,6 +556,9 @@ func (r *Repository) ListChildren(ctx context.Context, tenantID, taskID string) 
 // edge/grant cleanup needed here.
 func (r *Repository) Delete(ctx context.Context, tenantID, id string) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM task.tasks WHERE tenant_id = $1 AND id = $2`, tenantID, id)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: task %s for tenant %s: %w", id, tenantID, domain.ErrTaskNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete task: %w", err)
 	}

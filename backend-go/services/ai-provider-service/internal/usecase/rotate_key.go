@@ -34,7 +34,7 @@ func (uc *RotateKey) Execute(ctx context.Context, in RotateKeyInput) (domain.Pro
 
 	account, err := uc.repo.Get(ctx, tenantID, in.AccountID)
 	if err != nil {
-		return domain.ProviderAccount{}, apperrors.New(apperrors.KindNotFound, "AIPROVIDER_ACCOUNT_NOT_FOUND", "provider account not found", err)
+		return domain.ProviderAccount{}, accountRepoError(err, "AIPROVIDER_ACCOUNT_FETCH_FAILED", "failed to load provider account")
 	}
 
 	newRef, err := uc.broker.RotateCredential(ctx, account.CredentialRef)
@@ -54,7 +54,7 @@ func (uc *RotateKey) Execute(ctx context.Context, in RotateKeyInput) (domain.Pro
 		CredentialRef: newRef.ID,
 	})
 	if err != nil {
-		return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_UPDATE_STATUS_FAILED", "failed to persist rotation state", err)
+		return domain.ProviderAccount{}, accountRepoError(err, "AIPROVIDER_UPDATE_STATUS_FAILED", "failed to persist rotation state")
 	}
 
 	return updated, nil
