@@ -12800,7 +12800,13 @@
           "showPlanning": "Show Plan/Phase"
         },
         "TaskDetail": {
-          "phaseNotApproved": "Approve the Phase or Plan before running this task"
+          "phaseNotApproved": "Approve the Phase or Plan before running this task",
+          "openInGit": {
+            "noProject": "Cannot open Git: this task is not linked to a project",
+            "unknown": "This task's worktree no longer exists",
+            "notOnHost": "This task's worktree is no longer on this host. It may have been cleaned up.",
+            "failed": "Failed to open worktree: {{message}}"
+          }
         },
         "TaskDAGView": {
           "status": {
@@ -12826,6 +12832,28 @@
           "forbidden": "You do not have access to the tasks of this project.",
           "code": "Error code: {{code}}",
           "retry": "Retry"
+        },
+        "agentActivity": {
+          "title": "Agent activity",
+          "live": "Live",
+          "finished": "Finished",
+          "idle": "Idle",
+          "reconnecting": "Reconnecting…",
+          "olderHidden": "Older activity is not shown.",
+          "log": "Agent activity log",
+          "unavailable": "Live agent activity needs a connected runtime environment.",
+          "waiting": "Waiting for the agent to report what it is doing…",
+          "empty": "Nothing to show yet. Activity appears here while the agent runs; it is not kept after you reload the page.",
+          "jumpToLatest": "Jump to latest",
+          "savedElsewhere": "Live activity is not kept after you reload the page. See the saved output in the Result tab.",
+          "openResult": "Open the Result tab"
+        },
+        "dispatch": {
+          "loading": "Loading dispatch status…",
+          "none": "This task has no orchestration dispatch yet (it has not run through Engine 2, or it is running directly through Engine 1).",
+          "status": "Status:",
+          "assignee": "Assignee:",
+          "focusTerminal": "Focus the terminal running this dispatch"
         }
       },
       "taskPageEmptyState": {
@@ -13961,6 +13989,12 @@
             "env_defect": "Does not count as an attempt",
             "agent_defect": "Retries once with a format reminder",
             "unknown": "Unclassified failure"
+          },
+          "agentOutput": {
+            "title": "Agent output",
+            "note": "This run did not report a structured result. The end of what the agent printed is shown.",
+            "cut": "Only the last part is shown.",
+            "redacted": "Secrets were hidden."
           }
         },
         "aiSetup": {
@@ -15848,6 +15882,12 @@
           "waiveErrConflict": "This finding changed. Reload the list and try again.",
           "waiveErrValidation": "The waiver was rejected. Check the reason and expiry.",
           "waiveErrUnknown": "Could not save the waiver."
+        }
+      },
+      "devServer": {
+        "card": {
+          "busy": "Busy ({{count}} running)",
+          "idle": "Idle"
         }
       }
     },

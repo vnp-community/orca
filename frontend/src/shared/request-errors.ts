@@ -225,6 +225,7 @@ const CODE_TO_KIND: Record<string, RequestRpcErrorKind> = {
   SERVICE_UNAVAILABLE: 'unavailable',
   GATEWAY_TIMEOUT: 'unavailable',
   REQUEST_UNAVAILABLE: 'unavailable',
+  TASK_UNAVAILABLE: 'unavailable',
   REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE: 'unavailable',
   REQUEST_SOURCE_FETCH_FAILED: 'unavailable'
 }

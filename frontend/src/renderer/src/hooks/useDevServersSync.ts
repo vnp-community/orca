@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useAppStore } from '../store'
+import { useDevServerStatusStream } from './useDevServerStatusStream'
 
 /**
  * Syncs dev-server list and status into Zustand store.
@@ -11,6 +12,7 @@ import { useAppStore } from '../store'
  * Should be called once near the root of the component tree, e.g. inside useIpcEvents.
  */
 export function useDevServersSync(): void {
+  useDevServerStatusStream()
   const setDevServers = useAppStore((s) => s.setDevServers)
   const updateDevServerStatus = useAppStore((s) => s.updateDevServerStatus)
   const setActiveDevServerId = useAppStore((s) => s.setActiveDevServerId)
@@ -24,7 +26,9 @@ export function useDevServersSync(): void {
     // Restore active dev server from persisted settings
     void window.api.settings.get().then((settings) => {
       const id = settings?.activeDevServerId
-      if (id) {setActiveDevServerId(id)}
+      if (id) {
+        setActiveDevServerId(id)
+      }
     })
 
     // ── Status change subscription ────────────────────────────────────────────
@@ -42,7 +46,7 @@ export function useDevServersSync(): void {
           arch: event.arch ?? undefined,
           nodeVersion: event.nodeVersion ?? undefined,
           lastError: event.error ?? null,
-          lastConnectedAt: event.status === 'connected' ? Date.now() : undefined,
+          lastConnectedAt: event.status === 'connected' ? Date.now() : undefined
         })
       }
     )

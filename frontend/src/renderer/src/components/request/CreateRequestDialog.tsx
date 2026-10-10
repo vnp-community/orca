@@ -158,7 +158,8 @@ export function CreateRequestDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !submitting && onOpenChange(next)}>
-      <DialogContent>
+      {/* Why: the form is self-explanatory; without this Radix warns "Missing Description" on every open. */}
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{translate(`${T}title`, 'Create request')}</DialogTitle>
         </DialogHeader>

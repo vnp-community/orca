@@ -78,6 +78,10 @@ import { EMPTY_PTY_MAIN_DELIVERY_DIAGNOSTICS } from '../../../shared/pty-deliver
 import { createE2EConfig } from '../../../shared/e2e-config'
 import { relativePathInsideRoot } from '../../../shared/cross-platform-path'
 import {
+  collectWorktreeListsIgnoringFailures,
+  findWorktreeOwningPath
+} from './runtime-worktree-path-owner'
+import {
   applyPRBotAuthorOverride,
   normalizePRBotAuthorOverrides
 } from '../../../shared/pr-bot-author-overrides'
@@ -174,6 +178,7 @@ let activeClient: WebRuntimeClient | WebSessionClient | null = null
 let activeClientEnvironmentId: string | null = null
 let cachedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
 let cachedDetectedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
+let cachedBookkeptWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
 const runtimeCallQueuePool = new RuntimeRpcCallQueuePool()
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -250,6 +255,7 @@ async function readClipboardImagePngBase64(): Promise<string | null> {
 function invalidateRuntimeWorktreeCaches(): void {
   cachedWorktrees = null
   cachedDetectedWorktrees = null
+  cachedBookkeptWorktrees = null
 }
 
 type WebSettingsApi = NonNullable<PreloadApi['settings']>
@@ -4223,10 +4229,12 @@ async function listAllRuntimeDetectedWorktrees(): Promise<Worktree[]> {
   // match found" as an expected outcome, not a crash-worthy one.
   try {
     const views = await fetchAllRemoteRepoViews()
-    const detectedLists = await Promise.all(
-      views.map((view) => callRuntimeDetectedWorktrees(view.id, view.projectId))
+    const { worktrees } = await collectWorktreeListsIgnoringFailures(
+      views,
+      async (view) => (await callRuntimeDetectedWorktrees(view.id, view.projectId)).worktrees,
+      (view, error) =>
+        console.warn(`[web-preload-api] worktree.detectedList failed for repo ${view.id}:`, error)
     )
-    const worktrees = detectedLists.flatMap((result) => result.worktrees)
     cachedDetectedWorktrees = { loadedAt: Date.now(), worktrees }
     return worktrees
   } catch (err) {
@@ -4314,21 +4322,44 @@ function isMissingPathError(error: unknown): boolean {
   return /\bENOENT\b|not found|no such file/i.test(error.message)
 }
 
+// Why per project: the gateway's worktree.list requires a projectId.
+async function listAllBookkeptRuntimeWorktrees(): Promise<Worktree[]> {
+  if (cachedBookkeptWorktrees && Date.now() - cachedBookkeptWorktrees.loadedAt < 5_000) {
+    return cachedBookkeptWorktrees.worktrees
+  }
+  const projects = await listCallerProjectIds()
+  const { worktrees } = await collectWorktreeListsIgnoringFailures(
+    projects,
+    async (project) =>
+      (
+        await callRuntimeResult<{ worktrees: Worktree[] }>(
+          'worktree.list',
+          { projectId: project.id, limit: WEB_RUNTIME_WORKTREE_LIST_LIMIT },
+          15_000
+        )
+      ).worktrees ?? [],
+    (project, error) =>
+      console.warn(`[web-preload-api] worktree.list failed for project ${project.id}:`, error)
+  )
+  cachedBookkeptWorktrees = { loadedAt: Date.now(), worktrees }
+  return worktrees
+}
+
 async function resolveRuntimeWorktreeByPath(worktreePath: string): Promise<Worktree> {
   // Why: hidden-but-open worktrees must still resolve for git/file operations.
   // `worktree.list` is sidebar-visible only, so path resolution uses detected rows.
-  const worktrees = await listAllRuntimeDetectedWorktrees()
-  const match = worktrees
-    .map((worktree) => ({
-      worktree,
-      relativePath: relativePathInsideRoot(worktree.path, worktreePath)
-    }))
-    .filter((entry) => entry.relativePath !== null)
-    .sort((a, b) => b.worktree.path.length - a.worktree.path.length)[0]
-  if (!match) {
-    throw new Error(`No runtime worktree owns ${worktreePath}`)
+  const detected = findWorktreeOwningPath(await listAllRuntimeDetectedWorktrees(), worktreePath)
+  if (detected) {
+    return detected
   }
-  return match.worktree
+  // Why: the UI path comes from a bookkept row (e.g. the worktree a task created), so when
+  // git's own listing cannot claim it (repo host offline, or git printing a symlink-resolved
+  // path such as macOS /private/var for a repo registered under /var) the row itself still owns it.
+  const bookkept = findWorktreeOwningPath(await listAllBookkeptRuntimeWorktrees(), worktreePath)
+  if (bookkept) {
+    return bookkept
+  }
+  throw new Error(`No runtime worktree owns ${worktreePath}`)
 }
 
 async function resolveRuntimeFilePath(

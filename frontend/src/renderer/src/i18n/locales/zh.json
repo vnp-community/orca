@@ -12800,7 +12800,13 @@
           "showPlanning": "显示计划/阶段"
         },
         "TaskDetail": {
-          "phaseNotApproved": "运行此任务前请先批准阶段或计划"
+          "phaseNotApproved": "运行此任务前请先批准阶段或计划",
+          "openInGit": {
+            "noProject": "无法打开 Git：此任务未关联项目",
+            "unknown": "此任务的 worktree 已不存在",
+            "notOnHost": "此任务的 worktree 已不在此主机上，可能已被清理。",
+            "failed": "无法打开 worktree：{{message}}"
+          }
         },
         "TaskDAGView": {
           "status": {
@@ -12826,6 +12832,28 @@
           "forbidden": "你没有访问此项目任务的权限。",
           "code": "错误代码：{{code}}",
           "retry": "重试"
+        },
+        "agentActivity": {
+          "title": "智能体活动",
+          "live": "实时",
+          "finished": "已完成",
+          "idle": "空闲",
+          "reconnecting": "正在重新连接…",
+          "olderHidden": "较早的活动未显示。",
+          "log": "智能体活动日志",
+          "unavailable": "查看智能体实时活动需要已连接的运行时环境。",
+          "waiting": "正在等待智能体报告其正在执行的操作…",
+          "empty": "暂无内容可显示。智能体运行期间，活动会显示在这里；刷新页面后不会保留。",
+          "jumpToLatest": "跳到最新",
+          "savedElsewhere": "刷新页面后不会保留实时活动。请在 Result 标签页查看已保存的输出。",
+          "openResult": "打开 Result 标签页"
+        },
+        "dispatch": {
+          "loading": "正在加载调度状态…",
+          "none": "此任务还没有编排调度（尚未通过引擎 2 运行，或正通过引擎 1 直接运行）。",
+          "status": "状态：",
+          "assignee": "负责人：",
+          "focusTerminal": "聚焦运行此调度的终端"
         }
       },
       "taskPageEmptyState": {
@@ -13961,6 +13989,12 @@
             "env_defect": "不计入尝试次数",
             "agent_defect": "将附带格式提醒重试一次",
             "unknown": "未分类的失败"
+          },
+          "agentOutput": {
+            "title": "智能体输出",
+            "note": "本次运行没有报告结构化结果。这里显示的是智能体输出内容的末尾。",
+            "cut": "仅显示最后一部分。",
+            "redacted": "已隐藏敏感信息。"
           }
         },
         "aiSetup": {
@@ -15848,6 +15882,12 @@
           "waiveErrConflict": "该发现已更改。请刷新列表后重试。",
           "waiveErrValidation": "豁免被拒绝。请检查原因和到期时间。",
           "waiveErrUnknown": "无法保存豁免。"
+        }
+      },
+      "devServer": {
+        "card": {
+          "busy": "忙碌（{{count}} 个运行中）",
+          "idle": "空闲"
         }
       }
     },

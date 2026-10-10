@@ -3,6 +3,9 @@ import { useAppStore } from '../../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { focusRuntimeOrchestrationTask } from '../terminal-pane/terminal-orchestration-task-links'
 import { Button } from '../ui/button'
+import { translate } from '@/i18n/i18n'
+
+const T = 'auto.components.task.dispatch.'
 
 type DispatchView = {
   id: string
@@ -46,14 +49,20 @@ export function TaskDispatchStatusPanel({ taskId }: { taskId: string }) {
   }, [taskId])
 
   if (dispatch === 'loading') {
-    return <div className="text-xs text-muted-foreground p-2">Loading dispatch status…</div>
+    return (
+      <div className="text-xs text-muted-foreground p-2">
+        {translate(`${T}loading`, 'Loading dispatch status…')}
+      </div>
+    )
   }
 
   if (dispatch === 'not-dispatched') {
     return (
       <div className="text-xs text-muted-foreground p-2" data-testid="task-dispatch-none">
-        Task này chưa có dispatch orchestration nào (chưa chạy qua Engine 2, hoặc đang chạy trực
-        tiếp qua Engine 1 — xem CR-FLOW-TASK-001).
+        {translate(
+          `${T}none`,
+          'This task has no orchestration dispatch yet (it has not run through Engine 2, or it is running directly through Engine 1).'
+        )}
       </div>
     )
   }
@@ -73,10 +82,11 @@ export function TaskDispatchStatusPanel({ taskId }: { taskId: string }) {
       data-testid="task-dispatch-status"
     >
       <div>
-        <span className="font-medium">Status:</span> {dispatch.status}
+        <span className="font-medium">{translate(`${T}status`, 'Status:')}</span> {dispatch.status}
       </div>
       <div>
-        <span className="font-medium">Assignee:</span> {dispatch.assignee_handle || '—'}
+        <span className="font-medium">{translate(`${T}assignee`, 'Assignee:')}</span>{' '}
+        {dispatch.assignee_handle || '—'}
       </div>
       {dispatch.assignee_handle && (
         <Button
@@ -86,7 +96,7 @@ export function TaskDispatchStatusPanel({ taskId }: { taskId: string }) {
           onClick={focusTerminal}
           data-testid="task-dispatch-focus-terminal"
         >
-          Focus terminal đang chạy dispatch này
+          {translate(`${T}focusTerminal`, 'Focus the terminal running this dispatch')}
         </Button>
       )}
     </div>

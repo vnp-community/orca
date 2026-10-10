@@ -27,7 +27,9 @@ import { BacklogTab } from './backlog/BacklogTab'
 import type { RequestPageData } from '../../store/slices/request'
 
 function isInputElement(el: EventTarget | null): boolean {
-  if (!el || !(el instanceof Element)) {return false}
+  if (!el || !(el instanceof Element)) {
+    return false
+  }
   const tag = el.tagName.toLowerCase()
   return (
     tag === 'input' ||
@@ -53,6 +55,11 @@ export default function RequestPage(): React.JSX.Element {
   // Escape to close (when focus is not in an input)
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      // Why: a sheet/dialog/menu on top already consumed this Escape (Radix preventDefaults it on
+      // dismiss); the page must not also close underneath it.
+      if (e.defaultPrevented) {
+        return
+      }
       if (e.key === 'Escape' && !isInputElement(document.activeElement)) {
         closeRequestPage()
       }

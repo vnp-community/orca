@@ -157,6 +157,11 @@ export type ExecutionResult = {
   failureClass?: ExecutionFailureClass
   stdoutTail?: string
   outputs?: Record<string, unknown>
+  /** `last_execution_output`: no structured record, only the stdout of the last successful run (every Request task today). */
+  source?: 'execution_record' | 'last_execution_output'
+  /** The gateway already hid secrets / cut the output; shown as notes, never relied on for safety. */
+  redacted?: boolean
+  truncated?: boolean
 }
 
 // Why: strings are provisional until the CONTRACT section 7 names them.

@@ -42,6 +42,7 @@ describe('subscribeRuntimeStreamChannel', () => {
     unsubscribeSpy: ReturnType<typeof vi.fn>
     emit: (response: unknown) => void
     emitError: (error: { code: string; message: string }) => void
+    emitClose: () => void
   } {
     let callbacks: MockSubscriptionCallbacks | null = null
     const unsubscribeSpy = vi.fn()
@@ -54,7 +55,8 @@ describe('subscribeRuntimeStreamChannel', () => {
     return {
       unsubscribeSpy,
       emit: (response) => callbacks?.onResponse(response),
-      emitError: (error) => callbacks?.onError?.(error)
+      emitError: (error) => callbacks?.onError?.(error),
+      emitClose: () => callbacks?.onClose?.()
     }
   }
 
@@ -136,6 +138,41 @@ describe('subscribeRuntimeStreamChannel', () => {
     expect(unsubscribeSpy).toHaveBeenCalledTimes(1)
     expect(onEvent).toHaveBeenCalledTimes(1)
     expect(onEvent).toHaveBeenCalledWith({ line: 'before-unsubscribe' })
+  })
+
+  it('tells the caller when the stream closes after the ack, but not after its own unsubscribe()', async () => {
+    const { emit, emitClose } = mockSubscription()
+    const onClose = vi.fn()
+    const pending = subscribeRuntimeStreamChannel<null, unknown>(
+      ENV_TARGET,
+      'task.activity.subscribe',
+      {},
+      vi.fn(),
+      { onClose }
+    )
+    emit({ id: 'req-1', ok: true, result: null, _meta: { runtimeId: 'rt1' } })
+    const { unsubscribe } = await pending
+    emitClose()
+    expect(onClose).toHaveBeenCalledTimes(1)
+    unsubscribe()
+    emitClose()
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects instead of hanging when the stream closes before the ack', async () => {
+    const { emitClose } = mockSubscription()
+    const onClose = vi.fn()
+    const pending = subscribeRuntimeStreamChannel(
+      ENV_TARGET,
+      'task.activity.subscribe',
+      {},
+      vi.fn(),
+      { onClose }
+    )
+    await Promise.resolve()
+    emitClose()
+    await expect(pending).rejects.toThrow('closed before')
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('rejects when the ack response itself is a failure', async () => {

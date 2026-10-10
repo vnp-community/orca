@@ -66,6 +66,10 @@ export type DevServer = {
   // missing healthStatus as unknown, not "pending" (unlike approvalStatus's
   // fail-closed convention above, there is no safe default to assume here).
   healthStatus?: DevServerHealthStatus
+  // Absent on a backend that predates devServer.list's busy state (TASK-V2-025): unknown, not "idle".
+  /** Runs (agent.execPrompt, ai.complete) the dev server is answering right now; 0 when not connected. */
+  activeExecutions?: number
+  busy?: boolean
 }
 
 export type DevServerInput = {

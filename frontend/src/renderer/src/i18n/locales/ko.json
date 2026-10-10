@@ -12800,7 +12800,13 @@
           "showPlanning": "계획/단계 표시"
         },
         "TaskDetail": {
-          "phaseNotApproved": "이 작업을 실행하기 전에 단계 또는 계획을 승인하세요"
+          "phaseNotApproved": "이 작업을 실행하기 전에 단계 또는 계획을 승인하세요",
+          "openInGit": {
+            "noProject": "Git을 열 수 없습니다. 이 작업이 프로젝트에 연결되어 있지 않습니다",
+            "unknown": "이 작업의 worktree가 더 이상 존재하지 않습니다",
+            "notOnHost": "이 작업의 worktree가 이 호스트에 더 이상 없습니다. 정리되었을 수 있습니다.",
+            "failed": "worktree를 열지 못했습니다: {{message}}"
+          }
         },
         "TaskDAGView": {
           "status": {
@@ -12826,6 +12832,28 @@
           "forbidden": "이 프로젝트의 작업에 접근할 권한이 없습니다.",
           "code": "오류 코드: {{code}}",
           "retry": "다시 시도"
+        },
+        "agentActivity": {
+          "title": "에이전트 활동",
+          "live": "실시간",
+          "finished": "완료",
+          "idle": "대기 중",
+          "reconnecting": "다시 연결하는 중…",
+          "olderHidden": "이전 활동은 표시되지 않습니다.",
+          "log": "에이전트 활동 로그",
+          "unavailable": "에이전트 실시간 활동을 보려면 연결된 런타임 환경이 필요합니다.",
+          "waiting": "에이전트가 하고 있는 일을 보고하기를 기다리는 중…",
+          "empty": "아직 표시할 내용이 없습니다. 활동은 에이전트가 실행되는 동안 여기에 표시되며 페이지를 새로고침하면 유지되지 않습니다.",
+          "jumpToLatest": "최신으로 이동",
+          "savedElsewhere": "실시간 활동은 페이지를 새로고침하면 유지되지 않습니다. 저장된 출력은 Result 탭에서 확인하세요.",
+          "openResult": "Result 탭 열기"
+        },
+        "dispatch": {
+          "loading": "디스패치 상태를 불러오는 중…",
+          "none": "이 작업에는 아직 오케스트레이션 디스패치가 없습니다(엔진 2로 실행된 적이 없거나 엔진 1에서 직접 실행 중입니다).",
+          "status": "상태:",
+          "assignee": "담당자:",
+          "focusTerminal": "이 디스패치를 실행 중인 터미널로 이동"
         }
       },
       "taskPageEmptyState": {
@@ -13961,6 +13989,12 @@
             "env_defect": "시도 횟수에 포함되지 않습니다",
             "agent_defect": "형식 안내와 함께 한 번 재시도합니다",
             "unknown": "분류되지 않은 실패"
+          },
+          "agentOutput": {
+            "title": "에이전트 출력",
+            "note": "이 실행은 구조화된 결과를 보고하지 않았습니다. 에이전트가 출력한 내용의 끝부분을 표시합니다.",
+            "cut": "마지막 부분만 표시됩니다.",
+            "redacted": "비밀 정보는 숨겨졌습니다."
           }
         },
         "aiSetup": {
@@ -15848,6 +15882,12 @@
           "waiveErrConflict": "이 항목이 변경되었습니다. 목록을 새로고침한 뒤 다시 시도하세요.",
           "waiveErrValidation": "면제가 거부되었습니다. 사유와 만료일을 확인하세요.",
           "waiveErrUnknown": "면제를 저장하지 못했습니다."
+        }
+      },
+      "devServer": {
+        "card": {
+          "busy": "사용 중 (실행 {{count}}건)",
+          "idle": "대기 중"
         }
       }
     },

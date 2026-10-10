@@ -20,7 +20,7 @@ type InventoryEntry = { name: string; kind: string }
  * Channels the UI declares but the gateway does not register yet. Each one is a
  * contract name whose backend CR has not shipped; the hooks that call them must
  * treat `unsupported` as "feature not available" (see useDecisions, useImpactAssessment,
- * useTaskReadiness, useExecutionResult, usePlanHeatmap, useGraphLens). An entry that the
+ * useTaskReadiness, usePlanHeatmap, useGraphLens). An entry that the
  * gateway starts registering fails the test below so this list can only shrink.
  */
 const PENDING_GATEWAY_CHANNELS: Readonly<Record<string, string>> = {
@@ -39,9 +39,7 @@ const PENDING_GATEWAY_CHANNELS: Readonly<Record<string, string>> = {
   'decision.confirm': 'CR-REQ-029 decision channels are not registered at the gateway yet',
   'readiness.check': 'CR-REQ-029 task readiness channels are not registered at the gateway yet',
   'readiness.get': 'CR-REQ-029 task readiness channels are not registered at the gateway yet',
-  'readiness.list': 'CR-REQ-029 task readiness channels are not registered at the gateway yet',
-  'execution.get':
-    'CR-REQ-029 execution result is a proposed name, not registered at the gateway yet'
+  'readiness.list': 'CR-REQ-029 task readiness channels are not registered at the gateway yet'
 }
 
 function loadInventory(): InventoryEntry[] {
@@ -101,6 +99,13 @@ describe('request RPC channel contract with the gateway', () => {
       unknown,
       `Not in REQUEST_RPC_METHODS, remove from PENDING_GATEWAY_CHANNELS: ${unknown.join(', ')}`
     ).toEqual([])
+  })
+
+  it('registers execution.get and the push channels the task and dev-server views subscribe to', () => {
+    const kindOf = new Map(inventory.map((e) => [e.name, e.kind]))
+    expect(kindOf.get(REQUEST_RPC_METHODS.EXECUTION_GET)).toBe('unary')
+    expect(kindOf.get('task.activity.subscribe')).toBe('stream')
+    expect(kindOf.get('devServer.subscribeStatus')).toBe('stream')
   })
 
   it('declares streaming channels with the kind the UI uses them with', () => {

@@ -7,16 +7,12 @@ import type { OrcaTask } from '../../../shared/task-types'
 // keep the two polling hooks consistent rather than inventing a second value.
 const TASK_ACTIVITY_POLL_INTERVAL_MS = 4_000
 
-// Polling fallback for post-Run task status: `subscribeRuntimeEvent(target, 'task.activity:
-// ${taskId}', cb)` (CR-FLOW-TASK-005's original design) doesn't exist anywhere in the
-// codebase, and the one real push-event client (subscribeRuntimeClientEvents) only takes an
-// environmentId (no 'local' target) and a closed event union with no task/workflow variant.
-// Both the backend WS channel (CR-FLOW-TASK-003) and that client-side variant are still
-// unbuilt — polling `task.get` is a real, working, cross-platform stopgap until they land.
+// Polls `task.get` for post-Run task STATUS (cross-platform, works on the desktop `local` target too).
+// The agent's live OUTPUT is a separate push channel: see useTaskAgentOutput.ts
+// (`task.activity.subscribe`), which only has a client for runtime environments.
 export type TaskActivityState = {
   task: OrcaTask | null
-  // Always false today — flips meaningful once a real push channel replaces this poll, so UI
-  // can distinguish "polling" from "live" without a call-site change later.
+  // Always false: this hook only polls. Kept so callers need no change if status ever goes push.
   isLive: false
   lastPolledAt: number | null
 }

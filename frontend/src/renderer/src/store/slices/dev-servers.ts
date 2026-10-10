@@ -17,7 +17,16 @@ export type DevServerSlice = {
     id: string,
     status: DevServer['status'],
     extra?: Partial<
-      Pick<DevServer, 'platform' | 'arch' | 'nodeVersion' | 'lastConnectedAt' | 'lastError'>
+      Pick<
+        DevServer,
+        | 'platform'
+        | 'arch'
+        | 'nodeVersion'
+        | 'lastConnectedAt'
+        | 'lastError'
+        | 'activeExecutions'
+        | 'busy'
+      >
     >
   ) => void
   /** Hydrates `devServers` from `devServer.listForUser` (CR-STORAGE-006's

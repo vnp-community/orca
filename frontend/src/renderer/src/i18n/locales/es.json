@@ -12800,7 +12800,13 @@
           "showPlanning": "Mostrar plan/fase"
         },
         "TaskDetail": {
-          "phaseNotApproved": "Aprueba la fase o el plan antes de ejecutar esta tarea"
+          "phaseNotApproved": "Aprueba la fase o el plan antes de ejecutar esta tarea",
+          "openInGit": {
+            "noProject": "No se puede abrir Git: esta tarea no está vinculada a un proyecto",
+            "unknown": "El worktree de esta tarea ya no existe",
+            "notOnHost": "El worktree de esta tarea ya no está en este host. Puede que se haya limpiado.",
+            "failed": "No se pudo abrir el worktree: {{message}}"
+          }
         },
         "TaskDAGView": {
           "status": {
@@ -12826,6 +12832,28 @@
           "forbidden": "No tiene acceso a las tareas de este proyecto.",
           "code": "Código de error: {{code}}",
           "retry": "Reintentar"
+        },
+        "agentActivity": {
+          "title": "Actividad del agente",
+          "live": "En vivo",
+          "finished": "Finalizado",
+          "idle": "Inactivo",
+          "reconnecting": "Reconectando…",
+          "olderHidden": "No se muestra la actividad anterior.",
+          "log": "Registro de actividad del agente",
+          "unavailable": "La actividad en vivo del agente requiere un entorno de ejecución conectado.",
+          "waiting": "Esperando a que el agente informe qué está haciendo…",
+          "empty": "Aún no hay nada que mostrar. La actividad aparece aquí mientras el agente se ejecuta; no se conserva al recargar la página.",
+          "jumpToLatest": "Ir a lo más reciente",
+          "savedElsewhere": "La actividad en vivo no se conserva al recargar la página. Consulta la salida guardada en la pestaña Result.",
+          "openResult": "Abrir la pestaña Result"
+        },
+        "dispatch": {
+          "loading": "Cargando el estado del despacho…",
+          "none": "Esta tarea aún no tiene un despacho de orquestación (no se ha ejecutado por el Motor 2, o se está ejecutando directamente por el Motor 1).",
+          "status": "Estado:",
+          "assignee": "Asignado a:",
+          "focusTerminal": "Enfocar el terminal que ejecuta este despacho"
         }
       },
       "taskPageEmptyState": {
@@ -13961,6 +13989,12 @@
             "env_defect": "No cuenta como intento",
             "agent_defect": "Se reintenta una vez con un recordatorio de formato",
             "unknown": "Fallo sin clasificar"
+          },
+          "agentOutput": {
+            "title": "Salida del agente",
+            "note": "Esta ejecución no informó un resultado estructurado. Se muestra el final de lo que imprimió el agente.",
+            "cut": "Solo se muestra la última parte.",
+            "redacted": "Se ocultaron los secretos."
           }
         },
         "aiSetup": {
@@ -15848,6 +15882,12 @@
           "waiveErrConflict": "Este hallazgo cambió. Recarga la lista e inténtalo de nuevo.",
           "waiveErrValidation": "Se rechazó la exención. Revisa el motivo y la caducidad.",
           "waiveErrUnknown": "No se pudo guardar la exención."
+        }
+      },
+      "devServer": {
+        "card": {
+          "busy": "Ocupado ({{count}} en ejecución)",
+          "idle": "Libre"
         }
       }
     },

@@ -230,6 +230,39 @@ describe('readiness / execution parsers', () => {
     })
     expect(parseExecutionResult({ task_id: 't', parse_status: 'zzz' })?.parseStatus).toBe('invalid')
   })
+  it('execution result: reads the gateway view (camelCase) with its source and notes', () => {
+    expect(
+      parseExecutionResult({
+        taskId: 't',
+        parseStatus: 'missing',
+        filesChanged: [],
+        checksRun: [],
+        stdoutTail: 'tail',
+        source: 'last_execution_output',
+        redacted: true,
+        truncated: true
+      })
+    ).toMatchObject({
+      source: 'last_execution_output',
+      redacted: true,
+      truncated: true,
+      stdoutTail: 'tail',
+      parseStatus: 'missing'
+    })
+    const record = parseExecutionResult({
+      taskId: 't',
+      attempt: 2,
+      parseStatus: 'ok',
+      source: 'execution_record',
+      filesChanged: ['a'],
+      checksRun: []
+    })
+    expect(record).toMatchObject({ source: 'execution_record', attempt: 2 })
+    expect(record).not.toHaveProperty('redacted')
+    expect(parseExecutionResult({ taskId: 't', source: 'something_else' })).not.toHaveProperty(
+      'source'
+    )
+  })
 })
 
 describe('registry and errors additions', () => {

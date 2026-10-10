@@ -8,11 +8,11 @@ import type { TraceEvent } from '../../../../../shared/trace'
 
 const mockState = vi.hoisted(() => ({
   removeDevServer: vi.fn(),
-  traceEvents: [] as TraceEvent[],
+  traceEvents: [] as TraceEvent[]
 }))
 
 vi.mock('../../../store', () => ({
-  useAppStore: (selector: (state: typeof mockState) => unknown) => selector(mockState),
+  useAppStore: (selector: (state: typeof mockState) => unknown) => selector(mockState)
 }))
 
 import { DevServerCard } from '../DevServerCard'
@@ -44,7 +44,7 @@ function makeServer(overrides: Partial<DevServer> = {}): DevServer {
     workspaceDir: null,
     addedAt: 0,
     capabilities: null,
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -54,7 +54,7 @@ function makeEvent(overrides: Partial<TraceEvent> & { flow: string }): TraceEven
     level: 'ok',
     fields: {},
     ts: 1000,
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -78,7 +78,7 @@ describe('DevServerCard agent-ws trace badge', () => {
 
   it('renders "Agent WS: handshake ok" when the latest matching event level is ok', () => {
     mockState.traceEvents = [
-      makeEvent({ flow: 'agentWs:handshake', level: 'ok', fields: { devServerId: 'ds-1' } }),
+      makeEvent({ flow: 'agentWs:handshake', level: 'ok', fields: { devServerId: 'ds-1' } })
     ]
     const el = renderCard(makeServer({ id: 'ds-1' }))
 
@@ -90,8 +90,8 @@ describe('DevServerCard agent-ws trace badge', () => {
       makeEvent({
         flow: 'agentWs:handshake',
         level: 'fail',
-        fields: { devServerId: 'ds-1', reason: 'token expired' },
-      }),
+        fields: { devServerId: 'ds-1', reason: 'token expired' }
+      })
     ]
     const el = renderCard(makeServer({ id: 'ds-1' }))
 
@@ -100,5 +100,58 @@ describe('DevServerCard agent-ws trace badge', () => {
       s.textContent?.includes('Agent WS: token expired')
     )
     expect(badge?.className).toContain('text-destructive')
+  })
+})
+
+describe('DevServerCard test hooks', () => {
+  it('exposes a stable test id and the dev server id', () => {
+    const el = renderCard(makeServer({ id: 'ds-9' }))
+    const card = el.querySelector('[data-testid="dev-server-card"]')
+    expect(card).not.toBeNull()
+    expect(card?.getAttribute('data-dev-server-id')).toBe('ds-9')
+  })
+})
+
+describe('DevServerCard busy state and platform', () => {
+  it('shows "Busy (N running)" for a busy connected server', () => {
+    const el = renderCard(makeServer({ busy: true, activeExecutions: 2 }))
+    const busy = el.querySelector('[data-testid="dev-server-busy"]')
+    expect(busy?.textContent).toBe('Busy (2 running)')
+    expect(busy?.getAttribute('data-busy')).toBe('true')
+  })
+
+  it('shows "Idle" for a connected server with nothing running, and nothing when the state is unknown or disconnected', () => {
+    expect(
+      renderCard(makeServer({ busy: false, activeExecutions: 0 })).querySelector(
+        '[data-testid="dev-server-busy"]'
+      )?.textContent
+    ).toBe('Idle')
+    act(() => root?.unmount())
+    container?.remove()
+    expect(
+      renderCard(makeServer({ busy: undefined })).querySelector('[data-testid="dev-server-busy"]')
+    ).toBeNull()
+    act(() => root?.unmount())
+    container?.remove()
+    expect(
+      renderCard(makeServer({ status: 'disconnected', busy: false })).querySelector(
+        '[data-testid="dev-server-busy"]'
+      )
+    ).toBeNull()
+  })
+
+  it('shows platform and arch when the handshake reported them', () => {
+    expect(
+      renderCard(makeServer({ platform: 'darwin', arch: 'arm64' })).querySelector(
+        '[data-testid="dev-server-platform"]'
+      )?.textContent
+    ).toBe('macOS · arm64')
+    act(() => root?.unmount())
+    container?.remove()
+    expect(
+      renderCard(makeServer({ platform: null, arch: null })).querySelector(
+        '[data-testid="dev-server-platform"]'
+      )
+    ).toBeNull()
   })
 })

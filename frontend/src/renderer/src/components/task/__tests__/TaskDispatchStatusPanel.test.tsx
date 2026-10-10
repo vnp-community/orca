@@ -53,6 +53,14 @@ describe('TaskDispatchStatusPanel', () => {
     })
   })
 
+  it('the "not dispatched" notice is English, not hard-coded Vietnamese', async () => {
+    mockRpc.mockResolvedValueOnce({ dispatch: null })
+    render(<TaskDispatchStatusPanel taskId="t1" />)
+    const notice = await screen.findByTestId('task-dispatch-none')
+    expect(notice).toHaveTextContent('This task has no orchestration dispatch yet')
+    expect(notice.textContent).not.toMatch(/chưa|Task này/)
+  })
+
   it('RPC rejects → falls back to "not dispatched" (does not crash)', async () => {
     mockRpc.mockRejectedValueOnce(new Error('boom'))
     render(<TaskDispatchStatusPanel taskId="t1" />)

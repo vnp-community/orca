@@ -50,9 +50,11 @@ vi.mock('../../../runtime/runtime-rpc-client', () => ({
 }))
 vi.mock('../../../runtime/request-rpc-client', () => ({
   callRequestRpc: vi.fn(async (method: string) =>
-    method in h.rpc
-      ? { ok: true, value: h.rpc[method] }
-      : { ok: false, error: { kind: 'unsupported', code: 'method_not_found', message: 'm' } }
+    method in h.rpc && h.rpc[method] === 'TASK_NOT_FOUND'
+      ? { ok: false, error: { kind: 'not_found', code: 'TASK_NOT_FOUND', message: 'm' } }
+      : method in h.rpc
+        ? { ok: true, value: h.rpc[method] }
+        : { ok: false, error: { kind: 'unsupported', code: 'method_not_found', message: 'm' } }
   )
 }))
 vi.mock('../../../hooks/useTaskPermission', () => ({
@@ -131,6 +133,81 @@ describe('TaskDetail + readiness', () => {
     render(<TaskDetail />)
     expect(screen.queryByTestId('check-readiness-btn')).toBeNull()
     expect(screen.queryByRole('tab', { name: 'Result' })).toBeNull()
+  })
+
+  it('shows the live agent activity panel and no "no dispatch" notice for a Request task', async () => {
+    const first = render(<TaskDetail />)
+    expect(await screen.findByTestId('task-agent-activity')).toBeInTheDocument()
+    expect(screen.queryByTestId('task-dispatch-none')).toBeNull()
+    expect(screen.queryByTestId('task-dispatch-status')).toBeNull()
+    first.unmount()
+
+    // A task outside a Request keeps the Engine 2 dispatch panel.
+    h.task = { ...requestTask, requestId: undefined }
+    render(<TaskDetail />)
+    expect(await screen.findByTestId('task-dispatch-none')).toBeInTheDocument()
+  })
+
+  it('the Result tab shows the last output of a Request task, and is hidden when there is nothing to read', async () => {
+    h.rpc = {
+      'execution.get': {
+        taskId: 't1',
+        parseStatus: 'missing',
+        filesChanged: [],
+        checksRun: [],
+        stdoutTail: 'Ran 3 tests\nOK',
+        source: 'last_execution_output'
+      }
+    }
+    const first = render(<TaskDetail />)
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Result' }))
+    expect(await screen.findByTestId('execution-agent-output')).toHaveTextContent('Ran 3 tests')
+    expect(screen.queryByTestId('execution-malformed')).toBeNull()
+    first.unmount()
+
+    h.rpc = { 'execution.get': 'TASK_NOT_FOUND' }
+    const second = render(<TaskDetail />)
+    await waitFor(() => expect(screen.getByTestId('task-agent-activity')).toBeInTheDocument())
+    await new Promise((r) => setTimeout(r, 30))
+    expect(screen.queryByRole('tab', { name: 'Result' })).toBeNull()
+    second.unmount()
+
+    h.rpc = {}
+    render(<TaskDetail />)
+    await new Promise((r) => setTimeout(r, 30))
+    expect(screen.queryByRole('tab', { name: 'Result' })).toBeNull()
+  })
+
+  it('an idle agent panel points to the Result tab only when that tab has saved output', async () => {
+    h.rpc = {
+      'execution.get': {
+        taskId: 't1',
+        parseStatus: 'missing',
+        filesChanged: [],
+        checksRun: [],
+        stdoutTail: 'Ran 3 tests\nOK',
+        source: 'last_execution_output'
+      }
+    }
+    const first = render(<TaskDetail />)
+    fireEvent.click(await screen.findByTestId('task-agent-activity-open-result'))
+    expect(await screen.findByTestId('execution-agent-output')).toHaveTextContent('Ran 3 tests')
+    first.unmount()
+
+    // The tab exists (a run happened) but the run printed nothing: nothing to point to.
+    h.rpc = {
+      'execution.get': {
+        taskId: 't1',
+        parseStatus: 'missing',
+        filesChanged: [],
+        checksRun: [],
+        stdoutTail: '',
+        source: 'last_execution_output'
+      }
+    }
+    render(<TaskDetail />)
+    await screen.findByRole('tab', { name: 'Result' })
+    expect(screen.queryByTestId('task-agent-activity-open-result')).toBeNull()
   })
 
   it('unsupported readiness channels never lock Run (pre-CR-029 behaviour)', async () => {
