@@ -26,8 +26,27 @@ Options:
       expect(flags).toEqual({
         tools: true,
         permissionMode: true,
-        disallowedTools: true
+        disallowedTools: true,
+        streamJson: false
       })
+    })
+
+    it('reports streamJson only when --output-format, stream-json and --verbose are all advertised', async () => {
+      const full = `
+  --output-format <format>     Output format: "text" (default), "json", or "stream-json"
+  --verbose                    Override verbose mode setting
+`
+      const noVerbose =
+        '  --output-format <format>     Output format: "text", "json", "stream-json"\n'
+      const noStream =
+        '  --output-format <format>     Output format: "text", "json"\n  --verbose  Verbose\n'
+      expect((await detectClaudeFlags({ PATH: '/p1' }, async () => full))?.streamJson).toBe(true)
+      expect((await detectClaudeFlags({ PATH: '/p2' }, async () => noVerbose))?.streamJson).toBe(
+        false
+      )
+      expect((await detectClaudeFlags({ PATH: '/p3' }, async () => noStream))?.streamJson).toBe(
+        false
+      )
     })
 
     it('returns flag support when help lacks flags', async () => {
@@ -36,7 +55,8 @@ Options:
       expect(flags).toEqual({
         tools: false,
         permissionMode: false,
-        disallowedTools: false
+        disallowedTools: false,
+        streamJson: false
       })
     })
 
@@ -113,19 +133,34 @@ Options:
 
     it('returns FLAG_TOOLS_MISSING when tools flag is missing', () => {
       expect(
-        readonlyUnsupportedReason({ tools: false, permissionMode: true, disallowedTools: false })
+        readonlyUnsupportedReason({
+          tools: false,
+          permissionMode: true,
+          disallowedTools: false,
+          streamJson: false
+        })
       ).toBe('FLAG_TOOLS_MISSING')
     })
 
     it('returns FLAG_PERMISSION_MODE_MISSING when permissionMode flag is missing', () => {
       expect(
-        readonlyUnsupportedReason({ tools: true, permissionMode: false, disallowedTools: false })
+        readonlyUnsupportedReason({
+          tools: true,
+          permissionMode: false,
+          disallowedTools: false,
+          streamJson: false
+        })
       ).toBe('FLAG_PERMISSION_MODE_MISSING')
     })
 
     it('returns null when all required readonly flags are present', () => {
       expect(
-        readonlyUnsupportedReason({ tools: true, permissionMode: true, disallowedTools: false })
+        readonlyUnsupportedReason({
+          tools: true,
+          permissionMode: true,
+          disallowedTools: false,
+          streamJson: false
+        })
       ).toBeNull()
     })
   })
@@ -145,11 +180,17 @@ Options:
 
   describe('readonlyUnsupportedError', () => {
     it('formats JSON-RPC error response with reason and detail', () => {
-      const err = readonlyUnsupportedError('req-1', 'agent.execPrompt', 'FLAG_TOOLS_MISSING') as any
+      const err = readonlyUnsupportedError('req-1', 'agent.execPrompt', 'FLAG_TOOLS_MISSING') as {
+        jsonrpc: string
+        id: string
+        error: { code: number; message: string; data: unknown }
+      }
       expect(err.jsonrpc).toBe('2.0')
       expect(err.id).toBe('req-1')
       expect(err.error.code).toBe(-32602)
-      expect(err.error.message).toBe('agent.execPrompt: READONLY_MODE_UNSUPPORTED (FLAG_TOOLS_MISSING)')
+      expect(err.error.message).toBe(
+        'agent.execPrompt: READONLY_MODE_UNSUPPORTED (FLAG_TOOLS_MISSING)'
+      )
       expect(err.error.data).toEqual({
         reason: 'READONLY_MODE_UNSUPPORTED',
         detail: 'FLAG_TOOLS_MISSING'

@@ -1,6 +1,6 @@
 // src/relay/__tests__/agent-config.test.ts
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { loadAgentConfig } from '../agent-config'
+import { buildToolPath, loadAgentConfig } from '../agent-config'
 
 describe('loadAgentConfig', () => {
   beforeEach(() => {
@@ -66,6 +66,11 @@ describe('loadAgentConfig', () => {
 
   it('toolPath is colon-separated', () => {
     expect(loadAgentConfig().toolPath.split(':').length).toBeGreaterThan(1)
+  })
+
+  it('toolPath has the Homebrew bin dirs on macOS only', () => {
+    expect(buildToolPath('/h', 'darwin').split(':')).toContain('/opt/homebrew/bin')
+    expect(buildToolPath('/h', 'linux').split(':')).not.toContain('/opt/homebrew/bin')
   })
 
   // ── toolEnv ─────────────────────────────────────────────────────────────────

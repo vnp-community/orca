@@ -1,7 +1,11 @@
 /* oxlint-disable max-lines */
 import type { IPty } from 'node-pty'
 import type * as NodePty from 'node-pty'
+import type * as NodePath from 'node:path'
+import type * as NodeFs from 'node:fs'
+import type * as NodeOs from 'node:os'
 import { resolveWindowsGitBashShellPath } from '../main/git-bash'
+import { ensureNodePtySpawnHelperExecutable } from './node-pty-spawn-helper-permissions'
 import { WINDOWS_GIT_BASH_SHELL } from '../shared/windows-terminal-shell'
 import type { RelayDispatcher, RequestContext } from './dispatcher'
 import {
@@ -37,6 +41,7 @@ async function loadPty(): Promise<typeof NodePty | null> {
   }
   try {
     ptyModule = await import('node-pty')
+    ensureNodePtySpawnHelperExecutable()
     return ptyModule
   } catch {
     return null
@@ -248,22 +253,28 @@ export type PtyEnvAugmenter = (ctx: {
  * Does NOT throw — callers get a safe cwd or the home directory.
  */
 function validatePtyCwd(rawCwd: string): string {
-  const { resolve } = require('node:path') as typeof import('node:path')
-  const { statSync } = require('node:fs') as typeof import('node:fs')
-  const { homedir } = require('node:os') as typeof import('node:os')
+  const { resolve } = require('node:path') as typeof NodePath
+  const { statSync } = require('node:fs') as typeof NodeFs
+  const { homedir } = require('node:os') as typeof NodeOs
 
   const home = homedir()
-  if (!rawCwd) {return home}
+  if (!rawCwd) {
+    return home
+  }
 
   // Reject null bytes
-  if (rawCwd.includes('\0')) {return home}
+  if (rawCwd.includes('\0')) {
+    return home
+  }
 
   const resolved = resolve(rawCwd)
 
   // Must exist and be a directory
   try {
     const stat = statSync(resolved)
-    if (!stat.isDirectory()) {return home}
+    if (!stat.isDirectory()) {
+      return home
+    }
   } catch {
     return home
   }
@@ -663,9 +674,8 @@ export class PtyHandler {
     // TM-003: On Linux/macOS, resolvePtyShellOverride() always returns '' (only
     // processes Windows shell overrides). Fall back to env.SHELL if provided.
     // This lets callers set a specific shell (bash, zsh, fish) via env.SHELL.
-    const envShell = (env && typeof env.SHELL === 'string' && env.SHELL.trim())
-      ? env.SHELL.trim()
-      : ''
+    const envShell =
+      env && typeof env.SHELL === 'string' && env.SHELL.trim() ? env.SHELL.trim() : ''
     const shell = resolvedShellOverride || envShell || resolveDefaultShell()
     const id = `pty-${this.nextId++}`
 
@@ -698,9 +708,11 @@ export class PtyHandler {
     // binary name keeps this from also matching an unrelated "ghost"-style
     // binary.
     const providerEnv =
-      userId && command?.startsWith('gh ') ? buildGhEnv(userId, {}) :
-      userId && command?.startsWith('glab ') ? buildGlabEnv(userId, {}) :
-      undefined
+      userId && command?.startsWith('gh ')
+        ? buildGhEnv(userId, {})
+        : userId && command?.startsWith('glab ')
+          ? buildGlabEnv(userId, {})
+          : undefined
     const spawnEnv = this.buildSpawnEnv(
       // buildGhEnv/buildGlabEnv are typed as NodeJS.ProcessEnv (values may be
       // `string | undefined`) but only ever assign string literals — safe to

@@ -183,7 +183,7 @@ export async function handleShellExec(
 // untouched.
 //
 // Open Question 3 (chunking granularity) resolved consistently with
-// handleAgentExecPromptStream in agent-print-mode-exec.ts: forward each raw
+// handleAgentExecPromptStream in agent-exec-prompt-stream.ts: forward each raw
 // stdout/stderr `data` event verbatim, no line-splitting — lower latency,
 // and shell scripts commonly emit unterminated prompts/progress output that
 // line-buffering would hold back.

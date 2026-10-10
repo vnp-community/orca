@@ -13,7 +13,7 @@ const execFileAsync = promisify(_execFile)
 
 // UNVERIFIED tool names — confirmed once real e2e test runs (task 04)
 export const READONLY_DEFAULT_TOOLS = ['Read', 'Glob', 'Grep'] as const
-export const CLAUDE_FLAGS_TTL_MS = 600_000   // 10 minutes
+export const CLAUDE_FLAGS_TTL_MS = 600_000 // 10 minutes
 export const CLAUDE_HELP_TIMEOUT_MS = 5_000
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -22,6 +22,8 @@ export type ClaudeFlagSupport = {
   tools: boolean
   permissionMode: boolean
   disallowedTools: boolean
+  /** `--output-format stream-json` and `--verbose` are both advertised (activity stream for execPrompt). */
+  streamJson: boolean
 }
 
 export type ClaudeHelpProbe = (env: NodeJS.ProcessEnv) => Promise<string>
@@ -74,7 +76,13 @@ export async function detectClaudeFlags(
       const flags: ClaudeFlagSupport = {
         tools: /(?:^|[\s,])--tools(?=[\s<=,]|$)/m.test(helpText),
         permissionMode: /(?:^|[\s,])--permission-mode(?=[\s<=,]|$)/m.test(helpText),
-        disallowedTools: /(?:^|[\s,])--(?:disallowedTools|disallowed-tools)(?=[\s<=,]|$)/m.test(helpText)
+        disallowedTools: /(?:^|[\s,])--(?:disallowedTools|disallowed-tools)(?=[\s<=,]|$)/m.test(
+          helpText
+        ),
+        streamJson:
+          /(?:^|[\s,])--output-format(?=[\s<=,]|$)/m.test(helpText) &&
+          /stream-json/.test(helpText) &&
+          /(?:^|[\s,])--verbose(?=[\s<=,]|$)/m.test(helpText)
       }
       // Only cache successes; failed probes are retried next call
       flagCache.set(key, { at: now(), flags })
@@ -95,9 +103,15 @@ export async function detectClaudeFlags(
 export function readonlyUnsupportedReason(
   flags: ClaudeFlagSupport | null
 ): ReadonlyUnsupportedReason | null {
-  if (flags === null) { return 'CLAUDE_HELP_UNAVAILABLE' }
-  if (!flags.tools) { return 'FLAG_TOOLS_MISSING' }
-  if (!flags.permissionMode) { return 'FLAG_PERMISSION_MODE_MISSING' }
+  if (flags === null) {
+    return 'CLAUDE_HELP_UNAVAILABLE'
+  }
+  if (!flags.tools) {
+    return 'FLAG_TOOLS_MISSING'
+  }
+  if (!flags.permissionMode) {
+    return 'FLAG_PERMISSION_MODE_MISSING'
+  }
   return null
 }
 
