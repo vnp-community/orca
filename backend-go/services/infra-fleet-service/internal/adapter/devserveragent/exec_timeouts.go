@@ -36,3 +36,9 @@ func execTimeoutForMethod(method string) time.Duration {
 	}
 	return 0
 }
+
+// isAgentRunMethod marks the calls where the agent is working for a caller for minutes: a task run and a model call.
+// They are what makes a dev server "busy"; short probes (ports.scan, fs.*) are not.
+func isAgentRunMethod(method string) bool {
+	return method == "agent.execPrompt" || method == "ai.complete"
+}

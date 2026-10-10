@@ -29,11 +29,11 @@ type contractFixture struct {
 	edges    *fakeEdgeRepository
 	simple   *fakeSimpleExecutor
 	contract *fakeContractExecutor
-	specs    *fakeTaskSpecRepository
+	complex  *fakeExecutor
 	ctx      context.Context
 }
 
-func newContractFixture(t *testing.T, withSpec bool) *contractFixture {
+func newContractFixture(t *testing.T) *contractFixture {
 	t.Helper()
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
@@ -43,34 +43,39 @@ func newContractFixture(t *testing.T, withSpec bool) *contractFixture {
 	tasks.tasks["task-1"] = task
 	f := &contractFixture{tasks: tasks, edges: &fakeEdgeRepository{}, simple: &fakeSimpleExecutor{ref: "plain-ref"},
 		contract: &fakeContractExecutor{out: ContractExecuteOutput{ExecutionRef: "contract-ref", Record: domain.ExecutionRecord{ID: "rec-1"}}},
-		specs:    newFakeTaskSpecRepository(), ctx: withIdentity(context.Background(), "tenant-1", "user-1")}
-	if withSpec {
-		f.specs.specs["task-1"] = domain.TaskSpec{TaskID: "task-1", TenantID: "tenant-1"}
-	}
-	uc, _, _, _, _ := newExecutableExecuteTask(tasks, f.edges, f.simple, &fakeExecutor{ref: "orch"}, grants)
-	f.uc = uc.WithContract(f.contract, f.specs).WithRunEvents(newLeases(tasks), nil)
+		complex:  &fakeExecutor{ref: "orch"}, ctx: withIdentity(context.Background(), "tenant-1", "user-1")}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, f.edges, f.simple, f.complex, grants)
+	f.uc = uc.WithContract(f.contract).WithRunEvents(newLeases(tasks), nil)
 	return f
 }
 
-func TestSelectEngine_SpecTaskWithDependsOn_IsDirectAgent(t *testing.T) {
-	f := newContractFixture(t, true)
+func dependsOn(f *contractFixture) {
 	f.edges.edges = append(f.edges.edges, domain.TaskEdge{FromTaskID: "task-1", ToTaskID: "dep", Kind: domain.EdgeKindDependsOn})
+}
+
+// A Request's task is ordered by request-service, so depends_on must not hand it to the coordinator: that run never
+// launched the agent and left the task in_progress for good.
+func TestSelectEngine_RequestTaskWithDependsOn_IsDirectAgent(t *testing.T) {
+	f := newContractFixture(t)
+	dependsOn(f)
 	engine, err := f.uc.selectEngine(f.ctx, "tenant-1", f.tasks.tasks["task-1"])
 	if err != nil || engine != domain.EngineDirectAgent {
 		t.Fatalf("got %s %v", engine, err)
 	}
 }
 
-func TestSelectEngine_NoSpecWithDependsOn_StaysOrchestration(t *testing.T) {
-	f := newContractFixture(t, false)
-	f.edges.edges = append(f.edges.edges, domain.TaskEdge{FromTaskID: "task-1", ToTaskID: "dep", Kind: domain.EdgeKindDependsOn})
-	if engine, _ := f.uc.selectEngine(f.ctx, "tenant-1", f.tasks.tasks["task-1"]); engine != domain.EngineOrchestration {
+func TestSelectEngine_TaskWithoutRequestWithDependsOn_StaysOrchestration(t *testing.T) {
+	f := newContractFixture(t)
+	task := f.tasks.tasks["task-1"]
+	task.RequestID = ""
+	dependsOn(f)
+	if engine, _ := f.uc.selectEngine(f.ctx, "tenant-1", task); engine != domain.EngineOrchestration {
 		t.Fatalf("got %s", engine)
 	}
 }
 
 func TestSelectEngine_ContainerWithChildren_StaysOrchestration(t *testing.T) {
-	f := newContractFixture(t, true)
+	f := newContractFixture(t)
 	f.edges.edges = append(f.edges.edges, domain.TaskEdge{FromTaskID: "task-1", ToTaskID: "child", Kind: domain.EdgeKindParentChild})
 	if engine, _ := f.uc.selectEngine(f.ctx, "tenant-1", f.tasks.tasks["task-1"]); engine != domain.EngineOrchestration {
 		t.Fatalf("got %s", engine)
@@ -78,7 +83,7 @@ func TestSelectEngine_ContainerWithChildren_StaysOrchestration(t *testing.T) {
 }
 
 func TestSelectEngine_WorkflowTemplateWins(t *testing.T) {
-	f := newContractFixture(t, true)
+	f := newContractFixture(t)
 	task := f.tasks.tasks["task-1"]
 	task.WorkflowTemplateID = "wf"
 	if engine, _ := f.uc.selectEngine(f.ctx, "tenant-1", task); engine != domain.EngineWorkflow {
@@ -86,36 +91,23 @@ func TestSelectEngine_WorkflowTemplateWins(t *testing.T) {
 	}
 }
 
-func TestSelectEngine_NilSpecLookup_OldBehavior(t *testing.T) {
-	f := newContractFixture(t, true)
-	f.uc.specs = nil
-	f.edges.edges = append(f.edges.edges, domain.TaskEdge{FromTaskID: "task-1", ToTaskID: "dep", Kind: domain.EdgeKindDependsOn})
-	if engine, _ := f.uc.selectEngine(f.ctx, "tenant-1", f.tasks.tasks["task-1"]); engine != domain.EngineOrchestration {
-		t.Fatalf("got %s", engine)
+func TestExecuteTask_RequestTaskWithDependsOn_RunsTheAgentNotTheCoordinator(t *testing.T) {
+	f := newContractFixture(t)
+	dependsOn(f)
+	if _, err := f.uc.Execute(f.ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req:r:task-1:1"}); err != nil {
+		t.Fatal(err)
+	}
+	if !f.simple.called || f.complex.called {
+		t.Fatalf("agent=%v coordinator=%v", f.simple.called, f.complex.called)
+	}
+	if got := f.tasks.tasks["task-1"].Status; got != domain.StatusReview {
+		t.Fatalf("the run completes inline, got %s", got)
 	}
 }
 
-func TestSelectEngine_LookupErrorFailsClosed(t *testing.T) {
-	f := newContractFixture(t, true)
-	f.specs.lookupErr = errors.New("db down")
-	if _, err := f.uc.selectEngine(f.ctx, "tenant-1", f.tasks.tasks["task-1"]); err == nil {
-		t.Fatal("expected the lookup error")
-	}
-}
-
-func TestSelectEngine_TaskWithoutRequestIgnoresSpec(t *testing.T) {
-	f := newContractFixture(t, true)
-	task := f.tasks.tasks["task-1"]
-	task.RequestID = ""
-	f.edges.edges = append(f.edges.edges, domain.TaskEdge{FromTaskID: "task-1", ToTaskID: "dep", Kind: domain.EdgeKindDependsOn})
-	if engine, _ := f.uc.selectEngine(f.ctx, "tenant-1", task); engine != domain.EngineOrchestration {
-		t.Fatalf("got %s", engine)
-	}
-}
-
-func TestExecuteTask_PromptOverrideAllowedForSpecTaskWithDeps(t *testing.T) {
-	f := newContractFixture(t, true)
-	f.edges.edges = append(f.edges.edges, domain.TaskEdge{FromTaskID: "task-1", ToTaskID: "dep", Kind: domain.EdgeKindDependsOn})
+func TestExecuteTask_PromptOverrideAllowedForRequestTaskWithDeps(t *testing.T) {
+	f := newContractFixture(t)
+	dependsOn(f)
 	_, err := f.uc.Execute(f.ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req:r:task-1:3", Prompt: "do it", ResultNonce: "abcdef0123456789"})
 	if err != nil {
 		t.Fatalf("got %v", err)
@@ -129,7 +121,7 @@ func TestExecuteTask_PromptOverrideAllowedForSpecTaskWithDeps(t *testing.T) {
 }
 
 func TestExecuteTask_NoNonce_UsesPlainExecutor(t *testing.T) {
-	f := newContractFixture(t, true)
+	f := newContractFixture(t)
 	if _, err := f.uc.Execute(f.ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +156,7 @@ func onlyEvent(t *testing.T, f *contractFixture) map[string]any {
 }
 
 func TestExecuteTask_ContractFailure_RevertsAndEmitsFailureClass(t *testing.T) {
-	f := newContractFixture(t, true)
+	f := newContractFixture(t)
 	f.contract.err = &ExecutionFailure{Class: domain.FailureAgentDefect, Code: "RESULT_BLOCK_MISSING", RecordID: "rec-9"}
 	if _, err := f.uc.Execute(f.ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req:r:task-1:1", Prompt: "p", ResultNonce: "abcdef0123456789"}); err != nil {
 		t.Fatal(err)
@@ -179,7 +171,7 @@ func TestExecuteTask_ContractFailure_RevertsAndEmitsFailureClass(t *testing.T) {
 }
 
 func TestExecuteTask_ContractSuccess_GoesToReview(t *testing.T) {
-	f := newContractFixture(t, true)
+	f := newContractFixture(t)
 	if _, err := f.uc.Execute(f.ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req:r:task-1:1", Prompt: "p", ResultNonce: "abcdef0123456789"}); err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +200,7 @@ func TestStatusChangedPayload_OmitsContractFieldsWhenEmpty(t *testing.T) {
 }
 
 func TestExecuteTask_PlainPath_EmitsExactlyOneStatusChanged(t *testing.T) {
-	f := newContractFixture(t, true)
+	f := newContractFixture(t)
 	if _, err := f.uc.Execute(f.ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
 		t.Fatal(err)
 	}

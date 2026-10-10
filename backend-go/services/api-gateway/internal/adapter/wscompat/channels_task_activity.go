@@ -113,7 +113,7 @@ func RegisterTaskActivityStreamChannel(r *Registry, bus ephemeralSubscriber) {
 				go func() {
 					defer wg.Done()
 					_ = bus.SubscribeEphemeral(ctx, sub.StreamName, sub.Subject, func(ctx context.Context, ev commoneventbus.Event) error {
-						frame, ok := translateToTaskActivity(sub.Subject, ev, a.TaskID)
+						frame, ok := translateToTaskActivity(sub.Subject, ev, a.TaskID, id.TenantID)
 						if !ok {
 							return nil
 						}
@@ -133,7 +133,14 @@ func RegisterTaskActivityStreamChannel(r *Registry, bus ephemeralSubscriber) {
 // subjects' payloads carries directly (TASK-FT-003-01/-02/-03,
 // TASK-AG-FLOWTASK-003's agentOutputPartialPayload), so this function needs
 // no cross-service lookup of its own.
-func translateToTaskActivity(subject string, ev commoneventbus.Event, taskID string) (TaskActivityFrame, bool) {
+//
+// tenantID is the subscriber's tenant: the filter above is by task id alone, so without it a subscriber who
+// knew another tenant's task id would see that tenant's agent output. Skipped when either side is empty
+// (events or tests without a tenant).
+func translateToTaskActivity(subject string, ev commoneventbus.Event, taskID, tenantID string) (TaskActivityFrame, bool) {
+	if tenantID != "" && ev.TenantID != "" && ev.TenantID != tenantID {
+		return TaskActivityFrame{}, false
+	}
 	var origin struct {
 		OriginTaskID string `json:"origin_task_id"`
 	}

@@ -18,6 +18,8 @@ import (
 // subject in the real approvals table, which is the property the execution loop relies on.
 type dbOpener struct {
 	env ExecutionEnv
+	// phase is the real Phase subject validation OpenApproval runs: it reads the tree from task-service as the context's user.
+	phase usecase.SubjectArtifacts
 }
 
 func (o *dbOpener) Execute(ctx context.Context, in usecase.OpenApprovalInput) (*domain.Approval, error) {
@@ -28,6 +30,11 @@ func (o *dbOpener) Execute(ctx context.Context, in usecase.OpenApprovalInput) (*
 	req, err := o.env.Requests.Get(ctx, in.RequestID)
 	if err != nil {
 		return nil, err
+	}
+	if in.SubjectType == domain.SubjectPhase && o.phase != nil {
+		if _, _, err := o.phase.Describe(ctx, req, in.SubjectType, in.SubjectID); err != nil {
+			return nil, err
+		}
 	}
 	now := usec()
 	a := domain.Approval{
@@ -79,20 +86,21 @@ func newFlowRig(t *testing.T, env ExecutionEnv) *flowRig {
 		Approvals: &usecase.ApprovalLookupFromGateReader{Approvals: env.GateApprovals},
 	})
 	spawn := usecase.NewSpawnChildRequest(env.Requests, env.Links, usecase.NewIdempotentChildCreator(env.Requests, env.Idempotency, env.Outbox), env.Tx)
-	opener := &dbOpener{env: env}
+	opener := &dbOpener{env: env, phase: &usecase.PhaseArtifacts{Tasks: client}}
+	access := &usecase.ExecutionAccess{Tasks: client}
 	advance := &usecase.AdvanceExecution{
 		Requests: env.Requests, Tasks: client, Outcomes: env.Outcomes, PhaseStarts: env.PhaseStarts, Policies: policies, Approvals: opener, Settings: r.settings,
 	}
 	r.evaluate = &usecase.EvaluateExecution{
 		Tasks: client, Outcomes: env.Outcomes, PhaseStarts: env.PhaseStarts, Checks: env.Checks, Approvals: env.GateApprovals, Open: opener, Advance: advance,
-		Actors: &usecase.ApprovalExecutionActors{Approvals: env.GateApprovals, PhaseStarts: env.PhaseStarts}, Policies: policies, Transition: transition,
+		Actors: &usecase.ApprovalExecutionActors{Approvals: env.GateApprovals, PhaseStarts: env.PhaseStarts, Access: access}, Policies: policies, Transition: transition,
 		Returner: returner, FollowUps: &usecase.SpawnFollowUps{Spawn: spawn}, Tx: env.Tx, Outbox: env.Outbox, Settings: r.settings,
 	}
 	r.report = &usecase.ReportTaskOutcome{
 		Requests: env.Requests, Tasks: client, Outcomes: env.Outcomes, Processed: env.Processed, Evaluate: r.evaluate, Tx: env.Tx, Outbox: env.Outbox, Settings: r.settings,
 	}
 	r.startPh = &usecase.StartPhase{
-		Requests: env.Requests, Tasks: client, PhaseStarts: env.PhaseStarts, Approvals: env.GateApprovals, Authorizer: allowStart{}, Advance: advance, Tx: env.Tx, Outbox: env.Outbox,
+		Requests: env.Requests, Tasks: client, PhaseStarts: env.PhaseStarts, Approvals: env.GateApprovals, Authorizer: allowStart{}, Advance: advance, Access: access, Tx: env.Tx, Outbox: env.Outbox,
 	}
 	r.startExec = &usecase.StartExecution{Requests: env.Requests, Evaluate: r.evaluate}
 	r.reconcile = func(owner string) *usecase.ReconcileExecutingRequests {
@@ -216,6 +224,7 @@ func RunExecutionFlowContract(t *testing.T, newEnv func(t *testing.T) ExecutionE
 		{"ExecutionFlow_TwoReplicasReconcileOnce", flowTwoReplicas},
 		{"ExecutionFlow_DuplicateEventsAreHarmless", flowDuplicateEvents},
 		{"ExecutionFlow_DispatchOutageThenRecovery", flowDispatchOutage},
+		{"ExecutionFlow_ApproverAndStarterAreNotTheCommitter", flowApproverIsNotTheCommitter},
 	}
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) { s.fn(t, env) })
@@ -233,6 +242,8 @@ func flowChangeRequestToCompleted(t *testing.T, env ExecutionEnv) {
 	t3 := r.tasks.Add(req.ID, "task", "t3", p2, "open")
 	r.tasks.DependsOn(t2, t1)
 	planApprover, starter := uuid.NewString(), uuid.NewString()
+	// Like task-service, show the Plan tree only to the two people who act on it: a background context sees nothing.
+	r.tasks.AllowTreeReaders(planApprover, starter)
 	r.approve(req, domain.SubjectPlan, plan, planApprover)
 	r.approve(req, domain.SubjectPhase, p1, planApprover)
 
@@ -490,5 +501,68 @@ func flowDispatchOutage(t *testing.T, env ExecutionEnv) {
 	r.settle()
 	if r.tasks.Task(task).Status != "in_progress" {
 		t.Fatalf("recovered: %s", r.tasks.Task(task).Status)
+	}
+}
+
+// flowApproverIsNotTheCommitter is the multi-person case: one person commits the Plan (and so owns the tree in
+// task-service), another approves it, a third starts the first Phase, a fourth the second. Nobody is given tree
+// access by the test; the execution loop has to obtain what task-service demands.
+func flowApproverIsNotTheCommitter(t *testing.T, env ExecutionEnv) {
+	r := newFlowRig(t, env)
+	req := r.request(domain.RequestTypeChangeRequest, domain.RequestSizeM)
+	plan := r.tasks.Add(req.ID, "plan", "plan", "", "open")
+	p1 := r.tasks.Add(req.ID, "phase", "phase 1", plan, "open")
+	p2 := r.tasks.Add(req.ID, "phase", "phase 2", plan, "open")
+	t1 := r.tasks.Add(req.ID, "task", "t1", p1, "open")
+	t2 := r.tasks.Add(req.ID, "task", "t2", p2, "open")
+	r.tasks.DependsOn(p2, p1)
+	committer, planApprover, starter1, starter2, outsider := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+	r.tasks.OwnTree(plan, committer)
+	r.approve(req, domain.SubjectPlan, plan, planApprover)
+	r.approve(req, domain.SubjectPhase, p1, planApprover)
+
+	if res, err := r.startPh.Execute(actingAs(r.ctx, starter1), usecase.StartPhaseInput{RequestID: req.ID, PhaseTaskID: p1}); err != nil || len(res.Dispatched) != 1 {
+		t.Fatalf("a Phase started by someone who did not commit the Plan must run: %+v %v", res, err)
+	}
+	r.settle()
+	if r.tasks.Task(t1).Status != "in_progress" {
+		t.Fatalf("t1 runs, got %s", r.tasks.Task(t1).Status)
+	}
+
+	r.tasks.RunSucceeded(t1)
+	r.settle()
+	if r.tasks.Task(t1).Status != "done" || r.tasks.Task(p1).Status != "done" {
+		t.Fatalf("the finished task is completed and its phase derived done: %s %s", r.tasks.Task(t1).Status, r.tasks.Task(p1).Status)
+	}
+	pending := r.approvals(req, domain.SubjectPhase, p2)
+	if len(pending) != 1 || pending[0].Status != domain.ApprovalStatusPending {
+		t.Fatalf("the next Phase's gate opens although nobody involved committed the Plan: %+v", pending)
+	}
+	r.decide(pending[0], planApprover)
+	if res, err := r.startPh.Execute(actingAs(r.ctx, starter2), usecase.StartPhaseInput{RequestID: req.ID, PhaseTaskID: p2}); err != nil || len(res.Dispatched) != 1 {
+		t.Fatalf("StartPhase 2: %+v %v", res, err)
+	}
+	r.settle()
+	r.tasks.RunSucceeded(t2)
+	r.settle()
+	if got := r.reload(req); got.Status != domain.RequestStatusCompleted {
+		t.Fatalf("every phase done completes the request, got %s", got.Status)
+	}
+
+	if got := r.tasks.ExecutedBy(); len(got) != 2 || got[0] != starter1 || got[1] != starter2 {
+		t.Fatalf("task-service sees each Phase's starter: %v", got)
+	}
+	granted := strings.Join(r.tasks.Grants(plan), " ")
+	for _, who := range []string{starter1, starter2} {
+		if !strings.Contains(granted, who+":GRANT_LEVEL_USER") {
+			t.Errorf("%s needs a user-level grant on the Plan, got [%s]", who, granted)
+		}
+	}
+	if strings.Contains(granted, "OWNER") || strings.Contains(granted, "ADMIN") || strings.Contains(granted, outsider) {
+		t.Errorf("only execute-level grants for people the Request authorized, got [%s]", granted)
+	}
+	// Nobody else gains access: an unrelated user is still refused by task-service.
+	if ok, err := r.tasks.Client.CanExecute(r.ctx, plan, outsider); err != nil || ok {
+		t.Errorf("an outsider must not be able to execute: %v %v", ok, err)
 	}
 }

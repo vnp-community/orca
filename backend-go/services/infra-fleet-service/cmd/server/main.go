@@ -326,7 +326,15 @@ func run() error {
 	// capabilityRefresh is built after agentClient (it needs the client), but
 	// the attach hook must be registered before the client exists.
 	var capabilityRefresh atomic.Pointer[usecase.RefreshDevServerCapabilities]
+	var recordHandshake atomic.Pointer[usecase.RecordDevServerHandshake]
+	// statusBroadcast stays nil when NATS is unavailable: dev server status then reaches the UI only through the list call.
+	var statusBroadcast atomic.Pointer[usecase.BroadcastDevServerStatus]
 	agentOpts := []infradevserveragent.Option{
+		infradevserveragent.WithOnActivity(func(devServerID string) {
+			if b := statusBroadcast.Load(); b != nil {
+				b.Notify(devServerID)
+			}
+		}),
 		infradevserveragent.WithAgentTokens(agentTokenSource{tokens: agentTokenStore, broker: credentialBrokerClient}),
 		infradevserveragent.WithOnSessionAttached(func(devServerID string) {
 			uc := capabilityRefresh.Load()
@@ -338,6 +346,11 @@ func run() error {
 			tenantID, found, err := capabilityProfileStore.TenantIDForDevServer(probeCtx, devServerID)
 			if err != nil || !found {
 				return
+			}
+			if rec := recordHandshake.Load(); rec != nil {
+				if err := rec.Execute(tenant.WithTenantID(probeCtx, tenantID), tenantID, devServerID); err != nil {
+					logger.Warn("could not record the dev server handshake", slog.String("dev_server_id", devServerID), slog.Any("error", err))
+				}
 			}
 			// Failures only log inside the use case; a later GetDevServerCapabilities retries.
 			_, _ = uc.Execute(tenant.WithTenantID(probeCtx, tenantID), tenantID, devServerID, false)
@@ -420,7 +433,7 @@ func run() error {
 	// streamAgentExecOutputUC backs the StreamExecOutput RPC
 	// (TASK-AG-FLOWTASK-002/003) — task-service's SimpleExecutor consumes
 	// it alongside its own Relay('agent.execPrompt') call.
-	streamAgentExecOutputUC := usecase.NewStreamAgentExecOutput(repo, agentClient)
+	streamAgentExecOutputUC := usecase.NewStreamAgentExecOutput(repo, repo, agentClient)
 	listSshTargetsUC := usecase.NewListSshTargets(sshTargetStore)
 	getSshStateUC := usecase.NewGetSshState(sshTargetStore, repo, repo)
 
@@ -487,6 +500,7 @@ func run() error {
 		repo, agentClient, capabilityProfileStore, repo, usecase.RealClock{}, cfg.CapabilityRefreshMinInterval,
 	).WithLogger(logger)
 	capabilityRefresh.Store(refreshCapabilitiesUC)
+	recordHandshake.Store(usecase.NewRecordDevServerHandshake(repo, agentClient, usecase.RealClock{}))
 	getDevServerCapabilitiesUC := usecase.NewGetDevServerCapabilities(
 		repo, repo, capabilityProfileStore, refreshCapabilitiesUC, agentClient, cfg.CapabilityProfileTTL, usecase.RealClock{},
 	)
@@ -594,9 +608,15 @@ func run() error {
 		logger.Warn("eventbus unavailable — agent.statusChanged/agent.rateLimited will not be published", slog.Any("error", err))
 	} else {
 		defer func() { _ = closeEventBus() }()
-		if err := natsPub.EnsureStream(ctx, "INFRA", []string{"orca.infra.agent.>"}); err != nil {
+		// Same subjects as the lifecycle publisher's EnsureStream above: the two calls share the INFRA stream, and a
+		// narrower list here would silently drop every orca.infra.* subject outside agent.*, including dev server status.
+		if err := natsPub.EnsureStream(ctx, "INFRA", []string{"orca.infra.>"}); err != nil {
 			logger.Warn("failed to ensure jetstream stream for agent events", slog.Any("error", err))
 		} else {
+			broadcast := usecase.NewBroadcastDevServerStatus(capabilityProfileStore, agentClient, infraeventbus.NewDevServerStatusPublisher(natsPub), logger)
+			statusBroadcast.Store(broadcast)
+			go broadcast.Run(ctx)
+
 			agentStatusPublisher := infraeventbus.New(natsPub, agentRateLimitedOutboxStore)
 			classifierUC = usecase.NewAgentOutputClassifier(agentSessionStore, agentClient, agentStatusPublisher, killAgentSessionUC)
 
@@ -796,6 +816,7 @@ func run() error {
 	)
 	infraServer.WithCodeIntel(streamCodeIntelEventsUC, getAgentCapabilitiesUC)
 	infraServer.WithDevServerCapabilities(getDevServerCapabilitiesUC)
+	infraServer.WithDevServerActivity(agentClient)
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, withAgentSessionList(infraServer, agentSessionStore))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

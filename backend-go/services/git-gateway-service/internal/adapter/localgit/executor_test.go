@@ -18,6 +18,11 @@ import (
 func initRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
+	// git always prints realpaths (macOS: /private/var/... for t.TempDir()'s
+	// /var/...), so assertions on `git worktree list` need the resolved dir.
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = resolved
+	}
 
 	run := func(args ...string) {
 		t.Helper()

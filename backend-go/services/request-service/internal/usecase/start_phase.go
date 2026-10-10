@@ -39,8 +39,10 @@ type StartPhase struct {
 	Approvals   ApprovalGateReader
 	Authorizer  StartPhaseAuthorizer
 	Advance     *AdvanceExecution
-	Tx          TxRunner
-	Outbox      OutboxWriter
+	// Access makes the actor able to execute the Plan tree once the caller is authorized to start; nil skips it.
+	Access *ExecutionAccess
+	Tx     TxRunner
+	Outbox OutboxWriter
 }
 
 func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPhaseResult, error) {
@@ -69,7 +71,7 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 	tree := domain.BuildExecutionTree(tasks)
 
 	if in.PhaseTaskID == "" {
-		return uc.startWholePlan(ctx, req, tree, in, actor)
+		return uc.startWholePlan(ctx, req, tasks, tree, in, actor)
 	}
 	phase, ok := tree.Phase(in.PhaseTaskID)
 	if !ok || phase.RequestID != req.ID {
@@ -89,7 +91,10 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 	if flow.HasExecutionGate(domain.GatePhase) && (latest == nil || latest.Status != domain.ApprovalStatusApproved) {
 		return StartPhaseResult{}, domain.ErrPhaseNotApproved(phase.ID)
 	}
-	if err := uc.checkPredecessors(ctx, tree, phase); err != nil {
+	if err := uc.ensureAccess(ctx, tasks, actor); err != nil {
+		return StartPhaseResult{}, err
+	}
+	if err := uc.checkPredecessors(ctx, tree, phase, actor); err != nil {
 		return StartPhaseResult{}, err
 	}
 
@@ -102,7 +107,7 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 }
 
 // startWholePlan is the no-Phase path: the Plan itself is the unit that starts.
-func (uc *StartPhase) startWholePlan(ctx context.Context, req domain.Request, tree domain.ExecutionTree, in StartPhaseInput, actor string) (StartPhaseResult, error) {
+func (uc *StartPhase) startWholePlan(ctx context.Context, req domain.Request, tasks []domain.TaskView, tree domain.ExecutionTree, in StartPhaseInput, actor string) (StartPhaseResult, error) {
 	if tree.HasPhases() {
 		return StartPhaseResult{}, domain.ErrPhaseRequired()
 	}
@@ -111,18 +116,35 @@ func (uc *StartPhase) startWholePlan(ctx context.Context, req domain.Request, tr
 			return StartPhaseResult{}, err
 		}
 	}
+	if err := uc.ensureAccess(ctx, tasks, actor); err != nil {
+		return StartPhaseResult{}, err
+	}
 	res, err := uc.Advance.Execute(ctx, AdvanceInput{RequestID: req.ID, ActorID: actor})
 	return StartPhaseResult{Dispatched: res.Dispatched}, err
 }
 
+// ensureAccess runs after the caller is authorized to start and before the claim, so a person task-service would
+// refuse leaves no phase_starts row behind that makes them the actor of every later dispatch.
+func (uc *StartPhase) ensureAccess(ctx context.Context, tasks []domain.TaskView, actor string) error {
+	if uc.Access == nil {
+		return nil
+	}
+	return uc.Access.EnsureOnRoots(ctx, tasks, actor)
+}
+
 // checkPredecessors requires every Phase this one depends_on to be done or cancelled.
-func (uc *StartPhase) checkPredecessors(ctx context.Context, tree domain.ExecutionTree, phase domain.TaskView) error {
+func (uc *StartPhase) checkPredecessors(ctx context.Context, tree domain.ExecutionTree, phase domain.TaskView, actor string) error {
 	if tree.Plan == nil {
 		return nil
 	}
-	sub, err := uc.Tasks.GetSubtree(ctx, tree.Plan.ID)
+	sub, err := uc.Tasks.GetSubtree(asExecutionActor(ctx, actor), tree.Plan.ID)
 	if err != nil {
 		return err
+	}
+	// task-service hides what the actor has no grant on, and edges of a hidden Phase vanish with it: without this
+	// check an actor who cannot see the Phase would pass the predecessor test with no edges to look at.
+	if _, visible := findTask(sub.Tasks, phase.ID); !visible {
+		return domain.ErrExecuteForbidden()
 	}
 	for _, edge := range sub.DependsOn {
 		if edge.From != phase.ID {

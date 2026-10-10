@@ -70,6 +70,8 @@ type Server struct {
 	getTaskSpecs         *usecase.GetTaskSpecs
 	lockTaskSpecs        *usecase.LockTaskSpecs
 	listExecutionRecords *usecase.ListExecutionRecords
+	// Wired through WithTaskExecutionOutput.
+	getTaskExecutionOutput *usecase.GetTaskExecutionOutput
 }
 
 func New(

@@ -67,7 +67,7 @@ func taskErrorCode(err error) string {
 func toTaskView(t *taskv1.Task) domain.TaskView {
 	v := domain.TaskView{
 		ID: t.GetId(), ParentID: t.GetParentId(), Type: t.GetTaskType(), Status: t.GetStatus(), RequestID: t.GetRequestId(),
-		Title: t.GetTitle(), Description: t.GetDescription(), AssigneeID: t.GetAssigneeId(), WorktreeID: t.GetWorktreeId(), Labels: t.GetLabels(),
+		Title: t.GetTitle(), Description: t.GetDescription(), AssigneeID: t.GetAssigneeId(), OwnerID: t.GetOwnerId(), WorktreeID: t.GetWorktreeId(), Labels: t.GetLabels(),
 	}
 	if h := t.GetEstimatedHours(); h != nil {
 		hours := h.GetValue()
@@ -201,6 +201,44 @@ func (c *TaskClient) ListExecutionStates(ctx context.Context, taskIDs []string) 
 	return out, nil
 }
 
+// CanExecute asks task-service to resolve userID's grants; "no applicable grant" is an answer, not a failure.
+func (c *TaskClient) CanExecute(ctx context.Context, taskID, userID string) (bool, error) {
+	ctx, cancel, err := callContext(ctx, false, taskReadTimeout)
+	if err != nil {
+		return false, err
+	}
+	defer cancel()
+	_, err = c.client.ResolvePermission(ctx, &taskv1.ResolvePermissionRequest{TaskId: taskID, UserId: userID, Action: "execute"})
+	switch status.Code(err) {
+	case codes.OK:
+		return true, nil
+	case codes.PermissionDenied:
+		return false, nil
+	case codes.NotFound:
+		return false, domain.ErrTaskNotFoundRemote
+	}
+	return false, transportError("resolve permission", err)
+}
+
+// GrantExecute writes the grant as grantorID: task-service lets only a user who manages the task grant on it.
+func (c *TaskClient) GrantExecute(ctx context.Context, taskID, grantorID, userID string) error {
+	ctx, cancel, err := callContext(tenant.WithUserID(ctx, grantorID), true, taskReadTimeout)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	_, err = c.client.Grant(ctx, &taskv1.GrantRequest{TaskId: taskID, SubjectId: userID, Level: taskv1.GrantLevel_GRANT_LEVEL_USER, ApplyTree: true})
+	switch status.Code(err) {
+	case codes.OK:
+		return nil
+	case codes.PermissionDenied:
+		return domain.ErrTaskForbidden
+	case codes.NotFound:
+		return domain.ErrTaskNotFoundRemote
+	}
+	return transportError("grant execute", err)
+}
+
 func chunkStrings(in []string, size int) [][]string {
 	var out [][]string
 	for len(in) > 0 {
@@ -238,6 +276,12 @@ func (UnavailableTaskClient) SetWorktree(context.Context, string, string) error 
 	return errNoTaskService
 }
 func (UnavailableTaskClient) SetStatus(context.Context, string, string) error {
+	return errNoTaskService
+}
+func (UnavailableTaskClient) CanExecute(context.Context, string, string) (bool, error) {
+	return false, errNoTaskService
+}
+func (UnavailableTaskClient) GrantExecute(context.Context, string, string, string) error {
 	return errNoTaskService
 }
 func (UnavailableTaskClient) ListExecutionStates(context.Context, []string) (map[string]usecase.ExecutionStateView, error) {

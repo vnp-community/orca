@@ -1397,9 +1397,12 @@ type DevServer struct {
 	// tags is free-form, tenant-scoped (e.g. "gpu", "region:us-east"); also
 	// BL-PRF-03's allowedServerTags match target and WF's ListDevServersByTag
 	// dispatch-target key.
-	Tags          []string `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Tags []string `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
+	// active_executions counts agent.execPrompt runs in flight on this dev server's live session (0 when it has none or
+	// is not connected). Set by ListDevServers only; every other RPC returning a DevServer leaves it 0.
+	ActiveExecutions int32 `protobuf:"varint,15,opt,name=active_executions,json=activeExecutions,proto3" json:"active_executions,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *DevServer) Reset() {
@@ -1528,6 +1531,13 @@ func (x *DevServer) GetTags() []string {
 		return x.Tags
 	}
 	return nil
+}
+
+func (x *DevServer) GetActiveExecutions() int32 {
+	if x != nil {
+		return x.ActiveExecutions
+	}
+	return 0
 }
 
 type RegisterDevServerRequest struct {
@@ -3883,7 +3893,11 @@ type StreamExecOutputRequest struct {
 	// agent.execPrompt call in — this RPC does not validate that match
 	// itself (it has no visibility into a concurrent Relay call), the
 	// caller owns keeping them consistent.
-	StepId        string `protobuf:"bytes,2,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
+	StepId string `protobuf:"bytes,2,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
+	// dev_server_id is the fallback target when the caller has no connection_id
+	// (a project bound to a dev server without an infra.connections row, same
+	// case Relay's RelayByDevServer serves). Ignored when connection_id is set.
+	DevServerId   string `protobuf:"bytes,3,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3928,6 +3942,13 @@ func (x *StreamExecOutputRequest) GetConnectionId() string {
 func (x *StreamExecOutputRequest) GetStepId() string {
 	if x != nil {
 		return x.StepId
+	}
+	return ""
+}
+
+func (x *StreamExecOutputRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
 	}
 	return ""
 }
@@ -12829,7 +12850,7 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\tjump_host\x18\t \x01(\tR\bjumpHost\x12;\n" +
 	"\x1arelay_grace_period_seconds\x18\n" +
 	" \x01(\x05R\x17relayGracePeriodSeconds\x12J\n" +
-	"\rport_forwards\x18\v \x03(\v2%.orca.infrafleet.v1.RecipePortForwardR\fportForwards\"\xd0\x03\n" +
+	"\rport_forwards\x18\v \x03(\v2%.orca.infrafleet.v1.RecipePortForwardR\fportForwards\"\xfd\x03\n" +
 	"\tDevServer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
@@ -12845,7 +12866,8 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x04arch\x18\v \x01(\tR\x04arch\x12!\n" +
 	"\fnode_version\x18\f \x01(\tR\vnodeVersion\x12#\n" +
 	"\ragent_version\x18\r \x01(\tR\fagentVersion\x12\x12\n" +
-	"\x04tags\x18\x0e \x03(\tR\x04tags\"\x8d\x02\n" +
+	"\x04tags\x18\x0e \x03(\tR\x04tags\x12+\n" +
+	"\x11active_executions\x18\x0f \x01(\x05R\x10activeExecutions\"\x8d\x02\n" +
 	"\x18RegisterDevServerRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x126\n" +
@@ -12997,10 +13019,11 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"paramsJson\"1\n" +
 	"\x10RelayStreamFrame\x12\x1d\n" +
 	"\n" +
-	"frame_json\x18\x01 \x01(\tR\tframeJson\"W\n" +
+	"frame_json\x18\x01 \x01(\tR\tframeJson\"{\n" +
 	"\x17StreamExecOutputRequest\x12#\n" +
 	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x17\n" +
-	"\astep_id\x18\x02 \x01(\tR\x06stepId\"[\n" +
+	"\astep_id\x18\x02 \x01(\tR\x06stepId\x12\"\n" +
+	"\rdev_server_id\x18\x03 \x01(\tR\vdevServerId\"[\n" +
 	"\x14AgentExecOutputEvent\x12\x17\n" +
 	"\astep_id\x18\x01 \x01(\tR\x06stepId\x12\x16\n" +
 	"\x06stream\x18\x02 \x01(\tR\x06stream\x12\x12\n" +

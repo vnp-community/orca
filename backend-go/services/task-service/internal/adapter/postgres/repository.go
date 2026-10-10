@@ -495,9 +495,7 @@ const maxLastExecutionOutputBytes = 8 * 1024
 // truncated), and domain.Task.LastExecutionOutput's doc comment for who
 // reads this back.
 func (r *Repository) UpdateLastExecutionOutput(ctx context.Context, tenantID, id, output string) error {
-	if len(output) > maxLastExecutionOutputBytes {
-		output = output[:maxLastExecutionOutputBytes]
-	}
+	output = domain.BoundStoredOutput(output, maxLastExecutionOutputBytes)
 	_, err := r.db.Exec(ctx, `UPDATE task.tasks SET last_execution_output = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id, output)
 	if err != nil {
 		return fmt.Errorf("postgres: update task last_execution_output: %w", err)

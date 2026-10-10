@@ -64,6 +64,8 @@ func newKit(t *testing.T) *kit {
 	c := conn(t)
 	k.req, k.appr = requestv1.NewRequestServiceClient(c), requestv1.NewApprovalServiceClient(c)
 	theStack.stubs.Auth.SetAdmins(k.tenantID, k.admin, k.admin2)
+	// task-service shows a Plan tree only to its owner (the person who committed it) or a grantee. Nobody is pre-granted
+	// here: request-service must give the admins who approve and start Phases the access they need, as it does in production.
 	theStack.stubs.Project.SetMember(k.tenantID, k.project, k.reporter, projectv1.ProjectRole_PROJECT_ROLE_OWNER)
 	theStack.stubs.Project.SetMember(k.tenantID, k.project, k.approver, projectv1.ProjectRole_PROJECT_ROLE_MEMBER)
 	return k

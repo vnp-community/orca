@@ -113,6 +113,9 @@ service TaskService {
   rpc LockTaskSpecs(LockTaskSpecsRequest) returns (LockTaskSpecsResponse);
   // ListExecutionRecords returns the structured outcome of contract runs (CR-REQ-029).
   rpc ListExecutionRecords(ListExecutionRecordsRequest) returns (ListExecutionRecordsResponse);
+  // GetTaskExecutionOutput returns the stdout of the task's last successful run, secrets redacted and capped,
+  // for runs that have no ExecutionRecord (no result block). Needs read access on the task.
+  rpc GetTaskExecutionOutput(GetTaskExecutionOutputRequest) returns (GetTaskExecutionOutputResponse);
 }
 
 message GenerateShareLinkRequest {
@@ -645,4 +648,16 @@ message ListExecutionRecordsRequest {
 
 message ListExecutionRecordsResponse {
   repeated ExecutionRecord records = 1;
+}
+
+message GetTaskExecutionOutputRequest {
+  string task_id = 1;
+}
+
+message GetTaskExecutionOutputResponse {
+  // found is false when the task has no stored output (never ran, or only failed).
+  bool found = 1;
+  string output = 2; // tail of the stored stdout with secrets redacted
+  bool redacted = 3; // at least one secret was replaced
+  bool truncated = 4; // the stored output was longer than the cap
 }

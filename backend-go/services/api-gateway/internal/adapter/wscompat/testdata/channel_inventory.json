@@ -604,6 +604,10 @@
     "kind": "unary"
   },
   {
+    "name": "devServer.subscribeStatus",
+    "kind": "stream"
+  },
+  {
     "name": "devServerGroup.create",
     "kind": "unary"
   },
@@ -697,6 +701,10 @@
   },
   {
     "name": "ephemeralVm.suspendWorkspace",
+    "kind": "unary"
+  },
+  {
+    "name": "execution.get",
     "kind": "unary"
   },
   {

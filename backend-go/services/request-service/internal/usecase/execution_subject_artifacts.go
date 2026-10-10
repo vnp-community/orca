@@ -27,10 +27,25 @@ func (a *PhaseArtifacts) Describe(ctx context.Context, req domain.Request, _ dom
 		return "", "", domain.ErrExecutionTaskServiceUnavailable(err)
 	}
 	root, ok := findTask(sub.Tasks, hintedID)
-	if !ok || root.Type != domain.TaskTypePhase || root.RequestID != req.ID {
+	if !ok {
+		return "", "", a.notVisibleOrNotInPlan(ctx, req, hintedID)
+	}
+	if root.Type != domain.TaskTypePhase || root.RequestID != req.ID {
 		return "", "", domain.ErrPhaseNotInPlan(hintedID)
 	}
 	return hintedID, domain.SubjectDigest(domain.SubjectPhase, subtreeDigestParts(sub, hintedID)...), nil
+}
+
+// notVisibleOrNotInPlan tells a Phase of this Request that the caller cannot see (task-service filters the subtree by
+// user) from one that is not in the Plan: reporting both as "not in plan" hid an identity bug behind a wrong cause.
+func (a *PhaseArtifacts) notVisibleOrNotInPlan(ctx context.Context, req domain.Request, phaseID string) error {
+	tasks, err := a.Tasks.ListTasks(ctx, ListTasksQuery{RequestIDs: []string{req.ID}, TaskTypes: []string{domain.TaskTypePhase}})
+	if err == nil {
+		if t, ok := findTask(tasks, phaseID); ok && t.Type == domain.TaskTypePhase {
+			return domain.ErrExecuteForbidden()
+		}
+	}
+	return domain.ErrPhaseNotInPlan(phaseID)
 }
 
 func (a *PhaseArtifacts) Decided(context.Context, domain.Approval, bool) error  { return nil }
@@ -86,6 +101,9 @@ func (a *PreDeployArtifacts) describePlan(ctx context.Context, req domain.Reques
 	sub, err := a.Tasks.GetSubtree(ctx, tree.Plan.ID)
 	if err != nil {
 		return "", "", domain.ErrExecutionTaskServiceUnavailable(err)
+	}
+	if _, visible := findTask(sub.Tasks, tree.Plan.ID); !visible {
+		return "", "", domain.ErrExecuteForbidden() // an empty view would digest to a value that never matches what the approver sees
 	}
 	return tree.Plan.ID, domain.SubjectDigest(domain.SubjectPreDeploy, subtreeDigestParts(sub, tree.Plan.ID)...), nil
 }

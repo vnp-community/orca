@@ -133,6 +133,7 @@ func parseGrantLevel(v string) taskv1.GrantLevel {
 func registerAutomationTaskChannels(r *Registry, automationClient automationv1.AutomationServiceClient, taskClient taskv1.TaskServiceClient) {
 	registerAutomationCRUDChannels(r, automationClient)
 	registerTaskCRUDChannels(r, taskClient)
+	registerTaskExecutionChannels(r, taskClient)
 }
 
 // automationRunsListView/automationsListView are plain (non-proto.Message)

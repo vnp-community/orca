@@ -113,7 +113,7 @@ func (e *EvaluateExecution) autoComplete(ctx context.Context, req domain.Request
 		if err != nil {
 			return completed, err
 		}
-		if err := e.Tasks.SetStatus(tenant.WithUserID(ctx, actor), l.ID, domain.TaskStatusDone); err != nil {
+		if err := e.Tasks.SetStatus(asExecutionActor(ctx, actor), l.ID, domain.TaskStatusDone); err != nil {
 			errs = append(errs, fmt.Errorf("complete task %s: %w", l.ID, err))
 			continue
 		}
@@ -181,7 +181,7 @@ func (e *EvaluateExecution) exhaustedReturn(ctx context.Context, req domain.Requ
 	}
 	reason := fmt.Sprintf("Task %q lỗi sau %d lần: %s", task.Title, failed, lastErr)
 	if hinter, ok := e.Policies.PolicyFor(req.Type).(domain.FailureHinter); ok {
-		all := e.refsWithEdges(ctx, tree)
+		all := e.refsWithEdges(ctx, req, tree)
 		if hint := hinter.FailureHint(req, task.Ref(), all); hint != "" {
 			reason += ". " + hint
 		}
@@ -190,7 +190,7 @@ func (e *EvaluateExecution) exhaustedReturn(ctx context.Context, req domain.Requ
 }
 
 // refsWithEdges loads depends_on edges (one GetSubtree) so a policy can tell which tasks follow the failed one.
-func (e *EvaluateExecution) refsWithEdges(ctx context.Context, tree domain.ExecutionTree) []domain.TaskRef {
+func (e *EvaluateExecution) refsWithEdges(ctx context.Context, req domain.Request, tree domain.ExecutionTree) []domain.TaskRef {
 	refs := make([]domain.TaskRef, 0, len(tree.Leaves))
 	for _, l := range tree.Leaves {
 		refs = append(refs, l.Ref())
@@ -198,7 +198,11 @@ func (e *EvaluateExecution) refsWithEdges(ctx context.Context, tree domain.Execu
 	if tree.Plan == nil {
 		return refs
 	}
-	sub, err := e.Tasks.GetSubtree(ctx, tree.Plan.ID)
+	actor, err := e.Actors.ActorFor(ctx, req, "")
+	if err != nil {
+		return refs
+	}
+	sub, err := e.Tasks.GetSubtree(asExecutionActor(ctx, actor), tree.Plan.ID)
 	if err != nil {
 		return refs
 	}
@@ -274,7 +278,8 @@ func (e *EvaluateExecution) completePhases(ctx context.Context, req domain.Reque
 	if err != nil {
 		return err
 	}
-	_, err = e.Open.Execute(ctx, OpenApprovalInput{RequestID: req.ID, SubjectType: domain.SubjectPhase, SubjectID: next.ID, RequestedBy: actor})
+	// Opening validates the Phase against task-service, which only shows the tree to its owner or a grantee.
+	_, err = e.Open.Execute(asExecutionActor(ctx, actor), OpenApprovalInput{RequestID: req.ID, SubjectType: domain.SubjectPhase, SubjectID: next.ID, RequestedBy: actor})
 	return err
 }
 

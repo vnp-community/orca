@@ -112,7 +112,7 @@ func (uc *AdvanceExecution) run(ctx context.Context, req domain.Request, tree do
 	}
 	policy := uc.Policies.PolicyFor(req.Type)
 	shared := sharedWorktree(tree)
-	execCtx := tenant.WithUserID(ctx, in.ActorID)
+	execCtx := asExecutionActor(ctx, in.ActorID)
 
 	var res AdvanceResult
 	var errs []error
@@ -135,7 +135,7 @@ func (uc *AdvanceExecution) run(ctx context.Context, req domain.Request, tree do
 			return res, err
 		}
 		if gate != nil {
-			if err := uc.openGate(ctx, req, *gate, in.ActorID); err != nil {
+			if err := uc.openGate(execCtx, req, *gate, in.ActorID); err != nil {
 				errs = append(errs, fmt.Errorf("gate for task %s: %w", task.ID, err))
 				continue
 			}

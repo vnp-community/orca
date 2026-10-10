@@ -136,7 +136,8 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	}
 	visibility := &usecase.MemberRequestVisibility{Members: members}
 
-	actors := &usecase.ApprovalExecutionActors{Approvals: ex.gateApprovals, PhaseStarts: ex.phaseStarts}
+	access := &usecase.ExecutionAccess{Tasks: tasks.client, Log: log}
+	actors := &usecase.ApprovalExecutionActors{Approvals: ex.gateApprovals, PhaseStarts: ex.phaseStarts, Access: access}
 	advance := &usecase.AdvanceExecution{
 		Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Policies: policies,
 		Approvals: opener, Settings: settings, Log: log,
@@ -160,7 +161,7 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	w.Server = requestgrpc.ExecutionUseCases{
 		StartPhase: &usecase.StartPhase{
 			Requests: stores.requests, Tasks: tasks.client, PhaseStarts: ex.phaseStarts, Approvals: ex.gateApprovals,
-			Authorizer: &usecase.ApprovalStartPhaseAuthorizer{Approvals: authorizer}, Advance: advance, Tx: stores.tx, Outbox: stores.outboxWriter,
+			Authorizer: &usecase.ApprovalStartPhaseAuthorizer{Approvals: authorizer}, Advance: advance, Access: access, Tx: stores.tx, Outbox: stores.outboxWriter,
 		},
 		ReportOutcome: report,
 		RecordCheck: &usecase.RecordRequestCheck{

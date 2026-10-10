@@ -465,10 +465,11 @@ func TestConnectionResolver_ResolveConnection_NoTenantInContext(t *testing.T) {
 }
 
 func TestRelayExecutor_GetStatus_Success(t *testing.T) {
+	// Agent wire shape (GitStatusResult): rows under "entries", not "files".
 	resultJSON, err := json.Marshal(map[string]any{
 		"branch": "main",
-		"files": []map[string]any{
-			{"path": "a.txt", "state": "modified"},
+		"entries": []map[string]any{
+			{"path": "a.txt", "status": "modified", "area": "unstaged"},
 		},
 	})
 	if err != nil {

@@ -49,6 +49,8 @@ type FakeTaskService struct {
 	executeErrs map[string][]error
 	links       map[string]string
 	tenants     map[string]string
+	treeReaders []string
+	grants      []fakeGrant
 	// OnChange receives every status change; the test decides whether the event is delivered, delayed or lost.
 	OnChange func(StatusChange)
 	Client   *grpcclient.TaskClient
@@ -112,6 +114,16 @@ func (f *FakeTaskService) CreateTask(ctx context.Context, req *taskv1.CreateTask
 	f.tasks[id] = t
 	f.tenants[id] = tenantOfCall(ctx)
 	return &taskv1.CreateTaskResponse{Task: clone(t)}, nil
+}
+
+// AllowTreeReaders adds users who may read every subtree, like a grant on the Plan. GetSubtree already behaves as
+// task-service does for tasks that have an owner (CreateTask, CreatePlanTree): only the owner sees them, and a caller
+// with no user, such as a background consumer, sees nothing. Once called, tasks seeded with Add (no owner) are limited
+// to these users too; before that they are visible to everyone.
+func (f *FakeTaskService) AllowTreeReaders(users ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.treeReaders = append(f.treeReaders, users...)
 }
 
 func (f *FakeTaskService) DependsOn(task, on string) {
@@ -249,9 +261,11 @@ func (f *FakeTaskService) ListTasks(_ context.Context, req *taskv1.ListTasksRequ
 	return resp, nil
 }
 
-func (f *FakeTaskService) GetSubtree(_ context.Context, req *taskv1.GetSubtreeRequest) (*taskv1.GetSubtreeResponse, error) {
+func (f *FakeTaskService) GetSubtree(ctx context.Context, req *taskv1.GetSubtreeRequest) (*taskv1.GetSubtreeResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	caller := callerOf(ctx)
+	visible := func(t *taskv1.Task) bool { return f.permitsLocked(caller, t, "read") }
 	in := map[string]bool{req.GetRootId(): true}
 	for changed := true; changed; {
 		changed = false
@@ -263,7 +277,7 @@ func (f *FakeTaskService) GetSubtree(_ context.Context, req *taskv1.GetSubtreeRe
 	}
 	resp := &taskv1.GetSubtreeResponse{}
 	for _, id := range f.order {
-		if in[id] {
+		if in[id] && visible(f.tasks[id]) {
 			resp.Tasks = append(resp.Tasks, clone(f.tasks[id]))
 			for _, d := range f.deps[id] {
 				resp.DependsOnEdges = append(resp.DependsOnEdges, &taskv1.AddEdgeRequest{FromTaskId: id, ToTaskId: d})
@@ -282,6 +296,10 @@ func (f *FakeTaskService) Execute(ctx context.Context, req *taskv1.TaskServiceEx
 		return nil, status.Error(codes.PermissionDenied, "TASK_FORBIDDEN: no execute permission")
 	}
 	id := req.GetTaskId()
+	if t, found := f.tasks[id]; found && !f.permitsLocked(user, t, "execute") {
+		f.mu.Unlock()
+		return nil, status.Error(codes.PermissionDenied, "TASK_NO_GRANT: no applicable grant found for caller")
+	}
 	if errs := f.executeErrs[id]; len(errs) > 0 {
 		f.executeErrs[id] = errs[1:]
 		if errs[0] != nil {
@@ -326,6 +344,10 @@ func (f *FakeTaskService) UpdateTask(ctx context.Context, req *taskv1.UpdateTask
 	if !ok {
 		f.mu.Unlock()
 		return nil, status.Error(codes.NotFound, "TASK_NOT_FOUND: no such task")
+	}
+	if !f.permitsLocked(callerOf(ctx), t, "write") {
+		f.mu.Unlock()
+		return nil, status.Error(codes.PermissionDenied, "TASK_NO_GRANT: no applicable grant found for caller")
 	}
 	if req.GetWorktreeId() != nil {
 		t.WorktreeId = req.GetWorktreeId().GetValue()

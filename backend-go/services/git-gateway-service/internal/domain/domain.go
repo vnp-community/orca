@@ -71,12 +71,13 @@ const (
 	FileStateUntracked  FileState = "untracked"
 	FileStateConflicted FileState = "conflicted"
 	FileStateRenamed    FileState = "renamed"
+	FileStateCopied     FileState = "copied"
 )
 
 // Valid reports whether s is one of the known file-status states.
 func (s FileState) Valid() bool {
 	switch s {
-	case FileStateModified, FileStateAdded, FileStateDeleted, FileStateUntracked, FileStateConflicted, FileStateRenamed:
+	case FileStateModified, FileStateAdded, FileStateDeleted, FileStateUntracked, FileStateConflicted, FileStateRenamed, FileStateCopied:
 		return true
 	default:
 		return false
@@ -85,20 +86,44 @@ func (s FileState) Valid() bool {
 
 // FileStatus is one file's position in `git status` output — path plus its
 // state, translated 1:1 from either local `git status --porcelain` parsing
-// or the Dev Server Agent's git.status JSON response.
+// or the Dev Server Agent's git.status JSON response. A path changed both in
+// the index and the working tree yields two entries (one per Area), exactly
+// like the agent.
 type FileStatus struct {
 	Path  string
 	State FileState
+	// Area is "staged", "unstaged" or "untracked"; empty when the executor
+	// could not tell.
+	Area           string
+	OldPath        string
+	ConflictKind   string
+	ConflictStatus string
+	// Added/Removed are nil when line counts are unavailable (binary file,
+	// or a host-local executor that does not compute them).
+	Added   *int
+	Removed *int
 }
 
-// GitStatus is a worktree's full status: current branch plus its file list.
-// Ahead/behind counts and a conflict flag are part of the design doc's
-// sketch (§4) but are not part of the current generated proto surface
-// (GetStatusResponse only carries files+branch); add them here alongside
-// the corresponding proto fields if/when that RPC surface grows.
+// StatusUpstream is the upstream summary that rides along with a status.
+type StatusUpstream struct {
+	HasUpstream  bool
+	UpstreamName string
+	Ahead        int
+	Behind       int
+}
+
+// GitStatus is a worktree's full status: current branch plus its file list,
+// and — when the executor reports them (the Dev Server Agent does) — the
+// in-progress conflict operation, HEAD oid, upstream summary and the
+// entry-limit flags.
 type GitStatus struct {
-	Branch string
-	Files  []FileStatus
+	Branch            string
+	Files             []FileStatus
+	ConflictOperation string
+	Head              string
+	Upstream          *StatusUpstream
+	DidHitLimit       bool
+	StatusLength      int
 }
 
 // DiffResult is a unified-diff text blob returned by GetDiff — this service

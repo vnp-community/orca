@@ -10,14 +10,29 @@ import (
 
 // ApprovalExecutionActors picks the user whose permissions task-service checks when request-service dispatches
 // on its own (consumers, reconcile): whoever started the Phase, else whoever approved the Plan.
+//
+// The chosen user is made able to execute the Plan tree (Access), so the chain does not depend on the approver
+// also being the person who committed the Plan. Nil Access skips that step.
 type ApprovalExecutionActors struct {
 	Approvals   ApprovalGateReader
 	PhaseStarts PhaseStartRepository
+	Access      *ExecutionAccess
 }
 
 var _ ExecutionActors = (*ApprovalExecutionActors)(nil)
 
 func (a *ApprovalExecutionActors) ActorFor(ctx context.Context, req domain.Request, phaseID string) (string, error) {
+	actor, err := a.pick(ctx, req, phaseID)
+	if err != nil || a.Access == nil {
+		return actor, err
+	}
+	if err := a.Access.Ensure(ctx, req, actor); err != nil {
+		return "", err
+	}
+	return actor, nil
+}
+
+func (a *ApprovalExecutionActors) pick(ctx context.Context, req domain.Request, phaseID string) (string, error) {
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
 		return "", domain.ErrRequestTenantRequired()

@@ -62,7 +62,8 @@ func TestMigration0039_UpDownUp(t *testing.T) {
 	}
 
 	// Down 1
-	cmdDown := exec.Command("migrate", "-path", migrationsPath, "-database", rawDSN, "down", "1")
+	// Why: 0040 is the latest migration and its down is a no-op, so undoing 0039 takes two steps.
+	cmdDown := exec.Command("migrate", "-path", migrationsPath, "-database", rawDSN, "down", "2")
 	if out, err := cmdDown.CombinedOutput(); err != nil {
 		t.Fatalf("running migration down: %v\n%s", err, out)
 	}
@@ -73,7 +74,7 @@ func TestMigration0039_UpDownUp(t *testing.T) {
 	}
 
 	// Up 1
-	cmdUp := exec.Command("migrate", "-path", migrationsPath, "-database", rawDSN, "up", "1")
+	cmdUp := exec.Command("migrate", "-path", migrationsPath, "-database", rawDSN, "up", "2")
 	if out, err := cmdUp.CombinedOutput(); err != nil {
 		t.Fatalf("running migration up 1: %v\n%s", err, out)
 	}

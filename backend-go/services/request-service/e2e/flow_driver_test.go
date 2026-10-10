@@ -215,6 +215,18 @@ func (w *world) recordCompletionChecks() {
 	}
 }
 
+// requireNoGrantBeyondExecute: the people who drive execution without having committed the Plan get 'user' grants,
+// never owner or admin, which would let them manage the tree.
+func (w *world) requireNoGrantBeyondExecute() {
+	for _, t := range theStack.tasks.TasksOfRequest(w.id()) {
+		for _, g := range theStack.tasks.Grants(t.GetId()) {
+			if !strings.HasSuffix(g, ":GRANT_LEVEL_USER") {
+				w.k.t.Errorf("task %s has grant %q: execution must only ever grant the user level", t.GetId(), g)
+			}
+		}
+	}
+}
+
 const executionBudget = 90 * time.Second
 
 // execute runs the Request from executing to completed: it starts each Phase (after its approval where the flow gates
@@ -231,6 +243,7 @@ func (w *world) execute() {
 		req := k.get(w.id())
 		if req.GetStatus() == string(domain.RequestStatusCompleted) {
 			w.request = req
+			w.requireNoGrantBeyondExecute()
 			return
 		}
 		if req.GetStatus() != string(domain.RequestStatusExecuting) {

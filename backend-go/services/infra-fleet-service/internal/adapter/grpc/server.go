@@ -161,6 +161,8 @@ type Server struct {
 
 	// CR-REQ-033: dev server capability profile (set via WithDevServerCapabilities).
 	getDevServerCapabilities *usecase.GetDevServerCapabilities
+	// activity fills DevServer.active_executions in list replies; nil leaves it 0.
+	activity usecase.DevServerActivity
 }
 
 func New(
@@ -425,7 +427,7 @@ func (s *Server) ListDevServers(ctx context.Context, req *infrafleetv1.ListDevSe
 	}
 	out := make([]*infrafleetv1.DevServer, 0, len(devServers))
 	for _, ds := range devServers {
-		out = append(out, toProtoDevServer(ds))
+		out = append(out, s.withActivity(toProtoDevServer(ds)))
 	}
 	return &infrafleetv1.ListDevServersResponse{DevServers: out}, nil
 }
@@ -552,7 +554,7 @@ func (s *Server) ListDevServersForUser(ctx context.Context, req *infrafleetv1.Li
 	}
 	out := make([]*infrafleetv1.DevServer, 0, len(devServers))
 	for _, ds := range devServers {
-		out = append(out, toProtoDevServer(ds))
+		out = append(out, s.withActivity(toProtoDevServer(ds)))
 	}
 	return &infrafleetv1.ListDevServersForUserResponse{DevServers: out}, nil
 }
@@ -1520,6 +1522,7 @@ func (s *Server) StreamExecOutput(req *infrafleetv1.StreamExecOutputRequest, str
 
 	out, unsubscribe, err := s.streamAgentExecOutput.Execute(ctx, usecase.StreamAgentExecOutputInput{
 		ConnectionID: req.GetConnectionId(),
+		DevServerID:  req.GetDevServerId(),
 		StepID:       req.GetStepId(),
 	})
 	if err != nil {

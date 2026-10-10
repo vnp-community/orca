@@ -1176,3 +1176,9 @@ type AgentSessionOriginFilter struct {
 type AgentSessionOriginLister interface {
 	ListByOrigin(ctx context.Context, tenantID string, f AgentSessionOriginFilter) ([]domain.AgentSession, error)
 }
+
+// DevServerActivity says how much a dev server is working: agent runs in flight on its live session.
+// Implemented by devserveragent.Client.
+type DevServerActivity interface {
+	ActiveExecutions(devServerID string) int
+}

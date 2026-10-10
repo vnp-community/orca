@@ -19,6 +19,19 @@ func (s *Server) WithDevServerCapabilities(uc *usecase.GetDevServerCapabilities)
 	return s
 }
 
+// WithDevServerActivity makes list replies carry how many agent runs each dev server has in flight.
+func (s *Server) WithDevServerActivity(a usecase.DevServerActivity) *Server {
+	s.activity = a
+	return s
+}
+
+func (s *Server) withActivity(ds *infrafleetv1.DevServer) *infrafleetv1.DevServer {
+	if s.activity != nil {
+		ds.ActiveExecutions = int32(s.activity.ActiveExecutions(ds.GetId()))
+	}
+	return ds
+}
+
 // GetDevServerCapabilities returns the stored capability profile of a dev
 // server, refreshing it from the agent when connected and stale.
 func (s *Server) GetDevServerCapabilities(ctx context.Context, req *infrafleetv1.GetDevServerCapabilitiesRequest) (*infrafleetv1.DevServerCapabilityProfile, error) {

@@ -251,11 +251,11 @@ func (r *RelayExecutor) PullStream(ctx context.Context, repoPath string, sink fu
 // ── usecase.GitExecutor ───────────────────────────────────────────────────
 
 func (r *RelayExecutor) GetStatus(ctx context.Context, repoPath string) (domain.GitStatus, error) {
-	var result domain.GitStatus
+	var result gitStatusWire
 	err := r.relay(ctx, repoPath, "git.status", map[string]any{
 		"worktreePath": repoPath, // was "repoPath" — real agent contract, see BUG-036/TASK-228
 	}, &result)
-	return result, err
+	return result.toDomain(), err
 }
 
 func (r *RelayExecutor) GetDiff(ctx context.Context, repoPath, filePath string, staged bool) (domain.DiffResult, error) {
@@ -644,9 +644,9 @@ func (r *RelayExecutor) SubmoduleStatus(ctx context.Context, repoPath, submodule
 	if area != "" {
 		params["area"] = area
 	}
-	var result domain.GitStatus
+	var result gitStatusWire
 	err := r.relay(ctx, repoPath, "git.submoduleStatus", params, &result)
-	return result, err
+	return result.toDomain(), err
 }
 
 func (r *RelayExecutor) RemoteCommitURL(ctx context.Context, repoPath, sha string) (string, error) {

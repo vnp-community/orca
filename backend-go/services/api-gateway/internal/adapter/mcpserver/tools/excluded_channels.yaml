@@ -637,3 +637,11 @@
 - pattern: "request.planProposal"
   category: request_flow
   reason: "Reads the result of the asynchronous plan proposal run; waits for request_generatePlan to leave the Declared state."
+
+- pattern: "execution.get"
+  category: request_flow
+  reason: "Read channel for the task sheet's Result tab; carries agent output, so no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "devServer.subscribeStatus"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; devServer.list reports the same state (status, busy, activeExecutions)."

@@ -230,8 +230,15 @@ func waitReady(httpPort int, logs *syncBuffer, timeout time.Duration) error {
 	return fmt.Errorf("request-service never became ready; log:\n%s", tail(logs, 40))
 }
 
+// tail returns the last n log lines without the per-RPC "rpc ok" lines: pollers write dozens of them a second and
+// pushed the one warning that explains a failure out of the window.
 func tail(b *syncBuffer, n int) string {
-	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
+	var lines []string
+	for _, l := range strings.Split(strings.TrimSpace(b.String()), "\n") {
+		if !strings.Contains(l, `"msg":"rpc ok"`) {
+			lines = append(lines, l)
+		}
+	}
 	if len(lines) > n {
 		lines = lines[len(lines)-n:]
 	}

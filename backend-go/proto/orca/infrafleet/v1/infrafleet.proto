@@ -543,6 +543,9 @@ message DevServer {
   // BL-PRF-03's allowedServerTags match target and WF's ListDevServersByTag
   // dispatch-target key.
   repeated string tags = 14;
+  // active_executions counts agent.execPrompt runs in flight on this dev server's live session (0 when it has none or
+  // is not connected). Set by ListDevServers only; every other RPC returning a DevServer leaves it 0.
+  int32 active_executions = 15;
 }
 
 message RegisterDevServerRequest {
@@ -879,6 +882,10 @@ message StreamExecOutputRequest {
   // itself (it has no visibility into a concurrent Relay call), the
   // caller owns keeping them consistent.
   string step_id = 2;
+  // dev_server_id is the fallback target when the caller has no connection_id
+  // (a project bound to a dev server without an infra.connections row, same
+  // case Relay's RelayByDevServer serves). Ignored when connection_id is set.
+  string dev_server_id = 3;
 }
 
 // AgentExecOutputEvent is one stdout/stderr chunk from an in-flight

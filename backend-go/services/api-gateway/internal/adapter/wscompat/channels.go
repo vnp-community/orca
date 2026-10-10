@@ -188,6 +188,7 @@ func RegisterRealChannels(
 	registerOrcaProjectSharingChannels(r, projectClient)
 	registerWorkflowChannels(r, workflowClient)
 	registerAgentChannels(r, infraFleetClient, eventBusConsumer)
+	registerDevServerStatusSubscribeChannel(r, eventBusConsumer)
 	registerAdminUserChannels(r, authClient, tenantClient)
 	registerAdminPolicyChannels(r, authClient)
 	registerAdminSessionChannels(r, authClient)
@@ -637,42 +638,6 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 // implements for real against the local git binary; commit/push/pull relay
 // to the Dev Server Agent, still a stub) ────────────────────────────────
 
-// gitStatusEntryView/gitStatusResultView mirror the frontend's
-// GitStatusEntry/GitStatusResult (frontend/src/shared/git-status-types.ts) —
-// BUG-020: git.status used to return the raw gitgatewayv1.GetStatusResponse
-// proto (`files`/`state` field names, no `head`/`upstreamStatus` at all),
-// which crashed the whole Git tab (`useGit.ts`'s `for (const entry of
-// status.entries)` — `status.entries` was always undefined, since the wire
-// key was `files`) the moment GetStatus ever actually succeeded (it never
-// had, until SOL-013/014 fixed the dispatch/relay chain this session).
-//
-// area is hardcoded "unstaged" for every entry — git-gateway-service's
-// FileStatus has no staged/unstaged concept yet (BUG-020's "Phase 2", not
-// implemented here): parsePorcelainStatus (localgit/executor.go) already
-// extracts the full 2-char porcelain XY code but collapses it into a single
-// FileState, discarding the staged (X) vs unstaged (Y) distinction. This
-// stops the crash and reports accurate file lists/counts; the staged vs.
-// unstaged split in StagingArea.tsx is not yet accurate until Phase 2 lands.
-type gitStatusEntryView struct {
-	Path   string `json:"path"`
-	Status string `json:"status"`
-	Area   string `json:"area"`
-}
-
-type gitStatusResultView struct {
-	Branch  string               `json:"branch,omitempty"`
-	Entries []gitStatusEntryView `json:"entries"`
-}
-
-func toGitStatusResultView(resp *gitgatewayv1.GetStatusResponse) gitStatusResultView {
-	files := resp.GetFiles()
-	entries := make([]gitStatusEntryView, 0, len(files))
-	for _, f := range files {
-		entries = append(entries, gitStatusEntryView{Path: f.GetPath(), Status: f.GetState(), Area: "unstaged"})
-	}
-	return gitStatusResultView{Branch: resp.GetBranch(), Entries: entries}
-}
-
 func registerGitChannels(r *Registry, client gitgatewayv1.GitGatewayServiceClient) {
 	r.Register("git.status", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		// Every real caller (WorkspaceContext.tsx, useGit.ts, use-code-review.ts,
@@ -800,6 +765,10 @@ type devServerView struct {
 	// "degraded" | "unhealthy". See
 	// docs/backlog/BACKLOG-007-dev-server-bootstrap-status-proto-field.md.
 	HealthStatus string `json:"healthStatus"`
+	// ActiveExecutions counts the agent runs (task runs, model calls) the dev server is working on right now, taken
+	// from its live session; Busy is ActiveExecutions > 0. Both are 0 and false while the dev server is not connected.
+	ActiveExecutions int  `json:"activeExecutions"`
+	Busy             bool `json:"busy"`
 }
 
 // toDevServerView maps a proto DevServer (id/tenant_id/host/mode only) onto
@@ -814,7 +783,13 @@ func toDevServerView(ds *infrafleetv1.DevServer) devServerView {
 		ApprovalStatus: ds.GetApprovalStatus(),
 		GroupID:        ds.GetGroupId(),
 		HealthStatus:   ds.GetHealthStatus(),
+		Platform:       nonEmptyPtr(ds.GetPlatform()),
+		Arch:           nonEmptyPtr(ds.GetArch()),
+		NodeVersion:    nonEmptyPtr(ds.GetNodeVersion()),
+		// Only a connected dev server can be busy; attachConnectionStatus clears this when it is not.
+		ActiveExecutions: int(ds.GetActiveExecutions()),
 	}
+	view.Busy = view.ActiveExecutions > 0
 	if host := ds.GetHost(); host != "" {
 		view.WSUrl = &host
 	}
@@ -836,12 +811,14 @@ func attachConnectionStatus(ctx context.Context, client infrafleetv1.InfraFleetS
 	defer cancel()
 	resp, err := client.IsDevServerConnected(rpcCtx, &infrafleetv1.IsDevServerConnectedRequest{DevServerId: view.ID})
 	if err != nil {
+		view.ActiveExecutions, view.Busy = 0, false // reported "disconnected", so never busy
 		return view
 	}
 	if resp.GetConnected() {
 		view.Status = "connected"
 	} else {
 		view.Status = "disconnected"
+		view.ActiveExecutions, view.Busy = 0, false
 	}
 	return view
 }

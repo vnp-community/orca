@@ -474,9 +474,7 @@ func (r *Repository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, 
 const maxLastExecutionOutputBytes = 8 * 1024
 
 func (r *Repository) UpdateLastExecutionOutput(ctx context.Context, tenantID, id, output string) error {
-	if len(output) > maxLastExecutionOutputBytes {
-		output = output[:maxLastExecutionOutputBytes]
-	}
+	output = domain.BoundStoredOutput(output, maxLastExecutionOutputBytes)
 	_, err := r.db.ExecContext(ctx, `UPDATE tasks SET last_execution_output = ?, updated_at = NOW(6) WHERE tenant_id = ? AND id = ?`, output, tenantID, id)
 	if err != nil {
 		return fmt.Errorf("mysql: update task last_execution_output: %w", err)

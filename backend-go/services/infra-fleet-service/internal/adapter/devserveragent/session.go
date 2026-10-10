@@ -123,7 +123,9 @@ type session struct {
 	nextRequestID  uint32
 	highestPeerSeq uint32
 	pending        map[uint32]*pendingCall
-	closed         bool
+	// activeRuns counts agent runs (see isAgentRunMethod) awaiting their response on this session.
+	activeRuns int
+	closed     bool
 
 	// managedMode marks a session this package doesn't reconnect the plain
 	// relay-websocket way — direct-websocket's inbound accept (the agent
@@ -200,6 +202,8 @@ type session struct {
 	devServerID string
 	onCodeIntel func(devServerID string, n JSONRPCNotification)
 	onAttached  func(devServerID string)
+	// onActivity fires when connection state or the number of agent runs changes; it must not block.
+	onActivity func(devServerID string)
 }
 
 // wsURL builds ws://host:port/orca-relay — the fixed path
@@ -270,6 +274,7 @@ func (s *session) attachTransport(t Transport, info HandshakeInfo) {
 	if s.onAttached != nil {
 		s.onAttached(s.devServerID)
 	}
+	s.notifyActivity()
 }
 
 // runInitiatorHandshake sends agent.handshake (frame id=1, ack=0, exactly
@@ -991,6 +996,7 @@ func (s *session) handleDisconnect(t Transport, cause error) {
 		call.resultCh <- lostErr
 	}
 
+	s.notifyActivity()
 	go s.backgroundReconnect()
 }
 
@@ -1195,7 +1201,14 @@ func (s *session) callWithTimeout(ctx context.Context, method string, params any
 	ack := s.highestPeerSeq
 	call := &pendingCall{resultCh: make(chan JSONRPCResponse, 1)}
 	s.pending[reqID] = call
+	if isAgentRunMethod(method) {
+		s.activeRuns++
+		defer s.finishRun()
+	}
 	s.mu.Unlock()
+	if isAgentRunMethod(method) {
+		s.notifyActivity()
+	}
 
 	var paramsRaw json.RawMessage
 	if params != nil {
@@ -1231,6 +1244,26 @@ func (s *session) callWithTimeout(ctx context.Context, method string, params any
 		s.dropPending(reqID)
 		return nil, fmt.Errorf("devserveragent: request %q timed out: %w", method, callCtx.Err())
 	}
+}
+
+func (s *session) finishRun() {
+	s.mu.Lock()
+	s.activeRuns--
+	s.mu.Unlock()
+	s.notifyActivity()
+}
+
+func (s *session) notifyActivity() {
+	if s.onActivity != nil {
+		s.onActivity(s.devServerID)
+	}
+}
+
+// activeRunCount is how many agent runs are in flight on this session right now.
+func (s *session) activeRunCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeRuns
 }
 
 // callStream sends one JSON-RPC request the same way call() does, but

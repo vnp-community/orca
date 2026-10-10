@@ -42,7 +42,8 @@ type ExecuteResult struct {
 // parent_child (subtask) or depends_on edge FROM it makes it "complex" and
 // hands off to Engine 2 (ComplexExecutor/orchestration-service); everything
 // else is "simple" and relays directly to Engine 1 (SimpleExecutor/
-// infra-fleet-service).
+// infra-fleet-service). A task that belongs to a Request (request_id set) is
+// always Engine 1 unless it has subtasks: request-service orders its tasks.
 //
 // Execute (SOL-TG-04) does the following, in order, BEFORE marking the task
 // StatusInProgress: (1) resolves the caller's permission to "execute" the
@@ -113,9 +114,8 @@ type ExecuteTask struct {
 	releaser TaskExecutionReleaser
 	outbox   OutboxWriter
 
-	// contract/specs back the spec-task path, see WithContract.
+	// contract backs the spec-task path, see WithContract.
 	contract ContractAgentExecutor
-	specs    TaskSpecLookup
 }
 
 // WithRunEvents lets a failed dispatch revert through the link-guarded release
@@ -490,16 +490,11 @@ func (uc *ExecuteTask) selectEngine(ctx context.Context, tenantID string, task d
 	if len(children) > 0 {
 		return domain.EngineOrchestration, nil
 	}
-	// A task with a spec carries a prompt override, which only Engine 1 honors; ordering between
-	// spec tasks is AdvanceExecution's job, so depends_on must not push it to the coordinator.
-	if uc.specs != nil && task.RequestID != "" {
-		has, err := uc.specs.HasSpec(ctx, tenantID, task.ID)
-		if err != nil {
-			return "", err
-		}
-		if has {
-			return domain.EngineDirectAgent, nil
-		}
+	// A task of a Request is ordered by request-service's AdvanceExecution, which dispatches it only once its
+	// dependencies are done. Handing depends_on to the coordinator instead started a run that never launched the
+	// agent nor reported back, leaving the task in_progress for good.
+	if task.RequestID != "" {
+		return domain.EngineDirectAgent, nil
 	}
 	deps, err := uc.edges.ListFrom(ctx, tenantID, task.ID, domain.EdgeKindDependsOn)
 	if err != nil {

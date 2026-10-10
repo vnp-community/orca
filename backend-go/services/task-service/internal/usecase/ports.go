@@ -289,17 +289,23 @@ type AgentExecOutputChunk struct {
 	Data   string
 }
 
-// AgentExecOutputStreamer streams stepID's mid-run agent.execPrompt output
-// from infra-fleet-service's StreamExecOutput RPC (TASK-AG-FLOWTASK-002) —
-// SimpleExecutor's dependency for TASK-AG-FLOWTASK-003's throttled
-// republish onto task.activity. The returned channel closes once ctx is
-// cancelled or the underlying stream ends (EOF, a transport error, or a
-// resolve failure such as an unknown connectionId) — there is no separate
-// error return: a streaming failure is never fatal to SimpleExecutor.Execute
-// (whose real completion source of truth is its own unary Relay call), it
-// just means no partial-progress events get published for this run.
+// AgentExecOutputTarget names the run to observe: ConnectionID when the project has an infra.connections row,
+// otherwise DevServerID (the same split SimpleExecutor's Relay call makes). StepID is the run's request id.
+type AgentExecOutputTarget struct {
+	ConnectionID string
+	DevServerID  string
+	StepID       string
+}
+
+// AgentExecOutputStreamer streams a run's mid-run agent.execPrompt output from infra-fleet-service's
+// StreamExecOutput RPC (TASK-AG-FLOWTASK-002) — SimpleExecutor's dependency for TASK-AG-FLOWTASK-003's
+// throttled republish onto task.activity. The returned channel closes once ctx is cancelled or the
+// underlying stream ends. A streaming failure is never fatal to SimpleExecutor.Execute (its real completion
+// source of truth is its own unary Relay call): it only means no partial-progress events get published for
+// this run. onFailure is called at most once, before the channel closes, only when the stream broke for a
+// reason other than a clean end or the caller's own cancellation, so a silent loss of live output is visible.
 type AgentExecOutputStreamer interface {
-	StreamExecOutput(ctx context.Context, connectionID, stepID string) <-chan AgentExecOutputChunk
+	StreamExecOutput(ctx context.Context, target AgentExecOutputTarget, onFailure func(error)) <-chan AgentExecOutputChunk
 }
 
 // ComplexExecutor relays Execute's complex-path dispatch to

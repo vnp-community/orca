@@ -45,13 +45,14 @@ func TestMigration0039_UpDownUp(t *testing.T) {
 	}
 	dsn := repo.pool.Config().ConnString()
 
-	if out, err := exec.Command("migrate", "-path", migrationsPath, "-database", dsn, "down", "1").CombinedOutput(); err != nil {
+	// Why: 0040 is the latest migration and its down is a no-op, so undoing 0039 takes two steps.
+	if out, err := exec.Command("migrate", "-path", migrationsPath, "-database", dsn, "down", "2").CombinedOutput(); err != nil {
 		t.Fatalf("migration down: %v\n%s", err, out)
 	}
 	if _, err := repo.pool.Exec(ctx, `SELECT 1 FROM infra.dev_server_capability_profiles LIMIT 1`); err == nil {
 		t.Fatal("expected table to be dropped by down")
 	}
-	if out, err := exec.Command("migrate", "-path", migrationsPath, "-database", dsn, "up", "1").CombinedOutput(); err != nil {
+	if out, err := exec.Command("migrate", "-path", migrationsPath, "-database", dsn, "up", "2").CombinedOutput(); err != nil {
 		t.Fatalf("migration up: %v\n%s", err, out)
 	}
 	if err := insertProfile(); err != nil {

@@ -48,10 +48,10 @@ func (e *ExecutionFailure) Error() string {
 
 func (e *ExecutionFailure) Unwrap() error { return e.Cause }
 
-// WithContract enables the contract path: a task with a spec runs on Engine 1 and, when the
-// caller sent a result nonce, through ExecuteWithContract. nil arguments keep the old behavior.
-func (uc *ExecuteTask) WithContract(c ContractAgentExecutor, specs TaskSpecLookup) *ExecuteTask {
-	uc.contract, uc.specs = c, specs
+// WithContract enables the contract path: when the caller sent a result nonce, a run on Engine 1 goes through
+// ExecuteWithContract. nil keeps the old behavior.
+func (uc *ExecuteTask) WithContract(c ContractAgentExecutor) *ExecuteTask {
+	uc.contract = c
 	return uc
 }
 

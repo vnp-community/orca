@@ -289,10 +289,7 @@ func (s *Server) GetStatus(ctx context.Context, req *gitgatewayv1.GetStatusReque
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &gitgatewayv1.GetStatusResponse{
-		Branch: result.Branch,
-		Files:  toProtoFileStatuses(result.Files),
-	}, nil
+	return toProtoGitStatus(result), nil
 }
 
 func (s *Server) GetDiff(ctx context.Context, req *gitgatewayv1.GetDiffRequest) (*gitgatewayv1.GetDiffResponse, error) {
@@ -535,7 +532,7 @@ func (s *Server) SubmoduleStatus(ctx context.Context, req *gitgatewayv1.Submodul
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &gitgatewayv1.GetStatusResponse{Branch: result.Branch, Files: toProtoFileStatuses(result.Files)}, nil
+	return toProtoGitStatus(result), nil
 }
 
 func (s *Server) Fetch(ctx context.Context, req *gitgatewayv1.FetchRequest) (*gitgatewayv1.FetchResponse, error) {
@@ -1163,14 +1160,6 @@ func fromProtoPushTarget(pt *gitgatewayv1.PushTargetInput) *domain.PushTargetInp
 		RemoteURL:     pt.GetRemoteUrl(),
 		RemoteCreated: pt.GetRemoteCreated(),
 	}
-}
-
-func toProtoFileStatuses(files []domain.FileStatus) []*gitgatewayv1.FileStatus {
-	out := make([]*gitgatewayv1.FileStatus, 0, len(files))
-	for _, f := range files {
-		out = append(out, &gitgatewayv1.FileStatus{Path: f.Path, State: string(f.State)})
-	}
-	return out
 }
 
 func toProtoCommitRefs(commits []domain.CommitRef) []*gitgatewayv1.CommitRef {

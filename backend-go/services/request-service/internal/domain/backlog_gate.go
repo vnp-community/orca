@@ -11,14 +11,16 @@ const (
 
 // TaskView is the slice of a task-service Task the backlog views and the execution loop need.
 type TaskView struct {
-	ID             string
-	ParentID       string
-	Type           string
-	Status         string
-	RequestID      string
-	Title          string
-	Description    string
-	AssigneeID     string
+	ID          string
+	ParentID    string
+	Type        string
+	Status      string
+	RequestID   string
+	Title       string
+	Description string
+	AssigneeID  string
+	// OwnerID is who created the task; only the owner can write grants on the tree.
+	OwnerID        string
 	WorktreeID     string
 	EstimatedHours *float64
 	Labels         []string

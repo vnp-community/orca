@@ -44,6 +44,11 @@ type TaskClient interface {
 	SetStatus(ctx context.Context, taskID, status string) error
 	// ListExecutionStates batches its ids itself (at most 500 per call).
 	ListExecutionStates(ctx context.Context, taskIDs []string) (map[string]ExecutionStateView, error)
+	// CanExecute reports whether userID may run tasks under taskID (task-service's own grant resolution).
+	CanExecute(ctx context.Context, taskID, userID string) (bool, error)
+	// GrantExecute gives userID the grant level 'user' on taskID and its subtree, written as grantorID, who must
+	// manage the task (its owner); domain.ErrTaskForbidden when task-service refuses.
+	GrantExecute(ctx context.Context, taskID, grantorID, userID string) error
 }
 
 // ExecutionSettings are the REQUEST_* knobs of the execution loop.

@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc/status"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -170,7 +173,7 @@ type agentOutputPartialPayload struct {
 // eventually reads these frames (no client-side reassembly needed). Runs
 // until ctx is cancelled (Execute cancels it right after its own Relay
 // call returns, success or failure) or chunks closes on its own.
-func (s *SimpleExecutor) publishThrottledOutput(ctx context.Context, tenantID, taskID, requestID string, chunks <-chan usecase.AgentExecOutputChunk) {
+func (s *SimpleExecutor) publishThrottledOutput(ctx context.Context, tenantID, taskID, requestID string, chunks <-chan usecase.AgentExecOutputChunk) (received int) {
 	var stdout, stderr strings.Builder
 	dirty := false
 	ticker := time.NewTicker(s.throttleInterval)
@@ -184,6 +187,7 @@ func (s *SimpleExecutor) publishThrottledOutput(ctx context.Context, tenantID, t
 		s.publishAgentOutputPartial(tenantID, taskID, requestID, stdout.String(), stderr.String())
 	}
 	accumulate := func(chunk usecase.AgentExecOutputChunk) {
+		received++
 		if chunk.Stream == "stderr" {
 			stderr.WriteString(chunk.Data)
 		} else {
@@ -230,17 +234,18 @@ func (s *SimpleExecutor) publishThrottledOutput(ctx context.Context, tenantID, t
 	}
 }
 
-// publishAgentOutputPartial marshals and inserts one outbox row —
-// deliberately swallows both the marshal and insert error (best-effort,
-// see this file's SimpleExecutor doc comment and
+// publishAgentOutputPartial marshals and inserts one outbox row. Best-effort
+// (see this file's SimpleExecutor doc comment and
 // postgres.Repository.InsertOutboxEvent's doc comment for the shared
 // posture): a lost partial-progress update must never surface as
-// SimpleExecutor.Execute's own error.
+// SimpleExecutor.Execute's own error, but it is logged (ids only) so the
+// loss is visible.
 func (s *SimpleExecutor) publishAgentOutputPartial(tenantID, taskID, requestID, stdout, stderr string) {
 	payload, err := json.Marshal(agentOutputPartialPayload{
-		OriginTaskID: taskID, RequestID: requestID, Stdout: stdout, Stderr: stderr,
+		OriginTaskID: taskID, RequestID: requestID, Stdout: boundPartialStream(stdout), Stderr: boundPartialStream(stderr),
 	})
 	if err != nil {
+		slog.Warn("task: agent output frame not encoded", slog.String("task_id", taskID), slog.Any("error", err))
 		return
 	}
 	// context.Background(): this publish happens from publishThrottledOutput's
@@ -248,7 +253,9 @@ func (s *SimpleExecutor) publishAgentOutputPartial(tenantID, taskID, requestID, 
 	// ctx.Done() flush) by the time this call runs — an outbox insert
 	// should not be aborted just because the streaming subscription itself
 	// is winding down.
-	_ = s.outbox.InsertOutboxEvent(context.Background(), uuid.NewString(), tenantID, agentOutputPartialSubject, payload)
+	if err := s.outbox.InsertOutboxEvent(context.Background(), uuid.NewString(), tenantID, agentOutputPartialSubject, payload); err != nil {
+		slog.Warn("task: agent output frame not stored", slog.String("task_id", taskID), slog.String("request_id", requestID), slog.Any("error", err))
+	}
 }
 
 // agentExecPromptParams mirrors agent-print-mode-exec.ts's handled fields —
@@ -464,7 +471,20 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 	streamWG.Add(1)
 	go func() {
 		defer streamWG.Done()
-		s.publishThrottledOutput(streamCtx, tenantID, taskID, requestID, s.streamer.StreamExecOutput(streamCtx, connectionID, requestID))
+		var streamFailed atomic.Bool
+		// Live output is best-effort, but losing it silently is how a wrong connection id went unnoticed:
+		// say so, with ids only (never output content).
+		target := usecase.AgentExecOutputTarget{ConnectionID: connectionID, DevServerID: devServerID, StepID: requestID}
+		chunks := s.streamer.StreamExecOutput(streamCtx, target, func(err error) {
+			streamFailed.Store(true)
+			slog.WarnContext(streamCtx, "task: agent output stream failed; the run continues without live output",
+				slog.String("task_id", taskID), slog.String("request_id", requestID),
+				slog.String("dev_server_id", devServerID), slog.String("grpc_code", status.Code(err).String()), slog.Any("error", err))
+		})
+		if received := s.publishThrottledOutput(streamCtx, tenantID, taskID, requestID, chunks); received == 0 && !streamFailed.Load() {
+			slog.InfoContext(streamCtx, "task: agent run produced no streamed output",
+				slog.String("task_id", taskID), slog.String("request_id", requestID))
+		}
 	}()
 	// Deliberately two separate defers, not one combined func — LIFO order
 	// makes cancelStream() run BEFORE streamWG.Wait() (the later defer
