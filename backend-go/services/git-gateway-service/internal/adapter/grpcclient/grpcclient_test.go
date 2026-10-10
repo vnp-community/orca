@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -95,7 +96,10 @@ type fakeDevServerReachability struct {
 	reachable       bool
 	err             error
 	gotDevServerIDs []string
+	allowLocal      bool
 }
+
+func (f *fakeDevServerReachability) LocalReposAllowed() bool { return f.allowLocal }
 
 func (f *fakeDevServerReachability) IsReachable(ctx context.Context, devServerID string) (bool, error) {
 	f.gotDevServerIDs = append(f.gotDevServerIDs, devServerID)
@@ -147,7 +151,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ResolvesRealWorktreeP
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", Path: "/opt/repos/aiops-v3"}}
-	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{allowLocal: true})
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
 	if err != nil {
@@ -181,7 +185,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ExternalWorktree_Uses
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getWorktreeErr: errors.New("should not be called for an external worktree id")}
-	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{allowLocal: true})
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "45f573e8-be1a-4b1a-894b-a7c261fb7331::/opt/repos/aiops-v3")
 	if err != nil {
@@ -205,7 +209,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_RepoScoped_UsesGetRep
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getRepoResp: domain.RepoInfo{ID: "repo-1", URL: "/opt/repos/repo-1"}}
-	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{allowLocal: true})
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "repo:repo-1")
 	if err != nil {
@@ -283,32 +287,57 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ReachableDevServer_Re
 	}
 }
 
-// TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FallsBackToLocal
-// covers the fallback: a bound but unreachable dev server must not relay —
-// same SOL-013 local-path behavior as if no dev server were bound at all.
-func TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FallsBackToLocal(t *testing.T) {
+// TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FailsWithRetryableCode
+// guards the removal of the silent local fallback: a bound but unreachable
+// dev server must surface DEV_SERVER_UNREACHABLE, even when local repos are
+// allowed (the repo is bound to a host, so local is never the right place).
+func TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FailsWithRetryableCode(t *testing.T) {
+	for _, allowLocal := range []bool{false, true} {
+		infraFleet := &fakeInfraFleetServiceClient{
+			resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+		}
+		projects := &fakeProjectClient{
+			getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/aiops-v3"},
+			getRepoResp:     domain.RepoInfo{ID: "repo-1", DevServerID: "ds-1"},
+		}
+		r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: false, allowLocal: allowLocal})
+
+		_, _, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
+		ae := usecase.HostDispatchError(err)
+		if ae == nil || ae.Code != usecase.CodeDevServerUnreachable || ae.Kind != apperrors.KindUnavailable {
+			t.Fatalf("allowLocal=%v: expected %s (Unavailable), got %v", allowLocal, usecase.CodeDevServerUnreachable, err)
+		}
+	}
+}
+
+// An unbound repo is only valid when the deployment allows local repos.
+func TestConnectionResolver_ResolveConnection_NotConnected_NoDevServer_LocalNotAllowed_Rejected(t *testing.T) {
 	infraFleet := &fakeInfraFleetServiceClient{
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
-	projects := &fakeProjectClient{
-		getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/aiops-v3"},
-		getRepoResp:     domain.RepoInfo{ID: "repo-1", DevServerID: "ds-1"},
-	}
-	reachability := &fakeDevServerReachability{reachable: false}
-	r := NewConnectionResolver(infraFleet, projects, reachability)
+	projects := &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/Users/x/repo"}}
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: true})
 
-	ctx, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	_, _, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
+	ae := usecase.HostDispatchError(err)
+	if ae == nil || ae.Code != usecase.CodeRepoHostUnbound || ae.Kind != apperrors.KindFailedPrecondition {
+		t.Fatalf("expected %s (FailedPrecondition), got %v", usecase.CodeRepoHostUnbound, err)
 	}
-	if conn.Connected {
-		t.Error("expected Connected=false when the dev server is unreachable")
+}
+
+// When the repo's binding cannot be read, the host is unknown: fail rather
+// than guess local, unless local repos are allowed.
+func TestConnectionResolver_ResolveConnection_NotConnected_RepoLookupFails_LocalNotAllowed_HostCheckFailed(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
-	if conn.RepoPath != "/opt/repos/aiops-v3" {
-		t.Errorf("expected the real resolved path even on the local fallback, got %q", conn.RepoPath)
-	}
-	if _, ok := usecase.DevServerIDFromContext(ctx); ok {
-		t.Error("expected returned ctx NOT to carry DevServerID when the dev server is unreachable")
+	projects := &fakeProjectClient{getRepoErr: errors.New("project-service down")}
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: true})
+
+	_, _, err := r.ResolveConnection(ctxWithTenant(t), "45f573e8-be1a-4b1a-894b-a7c261fb7331::/opt/repos/aiops-v3")
+	ae := usecase.HostDispatchError(err)
+	if ae == nil || ae.Code != usecase.CodeHostCheckFailed || ae.Kind != apperrors.KindUnavailable {
+		t.Fatalf("expected %s (Unavailable), got %v", usecase.CodeHostCheckFailed, err)
 	}
 }
 
@@ -320,7 +349,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_NoDevServerBound_Unch
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/local-only"}}
-	reachability := &fakeDevServerReachability{reachable: true} // would relay if ever consulted
+	reachability := &fakeDevServerReachability{reachable: true, allowLocal: true} // would relay if ever consulted
 	r := NewConnectionResolver(infraFleet, projects, reachability)
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
@@ -364,7 +393,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ExternalWorktree_DevS
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getRepoErr: errors.New("repo not found")}
-	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: true})
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: true, allowLocal: true})
 
 	ctx, conn, err := r.ResolveConnection(ctxWithTenant(t), "45f573e8-be1a-4b1a-894b-a7c261fb7331::/opt/repos/aiops-v3")
 	if err != nil {
@@ -438,7 +467,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ModeLeftAtZeroValue(t
 	fake := &fakeInfraFleetServiceClient{
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
-	r := NewConnectionResolver(fake, &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{Path: "/opt/repos/wt-3"}}, &fakeDevServerReachability{})
+	r := NewConnectionResolver(fake, &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{Path: "/opt/repos/wt-3"}}, &fakeDevServerReachability{allowLocal: true})
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-3")
 	if err != nil {

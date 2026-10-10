@@ -10,7 +10,7 @@ import (
 )
 
 func TestDetectWorktrees_NoDevServer_DispatchesLocalUsingRepoURL(t *testing.T) {
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{listWorktreePathsOut: []domain.WorktreeGitInfo{{Path: "/repo"}, {Path: "/repo-feature"}}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/repo"}}
@@ -50,23 +50,40 @@ func TestDetectWorktrees_ReachableDevServer_DispatchesRelay(t *testing.T) {
 	}
 }
 
-func TestDetectWorktrees_UnreachableDevServer_DispatchesLocal(t *testing.T) {
-	reachability := &fakeDevServerReachability{reachable: false}
+func TestDetectWorktrees_UnreachableDevServer_Rejected(t *testing.T) {
+	reachability := &fakeDevServerReachability{reachable: false, allowLocal: true}
 	local := &fakeGitExecutor{listWorktreePathsOut: []domain.WorktreeGitInfo{{Path: "/srv/repo"}}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/srv/repo", DevServerID: "ds-1"}}
 	uc := NewDetectWorktrees(reachability, projects, local, relay)
 
-	if _, err := uc.Execute(context.Background(), "repo-1"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	_, err := uc.Execute(context.Background(), "repo-1")
+	if ae := HostDispatchError(err); ae == nil || ae.Code != CodeDevServerUnreachable {
+		t.Fatalf("expected %s, got %v", CodeDevServerUnreachable, err)
 	}
-	if !local.calledListWorktreePaths || relay.calledListWorktreePaths {
-		t.Error("expected the local executor when the dev server is bound but not reachable")
+	if local.calledListWorktreePaths || relay.calledListWorktreePaths {
+		t.Error("expected no executor call: an unreachable dev server must not fall back to local")
+	}
+}
+
+func TestDetectWorktrees_NoDevServer_LocalNotAllowed_Rejected(t *testing.T) {
+	reachability := &fakeDevServerReachability{reachable: true}
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/Users/x/repo"}}
+	uc := NewDetectWorktrees(reachability, projects, local, relay)
+
+	_, err := uc.Execute(context.Background(), "repo-1")
+	if ae := HostDispatchError(err); ae == nil || ae.Code != CodeRepoHostUnbound {
+		t.Fatalf("expected %s, got %v", CodeRepoHostUnbound, err)
+	}
+	if local.calledListWorktreePaths || relay.calledListWorktreePaths {
+		t.Error("expected no executor call for an unbound repo when local repos are not allowed")
 	}
 }
 
 func TestDetectWorktrees_RepoNotFound(t *testing.T) {
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{getRepoErr: errors.New("repo not found")}
@@ -97,7 +114,7 @@ func TestDetectWorktrees_ReachabilityCheckFails(t *testing.T) {
 }
 
 func TestDetectWorktrees_ListWorktreePathsFails(t *testing.T) {
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{listWorktreePathsErr: errors.New("git worktree list: exit status 128")}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/repo"}}

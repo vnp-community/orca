@@ -114,8 +114,9 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 			ProjectID   string `json:"projectId"`
 			URL         string `json:"url"`
 			DisplayName string `json:"displayName"`
-			// DevServerID (Phase 10): empty = local repo, validated against
-			// infra-fleet server-side when non-empty.
+			// DevServerID (Phase 10): empty falls back to the project's dev
+			// server; with neither, project-service rejects the repo with
+			// PROJECT_REPO_HOST_REQUIRED. Validated against infra-fleet there.
 			DevServerID string `json:"devServerId"`
 		}
 		in, err := decodeArg[addArgs](args, 0)

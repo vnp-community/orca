@@ -985,6 +985,7 @@ func registerDevServerChannels(r *Registry, client infrafleetv1.InfraFleetServic
 		type browseDirArgs struct {
 			DevServerID string `json:"id"`
 			Path        string `json:"path"`
+			browseDirOptions
 		}
 		in, err := decodeArg[browseDirArgs](args, 0)
 		if err != nil {
@@ -1016,32 +1017,19 @@ func registerDevServerChannels(r *Registry, client infrafleetv1.InfraFleetServic
 		}
 
 		var relayResult struct {
-			Path    string `json:"path"`
-			Entries []struct {
-				Name string `json:"name"`
-				Type string `json:"type"`
-			} `json:"entries"`
+			Path    string                `json:"path"`
+			Entries []browseDirRelayEntry `json:"entries"`
 		}
 		if raw := resp.GetResultJson(); raw != "" {
 			if err := json.Unmarshal([]byte(raw), &relayResult); err != nil {
 				return nil, fmt.Errorf("devServer.browseDir: decoding relay result: %w", err)
 			}
 		}
-		entries := make([]devServerBrowseDirEntryView, 0, len(relayResult.Entries))
-		for _, e := range relayResult.Entries {
-			entries = append(entries, devServerBrowseDirEntryView{
-				Name:        e.Name,
-				IsDirectory: e.Type == "directory",
-				// fs.readDir does not report symlink-ness — see this
-				// channel's doc comment.
-				IsSymlink: false,
-			})
-		}
 		resolvedPath := relayResult.Path
 		if resolvedPath == "" {
 			resolvedPath = path
 		}
-		return devServerBrowseDirResultView{ResolvedPath: resolvedPath, Entries: entries}, nil
+		return buildBrowseDirView(resolvedPath, relayResult.Entries, in.browseDirOptions), nil
 	})
 }
 
@@ -1058,6 +1046,10 @@ type devServerBrowseDirEntryView struct {
 type devServerBrowseDirResultView struct {
 	ResolvedPath string                        `json:"resolvedPath"`
 	Entries      []devServerBrowseDirEntryView `json:"entries"`
+	// Truncated/TotalEntries: Entries was capped (browseDirOptions.Limit);
+	// TotalEntries counts matches before the cap.
+	Truncated    bool `json:"truncated"`
+	TotalEntries int  `json:"totalEntries"`
 }
 
 // sshTargetPickerView is the minimal subset of frontend/src/shared/

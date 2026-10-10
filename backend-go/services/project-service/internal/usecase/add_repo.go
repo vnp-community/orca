@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -14,10 +15,10 @@ type AddRepoInput struct {
 	ProjectID   string
 	URL         string
 	DisplayName string
-	// DevServerID is this repo's own dev-server binding (Phase 10) — empty
-	// means a local repo (no dev server). Validated against infra-fleet
-	// when non-empty, same as CreateHostSetup's DevServerLister check,
-	// rather than trusting an arbitrary caller-supplied id.
+	// DevServerID is this repo's own dev-server binding (Phase 10). Empty
+	// falls back to the project's dev server, then to RepoHostPolicy
+	// (PROJECT_REPO_HOST_REQUIRED unless local repos are allowed). Always
+	// validated against infra-fleet, never trusted as caller-supplied.
 	DevServerID string
 }
 
@@ -32,13 +33,14 @@ type AddRepoInput struct {
 // was NOT extended to.
 type AddRepo struct {
 	repo       RepoRepository
-	membership MembershipRepository
+	projects   ProjectDirectory
 	opa        OPAClient
 	devServers DevServerLister
+	policy     RepoHostPolicy
 }
 
-func NewAddRepo(repo RepoRepository, membership MembershipRepository, opa OPAClient, devServers DevServerLister) *AddRepo {
-	return &AddRepo{repo: repo, membership: membership, opa: opa, devServers: devServers}
+func NewAddRepo(repo RepoRepository, projects ProjectDirectory, opa OPAClient, devServers DevServerLister, policy RepoHostPolicy) *AddRepo {
+	return &AddRepo{repo: repo, projects: projects, opa: opa, devServers: devServers, policy: policy}
 }
 
 func (uc *AddRepo) Execute(ctx context.Context, in AddRepoInput) (domain.Repo, error) {
@@ -50,12 +52,28 @@ func (uc *AddRepo) Execute(ctx context.Context, in AddRepoInput) (domain.Repo, e
 	if err != nil {
 		return domain.Repo{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
 	}
-	if err := requireProjectAccess(ctx, uc.membership, uc.opa, in.ProjectID, projectActionOwnerOnly); err != nil {
+	if err := requireProjectAccess(ctx, uc.projects, uc.opa, in.ProjectID, projectActionOwnerOnly); err != nil {
 		return domain.Repo{}, err
 	}
 
-	if in.DevServerID != "" {
-		exists, err := uc.devServers.Exists(ctx, tenantID, in.DevServerID)
+	// Request wins, then the project's own dev server: a repo added to a bound
+	// project must live on that host, so the client need not repeat it.
+	devServerID := in.DevServerID
+	if devServerID == "" {
+		project, err := uc.projects.Get(ctx, tenantID, in.ProjectID)
+		if err != nil {
+			if errors.Is(err, domain.ErrProjectNotFound) {
+				return domain.Repo{}, apperrors.New(apperrors.KindNotFound, "PROJECT_NOT_FOUND", "project not found", err)
+			}
+			return domain.Repo{}, apperrors.New(apperrors.KindInternal, "PROJECT_FETCH_FAILED", "failed to fetch project", err)
+		}
+		devServerID = project.DevServerID
+	}
+	if err := uc.policy.requireHost(devServerID); err != nil {
+		return domain.Repo{}, err
+	}
+	if devServerID != "" {
+		exists, err := uc.devServers.Exists(ctx, tenantID, devServerID)
 		if err != nil {
 			return domain.Repo{}, apperrors.New(apperrors.KindInternal, "PROJECT_DEV_SERVER_LOOKUP_FAILED", "failed to validate dev server", err)
 		}
@@ -64,7 +82,7 @@ func (uc *AddRepo) Execute(ctx context.Context, in AddRepoInput) (domain.Repo, e
 		}
 	}
 
-	r, err := domain.NewRepo(uuid.NewString(), in.ProjectID, in.URL, in.DisplayName, in.DevServerID)
+	r, err := domain.NewRepo(uuid.NewString(), in.ProjectID, in.URL, in.DisplayName, devServerID)
 	if err != nil {
 		return domain.Repo{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_REPO_INVALID", err.Error(), err)
 	}

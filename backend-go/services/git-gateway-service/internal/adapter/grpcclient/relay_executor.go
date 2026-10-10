@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
@@ -101,6 +104,11 @@ func (r *RelayExecutor) relay(ctx context.Context, connectionID, method string, 
 			ParamsJson:  string(paramsJSON),
 		})
 		if err != nil {
+			// Fleet-health samples lag up to 30s, so the agent can drop after
+			// dispatch; surface that as retryable instead of a git failure.
+			if status.Code(err) == codes.FailedPrecondition && strings.Contains(status.Convert(err).Message(), "INFRA_DEV_SERVER_NOT_CONNECTED") {
+				return usecase.ErrDevServerUnreachable(devServerID)
+			}
 			return fmt.Errorf("grpcclient: relayByDevServer %s: %w", method, err)
 		}
 		resultJSON = resp.GetResultJson()

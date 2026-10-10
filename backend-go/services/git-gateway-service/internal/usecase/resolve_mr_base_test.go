@@ -13,7 +13,7 @@ import (
 // SCMClient.GetMergeRequestBase/ResolveMrBase.Execute.
 
 func TestResolveMrBase_HappyPath(t *testing.T) {
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{fetchAndResolveRefSHA: "resolved-sha-2"}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
@@ -30,7 +30,7 @@ func TestResolveMrBase_HappyPath(t *testing.T) {
 }
 
 func TestResolveMrBase_FetchAndResolveRefFails_ReturnsUnresolvableAndZeroValue(t *testing.T) {
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{fetchAndResolveRefErr: errors.New("base branch not found locally")}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
@@ -51,7 +51,7 @@ func TestResolveMrBase_FetchAndResolveRefFails_ReturnsUnresolvableAndZeroValue(t
 }
 
 func TestResolveMrBase_SCMLookupFails_FetchAndResolveRefNeverCalled(t *testing.T) {
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}

@@ -28,9 +28,10 @@ type RebindRepoDevServer struct {
 	workflowChecker WorkflowExecutionChecker
 	taskChecker     TaskExecutionChecker
 	devServers      DevServerLister
+	policy          RepoHostPolicy
 }
 
-func NewRebindRepoDevServer(repos RepoRepository, membership MembershipRepository, opa OPAClient, workflowChecker WorkflowExecutionChecker, taskChecker TaskExecutionChecker, devServers DevServerLister) *RebindRepoDevServer {
+func NewRebindRepoDevServer(repos RepoRepository, membership MembershipRepository, opa OPAClient, workflowChecker WorkflowExecutionChecker, taskChecker TaskExecutionChecker, devServers DevServerLister, policy RepoHostPolicy) *RebindRepoDevServer {
 	return &RebindRepoDevServer{
 		repos:           repos,
 		membership:      membership,
@@ -38,6 +39,7 @@ func NewRebindRepoDevServer(repos RepoRepository, membership MembershipRepositor
 		workflowChecker: workflowChecker,
 		taskChecker:     taskChecker,
 		devServers:      devServers,
+		policy:          policy,
 	}
 }
 
@@ -59,6 +61,11 @@ func (uc *RebindRepoDevServer) Execute(ctx context.Context, in RebindRepoDevServ
 	}
 
 	if err := requireProjectAccess(ctx, uc.membership, uc.opa, existing.ProjectID, projectActionOwnerOnly); err != nil {
+		return domain.Repo{}, err
+	}
+
+	// Unbinding would recreate the orphan repo AddRepo refuses to store.
+	if err := uc.policy.requireHost(in.NewDevServerID); err != nil {
 		return domain.Repo{}, err
 	}
 

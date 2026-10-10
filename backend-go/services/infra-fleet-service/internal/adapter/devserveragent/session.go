@@ -243,6 +243,8 @@ func (s *session) connect(ctx context.Context, token string) error {
 		return fmt.Errorf("devserveragent: dial %s: %w", s.wsURL(), err)
 	}
 
+	// Before the handshake: its reply can already exceed the 32 KiB default.
+	conn.SetReadLimit(MaxWebSocketReadBytes)
 	info, err := s.runInitiatorHandshake(ctx, conn)
 	if err != nil {
 		conn.Close(websocket.StatusProtocolError, "handshake failed")

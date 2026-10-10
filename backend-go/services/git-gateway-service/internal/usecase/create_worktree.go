@@ -34,13 +34,13 @@ type CreateWorktreeInput struct {
 // is the reconciliation safety net for exactly that failure window, not
 // optional polish.
 type CreateWorktree struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewCreateWorktree(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *CreateWorktree {
+func NewCreateWorktree(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *CreateWorktree {
 	return &CreateWorktree{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

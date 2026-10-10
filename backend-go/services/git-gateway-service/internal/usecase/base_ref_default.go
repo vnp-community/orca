@@ -17,13 +17,13 @@ type BaseRefDefaultInput struct {
 // from repo-scoped contexts — Settings, SourceControl's default-branch hint —
 // that have no worktree/connection id to resolve.
 type BaseRefDefault struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewBaseRefDefault(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *BaseRefDefault {
+func NewBaseRefDefault(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *BaseRefDefault {
 	return &BaseRefDefault{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

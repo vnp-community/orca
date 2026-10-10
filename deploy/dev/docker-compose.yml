@@ -71,6 +71,12 @@ x-go-common-env: &go-common-env
   MCP_SERVICE_ADDR: mcp-service:9090
   CREDENTIAL_BROKER_SERVICE_ADDR: credential-broker-service:9090
   CREDENTIAL_BROKER_ADDR: credential-broker-service:9090 # ai-provider-service's own (slightly differently-named) var — see docs/execution-plan.md
+  # Read by project-service (refuse repos with no dev server) and git-gateway-service
+  # (never run git for an unbound repo in the container). Keep OFF in Docker: the
+  # git-gateway container cannot see users' disks. Turn on only when git-gateway runs
+  # on the same filesystem as the users' repos; existing unbound repos are not migrated
+  # (see scripts/rebind-unbound-repos.sh).
+  ORCA_ALLOW_LOCAL_REPOS: ${ORCA_ALLOW_LOCAL_REPOS:-false}
 
 x-go-defaults: &go-defaults
   image: *go-image
@@ -501,6 +507,10 @@ services:
   # below provide the latter). Per specs/backend-go/tdd/services/
   # git-gateway-service.md §2, host-local exec is "retained for local/dev
   # deployments" — this dev deploy IS that case, not a hypothetical.
+  #
+  # NOTE: unbound repos are only served when ORCA_ALLOW_LOCAL_REPOS=true (default
+  # false, see x-go-common-env); otherwise git-gateway rejects them with
+  # GITGATEWAY_REPO_HOST_UNBOUND and project-service refuses to store them.
   #
   # git-gateway-repos is where any repo NOT bound to a remote dev server
   # (Project.dev_server_id empty — e.g. a repo added via the sidebar's bare

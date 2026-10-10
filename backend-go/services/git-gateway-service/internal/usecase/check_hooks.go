@@ -24,13 +24,13 @@ type CheckHooksResult struct {
 // GITGATEWAY_MISSING_WORKTREE_ID on every call from Settings, since that
 // context never has one to send.
 type CheckHooks struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewCheckHooks(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *CheckHooks {
+func NewCheckHooks(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *CheckHooks {
 	return &CheckHooks{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

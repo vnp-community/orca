@@ -10,7 +10,7 @@ import (
 )
 
 func TestResolvePrBase_HappyPath(t *testing.T) {
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{fetchAndResolveRefSHA: "resolved-sha-1"}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
@@ -27,7 +27,7 @@ func TestResolvePrBase_HappyPath(t *testing.T) {
 }
 
 func TestResolvePrBase_FetchAndResolveRefFails_ReturnsUnresolvableAndZeroValue(t *testing.T) {
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{fetchAndResolveRefErr: errors.New("base branch not found locally")}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
@@ -48,7 +48,7 @@ func TestResolvePrBase_FetchAndResolveRefFails_ReturnsUnresolvableAndZeroValue(t
 }
 
 func TestResolvePrBase_SCMLookupFails_FetchAndResolveRefNeverCalled(t *testing.T) {
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}

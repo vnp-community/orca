@@ -17,13 +17,13 @@ type SearchRefsInput struct {
 // worktree/connection id, so it must dispatch via dispatchExecutorForRepo,
 // not dispatchExecutor/ConnectionResolver.
 type SearchRefs struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewSearchRefs(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *SearchRefs {
+func NewSearchRefs(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *SearchRefs {
 	return &SearchRefs{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

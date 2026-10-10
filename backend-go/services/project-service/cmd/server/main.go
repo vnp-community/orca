@@ -292,7 +292,12 @@ func run() error {
 	}
 	opa := projectopaclient.New(evaluator)
 
-	createProjectUC := usecase.NewCreateProject(repo, repoRepo, devServerLister, healthChecker, devServerRelay)
+	// Same flag as git-gateway-service: a repo with no dev server is only
+	// valid where git-gateway can reach the user's filesystem.
+	repoHostPolicy := usecase.RepoHostPolicy{AllowLocalRepos: cfg.AllowLocalRepos}
+	slog.Info("project-service repo host policy", "allow_local_repos", cfg.AllowLocalRepos)
+
+	createProjectUC := usecase.NewCreateProject(repo, repoRepo, devServerLister, healthChecker, devServerRelay, repoHostPolicy)
 	getProjectUC := usecase.NewGetProject(repo, opa)
 	listProjectsUC := usecase.NewListProjects(repo, profileResolver)
 	addMemberUC := usecase.NewAddMember(repo, opa)
@@ -300,7 +305,7 @@ func run() error {
 	removeMemberUC := usecase.NewRemoveMember(repo, opa)
 	updateMemberRoleUC := usecase.NewUpdateMemberRole(repo, opa)
 	rebindDevServerUC := usecase.NewRebindDevServer(repo, workflowChecker, taskChecker, opa, devServerLister, healthChecker, auditPublisher, memberNotifier)
-	rebindRepoDevServerUC := usecase.NewRebindRepoDevServer(repoRepo, repo, opa, workflowChecker, taskChecker, devServerLister)
+	rebindRepoDevServerUC := usecase.NewRebindRepoDevServer(repoRepo, repo, opa, workflowChecker, taskChecker, devServerLister, repoHostPolicy)
 	updateProjectUC := usecase.NewUpdateProject(repo, opa)
 	deleteProjectUC := usecase.NewDeleteProject(repo, workflowChecker, taskChecker, opa)
 	getProjectContextUC := usecase.NewGetProjectContext(repo, repoRepo, hostnameResolver, opa)
@@ -309,7 +314,7 @@ func run() error {
 	// structurally — passed as the membership-lookup port to usecases whose
 	// primary repository dependency is RepoRepository/WorktreeRepository
 	// instead. See usecase.MembershipRepository's doc comment.
-	addRepoUC := usecase.NewAddRepo(repoRepo, repo, opa, devServerLister)
+	addRepoUC := usecase.NewAddRepo(repoRepo, repo, opa, devServerLister, repoHostPolicy)
 	listReposUC := usecase.NewListRepos(repoRepo, repo, opa)
 	reorderReposUC := usecase.NewReorderRepos(repoRepo, repo, opa)
 	removeRepoUC := usecase.NewRemoveRepo(repoRepo, repo, opa)
@@ -339,7 +344,7 @@ func run() error {
 	listProjectGroupsUC := usecase.NewListProjectGroups(projectGroupRepo)
 	moveProjectUC := usecase.NewMoveProject(repo, projectGroupRepo, opa)
 	scanNestedUC := usecase.NewScanNested(devServerRelay)
-	importNestedUC := usecase.NewImportNested(projectGroupRepo)
+	importNestedUC := usecase.NewImportNested(projectGroupRepo, repoHostPolicy)
 
 	createHostSetupUC := usecase.NewCreateHostSetup(hostSetupRepo, devServerLister)
 	listHostSetupsUC := usecase.NewListHostSetups(hostSetupRepo)

@@ -9,7 +9,7 @@ import (
 
 func TestGetRemoteURL_DispatchesToResolvedExecutor(t *testing.T) {
 	t.Run("missing repo id is rejected", func(t *testing.T) {
-		uc := NewGetRemoteURL(&fakeDevServerReachability{}, &fakeProjectClient{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+		uc := NewGetRemoteURL(&fakeDevServerReachability{allowLocal: true}, &fakeProjectClient{}, &fakeGitExecutor{}, &fakeGitExecutor{})
 		_, err := uc.Execute(context.Background(), GetRemoteURLInput{})
 		if err == nil {
 			t.Fatal("expected error for missing repo_id")
@@ -37,7 +37,7 @@ func TestGetRemoteURL_DispatchesToResolvedExecutor(t *testing.T) {
 
 	t.Run("no dev server bound dispatches to local executor", func(t *testing.T) {
 		projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/local/repo"}}
-		reachability := &fakeDevServerReachability{}
+		reachability := &fakeDevServerReachability{allowLocal: true}
 		local := &fakeGitExecutor{remoteURL: "https://github.com/acme/widgets"}
 		relay := &fakeGitExecutor{}
 		uc := NewGetRemoteURL(reachability, projects, local, relay)
@@ -53,7 +53,7 @@ func TestGetRemoteURL_DispatchesToResolvedExecutor(t *testing.T) {
 
 	t.Run("repo not found is reported", func(t *testing.T) {
 		projects := &fakeProjectClient{getRepoErr: context.DeadlineExceeded}
-		uc := NewGetRemoteURL(&fakeDevServerReachability{}, projects, &fakeGitExecutor{}, &fakeGitExecutor{})
+		uc := NewGetRemoteURL(&fakeDevServerReachability{allowLocal: true}, projects, &fakeGitExecutor{}, &fakeGitExecutor{})
 
 		_, err := uc.Execute(context.Background(), GetRemoteURLInput{RepoID: "repo-1"})
 		if err == nil {
@@ -64,7 +64,7 @@ func TestGetRemoteURL_DispatchesToResolvedExecutor(t *testing.T) {
 	t.Run("remote not configured is reported", func(t *testing.T) {
 		projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/local/repo"}}
 		local := &fakeGitExecutor{remoteURLErr: context.DeadlineExceeded}
-		uc := NewGetRemoteURL(&fakeDevServerReachability{}, projects, local, &fakeGitExecutor{})
+		uc := NewGetRemoteURL(&fakeDevServerReachability{allowLocal: true}, projects, local, &fakeGitExecutor{})
 
 		_, err := uc.Execute(context.Background(), GetRemoteURLInput{RepoID: "repo-1", RemoteName: "upstream"})
 		if err == nil {

@@ -40,10 +40,11 @@ type CreateProject struct {
 	devServers DevServerLister        // NEW — existing port, reused
 	health     DevServerHealthChecker // NEW
 	relay      DevServerRelay         // NEW — existing port, reused (SetupExistingFolder's pattern)
+	policy     RepoHostPolicy
 }
 
-func NewCreateProject(repo ProjectRepository, repos RepoRepository, devServers DevServerLister, health DevServerHealthChecker, relay DevServerRelay) *CreateProject {
-	return &CreateProject{repo: repo, repos: repos, devServers: devServers, health: health, relay: relay}
+func NewCreateProject(repo ProjectRepository, repos RepoRepository, devServers DevServerLister, health DevServerHealthChecker, relay DevServerRelay, policy RepoHostPolicy) *CreateProject {
+	return &CreateProject{repo: repo, repos: repos, devServers: devServers, health: health, relay: relay, policy: policy}
 }
 
 func (uc *CreateProject) Execute(ctx context.Context, in CreateProjectInput) (domain.Project, error) {
@@ -57,6 +58,13 @@ func (uc *CreateProject) Execute(ctx context.Context, in CreateProjectInput) (do
 	}
 
 	devServerID := in.DevServerID
+	// A repo_path with no dev server used to be dropped silently, leaving a
+	// repo-less project; reject it instead so the caller picks a host.
+	if in.RepoPath != "" {
+		if err := uc.policy.requireHost(devServerID); err != nil {
+			return domain.Project{}, err
+		}
+	}
 	var repoPathValid bool
 	if devServerID != "" {
 		exists, err := uc.devServers.Exists(ctx, tenantID, devServerID)

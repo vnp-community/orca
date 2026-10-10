@@ -18,13 +18,13 @@ type ReadIssueCommandResult struct {
 // ReadIssueCommand resolves repoID's owning host and reads its issue
 // command file. Repo-scoped — see CheckHooks' doc comment for why.
 type ReadIssueCommand struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewReadIssueCommand(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *ReadIssueCommand {
+func NewReadIssueCommand(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *ReadIssueCommand {
 	return &ReadIssueCommand{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

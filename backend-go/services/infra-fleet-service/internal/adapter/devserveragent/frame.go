@@ -32,6 +32,12 @@ const (
 	MessageTypeKeepAlive byte = 9
 )
 
+// MaxWebSocketReadBytes is the largest single WebSocket message a session
+// reads: a maximal frame plus its header. coder/websocket defaults to
+// 32 KiB, so any agent reply above that (a big fs.readDir) closed the
+// connection with "message too big" and dropped the agent for ~30s.
+const MaxWebSocketReadBytes = MaxMessageSize + HeaderLength
+
 // EncodeFrame builds one wire frame: 13-byte header + payload. id plays the
 // SEQ role in relay-protocol.ts's naming; ack is the highest peer id/seq
 // observed so far.

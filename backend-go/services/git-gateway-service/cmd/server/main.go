@@ -109,7 +109,10 @@ func run() error {
 	defer func() { _ = aiProviderConn.Close() }()
 	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
 	aiProviderResolver := grpcclient.NewAIProviderResolver(aiProviderClient)
-	devServerReachability := grpcclient.NewDevServerReachability(infraFleetClient)
+	// Wraps reachability with the local-repo flag: unbound repos run git here
+	// only when this deployment shares a filesystem with the users' repos.
+	devServerReachability := usecase.NewRepoHostRouter(grpcclient.NewDevServerReachability(infraFleetClient), cfg.AllowLocalRepos)
+	slog.Info("git-gateway repo host policy", "allow_local_repos", cfg.AllowLocalRepos)
 
 	// project-service and scm-integration-service are new outbound
 	// dependencies as of this batch (TASK-193/194, SOL-031): the worktree

@@ -145,6 +145,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.logger().ErrorContext(r.Context(), "agentwsserver: ws upgrade failed", slog.Any("error", err))
 		return
 	}
+	// Inbound agents reply with frames far above the 32 KiB default.
+	conn.SetReadLimit(devserveragent.MaxWebSocketReadBytes)
 	s.handleConnection(r.Context(), conn)
 }
 

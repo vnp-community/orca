@@ -16,13 +16,13 @@ type GetRemoteURLInput struct {
 // from contexts — github.listWorkItems' owner/repo resolution — with no
 // worktree/connection id to resolve from).
 type GetRemoteURL struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewGetRemoteURL(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *GetRemoteURL {
+func NewGetRemoteURL(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *GetRemoteURL {
 	return &GetRemoteURL{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

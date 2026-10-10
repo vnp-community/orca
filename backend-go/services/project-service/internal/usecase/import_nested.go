@@ -25,10 +25,11 @@ type ImportNestedInput struct {
 // ProjectGroupRepository.ImportNested's doc comment).
 type ImportNested struct {
 	groupRepo ProjectGroupRepository
+	policy    RepoHostPolicy
 }
 
-func NewImportNested(groupRepo ProjectGroupRepository) *ImportNested {
-	return &ImportNested{groupRepo: groupRepo}
+func NewImportNested(groupRepo ProjectGroupRepository, policy RepoHostPolicy) *ImportNested {
+	return &ImportNested{groupRepo: groupRepo, policy: policy}
 }
 
 func (uc *ImportNested) Execute(ctx context.Context, in ImportNestedInput) ([]domain.ProjectGroup, []domain.Project, error) {
@@ -39,6 +40,12 @@ func (uc *ImportNested) Execute(ctx context.Context, in ImportNestedInput) ([]do
 	userID, ok := tenant.UserID(ctx)
 	if !ok {
 		return nil, nil, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_USER", "no user in request context", nil)
+	}
+
+	if len(in.Selected) > 0 {
+		if err := uc.policy.requireHost(in.DevServerID); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	if in.ParentGroupID != "" {

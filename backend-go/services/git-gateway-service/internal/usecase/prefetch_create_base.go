@@ -11,13 +11,13 @@ import (
 // comment for why this resolves repoID via ProjectClient.GetRepo before
 // dispatching, rather than passing repoID straight into dispatchExecutor.
 type PrefetchCreateBase struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewPrefetchCreateBase(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *PrefetchCreateBase {
+func NewPrefetchCreateBase(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *PrefetchCreateBase {
 	return &PrefetchCreateBase{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

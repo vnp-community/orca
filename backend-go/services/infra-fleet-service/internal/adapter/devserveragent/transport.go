@@ -46,6 +46,7 @@ type wsTransport struct {
 }
 
 func newWSTransport(conn *websocket.Conn, logger *slog.Logger) *wsTransport {
+	conn.SetReadLimit(MaxWebSocketReadBytes)
 	return &wsTransport{conn: conn, logger: logger}
 }
 

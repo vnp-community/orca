@@ -732,3 +732,21 @@ func TestHandleListProjectGroups_Success(t *testing.T) {
 func (f *fakeProjectServiceClient) ResolveProjectAccess(context.Context, *projectv1.ResolveProjectAccessRequest, ...grpc.CallOption) (*projectv1.ResolveProjectAccessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by the HTTP gateway")
 }
+
+func TestHandleAddRepo_ForwardsOptionalDevServerID(t *testing.T) {
+	fake := &fakeProjectServiceClient{addRepoResp: &projectv1.AddRepoResponse{Repo: &projectv1.Repo{Id: "r1"}}}
+	router := projectTestRouter(fake)
+
+	body := `{"url":"/Users/x/repo","display_name":"repo","dev_server_id":"ds-1"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects/proj-1/repos", bytes.NewBufferString(body))
+	req = withTestIdentity(req, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+	if got := fake.lastAddRepoReq.GetDevServerId(); got != "ds-1" {
+		t.Fatalf("DevServerId = %q, want ds-1", got)
+	}
+}

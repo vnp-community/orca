@@ -655,10 +655,10 @@ func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, r
 // doc comments explain why Repo.URL carries an absolute filesystem path
 // for these repos, not a git remote URL.
 //
-// repo.DevServerID == "" (no dev server bound to the owning project) is
-// treated as "operate locally" rather than an error — a project created
-// without ever calling RebindDevServer is a valid, if degenerate, local-only
-// state.
+// repo.DevServerID == "" runs locally only when the deployment declares
+// local repos allowed (RouteRepoHost); otherwise it is an error, and a dev
+// server that is not reachable is an error too — never a silent fallback to
+// git in this process, which cannot see the user's disk in Docker.
 //
 // Known gap this used to not close (fixed by this function returning ctx
 // carrying repo.DevServerID via WithDevServerID): the relay branch requires
@@ -670,22 +670,19 @@ func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, r
 // implemented). RelayExecutor now uses the returned ctx's DevServerID to
 // call RelayByDevServer instead, which was purpose-built for exactly this
 // "no connections row yet" case — see its own doc comment.
-func dispatchExecutorForRepo(ctx context.Context, reachability DevServerReachability, local, relay GitExecutor, repo domain.RepoInfo) (context.Context, GitExecutor, string, error) {
-	if repo.DevServerID == "" {
-		return ctx, local, repo.URL, nil
-	}
-	reachable, err := reachability.IsReachable(ctx, repo.DevServerID)
+func dispatchExecutorForRepo(ctx context.Context, reachability RepoHostRouting, local, relay GitExecutor, repo domain.RepoInfo) (context.Context, GitExecutor, string, error) {
+	useRelay, err := RouteRepoHost(ctx, reachability, repo.DevServerID)
 	if err != nil {
 		return ctx, nil, "", err
 	}
-	if reachable {
-		relayCtx := WithDevServerID(ctx, repo.DevServerID)
-		if repo.HiddenTargetID != "" {
-			relayCtx = WithHiddenTargetID(relayCtx, repo.HiddenTargetID)
-		}
-		return relayCtx, relay, repo.URL, nil
+	if !useRelay {
+		return ctx, local, repo.URL, nil
 	}
-	return ctx, local, repo.URL, nil
+	relayCtx := WithDevServerID(ctx, repo.DevServerID)
+	if repo.HiddenTargetID != "" {
+		relayCtx = WithHiddenTargetID(relayCtx, repo.HiddenTargetID)
+	}
+	return relayCtx, relay, repo.URL, nil
 }
 
 // dispatchFilesystemExecutorForRepo is dispatchExecutorForRepo's
@@ -696,20 +693,17 @@ func dispatchExecutorForRepo(ctx context.Context, reachability DevServerReachabi
 // dispatchExecutorForRepo above, parameterized on FilesystemExecutor
 // instead, for usecases like ReadEphemeralVmRecipes that need to read a
 // named file off a repo-scoped (not worktree-scoped) target.
-func dispatchFilesystemExecutorForRepo(ctx context.Context, reachability DevServerReachability, local, relay FilesystemExecutor, repo domain.RepoInfo) (context.Context, FilesystemExecutor, string, error) {
-	if repo.DevServerID == "" {
-		return ctx, local, repo.URL, nil
-	}
-	reachable, err := reachability.IsReachable(ctx, repo.DevServerID)
+func dispatchFilesystemExecutorForRepo(ctx context.Context, reachability RepoHostRouting, local, relay FilesystemExecutor, repo domain.RepoInfo) (context.Context, FilesystemExecutor, string, error) {
+	useRelay, err := RouteRepoHost(ctx, reachability, repo.DevServerID)
 	if err != nil {
 		return ctx, nil, "", err
 	}
-	if reachable {
-		relayCtx := WithDevServerID(ctx, repo.DevServerID)
-		if repo.HiddenTargetID != "" {
-			relayCtx = WithHiddenTargetID(relayCtx, repo.HiddenTargetID)
-		}
-		return relayCtx, relay, repo.URL, nil
+	if !useRelay {
+		return ctx, local, repo.URL, nil
 	}
-	return ctx, local, repo.URL, nil
+	relayCtx := WithDevServerID(ctx, repo.DevServerID)
+	if repo.HiddenTargetID != "" {
+		relayCtx = WithHiddenTargetID(relayCtx, repo.HiddenTargetID)
+	}
+	return relayCtx, relay, repo.URL, nil
 }

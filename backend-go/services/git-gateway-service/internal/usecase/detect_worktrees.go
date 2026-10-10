@@ -24,13 +24,13 @@ import (
 // function's doc comment for why this does NOT go through dispatchExecutor/
 // ConnectionResolver (an earlier revision did; it never worked).
 type DetectWorktrees struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewDetectWorktrees(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *DetectWorktrees {
+func NewDetectWorktrees(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *DetectWorktrees {
 	return &DetectWorktrees{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

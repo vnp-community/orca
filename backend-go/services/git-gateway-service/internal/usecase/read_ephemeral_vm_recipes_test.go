@@ -8,7 +8,7 @@ import (
 )
 
 func TestReadEphemeralVmRecipes_MissingRepoID_ReturnsError(t *testing.T) {
-	uc := NewReadEphemeralVmRecipes(&fakeDevServerReachability{}, &fakeProjectClient{}, &fakeFilesystemExecutor{}, &fakeFilesystemExecutor{})
+	uc := NewReadEphemeralVmRecipes(&fakeDevServerReachability{allowLocal: true}, &fakeProjectClient{}, &fakeFilesystemExecutor{}, &fakeFilesystemExecutor{})
 	_, err := uc.Execute(context.Background(), ReadEphemeralVmRecipesInput{})
 	if err == nil {
 		t.Fatal("expected error for missing repo_id")
@@ -17,7 +17,7 @@ func TestReadEphemeralVmRecipes_MissingRepoID_ReturnsError(t *testing.T) {
 
 func TestReadEphemeralVmRecipes_RepoNotFound_ReturnsError(t *testing.T) {
 	projects := &fakeProjectClient{getRepoErr: context.DeadlineExceeded}
-	uc := NewReadEphemeralVmRecipes(&fakeDevServerReachability{}, projects, &fakeFilesystemExecutor{}, &fakeFilesystemExecutor{})
+	uc := NewReadEphemeralVmRecipes(&fakeDevServerReachability{allowLocal: true}, projects, &fakeFilesystemExecutor{}, &fakeFilesystemExecutor{})
 	_, err := uc.Execute(context.Background(), ReadEphemeralVmRecipesInput{RepoID: "repo-1"})
 	if err == nil {
 		t.Fatal("expected error when GetRepo fails")
@@ -45,7 +45,7 @@ func TestReadEphemeralVmRecipes_ReachableDevServer_DispatchesToRelay(t *testing.
 
 func TestReadEphemeralVmRecipes_NoDevServer_DispatchesToLocal(t *testing.T) {
 	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/local/repo"}}
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeFilesystemExecutor{readFileContent: []byte("environmentRecipes: []")}
 	relay := &fakeFilesystemExecutor{}
 	uc := NewReadEphemeralVmRecipes(reachability, projects, local, relay)
@@ -65,7 +65,7 @@ func TestReadEphemeralVmRecipes_NoDevServer_DispatchesToLocal(t *testing.T) {
 func TestReadEphemeralVmRecipes_OrcaYamlMissing_ReturnsZeroRecipesNotError(t *testing.T) {
 	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/local/repo"}}
 	local := &fakeFilesystemExecutor{readFileErr: context.DeadlineExceeded}
-	uc := NewReadEphemeralVmRecipes(&fakeDevServerReachability{}, projects, local, &fakeFilesystemExecutor{})
+	uc := NewReadEphemeralVmRecipes(&fakeDevServerReachability{allowLocal: true}, projects, local, &fakeFilesystemExecutor{})
 
 	got, err := uc.Execute(context.Background(), ReadEphemeralVmRecipesInput{RepoID: "repo-1"})
 	if err != nil {
@@ -79,7 +79,7 @@ func TestReadEphemeralVmRecipes_OrcaYamlMissing_ReturnsZeroRecipesNotError(t *te
 func TestReadEphemeralVmRecipes_MalformedYaml_ProducesDiagnosticNotError(t *testing.T) {
 	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/local/repo"}}
 	local := &fakeFilesystemExecutor{readFileContent: []byte("not: valid: yaml: [")}
-	uc := NewReadEphemeralVmRecipes(&fakeDevServerReachability{}, projects, local, &fakeFilesystemExecutor{})
+	uc := NewReadEphemeralVmRecipes(&fakeDevServerReachability{allowLocal: true}, projects, local, &fakeFilesystemExecutor{})
 
 	got, err := uc.Execute(context.Background(), ReadEphemeralVmRecipesInput{RepoID: "repo-1"})
 	if err != nil {

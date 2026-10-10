@@ -16,7 +16,7 @@ func newTestCreateProject(repo *fakeProjectRepository) (*CreateProject, *fakeRep
 	devServers := &fakeDevServerLister{}
 	health := &fakeDevServerHealthChecker{}
 	relay := &fakeDevServerRelay{}
-	return NewCreateProject(repo, repos, devServers, health, relay), repos, devServers, health, relay
+	return NewCreateProject(repo, repos, devServers, health, relay, RepoHostPolicy{AllowLocalRepos: true}), repos, devServers, health, relay
 }
 
 func TestCreateProject_AppliesDefaultsAndCreatedBy(t *testing.T) {

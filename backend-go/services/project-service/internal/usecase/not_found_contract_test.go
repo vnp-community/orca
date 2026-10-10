@@ -74,7 +74,7 @@ func TestUsecases_RepoNotFoundIsNotFoundAndOtherErrorsAreInternal(t *testing.T) 
 			return e
 		}},
 		{"ImportNested/parent_group", domain.ErrProjectGroupNotFound, "PROJECT_GROUP_NOT_FOUND", "PROJECT_GROUP_FETCH_FAILED", func(err error) error {
-			uc := NewImportNested(erroringGroupGet{newFakeProjectGroupRepository(), err})
+			uc := NewImportNested(erroringGroupGet{newFakeProjectGroupRepository(), err}, RepoHostPolicy{AllowLocalRepos: true})
 			_, _, e := uc.Execute(ctx, ImportNestedInput{ParentGroupID: "g1"})
 			return e
 		}},
