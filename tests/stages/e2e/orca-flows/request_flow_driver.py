@@ -2,10 +2,21 @@
 from __future__ import annotations
 
 import json
+import os
 
 from acceptance_context import AcceptanceContext, wait_until
+from expected_request_flows import EXPECTED
 
 AI_FAILURE_REASONS = ("classifier error", "no dev server connected")
+
+# Types whose analysis is a read-only agent run (`claude --print` in the project's repo), not an ai.complete call.
+READONLY_ANALYSIS_TYPES = tuple(t for t, want in EXPECTED.items() if want["analysis"] in ("diagnosis", "findings", "answer"))
+
+
+def readonly_analysis_enabled(ctx: AcceptanceContext) -> bool:
+    """Answering the readiness Clarification of these types starts a real Claude agent on the dev server's repo (AI usage, minutes).
+    The fake claude makes that free, so it always runs with --ai-stub; with a real Claude it needs ORCA_E2E_READONLY_ANALYSIS=1."""
+    return bool(ctx.state.get("ai_stub")) or os.environ.get("ORCA_E2E_READONLY_ANALYSIS", "").lower() in ("1", "true", "yes")
 
 
 def create(ctx: AcceptanceContext, title: str, body: str = "", client_request_id: str = "", project_id: str = "") -> dict:
@@ -65,12 +76,13 @@ def answer(ctx: AcceptanceContext, clar: dict, complete: bool = True, text: str 
     return ctx.ws.call("clarification.answer", {"clarificationId": clar["id"], "answers": answers, "complete": complete, "expectedVersion": clar["version"]})
 
 
-def to_first_stage(ctx: AcceptanceContext, req: dict, typ: str, size: str = "M", urgency: str = "normal") -> dict:
-    """create -> classify -> confirm -> (answer readiness Clarification). Returns the Request after those steps."""
+def to_first_stage(ctx: AcceptanceContext, req: dict, typ: str, size: str = "M", urgency: str = "normal", answer_readiness: bool = True) -> dict:
+    """create -> classify -> confirm -> (answer readiness Clarification). Returns the Request after those steps.
+    `answer_readiness=False` stops at the open Clarification: answering it is what starts the analysis."""
     cur = settle_after_classify(ctx, req["id"])
     assert cur["status"] == "awaiting_type_confirmation", f"after classify the Request is {cur['status']!r}"
     cur = confirm(ctx, cur, typ, size, urgency)
-    if cur["status"] == "awaiting_information":
+    if cur["status"] == "awaiting_information" and answer_readiness:
         clar = open_clarification(ctx, cur["id"])
         assert clar, "Request is awaiting_information but no open Clarification exists"
         answer(ctx, clar)

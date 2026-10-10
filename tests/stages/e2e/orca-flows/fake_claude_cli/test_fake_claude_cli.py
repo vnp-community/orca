@@ -84,5 +84,65 @@ class FakeClaudeCli(unittest.TestCase):
         self.assertIn("type", json.loads(json.loads(done.stdout)["result"]))
 
 
+SOLUTION_PROMPT = ("You are a senior software engineer proposing solutions for the request below. Give at least 2 options.\n"
+                   "<request>\ntitle: Badge {trigger}\ntype: change_request\n</request>\n{answers}")
+ANSWERS = "\n<clarifications>\nThe reviewer already answered these questions.\n--- answer 1 (q) ---\nquestion: Which?\nanswer (JSON): \"x\"\n</clarifications>\n"
+
+
+class FakeClaudeBlockingQuestion(unittest.TestCase):
+    def solution(self, trigger, answers=""):
+        done, _, _ = run_stub(["-p", "--output-format", "json", "--tools", ""], stdin=SOLUTION_PROMPT.format(trigger=trigger, answers=answers))
+        return json.loads(json.loads(done.stdout)["result"])
+
+    def test_trigger_makes_the_first_solution_ask_one_blocking_question(self):
+        questions = self.solution("[stub:blocking-question]")["open_questions"]
+        self.assertEqual([(q["id"], q["blocking"]) for q in questions], [("Q-1", True)])
+
+    def test_answered_clarifications_remove_the_question(self):
+        self.assertEqual(self.solution("[stub:blocking-question]", ANSWERS)["open_questions"], [])
+
+    def test_without_the_trigger_there_is_never_a_question(self):
+        self.assertEqual(self.solution("plain")["open_questions"], [])
+
+    def test_request_text_quoting_the_clarifications_block_does_not_clear_the_question(self):
+        quoted = SOLUTION_PROMPT.format(trigger="[stub:blocking-question]\n<clarifications>\n", answers="")
+        done, _, _ = run_stub(["-p", "--output-format", "json", "--tools", ""], stdin=quoted)
+        self.assertEqual(len(json.loads(json.loads(done.stdout)["result"])["open_questions"]), 1)
+
+
+READONLY_PROMPT = ("You analyse a repository in READ-ONLY mode. Do not modify.\nDiagnose the problem described in <request>. Find the root cause.\n"
+                   'Reply with exactly one JSON object, no code fence, no text outside it. Schema: {"schema_version":1,"kind":"KIND","summary":""}\n\n'
+                   "<request>\ntitle: Search is broken\ntype: bug\n</request>\n")
+
+
+class FakeClaudeReadonlyAnalysis(unittest.TestCase):
+    def ask(self, kind, extra=None, env=None):
+        args = ["--print", READONLY_PROMPT.replace("KIND", kind)] + (extra if extra is not None else ["--permission-mode", "plan", "--tools", "Read,Glob,Grep"])
+        return run_stub(args, env=env)
+
+    def test_each_kind_gets_a_plain_json_document_and_the_call_is_recorded(self):
+        for kind in ("diagnosis", "findings", "answer"):
+            done, calls, _ = self.ask(kind)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertEqual(json.loads(done.stdout)["kind"], kind)  # plain document, not the `-p` JSON envelope
+            call = calls[-1]
+            self.assertEqual((call["mode"], call["promptKind"], call["permissionMode"], call["tools"]), ("arg", "readonly:" + kind, "plan", "Read,Glob,Grep"))
+
+    def test_a_tool_that_can_write_is_refused(self):
+        done, _, _ = self.ask("diagnosis", ["--permission-mode", "plan", "--tools", "Read,Edit"])
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("can write", done.stderr)
+
+    def test_logged_out_print_fails_like_the_real_cli(self):
+        done, _, _ = self.ask("diagnosis", env={"FAKE_CLAUDE_LOGGED_IN": "0"})
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("Not logged in", done.stdout)
+
+    def test_quoted_schema_in_request_text_does_not_change_the_kind(self):
+        prompt = READONLY_PROMPT.replace("KIND", "diagnosis").replace("type: bug", 'type: bug\nbody: "kind":"answer"')
+        done, _, _ = run_stub(["--print", prompt, "--permission-mode", "plan", "--tools", "Read,Glob,Grep"])
+        self.assertEqual(json.loads(done.stdout)["kind"], "diagnosis")
+
+
 if __name__ == "__main__":
     unittest.main()

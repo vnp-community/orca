@@ -7,11 +7,12 @@ CI has no Claude account, so `run_acceptance.py --ai-stub` puts this script wher
   claude --version
   claude --help
   claude auth status --json                         loggedIn follows FAKE_CLAUDE_LOGGED_IN (exit 1 when false, like the real CLI)
-  claude -p --output-format json --tools "" [--no-session-persistence] --system-prompt <text> [--model <m>]   prompt on stdin
+  claude -p --output-format json --tools "" [--no-session-persistence] --system-prompt <text> [--model <m>]   prompt on stdin (ai.complete)
+  claude --print <prompt> [--permission-mode plan --tools Read,Glob,Grep]   prompt in argv, plain stdout (agent.execPrompt, read-only analysis)
 
-Answers are keyed on the prompts the real request-service builds (classification, Solution, Plan) and are written to pass
-the real parsers and validators (ParseClassificationProposal, SolutionOptions.Validate + coverage, ParsePlanOutput,
-ValidatePlanProposal). A prompt it does not recognise fails loudly instead of inventing an answer.
+Answers are keyed on the prompts the real request-service builds (classification, Solution, Plan, and the read-only
+diagnosis / findings / answer analyses) and are written to pass the real parsers and validators (ParseClassificationProposal,
+SolutionOptions.Validate + coverage, ParsePlanOutput, ValidatePlanProposal, ValidateByKind). A prompt it does not recognise fails loudly instead of inventing an answer.
 
 State (calls.jsonl, logged_in) lives in $FAKE_CLAUDE_STATE_DIR, default ~/.fake-claude. The agent strips FAKE_* variables
 from the environment of `claude -p`, so the login state can also be switched with the `logged_in` file (0 or 1).
@@ -113,6 +114,9 @@ def emit(result_text, is_error=False, api_status=None, prompt_len=0):
 CLASSIFY_MARK = "You classify a software work request."
 SOLUTION_MARK = "You are a senior software engineer proposing solutions for the request below."
 PLAN_MARK = "You are a senior engineer turning an approved decision into an executable work plan."
+READONLY_MARK = "You analyse a repository in READ-ONLY mode."
+# Tools a read-only analysis may be given; anything else (Edit, Write, Bash...) means the agent lost its read-only guard.
+READONLY_TOOLS = {"Read", "Glob", "Grep"}
 
 # First match wins. Phrases are specific on purpose: the e2e suite titles its Requests "matrix hotfix", "matrix security" and so
 # on only to label them, and must not make the AI propose a type that needs a human approver (hotfix, security).
@@ -153,6 +157,19 @@ def acceptance_ids(block):
     return re.findall(r"^- (AC-\d+): ", block, re.M)
 
 
+# A Request whose title or text contains this code makes the FIRST Solution carry one blocking open question; once the
+# prompt holds a <clarifications> block (the reviewer answered it), the regenerated Solution has none. Lets the UI suite
+# exercise "ask back" deterministically.
+BLOCKING_QUESTION_TRIGGER = "[stub:blocking-question]"
+
+
+def has_answered_clarifications(prompt):
+    # The block follows </request> (BuildSolutionPrompt); the request text is untrusted and the real prompt escapes a quoted
+    # closing tag, so only what comes after the first "</request>" line can be the platform's own block.
+    after = prompt.split("\n</request>\n", 1)
+    return len(after) == 2 and "\n<clarifications>\n" in after[1]
+
+
 def solution_answer(prompt):
     block = request_block(prompt)
     title = request_field(block, "title")[:80] or "the request"
@@ -180,10 +197,16 @@ def solution_answer(prompt):
         "options": options,
         "recommendation": {"option_id": "opt-1", "reason": "Smallest change that meets the request."},
         "assumptions": [{"id": "A-1", "text": "The current behaviour is covered by tests.", "needs_confirmation": False}],
-        "open_questions": [],
+        "open_questions": blocking_questions(block, prompt),
         "requirement_coverage": [{"ac_id": ac, "option_ids": ids, "status": "covered", "note": ""} for ac in acceptance_ids(block)],
     }
     return doc
+
+
+def blocking_questions(block, prompt):
+    if BLOCKING_QUESTION_TRIGGER not in block or has_answered_clarifications(prompt):
+        return []
+    return [{"id": "Q-1", "text": "Which health signal should the badge be driven by?", "blocking": True}]
 
 
 def plan_answer(prompt):
@@ -237,6 +260,42 @@ def plan_answer(prompt):
     return plan
 
 
+def readonly_kind(prompt):
+    """diagnosis | findings | answer, from the schema the prompt asks for (read before <request>, which is untrusted)."""
+    head = prompt.split("\n<request>\n", 1)[0]  # the instructions also say "described in <request>", so match the block's own line
+    for kind in ("diagnosis", "findings", "answer"):
+        if f'"kind":"{kind}"' in head:
+            return kind
+    return ""
+
+
+def readonly_answer(prompt, kind):
+    block = request_block(prompt)
+    title = request_field(block, "title")[:80] or "the request"
+    # No file is claimed: the fixture reads nothing, and evidence must not pretend it did.
+    evidence = [{"type": "command", "ref": "fake-claude", "excerpt": "Deterministic fixture; no repository file was read."}]
+    if kind == "diagnosis":
+        return {
+            "schema_version": 1, "kind": "diagnosis", "summary": f"Fake-claude diagnosis for: {title}",
+            "root_cause": {"statement": f"Fixture root cause for: {title}", "confidence": 0.5, "evidence": evidence},
+            "reproduction": {"reproducible": "unknown", "steps": [], "notes": "Not reproduced by the fixture."},
+            "impact": {"severity": "low", "scope": "fixture", "affected_components": [], "user_facing": False, "data_risk": False},
+            "fix_directions": [{"id": "fix-1", "summary": "Apply the smallest fix and add a regression test.", "risk": "low"}],
+            "suggested_size": "S", "suggest_escalate_to_change_request": False, "open_questions": [],
+        }
+    if kind == "findings":
+        return {
+            "schema_version": 1, "kind": "findings", "question": title, "summary": f"Fake-claude findings for: {title}",
+            "findings": [{"id": "f-1", "statement": "The fixture found nothing to report.", "confidence": 0.5, "evidence": evidence}],
+            "recommendation": {"statement": "No follow-up needed.", "reason": "Fixture answer."},
+            "follow_ups": [], "unknowns": [],
+        }
+    return {
+        "schema_version": 1, "kind": "answer", "answer_markdown": f"Fake-claude answer for: {title}. This is a deterministic fixture.",
+        "confidence": 0.5, "citations": [], "limitations": ["Fixture answer; no repository was read."],
+    }
+
+
 def main():
     argv = sys.argv[1:]
     if not argv or argv[0] in ("--version", "-v", "-V"):
@@ -257,12 +316,19 @@ def main():
         record("unsupported", argv)
         sys.stderr.write("fake claude: only -p/--print, --version, --help and `auth status` are supported\n")
         return 2
+    if "--print" in argv:
+        return run_print_arg(argv)
+    return run_print_stdin(argv)
+
+
+def run_print_stdin(argv):
+    """ai.complete: `claude -p --output-format json --tools ""`, prompt on stdin, JSON envelope on stdout."""
     prompt = sys.stdin.read()
     tools = flag_value(argv, "--tools")
-    record("print", argv, len(prompt.encode("utf-8")), {"tools": tools, "systemPrompt": flag_value(argv, "--system-prompt"),
+    record("print", argv, len(prompt.encode("utf-8")), {"mode": "stdin", "tools": tools, "systemPrompt": flag_value(argv, "--system-prompt"),
                                                          "promptKind": prompt_kind(prompt), "prompt": prompt[:6000]})  # test fixture only: lets a failing run be diagnosed
     if not logged_in():
-        return emit("Not logged in · Please run /login", is_error=True, api_status=None, prompt_len=len(prompt))
+        return emit("Not logged in \u00b7 Please run /login", is_error=True, api_status=None, prompt_len=len(prompt))
     if tools != "":
         # The untrusted prompt must never get tools: fail the call so an agent regression is visible in the suite.
         return emit("fake claude: refusing to run without --tools \"\"", is_error=True, prompt_len=len(prompt))
@@ -278,11 +344,36 @@ def main():
     return emit(json.dumps(body), prompt_len=len(prompt))
 
 
+def run_print_arg(argv):
+    """agent.execPrompt: `claude --print <prompt> [flags]`, plain text on stdout (no JSON envelope), cwd is the project's repo."""
+    i = argv.index("--print")
+    prompt = argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith("--") else ""
+    tools = flag_value(argv, "--tools")
+    mode = flag_value(argv, "--permission-mode")
+    kind = prompt_kind(prompt)
+    record("print", argv, len(prompt.encode("utf-8")), {"mode": "arg", "tools": tools, "permissionMode": mode, "promptKind": kind,
+                                                         "prompt": prompt[:6000]})  # test fixture only: lets a failing run be diagnosed
+    if not logged_in():
+        sys.stdout.write("Not logged in \u00b7 Please run /login\n")
+        return 1
+    if tools is not None and not set(t for t in tools.split(",") if t) <= READONLY_TOOLS:
+        sys.stderr.write(f"fake claude: refusing, --tools {tools!r} contains a tool that can write\n")
+        return 1
+    if not kind.startswith("readonly:"):
+        sys.stderr.write("fake claude: no canned answer for this prompt\n")
+        return 1
+    body = readonly_answer(prompt, kind.split(":", 1)[1])
+    sys.stdout.write(json.dumps(body) + "\n")
+    return 0
+
+
 def prompt_kind(prompt):
     # startswith, not `in`: request text is untrusted and may quote another prompt's opening line.
     for mark, kind in ((PLAN_MARK, "plan"), (SOLUTION_MARK, "solution"), (CLASSIFY_MARK, "classification")):
         if prompt.startswith(mark):
             return kind
+    if prompt.startswith(READONLY_MARK) and readonly_kind(prompt):
+        return "readonly:" + readonly_kind(prompt)
     return "unknown"
 
 

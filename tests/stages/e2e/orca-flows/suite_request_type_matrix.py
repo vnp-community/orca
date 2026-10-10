@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import request_flow_driver as drv
 from acceptance_context import AcceptanceContext
-from acceptance_recorder import Blocked
+from acceptance_recorder import Blocked, Skipped
 from expected_request_flows import EXPECTED, PHASES
 
 
@@ -16,10 +16,13 @@ def run(ctx: AcceptanceContext) -> None:
     for index, (typ, want) in enumerate(EXPECTED.items(), start=1):
         def one_type(typ=typ, want=want):
             size = "L" if typ in PHASES else "M"
+            # Answering the readiness Clarification starts the analysis; for a read-only analysis that is a real agent run.
+            analysis_gated = typ in drv.READONLY_ANALYSIS_TYPES and not drv.readonly_analysis_enabled(ctx)
             req = drv.create(ctx, f"matrix {typ}")["request"]
-            cur = drv.to_first_stage(ctx, req, typ, size, want.get("urgency", "normal"))
+            cur = drv.to_first_stage(ctx, req, typ, size, want.get("urgency", "normal"), answer_readiness=not analysis_gated)
             assert cur["type"] == typ, f"stored type is {cur['type']!r}"
-            assert cur["status"] == want["first"], f"after confirming {typ} the Request is in {cur['status']!r}, expected {want['first']!r}"
+            if not analysis_gated:
+                assert cur["status"] == want["first"], f"after confirming {typ} the Request is in {cur['status']!r}, expected {want['first']!r}"
 
             flow = ws.call("request.flow", {"type": typ, "size": size})
             assert flow["statusPath"] == want["path"], f"status path {flow['statusPath']}, expected {want['path']}"
@@ -33,6 +36,9 @@ def run(ctx: AcceptanceContext) -> None:
                 m_phases, l_phases = PHASES[typ]
                 at_m = ws.call("request.flow", {"type": typ, "size": "M"})["hasPhases"]
                 assert (at_m, flow["hasPhases"]) == (m_phases, l_phases), f"hasPhases M/L = {at_m}/{flow['hasPhases']}, expected {m_phases}/{l_phases}"
+            if analysis_gated:
+                raise Skipped(f"flow table for '{typ}' checked, but the first-stage check needs the readiness Clarification answered, which starts a real read-only "
+                              "analysis by the agent (AI usage); set ORCA_E2E_READONLY_ANALYSIS=1, or use --ai-stub")
         rec.run(f"MTX-{index:02d}", f"Type '{typ}': first stage '{want['first']}' and the documented flow", one_type)
 
     def declared_kind_matches_validation():

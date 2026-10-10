@@ -29,6 +29,7 @@ import suite_request_ai_stages
 import suite_request_exits
 import suite_request_lifecycle
 import suite_request_plan_stage
+import suite_request_readonly_analysis
 import suite_request_type_matrix
 import suite_task_and_mcp
 import suite_workflow_dag
@@ -49,12 +50,13 @@ SUITES = [
     ("exits", "Backlog, reopen, cancel, change type", suite_request_exits),
     ("ai", "AI-dependent stages", suite_request_ai_stages),
     ("plan", "Plan stage (propose, commit, approve)", suite_request_plan_stage),
+    ("analysis", "Read-only analyses: diagnosis, findings, answer", suite_request_readonly_analysis),
     ("task", "Task CRUD, agent execution, MCP", suite_task_and_mcp),
     ("notfound", "Unknown ids are NotFound on every service", suite_not_found_contract),
     ("aistub", "Fake claude wiring and the logged-out path (--ai-stub only)", suite_ai_stub_login),
 ]
 STUB_ONLY = {"aistub"}
-AI_USING = {"request", "matrix", "exits", "ai", "plan"}  # suites whose requests go through classification
+AI_USING = {"request", "matrix", "exits", "ai", "plan", "analysis"}  # suites whose requests go through classification
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
 
 

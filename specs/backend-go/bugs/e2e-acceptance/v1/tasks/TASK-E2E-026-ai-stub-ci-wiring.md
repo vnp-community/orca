@@ -24,7 +24,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [x] `python3 run_acceptance.py --strict --ai-stub` cho 0 BLOCKED trừ MCP và tuỳ chọn. — _đạt: BLOCKED chỉ còn `MCP-01/02` (`MCP_ENABLED` tắt, truyền `--allow-blocked MCP-01,MCP-02`); `TSK-08` là SKIP tuỳ chọn. Mã thoát vẫn 1 vì `AST-05` FAIL (lỗi sản phẩm, xem TASK-035)_
+- [x] `python3 run_acceptance.py --strict --ai-stub` cho 0 BLOCKED trừ MCP và tuỳ chọn. — _đạt: BLOCKED chỉ còn `MCP-01/02` (`MCP_ENABLED` tắt, truyền `--allow-blocked MCP-01,MCP-02`); `TSK-08` là SKIP tuỳ chọn. Từ 2026-10-10 `AST-05` đã xanh nên mã thoát là 0_
 
 ## Kiểm thử
 
@@ -36,7 +36,7 @@ Chạy thật.
 
 | Lệnh | Kết quả |
 |---|---|
-| `python3 run_acceptance.py --strict --ai-stub --allow-blocked MCP-01,MCP-02` (stack local) | **109 PASS, 1 FAIL (AST-05), 2 BLOCKED (MCP-01/02), 1 SKIP (TSK-08)**, 88 giây. `AIS-01/03` hết BLOCKED nhờ pha 2 |
+| `python3 run_acceptance.py --strict --ai-stub --allow-blocked MCP-01,MCP-02` (stack local) | 2026-10-09: 109 PASS, 1 FAIL (`AST-05`, lỗi sản phẩm lúc đó), 2 BLOCKED, 1 SKIP. **2026-10-10: 114 PASS, 0 FAIL, 2 BLOCKED (MCP-01/02), 1 SKIP (TSK-08), 80 giây, mã thoát 0.** `AIS-01/03` hết BLOCKED nhờ pha 2 |
 | `python3 run_acceptance.py request ai plan` **không** `--ai-stub` (Claude thật qua phiên đăng nhập, sau các thay đổi test) | 37 PASS, 0 FAIL, 3 BLOCKED (`AIS-01/03` vì có AI; `PLN-08`, xem dưới), 223 giây |
 
 Thay đổi test ngoài việc nối stub (đều do chạy thật mà ra):
@@ -55,3 +55,15 @@ Chưa làm: kiểm nội dung cho các loại Solution khác `solution` (chẩn 
 | `python3 run_acceptance.py` (Claude thật qua phiên CLI) | **103 PASS, 0 FAIL, 4 BLOCKED (MCP-01/02, AIS-01/03), 1 SKIP**, 409 giây; `PLN-08` PASS |
 
 Sửa `AST-05`: `ProposeRequestClassification` không còn huỷ giao dịch khi `RequestTypeApproval` trả `REQUEST_APPROVAL_NO_ELIGIBLE_APPROVER`; Request vẫn sang `awaiting_type_confirmation` (test `TestPropose_NoEligibleApprover_DoesNotStrandTheRequest`, lỗi khác vẫn huỷ giao dịch).
+
+### Cập nhật 2026-10-10: phân tích chỉ đọc
+
+Lỗi `REQUEST_ANALYSIS_NO_REPO_PATH` được sửa nên phân tích chỉ đọc chạy thật. Hệ quả cho bộ test:
+
+- **Cái gì kích hoạt agent.** Trả lời Clarification chuẩn bị (readiness) của một Request tự khởi động phân tích (request-service gọi `GenerateSolution` cho hệ thống). Đếm lệnh gọi `claude` trong một lượt `--ai-stub`: đúng 6 lượt `--print` (diagnosis x4 cho `bug`, `hotfix`, `security`, `performance`; findings x1 cho `spike`; answer x1 cho `question`), tất cả từ 6 test `MTX-02/03/05/06/08/09`. Các suite khác (`lifecycle`, `exits`, `ai`, `plan`) không kích hoạt, vì `task`/`docs`/`ops_request` không có phân tích còn `change_request`/`refactor` đi `ai.complete`.
+- **Cổng cho Claude thật**: biến mới `ORCA_E2E_READONLY_ANALYSIS=1` (`request_flow_driver.readonly_analysis_enabled`). Không đặt và không `--ai-stub` thì `MTX` cho sáu loại đó dừng ở Clarification chưa trả lời, vẫn kiểm bảng luồng `request.flow`, rồi kết thúc `SKIP` có lý do; `RAN-01..03` là `SKIP`. Với `--ai-stub` luôn chạy. Đã ghi vào README orca-flows.
+- **Suite mới `analysis`** (`suite_request_readonly_analysis.py`, `RAN-01..03`) là bằng chứng nghiệp vụ cho lỗi vừa sửa: tạo Request `bug` / `spike` / `question`, trả lời Clarification, đợi agent chỉ đọc chạy xong; kiểm run `succeeded`, Solution đúng `kind` (`diagnosis` / `findings` / `answer`) với tài liệu có trường bắt buộc của loại đó, Request dừng ở `awaiting_analysis_approval`, và Approval `solution` / `findings` / `answer` đang chờ. Cả ba PASS với stub. Chưa viết bước duyệt Approval để Request đi tiếp (câu hỏi `question` hoàn thành sau duyệt).
+
+Kết quả chạy Claude thật mặc định (`python3 run_acceptance.py --no-report`, 454 giây): **97 PASS, 0 FAIL, 4 BLOCKED (`AIS-01/03` vì có AI, `MCP-01/02`), 10 SKIP** (6 `MTX` và 3 `RAN` vì cổng trên, `TSK-08`). Kiểm không có agent AI ngoài ý muốn: số dòng `agent.execPrompt` trong log agent thật là 0 trước và sau lượt chạy, còn `ai.complete` qua phiên CLI vẫn chạy bình thường (34 lượt). Agent khôi phục về Claude thật (HOME/PATH thật, `dev-local-mac`).
+
+Chưa kiểm: phân tích chỉ đọc với Claude **thật** (chưa chạy `ORCA_E2E_READONLY_ANALYSIS=1` vì tốn lượt AI); chưa biết đầu ra thật của Claude có qua `ValidateByKind` hay không. `hotfix` (tài liệu chẩn đoán còn tạo task sửa và Approval `pre_deploy`) chưa có test e2e riêng.

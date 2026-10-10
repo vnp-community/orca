@@ -30,6 +30,8 @@ Ký hiệu: `[x]` xong và đã kiểm chứng, `[~]` làm một phần, `[ ]` c
 - [x] TASK-V2-019 · Với `change_request` có cổng Phase, Approval của Phase đầu không bao giờ được mở nên Request kẹt ở `executing`: `StartExecution` gọi `EvaluateExecution` và `completePhases` mở Approval Phase kế (idempotent). Test `TestStatusConsumer_GatedFlowOpensTheFirstPhaseApprovalOnce`, e2e Go E01 cả hai dialect (ghi trong TASK-E2E-028)
 - [x] TASK-V2-020 · `AST-05`: AI đề xuất `hotfix`/`security` trong tenant một người dùng → `REQUEST_APPROVAL_NO_ELIGIBLE_APPROVER` huỷ giao dịch phân loại, Request kẹt ở `classifying`. `ProposeRequestClassification` chấp nhận lỗi này (người báo xác nhận loại trực tiếp), lỗi khác vẫn huỷ. Test `TestPropose_NoEligibleApprover_DoesNotStrandTheRequest`, `AST-05` PASS (ghi trong TASK-E2E-026)
 - [x] TASK-V2-021 · Con trỏ nil `*ProjectAccessLookup` gắn vào interface làm panic `GetRequest` khi thiếu `PROJECT_INTERNAL_CALLER_TOKEN`: `projectAccess.existence()` + `wire_project_access_test.go`
+- [x] TASK-V2-022 · [Lỗi backend từ UI live: panic gateway, `task.list` tab Plan, Solution không tự bắt đầu](./TASK-V2-022-ui-live-findings-backend.md)
+- [x] TASK-V2-023 · [Loại chỉ đọc thiếu `repo_path`; câu hỏi chặn của Solution không có đường trả lời](./TASK-V2-023-readonly-analysis-repo-path-and-blocking-questions.md). Resolver lấy đường dẫn từ repo mặc định (không đoán), kênh `clarification.request`, câu trả lời vào prompt phân tích lại
 
 ## Kết quả thực thi (2026-10-09)
 

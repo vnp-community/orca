@@ -166,8 +166,10 @@ test.describe('Request solution review (mocked request-service)', () => {
     // Plain Enter only adds a line; it must not submit.
     await box.press('Enter')
     expect(backend.callsTo('approval.reject')).toHaveLength(0)
-    // Playwright maps ControlOrMeta to Meta on macOS and Control on Linux/Windows.
-    await box.press('ControlOrMeta+Enter')
+    // Why: the app picks the modifier from the page's userAgent (Desktop Chrome emulates Windows), not from the host OS
+    // that ControlOrMeta follows, so a Mac runner would press Meta while the page waits for Control.
+    const pageIsMac = await page.evaluate(() => navigator.userAgent.includes('Mac'))
+    await box.press(pageIsMac ? 'Meta+Enter' : 'Control+Enter')
     await expect.poll(() => backend.callsTo('approval.reject').length).toBe(1)
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })

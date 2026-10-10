@@ -3,7 +3,7 @@ import {
   CHANGE_OVERLAY_SMALL,
   CHANGE_OVERLAY_TRUNCATED,
   INDEX_STATUS_FIXTURES
-} from '../../../frontend/src/renderer/src/test-support/code-intel-fixtures'
+} from '../../../../../frontend/src/renderer/src/test-support/code-intel-fixtures'
 import { bootIntoReview } from './support/code-intel-app-navigation'
 import { devStackUrl } from './support/code-intel-dev-backend'
 import {

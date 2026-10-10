@@ -214,7 +214,7 @@ README v6 mục 8 dòng 12 thêm RPC mà CR-016 chưa có kênh. Backend dự tr
 
 ### 2.6 `clarification.*` (CR-REQ-028)
 
-Sau khi xác nhận loại, request-service đưa Request vào `awaiting_information` nếu thiếu thông tin. Không có bốn kênh này thì không client nào trả lời được và Request đứng yên, nên chúng là một phần bắt buộc của luồng (BUG-E2E-001). Quyền: người được giao câu hỏi hoặc người có quyền trên Request; gateway chỉ ánh xạ hình dạng.
+Sau khi xác nhận loại, request-service đưa Request vào `awaiting_information` nếu thiếu thông tin. Không có các kênh này thì không client nào trả lời được và Request đứng yên, nên chúng là một phần bắt buộc của luồng (BUG-E2E-001). Quyền: người được giao câu hỏi hoặc người có quyền trên Request; gateway chỉ ánh xạ hình dạng.
 
 | Kênh | Tham số | Kết quả | RPC |
 |---|---|---|---|
@@ -222,10 +222,34 @@ Sau khi xác nhận loại, request-service đưa Request vào `awaiting_informa
 | `clarification.get` | `{clarificationId}` | `{clarification}` | `GetClarification` |
 | `clarification.answer` | `{clarificationId, answers: [{questionId, valueJson, acceptDefault?}], complete?, expectedVersion?}` | `{clarification, requestStatus, requestRevision, stillMissing}` | `AnswerClarification` |
 | `clarification.cancel` | `{clarificationId, reason?, expectedVersion?}` | `{clarification}` | `CancelClarification` |
+| `clarification.request` | `{requestId, source, sourceRef?, questions: [{questionKey, kind, prompt, reason, options?, suggestedDefault?, required?, targetPath?}]}`; `source` ∈ `solution_open_question`, `plan_assumption`, `manual`; `kind` ∈ `text`, `single_choice`, `multi_choice`, `file`, `boolean` | `{clarification}` | `RequestClarification` |
 
 `ClarificationView`: `{id, displayId, requestId, source, sourceRef?, status, resumeStatus?, round, questions: ClarificationQuestionView[], dueAt?, version, createdAt?}`. `ClarificationQuestionView`: `{id, seq, questionKey, kind, prompt, reason?, options?, suggestedDefault?, required, targetPath?, valueType?, answer?}`. `valueType` ∈ `string`, `number`, `boolean`, `list` suy từ cùng luật kiểm tra trường đích, để UI chọn ô nhập và cách mã hoá `valueJson` (ví dụ `time_box_hours` là `number`, `data_exposed` là `boolean`, `repro_steps` là `list`); vắng thì coi là `string`. `options`, `suggestedDefault` và `answer` là giá trị JSON đã giải mã, không phải chuỗi.
 
 `valueJson` là **chuỗi JSON** (ví dụ `"\"yes\""`, `42`, `["a","b"]`). Khi `complete=true` mà còn câu bắt buộc chưa trả lời, kết quả có `stillMissing=true` và Request chưa rời `awaiting_information`. Lỗi riêng: `REQUEST_CLARIFICATION_*` (mục 5). Không thuộc công cụ MCP: đây là việc của người (`excluded_channels.yaml`, mẫu `clarification.*`).
+
+#### Câu hỏi chặn của Solution (TASK-V2-023, CR-REQ-028 mục 2.5)
+
+Solution có `open_questions[{id, text, blocking}]` (trong `optionsJson` của `solution.list`). Mục `blocking=true` chặn duyệt: `approval.approve` trả `REQUEST_SOLUTION_BLOCKING_QUESTIONS: blocking open questions are unanswered: Q-1, Q-2` (FailedPrecondition; danh sách id sau dấu hai chấm cuối, cách nhau `, `; đây là hợp đồng, có test giữ nguyên). Đường trả lời, theo thứ tự:
+
+1. Người báo cáo hoặc admin gọi `clarification.request {requestId, source:"solution_open_question", sourceRef:<solution.id>, questions:[{questionKey:"open_question:<Q-id>", kind:"text", prompt:<text, tối đa 1000 ký tự>, reason:<lý do hỏi, bắt buộc, tối đa 500>, required:true}]}`, mỗi câu hỏi của Solution một câu (`questionKey` đúng `open_question:` + `id` của câu; `boolean` cho câu có/không). Hiệu ứng: approval đang chờ bị huỷ (`information_required`), Request sang `awaiting_information`, một Clarification `open` với `resumeStatus:"analyzing"`. Một Request chỉ có một Clarification mở; gọi lặp cùng `source`, `sourceRef` và bộ `questionKey` trả lại chính Clarification đó.
+2. `clarification.answer {clarificationId, answers:[{questionId, valueJson}], complete:true, expectedVersion}` (cùng kênh với Clarification sẵn sàng).
+3. Trả lời xong, Request về `analyzing`, **Solution cũ bị `superseded`** (Decision cũng vậy) và backend tự sinh lại (`REQUEST_CLARIFICATION_AUTO_REGENERATE`, mặc định bật) với câu trả lời đã nằm trong đầu vào của AI. Solution mới có `id` mới; UI phải chọn lại phương án rồi duyệt. Câu hỏi chặn của Solution mới (nếu AI vẫn hỏi) cần Clarification mới với `sourceRef` là id mới. Chưa tự khởi động được thì UI gọi `solution.generate`.
+
+Lỗi của `clarification.request`: `REQUEST_CLARIFICATION_STATE_NOT_ALLOWED` (nguồn của nền tảng như `readiness`, `task_blocked`; Request ở trạng thái không hỏi được; đã có Clarification mở khác), `REQUEST_CLARIFICATION_INVALID_ANSWER` (câu hỏi sai: thiếu `reason`, `prompt` quá dài, trùng `questionKey`), `REQUEST_FORBIDDEN` (không phải người báo cáo hoặc admin).
+
+### 2.7 `task.list` cho tab Plan (TASK-V2-022)
+
+`task.list` nhận thêm các tham số tuỳ chọn, gateway chuyển nguyên xuống `TaskService.ListTasks` (proto đã có `task_types`, `request_ids`, `parent_id`; không đổi proto):
+
+| Tham số | Kiểu | Ý nghĩa |
+|---|---|---|
+| `taskTypes` | `string[]` | lọc theo `task`, `bug`, `feature`, `epic`, `plan`, `phase`; **vắng thì task-service ẩn `plan`/`phase`** (tương thích client cũ), nên tab Plan phải gửi `["plan","phase", ...]` |
+| `requestId` | `string` | một Request; gộp với `requestIds` nếu cả hai có (tối đa 100 id) |
+| `requestIds` | `string[]` | nhiều Request |
+| `parentId` | `string` | chỉ con trực tiếp của task đó |
+
+Kết quả giữ `{tasks, nextPageToken}`; mỗi task thêm `requestId` (vắng nếu task không thuộc Request). Phạm vi vẫn là tenant của người gọi (task-service không lọc theo grant ở `ListTasks`); Plan và Phase do `CreatePlanTree` cấp quyền owner (`ApplyTree`) cho người tạo Request.
 
 ## 3. Sự kiện thời gian thực: `request.subscribe`
 
@@ -285,6 +309,9 @@ Tiền tố `REQUEST_` cho **mọi** mã (README v6 mục 8 dòng 5; CR-REQ-007 
 | `REQUEST_SOURCE_FORBIDDEN` | PermissionDenied | client WS khai nguồn `mcp`, `webhook`, `manual` (do **gateway** trả) | không xảy ra với UI đúng |
 | `REQUEST_SOURCE_NOT_FOUND`, `REQUEST_SOURCE_FETCH_FAILED` | NotFound, Unavailable | không lấy được issue nguồn | toast, cho nhập tay |
 | `REQUEST_SOLUTION_WRONG_STATE`, `REQUEST_SOLUTION_KIND_NOT_ALLOWED`, `REQUEST_SOLUTION_NOT_PROPOSED`, `REQUEST_SOLUTION_OPTION_NOT_FOUND`, `REQUEST_SOLUTION_OPTION_NOT_CHOSEN` | FailedPrecondition, InvalidArgument | CR-REQ-007 | toast; tải lại Solution |
+| `REQUEST_SOLUTION_BLOCKING_QUESTIONS` | FailedPrecondition | `approval.approve` khi Solution còn `open_questions` `blocking` chưa trả lời; danh sách id nằm trong thông báo | hiện các câu hỏi chặn và nút hỏi (mục 2.6, `clarification.request`); không phải "đã được quyết định" |
+| `REQUEST_PLAN_UNCONFIRMED_ASSUMPTIONS` | FailedPrecondition | `approval.approve` của Plan khi còn `assumptions` `needs_confirmation` chưa trả lời | hỏi bằng `clarification.request` với `source:"plan_assumption"` (đường này của Plan chưa được kiểm trong đợt TASK-V2-023) |
+| `REQUEST_ANALYSIS_NO_REPO_PATH` | FailedPrecondition | `solution.generate` (loại chỉ đọc: bug, hotfix, security, performance, spike, question) khi repo mặc định của project không có đường dẫn thư mục trên dev server (URL là địa chỉ từ xa hoặc đường dẫn tương đối) | hướng dẫn gắn repo vào một thư mục trên dev server; không tự hạ xuống chế độ `complete` |
 | `REQUEST_SOLUTION_NO_CONNECTION`, `REQUEST_AI_NO_PROVIDER`, `REQUEST_ANALYSIS_NO_CONNECTION`, `REQUEST_ANALYSIS_BUSY` | FailedPrecondition | project chưa có dev server, chưa có AI | hướng dẫn kết nối dev server |
 | `REQUEST_SOLUTION_INVALID_OUTPUT`, `REQUEST_SOLUTION_RUN_INTERRUPTED`, `REQUEST_ANALYSIS_*`, `REQUEST_HOTFIX_FIX_TASK_FAILED`, `REQUEST_HOTFIX_APPROVAL_FAILED` | (nằm ở `runs[].errorCode`, không ném) | run sinh Solution lỗi | nút "Sinh lại" |
 | `REQUEST_PLAN_NOT_APPLICABLE`, `REQUEST_PLAN_SOLUTION_NOT_APPROVED`, `REQUEST_PLAN_AI_UNAVAILABLE`, `REQUEST_PLAN_AI_INVALID_JSON`, `REQUEST_PLAN_*` (kiểm đề xuất, CR-REQ-012 mục 2.4), `REQUEST_AI_COMPLETE_TIMEOUT` | FailedPrecondition, InvalidArgument | `request.generatePlan` | hiện lỗi cụ thể; `REQUEST_PLAN_AI_INVALID_JSON` kèm `raw` để người xem |

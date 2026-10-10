@@ -2,7 +2,8 @@ package usecase_test
 
 // Compiled into request-service's usecase package only through `go test -overlay` (see verify-against-request-service.sh),
 // so nothing is added to backend-go. It builds prompts with the REAL prompt builders, runs the fake `claude` on them
-// exactly as the agent does, and feeds the answer to the REAL parsers and validators. When a prompt or a validator
+// exactly as the agent does (ai.complete: stdin + JSON envelope; read-only analysis: `--print <prompt>` + plain stdout), and feeds
+// the answer to the REAL parsers and validators. When a prompt or a validator
 // changes in request-service, this fails before the nightly e2e does.
 
 import (
@@ -11,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stablyai/orca-go/services/request-service/internal/adapter/grpcclient"
@@ -171,5 +173,63 @@ func TestFakeClaude_FeedbackReachesThePlan(t *testing.T) {
 	p, err := usecase.ParsePlanOutput(text)
 	if err != nil || p.Notes == "" {
 		t.Fatalf("plan with feedback: %v %+v", err, p)
+	}
+}
+
+// askFakeClaudeReadonly mirrors agent-print-mode-exec.ts for accessMode=readonly: argv `--print <prompt> --permission-mode plan
+// --tools Read,Glob,Grep`, stdout is the model text itself.
+func askFakeClaudeReadonly(t *testing.T, prompt string) string {
+	t.Helper()
+	bin := os.Getenv("FAKE_CLAUDE_BIN")
+	if bin == "" {
+		t.Skip("FAKE_CLAUDE_BIN is not set")
+	}
+	cmd := exec.Command(bin, "--print", prompt, "--permission-mode", "plan", "--tools", "Read,Glob,Grep")
+	cmd.Dir = t.TempDir()
+	cmd.Env = append(os.Environ(), "FAKE_CLAUDE_STATE_DIR="+t.TempDir(), "FAKE_CLAUDE_LOGGED_IN=1")
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("fake claude --print failed: %v\n%s%s", err, out.String(), errb.String())
+	}
+	return out.String()
+}
+
+func TestFakeClaude_ReadonlyAnalysisPassesTheRealValidators(t *testing.T) {
+	seen := map[domain.SolutionKind]bool{}
+	for _, typ := range domain.AllRequestTypes() {
+		flow, err := domain.FlowFor(typ)
+		if err != nil {
+			t.Fatal(err)
+		}
+		kind, ok := domain.KindForAnalysis(flow.AnalysisKind)
+		if !ok || kind == domain.SolutionKindSolution {
+			continue // no analysis, or kind=solution (ai.complete, covered above)
+		}
+		for _, acs := range [][]string{nil, {"AC-1", "AC-2"}} {
+			req := requestWithACs(typ, domain.RequestSizeM, acs...)
+			prompt := usecase.BuildSolutionPrompt(usecase.SolutionPromptInput{Kind: kind, Request: req, MinOptions: domain.MinOptionsFor(typ)})
+			text := askFakeClaudeReadonly(t, prompt)
+			obj, err := usecase.ExtractJSONObject(text)
+			if err != nil {
+				t.Fatalf("%s/%s: %v", typ, kind, err)
+			}
+			doc, err := usecase.ValidateByKind(kind, obj, domain.MinOptionsFor(typ))
+			if err != nil {
+				t.Fatalf("%s/%s: the real validator rejected the document: %v", typ, kind, err)
+			}
+			if _, _, err := usecase.RedactDocument(doc); err != nil {
+				t.Fatalf("%s/%s: redaction: %v", typ, kind, err)
+			}
+			if !strings.Contains(string(doc), `"kind":"`+string(kind)+`"`) {
+				t.Errorf("%s: the stored document does not say kind=%s", typ, kind)
+			}
+			seen[kind] = true
+		}
+	}
+	for _, k := range []domain.SolutionKind{domain.SolutionKindDiagnosis, domain.SolutionKindFindings, domain.SolutionKindAnswer} {
+		if !seen[k] {
+			t.Errorf("no request type exercised kind %s", k)
+		}
 	}
 }

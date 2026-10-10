@@ -2,7 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import {
   createFakeMcpBackend,
   type FakeMcpBackend
-} from '../../../../frontend/src/renderer/src/test-support/mcp-fake-backend'
+} from '../../../../../../frontend/src/renderer/src/test-support/mcp-fake-backend'
 import { BOOT_CHANNEL_STUBS } from './mock-orca-boot-channels'
 
 export { createFakeMcpBackend, type FakeMcpBackend }

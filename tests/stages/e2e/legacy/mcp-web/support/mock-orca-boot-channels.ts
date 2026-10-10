@@ -3,7 +3,7 @@
 import {
   MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
   RUNTIME_PROTOCOL_VERSION
-} from '../../../../frontend/src/shared/protocol-version'
+} from '../../../../../../frontend/src/shared/protocol-version'
 
 export const BOOT_CHANNEL_STUBS: Record<string, unknown> = {
   'status.get': {

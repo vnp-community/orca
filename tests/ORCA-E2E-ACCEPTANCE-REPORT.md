@@ -167,3 +167,7 @@ Sau khi hoàn tất các task còn lại và dựng lại mọi service đã s�
 | `--strict --ai-stub --allow-blocked MCP-01,MCP-02` (báo cáo ghi `AI: STUB, wiring only`) | 110 | 0 | 2 (MCP-01/02) | 1 (TSK-08) |
 
 Lỗi sản phẩm mới tìm thấy và đã sửa trong đợt này: thông báo duyệt làm kẹt outbox (`AUTH_NO_ACTOR`), Approval của Phase đầu không bao giờ mở, phân loại kẹt khi không có người duyệt hợp lệ (`AST-05`), panic `GetRequest` thiếu token. Chi tiết và trạng thái từng task: [v1](../specs/backend-go/bugs/e2e-acceptance/v1/tasks/README.md), [v2](../specs/backend-go/bugs/e2e-acceptance/v2/tasks/README.md).
+
+### 10.1 Qua giao diện thật (2026-10-10)
+
+`python3 tests/stages/e2e/orca-flows/run_ui_flow.py [--ai-stub]` điều khiển trình duyệt (Playwright, project `request-live`) trên stack local: đăng nhập form, tạo Request, xác nhận loại, trả lời Clarification, chọn và duyệt Solution (kể cả "Hỏi lại" khi có câu hỏi chặn), sinh Plan, thấy Approval, từ chối, hủy; mỗi bước đối chiếu với gateway. Kết quả: stub 3/3 xanh, `ask-back` 6/6, Claude thật `change_request` xanh (có 1 vòng Hỏi lại thật); gateway 0 restart. Phát hiện và đã sửa: gateway panic, tab Plan trống, Solution không tự sinh, phân tích chỉ đọc thiếu `repo_path`, câu hỏi chặn không có đường trả lời, `RequestClarification` bị đánh dấu nội bộ, màn hình giữ Solution cũ. Suite backend sau cùng: `--strict --ai-stub` 114 PASS, 0 FAIL, 2 BLOCKED (MCP). Chi tiết: [frontend tasks](../specs/frontend/bugs/e2e-acceptance-v1/tasks/README.md).
