@@ -8,6 +8,7 @@
   python3 run_ui_flow.py --real execute  # REAL Claude Code approves and EXECUTES a tiny Plan on a throwaway repo
   python3 run_ui_flow.py --real monitor  # REAL Claude Code executes a one-task Plan while the spec watches the agent through the UI (TASK-FE-E2E-011)
   python3 run_ui_flow.py --real all      # all three; never combined with --ai-stub
+  python3 run_ui_flow.py --repro add-project-worktree  # no AI: Add Project (host dev-local-mac) -> worktree "test-02" through the UI on a throwaway repo (TASK-FE-E2E-015); RED while the bug exists
 
 The agent switch is the same StubbedAgent run_acceptance.py uses, so the stub behaves identically in both runners.
 `--real` runs the real-AI specs (ui-live/readonly-real, execute-real) in a safety net (real-flow-harness.ts): a temp repo that
@@ -33,6 +34,8 @@ REAL_SPECS = {
     "monitor": ["agent-session-monitoring-real"],
     "all": ["readonly-real", "execute-real", "agent-session-monitoring-real"],
 }
+# Why: no AI and no Request: UI-only repros of a reported bug; each prints BUG REPRODUCED and fails until the product is fixed.
+REPRO_SPECS = {"add-project-worktree": ["add-project-worktree-repro"]}
 # Why: these approve a Plan, which runs a real agent that WRITES to the throwaway repo; read-only analysis does not need the flag.
 EXECUTING = ("execute", "monitor", "all")
 
@@ -55,14 +58,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--ai-stub", action="store_true", help="answer AI calls with the deterministic fake claude")
     parser.add_argument("--real", choices=sorted(REAL_SPECS), help="run the real-Claude specs: read-only analysis, plan execution, agent-session monitoring, or all")
+    parser.add_argument("--repro", choices=sorted(REPRO_SPECS), help="run a UI repro of a reported bug (no AI, no Request, throwaway repo)")
     parser.add_argument("playwright_args", nargs="*", help="extra arguments for `playwright test` (after `--`)")
     args = parser.parse_args()
 
     if args.real and args.ai_stub:
         print("--real and --ai-stub exclude each other: the real-AI specs never run against the fake claude", file=sys.stderr)
         return 2
+    if args.repro and (args.real or args.ai_stub):
+        print("--repro runs alone: it uses no AI, so --real and --ai-stub do not apply", file=sys.stderr)
+        return 2
     cfg = load_config(time.strftime("%m%d%H%M%S"))
     env = dict(os.environ, ORCA_E2E_LIVE="1")
+    if args.repro:
+        args.playwright_args = [*REPRO_SPECS[args.repro], *args.playwright_args]
+        print(f"UI repro: {args.repro} (dev server '{env.get('ORCA_E2E_DEV_SERVER_NAME', cfg.dev_server_name)}', throwaway repo, no AI)")
     if args.real:
         env.pop("ORCA_E2E_AI_MODE", None)
         env["ORCA_E2E_READONLY_ANALYSIS"] = "1"
