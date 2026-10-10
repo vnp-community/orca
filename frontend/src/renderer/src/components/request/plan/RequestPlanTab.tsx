@@ -19,6 +19,7 @@ import { buildStageTimeline } from '../request-stage-timeline-model'
 import { attachApprovals, computeExecutionGates } from './plan-approval-model'
 import { canGeneratePlan, derivePlanViewState } from './plan-view-state'
 import { planDecisionErrorMessage } from './plan-decision-error-message'
+import { firstAiSetupCode } from '../request-ai-setup'
 import { PhaseApprovalBar } from './PhaseApprovalBar'
 import { PlanApprovalBar } from './PlanApprovalBar'
 import { PlanGateChips } from './PlanGateChips'
@@ -31,7 +32,9 @@ import { planBlockedByDecision } from '../decision/decision-rules'
 import { GraphSkeleton } from '../../graph/GraphStates'
 import type { OrcaRequest } from '../../../../../shared/request-types'
 
-const GraphPanel = React.lazy(() => import('../../graph/GraphPanel').then((m) => ({ default: m.GraphPanel })))
+const GraphPanel = React.lazy(() =>
+  import('../../graph/GraphPanel').then((m) => ({ default: m.GraphPanel }))
+)
 
 export type RequestPlanTabProps = {
   request: OrcaRequest
@@ -108,6 +111,7 @@ export function RequestPlanTab({
           canGenerate={canGeneratePlan(request.status)}
           generating={decision.isBusy('generatePlan')}
           generateError={generateFailure ? planDecisionErrorMessage(generateFailure) : null}
+          generateAiCode={firstAiSetupCode(generateFailure?.error.backendCode)}
           onGenerate={() => void decision.regeneratePlan()}
           onRetry={refetch}
           loadErrorKind={error}
@@ -119,7 +123,12 @@ export function RequestPlanTab({
   const planApproval = approvalMap.plan ?? approvalMap.taskList
   return (
     <div className="flex h-full flex-col overflow-auto" data-testid="request-tab-plan">
-      <PlanSummaryHeader tree={tree} approval={planApproval} view={planView} onViewChange={setPlanView} />
+      <PlanSummaryHeader
+        tree={tree}
+        approval={planApproval}
+        view={planView}
+        onViewChange={setPlanView}
+      />
       {truncated && (
         <div
           role="status"
@@ -136,13 +145,21 @@ export function RequestPlanTab({
           </Button>
         </div>
       )}
-      <PlanDriftSection request={request} approvals={approvals} phases={tree.phases} onChanged={onSettled} />
+      <PlanDriftSection
+        request={request}
+        approvals={approvals}
+        phases={tree.phases}
+        onChanged={onSettled}
+      />
       <PlanApprovalBar
         approval={planApproval}
         decision={decision}
         approveBlockedReason={
           planBlockedByDecision(requestDecisions.decisions)
-            ? translate('auto.components.request.decision.planBlocked', 'No decision recorded for the chosen option yet')
+            ? translate(
+                'auto.components.request.decision.planBlocked',
+                'No decision recorded for the chosen option yet'
+              )
             : null
         }
       />

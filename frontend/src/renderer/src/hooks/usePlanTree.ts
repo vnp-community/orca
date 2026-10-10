@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
 import { useAppStore } from '../store'
 import { useApprovals } from './useApprovals'
+import { keepTasksOfRequest, planTaskListParams } from './plan-task-list-filter'
 import { useRequestSubscription } from './useRequestSubscription'
 import { classifyRequestRpcError } from '../../../shared/request-errors'
 import { normalizeTask } from '../../../shared/task-status-normalization'
@@ -39,6 +40,7 @@ export type UsePlanTreeResult = {
 export function usePlanTree(request: OrcaRequest): UsePlanTreeResult {
   const planTaskId = request.planTaskId
   const projectId = request.projectId
+  const requestId = request.id
   const [tasks, setTasks] = useState<OrcaTask[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -69,14 +71,13 @@ export function usePlanTree(request: OrcaRequest): UsePlanTreeResult {
       let pages = 0
       let more = false
       do {
-        // Swap to requestId/planTaskId filter here once task.list supports it (CR-REQ-011/016).
         const res = await callRuntimeRpc<{ tasks: OrcaTask[] | null; nextPageToken?: string }>(
           target,
           'task.list',
-          { projectId, pageSize: PLAN_TREE_PAGE_SIZE, ...(pageToken ? { pageToken } : {}) }
+          planTaskListParams({ projectId, requestId, pageSize: PLAN_TREE_PAGE_SIZE, pageToken })
         )
         pages++
-        collected.push(...(res.tasks ?? []).map(normalizeTask))
+        collected.push(...keepTasksOfRequest((res.tasks ?? []).map(normalizeTask), requestId))
         pageToken = res.nextPageToken || undefined
         more = !!pageToken
       } while (more && pages < PLAN_TREE_MAX_PAGES)
@@ -97,7 +98,7 @@ export function usePlanTree(request: OrcaRequest): UsePlanTreeResult {
         setIsLoading(false)
       }
     }
-  }, [planTaskId, projectId])
+  }, [planTaskId, projectId, requestId])
 
   const refetch = useCallback(() => {
     void load()

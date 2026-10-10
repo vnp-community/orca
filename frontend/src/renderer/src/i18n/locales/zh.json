@@ -12815,6 +12815,17 @@
         "TaskBoardView": {
           "backlogMoved": "尚未开始的任务位于 请求 > 待办",
           "openBacklog": "打开待办"
+        },
+        "TaskLoadStates": {
+          "loading": "正在加载任务...",
+          "empty": "还没有任务。",
+          "emptyFiltered": "没有符合当前搜索或筛选条件的任务。",
+          "emptyPlanningHidden": "仅存在计划和阶段任务。打开“显示计划/阶段”即可查看。",
+          "errorTitle": "无法加载任务。",
+          "staleTitle": "无法刷新任务，正在显示上次加载的列表。",
+          "forbidden": "你没有访问此项目任务的权限。",
+          "code": "错误代码：{{code}}",
+          "retry": "重试"
         }
       },
       "taskPageEmptyState": {
@@ -13161,12 +13172,28 @@
           "notFound": "该项目已不存在。",
           "conflict": "此项已被他人修改,请刷新后重试。",
           "invalidState": "当前状态下不允许此操作。",
+          "blockingQuestions": "暂时无法批准：分析中仍有需要回答的阻塞性开放问题。",
+          "unconfirmedAssumptions": "暂时无法批准此计划：其中需要确认的假设尚无已记录的回答。",
           "network": "网络错误,请检查连接。",
           "unavailable": "请求服务不可用,请稍后重试。",
           "rateLimited": "尝试次数过多,请稍候重试。",
           "validation": "请检查输入后重试。",
           "unknown": "出现了问题。",
-          "retry": "重试"
+          "retry": "重试",
+          "unsupported": "此服务器尚不支持该操作。",
+          "expired": "该项目已过期。",
+          "pending": "仍在准备中，请稍后重试。",
+          "noDevServer": "此项目没有已连接的开发服务器。请先连接后重试。",
+          "noAi": "开发服务器上无法使用 AI。请检查其 AI 配置。",
+          "featureOff": "此组织未启用请求流程。",
+          "code": {
+            "rateLimited": "操作过快，请稍候再试。",
+            "projectNotFound": "该项目已不存在。",
+            "aiQuotaExhausted": "开发服务器的 AI 额度已用完，请稍后再试。",
+            "aiBusy": "AI 正忙于其他任务，请稍后重试。",
+            "aiTimeout": "AI 响应超时，请重试。",
+            "aiAgentUnavailable": "没有已连接的开发服务器，AI 无法运行。"
+          }
         },
         "AnswerView": {
           "answer": "答复",
@@ -13224,7 +13251,12 @@
           "analyzing": "AI 正在分析此请求",
           "drafting": "AI 正在撰写分析",
           "failed": "无法生成分析。",
-          "regenerate": "重新生成"
+          "regenerate": "重新生成",
+          "errorCode": "错误代码：{{code}}"
+        },
+        "SolutionStartPrompt": {
+          "description": "此请求的分析尚未开始。开始后即可获得供审阅的方案选项。",
+          "generate": "生成方案"
         },
         "SolutionOptionCard": {
           "chosen": "已选",
@@ -13408,7 +13440,8 @@
             "phase": "阶段",
             "gates": "{{count}} 个审批关口",
             "noGates": "无审批关口"
-          }
+          },
+          "classifyFailed": "AI 无法自动分类此请求。请自行选择类型或重新分类。"
         },
         "RequestHistoryTab": {
           "empty": "类型尚未更改过。",
@@ -13505,7 +13538,8 @@
             "notYet": "尚无计划。",
             "notFound": "未找到计划。",
             "empty": "计划为空。",
-            "currentStep": "当前步骤:{{step}}"
+            "currentStep": "当前步骤:{{step}}",
+            "notFoundHint": "可能已被删除，或者你没有访问其任务的权限。"
           },
           "PlanSummaryHeader": {
             "counts": "{{phases}} 个阶段,{{tasks}} 个任务",
@@ -13524,6 +13558,9 @@
           "RequestPlanTab": {
             "reload": "重新加载",
             "truncated": "任务列表已被截断,部分任务可能缺失。"
+          },
+          "PlanUnconfirmedAssumptionsNotice": {
+            "ids": "尚未确认：{{ids}}"
           }
         },
         "approval": {
@@ -13723,7 +13760,14 @@
             "solution_open_question": "方案待决问题",
             "plan_assumption": "计划假设",
             "task_blocked": "任务受阻"
-          }
+          },
+          "loadFailedTitle": "无法加载问题",
+          "loadFailedUnsupported": "此服务器尚不支持回答问题。请联系管理员升级。",
+          "loadFailedCode": "错误代码：{{code}}",
+          "refresh": "刷新",
+          "invalidNumber": "不是有效数字。请仅使用数字，例如 8 或 2.5",
+          "numberHint": "请输入数字，例如 8 或 2.5",
+          "listHint": "每行一项"
         },
         "decision": {
           "rationaleLabel": "选择理由",
@@ -13918,6 +13962,48 @@
             "agent_defect": "将附带格式提醒重试一次",
             "unknown": "未分类的失败"
           }
+        },
+        "aiSetup": {
+          "title": {
+            "notConfigured": "开发服务器上尚未配置 AI",
+            "credentialUnavailable": "无法读取 AI 凭据",
+            "sessionExpired": "开发服务器上的 Claude Code 会话已过期",
+            "quotaExhausted": "开发服务器的 AI 额度已用完",
+            "agentUnavailable": "没有可用于运行 AI 的开发服务器",
+            "busy": "AI 正忙"
+          },
+          "body": {
+            "notConfigured": "开发服务器尚未登录 Claude Code。请在开发服务器上运行 claude auth login（或为其代理设置 API 密钥），然后重试。",
+            "credentialUnavailable": "请检查为开发服务器配置的 AI 凭据，然后重试。",
+            "sessionExpired": "请在开发服务器上使用 claude auth login 重新登录，然后重试。",
+            "quotaExhausted": "开发服务器上 Claude Code 登录账号的额度已用完。请等待额度重置或切换账号。",
+            "agentUnavailable": "请为此项目连接开发服务器，或更新其代理，然后重试。",
+            "busy": "开发服务器已在运行允许的最大数量的 AI 任务。请稍后重试。"
+          },
+          "code": "错误代码：{{code}}",
+          "retry": "重试",
+          "openSettings": "打开开发服务器设置",
+          "askAdmin": "请联系管理员解决。"
+        },
+        "SolutionOpenQuestions": {
+          "title": "开放问题",
+          "notice": "在下方每个阻塞性问题都有已记录的回答之前，无法批准。",
+          "refused": "批准被拒绝。以下阻塞性问题仍未回答：{{ids}}",
+          "blocking": "阻塞",
+          "nonBlocking": "非阻塞"
+        },
+        "SolutionAskBackDialog": {
+          "ask": "回问",
+          "title": "回问",
+          "description": "把阻塞性问题发给报告人。对方回答后会重新生成方案，你需要重新选择一个选项。",
+          "reasonDefault": "在回答此问题之前无法批准该方案 ({{id}})：{{text}}",
+          "notAllowed": "现在无法提问：可能已有另一轮提问处于打开状态，或请求所处状态不允许提问。",
+          "invalid": "问题被拒绝。请确认每条理由都已填写且不过长。",
+          "reasonLabel": "提问原因 ({{id}})",
+          "pickOne": "请至少选择一个问题。",
+          "reasonRequired": "每个选中的问题都需要理由。",
+          "cancel": "取消",
+          "submit": "发送给报告人"
         }
       },
       "reviewMap": {

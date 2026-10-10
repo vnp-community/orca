@@ -40,40 +40,81 @@ import type {
   ExecuteBacklogItem,
   RequestEvent
 } from './request-types'
+import { parseSolutionOpenQuestions } from './request-solution-open-questions'
 
 // ---------------------------------------------------------------------------
 // Enum guard helpers
 // ---------------------------------------------------------------------------
 
 const REQUEST_TYPES = new Set<RequestType>([
-  'bug', 'task', 'docs', 'question', 'hotfix', 'security',
-  'ops_request', 'change_request', 'refactor', 'spike', 'performance'
+  'bug',
+  'task',
+  'docs',
+  'question',
+  'hotfix',
+  'security',
+  'ops_request',
+  'change_request',
+  'refactor',
+  'spike',
+  'performance'
 ])
 
 const REQUEST_STATUSES = new Set<RequestStatus>([
-  'submitted', 'classifying', 'awaiting_type_confirmation', 'analyzing',
-  'awaiting_analysis_approval', 'awaiting_information', 'planning',
-  'awaiting_plan_approval', 'executing', 'completed', 'cancelled', 'request_backlog'
+  'submitted',
+  'classifying',
+  'awaiting_type_confirmation',
+  'analyzing',
+  'awaiting_analysis_approval',
+  'awaiting_information',
+  'planning',
+  'awaiting_plan_approval',
+  'executing',
+  'completed',
+  'cancelled',
+  'request_backlog'
 ])
 
 const REQUEST_SIZES = new Set<RequestSize>(['S', 'M', 'L'])
 const REQUEST_URGENCIES = new Set<RequestUrgency>(['normal', 'urgent'])
 const TYPE_SOURCES = new Set<TypeSource>(['ai', 'human'])
 const SOURCE_PROVIDERS = new Set<RequestSourceProvider>([
-  'jira', 'github', 'gitlab', 'linear', 'mcp', 'manual', 'webhook'
+  'jira',
+  'github',
+  'gitlab',
+  'linear',
+  'mcp',
+  'manual',
+  'webhook'
 ])
 const RETURNED_FROM_STAGES = new Set<ReturnedFromStage>([
-  'classification', 'analysis', 'plan', 'phase', 'task'
+  'classification',
+  'analysis',
+  'plan',
+  'phase',
+  'task'
 ])
 const LINK_REASONS = new Set<RequestLinkReason>([
-  'spawned_by_spike', 'spawned_by_question', 'followup_hotfix', 'escalation', 'parent', 'child'
+  'spawned_by_spike',
+  'spawned_by_question',
+  'followup_hotfix',
+  'escalation',
+  'parent',
+  'child'
 ])
 const SOLUTION_KINDS = new Set<SolutionKind>(['solution', 'diagnosis', 'findings', 'answer'])
 const SOLUTION_STATUSES = new Set<SolutionStatus>([
-  'generating', 'ready', 'chosen', 'rejected', 'superseded'
+  'generating',
+  'ready',
+  'chosen',
+  'rejected',
+  'superseded'
 ])
 const APPROVAL_SUBJECT_TYPES = new Set<ApprovalSubjectType>([
-  'solution', 'plan', 'phase', 'pre_deploy'
+  'solution',
+  'plan',
+  'phase',
+  'pre_deploy'
 ])
 const APPROVAL_STATUSES = new Set<ApprovalStatus>(['pending', 'approved', 'rejected', 'expired'])
 
@@ -116,7 +157,9 @@ function safeArr<T>(value: unknown, mapper: (item: unknown, i: number) => T): T[
 function safeRaw(obj: Record<string, unknown>, ...known: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(obj)) {
-    if (!known.includes(k)) {result[k] = v}
+    if (!known.includes(k)) {
+      result[k] = v
+    }
   }
   return result
 }
@@ -166,8 +209,7 @@ export function parseRequest(raw: unknown): OrcaRequest {
           }
         : undefined
 
-  const links =
-    Array.isArray(r.links) ? r.links.map(parseRequestLink) : undefined
+  const links = Array.isArray(r.links) ? r.links.map(parseRequestLink) : undefined
 
   return {
     id: safeStr(r.id),
@@ -239,17 +281,25 @@ export function parseSolution(raw: unknown): Solution {
     r.options && typeof r.options === 'object' && !Array.isArray(r.options)
       ? (r.options as Record<string, unknown>)
       : undefined
-  const optList = Array.isArray(r.options) ? r.options : Array.isArray(optObj?.options) ? optObj.options : undefined
+  const optList = Array.isArray(r.options)
+    ? r.options
+    : Array.isArray(optObj?.options)
+      ? optObj.options
+      : undefined
   let options = optList?.map((item, i) => parseSolutionOption(item, i))
   const recId = recommendedOptionId(optObj?.recommendation)
   if (options && recId) {
-    options = options.map((o) => (o.id === recId ? { ...o, raw: { ...o.raw, recommended: true } } : o))
+    options = options.map((o) =>
+      o.id === recId ? { ...o, raw: { ...o.raw, recommended: true } } : o
+    )
   }
-  const statusRaw = typeof r.status === 'string' ? (SOLUTION_STATUS_ALIASES[r.status] ?? r.status) : r.status
+  const statusRaw =
+    typeof r.status === 'string' ? (SOLUTION_STATUS_ALIASES[r.status] ?? r.status) : r.status
   let chosenOptionId = safeOptStr(r.chosenOptionId)
   if (!chosenOptionId && typeof r.chosenOption === 'number' && r.chosenOption >= 0 && options) {
     chosenOptionId = options[r.chosenOption]?.id
   }
+  const openQuestions = parseSolutionOpenQuestions(optObj)
   let content = safeOptStr(r.content)
   content ??= optObj && !optList ? JSON.stringify(optObj) : undefined
   return {
@@ -259,6 +309,7 @@ export function parseSolution(raw: unknown): Solution {
     status: safeEnum(statusRaw, SOLUTION_STATUSES, 'unknown'),
     content,
     options,
+    ...(openQuestions ? { openQuestions } : {}),
     chosenOptionId,
     rejectionReason: safeOptStr(r.rejectionReason),
     generatedAt: safeOptStr(r.generatedAt) ?? safeOptStr(r.createdAt),

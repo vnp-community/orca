@@ -37,6 +37,7 @@ export function SidebarRequestNavButton(): React.JSX.Element | null {
       title={label}
       aria-label={label}
       aria-pressed={isActive}
+      data-testid="sidebar-requests"
       onClick={() => setActiveView('requests')}
       className={cn(
         'relative flex items-center justify-center size-8 rounded transition-colors',

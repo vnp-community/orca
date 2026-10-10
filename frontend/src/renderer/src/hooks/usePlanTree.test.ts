@@ -48,12 +48,36 @@ describe('usePlanTree', () => {
     const { result } = renderHook(() => usePlanTree(baseReq))
     await waitFor(() => expect(result.current.tree?.plan?.id).toBe('plan1'))
     expect(result.current.tree?.tasksByPhase['ph1'].map((x) => x.id)).toEqual(['w1'])
+    expect(callRuntimeRpc.mock.calls[0][1]).toBe('task.list')
+    expect(callRuntimeRpc.mock.calls[0][2]).toEqual({
+      projectId: 'p1',
+      requestId: 'r1',
+      taskTypes: ['plan', 'phase', 'task', 'bug', 'feature', 'epic'],
+      pageSize: 200
+    })
     expect(callRuntimeRpc.mock.calls[1][2]).toMatchObject({
       projectId: 'p1',
+      requestId: 'r1',
+      taskTypes: ['plan', 'phase', 'task', 'bug', 'feature', 'epic'],
       pageToken: 'n1',
       pageSize: 200
     })
     expect(result.current.truncated).toBe(false)
+  })
+
+  it('still builds the tree when an older server ignores the filters and returns other requests tasks', async () => {
+    callRuntimeRpc.mockResolvedValue({
+      tasks: [
+        { ...t('plan1', 'plan'), requestId: 'r1' },
+        { ...t('ph1', 'phase', 'plan1'), requestId: 'r1' },
+        { ...t('plan2', 'plan'), requestId: 'other' },
+        { ...t('ph2', 'phase', 'plan2'), requestId: 'other' },
+        t('free', 'task')
+      ]
+    })
+    const { result } = renderHook(() => usePlanTree(baseReq))
+    await waitFor(() => expect(result.current.tree?.plan?.id).toBe('plan1'))
+    expect(result.current.tree?.phases.map((p) => p.id)).toEqual(['ph1'])
   })
 
   it('flags truncated after the max page count', async () => {

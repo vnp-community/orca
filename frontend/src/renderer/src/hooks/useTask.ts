@@ -1,6 +1,7 @@
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
 import { Tracers } from '../../../shared/trace/tracers'
+import { isTaskNotFoundError } from '../../../shared/task-errors'
 import type { OrcaTask } from '../../../shared/task-types'
 
 export function useTask(taskId: string) {
@@ -32,7 +33,15 @@ export function useTask(taskId: string) {
 
   const deleteTask = async () => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    await callRuntimeRpc(target, 'task.delete', { taskId })
+    try {
+      // Why `id`: task.delete decodes {id}; a `taskId` key reaches the service as an empty id.
+      await callRuntimeRpc(target, 'task.delete', { id: taskId })
+    } catch (err) {
+      // Why: a task that is already gone is the outcome the caller asked for, so a repeat is not an error.
+      if (!isTaskNotFoundError(err)) {
+        throw err
+      }
+    }
     useAppStore.getState().removeTask(taskId)
   }
 

@@ -10,7 +10,14 @@
 
 import type { GraphRisk } from './graph-types'
 
-export type ClarificationQuestionKind = 'text' | 'single_choice' | 'multi_choice' | 'file' | 'boolean'
+export type ClarificationQuestionKind =
+  | 'text'
+  | 'single_choice'
+  | 'multi_choice'
+  | 'file'
+  | 'boolean'
+/** How the server wants the answer collected; absent (older servers) means `string`. */
+export type ClarificationValueType = 'string' | 'number' | 'boolean' | 'list'
 export type ClarificationSource =
   | 'readiness'
   | 'solution_open_question'
@@ -29,6 +36,7 @@ export type ClarificationQuestion = {
   options?: { value: string; label: string }[]
   suggestedDefault?: unknown
   required: boolean
+  valueType?: ClarificationValueType
   answer?: unknown
 }
 

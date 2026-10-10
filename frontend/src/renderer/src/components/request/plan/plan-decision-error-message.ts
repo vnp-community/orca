@@ -5,7 +5,7 @@
  */
 
 import { translate } from '@/i18n/i18n'
-import { requestErrorMessage } from '../request-error-message'
+import { requestErrorMessage, requestErrorMessageForError } from '../request-error-message'
 import { splitErrorCode } from '../../../../../shared/request-errors'
 import { backendErrorCode } from '../solution/solution-error-classification'
 import type { PlanDecisionFailure } from '../../../hooks/usePlanDecision'
@@ -40,5 +40,5 @@ export function planDecisionErrorMessage(failure: PlanDecisionFailure): string {
   if (failure.errorClass === 'rateLimited') {
     return requestErrorMessage('rate_limited')
   }
-  return requestErrorMessage(failure.error.kind)
+  return requestErrorMessageForError(failure.error)
 }

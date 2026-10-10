@@ -141,6 +141,40 @@ describe('PlanApprovalBar', () => {
     expect(screen.getByTestId('plan-approve')).toBeDisabled()
   })
 
+  it('explains unconfirmed assumptions with their ids instead of "already decided"', async () => {
+    callRequestRpc.mockResolvedValue({
+      ok: false,
+      error: {
+        kind: 'unconfirmed_assumptions',
+        code: 'runtime_error',
+        message:
+          'REQUEST_PLAN_UNCONFIRMED_ASSUMPTIONS: assumptions needing confirmation are unanswered: A-1, A-3'
+      }
+    })
+    render(<PlanHarness approval={planApproval('ap1')} />)
+    fireEvent.click(screen.getByTestId('plan-approve'))
+    const notice = await screen.findByTestId('plan-unconfirmed-assumptions-notice')
+    expect(notice).toHaveTextContent('assumptions that need confirmation')
+    expect(screen.getByTestId('plan-unconfirmed-assumption-ids')).toHaveTextContent('A-1, A-3')
+    expect(screen.queryByTestId('plan-decision-error')).toBeNull()
+    expect(screen.queryByText('This was already decided.')).toBeNull()
+  })
+
+  it('shows the notice without ids when the message lists none', async () => {
+    callRequestRpc.mockResolvedValue({
+      ok: false,
+      error: {
+        kind: 'unconfirmed_assumptions',
+        code: 'runtime_error',
+        message: 'REQUEST_PLAN_UNCONFIRMED_ASSUMPTIONS: blocked'
+      }
+    })
+    render(<PlanHarness approval={planApproval('ap1')} />)
+    fireEvent.click(screen.getByTestId('plan-approve'))
+    expect(await screen.findByTestId('plan-unconfirmed-assumptions-notice')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-unconfirmed-assumption-ids')).toBeNull()
+  })
+
   it('is read-only once approved and shows the reason after rejection', () => {
     const { container, rerender } = render(
       <PlanHarness approval={planApproval('ap1', { status: 'approved' })} />

@@ -16,6 +16,7 @@ import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { useRequest } from '../../hooks/useRequest'
 import { useRequestActions } from '../../hooks/useRequestActions'
+import { useRequestPostAnswerRefresh } from '../../hooks/useRequestPostAnswerRefresh'
 import { useRequestSubscription } from '../../hooks/useRequestSubscription'
 import { ChangeTypeConfirmDialog } from './ChangeTypeConfirmDialog'
 import { CancelRequestDialog } from './CancelRequestDialog'
@@ -72,6 +73,11 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
   }, [])
 
   useRequestSubscription({ requestId, onEvent: refetch })
+  const armPostAnswerRefresh = useRequestPostAnswerRefresh(request?.status, refetch)
+  const onClarificationAnswered = useCallback(() => {
+    refetch()
+    armPostAnswerRefresh()
+  }, [refetch, armPostAnswerRefresh])
 
   const closeToList = useCallback(() => {
     useAppStore.getState().setRequestPageRequest(null)
@@ -188,6 +194,7 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
               currentUserId={currentUser?.id ?? null}
               isAdmin={currentUser?.role === 'admin'}
               onStateChange={setClarification}
+              onAnswered={onClarificationAnswered}
             />
           )}
           {(request.status === 'awaiting_type_confirmation' ||

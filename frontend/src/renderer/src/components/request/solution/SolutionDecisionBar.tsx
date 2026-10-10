@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useDecisions } from '../../../hooks/useDecisions'
 import { useImpactAssessment } from '../../../hooks/useImpactAssessment'
+import { useRequestCooldown } from '../../../hooks/useRequestCooldown'
 import { splitErrorCode } from '../../../../../shared/request-errors'
 import { ImpactFindingList } from '../impact/ImpactFindingList'
 import { RiskAcceptanceChecklist } from '../impact/RiskAcceptanceChecklist'
@@ -62,6 +63,9 @@ export function SolutionDecisionBar({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingDecision, setPendingDecision] = useState<Decision | null>(null)
   const decisions = useDecisions(solution.requestId, solution.id)
+  // Why: while the limiter says wait, a click is only another rejection.
+  const writeCooling = useRequestCooldown('write').coolingDown
+  const aiCooling = useRequestCooldown('ai').coolingDown
   const impactSubject = selectedId ?? solution.chosenOptionId ?? ''
   const impact = useImpactAssessment({
     requestId: solution.requestId,
@@ -72,16 +76,26 @@ export function SolutionDecisionBar({
   })
   const riskGate = useRiskApprovalGate(impact)
   const earlyFailure = decision.failure
-  const earlyFailureCode = earlyFailure ? splitErrorCode(earlyFailure.error.message).code || earlyFailure.error.code : ''
+  const earlyFailureCode = earlyFailure
+    ? splitErrorCode(earlyFailure.error.message).code || earlyFailure.error.code
+    : ''
   // Why: a missing/stale/pending acceptance means our local view of the assessment is outdated.
   const { refetch: refetchImpact } = impact
   React.useEffect(() => {
-    if (['REQUEST_RISK_ACCEPTANCE_REQUIRED', 'REQUEST_RISK_ASSESSMENT_STALE', 'REQUEST_RISK_ASSESSMENT_PENDING'].includes(earlyFailureCode)) {
+    if (
+      [
+        'REQUEST_RISK_ACCEPTANCE_REQUIRED',
+        'REQUEST_RISK_ASSESSMENT_STALE',
+        'REQUEST_RISK_ASSESSMENT_PENDING'
+      ].includes(earlyFailureCode)
+    ) {
       refetchImpact()
     }
   }, [earlyFailureCode, refetchImpact])
   const { actions } = presentation
-  if (presentation.readOnly || actions.length === 0) {return null}
+  if (presentation.readOnly || actions.length === 0) {
+    return null
+  }
 
   const denied = decision.isDenied(approval?.id)
   const gate = canApproveSolution({
@@ -91,25 +105,32 @@ export function SolutionDecisionBar({
     chosenOptionId: selectedId ?? solution.chosenOptionId
   })
   const busy = decision.submitting
+  const writeBusy = busy || writeCooling
   const approveLabel =
     solution.kind === 'answer'
       ? translate('auto.components.request.SolutionDecisionBar.accept', 'Accept')
       : solution.kind === 'solution'
-        ? translate('auto.components.request.SolutionDecisionBar.approveOption', 'Approve this option')
+        ? translate(
+            'auto.components.request.SolutionDecisionBar.approveOption',
+            'Approve this option'
+          )
         : translate('auto.components.request.SolutionDecisionBar.approve', 'Approve')
   const failure = decision.failure
   const showFailure =
     failure !== null && failure.errorClass !== 'notApprover' && failure.errorClass !== 'conflict'
 
   const chosenId = selectedId ?? solution.chosenOptionId ?? undefined
-  const failureCode = failure ? splitErrorCode(failure.error.message).code || failure.error.code : ''
+  const failureCode = failure
+    ? splitErrorCode(failure.error.message).code || failure.error.code
+    : ''
   const approverNotAllowed = failureCode === 'REQUEST_RISK_APPROVER_NOT_ALLOWED'
   const reqs = riskGate.requirements
   const riskBlocked = !reqs.canApprove
   const recommendedId =
     decisions.current?.recommendedOptionId ??
     solution.options?.find((o) => o.raw?.recommended === true)?.id
-  const rationaleRequired = solution.kind === 'solution' && requiresRationale(chosenId, recommendedId)
+  const rationaleRequired =
+    solution.kind === 'solution' && requiresRationale(chosenId, recommendedId)
   const rationaleOk = !rationaleRequired || isRationaleValid(rationale, true)
   const activeDecision = pendingDecision ?? decisions.current
   const decisionGate = getDecisionGate(
@@ -120,9 +141,14 @@ export function SolutionDecisionBar({
   )
   const optionTitle = (id: string | undefined): string =>
     solution.options?.find((o) => o.id === id)?.title ?? id ?? ''
-  const waitingConfirmation = decisionGate === 'needsConfirmation' || (pendingDecision !== null && pendingDecision.status !== 'effective')
+  const waitingConfirmation =
+    decisionGate === 'needsConfirmation' ||
+    (pendingDecision !== null && pendingDecision.status !== 'effective')
   const approve = async (): Promise<void> => {
-    const outcome = await decision.approveSelected(chosenId, undefined, { rationale, ...riskGate.approveExtras })
+    const outcome = await decision.approveSelected(chosenId, undefined, {
+      rationale,
+      ...riskGate.approveExtras
+    })
     if (outcome.needsConfirmation && outcome.decision) {
       setPendingDecision(outcome.decision)
       setConfirmOpen(true)
@@ -144,45 +170,84 @@ export function SolutionDecisionBar({
         </p>
       )}
       {waitingConfirmation && (
-        <p role="status" className="text-xs text-muted-foreground" data-testid="decision-pending-confirmation">
-          {translate('auto.components.request.decision.pendingConfirmation', 'Waiting for the second confirmation of this high-risk choice')}
+        <p
+          role="status"
+          className="text-xs text-muted-foreground"
+          data-testid="decision-pending-confirmation"
+        >
+          {translate(
+            'auto.components.request.decision.pendingConfirmation',
+            'Waiting for the second confirmation of this high-risk choice'
+          )}
         </p>
       )}
       {decisionGate === 'digestChanged' && (
         <p role="alert" className="text-xs text-destructive" data-testid="decision-digest-changed">
-          {translate('auto.components.request.decision.digestChanged', 'The content just changed. Review it again before approving.')}
+          {translate(
+            'auto.components.request.decision.digestChanged',
+            'The content just changed. Review it again before approving.'
+          )}
         </p>
       )}
       {decisionGate === 'selfChoiceForbidden' && (
         <p role="status" className="text-xs text-muted-foreground">
-          {translate('auto.components.request.decision.selfChoiceForbidden', 'The reporter cannot choose their own request')}
+          {translate(
+            'auto.components.request.decision.selfChoiceForbidden',
+            'The reporter cannot choose their own request'
+          )}
         </p>
       )}
       {showFailure && (
         <p role="alert" className="text-xs text-destructive">
-          {failure.errorClass === 'alreadyDecided'
-            ? translate('auto.components.request.SolutionDecisionBar.alreadyDecided', 'This was already decided.')
-            : failure.errorClass === 'expired'
-              ? translate('auto.components.request.SolutionDecisionBar.expired', 'Expired')
-              : requestErrorMessage(failure.error.kind)}
+          {failure.errorClass === 'blockingQuestions'
+            ? requestErrorMessage('blocking_questions')
+            : failure.errorClass === 'alreadyDecided'
+              ? translate(
+                  'auto.components.request.SolutionDecisionBar.alreadyDecided',
+                  'This was already decided.'
+                )
+              : failure.errorClass === 'expired'
+                ? translate('auto.components.request.SolutionDecisionBar.expired', 'Expired')
+                : requestErrorMessage(failure.error.kind)}
         </p>
       )}
       {!gate.ok && gate.reasonKey === 'chooseOne' && actions.includes('approve') && !denied && (
         <p className="text-xs text-muted-foreground">
-          {translate('auto.components.request.SolutionDecisionBar.chooseOne', 'Choose an option to approve.')}
+          {translate(
+            'auto.components.request.SolutionDecisionBar.chooseOne',
+            'Choose an option to approve.'
+          )}
         </p>
       )}
-      {solution.kind === 'solution' && approval && actions.includes('approve') && chosenId && reqs.requiresView && (
-        <Collapsible onOpenChange={(open) => { if (open) {riskGate.markViewed()} }}>
-          <CollapsibleTrigger className="text-xs underline-offset-2 hover:underline" data-testid="view-impact-trigger">
-            {translate('auto.components.request.impact.gate.viewImpact', 'View impact')}
-          </CollapsibleTrigger>
-          <CollapsibleContent className="flex flex-col gap-2 pt-2">
-            <RiskSummaryCard assessment={impact} subjectType="solution_option" subjectId={impactSubject} solutionId={solution.id} />
-            <ImpactFindingList findings={impact.findings} />
-          </CollapsibleContent>
-        </Collapsible>
-      )}
+      {solution.kind === 'solution' &&
+        approval &&
+        actions.includes('approve') &&
+        chosenId &&
+        reqs.requiresView && (
+          <Collapsible
+            onOpenChange={(open) => {
+              if (open) {
+                riskGate.markViewed()
+              }
+            }}
+          >
+            <CollapsibleTrigger
+              className="text-xs underline-offset-2 hover:underline"
+              data-testid="view-impact-trigger"
+            >
+              {translate('auto.components.request.impact.gate.viewImpact', 'View impact')}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex flex-col gap-2 pt-2">
+              <RiskSummaryCard
+                assessment={impact}
+                subjectType="solution_option"
+                subjectId={impactSubject}
+                solutionId={solution.id}
+              />
+              <ImpactFindingList findings={impact.findings} />
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       {solution.kind === 'solution' && approval && actions.includes('approve') && chosenId && (
         <RiskAcceptanceChecklist
           requirements={reqs}
@@ -194,23 +259,37 @@ export function SolutionDecisionBar({
         />
       )}
       {approverNotAllowed && (
-        <p role="status" className="text-xs text-muted-foreground" data-testid="risk-approver-not-allowed">
-          {translate('auto.components.request.impact.gate.approverNotAllowed', 'An approver from the designated team is required')}
+        <p
+          role="status"
+          className="text-xs text-muted-foreground"
+          data-testid="risk-approver-not-allowed"
+        >
+          {translate(
+            'auto.components.request.impact.gate.approverNotAllowed',
+            'An approver from the designated team is required'
+          )}
         </p>
       )}
-      {solution.kind === 'solution' && approval && actions.includes('approve') && chosenId && decisionGate !== 'selfChoiceForbidden' && (
-        <DecisionRationaleField
-          value={rationale}
-          onChange={setRationale}
-          required={rationaleRequired}
-          disabled={busy}
-          onSubmit={rationaleOk && gate.ok ? () => void approve() : undefined}
-        />
-      )}
+      {solution.kind === 'solution' &&
+        approval &&
+        actions.includes('approve') &&
+        chosenId &&
+        decisionGate !== 'selfChoiceForbidden' && (
+          <DecisionRationaleField
+            value={rationale}
+            onChange={setRationale}
+            required={rationaleRequired}
+            disabled={busy}
+            onSubmit={rationaleOk && gate.ok ? () => void approve() : undefined}
+          />
+        )}
       <div className="flex flex-wrap items-center gap-2">
         {denied ? (
           <p className="text-sm text-muted-foreground">
-            {translate('auto.components.request.SolutionDecisionBar.noPermission', 'You do not have permission to approve')}
+            {translate(
+              'auto.components.request.SolutionDecisionBar.noPermission',
+              'You do not have permission to approve'
+            )}
           </p>
         ) : expiredApproval ? (
           <span className="text-sm text-muted-foreground">
@@ -221,17 +300,40 @@ export function SolutionDecisionBar({
           actions.includes('approve') && (
             <>
               <Button
-                disabled={busy || !gate.ok || !rationaleOk || riskBlocked || approverNotAllowed || decisionGate === 'digestChanged' || decisionGate === 'selfChoiceForbidden'}
-                title={reqs.blockedReasonKey ? translate(reqs.blockedReasonKey, 'Review the impact before approving') : undefined}
+                data-testid={
+                  waitingConfirmation
+                    ? 'solution-confirm-choice'
+                    : solution.kind === 'solution'
+                      ? 'solution-approve-option'
+                      : 'solution-approve'
+                }
+                disabled={
+                  writeBusy ||
+                  !gate.ok ||
+                  !rationaleOk ||
+                  riskBlocked ||
+                  approverNotAllowed ||
+                  decisionGate === 'digestChanged' ||
+                  decisionGate === 'selfChoiceForbidden'
+                }
+                title={
+                  reqs.blockedReasonKey
+                    ? translate(reqs.blockedReasonKey, 'Review the impact before approving')
+                    : undefined
+                }
                 onClick={() => (waitingConfirmation ? setConfirmOpen(true) : void approve())}
               >
-                {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+                {busy ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Check className="size-4" aria-hidden />
+                )}
                 {waitingConfirmation
                   ? translate('auto.components.request.decision.confirmSubmit', 'Confirm choice')
                   : approveLabel}
               </Button>
               {actions.includes('reject') && (
-                <Button variant="outline" disabled={busy} onClick={() => setRejectOpen(true)}>
+                <Button variant="outline" disabled={writeBusy} onClick={() => setRejectOpen(true)}>
                   <X className="size-4" aria-hidden />
                   {translate('auto.components.request.SolutionDecisionBar.reject', 'Reject')}
                 </Button>
@@ -247,13 +349,21 @@ export function SolutionDecisionBar({
           />
         )}
         {actions.includes('regenerate') && (
-          <Button variant="outline" disabled={busy || regenerateCooldown} onClick={() => void decision.regenerate()}>
+          <Button
+            variant="outline"
+            disabled={busy || regenerateCooldown || aiCooling}
+            onClick={() => void decision.regenerate()}
+          >
             <RefreshCw className="size-4" aria-hidden />
             {translate('auto.components.request.SolutionGenerationState.regenerate', 'Regenerate')}
           </Button>
         )}
         {actions.includes('generatePlan') && onGeneratePlan && (
-          <Button disabled={busy} onClick={onGeneratePlan}>
+          <Button
+            disabled={busy || aiCooling}
+            onClick={onGeneratePlan}
+            data-testid="solution-generate-plan"
+          >
             {translate('auto.components.request.SolutionDecisionBar.generatePlan', 'Generate plan')}
           </Button>
         )}

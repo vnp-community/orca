@@ -12815,6 +12815,17 @@
         "TaskBoardView": {
           "backlogMoved": "Tasks not started yet live under Requests > Backlog",
           "openBacklog": "Open backlog"
+        },
+        "TaskLoadStates": {
+          "loading": "Loading tasks...",
+          "empty": "No tasks yet.",
+          "emptyFiltered": "No tasks match the current search or filter.",
+          "emptyPlanningHidden": "Only Plan and Phase tasks exist. Turn on \"Show Plan/Phase\" to see them.",
+          "errorTitle": "Could not load the tasks.",
+          "staleTitle": "Could not refresh the tasks. Showing the last loaded list.",
+          "forbidden": "You do not have access to the tasks of this project.",
+          "code": "Error code: {{code}}",
+          "retry": "Retry"
         }
       },
       "taskPageEmptyState": {
@@ -13161,12 +13172,28 @@
           "notFound": "This item no longer exists.",
           "conflict": "Someone else changed this. Refresh and try again.",
           "invalidState": "This action is not allowed in the current state.",
+          "blockingQuestions": "This cannot be approved yet: the analysis has blocking open questions that still need an answer.",
+          "unconfirmedAssumptions": "This plan cannot be approved yet: it has assumptions that need confirmation and still have no recorded answer.",
           "network": "Network error. Check your connection.",
           "unavailable": "The request service is unavailable. Try again shortly.",
           "rateLimited": "Too many attempts. Wait a moment and retry.",
           "validation": "Check the highlighted fields and try again.",
           "unknown": "Something went wrong.",
-          "retry": "Retry"
+          "retry": "Retry",
+          "unsupported": "This server does not support this action yet.",
+          "expired": "This item has expired.",
+          "pending": "This is still being prepared. Try again shortly.",
+          "noDevServer": "No dev server is connected to this project. Connect one and try again.",
+          "noAi": "AI is not available on the dev server. Check its AI configuration.",
+          "featureOff": "The Request flow is not enabled for this organization.",
+          "code": {
+            "rateLimited": "You are going too fast. Wait a moment and try again.",
+            "projectNotFound": "This project no longer exists.",
+            "aiQuotaExhausted": "The AI quota of the dev server is used up. Try again later.",
+            "aiBusy": "The AI is busy with another job. Try again shortly.",
+            "aiTimeout": "The AI took too long to answer. Try again.",
+            "aiAgentUnavailable": "No dev server is connected, so the AI cannot run."
+          }
         },
         "AnswerView": {
           "answer": "Answer",
@@ -13224,7 +13251,12 @@
           "analyzing": "AI is analyzing this request",
           "drafting": "AI is drafting the analysis",
           "failed": "Could not generate the analysis.",
-          "regenerate": "Regenerate"
+          "regenerate": "Regenerate",
+          "errorCode": "Error code: {{code}}"
+        },
+        "SolutionStartPrompt": {
+          "description": "No analysis has started for this request yet. Start it to get solution options to review.",
+          "generate": "Generate solution"
         },
         "SolutionOptionCard": {
           "chosen": "Chosen",
@@ -13408,7 +13440,8 @@
             "phase": "Phases",
             "gates": "{{count}} approval gates",
             "noGates": "No approval gates"
-          }
+          },
+          "classifyFailed": "The AI could not classify this request automatically. Pick the type yourself or reclassify."
         },
         "RequestHistoryTab": {
           "empty": "The type has not been changed yet.",
@@ -13505,7 +13538,8 @@
             "notYet": "No plan yet.",
             "notFound": "Plan not found.",
             "empty": "The plan is empty.",
-            "currentStep": "Current step: {{step}}"
+            "currentStep": "Current step: {{step}}",
+            "notFoundHint": "It may have been deleted, or you may not have access to its tasks."
           },
           "PlanSummaryHeader": {
             "counts": "{{phases}} phases, {{tasks}} tasks",
@@ -13524,6 +13558,9 @@
           "RequestPlanTab": {
             "reload": "Reload",
             "truncated": "The task list was cut off; some tasks may be missing."
+          },
+          "PlanUnconfirmedAssumptionsNotice": {
+            "ids": "Still unconfirmed: {{ids}}"
           }
         },
         "approval": {
@@ -13723,7 +13760,14 @@
             "solution_open_question": "Solution open question",
             "plan_assumption": "Plan assumption",
             "task_blocked": "Task blocked"
-          }
+          },
+          "loadFailedTitle": "Could not load the questions",
+          "loadFailedUnsupported": "This server does not support answering questions yet. Ask your administrator to update it.",
+          "loadFailedCode": "Error code: {{code}}",
+          "refresh": "Refresh",
+          "invalidNumber": "That is not a number. Use digits only, for example 8 or 2.5",
+          "numberHint": "Enter a number, for example 8 or 2.5",
+          "listHint": "One item per line"
         },
         "decision": {
           "rationaleLabel": "Reason for choosing",
@@ -13918,6 +13962,48 @@
             "agent_defect": "Retries once with a format reminder",
             "unknown": "Unclassified failure"
           }
+        },
+        "aiSetup": {
+          "title": {
+            "notConfigured": "AI is not set up on the dev server",
+            "credentialUnavailable": "The AI credential could not be read",
+            "sessionExpired": "The Claude Code session on the dev server has expired",
+            "quotaExhausted": "The AI quota of the dev server is used up",
+            "agentUnavailable": "No dev server is available to run the AI",
+            "busy": "The AI is busy"
+          },
+          "body": {
+            "notConfigured": "The dev server is not signed in to Claude Code. Run claude auth login on the dev server (or set an API key for its agent), then try again.",
+            "credentialUnavailable": "Check the AI credential configured for the dev server, then try again.",
+            "sessionExpired": "Sign in again with claude auth login on the dev server, then try again.",
+            "quotaExhausted": "The account behind the Claude Code login on the dev server has no quota left. Wait for it to reset or switch accounts.",
+            "agentUnavailable": "Connect a dev server for this project, or update its agent, then try again.",
+            "busy": "The dev server is already running as many AI jobs as it allows. Try again in a moment."
+          },
+          "code": "Error code: {{code}}",
+          "retry": "Try again",
+          "openSettings": "Open dev server settings",
+          "askAdmin": "Ask your administrator to fix this."
+        },
+        "SolutionOpenQuestions": {
+          "title": "Open questions",
+          "notice": "Approval stays blocked until every blocking question below has a recorded answer.",
+          "refused": "Approval was refused. These blocking questions are still unanswered: {{ids}}",
+          "blocking": "Blocking",
+          "nonBlocking": "Not blocking"
+        },
+        "SolutionAskBackDialog": {
+          "ask": "Ask back",
+          "title": "Ask back",
+          "description": "Send the blocking questions to the reporter. After they answer, the solution is generated again and you choose an option again.",
+          "reasonDefault": "The solution cannot be approved until this is answered ({{id}}): {{text}}",
+          "notAllowed": "Questions cannot be asked now: another question round may already be open, or the request is in a state that does not allow it.",
+          "invalid": "The question was rejected. Check that every reason is filled in and not too long.",
+          "reasonLabel": "Why you are asking ({{id}})",
+          "pickOne": "Select at least one question.",
+          "reasonRequired": "Every selected question needs a reason.",
+          "cancel": "Cancel",
+          "submit": "Send to reporter"
         }
       },
       "reviewMap": {

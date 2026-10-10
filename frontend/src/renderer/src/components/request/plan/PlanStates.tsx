@@ -12,6 +12,9 @@ import { AlertTriangle, ClipboardList, Loader2, Lock, Sparkles } from 'lucide-re
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useRequestCooldown } from '../../../hooks/useRequestCooldown'
+import { RequestAiSetupBanner } from '../RequestAiSetupBanner'
+import type { AiSetupCode } from '../request-ai-setup'
 import { requestErrorMessage } from '../request-error-message'
 import { RequestUnsupportedNotice } from '../RequestUnsupportedNotice'
 import type { PlanViewState } from './plan-view-state'
@@ -26,6 +29,8 @@ type Props = {
   generating: boolean
   /** Inline failure of the last generate attempt. */
   generateError?: string | null
+  /** Set when the last generate attempt failed because the dev server's AI cannot run. */
+  generateAiCode?: AiSetupCode | null
   onGenerate: () => void
   onRetry: () => void
   /** RequestRpcErrorKind of a failed load. */
@@ -38,16 +43,23 @@ export function PlanStates({
   canGenerate,
   generating,
   generateError,
+  generateAiCode,
   onGenerate,
   onRetry,
   loadErrorKind
 }: Props): React.JSX.Element {
+  const aiCooldown = useRequestCooldown('ai')
   if (state === 'unsupported') {
     return <RequestUnsupportedNotice />
   }
 
   const generateButton = canGenerate && (
-    <Button size="sm" disabled={generating} onClick={onGenerate} data-testid="plan-generate">
+    <Button
+      size="sm"
+      disabled={generating || aiCooldown.coolingDown}
+      onClick={onGenerate}
+      data-testid="plan-generate"
+    >
       {generating ? (
         <Loader2 className="size-3.5 animate-spin" aria-hidden />
       ) : (
@@ -56,10 +68,18 @@ export function PlanStates({
       {translate(`${P}generate`, 'Generate plan')}
     </Button>
   )
-  const generateFailure = generateError && (
-    <p role="alert" className="text-xs text-destructive" data-testid="plan-generate-error">
-      {generateError}
-    </p>
+  const generateFailure = generateAiCode ? (
+    <RequestAiSetupBanner
+      code={generateAiCode}
+      onRetry={canGenerate ? onGenerate : undefined}
+      retryDisabled={generating || aiCooldown.coolingDown}
+    />
+  ) : (
+    generateError && (
+      <p role="alert" className="text-xs text-destructive" data-testid="plan-generate-error">
+        {generateError}
+      </p>
+    )
   )
 
   if (state === 'loading') {
@@ -132,6 +152,19 @@ export function PlanStates({
         <p className="text-xs text-muted-foreground" data-testid="plan-current-step">
           {translate(`${P}currentStep`, 'Current step: {{step}}', { step: currentStepLabel })}
         </p>
+      )}
+      {state === 'not_found' && (
+        <>
+          <p className="text-xs text-muted-foreground" data-testid="plan-not-found-hint">
+            {translate(
+              `${P}notFoundHint`,
+              'It may have been deleted, or you may not have access to its tasks.'
+            )}
+          </p>
+          <Button size="sm" variant="outline" onClick={onRetry} data-testid="plan-not-found-retry">
+            {translate(`${P}retry`, 'Try again')}
+          </Button>
+        </>
       )}
       {(state === 'empty' || state === 'not_found') && generateButton}
       {generateFailure}

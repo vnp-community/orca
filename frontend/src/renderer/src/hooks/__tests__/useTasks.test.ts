@@ -249,4 +249,42 @@ describe('computeClientProgress', () => {
     ] as unknown as OrcaTask[]
     expect(computeClientProgress(tasks, 'parent')).toBe(100)
   })
+
+  it('reports a failed load instead of looking like an empty project, and clears it on a good retry', async () => {
+    mockRpc.mockRejectedValueOnce(
+      Object.assign(new Error('TASK_FORBIDDEN: no access'), { code: 'runtime_error' })
+    )
+    const { useTasks } = await import('../useTasks')
+    const { result } = renderHook(() => useTasks('p1'))
+    expect(result.current.loaded).toBe(false)
+
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(result.current.loadError).toEqual({ kind: 'forbidden', code: 'TASK_FORBIDDEN' })
+    expect(result.current.totalTaskCount).toBe(0)
+
+    mockRpc.mockResolvedValueOnce({
+      tasks: [{ id: 't1', title: 'T', projectId: 'p1', status: 'todo' }]
+    })
+    act(() => result.current.refetch())
+    await waitFor(() => expect(result.current.loadError).toBeNull())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+  })
+
+  it('keeps the tasks it already has when a refresh fails', async () => {
+    mockStore.tasks = [{ id: 't1', title: 'T', projectId: 'p1', status: 'todo' }]
+    mockRpc.mockRejectedValueOnce(new Error('network down'))
+    const { useTasks } = await import('../useTasks')
+    const { result } = renderHook(() => useTasks('p1'))
+    await waitFor(() => expect(result.current.loadError?.kind).toBe('network'))
+    expect(result.current.totalTaskCount).toBe(1)
+    expect(result.current.filteredTasks).toHaveLength(1)
+  })
+
+  it('an empty answer is loaded with no error', async () => {
+    const { useTasks } = await import('../useTasks')
+    const { result } = renderHook(() => useTasks('p1'))
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(result.current.loadError).toBeNull()
+    expect(result.current.totalTaskCount).toBe(0)
+  })
 })

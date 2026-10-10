@@ -70,7 +70,7 @@ export function PhaseApprovalBar({ phase, approval, decision }: Props): React.JS
             <Button
               size="sm"
               variant="outline"
-              disabled={!approved || starting}
+              disabled={!approved || starting || decision.coolingDown}
               onClick={() => void decision.startPhase(phase.id)}
               data-testid={`phase-${phase.id}-start`}
             >

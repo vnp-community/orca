@@ -14,6 +14,7 @@ import { i18n, translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { useApprovalInbox, type ApprovalDecisionResult } from '../../../hooks/useApprovalInbox'
 import { useMinuteClock } from '../../../hooks/useMinuteClock'
+import { useRequestCooldown } from '../../../hooks/useRequestCooldown'
 import { useRequestSummaries } from '../../../hooks/useRequestSummaries'
 import { requestErrorMessage } from '../request-error-message'
 import { openRequestPage } from '../request-page-navigation'
@@ -21,13 +22,21 @@ import { RejectReasonDialog, type RejectReasonSubmitResult } from '../solution/R
 import { ApprovalInboxToolbar } from './ApprovalInboxToolbar'
 import { ApprovalList } from './ApprovalList'
 import {
-  ApprovalInboxEmptyFiltered, ApprovalInboxEmptyState, ApprovalInboxErrorState, ApprovalInboxSkeleton
+  ApprovalInboxEmptyFiltered,
+  ApprovalInboxEmptyState,
+  ApprovalInboxErrorState,
+  ApprovalInboxSkeleton
 } from './ApprovalInboxStates'
 import { approvalSubjectLabel } from './ApprovalSubjectIcon'
 import { requestHeading } from './ApprovalRow'
 import {
-  compareApprovals, groupByRequest, openTargetFor, quickApproveConsequenceKey, subjectKindOf,
-  canQuickApprove, type ApprovalSubjectGroup
+  compareApprovals,
+  groupByRequest,
+  openTargetFor,
+  quickApproveConsequenceKey,
+  subjectKindOf,
+  canQuickApprove,
+  type ApprovalSubjectGroup
 } from './approval-inbox-rules'
 import type { Approval } from '../../../../../shared/request-types'
 
@@ -40,6 +49,7 @@ export function ApprovalInboxTab(): React.JSX.Element | null {
   const [overdueOnly, setOverdueOnly] = useState(false)
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set())
   const [rejectTarget, setRejectTarget] = useState<Approval | null>(null)
+  const writeCooldown = useRequestCooldown('write')
   const now = useMinuteClock()
   const locale = i18n.language || 'en'
 
@@ -79,14 +89,17 @@ export function ApprovalInboxTab(): React.JSX.Element | null {
     }
   }, [])
 
-  const open = useCallback((approval: Approval) => {
-    if (summaries.notFoundIds.has(approval.requestId)) {
-      toast(translate(`${T}ApprovalRow.requestGone`, 'This request no longer exists.'))
-      inbox.refetch()
-      return
-    }
-    openRequestPage(openTargetFor(approval))
-  }, [summaries.notFoundIds, inbox])
+  const open = useCallback(
+    (approval: Approval) => {
+      if (summaries.notFoundIds.has(approval.requestId)) {
+        toast(translate(`${T}ApprovalRow.requestGone`, 'This request no longer exists.'))
+        inbox.refetch()
+        return
+      }
+      openRequestPage(openTargetFor(approval))
+    },
+    [summaries.notFoundIds, inbox]
+  )
 
   // Shared by approve and reject; returns whether the caller's dialog may close.
   const announce = useCallback((approval: Approval, result: ApprovalDecisionResult): boolean => {
@@ -99,9 +112,18 @@ export function ApprovalInboxTab(): React.JSX.Element | null {
         toast(translate(`${T}ApprovalRow.alreadyDecided`, 'Already decided by someone else.'))
         return true
       case 'changed':
-        toast(translate(`${T}ApprovalRow.changed`, 'This item changed after it was listed. Open it to review.'), {
-          action: { label: translate(`${T}ApprovalRow.open`, 'Open'), onClick: () => openRequestPage(openTargetFor(approval)) }
-        })
+        toast(
+          translate(
+            `${T}ApprovalRow.changed`,
+            'This item changed after it was listed. Open it to review.'
+          ),
+          {
+            action: {
+              label: translate(`${T}ApprovalRow.open`, 'Open'),
+              onClick: () => openRequestPage(openTargetFor(approval))
+            }
+          }
+        )
         return true
       case 'forbidden':
         toast.error(requestErrorMessage('forbidden'))
@@ -114,30 +136,51 @@ export function ApprovalInboxTab(): React.JSX.Element | null {
     }
   }, [])
 
-  const quickApprove = useCallback(async (approval: Approval) => {
-    if (!canQuickApprove(approval)) {return}
-    const request = summaries.byId[approval.requestId]
-    const confirmed = await confirm({
-      title: `${requestHeading(approval.requestId, request)} · ${approvalSubjectLabel(subjectKindOf(approval))}`,
-      description: translate(quickApproveConsequenceKey(approval), 'The request moves to the next step.'),
-      confirmLabel: translate(`${T}ApprovalRow.approve`, 'Quick approve'),
-      confirmVariant: 'default'
-    })
-    if (!confirmed) {return}
-    const result = await withBusy(approval.id, () => inbox.approve(approval))
-    announce(approval, result)
-  }, [announce, confirm, inbox, summaries.byId, withBusy])
+  const quickApprove = useCallback(
+    async (approval: Approval) => {
+      if (!canQuickApprove(approval)) {
+        return
+      }
+      const request = summaries.byId[approval.requestId]
+      const confirmed = await confirm({
+        title: `${requestHeading(approval.requestId, request)} · ${approvalSubjectLabel(subjectKindOf(approval))}`,
+        description: translate(
+          quickApproveConsequenceKey(approval),
+          'The request moves to the next step.'
+        ),
+        confirmLabel: translate(`${T}ApprovalRow.approve`, 'Quick approve'),
+        confirmVariant: 'default'
+      })
+      if (!confirmed) {
+        return
+      }
+      const result = await withBusy(approval.id, () => inbox.approve(approval))
+      announce(approval, result)
+    },
+    [announce, confirm, inbox, summaries.byId, withBusy]
+  )
 
-  const submitReject = useCallback(async (comment: string): Promise<RejectReasonSubmitResult> => {
-    const approval = rejectTarget
-    if (!approval) {return { ok: true }}
-    const result = await withBusy(approval.id, () => inbox.reject(approval, comment))
-    if (result.outcome === 'validation') {return { ok: false, error: { kind: 'validation' } }}
-    const close = announce(approval, result)
-    return close ? { ok: true } : { ok: false, error: { kind: result.outcome === 'network' ? 'network' : 'unknown' } }
-  }, [announce, inbox, rejectTarget, withBusy])
+  const submitReject = useCallback(
+    async (comment: string): Promise<RejectReasonSubmitResult> => {
+      const approval = rejectTarget
+      if (!approval) {
+        return { ok: true }
+      }
+      const result = await withBusy(approval.id, () => inbox.reject(approval, comment))
+      if (result.outcome === 'validation') {
+        return { ok: false, error: { kind: 'validation' } }
+      }
+      const close = announce(approval, result)
+      return close
+        ? { ok: true }
+        : { ok: false, error: { kind: result.outcome === 'network' ? 'network' : 'unknown' } }
+    },
+    [announce, inbox, rejectTarget, withBusy]
+  )
 
-  if (!inbox.supported) {return null}
+  if (!inbox.supported) {
+    return null
+  }
 
   const errorKind = inbox.error?.kind
   const forbidden = errorKind === 'forbidden'
@@ -160,7 +203,11 @@ export function ApprovalInboxTab(): React.JSX.Element | null {
           {showSkeleton ? (
             <ApprovalInboxSkeleton />
           ) : empty ? (
-            filtered ? <ApprovalInboxEmptyFiltered onClear={clearFilters} /> : <ApprovalInboxEmptyState />
+            filtered ? (
+              <ApprovalInboxEmptyFiltered onClear={clearFilters} />
+            ) : (
+              <ApprovalInboxEmptyState />
+            )
           ) : (
             groups.length > 0 && (
               <ApprovalList
@@ -169,6 +216,7 @@ export function ApprovalInboxTab(): React.JSX.Element | null {
                 now={now}
                 locale={locale}
                 busyIds={busyIds}
+                actionsLocked={writeCooldown.coolingDown}
                 hasMore={inbox.hasMore}
                 isLoadingMore={inbox.isLoadingMore}
                 dimmed={Boolean(inbox.error)}
@@ -183,7 +231,11 @@ export function ApprovalInboxTab(): React.JSX.Element | null {
       )}
       <RejectReasonDialog
         open={rejectTarget !== null}
-        onOpenChange={(next) => { if (!next) {setRejectTarget(null)} }}
+        onOpenChange={(next) => {
+          if (!next) {
+            setRejectTarget(null)
+          }
+        }}
         title={
           rejectTarget
             ? `${translate(`${T}ApprovalRow.reject`, 'Reject')} · ${requestHeading(rejectTarget.requestId, summaries.byId[rejectTarget.requestId])}`

@@ -101,8 +101,61 @@ describe('RequestPlanTab', () => {
     expect(await screen.findByTestId('plan-generating')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('plan-generate'))
     await waitFor(() =>
-      expect(callRequestRpc).toHaveBeenCalledWith('request.generatePlan', { id: 'r1', mode: 'propose' })
+      expect(callRequestRpc).toHaveBeenCalledWith('request.generatePlan', {
+        id: 'r1',
+        mode: 'propose'
+      })
     )
+  })
+
+  it('shows the AI setup banner when the background plan run fails for lack of AI', async () => {
+    callRuntimeRpc.mockResolvedValue({ tasks: [] })
+    callRequestRpc.mockImplementation(async (method: string, params: { mode?: string }) => {
+      if (method === 'approval.list') {
+        return { ok: true, value: { approvals: [] } }
+      }
+      if (method === 'request.generatePlan' && params.mode === 'propose') {
+        return { ok: true, value: { runId: 'run1', proposal: null } }
+      }
+      if (method === 'request.planProposal') {
+        return {
+          ok: true,
+          value: {
+            runId: 'run1',
+            status: 'failed',
+            errorCode: 'REQUEST_AI_NOT_CONFIGURED',
+            errorMessage: 'log in',
+            proposal: null
+          }
+        }
+      }
+      return { ok: true, value: {} }
+    })
+    render(
+      <RequestPlanTab
+        request={req({ status: 'planning', planTaskId: undefined })}
+        onChanged={vi.fn()}
+      />
+    )
+    expect(await screen.findByTestId('plan-generating')).toBeInTheDocument()
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByTestId('plan-generate'))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2100)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+    const banner = await screen.findByTestId('request-ai-setup-banner')
+    expect(banner).toHaveAttribute('data-ai-code', 'REQUEST_AI_NOT_CONFIGURED')
+    expect(screen.queryByTestId('plan-generate-error')).toBeNull()
+    expect(callRequestRpc).toHaveBeenCalledWith('request.planProposal', { id: 'r1', runId: 'run1' })
+    expect(
+      callRequestRpc.mock.calls.some(
+        ([, p]) => (p as { mode?: string } | undefined)?.mode === 'commit'
+      )
+    ).toBe(false)
   })
 
   it('shows a calm "plan not found" state when the plan task is missing', async () => {
@@ -110,6 +163,10 @@ describe('RequestPlanTab', () => {
     render(<RequestPlanTab request={req()} onChanged={vi.fn()} />)
     expect(await screen.findByTestId('plan-state-not_found')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByTestId('plan-not-found-hint').textContent).toContain('may not have access')
+    callRuntimeRpc.mockResolvedValue({ tasks: wireTasks() })
+    fireEvent.click(screen.getByTestId('plan-not-found-retry'))
+    expect(await screen.findByTestId('phase-node-ph1')).toBeInTheDocument()
   })
 
   it('shows the empty-plan state', async () => {

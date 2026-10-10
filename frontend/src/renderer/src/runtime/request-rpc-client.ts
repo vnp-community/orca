@@ -16,7 +16,14 @@ import {
 } from './runtime-rpc-client'
 import { classifyRequestRpcError } from '../../../shared/request-errors'
 import { parseRequestEvent } from '../../../shared/request-wire-parsers'
-import type { RequestRpcMethod } from '../../../shared/request-rpc-methods'
+import { REQUEST_RPC_METHODS, type RequestRpcMethod } from '../../../shared/request-rpc-methods'
+import {
+  autoRetryDelayMs,
+  cooldownMsFor,
+  isShortThrottle,
+  rateLimitClassOf,
+  startRequestCooldown
+} from './request-rate-limit'
 import type { RequestRpcError } from '../../../shared/request-errors'
 import type { RequestEvent } from '../../../shared/request-types'
 import { useAppStore } from '../store'
@@ -33,19 +40,51 @@ export type Result<T> = OkResult<T> | ErrResult
 // Core RPC call — never throws
 // ---------------------------------------------------------------------------
 
-/** Call a request-service RPC method. Never rejects — returns Result<T, RequestRpcError>. */
+export type CallRequestRpcOptions = {
+  /**
+   * Overrides whether one automatic retry after REQUEST_RATE_LIMITED is safe. By default
+   * reads and version-guarded writes retry; other writes are reported, never repeated.
+   */
+  idempotent?: boolean
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Call a request-service RPC method. Never rejects — returns Result<T, RequestRpcError>.
+ *
+ * A throttled call (REQUEST_RATE_LIMITED) is retried once after `retryAfterMs` (1s when the
+ * server gave none) if repeating it is safe; if it still fails the class' cooldown starts so
+ * buttons stop firing into the limiter.
+ */
 export async function callRequestRpc<T>(
   method: RequestRpcMethod,
-  params?: object
+  params?: object,
+  options: CallRequestRpcOptions = {}
 ): Promise<Result<T>> {
   const settings = useAppStore.getState().settings
   const target = getActiveRuntimeTarget(settings)
 
-  try {
-    const value = await callRuntimeRpc<T>(target, method, params)
-    return { ok: true, value }
-  } catch (err) {
-    return { ok: false, error: classifyRequestRpcError(err) }
+  let retried = false
+  for (;;) {
+    try {
+      const value = await callRuntimeRpc<T>(target, method, params)
+      return { ok: true, value }
+    } catch (err) {
+      const error = classifyRequestRpcError(err)
+      const delay = retried ? null : autoRetryDelayMs(method, error, options.idempotent)
+      if (delay !== null) {
+        retried = true
+        await wait(delay)
+        continue
+      }
+      if (isShortThrottle(error)) {
+        startRequestCooldown(rateLimitClassOf(method), cooldownMsFor(error))
+      }
+      return { ok: false, error }
+    }
   }
 }
 
@@ -55,10 +94,13 @@ export async function callRequestRpc<T>(
  */
 export async function callRequestRpcOrThrow<T>(
   method: RequestRpcMethod,
-  params?: object
+  params?: object,
+  options?: CallRequestRpcOptions
 ): Promise<T> {
-  const result = await callRequestRpc<T>(method, params)
-  if (!result.ok) {throw result.error}
+  const result = await callRequestRpc<T>(method, params, options)
+  if (!result.ok) {
+    throw result.error
+  }
   return result.value
 }
 
@@ -98,30 +140,32 @@ export function subscribeRequestEvents({
   // Even if cancelled before ack, we need to call unsubscribe after ack arrives
   subscribeRuntimeStreamChannel(
     target,
-    'request.subscribe',
+    REQUEST_RPC_METHODS.SUBSCRIBE,
     requestId ? { id: requestId } : {},
     (evt: unknown) => {
       if (!cancelled) {
         onEvent(parseRequestEvent(evt))
       }
     }
-  ).then(({ unsubscribe }) => {
-    unsubscribeFn = unsubscribe
-    if (cancelled) {
-      // Caller already cleaned up before ack — unsubscribe immediately
-      unsubscribe()
-    }
-  }).catch((err: unknown) => {
-    // Check if error is unsupported (method_not_found etc.)
-    const classified = classifyRequestRpcError(err)
-    if (classified.kind === 'unsupported' || classified.kind === 'network') {
-      onFallback()
-    }
-    // Other errors are logged but don't trigger fallback — let the hook retry
-    if (classified.kind !== 'unsupported') {
-      console.error('[request-rpc-client] subscription failed', classified)
-    }
-  })
+  )
+    .then(({ unsubscribe }) => {
+      unsubscribeFn = unsubscribe
+      if (cancelled) {
+        // Caller already cleaned up before ack — unsubscribe immediately
+        unsubscribe()
+      }
+    })
+    .catch((err: unknown) => {
+      // Check if error is unsupported (method_not_found etc.)
+      const classified = classifyRequestRpcError(err)
+      if (classified.kind === 'unsupported' || classified.kind === 'network') {
+        onFallback()
+      }
+      // Other errors are logged but don't trigger fallback — let the hook retry
+      if (classified.kind !== 'unsupported') {
+        console.error('[request-rpc-client] subscription failed', classified)
+      }
+    })
 
   return () => {
     cancelled = true

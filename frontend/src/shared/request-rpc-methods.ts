@@ -32,6 +32,8 @@ export const REQUEST_RPC_METHODS = {
 
   // Plan / execution
   GENERATE_PLAN: 'request.generatePlan',
+  // Result of a background `generatePlan` propose run (CONTRACT Q2, option a)
+  PLAN_PROPOSAL: 'request.planProposal',
   START_PHASE: 'request.startPhase',
 
   // Subscriptions
@@ -70,6 +72,7 @@ export const REQUEST_RPC_METHODS = {
   CLARIFICATION_GET: 'clarification.get',
   CLARIFICATION_ANSWER: 'clarification.answer',
   CLARIFICATION_CANCEL: 'clarification.cancel',
+  CLARIFICATION_REQUEST: 'clarification.request',
   REQUEST_READINESS: 'request.readiness',
   DECISION_LIST: 'decision.list',
   DECISION_CONFIRM: 'decision.confirm',

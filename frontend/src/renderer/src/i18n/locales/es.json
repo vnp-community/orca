@@ -12815,6 +12815,17 @@
         "TaskBoardView": {
           "backlogMoved": "Las tareas sin iniciar están en Solicitudes > Backlog",
           "openBacklog": "Abrir backlog"
+        },
+        "TaskLoadStates": {
+          "loading": "Cargando tareas...",
+          "empty": "Aún no hay tareas.",
+          "emptyFiltered": "Ninguna tarea coincide con la búsqueda o el filtro actual.",
+          "emptyPlanningHidden": "Solo existen tareas de Plan y Fase. Active \"Mostrar Plan/Fase\" para verlas.",
+          "errorTitle": "No se pudieron cargar las tareas.",
+          "staleTitle": "No se pudieron actualizar las tareas. Se muestra la última lista cargada.",
+          "forbidden": "No tiene acceso a las tareas de este proyecto.",
+          "code": "Código de error: {{code}}",
+          "retry": "Reintentar"
         }
       },
       "taskPageEmptyState": {
@@ -13161,12 +13172,28 @@
           "notFound": "Este elemento ya no existe.",
           "conflict": "Alguien más lo cambió. Actualiza e inténtalo de nuevo.",
           "invalidState": "Esta acción no está permitida en el estado actual.",
+          "blockingQuestions": "Aún no se puede aprobar: el análisis tiene preguntas abiertas bloqueantes sin respuesta.",
+          "unconfirmedAssumptions": "Este plan aún no se puede aprobar: tiene supuestos que requieren confirmación y todavía no tienen una respuesta registrada.",
           "network": "Error de red. Comprueba tu conexión.",
           "unavailable": "El servicio no está disponible. Inténtalo de nuevo en breve.",
           "rateLimited": "Demasiados intentos. Espera un momento.",
           "validation": "Revisa los campos e inténtalo de nuevo.",
           "unknown": "Algo salió mal.",
-          "retry": "Reintentar"
+          "retry": "Reintentar",
+          "unsupported": "Este servidor aún no admite esta acción.",
+          "expired": "Este elemento ha caducado.",
+          "pending": "Todavía se está preparando. Inténtelo de nuevo en breve.",
+          "noDevServer": "No hay ningún servidor de desarrollo conectado a este proyecto. Conecte uno e inténtelo de nuevo.",
+          "noAi": "La IA no está disponible en el servidor de desarrollo. Revise su configuración de IA.",
+          "featureOff": "El flujo de solicitudes no está habilitado para esta organización.",
+          "code": {
+            "rateLimited": "Va demasiado rápido. Espere un momento e inténtelo de nuevo.",
+            "projectNotFound": "Este proyecto ya no existe.",
+            "aiQuotaExhausted": "La cuota de IA del servidor de desarrollo se ha agotado. Inténtelo más tarde.",
+            "aiBusy": "La IA está ocupada con otra tarea. Inténtelo de nuevo en breve.",
+            "aiTimeout": "La IA tardó demasiado en responder. Inténtelo de nuevo.",
+            "aiAgentUnavailable": "No hay ningún servidor de desarrollo conectado, por lo que la IA no puede ejecutarse."
+          }
         },
         "AnswerView": {
           "answer": "Respuesta",
@@ -13224,7 +13251,12 @@
           "analyzing": "La IA está analizando esta solicitud",
           "drafting": "La IA está redactando el análisis",
           "failed": "No se pudo generar el análisis.",
-          "regenerate": "Regenerar"
+          "regenerate": "Regenerar",
+          "errorCode": "Código de error: {{code}}"
+        },
+        "SolutionStartPrompt": {
+          "description": "Todavía no se ha iniciado el análisis de esta solicitud. Inícialo para obtener opciones de solución que revisar.",
+          "generate": "Generar solución"
         },
         "SolutionOptionCard": {
           "chosen": "Elegida",
@@ -13408,7 +13440,8 @@
             "phase": "Fases",
             "gates": "{{count}} puntos de aprobación",
             "noGates": "Sin puntos de aprobación"
-          }
+          },
+          "classifyFailed": "La IA no pudo clasificar esta solicitud automáticamente. Elija el tipo usted mismo o vuelva a clasificar."
         },
         "RequestHistoryTab": {
           "empty": "El tipo aún no se ha cambiado.",
@@ -13505,7 +13538,8 @@
             "notYet": "Aún no hay plan.",
             "notFound": "Plan no encontrado.",
             "empty": "El plan está vacío.",
-            "currentStep": "Paso actual: {{step}}"
+            "currentStep": "Paso actual: {{step}}",
+            "notFoundHint": "Puede que se haya eliminado, o que no tenga acceso a sus tareas."
           },
           "PlanSummaryHeader": {
             "counts": "{{phases}} fases, {{tasks}} tareas",
@@ -13524,6 +13558,9 @@
           "RequestPlanTab": {
             "reload": "Recargar",
             "truncated": "La lista de tareas se truncó; pueden faltar algunas tareas."
+          },
+          "PlanUnconfirmedAssumptionsNotice": {
+            "ids": "Aún sin confirmar: {{ids}}"
           }
         },
         "approval": {
@@ -13723,7 +13760,14 @@
             "solution_open_question": "Pregunta abierta de la solución",
             "plan_assumption": "Suposición del plan",
             "task_blocked": "Tarea bloqueada"
-          }
+          },
+          "loadFailedTitle": "No se pudieron cargar las preguntas",
+          "loadFailedUnsupported": "Este servidor aún no admite responder preguntas. Pida a su administrador que lo actualice.",
+          "loadFailedCode": "Código de error: {{code}}",
+          "refresh": "Actualizar",
+          "invalidNumber": "No es un número. Use solo dígitos, por ejemplo 8 o 2.5",
+          "numberHint": "Introduzca un número, por ejemplo 8 o 2.5",
+          "listHint": "Un elemento por línea"
         },
         "decision": {
           "rationaleLabel": "Motivo de la elección",
@@ -13918,6 +13962,48 @@
             "agent_defect": "Se reintenta una vez con un recordatorio de formato",
             "unknown": "Fallo sin clasificar"
           }
+        },
+        "aiSetup": {
+          "title": {
+            "notConfigured": "La IA no está configurada en el servidor de desarrollo",
+            "credentialUnavailable": "No se pudo leer la credencial de IA",
+            "sessionExpired": "La sesión de Claude Code en el servidor de desarrollo ha caducado",
+            "quotaExhausted": "La cuota de IA del servidor de desarrollo se ha agotado",
+            "agentUnavailable": "No hay ningún servidor de desarrollo disponible para ejecutar la IA",
+            "busy": "La IA está ocupada"
+          },
+          "body": {
+            "notConfigured": "El servidor de desarrollo no ha iniciado sesión en Claude Code. Ejecute claude auth login en el servidor de desarrollo (o configure una clave de API para su agente) e inténtelo de nuevo.",
+            "credentialUnavailable": "Revise la credencial de IA configurada para el servidor de desarrollo e inténtelo de nuevo.",
+            "sessionExpired": "Vuelva a iniciar sesión con claude auth login en el servidor de desarrollo e inténtelo de nuevo.",
+            "quotaExhausted": "La cuenta con la que se inició sesión en Claude Code en el servidor de desarrollo no tiene cuota disponible. Espere a que se restablezca o cambie de cuenta.",
+            "agentUnavailable": "Conecte un servidor de desarrollo para este proyecto, o actualice su agente, e inténtelo de nuevo.",
+            "busy": "El servidor de desarrollo ya está ejecutando el máximo de tareas de IA permitidas. Inténtelo de nuevo en un momento."
+          },
+          "code": "Código de error: {{code}}",
+          "retry": "Reintentar",
+          "openSettings": "Abrir la configuración del servidor de desarrollo",
+          "askAdmin": "Pida a su administrador que lo solucione."
+        },
+        "SolutionOpenQuestions": {
+          "title": "Preguntas abiertas",
+          "notice": "La aprobación sigue bloqueada hasta que cada pregunta bloqueante de abajo tenga una respuesta registrada.",
+          "refused": "Se rechazó la aprobación. Estas preguntas bloqueantes siguen sin respuesta: {{ids}}",
+          "blocking": "Bloqueante",
+          "nonBlocking": "No bloqueante"
+        },
+        "SolutionAskBackDialog": {
+          "ask": "Preguntar de nuevo",
+          "title": "Preguntar de nuevo",
+          "description": "Envía las preguntas bloqueantes a quien reportó. Cuando responda, la solución se genera otra vez y vuelves a elegir una opción.",
+          "reasonDefault": "La solución no se puede aprobar hasta que esto se responda ({{id}}): {{text}}",
+          "notAllowed": "No se pueden hacer preguntas ahora: puede haber otra ronda de preguntas abierta, o la solicitud está en un estado que no lo permite.",
+          "invalid": "Se rechazó la pregunta. Comprueba que cada motivo esté escrito y no sea demasiado largo.",
+          "reasonLabel": "Por qué preguntas ({{id}})",
+          "pickOne": "Selecciona al menos una pregunta.",
+          "reasonRequired": "Cada pregunta seleccionada necesita un motivo.",
+          "cancel": "Cancelar",
+          "submit": "Enviar a quien reportó"
         }
       },
       "reviewMap": {

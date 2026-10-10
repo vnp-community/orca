@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ApprovalRiskGateSection, useApprovalRiskGate } from '../impact/ApprovalRiskGate'
 import { planDecisionErrorMessage } from './plan-decision-error-message'
 import { PlanDecisionButtons } from './PlanDecisionButtons'
+import { PlanUnconfirmedAssumptionsNotice } from './PlanUnconfirmedAssumptionsNotice'
 import type { PlanDecision } from '../../../hooks/usePlanDecision'
 import type { Approval } from '../../../../../shared/request-types'
 
@@ -47,7 +48,7 @@ export function PlanApprovalBar({
     <Button
       size="sm"
       variant="outline"
-      disabled={regenerating}
+      disabled={regenerating || decision.generateCoolingDown}
       onClick={() => void decision.regeneratePlan()}
       data-testid="plan-regenerate"
     >
@@ -109,7 +110,10 @@ export function PlanApprovalBar({
           {translate(`${P}notApprover`, 'You are not allowed to approve this.')}
         </p>
       )}
-      {failure && (
+      {failure?.errorClass === 'unconfirmedAssumptions' && (
+        <PlanUnconfirmedAssumptionsNotice message={failure.error.message ?? ''} />
+      )}
+      {failure && failure.errorClass !== 'unconfirmedAssumptions' && (
         <p role="alert" className="text-xs text-destructive" data-testid="plan-decision-error">
           {planDecisionErrorMessage(failure)}
         </p>

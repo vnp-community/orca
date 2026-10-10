@@ -12815,6 +12815,17 @@
         "TaskBoardView": {
           "backlogMoved": "未開始のタスクは リクエスト > バックログ にあります",
           "openBacklog": "バックログを開く"
+        },
+        "TaskLoadStates": {
+          "loading": "タスクを読み込み中...",
+          "empty": "まだタスクがありません。",
+          "emptyFiltered": "現在の検索またはフィルターに一致するタスクはありません。",
+          "emptyPlanningHidden": "プランとフェーズのタスクのみ存在します。「プラン/フェーズを表示」をオンにすると表示されます。",
+          "errorTitle": "タスクを読み込めませんでした。",
+          "staleTitle": "タスクを更新できませんでした。最後に読み込んだ一覧を表示しています。",
+          "forbidden": "このプロジェクトのタスクにアクセスする権限がありません。",
+          "code": "エラーコード: {{code}}",
+          "retry": "再試行"
         }
       },
       "taskPageEmptyState": {
@@ -13161,12 +13172,28 @@
           "notFound": "この項目は存在しません。",
           "conflict": "他の人が変更しました。更新して再試行してください。",
           "invalidState": "現在の状態ではこの操作はできません。",
+          "blockingQuestions": "まだ承認できません。分析に、回答が必要なブロッキングの未解決の質問があります。",
+          "unconfirmedAssumptions": "このプランはまだ承認できません。確認が必要な前提に、回答がまだ記録されていません。",
           "network": "ネットワークエラーです。接続を確認してください。",
           "unavailable": "リクエストサービスは利用できません。しばらくしてから再試行してください。",
           "rateLimited": "試行回数が多すぎます。少し待って再試行してください。",
           "validation": "入力内容を確認して再試行してください。",
           "unknown": "問題が発生しました。",
-          "retry": "再試行"
+          "retry": "再試行",
+          "unsupported": "このサーバーはまだこの操作に対応していません。",
+          "expired": "この項目は期限切れです。",
+          "pending": "まだ準備中です。しばらくしてからもう一度お試しください。",
+          "noDevServer": "このプロジェクトに接続された開発サーバーがありません。接続してからもう一度お試しください。",
+          "noAi": "開発サーバーでAIを利用できません。AIの設定を確認してください。",
+          "featureOff": "この組織ではリクエストフローが有効になっていません。",
+          "code": {
+            "rateLimited": "操作が速すぎます。少し待ってからもう一度お試しください。",
+            "projectNotFound": "このプロジェクトはもう存在しません。",
+            "aiQuotaExhausted": "開発サーバーのAI利用枠を使い切りました。後でもう一度お試しください。",
+            "aiBusy": "AIは別の処理中です。しばらくしてからもう一度お試しください。",
+            "aiTimeout": "AIの応答に時間がかかりすぎました。もう一度お試しください。",
+            "aiAgentUnavailable": "開発サーバーが接続されていないため、AIを実行できません。"
+          }
         },
         "AnswerView": {
           "answer": "回答",
@@ -13224,7 +13251,12 @@
           "analyzing": "AIがこのリクエストを分析しています",
           "drafting": "AIが分析を作成しています",
           "failed": "分析を生成できませんでした。",
-          "regenerate": "再生成"
+          "regenerate": "再生成",
+          "errorCode": "エラーコード: {{code}}"
+        },
+        "SolutionStartPrompt": {
+          "description": "このリクエストの分析はまだ開始されていません。開始すると、確認できる解決策の候補が得られます。",
+          "generate": "解決策を生成"
         },
         "SolutionOptionCard": {
           "chosen": "選択済み",
@@ -13408,7 +13440,8 @@
             "phase": "フェーズ",
             "gates": "承認ゲート {{count}} 件",
             "noGates": "承認ゲートなし"
-          }
+          },
+          "classifyFailed": "AIがこのリクエストを自動分類できませんでした。種類を自分で選ぶか、再分類してください。"
         },
         "RequestHistoryTab": {
           "empty": "種別はまだ変更されていません。",
@@ -13505,7 +13538,8 @@
             "notYet": "プランはまだありません。",
             "notFound": "プランが見つかりません。",
             "empty": "プランは空です。",
-            "currentStep": "現在のステップ: {{step}}"
+            "currentStep": "現在のステップ: {{step}}",
+            "notFoundHint": "削除されたか、そのタスクにアクセスする権限がない可能性があります。"
           },
           "PlanSummaryHeader": {
             "counts": "{{phases}} フェーズ、{{tasks}} タスク",
@@ -13524,6 +13558,9 @@
           "RequestPlanTab": {
             "reload": "再読み込み",
             "truncated": "タスク一覧が途中で切れています。一部のタスクが表示されていない可能性があります。"
+          },
+          "PlanUnconfirmedAssumptionsNotice": {
+            "ids": "未確認: {{ids}}"
           }
         },
         "approval": {
@@ -13723,7 +13760,14 @@
             "solution_open_question": "解決策の未解決の質問",
             "plan_assumption": "計画の前提",
             "task_blocked": "タスクがブロック中"
-          }
+          },
+          "loadFailedTitle": "質問を読み込めませんでした",
+          "loadFailedUnsupported": "このサーバーはまだ質問への回答に対応していません。管理者に更新を依頼してください。",
+          "loadFailedCode": "エラーコード: {{code}}",
+          "refresh": "更新",
+          "invalidNumber": "数値ではありません。数字のみで入力してください(例: 8 または 2.5)",
+          "numberHint": "数値を入力してください(例: 8 または 2.5)",
+          "listHint": "1行につき1項目"
         },
         "decision": {
           "rationaleLabel": "選択の理由",
@@ -13918,6 +13962,48 @@
             "agent_defect": "形式の注意を添えて一度再試行します",
             "unknown": "未分類の失敗"
           }
+        },
+        "aiSetup": {
+          "title": {
+            "notConfigured": "開発サーバーでAIが設定されていません",
+            "credentialUnavailable": "AIの認証情報を読み取れませんでした",
+            "sessionExpired": "開発サーバーのClaude Codeセッションが期限切れです",
+            "quotaExhausted": "開発サーバーのAI利用枠を使い切りました",
+            "agentUnavailable": "AIを実行できる開発サーバーがありません",
+            "busy": "AIは処理中です"
+          },
+          "body": {
+            "notConfigured": "開発サーバーがClaude Codeにサインインしていません。開発サーバーで claude auth login を実行(またはエージェントにAPIキーを設定)してから、再試行してください。",
+            "credentialUnavailable": "開発サーバーに設定されているAIの認証情報を確認してから、もう一度お試しください。",
+            "sessionExpired": "開発サーバーで claude auth login を実行して再度サインインしてから、もう一度お試しください。",
+            "quotaExhausted": "開発サーバーのClaude Codeにサインインしているアカウントの利用枠が残っていません。リセットを待つか、アカウントを切り替えてください。",
+            "agentUnavailable": "このプロジェクトに開発サーバーを接続するか、そのエージェントを更新してから、もう一度お試しください。",
+            "busy": "開発サーバーは許可されている数のAIジョブをすでに実行中です。しばらくしてからもう一度お試しください。"
+          },
+          "code": "エラーコード: {{code}}",
+          "retry": "再試行",
+          "openSettings": "開発サーバーの設定を開く",
+          "askAdmin": "管理者に修正を依頼してください。"
+        },
+        "SolutionOpenQuestions": {
+          "title": "未解決の質問",
+          "notice": "以下のブロッキングの質問すべてに回答が記録されるまで、承認はできません。",
+          "refused": "承認は拒否されました。次のブロッキングの質問がまだ未回答です: {{ids}}",
+          "blocking": "ブロッキング",
+          "nonBlocking": "ブロッキングではない"
+        },
+        "SolutionAskBackDialog": {
+          "ask": "問い合わせる",
+          "title": "問い合わせる",
+          "description": "ブロッキングの質問を報告者に送ります。回答後、ソリューションが再生成され、もう一度オプションを選びます。",
+          "reasonDefault": "この質問に回答されるまでソリューションを承認できません ({{id}}): {{text}}",
+          "notAllowed": "今は質問できません。別の質問ラウンドが開いているか、リクエストが質問できない状態です。",
+          "invalid": "質問が拒否されました。すべての理由が入力され、長すぎないことを確認してください。",
+          "reasonLabel": "質問する理由 ({{id}})",
+          "pickOne": "質問を1つ以上選択してください。",
+          "reasonRequired": "選択した質問にはすべて理由が必要です。",
+          "cancel": "キャンセル",
+          "submit": "報告者に送信"
         }
       },
       "reviewMap": {

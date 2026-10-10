@@ -141,12 +141,7 @@ export type RequestTypeHistoryEntry = {
 // Solution
 // ---------------------------------------------------------------------------
 
-export type SolutionKind =
-  | 'solution'
-  | 'diagnosis'
-  | 'findings'
-  | 'answer'
-  | 'unknown'
+export type SolutionKind = 'solution' | 'diagnosis' | 'findings' | 'answer' | 'unknown'
 
 export type SolutionStatus =
   | 'generating'
@@ -167,6 +162,13 @@ export type SolutionOption = {
   raw?: Record<string, unknown>
 }
 
+/** AI-raised question on a Solution (`open_questions`, CR-REQ-027 §2.5); `blocking` ones gate approval. */
+export type SolutionOpenQuestion = {
+  id: string
+  text: string
+  blocking: boolean
+}
+
 export type Solution = {
   id: string
   requestId: string
@@ -174,6 +176,8 @@ export type Solution = {
   status: SolutionStatus
   content?: string
   options?: SolutionOption[]
+  /** Absent when the payload carried none. */
+  openQuestions?: SolutionOpenQuestion[]
   chosenOptionId?: string
   rejectionReason?: string
   generatedAt?: string
@@ -182,16 +186,24 @@ export type Solution = {
   version?: number
 }
 
+/** One background AI run behind a Solution (`solution.list` → `runs`). */
+export type AnalysisRunStatus = 'running' | 'succeeded' | 'failed' | 'unknown'
+export type AnalysisRun = {
+  id: string
+  kind: SolutionKind
+  status: AnalysisRunStatus
+  /** Backend code of a failed run (REQUEST_AI_NOT_CONFIGURED, REQUEST_SOLUTION_INVALID_OUTPUT, ...). */
+  errorCode?: string
+  errorMessage?: string
+  startedAt?: string
+  finishedAt?: string
+}
+
 // ---------------------------------------------------------------------------
 // Approval
 // ---------------------------------------------------------------------------
 
-export type ApprovalSubjectType =
-  | 'solution'
-  | 'plan'
-  | 'phase'
-  | 'pre_deploy'
-  | 'unknown'
+export type ApprovalSubjectType = 'solution' | 'plan' | 'phase' | 'pre_deploy' | 'unknown'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'unknown'
 

@@ -117,6 +117,7 @@ export function RequestDetailHeader({
               variant="outline"
               disabled={busy}
               onClick={onCancel}
+              data-testid="request-cancel"
               className="text-destructive"
             >
               <Ban className="size-3" aria-hidden />

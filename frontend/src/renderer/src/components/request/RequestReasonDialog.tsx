@@ -32,6 +32,8 @@ type Props = {
   submitLabel: string
   reasonRequired: boolean
   destructive?: boolean
+  /** Stable selector for the confirm button (specs must not depend on its label). */
+  submitTestId?: string
   /** Extra controls rendered above the reason (e.g. a stage select). */
   children?: React.ReactNode
   /** Resolves true when the action succeeded; the dialog then closes. */
@@ -47,6 +49,7 @@ export function RequestReasonDialog({
   submitLabel,
   reasonRequired,
   destructive,
+  submitTestId,
   children,
   onSubmit
 }: Props): React.JSX.Element {
@@ -56,7 +59,9 @@ export function RequestReasonDialog({
   const blocked = submitting || (reasonRequired && trimmed.length === 0)
 
   const submit = async (): Promise<void> => {
-    if (blocked) {return}
+    if (blocked) {
+      return
+    }
     setSubmitting(true)
     try {
       if (await onSubmit(trimmed)) {
@@ -98,6 +103,7 @@ export function RequestReasonDialog({
           <Button
             variant={destructive ? 'destructive' : 'default'}
             disabled={blocked}
+            data-testid={submitTestId}
             onClick={() => void submit()}
             title={getScreenSubmitShortcutLabel()}
           >
