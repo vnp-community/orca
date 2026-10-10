@@ -50,7 +50,7 @@ var requestServiceRPCChannels = map[string]rpcDisposition{
 	"ListRequestChecks":        viaChannel("request.checks"),
 
 	"GetRequestReadiness":              deferredRPC("CR-REQ-028 readiness panel"),
-	"RequestClarification":             internalRPC("raised by the readiness gate and the AI, answered by people"),
+	"RequestClarification":             viaChannel("clarification.request"),
 	"ListClarifications":               viaChannel("clarification.list"),
 	"GetClarification":                 viaChannel("clarification.get"),
 	"AnswerClarification":              viaChannel("clarification.answer"),

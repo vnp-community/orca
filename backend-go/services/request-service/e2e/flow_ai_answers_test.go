@@ -25,33 +25,45 @@ var (
 	promptMinOpts   = regexp.MustCompile(`Give at least (\d+) options`)
 )
 
+// blockingQuestionMarker in a Request title makes the stub model ask a blocking open question.
+const blockingQuestionMarker = "e2e-blocking-question"
+
 func installFlowAnswers(script *stubs.AgentScript) {
 	script.AddHandler(func(method string, params map[string]any) (any, bool) {
-		if method != "ai.complete" {
+		if method != "ai.complete" && method != "agent.execPrompt" {
 			return nil, false
 		}
 		prompt, _ := params["prompt"].(string)
-		var doc any
-		switch {
-		case strings.Contains(prompt, "proposing solutions for the request below"):
-			doc = solutionAnswer(prompt)
-		case strings.Contains(prompt, "Diagnose the problem described in <request>"):
-			doc = golden("analysis_documents/diagnosis_valid.json")
-		case strings.Contains(prompt, "Investigate the question in <request>"):
-			doc = golden("analysis_documents/findings_valid.json")
-		case strings.Contains(prompt, "Answer the question in <request>"):
-			doc = golden("analysis_documents/answer_valid.json")
-		case strings.Contains(prompt, "executable work plan"):
-			doc = planAnswer(prompt)
-		default:
+		doc, ok := answerFor(prompt)
+		if !ok {
 			return nil, false
 		}
 		b, err := json.Marshal(doc)
 		if err != nil {
 			panic(err)
 		}
+		if method == "agent.execPrompt" {
+			// The read-only analysis reads the document from the agent's stdout.
+			return map[string]any{"stdout": string(b), "exitCode": 0}, true
+		}
 		return map[string]any{"content": string(b)}, true
 	})
+}
+
+func answerFor(prompt string) (any, bool) {
+	switch {
+	case strings.Contains(prompt, "proposing solutions for the request below"):
+		return solutionAnswer(prompt), true
+	case strings.Contains(prompt, "Diagnose the problem described in <request>"):
+		return golden("analysis_documents/diagnosis_valid.json"), true
+	case strings.Contains(prompt, "Investigate the question in <request>"):
+		return golden("analysis_documents/findings_valid.json"), true
+	case strings.Contains(prompt, "Answer the question in <request>"):
+		return golden("analysis_documents/answer_valid.json"), true
+	case strings.Contains(prompt, "executable work plan"):
+		return planAnswer(prompt), true
+	}
+	return nil, false
 }
 
 func golden(rel string) map[string]any {
@@ -84,6 +96,11 @@ func solutionAnswer(prompt string) map[string]any {
 	}
 	doc["options"] = options
 	doc["assumptions"], doc["open_questions"] = []any{}, []any{}
+	// A Request titled with blockingQuestionMarker gets one blocking question until the prompt shows it answered,
+	// as a model would behave once the reviewer's answer is part of its input.
+	if strings.Contains(prompt, blockingQuestionMarker) && !strings.Contains(prompt, "<clarifications>") {
+		doc["open_questions"] = []any{map[string]any{"id": "Q-1", "text": "Which database should hold the data?", "blocking": true}}
+	}
 	var coverage []any
 	for _, m := range promptCriterion.FindAllStringSubmatch(prompt, -1) {
 		coverage = append(coverage, map[string]any{"ac_id": m[1], "option_ids": []string{"opt-1"}, "status": "covered", "note": ""})

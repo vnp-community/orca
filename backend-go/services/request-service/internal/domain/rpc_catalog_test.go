@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -184,5 +186,26 @@ func TestPublicAndInternalMethodsPartitionCatalog(t *testing.T) {
 	}
 	if RPCName("/orca.request.v1.RequestService/GetRequest") != "GetRequest" || RPCName("Plain") != "Plain" {
 		t.Error("RPCName")
+	}
+}
+
+// A gateway channel calls its RPC with the gateway token; an RPC in the internal group only admits the service
+// token, so such a channel would answer INTERNAL_CALLER_REQUIRED for every user (found on RequestClarification).
+func TestNoGatewayChannelTargetsAnInternalRPC(t *testing.T) {
+	raw, err := os.ReadFile("../../../api-gateway/internal/adapter/wscompat/request_rpc_channel_map_test.go")
+	if err != nil {
+		t.Skipf("gateway channel map not in this checkout: %v", err)
+	}
+	re := regexp.MustCompile(`"([A-Za-z]+)":\s+viaChannel\(`)
+	matches := re.FindAllStringSubmatch(string(raw), -1)
+	if len(matches) < 20 {
+		t.Fatalf("parsed only %d viaChannel entries; the map format changed", len(matches))
+	}
+	for _, m := range matches {
+		for full, e := range Catalog {
+			if RPCName(full) == m[1] && e.Group == GroupInternal {
+				t.Errorf("%s has a gateway channel but is in the internal group", m[1])
+			}
+		}
 	}
 }

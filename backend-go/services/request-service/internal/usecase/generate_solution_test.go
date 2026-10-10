@@ -235,6 +235,37 @@ func TestGenerateSolution_AgentModeNeedsRepoPathAndConnection(t *testing.T) {
 	}
 }
 
+// The dev-server fallback of the connection resolver has a repo path and a dev server but no connection id or worktree.
+func TestGenerateSolution_AgentModeAcceptsADevServerConnectionWithARepoPath(t *testing.T) {
+	for _, typ := range []domain.RequestType{domain.RequestTypeBug, domain.RequestTypeHotfix, domain.RequestTypeSecurity, domain.RequestTypePerformance, domain.RequestTypeSpike, domain.RequestTypeQuestion} {
+		t.Run(string(typ), func(t *testing.T) {
+			w := newSolWorld()
+			r := w.seedRequest(typ, domain.RequestStatusAnalyzing)
+			conn := AnalysisConnection{DevServerID: "ds-1", RepoPath: "/srv/repo"}
+			res, err := w.newGenerate(&capturingSpawner{}, fakeConns{conn: conn}).Execute(w.ctx(), GenerateSolutionInput{RequestID: r.ID})
+			if err != nil || w.runs[res.RunID].Mode != domain.AnalysisModeAgentReadonly {
+				t.Fatalf("res %+v err %v run %+v", res, err, w.runs[res.RunID])
+			}
+		})
+	}
+}
+
+// A dev server whose default repo is a remote URL has nowhere to run the agent: refuse with the structured code, create nothing.
+func TestGenerateSolution_AgentModeRefusesADevServerConnectionWithoutARepoPath(t *testing.T) {
+	w := newSolWorld()
+	r := w.seedRequest(domain.RequestTypeBug, domain.RequestStatusAnalyzing)
+	_, err := w.newGenerate(&capturingSpawner{}, fakeConns{conn: AnalysisConnection{DevServerID: "ds-1"}}).Execute(w.ctx(), GenerateSolutionInput{RequestID: r.ID})
+	requireCode(t, err, "REQUEST_ANALYSIS_NO_REPO_PATH")
+	if len(w.runs) != 0 || len(w.solutions) != 0 {
+		t.Fatalf("no row may be created: %d runs, %d drafts", len(w.runs), len(w.solutions))
+	}
+	// Complete mode never reads the repo, so the same connection still serves it.
+	res, err := w.newGenerate(&capturingSpawner{}, fakeConns{conn: AnalysisConnection{DevServerID: "ds-1"}}).Execute(w.ctx(), GenerateSolutionInput{RequestID: r.ID, Mode: domain.AnalysisModeComplete})
+	if err != nil || w.runs[res.RunID].Mode != domain.AnalysisModeComplete {
+		t.Fatalf("complete mode: %+v err %v", res, err)
+	}
+}
+
 func TestGenerateSolution_BusyProjectLeavesNoRows(t *testing.T) {
 	w := newSolWorld()
 	uc := w.newGenerate(&capturingSpawner{}, fakeConns{conn: AnalysisConnection{ConnectionID: "c", RepoPath: "/repo"}})
@@ -317,5 +348,41 @@ func TestGenerateSolution_SystemStartNeedsNoCallerAndDefersTheSpawn(t *testing.T
 	again, after2, err := uc.PrepareForSystem(noUser, GenerateSolutionInput{RequestID: r.ID, IdempotencyKey: "clr-c-1"})
 	if err != nil || again.Created || after2 != nil || again.RunID != res.RunID {
 		t.Fatalf("the same key must hand back the same run without a second spawn: %+v", again)
+	}
+}
+
+// userRequiringConns mimics AIConnectionResolver: it fails without a user in ctx, as project-service does for a
+// tenant-only background call (the cause of SOLUTION-NOT-STARTED: the resume consumer's ctx has only the tenant).
+type userRequiringConns struct{}
+
+func (userRequiringConns) ResolveForProject(ctx context.Context, _ string) (AnalysisConnection, error) {
+	if u, _ := tenant.UserID(ctx); u == "" {
+		return AnalysisConnection{}, domain.ErrRequestReporterRequired()
+	}
+	return AnalysisConnection{DevServerID: "ds-1"}, nil
+}
+
+func TestGenerateSolution_SystemStartActsAsReporterForConnectionLookup(t *testing.T) {
+	w := newSolWorld()
+	sp := &capturingSpawner{}
+	uc := w.newGenerate(sp, userRequiringConns{})
+	r := w.seedRequest(domain.RequestTypeChangeRequest, domain.RequestStatusAnalyzing)
+
+	// Same ctx the clarification resume consumer builds: tenant only.
+	res, after, err := uc.PrepareForSystem(lcCtx(), GenerateSolutionInput{RequestID: r.ID, Feedback: "clarification:c1", IdempotencyKey: "clr-c1"})
+	if err != nil || !res.Created || after == nil {
+		t.Fatalf("res=%+v after=%v err=%v", res, after != nil, err)
+	}
+	if run := w.runs[res.RunID]; run.ActorID != r.ReporterID {
+		t.Errorf("run actor = %q, want the reporter %q", run.ActorID, r.ReporterID)
+	}
+	after()
+	if len(sp.runs) != 1 {
+		t.Fatalf("worker not spawned: %+v", sp.runs)
+	}
+
+	// A user-initiated start without a user still fails: only the system path borrows the reporter.
+	if _, err := w.newGenerate(&capturingSpawner{}, userRequiringConns{}).Execute(lcCtx(), GenerateSolutionInput{RequestID: r.ID}); err == nil {
+		t.Fatal("a caller-less user start must be rejected")
 	}
 }

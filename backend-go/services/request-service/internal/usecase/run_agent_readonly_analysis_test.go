@@ -24,6 +24,8 @@ type agentKit struct {
 	setting AnalysisSettings
 	// hotfix, when set, gives hotfix diagnoses their fix task and pre_deploy approval.
 	hotfix HotfixFixTasks
+	// clarifications, when set, feeds earlier answers to the analysis prompt.
+	clarifications ClarificationRepository
 }
 
 func newAgentKit(t *testing.T, reply string) *agentKit {
@@ -46,7 +48,7 @@ func (k *agentKit) build() {
 	w := k.w
 	worker := NewRunAgentReadonlyAnalysis(AgentReadonlyDeps{
 		Requests: w, Solutions: fakeSolutions{w}, Conns: fakeConns{conn: k.conn}, Agent: k.agent, Probe: k.probe, Caps: k.caps,
-		Writer: w.newWriter(w.transitioner()).WithHotfixFixTasks(k.hotfix), Settings: k.setting,
+		Writer: w.newWriter(w.transitioner()).WithHotfixFixTasks(k.hotfix), Settings: k.setting, Clarifications: k.clarifications,
 	})
 	gen := NewRunSolutionGeneration(w, fakeSolutions{w}, k.comp, nil, w.newWriter(w.transitioner()), k.setting)
 	k.runner = NewAnalysisRunner(fakeRuns{w}, fakeSolutions{w}, w, gen, worker, k.setting, testOwner)
@@ -102,6 +104,33 @@ func TestAgentReadonly_SuccessPerKindOpensTheRightApproval(t *testing.T) {
 				t.Fatal("agent analysis must never fall back to ai.complete")
 			}
 		})
+	}
+}
+
+// Through the dev-server fallback there is a repo path but no worktree: the agent still reads that folder, and the
+// repository comparison is recorded as skipped instead of pretending the repo was checked.
+func TestAgentReadonly_DevServerConnectionRunsInTheRepoPathWithoutARepoComparison(t *testing.T) {
+	k := newAgentKit(t, analysisReply(t, "diagnosis_valid.json"))
+	k.conn = AnalysisConnection{DevServerID: "ds-1", RepoPath: "/home/dev/orca"}
+	run, _ := k.run(t, domain.RequestTypeBug)
+	if run.Status != domain.RunStatusSucceeded || run.RepoCheck != domain.RepoCheckSkipped {
+		t.Fatalf("run = %s repo=%s", describe(run), run.RepoCheck)
+	}
+	if len(k.agent.inputs) != 1 || k.agent.inputs[0].RepoPath != "/home/dev/orca" || !k.agent.inputs[0].ReadOnlyEnforced {
+		t.Fatalf("agent inputs = %+v", k.agent.inputs)
+	}
+}
+
+func TestAgentReadonly_NoRepoPathFailsTheRunWithAStructuredCode(t *testing.T) {
+	k := newAgentKit(t, analysisReply(t, "diagnosis_valid.json"))
+	// The binding can change between the start of the run and the worker picking it up.
+	run, _ := startRunWith(t, k, domain.RequestTypeBug, AnalysisConnection{DevServerID: "ds-1", RepoPath: "/srv/repo"})
+	k.conn = AnalysisConnection{DevServerID: "ds-1"}
+	k.build()
+	k.runner.execute(run)
+	run = k.w.runs[run.ID]
+	if run.Status != domain.RunStatusFailed || run.ErrorCode == nil || *run.ErrorCode != domain.RunErrNoRepoPath || len(k.agent.inputs) != 0 {
+		t.Fatalf("run = %s agent calls = %d", describe(run), len(k.agent.inputs))
 	}
 }
 

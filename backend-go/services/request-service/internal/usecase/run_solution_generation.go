@@ -18,6 +18,13 @@ type RunSolutionGeneration struct {
 	writer    *AnalysisResultWriter
 	settings  AnalysisSettings
 	coverage  SolutionArtifacts
+	answers   ClarificationRepository
+}
+
+// WithClarifications lets the model see the answers to the open questions of earlier proposals.
+func (g *RunSolutionGeneration) WithClarifications(c ClarificationRepository) *RunSolutionGeneration {
+	g.answers = c
+	return g
 }
 
 // WithCoverage makes a solution document that leaves an active acceptance criterion uncovered count as invalid,
@@ -43,6 +50,7 @@ func (g *RunSolutionGeneration) Execute(ctx context.Context, run domain.Analysis
 	in := SolutionPromptInput{
 		Kind: kind, Request: req, MinOptions: domain.MinOptionsFor(req.Type), Feedback: run.Feedback,
 		PriorArtifacts: priorArtifacts(ctx, g.solutions, req.ID, kind, run.SolutionID),
+		Answers:        answeredForPrompt(ctx, g.answers, req.ID),
 	}
 	in.ProjectName, in.RepoURL = projectFacts(ctx, g.projects, req.ProjectID)
 

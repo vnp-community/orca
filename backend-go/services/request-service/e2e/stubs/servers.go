@@ -56,12 +56,23 @@ func (f *InfraFleet) RelayByDevServer(_ context.Context, in *infrafleetv1.RelayB
 // project-role check (CR-REQ-035) from what the scenarios register with SetMember.
 type Project struct {
 	projectv1.UnimplementedProjectServiceServer
-	mu      sync.Mutex
-	members map[[3]string]projectv1.ProjectRole
+	mu       sync.Mutex
+	members  map[[3]string]projectv1.ProjectRole
+	repoURLs map[string]string
 }
 
 func NewProject() *Project {
-	return &Project{members: map[[3]string]projectv1.ProjectRole{}}
+	return &Project{members: map[[3]string]projectv1.ProjectRole{}, repoURLs: map[string]string{}}
+}
+
+// DefaultRepoURL is the folder every project's repo has on the stub dev server unless a test overrides it.
+const DefaultRepoURL = "/srv/orca-e2e/repo"
+
+// SetRepoURL replaces the default repo's URL of one project, for example with a remote address that names no folder.
+func (p *Project) SetRepoURL(projectID, url string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.repoURLs[projectID] = url
 }
 
 // SetMember makes userID an owner or member of the project; unregistered users are not members.
@@ -89,8 +100,15 @@ func (p *Project) ListMembers(ctx context.Context, in *projectv1.ListMembersRequ
 	return &projectv1.ListMembersResponse{Members: []*projectv1.Member{{UserId: userID, Role: role}}}, nil
 }
 
-func (*Project) ListRepos(context.Context, *projectv1.ListReposRequest) (*projectv1.ListReposResponse, error) {
-	return &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "stub-repo", DevServerId: DevServerID}}}, nil
+// ListRepos binds the project's default repo to the stub dev server; its URL is the folder path there.
+func (p *Project) ListRepos(_ context.Context, in *projectv1.ListReposRequest) (*projectv1.ListReposResponse, error) {
+	p.mu.Lock()
+	url, ok := p.repoURLs[in.GetProjectId()]
+	p.mu.Unlock()
+	if !ok {
+		url = DefaultRepoURL
+	}
+	return &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "stub-repo", Url: url, DevServerId: DevServerID}}}, nil
 }
 
 // AuditEntry is one AppendAuditEntry call as received.

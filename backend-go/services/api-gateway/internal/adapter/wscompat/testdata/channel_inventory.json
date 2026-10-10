@@ -324,6 +324,10 @@
     "kind": "unary"
   },
   {
+    "name": "clarification.request",
+    "kind": "unary"
+  },
+  {
     "name": "clientState.get",
     "kind": "unary"
   },

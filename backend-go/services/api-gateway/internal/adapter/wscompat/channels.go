@@ -458,6 +458,8 @@ type taskView struct {
 	DoneSubtasks       int32    `json:"doneSubtasks"`
 	TotalSubtasks      int32    `json:"totalSubtasks"`
 	ShareToken         string   `json:"shareToken,omitempty"`
+	// RequestID links a task to its Request so the Plan tab can group a tree by request.
+	RequestID string `json:"requestId,omitempty"`
 	// dueDate is passed through as-is (RFC3339 string or "") — task.proto's
 	// due_date is a google.protobuf.Timestamp; converting it to a JS-Date-
 	// parseable string here is enough, no numeric-ms conversion needed.
@@ -475,7 +477,7 @@ func toTaskView(t *taskv1.Task) taskView {
 		WorkflowTemplateID: t.GetWorkflowTemplateId(), WorktreeID: t.GetWorktreeId(),
 		AgentSessionID: t.GetAgentSessionId(), TaskNumber: t.GetTaskNumber(), PRURL: t.GetPrUrl(),
 		WorkflowExecID: t.GetWorkflowExecId(), DoneSubtasks: t.GetDoneSubtasks(),
-		TotalSubtasks: t.GetTotalSubtasks(), ShareToken: t.GetShareToken(),
+		TotalSubtasks: t.GetTotalSubtasks(), ShareToken: t.GetShareToken(), RequestID: t.GetRequestId(),
 	}
 	if t.GetLabels() == nil {
 		v.Labels = []string{}

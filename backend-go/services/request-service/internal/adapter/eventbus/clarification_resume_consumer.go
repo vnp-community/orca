@@ -50,7 +50,12 @@ func (c *ClarificationResumeConsumer) Handle(ctx context.Context, ev commonevent
 		slog.WarnContext(ctx, "status_changed event ignored: no tenant", slog.String("event_id", ev.ID))
 		return nil
 	}
-	return c.resumer.Handle(tenant.WithTenantID(ctx, ev.TenantID), usecase.ResumeEvent{
+	err := c.resumer.Handle(tenant.WithTenantID(ctx, ev.TenantID), usecase.ResumeEvent{
 		ID: ev.ID, TenantID: ev.TenantID, RequestID: p.RequestID, To: p.To, Trigger: p.Trigger,
 	})
+	if err != nil {
+		// A failure here is redelivered at once; without this line a permanent one loops silently.
+		slog.WarnContext(ctx, "clarification resume failed; will be redelivered", slog.String("request_id", p.RequestID), slog.Any("error", err))
+	}
+	return err
 }

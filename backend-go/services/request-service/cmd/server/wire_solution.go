@@ -108,10 +108,11 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	gates := usecase.NewApprovalGates(stores.artifact.decisions, stores.artifact.clarifications)
 
 	writer := usecase.NewAnalysisResultWriter(stores.requests, stores.solutions, stores.analysisRuns, w.opener, transition, stores.tx, stores.outboxWriter, owner).WithArtifacts(artifacts)
-	generation := usecase.NewRunSolutionGeneration(stores.requests, stores.solutions, completer, projects, writer, settings).WithCoverage(artifacts)
+	generation := usecase.NewRunSolutionGeneration(stores.requests, stores.solutions, completer, projects, writer, settings).WithCoverage(artifacts).
+		WithClarifications(stores.artifact.clarifications)
 	readonly := usecase.NewRunAgentReadonlyAnalysis(usecase.AgentReadonlyDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Conns: conns, Agent: agent, Probe: probe, Caps: caps,
-		Projects: projects, Writer: writer, Settings: settings,
+		Projects: projects, Writer: writer, Settings: settings, Clarifications: stores.artifact.clarifications,
 	})
 	w.writer = writer
 	w.runner = usecase.NewAnalysisRunner(stores.analysisRuns, stores.solutions, stores.tx, generation, readonly, settings, owner)

@@ -14,8 +14,11 @@ import (
 type AIConnection struct {
 	ConnectionID string
 	DevServerID  string
-	// RepoPath and WorktreeID are only known for a resolved infra connection (the dev-server fallback has neither).
-	RepoPath   string
+	// RepoPath is the repo folder on the dev server that runs the agent. A resolved infra connection carries it; the
+	// dev-server fallback takes it from the default repo's URL, and leaves it empty when that URL is not a folder
+	// path (read-only analysis then fails with REQUEST_ANALYSIS_NO_REPO_PATH rather than guessing a cwd).
+	RepoPath string
+	// WorktreeID is only known for a resolved infra connection; the fallback has none.
 	WorktreeID string
 }
 
@@ -52,10 +55,12 @@ func (r *AIConnectionResolver) ResolveForProject(ctx context.Context, projectID 
 	if err != nil {
 		return AIConnection{}, fmt.Errorf("grpcclient: ListRepos: %w", err)
 	}
+	// The default repo (lowest position) is the one task-service executes on, so analysis and execution read the same code.
 	if len(repos.GetRepos()) == 0 || repos.GetRepos()[0].GetDevServerId() == "" {
 		return AIConnection{}, usecase.ErrNoDevServer
 	}
-	devServerID := repos.GetRepos()[0].GetDevServerId()
+	repo := repos.GetRepos()[0]
+	devServerID := repo.GetDevServerId()
 	reachable, err := r.reachable(tctx, devServerID)
 	if err != nil {
 		return AIConnection{}, err
@@ -63,7 +68,7 @@ func (r *AIConnectionResolver) ResolveForProject(ctx context.Context, projectID 
 	if !reachable {
 		return AIConnection{}, usecase.ErrNoDevServer
 	}
-	return AIConnection{DevServerID: devServerID}, nil
+	return AIConnection{DevServerID: devServerID, RepoPath: devServerRepoPath(repo.GetUrl())}, nil
 }
 
 // reachable treats a dev server with no health sample as unreachable rather than an error.

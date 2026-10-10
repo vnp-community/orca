@@ -135,6 +135,12 @@ func (uc *GenerateSolution) start(ctx context.Context, in GenerateSolutionInput,
 	if err != nil {
 		return GenerateSolutionResult{}, domain.AnalysisRun{}, err
 	}
+	// A system start has no caller, but the dev-server lookup below needs a user (project-service
+	// rejects tenant-only calls): act as the reporter, who the run is attributed to anyway.
+	if system && actor == "" && req.ReporterID != "" {
+		actor = req.ReporterID
+		ctx = tenant.WithUserID(ctx, actor)
+	}
 	// Resolve the connection before any write: no dev server means no run row at all.
 	conn, err := uc.conns.ResolveForProject(ctx, req.ProjectID)
 	if err != nil {

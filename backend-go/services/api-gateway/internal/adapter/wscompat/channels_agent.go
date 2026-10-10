@@ -15,6 +15,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 
@@ -276,36 +277,36 @@ func registerAgentSwitchAccountChannel(r *Registry, client infrafleetv1.InfraFle
 // whole invoke erroring or panicking.
 func registerAgentStatusSubscribeChannel(r *Registry, bus *commoneventbus.Consumer) {
 	r.RegisterStream("agent.subscribeStatus", func(ctx context.Context, id Identity, args []json.RawMessage) (<-chan PushEvent, error) {
-		events := make(chan PushEvent)
+		sink := newPushFanInSink()
 		if bus == nil {
-			close(events)
-			return events, nil
+			sink.close()
+			return sink.out, nil
+		}
+		// The sink closes only after both subscriptions end; closing from one of the
+		// two goroutines would panic the other's in-flight send.
+		subscribe := func(subject, channel string) func() {
+			return func() {
+				_ = bus.SubscribeEphemeral(ctx, "INFRA", subject, func(ctx context.Context, ev commoneventbus.Event) error {
+					if ev.TenantID != id.TenantID {
+						return nil // tenant isolation — see tenant-service's consumer.go for the established pattern
+					}
+					sink.send(ctx, PushEvent{Channel: channel, Args: []any{ev.Payload}})
+					return nil
+				})
+			}
 		}
 		go func() {
-			defer close(events)
-			_ = bus.SubscribeEphemeral(ctx, "INFRA", "orca.infra.agent.statusChanged", func(ctx context.Context, ev commoneventbus.Event) error {
-				if ev.TenantID != id.TenantID {
-					return nil // tenant isolation — see tenant-service's consumer.go for the established pattern
-				}
-				select {
-				case events <- PushEvent{Channel: "agent.statusChanged", Args: []any{ev.Payload}}:
-				case <-ctx.Done():
-				}
-				return nil
-			})
+			defer sink.close()
+			var wg sync.WaitGroup
+			for _, run := range []func(){
+				subscribe("orca.infra.agent.statusChanged", "agent.statusChanged"),
+				subscribe("orca.infra.agent.rateLimited", "agent:rateLimited"),
+			} {
+				wg.Add(1)
+				go func() { defer wg.Done(); run() }()
+			}
+			wg.Wait()
 		}()
-		go func() {
-			_ = bus.SubscribeEphemeral(ctx, "INFRA", "orca.infra.agent.rateLimited", func(ctx context.Context, ev commoneventbus.Event) error {
-				if ev.TenantID != id.TenantID {
-					return nil
-				}
-				select {
-				case events <- PushEvent{Channel: "agent:rateLimited", Args: []any{ev.Payload}}:
-				case <-ctx.Done():
-				}
-				return nil
-			})
-		}()
-		return events, nil
+		return sink.out, nil
 	})
 }

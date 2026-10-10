@@ -109,7 +109,7 @@ var Catalog = map[string]Entry{
 	reqSvc + "RecordRequestCheck":               unlocated(GroupInternal, RateNone, false),
 	reqSvc + "ListRequestChecks":                onRequest(GroupRead, "request_id", RateRead, false),
 	reqSvc + "GetRequestReadiness":              onRequest(GroupRead, "request_id", RateRead, false),
-	reqSvc + "RequestClarification":             unlocated(GroupInternal, RateNone, false),
+	reqSvc + "RequestClarification":             onRequest(GroupTriage, "request_id", RateWrite, false),
 	reqSvc + "ListClarifications":               onRequest(GroupRead, "request_id", RateRead, false),
 	reqSvc + "GetClarification":                 onEntity(GroupRead, "clarification", "id", RateRead),
 	reqSvc + "AnswerClarification":              onEntity(GroupTriage, "clarification", "clarification_id", RateWrite),

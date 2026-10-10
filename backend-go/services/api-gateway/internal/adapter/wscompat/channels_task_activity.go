@@ -103,9 +103,9 @@ func RegisterTaskActivityStreamChannel(r *Registry, bus ephemeralSubscriber) {
 			return nil, fmt.Errorf("task.activity.subscribe: taskId is required")
 		}
 
-		out := make(chan PushEvent)
+		sink := newPushFanInSink()
 		go func() {
-			defer close(out)
+			defer sink.close()
 			var wg sync.WaitGroup
 			for _, sub := range taskActivitySubjects {
 				sub := sub
@@ -117,17 +117,14 @@ func RegisterTaskActivityStreamChannel(r *Registry, bus ephemeralSubscriber) {
 						if !ok {
 							return nil
 						}
-						select {
-						case out <- PushEvent{Channel: "task.activity.event", Args: []any{frame}}:
-						case <-ctx.Done():
-						}
+						sink.send(ctx, PushEvent{Channel: "task.activity.event", Args: []any{frame}})
 						return nil
 					})
 				}()
 			}
 			wg.Wait()
 		}()
-		return out, nil
+		return sink.out, nil
 	})
 }
 

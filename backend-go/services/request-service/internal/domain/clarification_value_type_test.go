@@ -39,3 +39,19 @@ func TestClarificationValueTypeMatchesEveryRequiredField(t *testing.T) {
 		}
 	}
 }
+
+// Clients read the unanswered ids from this text (gateway relays it as is), so its shape is part of the contract.
+func TestBlockingErrorsListTheirIdsAfterTheColon(t *testing.T) {
+	cases := []struct {
+		err  error
+		want string
+	}{
+		{ErrSolutionBlockingQuestions([]string{"Q-1", "Q-2"}), "REQUEST_SOLUTION_BLOCKING_QUESTIONS: blocking open questions are unanswered: Q-1, Q-2"},
+		{ErrPlanUnconfirmedAssumptions([]string{"A-1"}), "REQUEST_PLAN_UNCONFIRMED_ASSUMPTIONS: assumptions needing confirmation are unanswered: A-1"},
+	}
+	for _, c := range cases {
+		if got := c.err.Error(); got != c.want {
+			t.Errorf("got %q want %q", got, c.want)
+		}
+	}
+}

@@ -115,9 +115,9 @@ func registerRequestStream(r *Registry, bus ephemeralSubscriber, req requestv1.R
 			}
 		}
 		subscribedAt := now()
-		out := make(chan PushEvent)
+		sink := newPushFanInSink()
 		go func() {
-			defer close(out)
+			defer sink.close()
 			var wg sync.WaitGroup
 			for _, m := range events {
 				m := m
@@ -129,17 +129,14 @@ func registerRequestStream(r *Registry, bus ephemeralSubscriber, req requestv1.R
 						if !ok {
 							return nil
 						}
-						select {
-						case out <- PushEvent{Channel: "request.event", Args: []any{frame}}:
-						case <-ctx.Done():
-						}
+						sink.send(ctx, PushEvent{Channel: "request.event", Args: []any{frame}})
 						return nil
 					})
 				}()
 			}
 			wg.Wait()
 		}()
-		return out, nil
+		return sink.out, nil
 	})
 }
 

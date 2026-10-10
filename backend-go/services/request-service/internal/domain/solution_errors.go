@@ -58,7 +58,7 @@ func ErrAnalysisNoConnection() error {
 }
 
 func ErrAnalysisNoRepoPath() error {
-	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ANALYSIS_NO_REPO_PATH", "the project connection has no repository path", nil)
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ANALYSIS_NO_REPO_PATH", "the project's default repository has no folder path on its dev server (its URL is not an absolute path), so the agent has no directory to read", nil)
 }
 
 func ErrAnalysisBusy() error {
