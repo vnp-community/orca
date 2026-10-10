@@ -252,7 +252,8 @@
           "3be0f7df04": "선택한 런타임에서 폴더를 열 수 없습니다.",
           "15cf5319ec": "{{path}}이(가) {{hostName}}에서 확인되었지만 해당 호스트가 사용 가능한 폴더를 보고하지 않았습니다.",
           "2dcd706774": "프로젝트가 다른 프로필에도 있습니다",
-          "presenceProfileOverflow": "{{names}} 외 {{count}}개"
+          "presenceProfileOverflow": "{{names}} 외 {{count}}개",
+          "setupProjectCloneDevServerUnsupported": "개발 서버에 새 저장소를 복제하는 기능은 아직 지원되지 않습니다. 대신 기존 폴더를 추가하세요."
         },
         "settings": {
           "e12dab333b": "서버를 전환하지 못했습니다.",
@@ -525,7 +526,19 @@
           "error": {
             "format": {
               "37cf0bc991": "Orca가 이 워크스페이스에 대해 사용 가능한 기본 참조를 확인할 수 없습니다.",
-              "64555d0014": "기본 브랜치를 찾을 수 없습니다."
+              "64555d0014": "기본 브랜치를 찾을 수 없습니다.",
+              "hostUnbound": {
+                "title": "이 프로젝트는 개발 서버에 할당되지 않았습니다",
+                "message": "이 프로젝트가 있는 개발 서버를 선택한 후 다시 시도하세요."
+              },
+              "hostUnreachable": {
+                "title": "개발 서버가 오프라인입니다",
+                "message": "Orca가 이 프로젝트가 있는 개발 서버에 연결할 수 없습니다. 다시 연결한 후 재시도하세요."
+              },
+              "hostCheckFailed": {
+                "title": "개발 서버를 확인하지 못했습니다",
+                "message": "Orca가 개발 서버가 온라인인지 확인하지 못했습니다. 잠시 후 다시 시도하세요."
+              }
             }
           }
         }
@@ -590,6 +603,15 @@
       },
       "workspaceTabPalette": {
         "reviewTab": "리뷰 탭"
+      },
+      "repoHostBinding": {
+        "hostRequired": "먼저 이 프로젝트의 개발 서버를 선택하세요."
+      },
+      "repoHostRebind": {
+        "activeWorkflows": "개발 서버를 변경하기 전에 이 프로젝트에서 실행 중인 작업을 중지하세요.",
+        "devServerNotFound": "해당 개발 서버가 더 이상 존재하지 않습니다. 다른 서버를 선택하세요.",
+        "forbidden": "이 프로젝트의 개발 서버를 변경할 권한이 없습니다.",
+        "failed": "개발 서버를 변경하지 못했습니다."
       }
     },
     "hooks": {
@@ -2295,7 +2317,8 @@
             "767951265d": "작업 트리를 만드는 중에 문제가 발생했습니다.",
             "vmProvisioningTitle": "VM 프로비저닝",
             "cancelProvisioning": "취소",
-            "vmProvisioningLogEmpty": "레시피 출력을 기다리는 중…"
+            "vmProvisioningLogEmpty": "레시피 출력을 기다리는 중…",
+            "chooseHost": "개발 서버 선택"
           }
         }
       },
@@ -3836,7 +3859,11 @@
           "51001182e3": "빈 디렉토리",
           "971d85cc84": "이 호스트에서 프로젝트로 열립니다 · {{value0}}",
           "00c4235c10": "'{{value0}}'과(와) 일치하는 항목이 없습니다.",
-          "largeInputNoMatches": "이 긴 입력과 일치하는 항목 없음"
+          "largeInputNoMatches": "이 긴 입력과 일치하는 항목 없음",
+          "hostReconnecting": "호스트를 다시 연결하는 중입니다. 연결되면 이 폴더가 자동으로 다시 로드됩니다.",
+          "retry": "다시 시도",
+          "truncated": "{{total}}개 중 {{shown}}개 항목을 표시합니다. 입력하여 목록을 좁히세요.",
+          "hostOffline": "호스트가 연결되어 있지 않습니다. 이 선택기는 열린 상태로 유지되며 다시 연결되면 새로 고쳐집니다."
         },
         "RemoveFolderDialog": {
           "4dc5b5065b": "제거",
@@ -4545,7 +4572,8 @@
           "addRemoteHostTooltip": "로그인할 수 있는 시스템의 경우 SSH를 선택하고 Orca 서버의 경우 원격 서버를 선택합니다.",
           "addSshHostDetail": "SSH를 통해 기존 머신을 사용합니다.",
           "addRemoteServerDetail": "다른 컴퓨터에서 실행 중인 Orca와 페어링합니다.",
-          "addRemoteHostDetail": "SSH 호스트 또는 Orca 서버"
+          "addRemoteHostDetail": "SSH 호스트 또는 Orca 서버",
+          "chooseHost": "호스트 선택"
         },
         "sidebarHostOptions": {
           "3e102f111c": "모든 호스트",
@@ -4695,6 +4723,32 @@
           "cancel": "취소",
           "forget": "Orca에서 제거",
           "reconnectAndDelete": "재연결 후 삭제"
+        },
+        "AddRepoHostGateNotice": {
+          "reconnecting": "{{host}}에 다시 연결하는 중입니다. 선택은 유지되며 다시 온라인이 되면 프로젝트 추가를 이어갈 수 있습니다.",
+          "removed": "{{host}}을(를) 더 이상 사용할 수 없습니다. 다른 개발 서버를 선택하세요.",
+          "offline": "{{host}}이(가) 오프라인입니다. 선택은 유지되며 다시 연결되면 프로젝트 추가를 이어갈 수 있습니다. 다른 개발 서버를 선택할 수도 있습니다.",
+          "noHostTitle": "연결된 개발 서버가 없습니다",
+          "noHostBody": "프로젝트는 개발 서버에 있습니다. 개발 서버를 연결한 후 프로젝트를 추가하세요.",
+          "openDevServers": "개발 서버 열기",
+          "chooseHostBody": "이 프로젝트가 있는 개발 서버를 선택하세요. 선택하면 찾아보기와 추가를 사용할 수 있습니다."
+        },
+        "RepoHostBadge": {
+          "noHost": "개발 서버 없음",
+          "inheritedTitle": "{{name}} (프로젝트에서 상속)"
+        },
+        "RepoHostPickerDialog": {
+          "updated": "개발 서버를 업데이트했습니다",
+          "title": "개발 서버 선택",
+          "description": "Orca는 {{project}}의 git을 개발 서버에서 실행합니다. 이 프로젝트가 있는 서버를 선택하세요.",
+          "hostLabel": "개발 서버",
+          "placeholder": "개발 서버 선택",
+          "unavailableHost": "{{name}} ({{status}})",
+          "noConnectedHost": "연결된 개발 서버가 없습니다. 개발 서버를 연결한 후 여기에서 선택하세요.",
+          "openDevServers": "개발 서버 열기",
+          "cancel": "취소",
+          "saving": "저장 중…",
+          "confirm": "이 개발 서버 사용"
         }
       },
       "shared": {
@@ -9057,6 +9111,14 @@
         "TerminalInteractionSection": {
           "567633ff50": "Right-click pastes the clipboard into the terminal. Control-click to open the context menu.",
           "c64497148a": "Right-click pastes the clipboard. Control-click opens the context menu."
+        },
+        "RepositoryDevServerHostSection": {
+          "title": "개발 서버",
+          "description": "이 프로젝트가 있는 개발 서버입니다. Orca는 git과 에이전트를 여기에서 실행합니다.",
+          "unbound": "할당된 개발 서버가 없어 Orca가 이 프로젝트에서 git을 실행할 수 없습니다. 하나를 선택하세요.",
+          "unknownStatus": "상태 알 수 없음",
+          "fromProject": "프로젝트에서 상속",
+          "change": "개발 서버 변경"
         }
       },
       "right": {
@@ -13085,6 +13147,9 @@
           "saving": "저장 중…",
           "saved": "Jira 매핑이 업데이트되었습니다",
           "saveFailed": "Jira 매핑을 업데이트하지 못했습니다."
+        },
+        "CreateProjectDialog": {
+          "repoAddFailed": "프로젝트는 만들어졌지만 저장소를 추가하지 못했습니다: {{message}}. 다시 시도하세요."
         }
       },
       "request": {

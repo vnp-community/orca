@@ -1,7 +1,6 @@
 // CreateProjectDialog.tsx — "Create New Project" form for ProjectSwitcher (F38 Workspace, TDD-FE-12)
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { toast } from 'sonner'
 import {
   callRuntimeRpc,
   getActiveRuntimeTarget,
@@ -22,6 +21,7 @@ import {
 } from '../ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
+import { translate } from '@/i18n/i18n'
 
 type DevServerOption = { id: string; name: string; status: string }
 
@@ -71,6 +71,9 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Set once project.create succeeded but registering the repo failed: a retry must reuse it
+  // instead of creating a second project.
+  const [createdProject, setCreatedProject] = useState<OrcaProject | null>(null)
 
   // BUG-FE-PW-001: existing sidebar repo data, used to warn when
   // repoPath+devServerId already exists there — already lives in the client
@@ -107,6 +110,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
     setVisibility('private')
     setSelectedProjectId('')
     setError(null)
+    setCreatedProject(null)
   }
 
   function findDuplicateRepo(path: string, targetDevServerId: string) {
@@ -171,34 +175,45 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
     setError(null)
     try {
       const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-      // Why devServerId/repoPath aren't sent here: CreateProjectRequest
-      // (project.proto) has neither field — a repo path only makes sense as
-      // a follow-up AddRepo call against the new project's id. Both used to
-      // be sent here anyway and were silently dropped by the wscompat
-      // handler — this project's dev server/repo were never actually set.
-      const project = await callRuntimeRpc<OrcaProject>(target, 'project.create', {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        visibility
-      })
+      // Why devServerId/repoPath go with project.create: the gateway decodes both (CreateProjectRequest
+      // carries dev_server_id + repo_path), so the project is bound to the host from the start.
+      const project =
+        createdProject ??
+        (await callRuntimeRpc<OrcaProject>(target, 'project.create', {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          visibility,
+          devServerId,
+          repoPath: repoPath.trim()
+        }))
 
-      // Phase 10 (project.repos.dev_server_id): the repo now carries its own
-      // dev-server binding, set directly here — no more separate
-      // project.rebindDevServer step before it. The project row already
-      // exists past this point — a follow-up failure is "couldn't fully set
-      // it up", not "creation failed", so it surfaces as a toast (same
-      // reasoning as ProjectSwitcher's onCreated catch) rather than blocking
-      // onCreated/closing the dialog.
-      await callRuntimeRpc(target, 'repo.add', {
-        projectId: project.id,
-        url: repoPath.trim(),
-        displayName: name.trim(),
-        devServerId
-      }).catch(() => {
-        toast.error(
-          'Project created, but the repo could not be added. Add it from Project Settings.'
+      // Why list-then-add: project.create already attaches the repo best-effort, and a second add
+      // would duplicate it; add only when the project really lacks it (repo carries devServerId).
+      try {
+        const listed = await callRuntimeRpc<{ repos?: { url: string }[] }>(target, 'repo.list', {
+          projectId: project.id
+        })
+        if (!listed?.repos?.some((repo) => repo.url === repoPath.trim())) {
+          await callRuntimeRpc(target, 'repo.add', {
+            projectId: project.id,
+            url: repoPath.trim(),
+            displayName: name.trim(),
+            devServerId
+          })
+        }
+      } catch (repoErr) {
+        // Why inline, not a toast: the project exists but is unusable without its repo; keep the
+        // dialog open so the user can retry without creating a duplicate project.
+        setCreatedProject(project)
+        setError(
+          translate(
+            'auto.components.project.CreateProjectDialog.repoAddFailed',
+            'Project created, but its repo could not be added: {{message}}. Try again.',
+            { message: describeError(repoErr, 'repo.add failed') }
+          )
         )
-      })
+        return
+      }
 
       onCreated(project)
       onOpenChange(false)

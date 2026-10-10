@@ -252,7 +252,8 @@
           "3be0f7df04": "Cannot open folder on selected runtime",
           "15cf5319ec": "{{path}} was checked on {{hostName}}, but that host did not report a usable folder.",
           "2dcd706774": "Project also exists in another profile",
-          "presenceProfileOverflow": "{{names}} +{{count}} more"
+          "presenceProfileOverflow": "{{names}} +{{count}} more",
+          "setupProjectCloneDevServerUnsupported": "Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead."
         },
         "settings": {
           "e12dab333b": "Failed to switch servers",
@@ -525,7 +526,19 @@
           "error": {
             "format": {
               "37cf0bc991": "Orca could not resolve a usable base ref for this workspace.",
-              "64555d0014": "No base branch found"
+              "64555d0014": "No base branch found",
+              "hostUnbound": {
+                "title": "This project isn’t assigned to a dev server",
+                "message": "Choose the dev server this project lives on, then try again."
+              },
+              "hostUnreachable": {
+                "title": "The dev server is offline",
+                "message": "Orca can’t reach the dev server this project lives on. Reconnect it, then retry."
+              },
+              "hostCheckFailed": {
+                "title": "Couldn’t check the dev server",
+                "message": "Orca couldn’t confirm the dev server is online. Retry in a moment."
+              }
             }
           }
         }
@@ -590,6 +603,15 @@
       },
       "workspaceTabPalette": {
         "reviewTab": "Review tab"
+      },
+      "repoHostBinding": {
+        "hostRequired": "Choose a dev server for this project first."
+      },
+      "repoHostRebind": {
+        "activeWorkflows": "Stop the tasks running on this project before changing its dev server.",
+        "devServerNotFound": "That dev server no longer exists. Choose another one.",
+        "forbidden": "You do not have permission to change this project’s dev server.",
+        "failed": "Failed to change the dev server."
       }
     },
     "hooks": {
@@ -2295,7 +2317,8 @@
             "767951265d": "Something went wrong while creating the worktree.",
             "vmProvisioningTitle": "Provisioning VM",
             "cancelProvisioning": "Cancel",
-            "vmProvisioningLogEmpty": "Waiting for recipe output…"
+            "vmProvisioningLogEmpty": "Waiting for recipe output…",
+            "chooseHost": "Choose dev server"
           }
         }
       },
@@ -3668,7 +3691,8 @@
           "addRemoteHostTooltip": "Choose SSH for a machine you can log into, or remote server for an Orca server.",
           "addSshHostDetail": "Use an existing machine over SSH.",
           "addRemoteServerDetail": "Pair with Orca running on another computer.",
-          "addRemoteHostDetail": "SSH host or Orca server"
+          "addRemoteHostDetail": "SSH host or Orca server",
+          "chooseHost": "Choose a host"
         },
         "AddRepoNestedImportStep": {
           "496f68cf8c": "Scanning repositories. Click to stop.",
@@ -3870,7 +3894,11 @@
           "51001182e3": "Empty directory",
           "971d85cc84": "Opens as a project on this host · {{value0}}",
           "00c4235c10": "No matches for '{{value0}}'",
-          "largeInputNoMatches": "No matches for this long input"
+          "largeInputNoMatches": "No matches for this long input",
+          "hostReconnecting": "The host is reconnecting. This folder reloads automatically when it is back.",
+          "retry": "Try again",
+          "truncated": "Showing {{shown}} of {{total}} entries. Type to narrow the list.",
+          "hostOffline": "The host is not connected. This picker stays open and refreshes when it reconnects."
         },
         "RemoveFolderDialog": {
           "4dc5b5065b": "Remove",
@@ -4695,6 +4723,32 @@
           "cancel": "Cancel",
           "forget": "Remove from Orca",
           "reconnectAndDelete": "Reconnect & Delete"
+        },
+        "AddRepoHostGateNotice": {
+          "reconnecting": "{{host}} is reconnecting. Your choice is kept, and Add Project resumes when it is back online.",
+          "removed": "{{host}} is no longer available. Choose another dev server.",
+          "offline": "{{host}} is offline. Your choice is kept; Add Project resumes when it reconnects, or choose another dev server.",
+          "noHostTitle": "No dev server is connected",
+          "noHostBody": "Projects live on a dev server. Connect one, then come back to add a project.",
+          "openDevServers": "Open Dev Servers",
+          "chooseHostBody": "Choose the dev server this project lives on. Browse and Add unlock once you pick one."
+        },
+        "RepoHostBadge": {
+          "noHost": "No dev server",
+          "inheritedTitle": "{{name}} (inherited from the project)"
+        },
+        "RepoHostPickerDialog": {
+          "updated": "Dev server updated",
+          "title": "Choose a dev server",
+          "description": "Orca runs git for {{project}} on its dev server. Pick the one this project lives on.",
+          "hostLabel": "Dev server",
+          "placeholder": "Choose a dev server",
+          "unavailableHost": "{{name}} ({{status}})",
+          "noConnectedHost": "No dev server is connected. Connect one, then choose it here.",
+          "openDevServers": "Open Dev Servers",
+          "cancel": "Cancel",
+          "saving": "Saving…",
+          "confirm": "Use this dev server"
         }
       },
       "shared": {
@@ -9057,6 +9111,14 @@
         "TerminalInteractionSection": {
           "567633ff50": "Right-click pastes the clipboard into the terminal. Control-click to open the context menu.",
           "c64497148a": "Right-click pastes the clipboard. Control-click opens the context menu."
+        },
+        "RepositoryDevServerHostSection": {
+          "title": "Dev server",
+          "description": "The dev server this project lives on. Orca runs git and agents there.",
+          "unbound": "No dev server is assigned, so Orca cannot run git for this project. Choose one.",
+          "unknownStatus": "status unknown",
+          "fromProject": "from the project",
+          "change": "Change dev server"
         }
       },
       "right": {
@@ -13085,6 +13147,9 @@
           "saving": "Saving…",
           "saved": "Jira mapping updated",
           "saveFailed": "Failed to update the Jira mapping."
+        },
+        "CreateProjectDialog": {
+          "repoAddFailed": "Project created, but its repo could not be added: {{message}}. Try again."
         }
       },
       "request": {

@@ -23,12 +23,13 @@ import type {
   GlobalSettings,
   NestedRepoScanResult,
   OnboardingState,
-  Repo,
   TuiAgent
 } from '../../../../shared/types'
 import { STEPS, type StepNumber } from './use-onboarding-flow-types'
 import { persistStep, useCloseWith, usePersistCurrentStep } from './use-onboarding-flow-persistence'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { requireRepoDevServerId } from '@/lib/repo-host-binding'
+import { cloneRepoOntoDevServer } from '@/lib/clone-repo-onto-dev-server'
 import { buildOnboardingFolderAgentStartup } from '@/lib/onboarding-folder-agent-startup'
 import { resolveOnboardingSettingsHydration } from './onboarding-settings-hydration'
 import { openProjectDefaultCheckout } from '../sidebar/project-added-default-checkout'
@@ -822,6 +823,9 @@ export function useOnboardingFlow(
   const onboardingNestedRepoRuntimeKind: NestedRepoTelemetryRuntimeKind =
     settings?.activeRuntimeEnvironmentId?.trim() ? 'runtime' : 'local'
 
+  // Why: the dev server picked in the onboarding DevServerStep is the host every repo added here lives on.
+  const onboardingDevServerId = settings?.activeDevServerId?.trim() || null
+
   const openFolder = useCallback(
     async (kind: 'git' | 'folder' = 'git') => {
       // Why: re-entry guard — rapid Cmd+Enter must not launch duplicate pickers.
@@ -841,7 +845,11 @@ export function useOnboardingFlow(
         try {
           if (kind === 'git') {
             const attemptId = createNestedRepoTelemetryAttemptId()
-            const scan = await scanNestedRepos(path)
+            const scan = await scanNestedRepos(
+              path,
+              undefined,
+              onboardingDevServerId ? { devServerId: onboardingDevServerId } : undefined
+            )
             track(
               'add_repo_nested_scan_result',
               buildNestedRepoScanTelemetry({
@@ -857,7 +865,11 @@ export function useOnboardingFlow(
             }
           }
           setBusyLabel(kind === 'git' ? 'Opening project…' : 'Opening folder…')
-          const repo = await addRepoPath(path, kind)
+          const repo = await addRepoPath(
+            path,
+            kind,
+            onboardingDevServerId ? { devServerId: onboardingDevServerId } : undefined
+          )
           if (!repo) {
             track('onboarding_step4_path_failed', { path: 'open_folder', reason: 'invalid_path' })
             return
@@ -938,6 +950,7 @@ export function useOnboardingFlow(
       addRepoPath,
       busyLabel,
       completeRepo,
+      onboardingDevServerId,
       scanNestedRepos,
       serverPath,
       showNestedRepoReview,
@@ -1134,16 +1147,15 @@ export function useOnboardingFlow(
     }
     setBusyLabel('Cloning repo…')
     try {
+      // Why clone + repo.add (both with the host): repo.clone reads {devServerId, destPath} and only
+      // puts files on the host; the catalog row needs the same dev server or git runs in the gateway.
       const repo =
         target.kind === 'environment'
-          ? (
-              await callRuntimeRpc<{ repo: Repo }>(
-                target,
-                'repo.clone',
-                { url: trimmed, destination },
-                { timeoutMs: 10 * 60_000 }
-              )
-            ).repo
+          ? await cloneRepoOntoDevServer(target, {
+              devServerId: requireRepoDevServerId(onboardingDevServerId),
+              url: trimmed,
+              destPath: destination
+            })
           : await window.api.repos.clone({
               url: trimmed,
               destination
@@ -1161,7 +1173,7 @@ export function useOnboardingFlow(
     } finally {
       setBusyLabel(null)
     }
-  }, [busyLabel, cloneDestination, cloneUrl, completeRepo, settings])
+  }, [busyLabel, cloneDestination, cloneUrl, completeRepo, onboardingDevServerId, settings])
 
   const continueWithExistingProject = useCallback(
     async (advancedVia: 'button' | 'keyboard' = 'button') => {

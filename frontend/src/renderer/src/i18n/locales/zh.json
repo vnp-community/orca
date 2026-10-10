@@ -252,7 +252,8 @@
           "3be0f7df04": "无法在所选运行时打开文件夹",
           "15cf5319ec": "已在 {{hostName}} 上检查 {{path}}，但该主机未报告可用文件夹。",
           "2dcd706774": "该项目也存在于另一个配置文件中",
-          "presenceProfileOverflow": "{{names}} 及另外 {{count}} 个"
+          "presenceProfileOverflow": "{{names}} 及另外 {{count}} 个",
+          "setupProjectCloneDevServerUnsupported": "尚不支持将新仓库克隆到开发服务器。请改为添加现有文件夹。"
         },
         "settings": {
           "e12dab333b": "切换服务器失败",
@@ -525,7 +526,19 @@
           "error": {
             "format": {
               "37cf0bc991": "Orca 无法解析此工作区的可用基础引用。",
-              "64555d0014": "未找到基础分支"
+              "64555d0014": "未找到基础分支",
+              "hostUnbound": {
+                "title": "此项目尚未分配开发服务器",
+                "message": "请选择此项目所在的开发服务器，然后重试。"
+              },
+              "hostUnreachable": {
+                "title": "开发服务器已离线",
+                "message": "Orca 无法连接此项目所在的开发服务器。请重新连接后重试。"
+              },
+              "hostCheckFailed": {
+                "title": "无法检查开发服务器",
+                "message": "Orca 无法确认开发服务器是否在线。请稍后重试。"
+              }
             }
           }
         }
@@ -590,6 +603,15 @@
       },
       "workspaceTabPalette": {
         "reviewTab": "审查标签页"
+      },
+      "repoHostBinding": {
+        "hostRequired": "请先为此项目选择开发服务器。"
+      },
+      "repoHostRebind": {
+        "activeWorkflows": "更改开发服务器之前，请先停止此项目上正在运行的任务。",
+        "devServerNotFound": "该开发服务器已不存在。请选择其他服务器。",
+        "forbidden": "您没有权限更改此项目的开发服务器。",
+        "failed": "无法更改开发服务器。"
       }
     },
     "hooks": {
@@ -2295,7 +2317,8 @@
             "767951265d": "创建工作树时出现问题。",
             "vmProvisioningTitle": "正在预配虚拟机",
             "cancelProvisioning": "取消",
-            "vmProvisioningLogEmpty": "正在等待环境模板输出…"
+            "vmProvisioningLogEmpty": "正在等待环境模板输出…",
+            "chooseHost": "选择开发服务器"
           }
         }
       },
@@ -3836,7 +3859,11 @@
           "51001182e3": "空目录",
           "971d85cc84": "作为远程项目打开 · {{value0}}",
           "00c4235c10": "没有匹配“{{value0}}”",
-          "largeInputNoMatches": "没有匹配此长输入的结果"
+          "largeInputNoMatches": "没有匹配此长输入的结果",
+          "hostReconnecting": "主机正在重新连接。恢复后此文件夹将自动重新加载。",
+          "retry": "重试",
+          "truncated": "显示 {{total}} 项中的 {{shown}} 项。输入内容可缩小范围。",
+          "hostOffline": "主机未连接。此选择器会保持打开，并在重新连接后刷新。"
         },
         "RemoveFolderDialog": {
           "4dc5b5065b": "移除",
@@ -4545,7 +4572,8 @@
           "addRemoteHostTooltip": "可选择能通过 SSH 登录的机器，也可选择运行 Orca 的远程服务器。",
           "addSshHostDetail": "通过 SSH 使用现有机器。",
           "addRemoteServerDetail": "与另一台电脑上运行的 Orca 配对。",
-          "addRemoteHostDetail": "SSH 主机或 Orca 服务器"
+          "addRemoteHostDetail": "SSH 主机或 Orca 服务器",
+          "chooseHost": "选择主机"
         },
         "sidebarHostOptions": {
           "3e102f111c": "所有主机",
@@ -4695,6 +4723,32 @@
           "cancel": "取消",
           "forget": "从 Orca 中移除",
           "reconnectAndDelete": "重新连接并删除"
+        },
+        "AddRepoHostGateNotice": {
+          "reconnecting": "{{host}} 正在重新连接。您的选择会保留，重新上线后即可继续添加项目。",
+          "removed": "{{host}} 已不可用。请选择其他开发服务器。",
+          "offline": "{{host}} 已离线。您的选择会保留，重新连接后即可继续添加项目，也可以选择其他开发服务器。",
+          "noHostTitle": "没有已连接的开发服务器",
+          "noHostBody": "项目位于开发服务器上。请先连接一个开发服务器，再回来添加项目。",
+          "openDevServers": "打开开发服务器",
+          "chooseHostBody": "请选择此项目所在的开发服务器。选择后即可浏览和添加。"
+        },
+        "RepoHostBadge": {
+          "noHost": "无开发服务器",
+          "inheritedTitle": "{{name}}（继承自项目）"
+        },
+        "RepoHostPickerDialog": {
+          "updated": "开发服务器已更新",
+          "title": "选择开发服务器",
+          "description": "Orca 在开发服务器上为 {{project}} 运行 git。请选择此项目所在的服务器。",
+          "hostLabel": "开发服务器",
+          "placeholder": "选择开发服务器",
+          "unavailableHost": "{{name}}（{{status}}）",
+          "noConnectedHost": "没有已连接的开发服务器。请先连接，然后在此选择。",
+          "openDevServers": "打开开发服务器",
+          "cancel": "取消",
+          "saving": "正在保存…",
+          "confirm": "使用此开发服务器"
         }
       },
       "shared": {
@@ -9057,6 +9111,14 @@
         "TerminalInteractionSection": {
           "567633ff50": "Right-click pastes the clipboard into the terminal. Control-click to open the context menu.",
           "c64497148a": "Right-click pastes the clipboard. Control-click opens the context menu."
+        },
+        "RepositoryDevServerHostSection": {
+          "title": "开发服务器",
+          "description": "此项目所在的开发服务器。Orca 在其上运行 git 和智能体。",
+          "unbound": "尚未分配开发服务器，Orca 无法为此项目运行 git。请选择一个。",
+          "unknownStatus": "状态未知",
+          "fromProject": "继承自项目",
+          "change": "更改开发服务器"
         }
       },
       "right": {
@@ -13085,6 +13147,9 @@
           "saving": "保存中…",
           "saved": "Jira 映射已更新",
           "saveFailed": "更新 Jira 映射失败。"
+        },
+        "CreateProjectDialog": {
+          "repoAddFailed": "项目已创建，但无法添加其仓库：{{message}}。请重试。"
         }
       },
       "request": {

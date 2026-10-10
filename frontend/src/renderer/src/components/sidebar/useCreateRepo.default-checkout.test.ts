@@ -275,7 +275,7 @@ describe('useCreateRepo default-checkout handoff', () => {
             id: 'default-project',
             name: 'My Repos',
             defaultBranch: 'main',
-            devServerId: '',
+            devServerId: 'ds-1',
             visibility: 'private',
             createdAt: 1,
             updatedAt: 1
@@ -323,7 +323,13 @@ describe('useCreateRepo default-checkout handoff', () => {
     expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'env-1' },
       'repo.add',
-      { projectId: 'default-project', url: '/projects/created', displayName: 'created' },
+      // The catalog row carries the same host as the repo.create (SOL-FE-E2E-004).
+      {
+        projectId: 'default-project',
+        url: '/projects/created',
+        displayName: 'created',
+        devServerId: 'ds-1'
+      },
       { timeoutMs: 15_000 }
     )
     expect(mocks.createRepo).not.toHaveBeenCalled()

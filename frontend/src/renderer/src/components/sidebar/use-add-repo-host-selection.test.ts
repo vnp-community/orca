@@ -10,9 +10,12 @@ const mocks = vi.hoisted(() => ({
   refValues: [] as unknown[],
   refIndex: 0,
   hostOptions: [] as SidebarHostOption[],
+  isWeb: false,
   storeState: {
     settings: { activeRuntimeEnvironmentId: null as string | null },
     switchRuntimeEnvironment: vi.fn(),
+    setActiveDevServerId: vi.fn(),
+    devServers: [] as { id: string; name: string; status: string }[],
     setSshConnectionState: vi.fn(),
     sshConnectionStates: new Map(),
     runtimeEnvironments: [] as { id: string; name: string; source?: 'manual' | 'ephemeral-vm' }[]
@@ -55,6 +58,8 @@ vi.mock('@/store', () => ({
   useAppStore: (selector: (state: typeof mocks.storeState) => unknown) => selector(mocks.storeState)
 }))
 
+vi.mock('@/lib/web-client-location', () => ({ isWebClientLocation: () => mocks.isWeb }))
+
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn()
@@ -72,6 +77,8 @@ describe('useAddRepoHostSelection', () => {
     mocks.stateSetters = []
     mocks.refIndex = 0
     mocks.refValues = []
+    mocks.isWeb = false
+    mocks.storeState.devServers = []
     mocks.hostOptions = [
       {
         id: 'local',
@@ -252,5 +259,107 @@ describe('useAddRepoHostSelection', () => {
     await result.handleSelectAddProjectHost('runtime:env-vm')
     expect(mocks.storeState.switchRuntimeEnvironment).not.toHaveBeenCalledWith('env-vm')
     expect(setStep).not.toHaveBeenCalled()
+  })
+})
+
+// SOL-FE-E2E-004: on web there is no local fallback; a dev server is chosen (or the dialog says why not).
+describe('useAddRepoHostSelection on web', () => {
+  const devServerOption = (id: string, name: string): SidebarHostOption => ({
+    id: `devServer:${id}` as SidebarHostOption['id'],
+    label: name,
+    detail: 'Dev Server',
+    kind: 'devServer',
+    health: 'available',
+    presence: 'project'
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.isWeb = true
+    mocks.stateIndex = 0
+    mocks.stateSetters = []
+    mocks.refIndex = 0
+    mocks.refValues = []
+    mocks.storeState.settings = { activeRuntimeEnvironmentId: 'session-auth' }
+    mocks.storeState.runtimeEnvironments = []
+    mocks.storeState.devServers = []
+    vi.stubGlobal('window', { api: {} })
+  })
+
+  it('blocks instead of falling back to local when no dev server is connected', async () => {
+    mocks.hostOptions = []
+    mocks.stateValues = ['local', false, null]
+    const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+    const result = useAddRepoHostSelection({ isOpen: true, setStep: vi.fn() })
+
+    expect(result.selectedHostId).toBeNull()
+    expect(result.selectedParsedHost).toBeNull()
+    expect(result.hostGate).toEqual({ status: 'no-host' })
+  })
+
+  it('selects the only connected dev server and pins it', async () => {
+    mocks.hostOptions = [devServerOption('ds-1', 'Mac Studio')]
+    mocks.stateValues = ['local', false, null]
+    const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+    const result = useAddRepoHostSelection({ isOpen: true, setStep: vi.fn() })
+
+    expect(result.selectedHostId).toBe('devServer:ds-1')
+    expect(result.selectedParsedHost).toMatchObject({ kind: 'devServer', devServerId: 'ds-1' })
+    expect(result.hostGate).toEqual({ status: 'ready' })
+    expect(mocks.stateSetters[2]).toHaveBeenCalledWith('devServer:ds-1')
+  })
+
+  it('does not choose for the user when several dev servers are connected', async () => {
+    mocks.hostOptions = [
+      devServerOption('ds-1', 'Mac Studio'),
+      devServerOption('ds-2', 'Build Box')
+    ]
+    mocks.stateValues = ['local', false, null]
+    const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+    const result = useAddRepoHostSelection({ isOpen: true, setStep: vi.fn() })
+
+    expect(result.selectedHostId).toBeNull()
+    expect(result.hostGate).toEqual({ status: 'choose-host' })
+    expect(mocks.stateSetters[2]).not.toHaveBeenCalled()
+  })
+
+  it('keeps the chosen host when it drops mid-way and reports it as unavailable', async () => {
+    mocks.hostOptions = []
+    mocks.storeState.devServers = [{ id: 'ds-1', name: 'Mac Studio', status: 'disconnected' }]
+    mocks.stateValues = ['local', false, 'devServer:ds-1']
+    const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+    const result = useAddRepoHostSelection({ isOpen: true, setStep: vi.fn() })
+
+    // The Browse step keeps its devServerId, so the dialog does not close or switch hosts silently.
+    expect(result.selectedHostId).toBe('devServer:ds-1')
+    expect(result.selectedParsedHost).toMatchObject({ kind: 'devServer', devServerId: 'ds-1' })
+    expect(result.hostGate).toMatchObject({
+      status: 'host-unavailable',
+      label: 'Mac Studio',
+      reason: 'disconnected'
+    })
+    expect(result.hostOptions.map((host) => host.id)).toEqual(['devServer:ds-1'])
+    expect(result.hostOptions[0]).toMatchObject({ health: 'disconnected', label: 'Mac Studio' })
+  })
+
+  it('records the picked dev server and moves to the add step', async () => {
+    mocks.hostOptions = [
+      devServerOption('ds-1', 'Mac Studio'),
+      devServerOption('ds-2', 'Build Box')
+    ]
+    mocks.stateValues = ['local', false, null]
+    const setStep = vi.fn()
+    const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+    const result = useAddRepoHostSelection({ isOpen: true, setStep })
+    await result.handleSelectAddProjectHost('devServer:ds-2')
+
+    expect(mocks.storeState.setActiveDevServerId).toHaveBeenCalledWith('ds-2')
+    expect(mocks.stateSetters[2]).toHaveBeenCalledWith('devServer:ds-2')
+    expect(setStep).toHaveBeenCalledWith('add')
   })
 })

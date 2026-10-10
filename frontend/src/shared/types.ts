@@ -301,6 +301,8 @@ export type Repo = {
   projectHostSetupMethod?: RepoProjectHostSetupMethod
   /** ID of the DevServer that hosts this repo. null/undefined = local repo. Added in Phase 2. */
   devServerId?: string | null
+  /** True when devServerId came from the owning project (the repo has none of its own); UI-only, never persisted. */
+  devServerInherited?: boolean
 }
 
 export type ProjectGroupCreatedFrom = 'manual' | 'folder-scan' | 'migration'
@@ -3377,7 +3379,6 @@ export type TopLevelView =
   | 'workspace'
   // CR-REQ-018-05: Request management page (analogous to 'tasks').
   | 'requests'
-
 
 export type PersistedUIState = {
   lastActiveRepoId: string | null

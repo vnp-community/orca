@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
-import {
-  getOrCreateDefaultProject,
-  mergeRepoViewIntoRepo,
-  repoDisplayNameFromUrl,
-  type RemoteRepoView
-} from '@/store/slices/repos'
+import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { cloneRepoOntoDevServer } from '@/lib/clone-repo-onto-dev-server'
 import type { AddRepoExistingWorkspaceSource } from '../../../../shared/telemetry-events'
 import type { Repo } from '../../../../shared/types'
 import { getCloneDestinationAutoFill } from './clone-defaults'
@@ -153,22 +148,6 @@ export function useAddRepoCloneFlow({
           })
         : devServerId || target.kind === 'environment'
           ? await (async (): Promise<Repo> => {
-              // Why a two-step clone+add, not one repo.clone call: the Go
-              // handler (channels_repo_ssh_status_workspace.go) decodes
-              // {devServerId, url, destPath} and only relays to
-              // git-gateway-service's Clone — it clones the repo onto disk
-              // but never registers a project.repos row. repo.add is the
-              // only call that does that. devServerId comes from this
-              // hook's own option (the dialog's Host selector), not
-              // useAppStore's global activeDevServerId — see this hook's
-              // param doc comment.
-              const destPath = cloneDestination.trim()
-              await callRuntimeRpc<{ worktreePath: string; defaultBranch: string }>(
-                target,
-                'repo.clone',
-                { devServerId: devServerId ?? '', url: trimmedUrl, destPath },
-                { timeoutMs: 10 * 60_000 }
-              )
               // getOrCreateDefaultProject needs a real environment target —
               // only reachable if devServerId was set with no active
               // runtime environment resolved at all.
@@ -177,18 +156,18 @@ export function useAddRepoCloneFlow({
                   'No active runtime environment to register the cloned repo with a project.'
                 )
               }
-              const projectId = await getOrCreateDefaultProject(target)
-              const view = await callRuntimeRpc<RemoteRepoView>(
-                target,
-                'repo.add',
-                { projectId, url: destPath, displayName: repoDisplayNameFromUrl(trimmedUrl) },
-                { timeoutMs: 15_000 }
-              )
-              return mergeRepoViewIntoRepo(view)
+              // devServerId comes from this hook's own option (the dialog's Host selector), not
+              // the global activeDevServerId — see this hook's param doc comment.
+              return cloneRepoOntoDevServer(target, {
+                devServerId: devServerId ?? null,
+                url: trimmedUrl,
+                destPath: cloneDestination.trim()
+              })
             })()
           : ((await window.api.repos.clone({
               url: trimmedUrl,
-              destination: cloneDestination.trim()
+              destination: cloneDestination.trim(),
+              ...(devServerId ? { devServerId } : {})
             })) as Repo)
       if (gen !== cloneGenRef.current || requestHostToken !== hostTokenRef.current) {
         return

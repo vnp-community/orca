@@ -1,6 +1,17 @@
 /* eslint-disable max-lines -- Why: the remote file browser centralizes filter state, path-mode preview state, cache, debounce, request gen, and click/keyboard handling in one component so picker navigation stays coherent. */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronRight, Folder, ArrowUp, LoaderCircle, Home, Search, FolderPlus, Trash2, Check, X } from 'lucide-react'
+import {
+  ChevronRight,
+  Folder,
+  ArrowUp,
+  LoaderCircle,
+  Home,
+  Search,
+  FolderPlus,
+  Trash2,
+  Check,
+  X
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getFileTypeIcon } from '@/lib/file-type-icons'
@@ -8,6 +19,7 @@ import {
   decideEnterAction,
   decideEscAction,
   filterEntries,
+  isRemoteFileBrowserFilterQueryTooLarge,
   isRemoteFileBrowserPathResolveTextTooLarge,
   isPathMode,
   joinPath,
@@ -19,6 +31,15 @@ import {
 } from './remote-file-browser-helpers'
 import { browseRuntimeServerDirectory } from '@/runtime/runtime-server-directory-browser'
 import { translate } from '@/i18n/i18n'
+import { useAppStore } from '@/store'
+import { isWebClientLocation } from '@/lib/web-client-location'
+import {
+  directListingTarget,
+  isHostReconnectingBrowseError,
+  normalizeBrowseListing,
+  REMOTE_BROWSE_ENTRY_LIMIT,
+  type BrowseListing
+} from './remote-browse-listing'
 
 type RemoteFileBrowserProps = (
   | { targetId: string; runtimeEnvironmentId?: never; devServerId?: never }
@@ -34,11 +55,13 @@ const FILE_HINT_MS = 2000
 const FILE_HINT_TEXT = "Files can't be opened as a project"
 const PATH_DEBOUNCE_MS = 300
 
-type BrowseResult = { resolvedPath: string; entries: DirEntry[] }
+type BrowseResult = BrowseListing
 
 type PreviewState = {
   resolvedPath: string
   entries: DirEntry[]
+  // Set when the preview listing was cut by the browse entry limit.
+  truncated?: { shown: number; total: number }
   filter: string
   error: string | null
   loading: boolean
@@ -57,6 +80,17 @@ export function RemoteFileBrowser({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
+  // The committed listing was cut by the entry limit; `serverFiltered` is the host's own answer to
+  // the typed filter, so a name past the cap is still reachable.
+  const [listingTruncation, setListingTruncation] = useState<{
+    shown: number
+    total: number
+  } | null>(null)
+  const [serverFiltered, setServerFiltered] = useState<{
+    path: string
+    query: string
+    listing: BrowseListing
+  } | null>(null)
   const [fileHint, setFileHint] = useState(false)
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
@@ -66,6 +100,8 @@ export function RemoteFileBrowser({
   const [preview, setPreview] = useState<PreviewState | null>(null)
   const genRef = useRef(0)
   const previewGenRef = useRef(0)
+  const queryGenRef = useRef(0)
+  const lastRequestedPathRef = useRef(initialPath)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -122,19 +158,38 @@ export function RemoteFileBrowser({
   )
 
   const fetchListing = useCallback(
-    async (dirPath: string): Promise<BrowseResult> => {
-      const cached = listingCacheRef.current.get(dirPath)
+    async (dirPath: string, query = ''): Promise<BrowseResult> => {
+      const cacheKey = query ? `${dirPath}\u0000${query}` : dirPath
+      const cached = listingCacheRef.current.get(cacheKey)
       if (cached) {
         return cached
       }
-      const result = targetId
+      // Why bounded only on dev-server/web hosts: that relay drops frames over ~32 KiB, and the
+      // gateway caps listings itself. SSH and desktop runtimes keep their full listings, and never
+      // see the extra params. Older gateways ignore limit/query; normalizeBrowseListing then trims.
+      const bounded = Boolean(devServerId) || (!targetId && isWebClientLocation())
+      const hostBrowseOptions = { limit: REMOTE_BROWSE_ENTRY_LIMIT, ...(query ? { query } : {}) }
+      const raw = targetId
         ? await window.api.ssh.browseDir({ targetId, dirPath })
         : devServerId
-          ? await window.api.devServer!.browseDir!({ id: devServerId, path: dirPath })
+          ? await window.api.devServer!.browseDir!({
+              id: devServerId,
+              path: dirPath,
+              ...hostBrowseOptions
+            })
           : await browseRuntimeServerDirectory(
               requireRuntimeEnvironmentId(runtimeEnvironmentId),
-              dirPath
+              dirPath,
+              bounded ? hostBrowseOptions : {}
             )
+      const result = normalizeBrowseListing(
+        raw,
+        bounded ? REMOTE_BROWSE_ENTRY_LIMIT : Number.POSITIVE_INFINITY
+      )
+      if (query) {
+        listingCacheRef.current.set(cacheKey, result)
+        return result
+      }
       listingCacheRef.current.set(result.resolvedPath, result)
       // Also cache under the requested dirPath when it differs from the
       // server-resolved canonical path (e.g. `~`, `~/foo`, or a relative
@@ -151,6 +206,7 @@ export function RemoteFileBrowser({
   const loadDir = useCallback(
     async (dirPath: string) => {
       const gen = ++genRef.current
+      lastRequestedPathRef.current = dirPath
       setLoading(true)
       setError(null)
       try {
@@ -160,6 +216,9 @@ export function RemoteFileBrowser({
         }
         setResolvedPath(result.resolvedPath)
         setEntries(result.entries)
+        setListingTruncation(
+          result.truncated ? { shown: result.entries.length, total: result.totalEntries } : null
+        )
         // Only the bare-tilde listing returns the home directory itself;
         // `~/sub` resolves to `.../sub`, which must not overwrite the home
         // anchor used for resolving later `~/...` inputs.
@@ -172,6 +231,7 @@ export function RemoteFileBrowser({
         }
         setError(err instanceof Error ? err.message : String(err))
         setEntries([])
+        setListingTruncation(null)
       } finally {
         if (gen === genRef.current) {
           setLoading(false)
@@ -224,6 +284,45 @@ export function RemoteFileBrowser({
   const previewFilteredEntries = useMemo(
     () => (preview ? filterEntries(preview.entries, preview.filter) : []),
     [preview]
+  )
+
+  // Past the entry cap the local filter cannot see every name, so ask the host to filter.
+  useEffect(() => {
+    const query = filter.trim()
+    if (
+      !listingTruncation ||
+      !query ||
+      isPathMode(filter) ||
+      isRemoteFileBrowserFilterQueryTooLarge(query)
+    ) {
+      queryGenRef.current++
+      setServerFiltered(null)
+      return
+    }
+    const gen = ++queryGenRef.current
+    const timer = setTimeout(() => {
+      fetchListing(resolvedPath, query).then(
+        (listing) => {
+          if (gen === queryGenRef.current) {
+            setServerFiltered({ path: resolvedPath, query, listing })
+          }
+        },
+        () => {
+          // Keep the local filter result; the host error surfaces on the next navigation.
+        }
+      )
+    }, PATH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [fetchListing, filter, listingTruncation, resolvedPath])
+
+  const activeServerFilter =
+    serverFiltered && serverFiltered.path === resolvedPath && serverFiltered.query === filter.trim()
+      ? serverFiltered.listing
+      : null
+  const committedDisplayEntries = useMemo(
+    () =>
+      activeServerFilter ? filterEntries(activeServerFilter.entries, filter) : filteredEntries,
+    [activeServerFilter, filter, filteredEntries]
   )
 
   const triggerFileHint = useCallback(() => {
@@ -308,6 +407,45 @@ export function RemoteFileBrowser({
 
       let currentPath = basePath
       try {
+        // Why one call first: listing every ancestor (the step-by-step walk below) pulls in huge
+        // directories such as $TMPDIR on the way to the target. The walk only runs to explain a
+        // failure segment by segment.
+        const directTarget = directListingTarget(basePath, parsed.committedSegments)
+        if (directTarget) {
+          try {
+            const direct = await fetchListing(directTarget)
+            if (gen !== previewGenRef.current) {
+              return
+            }
+            lastCommittedPrefixRef.current = committedPrefix(raw)
+            setPreview({
+              resolvedPath: direct.resolvedPath,
+              entries: direct.entries,
+              ...(direct.truncated
+                ? { truncated: { shown: direct.entries.length, total: direct.totalEntries } }
+                : {}),
+              filter: parsed.trailingFilter,
+              error: null,
+              loading: false
+            })
+            return
+          } catch (directErr) {
+            if (gen !== previewGenRef.current) {
+              return
+            }
+            const directMessage = directErr instanceof Error ? directErr.message : String(directErr)
+            if (isHostReconnectingBrowseError(directMessage)) {
+              setPreview({
+                resolvedPath,
+                entries: [],
+                filter: '',
+                error: directMessage,
+                loading: false
+              })
+              return
+            }
+          }
+        }
         for (const segment of parsed.committedSegments) {
           const listing = await fetchListing(currentPath)
           if (gen !== previewGenRef.current) {
@@ -341,6 +479,11 @@ export function RemoteFileBrowser({
         setPreview({
           resolvedPath: finalListing.resolvedPath,
           entries: finalListing.entries,
+          ...(finalListing.truncated
+            ? {
+                truncated: { shown: finalListing.entries.length, total: finalListing.totalEntries }
+              }
+            : {}),
           filter: parsed.trailingFilter,
           error: null,
           loading: false
@@ -616,19 +759,46 @@ export function RemoteFileBrowser({
     }
   }, [newFolderName, resolvedPath, devServerId, invalidateBrowseRequests, loadDir])
 
-  const handleDeleteFolder = useCallback(async (folderName: string) => {
-    if (!window.confirm(`Are you sure you want to delete folder '${folderName}'?`)) {return}
-    try {
-      const targetPath = joinPath(resolvedPath, folderName)
-      if (devServerId) {
-        await window.api.devServer!.rmdir!({ id: devServerId, path: targetPath })
+  const handleDeleteFolder = useCallback(
+    async (folderName: string) => {
+      if (!window.confirm(`Are you sure you want to delete folder '${folderName}'?`)) {
+        return
       }
-      invalidateBrowseRequests()
-      await loadDir(resolvedPath)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      try {
+        const targetPath = joinPath(resolvedPath, folderName)
+        if (devServerId) {
+          await window.api.devServer!.rmdir!({ id: devServerId, path: targetPath })
+        }
+        invalidateBrowseRequests()
+        await loadDir(resolvedPath)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err))
+      }
+    },
+    [resolvedPath, devServerId, invalidateBrowseRequests, loadDir]
+  )
+
+  // Dev-server hosts only: the live connection state tells us a failure is "reconnecting", not "bad path".
+  const devServerStatus = useAppStore((s) =>
+    devServerId ? s.devServers?.find((server) => server.id === devServerId)?.status : undefined
+  )
+  const hostOffline =
+    Boolean(devServerId) && devServerStatus !== undefined && devServerStatus !== 'connected'
+  const hostReconnecting = hostOffline || (error !== null && isHostReconnectingBrowseError(error))
+  const previousDevServerStatusRef = useRef(devServerStatus)
+  useEffect(() => {
+    const previous = previousDevServerStatusRef.current
+    previousDevServerStatusRef.current = devServerStatus
+    if (!devServerId || devServerStatus !== 'connected' || previous === 'connected') {
+      return
     }
-  }, [resolvedPath, devServerId, invalidateBrowseRequests, loadDir])
+    // The host is back: reload what failed instead of leaving the picker stuck on an error.
+    if (error !== null) {
+      void loadDir(lastRequestedPathRef.current)
+    } else if (preview?.error && isHostReconnectingBrowseError(preview.error)) {
+      void resolvePathInput(filter)
+    }
+  }, [devServerId, devServerStatus, error, filter, loadDir, preview?.error, resolvePathInput])
 
   const pathSegments = resolvedPath.split('/').filter(Boolean)
 
@@ -636,7 +806,14 @@ export function RemoteFileBrowser({
   // error) during path mode, committed listing otherwise.
   const isPreviewActive = preview !== null
   const showPreviewLoading = isPreviewActive && preview!.loading
-  const displayEntries = isPreviewActive ? previewFilteredEntries : filteredEntries
+  const displayEntries = isPreviewActive ? previewFilteredEntries : committedDisplayEntries
+  const truncationNotice = isPreviewActive
+    ? (preview!.truncated ?? null)
+    : activeServerFilter
+      ? activeServerFilter.truncated
+        ? { shown: activeServerFilter.entries.length, total: activeServerFilter.totalEntries }
+        : null
+      : listingTruncation
   const displayEmptyDirCopy = isPreviewActive
     ? `${preview!.resolvedPath} is empty`
     : 'Empty directory'
@@ -760,8 +937,30 @@ export function RemoteFileBrowser({
               <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
             </div>
           ) : error ? (
-            <div className="flex items-center justify-center h-full px-4">
-              <p className="text-xs text-destructive text-center">{error}</p>
+            <div
+              role="alert"
+              data-testid="remote-file-browser-error"
+              className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center"
+            >
+              <p className="text-xs text-destructive">
+                {hostReconnecting
+                  ? translate(
+                      'auto.components.sidebar.RemoteFileBrowser.hostReconnecting',
+                      'The host is reconnecting. This folder reloads automatically when it is back.'
+                    )
+                  : error}
+              </p>
+              {hostReconnecting ? (
+                <p className="text-[11px] text-muted-foreground">{error}</p>
+              ) : null}
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                onClick={() => void loadDir(lastRequestedPathRef.current)}
+              >
+                {translate('auto.components.sidebar.RemoteFileBrowser.retry', 'Try again')}
+              </Button>
             </div>
           ) : isPreviewActive &&
             preview!.entries.length === 0 &&
@@ -784,7 +983,6 @@ export function RemoteFileBrowser({
             // filter emptiness from directory emptiness keeps copy accurate.
             <div className="flex items-center justify-center h-full">
               <p className="text-xs text-muted-foreground">{displayNoMatchesCopy}</p>
-              <p className="text-xs text-muted-foreground">{displayNoMatchesCopy}</p>
             </div>
           ) : (
             <>
@@ -797,7 +995,9 @@ export function RemoteFileBrowser({
                     value={newFolderName}
                     onChange={(e) => setNewFolderName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {handleCreateFolder()}
+                      if (e.key === 'Enter') {
+                        handleCreateFolder()
+                      }
                       if (e.key === 'Escape') {
                         setIsCreatingFolder(false)
                         setNewFolderName('')
@@ -806,10 +1006,21 @@ export function RemoteFileBrowser({
                     placeholder="Folder name..."
                     className="flex-1 bg-transparent border-none outline-none min-w-0 h-5"
                   />
-                  <button type="button" onClick={handleCreateFolder} className="p-0.5 rounded hover:bg-background text-muted-foreground cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={handleCreateFolder}
+                    className="p-0.5 rounded hover:bg-background text-muted-foreground cursor-pointer"
+                  >
                     <Check className="size-3.5" />
                   </button>
-                  <button type="button" onClick={() => { setIsCreatingFolder(false); setNewFolderName('') }} className="p-0.5 rounded hover:bg-background text-muted-foreground cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingFolder(false)
+                      setNewFolderName('')
+                    }}
+                    className="p-0.5 rounded hover:bg-background text-muted-foreground cursor-pointer"
+                  >
                     <X className="size-3.5" />
                   </button>
                 </div>
@@ -861,6 +1072,31 @@ export function RemoteFileBrowser({
           )}
         </div>
       </div>
+
+      {truncationNotice ? (
+        <p
+          data-testid="remote-file-browser-truncated"
+          className="text-[11px] text-muted-foreground"
+        >
+          {translate(
+            'auto.components.sidebar.RemoteFileBrowser.truncated',
+            'Showing {{shown}} of {{total}} entries. Type to narrow the list.',
+            { shown: truncationNotice.shown, total: truncationNotice.total }
+          )}
+        </p>
+      ) : null}
+      {hostOffline && !error ? (
+        <p
+          role="status"
+          data-testid="remote-file-browser-host-offline"
+          className="text-[11px] text-destructive"
+        >
+          {translate(
+            'auto.components.sidebar.RemoteFileBrowser.hostOffline',
+            'The host is not connected. This picker stays open and refreshes when it reconnects.'
+          )}
+        </p>
+      ) : null}
 
       {/* Footer */}
       <p

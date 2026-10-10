@@ -107,4 +107,35 @@ describe('useAddRepoServerPathFlow', () => {
     expect(mocks.markOnboardingProjectAdded.mock.calls[0]?.[0]).toBe('addedFolder')
     expect(mocks.closeModal).toHaveBeenCalled()
   })
+
+  it('registers the project on the dialog host and scans that host for nested repos', async () => {
+    const repo = makeRepo({ kind: 'git' })
+    mocks.addRepoPath.mockResolvedValue(repo)
+    mocks.scanNestedRepos.mockResolvedValue({ selectedPathKind: 'git_repo', repos: [] })
+    mocks.getNestedRepoRuntimeKind.mockReturnValue('runtime')
+    const { useAddRepoServerPathFlow } = await import('./useAddRepoServerPathFlow')
+
+    const result = useAddRepoServerPathFlow({
+      devServerId: 'ds-1',
+      addRepoPath: mocks.addRepoPath,
+      closeModal: mocks.closeModal,
+      fetchWorktrees: mocks.fetchWorktrees,
+      getNestedRepoRuntimeKind: mocks.getNestedRepoRuntimeKind,
+      scanNestedRepos: mocks.scanNestedRepos,
+      setActiveNestedScanId: mocks.setActiveNestedScanId,
+      setNestedScanInProgress: mocks.setNestedScanInProgress,
+      showNestedRepoReview: mocks.showNestedRepoReview,
+      onGitRepoReady: mocks.onGitRepoReady,
+      setAddProjectBusyLabel: mocks.setAddProjectBusyLabel
+    })
+    await result.handleAddServerPath('git')
+
+    // Why: the host picked in the dialog must reach repo.add, not only the folder browser.
+    expect(mocks.scanNestedRepos).toHaveBeenCalledWith(
+      '/server/docs',
+      undefined,
+      expect.objectContaining({ devServerId: 'ds-1' })
+    )
+    expect(mocks.addRepoPath).toHaveBeenCalledWith('/server/docs', 'git', { devServerId: 'ds-1' })
+  })
 })

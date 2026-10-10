@@ -12,6 +12,8 @@ type AddRepoServerPathStartStepProps = {
   runtimeEnvironmentId: string | null | undefined
   devServerId: string | null | undefined
   isAddingServerPath: boolean
+  // Chosen dev server is offline (web): keep the form, but Browse/Add wait for it.
+  hostBlocked?: boolean
   addProjectBusyLabel: string | null
   hostSelector?: ReactNode
   initialBrowsing?: boolean
@@ -26,6 +28,7 @@ export function AddRepoServerPathStartStep({
   runtimeEnvironmentId,
   devServerId,
   isAddingServerPath,
+  hostBlocked = false,
   addProjectBusyLabel,
   hostSelector,
   initialBrowsing = false,
@@ -85,7 +88,7 @@ export function AddRepoServerPathStartStep({
   }
 
   if (!pathEntryOpen) {
-    const disabled = isAddingServerPath || (!runtimeEnvironmentId && !devServerId)
+    const disabled = isAddingServerPath || hostBlocked || (!runtimeEnvironmentId && !devServerId)
 
     return (
       <>
@@ -230,7 +233,9 @@ export function AddRepoServerPathStartStep({
                   // runtimeEnvironmentId nor sshTargetId) — the render branch
                   // above (browsing && (runtimeEnvironmentId || devServerId))
                   // already supports it, this button just never let you reach it.
-                  disabled={isAddingServerPath || (!runtimeEnvironmentId && !devServerId)}
+                  disabled={
+                    isAddingServerPath || hostBlocked || (!runtimeEnvironmentId && !devServerId)
+                  }
                   aria-label={translate(
                     'auto.components.sidebar.AddRepoServerStartStep.ac66a3ed2d',
                     'Browse host filesystem'
@@ -251,7 +256,7 @@ export function AddRepoServerPathStartStep({
         <div className="grid grid-cols-2 gap-2">
           <Button
             onClick={() => onAddServerPath('git')}
-            disabled={!serverPath.trim() || isAddingServerPath}
+            disabled={!serverPath.trim() || isAddingServerPath || hostBlocked}
             className="h-10"
           >
             {translate(
@@ -261,7 +266,7 @@ export function AddRepoServerPathStartStep({
           </Button>
           <Button
             onClick={() => onAddServerPath('folder')}
-            disabled={!serverPath.trim() || isAddingServerPath}
+            disabled={!serverPath.trim() || isAddingServerPath || hostBlocked}
             variant="outline"
             className="h-10"
           >

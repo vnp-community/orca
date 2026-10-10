@@ -252,7 +252,8 @@
           "3be0f7df04": "選択したランタイムでフォルダーを開けません",
           "15cf5319ec": "{{path}} は {{hostName}} でチェックされましたが、そのホストは使用可能なフォルダーを報告しませんでした。",
           "2dcd706774": "プロジェクトは別のプロファイルにも存在します",
-          "presenceProfileOverflow": "{{names}} 他 {{count}} 件"
+          "presenceProfileOverflow": "{{names}} 他 {{count}} 件",
+          "setupProjectCloneDevServerUnsupported": "開発サーバーへの新しいリポジトリのクローンはまだサポートされていません。代わりに既存のフォルダーを追加してください。"
         },
         "settings": {
           "e12dab333b": "サーバーの切り替えに失敗しました",
@@ -525,7 +526,19 @@
           "error": {
             "format": {
               "37cf0bc991": "Orca は、このワークスペースの使用可能な基本参照を解決できませんでした。",
-              "64555d0014": "ベースブランチが見つかりません"
+              "64555d0014": "ベースブランチが見つかりません",
+              "hostUnbound": {
+                "title": "このプロジェクトは開発サーバーに割り当てられていません",
+                "message": "このプロジェクトがある開発サーバーを選択して、もう一度お試しください。"
+              },
+              "hostUnreachable": {
+                "title": "開発サーバーがオフラインです",
+                "message": "このプロジェクトがある開発サーバーに Orca が接続できません。再接続してからもう一度お試しください。"
+              },
+              "hostCheckFailed": {
+                "title": "開発サーバーを確認できませんでした",
+                "message": "開発サーバーがオンラインか確認できませんでした。しばらくしてからもう一度お試しください。"
+              }
             }
           }
         }
@@ -590,6 +603,15 @@
       },
       "workspaceTabPalette": {
         "reviewTab": "レビュータブ"
+      },
+      "repoHostBinding": {
+        "hostRequired": "まず、このプロジェクトの開発サーバーを選択してください。"
+      },
+      "repoHostRebind": {
+        "activeWorkflows": "開発サーバーを変更する前に、このプロジェクトで実行中のタスクを停止してください。",
+        "devServerNotFound": "その開発サーバーは存在しません。別のサーバーを選択してください。",
+        "forbidden": "このプロジェクトの開発サーバーを変更する権限がありません。",
+        "failed": "開発サーバーを変更できませんでした。"
       }
     },
     "hooks": {
@@ -2295,7 +2317,8 @@
             "767951265d": "ワークツリーの作成中に問題が発生しました。",
             "vmProvisioningTitle": "VMのプロビジョニング",
             "cancelProvisioning": "キャンセル",
-            "vmProvisioningLogEmpty": "レシピの出力を待っています…"
+            "vmProvisioningLogEmpty": "レシピの出力を待っています…",
+            "chooseHost": "開発サーバーを選択"
           }
         }
       },
@@ -3836,7 +3859,11 @@
           "51001182e3": "空のディレクトリ",
           "971d85cc84": "リモート プロジェクトとして開きます · {{value0}}",
           "00c4235c10": "「{{value0}}」に一致するものはありません",
-          "largeInputNoMatches": "この長い入力に一致するものはありません"
+          "largeInputNoMatches": "この長い入力に一致するものはありません",
+          "hostReconnecting": "ホストを再接続しています。復旧するとこのフォルダーは自動的に再読み込みされます。",
+          "retry": "再試行",
+          "truncated": "{{total}} 件中 {{shown}} 件を表示しています。入力して絞り込んでください。",
+          "hostOffline": "ホストが接続されていません。この選択画面は開いたままで、再接続されると更新されます。"
         },
         "RemoveFolderDialog": {
           "4dc5b5065b": "削除",
@@ -4545,7 +4572,8 @@
           "addRemoteHostTooltip": "ログインできるマシンには SSH を選択し、Orca サーバーにはリモート サーバーを選択します。",
           "addSshHostDetail": "SSH 経由で既存のマシンを使用します。",
           "addRemoteServerDetail": "別のコンピューターで実行されている Orca とペアリングします。",
-          "addRemoteHostDetail": "SSH ホストまたは Orca サーバー"
+          "addRemoteHostDetail": "SSH ホストまたは Orca サーバー",
+          "chooseHost": "ホストを選択"
         },
         "sidebarHostOptions": {
           "3e102f111c": "All hosts",
@@ -4695,6 +4723,32 @@
           "cancel": "キャンセル",
           "forget": "Orcaから削除",
           "reconnectAndDelete": "再接続して削除"
+        },
+        "AddRepoHostGateNotice": {
+          "reconnecting": "{{host}} を再接続しています。選択は保持され、オンラインに戻るとプロジェクトの追加を再開できます。",
+          "removed": "{{host}} は利用できなくなりました。別の開発サーバーを選択してください。",
+          "offline": "{{host}} はオフラインです。選択は保持され、再接続するとプロジェクトの追加を再開できます。別の開発サーバーを選ぶこともできます。",
+          "noHostTitle": "接続された開発サーバーがありません",
+          "noHostBody": "プロジェクトは開発サーバー上にあります。開発サーバーを接続してから、プロジェクトを追加してください。",
+          "openDevServers": "開発サーバーを開く",
+          "chooseHostBody": "このプロジェクトがある開発サーバーを選択してください。選択すると参照と追加が使えるようになります。"
+        },
+        "RepoHostBadge": {
+          "noHost": "開発サーバーなし",
+          "inheritedTitle": "{{name}}（プロジェクトから継承）"
+        },
+        "RepoHostPickerDialog": {
+          "updated": "開発サーバーを更新しました",
+          "title": "開発サーバーを選択",
+          "description": "Orca は {{project}} の git を開発サーバー上で実行します。このプロジェクトがあるサーバーを選択してください。",
+          "hostLabel": "開発サーバー",
+          "placeholder": "開発サーバーを選択",
+          "unavailableHost": "{{name}} ({{status}})",
+          "noConnectedHost": "接続された開発サーバーがありません。接続してから、ここで選択してください。",
+          "openDevServers": "開発サーバーを開く",
+          "cancel": "キャンセル",
+          "saving": "保存中…",
+          "confirm": "この開発サーバーを使用"
         }
       },
       "shared": {
@@ -9057,6 +9111,14 @@
         "TerminalInteractionSection": {
           "567633ff50": "Right-click pastes the clipboard into the terminal. Control-click to open the context menu.",
           "c64497148a": "Right-click pastes the clipboard. Control-click opens the context menu."
+        },
+        "RepositoryDevServerHostSection": {
+          "title": "開発サーバー",
+          "description": "このプロジェクトがある開発サーバーです。Orca は git とエージェントをそこで実行します。",
+          "unbound": "開発サーバーが割り当てられていないため、Orca はこのプロジェクトで git を実行できません。選択してください。",
+          "unknownStatus": "状態不明",
+          "fromProject": "プロジェクトから継承",
+          "change": "開発サーバーを変更"
         }
       },
       "right": {
@@ -13085,6 +13147,9 @@
           "saving": "保存中…",
           "saved": "Jira マッピングを更新しました",
           "saveFailed": "Jira マッピングの更新に失敗しました。"
+        },
+        "CreateProjectDialog": {
+          "repoAddFailed": "プロジェクトは作成されましたが、リポジトリを追加できませんでした: {{message}}。もう一度お試しください。"
         }
       },
       "request": {

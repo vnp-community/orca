@@ -218,18 +218,17 @@ describe('CreateProjectDialog', () => {
       fireEvent.click(submit)
     })
 
-    // Why project.create's args have neither devServerId nor repoPath:
-    // CreateProjectRequest (project.proto) has no such fields — both used
-    // to be sent here and were silently dropped by the wscompat handler.
+    // Why project.create carries devServerId and repoPath: the gateway decodes both, so the
+    // project is bound to the chosen host from the start (SOL-FE-E2E-004).
     expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'project.create', {
       name: 'My Project',
       description: undefined,
-      visibility: 'private'
+      visibility: 'private',
+      devServerId: 'ds-1',
+      repoPath: '/home/user/repo'
     })
-    // The repo attaches via a follow-up repo.add call, with the shape the Go
-    // handler actually decodes (projectId/url/displayName) — Phase 10 gave
-    // AddRepoRequest its own devServerId, so the dev server binds directly on
-    // this same call now instead of a separate project.rebindDevServer step.
+    // When project.create did not attach the repo (repo.list has none), repo.add registers it with
+    // the same dev server — Phase 10 gave AddRepoRequest its own devServerId.
     expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'repo.add', {
       projectId: 'new-p',
       url: '/home/user/repo',
@@ -245,8 +244,11 @@ describe('CreateProjectDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
-  it('still creates and closes when the repo.add follow-up fails, but shows a toast', async () => {
-    const { toast } = await import('sonner')
+  const projectCreateCalls = (): number =>
+    vi.mocked(callRuntimeRpc).mock.calls.filter(([, method]) => method === 'project.create').length
+
+  it('keeps the dialog open with an inline error when repo.add fails, and retries without a second project', async () => {
+    let repoAddFails = true
     vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
       if (method === 'devServer.list') {
         return devServers
@@ -255,7 +257,10 @@ describe('CreateProjectDialog', () => {
         return { id: 'new-p', name: 'New Project' }
       }
       if (method === 'repo.add') {
-        throw new Error('repo path already registered')
+        if (repoAddFails) {
+          throw new Error('repo path already registered')
+        }
+        return { id: 'r1' }
       }
       return null
     })
@@ -274,9 +279,20 @@ describe('CreateProjectDialog', () => {
       fireEvent.click(submit)
     })
 
-    // The project row already exists at this point — a repo.add failure is
-    // "couldn't fully set it up", not "creation failed".
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('repo could not be added'))
+    // The project row already exists, but without its repo it is unusable: the error stays inline
+    // (not a toast) and the dialog stays open so the user can retry.
+    expect(
+      screen.getByText(/repo could not be added: repo path already registered/)
+    ).toBeInTheDocument()
+    expect(onCreated).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalledWith(false)
+
+    const createsBeforeRetry = projectCreateCalls()
+    repoAddFails = false
+    await act(async () => {
+      fireEvent.click(submit)
+    })
+    expect(projectCreateCalls()).toBe(createsBeforeRetry)
     expect(onCreated).toHaveBeenCalledWith({ id: 'new-p', name: 'New Project' })
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })

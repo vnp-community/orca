@@ -1,5 +1,7 @@
 /* eslint-disable max-lines -- Why: web preload parity tests share module-reset
 global setup across namespaces so browser API installation stays realistic. */
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PreloadApi } from '../../../preload/api-types'
 import type { FeatureInteractionState } from '../../../shared/feature-interactions'
@@ -2357,6 +2359,243 @@ describe('web repos preload API', () => {
       }
     ])
     expect(updated.hookSettings).toEqual({ scripts: { setup: 'pnpm install' } })
+  })
+
+  // SOL-FE-E2E-004: every repo registered from web carries its dev server, because git-gateway
+  // runs git on that host and has no local fallback for web.
+  describe('host binding (devServerId)', () => {
+    type RpcCall = { method: string; params: unknown }
+
+    async function installWithBackend(
+      handlers: Record<string, (params: unknown) => unknown>
+    ): Promise<{ api: PreloadApi['repos']; calls: RpcCall[] }> {
+      const calls: RpcCall[] = []
+      vi.doMock('./web-runtime-client', () => ({
+        WebRuntimeClient: class {
+          call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
+            calls.push({ method, params })
+            const handler = handlers[method]
+            if (!handler) {
+              return Promise.reject(new Error(`unexpected method ${method}`))
+            }
+            return Promise.resolve({
+              id: method,
+              ok: true,
+              result: handler(params),
+              _meta: { runtimeId: 'runtime-1' }
+            })
+          }
+
+          close(): void {}
+        }
+      }))
+      const globals = installBrowserGlobals('Linux')
+      await writeStoredRuntimeEnvironment(globals.storage)
+      const { installWebPreloadApi } = await import('./web-preload-api')
+      installWebPreloadApi()
+      return { api: globals.window.api.repos, calls }
+    }
+
+    const repoView = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+      id: 'repo-1',
+      projectId: 'proj-ds1',
+      url: '/srv/app',
+      displayName: 'app',
+      position: 0,
+      devServerId: 'ds-1',
+      ...over
+    })
+
+    it('add sends devServerId and reuses the project bound to that host', async () => {
+      const { api, calls } = await installWithBackend({
+        'project.list': () => [
+          { id: 'proj-legacy', createdAt: 1, devServerId: 'local-mac' },
+          { id: 'proj-ds1', createdAt: 2, devServerId: 'ds-1' }
+        ],
+        'repo.add': () => repoView()
+      })
+
+      const result = await api.add({ path: '/srv/app', devServerId: 'ds-1' })
+
+      expect(excludeClientStateCalls(calls).map((call) => call.method)).toEqual([
+        'project.list',
+        'repo.add'
+      ])
+      expect(calls[1].params).toEqual({
+        projectId: 'proj-ds1',
+        url: '/srv/app',
+        displayName: 'app',
+        devServerId: 'ds-1'
+      })
+      expect('repo' in result && result.repo.devServerId).toBe('ds-1')
+    })
+
+    it('add creates a project bound to the host (named after it) when none exists', async () => {
+      const { api, calls } = await installWithBackend({
+        'project.list': () => [{ id: 'proj-legacy', createdAt: 1, devServerId: 'local-mac' }],
+        'devServer.list': () => [{ id: 'ds-1', name: 'Mac Studio' }],
+        'project.create': () => ({ id: 'proj-new' }),
+        'repo.add': () => repoView({ projectId: 'proj-new' })
+      })
+
+      await api.add({ path: '/srv/app', devServerId: 'ds-1' })
+
+      expect(calls.find((call) => call.method === 'project.create')?.params).toEqual({
+        name: 'Mac Studio',
+        devServerId: 'ds-1',
+        visibility: 'private'
+      })
+      expect(calls.find((call) => call.method === 'repo.add')?.params).toMatchObject({
+        projectId: 'proj-new',
+        devServerId: 'ds-1'
+      })
+    })
+
+    it.each([
+      ['add', (api: PreloadApi['repos']) => api.add({ path: '/srv/app' })],
+      [
+        'addRemote',
+        (api: PreloadApi['repos']) => api.addRemote({ connectionId: '', remotePath: '/srv/app' })
+      ],
+      [
+        'clone',
+        (api: PreloadApi['repos']) => api.clone({ url: 'https://x/y.git', destination: '/srv/y' })
+      ],
+      [
+        'create',
+        (api: PreloadApi['repos']) => api.create({ parentPath: '/srv', name: 'n', kind: 'git' })
+      ]
+    ])('%s without a dev server fails before any RPC (no orphan project)', async (_name, run) => {
+      const { api, calls } = await installWithBackend({})
+
+      await expect(run(api)).rejects.toMatchObject({ code: 'REPO_HOST_REQUIRED' })
+      expect(excludeClientStateCalls(calls)).toEqual([])
+    })
+
+    it('clone uses the gateway field names, then registers the checkout on the same host', async () => {
+      const { api, calls } = await installWithBackend({
+        'project.list': () => [{ id: 'proj-ds1', createdAt: 2, devServerId: 'ds-1' }],
+        'repo.clone': () => ({ worktreePath: '/srv/orca', defaultBranch: 'main' }),
+        'repo.add': () => repoView({ url: '/srv/orca', displayName: 'orca' })
+      })
+
+      const repo = await api.clone({
+        url: 'https://github.com/stablyai/orca.git',
+        destination: '/srv/orca',
+        devServerId: 'ds-1'
+      })
+
+      expect(calls.find((call) => call.method === 'repo.clone')?.params).toEqual({
+        devServerId: 'ds-1',
+        url: 'https://github.com/stablyai/orca.git',
+        destPath: '/srv/orca'
+      })
+      expect(calls.find((call) => call.method === 'repo.add')?.params).toEqual({
+        projectId: 'proj-ds1',
+        url: '/srv/orca',
+        displayName: 'orca',
+        devServerId: 'ds-1'
+      })
+      expect(repo.devServerId).toBe('ds-1')
+    })
+
+    it('create initialises the repo with destPath/devServerId, then registers it on the same host', async () => {
+      const { api, calls } = await installWithBackend({
+        'project.list': () => [{ id: 'proj-ds1', createdAt: 2, devServerId: 'ds-1' }],
+        'repo.create': () => ({ path: '/srv/fresh', defaultBranch: 'main' }),
+        'repo.add': () => repoView({ url: '/srv/fresh', displayName: 'fresh' })
+      })
+
+      const result = await api.create({
+        parentPath: '/srv/',
+        name: 'fresh',
+        kind: 'git',
+        devServerId: 'ds-1'
+      })
+
+      expect(calls.find((call) => call.method === 'repo.create')?.params).toEqual({
+        devServerId: 'ds-1',
+        destPath: '/srv/fresh',
+        defaultBranch: ''
+      })
+      expect(calls.find((call) => call.method === 'repo.add')?.params).toEqual({
+        projectId: 'proj-ds1',
+        url: '/srv/fresh',
+        displayName: 'fresh',
+        devServerId: 'ds-1'
+      })
+      expect('repo' in result && result.repo.kind).toBe('git')
+    })
+
+    // Contract: the keys this client sends must be fields the Go gateway decodes (an unknown key is
+    // silently dropped, which is how the host used to disappear). Skipped without the backend tree.
+    it('sends only fields the gateway decodes for repo.add, repo.clone and repo.create', async () => {
+      const goFile = join(
+        __dirname,
+        '../../../../..',
+        'backend-go/services/api-gateway/internal/adapter/wscompat/channels_repo_ssh_status_workspace.go'
+      )
+      if (!existsSync(goFile)) {
+        return
+      }
+      const source = readFileSync(goFile, 'utf8')
+      const gatewayFields = (channel: string): string[] => {
+        const start = source.indexOf(`r.Register("${channel}"`)
+        const structStart = source.indexOf('struct {', start)
+        const structEnd = source.indexOf('\n\t\t}', structStart)
+        return [...source.slice(structStart, structEnd).matchAll(/json:"([A-Za-z]+)"/g)].map(
+          (match) => match[1]
+        )
+      }
+      const { api, calls } = await installWithBackend({
+        'project.list': () => [{ id: 'proj-ds1', createdAt: 2, devServerId: 'ds-1' }],
+        'repo.add': () => repoView(),
+        'repo.clone': () => ({ worktreePath: '/srv/orca', defaultBranch: 'main' }),
+        'repo.create': () => ({ path: '/srv/fresh', defaultBranch: 'main' })
+      })
+
+      await api.add({ path: '/srv/app', devServerId: 'ds-1' })
+      await api.clone({ url: 'https://x/y.git', destination: '/srv/y', devServerId: 'ds-1' })
+      await api.create({ parentPath: '/srv', name: 'fresh', kind: 'git', devServerId: 'ds-1' })
+
+      for (const channel of ['repo.add', 'repo.clone', 'repo.create']) {
+        const decoded = gatewayFields(channel)
+        expect(decoded, `could not read ${channel} arg tags from the gateway`).toContain(
+          'devServerId'
+        )
+        for (const call of calls.filter((entry) => entry.method === channel)) {
+          expect(
+            Object.keys(call.params as Record<string, unknown>).filter(
+              (key) => !decoded.includes(key)
+            ),
+            `${channel} payload has keys the gateway does not decode`
+          ).toEqual([])
+          expect((call.params as Record<string, unknown>).devServerId).toBe('ds-1')
+        }
+      }
+    })
+
+    it('addRemote registers the remote path on the dev server', async () => {
+      const { api, calls } = await installWithBackend({
+        'project.list': () => [{ id: 'proj-ds1', createdAt: 2, devServerId: 'ds-1' }],
+        'repo.add': () => repoView({ displayName: 'docs' })
+      })
+
+      await api.addRemote({
+        connectionId: '',
+        remotePath: '/srv/docs',
+        displayName: 'docs',
+        kind: 'folder',
+        devServerId: 'ds-1'
+      })
+
+      expect(calls.find((call) => call.method === 'repo.add')?.params).toEqual({
+        projectId: 'proj-ds1',
+        url: '/srv/docs',
+        displayName: 'docs',
+        devServerId: 'ds-1'
+      })
+    })
   })
 })
 

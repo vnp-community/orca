@@ -7,6 +7,7 @@ import WorktreeCreationPanel from './WorktreeCreationPanel'
 import type { PendingWorktreeCreation } from '@/lib/pending-worktree-creation'
 
 const mocks = vi.hoisted(() => ({
+  openModal: vi.fn(),
   state: {
     pendingWorktreeCreations: {
       'create-1': {
@@ -34,7 +35,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/store', () => ({
-  useAppStore: (selector: (state: typeof mocks.state) => unknown) => selector(mocks.state)
+  useAppStore: Object.assign(
+    (selector: (state: typeof mocks.state) => unknown) => selector(mocks.state),
+    { getState: () => ({ ...mocks.state, repos: [], openModal: mocks.openModal }) }
+  )
 }))
 
 vi.mock('@/lib/worktree-creation-flow', () => ({
@@ -177,5 +181,40 @@ describe('WorktreeCreationPanel', () => {
 
     expect(container.textContent).toContain('git worktree add failed')
     expect(container.querySelector('pre')).toBeNull()
+  })
+
+  it('offers "Choose dev server" for a project with no host, and Retry for an offline host', async () => {
+    const base = mocks.state.pendingWorktreeCreations['create-1']
+    mocks.state.pendingWorktreeCreations['create-1'] = {
+      ...base,
+      status: 'error',
+      error: 'Choose the dev server this project lives on, then try again.',
+      errorKind: 'host-unbound'
+    }
+
+    const container = await renderPanel(false)
+    const choose = container.querySelector<HTMLButtonElement>(
+      '[data-testid="worktree-creation-choose-host"]'
+    )
+    expect(choose?.textContent).toContain('Choose dev server')
+    await act(async () => {
+      choose?.click()
+    })
+    // The failed create is retried by the dialog once a host is picked.
+    expect(mocks.openModal).toHaveBeenCalledWith('repo-host-picker', {
+      creationId: 'create-1',
+      repoId: 'repo-1'
+    })
+
+    mocks.state.pendingWorktreeCreations['create-1'] = {
+      ...base,
+      status: 'error',
+      error: 'Orca can’t reach the dev server this project lives on. Reconnect it, then retry.',
+      errorKind: 'host-unreachable'
+    }
+    const offline = await renderPanel(false)
+    expect(offline.querySelector('[data-testid="worktree-creation-choose-host"]')).toBeNull()
+    expect(offline.textContent).toContain('Reconnect it, then retry')
+    expect(offline.textContent).toContain('Retry')
   })
 })

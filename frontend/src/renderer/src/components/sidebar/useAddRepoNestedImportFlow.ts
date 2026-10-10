@@ -12,6 +12,7 @@ import {
 import type { AddRepoExistingWorkspaceSource } from '../../../../shared/telemetry-events'
 import type { NestedRepoScanResult, ProjectGroupImportResult } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import { useAddRepoNestedRootFolder } from './useAddRepoNestedRootFolder'
 
 export function useAddRepoNestedImportFlow({
   nestedAttemptId,
@@ -22,6 +23,7 @@ export function useAddRepoNestedImportFlow({
   nestedGroupName,
   nestedImportScanId,
   activeRuntimeEnvironmentId,
+  devServerId,
   fetchWorktrees,
   importNestedRepos,
   getNestedRepoRuntimeKind,
@@ -36,6 +38,8 @@ export function useAddRepoNestedImportFlow({
   nestedGroupName: string
   nestedImportScanId: string | null
   activeRuntimeEnvironmentId: string | null | undefined
+  // Host chosen in the Add Project dialog; import and folder-open must register on it.
+  devServerId?: string | null
   fetchWorktrees: (repoId: string, options?: { requireAuthoritative?: boolean }) => Promise<unknown>
   importNestedRepos: (args: {
     parentPath: string
@@ -44,6 +48,7 @@ export function useAddRepoNestedImportFlow({
     connectionId?: string
     scanId?: string
     mode: 'group' | 'separate'
+    devServerId?: string | null
     selectedCandidates?: NestedRepoScanResult['repos']
   }) => Promise<ProjectGroupImportResult | null>
   getNestedRepoRuntimeKind: (connectionId: string | null) => NestedRepoTelemetryRuntimeKind
@@ -133,6 +138,7 @@ export function useAddRepoNestedImportFlow({
           selectedCandidates: nestedScan.repos,
           ...(nestedConnectionId ? { connectionId: nestedConnectionId } : {}),
           ...(nestedImportScanId ? { scanId: nestedImportScanId } : {}),
+          ...(devServerId ? { devServerId } : {}),
           mode
         })
         track(
@@ -228,6 +234,7 @@ export function useAddRepoNestedImportFlow({
     },
     [
       activeRuntimeEnvironmentId,
+      devServerId,
       fetchWorktrees,
       importNestedRepos,
       nestedAttemptId,
@@ -243,64 +250,18 @@ export function useAddRepoNestedImportFlow({
     ]
   )
 
-  const handleOpenNestedRootFolder = useCallback(async (): Promise<void> => {
-    if (!nestedScan) {
-      return
-    }
-    const gen = ++nestedImportGenRef.current
-    const path = nestedScan.selectedPath
-    if (nestedAttemptId) {
-      track(
-        'add_repo_nested_import_action',
-        buildNestedRepoImportActionTelemetry({
-          attemptId: nestedAttemptId,
-          surface: 'sidebar',
-          runtimeKind: nestedRuntimeKind ?? getNestedRepoRuntimeKind(nestedConnectionId),
-          action: 'open_as_folder',
-          foundCount: nestedScan.repos.length,
-          selectedCount: nestedSelectedPaths.size
-        })
-      )
-    }
-    setIsAdding(true)
-    try {
-      const state = useAppStore.getState()
-      if (nestedConnectionId) {
-        state.closeModal()
-        state.openModal('confirm-non-git-folder', {
-          folderPath: path,
-          connectionId: nestedConnectionId
-        })
-        return
-      }
-      const repo = await state.addNonGitFolder(path, {
-        runtimeEnvironmentId: activeRuntimeEnvironmentId?.trim() || null
-      })
-      if (gen !== nestedImportGenRef.current) {
-        return
-      }
-      if (repo) {
-        useAppStore.getState().closeModal()
-      }
-    } catch (err) {
-      if (gen === nestedImportGenRef.current) {
-        toast.error(err instanceof Error ? err.message : String(err))
-      }
-    } finally {
-      if (gen === nestedImportGenRef.current) {
-        setIsAdding(false)
-      }
-    }
-  }, [
-    activeRuntimeEnvironmentId,
-    getNestedRepoRuntimeKind,
-    nestedAttemptId,
-    nestedConnectionId,
-    nestedRuntimeKind,
+  const handleOpenNestedRootFolder = useAddRepoNestedRootFolder({
+    nestedImportGenRef,
     nestedScan,
-    nestedSelectedPaths.size,
+    nestedAttemptId,
+    nestedRuntimeKind,
+    nestedConnectionId,
+    nestedSelectedPathCount: nestedSelectedPaths.size,
+    activeRuntimeEnvironmentId,
+    devServerId,
+    getNestedRepoRuntimeKind,
     setIsAdding
-  ])
+  })
 
   return {
     handleImportNestedRepos,

@@ -252,7 +252,8 @@
           "3be0f7df04": "No se puede abrir la carpeta en el host seleccionado",
           "15cf5319ec": "{{path}} se verificó en {{hostName}}, pero ese host no reportó ninguna carpeta utilizable.",
           "2dcd706774": "El proyecto también existe en otro perfil",
-          "presenceProfileOverflow": "{{names}} +{{count}} más"
+          "presenceProfileOverflow": "{{names}} +{{count}} más",
+          "setupProjectCloneDevServerUnsupported": "Aún no se admite clonar un repositorio nuevo en un servidor de desarrollo. Agregue una carpeta existente."
         },
         "settings": {
           "e12dab333b": "No se pudo cambiar de servidor",
@@ -525,7 +526,19 @@
           "error": {
             "format": {
               "37cf0bc991": "Orca no pudo resolver una referencia base utilizable para este espacio de trabajo.",
-              "64555d0014": "No se encontró ninguna rama base"
+              "64555d0014": "No se encontró ninguna rama base",
+              "hostUnbound": {
+                "title": "Este proyecto no está asignado a un servidor de desarrollo",
+                "message": "Elija el servidor de desarrollo donde está el proyecto y vuelva a intentarlo."
+              },
+              "hostUnreachable": {
+                "title": "El servidor de desarrollo está sin conexión",
+                "message": "Orca no puede conectar con el servidor de desarrollo de este proyecto. Reconéctelo y vuelva a intentarlo."
+              },
+              "hostCheckFailed": {
+                "title": "No se pudo comprobar el servidor de desarrollo",
+                "message": "Orca no pudo confirmar que el servidor de desarrollo esté en línea. Inténtelo de nuevo en un momento."
+              }
             }
           }
         }
@@ -590,6 +603,15 @@
       },
       "workspaceTabPalette": {
         "reviewTab": "Pestaña de revisión"
+      },
+      "repoHostBinding": {
+        "hostRequired": "Primero elija un servidor de desarrollo para este proyecto."
+      },
+      "repoHostRebind": {
+        "activeWorkflows": "Detenga las tareas en ejecución de este proyecto antes de cambiar su servidor de desarrollo.",
+        "devServerNotFound": "Ese servidor de desarrollo ya no existe. Elija otro.",
+        "forbidden": "No tiene permiso para cambiar el servidor de desarrollo de este proyecto.",
+        "failed": "No se pudo cambiar el servidor de desarrollo."
       }
     },
     "hooks": {
@@ -2295,7 +2317,8 @@
             "767951265d": "Algo salió mal al crear el worktree.",
             "vmProvisioningTitle": "Provisionando VM",
             "cancelProvisioning": "Cancelar",
-            "vmProvisioningLogEmpty": "Esperando output de la receta..."
+            "vmProvisioningLogEmpty": "Esperando output de la receta...",
+            "chooseHost": "Elegir servidor de desarrollo"
           }
         }
       },
@@ -3855,7 +3878,11 @@
           "51001182e3": "Directorio vacío",
           "971d85cc84": "Se abre como proyecto en este host · {{value0}}",
           "00c4235c10": "No hay coincidencias para '{{value0}}'",
-          "largeInputNoMatches": "No hay coincidencias para esta entrada larga"
+          "largeInputNoMatches": "No hay coincidencias para esta entrada larga",
+          "hostReconnecting": "El host se está reconectando. Esta carpeta se recargará automáticamente cuando vuelva.",
+          "retry": "Reintentar",
+          "truncated": "Mostrando {{shown}} de {{total}} elementos. Escriba para acotar la lista.",
+          "hostOffline": "El host no está conectado. Este selector sigue abierto y se actualiza cuando se reconecte."
         },
         "RemoveFolderDialog": {
           "4dc5b5065b": "Quitar",
@@ -4545,7 +4572,8 @@
           "addRemoteHostTooltip": "Elige SSH para una máquina donde puedas iniciar sesión, o servidor remoto para un servidor de Orca.",
           "addSshHostDetail": "Usa una máquina existente mediante SSH.",
           "addRemoteServerDetail": "Empareja con Orca ejecutándose en otro equipo.",
-          "addRemoteHostDetail": "Host SSH o servidor Orca"
+          "addRemoteHostDetail": "Host SSH o servidor Orca",
+          "chooseHost": "Elegir un host"
         },
         "sidebarHostOptions": {
           "3e102f111c": "Todos los hosts",
@@ -4695,6 +4723,32 @@
           "cancel": "Cancelar",
           "forget": "Eliminar de Orca",
           "reconnectAndDelete": "Reconectar y eliminar"
+        },
+        "AddRepoHostGateNotice": {
+          "reconnecting": "{{host}} se está reconectando. Se conserva su elección y Agregar proyecto se reanuda cuando vuelva a estar en línea.",
+          "removed": "{{host}} ya no está disponible. Elija otro servidor de desarrollo.",
+          "offline": "{{host}} está sin conexión. Se conserva su elección; Agregar proyecto se reanuda al reconectarse, o elija otro servidor de desarrollo.",
+          "noHostTitle": "No hay ningún servidor de desarrollo conectado",
+          "noHostBody": "Los proyectos residen en un servidor de desarrollo. Conecte uno y vuelva para agregar un proyecto.",
+          "openDevServers": "Abrir servidores de desarrollo",
+          "chooseHostBody": "Elija el servidor de desarrollo donde está el proyecto. Explorar y Agregar se habilitan al elegir uno."
+        },
+        "RepoHostBadge": {
+          "noHost": "Sin servidor de desarrollo",
+          "inheritedTitle": "{{name}} (heredado del proyecto)"
+        },
+        "RepoHostPickerDialog": {
+          "updated": "Servidor de desarrollo actualizado",
+          "title": "Elegir un servidor de desarrollo",
+          "description": "Orca ejecuta git para {{project}} en su servidor de desarrollo. Elija aquel donde está el proyecto.",
+          "hostLabel": "Servidor de desarrollo",
+          "placeholder": "Elegir un servidor de desarrollo",
+          "unavailableHost": "{{name}} ({{status}})",
+          "noConnectedHost": "No hay ningún servidor de desarrollo conectado. Conecte uno y elíjalo aquí.",
+          "openDevServers": "Abrir servidores de desarrollo",
+          "cancel": "Cancelar",
+          "saving": "Guardando…",
+          "confirm": "Usar este servidor de desarrollo"
         }
       },
       "shared": {
@@ -9057,6 +9111,14 @@
         "TerminalInteractionSection": {
           "567633ff50": "Right-click pastes the clipboard into the terminal. Control-click to open the context menu.",
           "c64497148a": "Right-click pastes the clipboard. Control-click opens the context menu."
+        },
+        "RepositoryDevServerHostSection": {
+          "title": "Servidor de desarrollo",
+          "description": "El servidor de desarrollo donde está este proyecto. Orca ejecuta allí git y los agentes.",
+          "unbound": "No hay ningún servidor de desarrollo asignado, por lo que Orca no puede ejecutar git para este proyecto. Elija uno.",
+          "unknownStatus": "estado desconocido",
+          "fromProject": "del proyecto",
+          "change": "Cambiar servidor de desarrollo"
         }
       },
       "right": {
@@ -13085,6 +13147,9 @@
           "saving": "Guardando…",
           "saved": "Asignación de Jira actualizada",
           "saveFailed": "No se pudo actualizar la asignación de Jira."
+        },
+        "CreateProjectDialog": {
+          "repoAddFailed": "Proyecto creado, pero no se pudo agregar su repositorio: {{message}}. Inténtelo de nuevo."
         }
       },
       "request": {

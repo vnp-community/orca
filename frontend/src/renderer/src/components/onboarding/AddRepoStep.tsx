@@ -82,7 +82,9 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
   const handleBrowseSelect = async (path: string) => {
     try {
       const result = await addRuntimeRepoRemote(useAppStore.getState().settings, {
-        connectionId: effectiveDevServerId,
+        // Why devServerId, not connectionId: the host is a dev server; connectionId means SSH.
+        connectionId: '',
+        devServerId: effectiveDevServerId,
         remotePath: path
       })
       if ('error' in result) {
@@ -138,7 +140,8 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
     for (const path of selectedScanPaths) {
       try {
         const result = await addRuntimeRepoRemote(useAppStore.getState().settings, {
-          connectionId: effectiveDevServerId,
+          connectionId: '',
+          devServerId: effectiveDevServerId,
           remotePath: path
         })
         if ('error' in result) {

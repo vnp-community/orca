@@ -31,6 +31,7 @@ export type SettingsNavTarget =
   | 'agents'
   | 'orchestration'
   | 'servers'
+  | 'dev-servers'
   | 'mcp'
   | 'code-intel'
   | 'mobile'

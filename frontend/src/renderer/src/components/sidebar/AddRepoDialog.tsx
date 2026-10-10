@@ -12,9 +12,11 @@ import { useAddRepoNestedImportFlow } from './useAddRepoNestedImportFlow'
 import { useAddRepoHostSelection } from './use-add-repo-host-selection'
 import { useCompleteGitRepoAdd } from './use-complete-git-repo-add'
 import { useCreateProjectDefaults } from './useCreateProjectDefaults'
-import { useAddRepoHostChangeReset } from './use-add-repo-host-change-reset'
+import { useAddRepoDialogReset } from './use-add-repo-dialog-reset'
 import { AddRepoDialogChrome } from './AddRepoDialogChrome'
 import { AddRepoHostSelectorSlot } from './AddRepoHostSelectorSlot'
+import { AddRepoHostGateNotice } from './AddRepoHostGateNotice'
+import { isAddRepoHostGateBlocking } from './add-repo-web-host-gate'
 import { useAddRepoRemoteNestedScan } from './use-add-repo-remote-nested-scan'
 
 const AddRepoDialog = React.memo(function AddRepoDialog() {
@@ -188,6 +190,7 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     resetServerPathFlow,
     handleAddServerPath
   } = useAddRepoServerPathFlow({
+    devServerId: selectedDevServerId,
     addRepoPath,
     closeModal,
     fetchWorktrees,
@@ -213,6 +216,7 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     nestedGroupName,
     nestedImportScanId,
     activeRuntimeEnvironmentId: selectedRuntimeEnvironmentId,
+    devServerId: selectedDevServerId,
     fetchWorktrees,
     importNestedRepos,
     getNestedRepoRuntimeKind,
@@ -220,53 +224,20 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     setIsAdding
   })
 
-  const resetState = useCallback(() => {
-    // Why: kill the git clone process if one is running, so backing out
-    // or closing the dialog doesn't leave a clone running on disk.
-    void window.api.repos.cloneAbort()
-    resetLocalFolderFlow()
-    setStep('add')
-    setIsAdding(false)
-    setAddProjectBusyLabel(null)
-    resetServerPathFlow()
-    resetCloneFlow()
-    resetNestedImportFlow()
-    resetNestedRepoReviewState()
-    resetCreateDefaultState()
-    resetCreateState()
-    resetRemoteState()
-  }, [
-    resetCloneFlow,
+  const { resetState } = useAddRepoDialogReset({
+    isOpen,
+    selectedHostId: hostSelection.selectedHostId ?? '',
+    setStep,
+    setIsAdding,
+    setAddProjectBusyLabel,
     resetLocalFolderFlow,
+    resetServerPathFlow,
+    resetCloneFlow,
+    resetNestedImportFlow,
     resetNestedRepoReviewState,
     resetCreateDefaultState,
-    resetServerPathFlow,
-    resetNestedImportFlow,
-    resetRemoteState,
-    resetCreateState
-  ])
-
-  const resetHostScopedState = useCallback(() => {
-    setIsAdding(false)
-    setAddProjectBusyLabel(null)
-    resetServerPathFlow()
-    resetCloneFlow()
-    resetCreateDefaultState()
-    resetCreateState()
-    resetRemoteState()
-  }, [
-    resetCloneFlow,
-    resetCreateDefaultState,
     resetCreateState,
-    resetRemoteState,
-    resetServerPathFlow
-  ])
-
-  useAddRepoHostChangeReset({
-    isOpen,
-    selectedHostId: hostSelection.selectedHostId,
-    onResetClosed: resetState,
-    onResetHostScopedState: resetHostScopedState
+    resetRemoteState
   })
 
   const handleBack = useCallback(() => {
@@ -334,7 +305,13 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
         createParent={createParent}
         createError={createError}
         isCreating={isCreating}
-        hostSelector={<AddRepoHostSelectorSlot hostSelection={hostSelection} />}
+        hostGateBlocking={isAddRepoHostGateBlocking(hostSelection.hostGate)}
+        hostSelector={
+          <>
+            <AddRepoHostSelectorSlot hostSelection={hostSelection} />
+            <AddRepoHostGateNotice gate={hostSelection.hostGate} />
+          </>
+        }
         showRemoteAction={false}
         browseHostKind={
           selectedHostKind === 'ssh'

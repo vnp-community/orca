@@ -11,6 +11,7 @@ import type {
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import type { AgentStartedTelemetry } from '@/lib/worktree-activation'
 import type { TaskSourceContext, WorkspaceRunContext } from '../../../shared/task-source-context'
+import type { WorkspaceCreateErrorKind } from '@/lib/workspace-create-error-format'
 
 /** Two-phase status reported by the main process while a worktree is created.
  *  `preparing` covers renderer-side preflight before `createWorktree` starts;
@@ -119,7 +120,7 @@ export type PendingWorktreeCreation = {
   /** Set when `error` matches a known, actionable failure signature — drives
    *  an extra remedy action in WorktreeCreationPanel (e.g. "Initialize as
    *  Git repo" for 'not-a-git-repo') alongside the generic Retry/Dismiss. */
-  errorKind?: 'not-a-git-repo'
+  errorKind?: WorkspaceCreateErrorKind
   provisioningLog?: string
   request: WorktreeCreationRequest
 }

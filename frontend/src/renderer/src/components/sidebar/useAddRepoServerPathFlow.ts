@@ -23,6 +23,7 @@ type ShowNestedRepoReview = (args: {
 }) => void
 
 export function useAddRepoServerPathFlow({
+  devServerId,
   addRepoPath,
   closeModal,
   fetchWorktrees,
@@ -34,14 +35,24 @@ export function useAddRepoServerPathFlow({
   onGitRepoReady,
   setAddProjectBusyLabel
 }: {
-  addRepoPath: (path: string, kind?: 'git' | 'folder') => Promise<Repo | null>
+  // Host picked in the Add Project dialog; it must reach repo.add, not only the folder browser.
+  devServerId?: string | null
+  addRepoPath: (
+    path: string,
+    kind?: 'git' | 'folder',
+    options?: { devServerId?: string | null }
+  ) => Promise<Repo | null>
   closeModal: () => void
   fetchWorktrees: (repoId: string, options?: { requireAuthoritative?: boolean }) => Promise<unknown>
   getNestedRepoRuntimeKind: (connectionId: string | null) => NestedRepoTelemetryRuntimeKind
   scanNestedRepos: (
     path: string,
     connectionId?: string,
-    controls?: { scanId?: string; onProgress?: (scan: NestedRepoScanResult) => void }
+    controls?: {
+      scanId?: string
+      onProgress?: (scan: NestedRepoScanResult) => void
+      devServerId?: string | null
+    }
   ) => Promise<NestedRepoScanResult | null>
   setActiveNestedScanId: (scanId: string | null) => void
   setNestedScanInProgress: (inProgress: boolean) => void
@@ -87,9 +98,10 @@ export function useAddRepoServerPathFlow({
           const scan = await scanNestedRepos(
             path,
             undefined,
-            scanId
+            scanId || devServerId
               ? {
-                  scanId,
+                  ...(devServerId ? { devServerId } : {}),
+                  ...(scanId ? { scanId } : {}),
                   onProgress: (progressScan) => {
                     if (
                       gen !== serverAddGenRef.current ||
@@ -139,7 +151,9 @@ export function useAddRepoServerPathFlow({
           }
         }
         setAddProjectBusyLabel(kind === 'git' ? 'Opening project...' : 'Opening folder...')
-        const repo = await addRepoPath(path, kind)
+        const repo = devServerId
+          ? await addRepoPath(path, kind, { devServerId })
+          : await addRepoPath(path, kind)
         if (gen !== serverAddGenRef.current) {
           return
         }
@@ -169,6 +183,7 @@ export function useAddRepoServerPathFlow({
     [
       addRepoPath,
       closeModal,
+      devServerId,
       fetchWorktrees,
       getNestedRepoRuntimeKind,
       onGitRepoReady,

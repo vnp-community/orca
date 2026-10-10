@@ -9,6 +9,8 @@ import { useAppStore } from '@/store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { retryBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import { translate } from '@/i18n/i18n'
+import { RepoHostRequiredError } from '@/lib/repo-host-binding'
+import { isWebClientLocation } from '@/lib/web-client-location'
 
 export type InitRepoAsGitOptions = {
   defaultBranch?: string
@@ -28,6 +30,14 @@ async function runInitRepoAsGit(
   options: InitRepoAsGitOptions
 ): Promise<string | null> {
   const target = getActiveRuntimeTarget(settings)
+  const repoDevServerId = repo.devServerId?.trim() ?? ''
+  // Why: an empty devServerId makes git-gateway reject the call with a generic missing-host error;
+  // say what to do instead.
+  if (isWebClientLocation() && !repoDevServerId) {
+    const message = new RepoHostRequiredError().message
+    toast.error(message)
+    return message
+  }
   if (target.kind !== 'environment') {
     return translate(
       'auto.lib.init.repo.as.git.noRuntimeTarget',
@@ -40,7 +50,7 @@ async function runInitRepoAsGit(
       target,
       'repo.create',
       {
-        devServerId: repo.devServerId ?? '',
+        devServerId: repoDevServerId,
         destPath: repo.path,
         defaultBranch: options.defaultBranch ?? '',
         remoteUrl: options.remoteUrl ?? '',
