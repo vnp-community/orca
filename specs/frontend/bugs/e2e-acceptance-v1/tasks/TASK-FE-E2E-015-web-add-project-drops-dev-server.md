@@ -9,9 +9,17 @@
 - backend-go/services/git-gateway-service/internal/usecase/ports.go (`dispatchExecutorForRepo`: `repo.DevServerID == ""` thì chạy git trong container)
 - tests/stages/e2e/orca-flows/ui-live/add-project-worktree-repro.web.e2e.ts + `live-add-project-repro-steps.ts` (spec tái hiện, đã có), run_ui_flow.py (`--repro`)
 **Depends on:** không
-**Status:** `[ ]` CHƯA SỬA. Đã tái hiện bằng Playwright qua giao diện thật và đã xác minh nguyên nhân. Spec ĐỎ cho tới khi sửa.
+**Status:** `[x]` ĐÃ SỬA (2026-10-11) bằng TASK-FE-E2E-016..021 và TASK-V2-035; spec tái hiện chuyển xanh. Kiểm live (2026-10-11): `run_ui_flow.py --repro add-project-worktree` XANH (worktree test-02 tạo được, repo có devServerId = dev-local-mac); `--real all` 6/6 XANH (21.8 phút); backend `--strict --ai-stub` 114 PASS, 0 FAIL.
 
 ---
+
+## Giải pháp và danh sách task (thêm 2026-10-10; nội dung tái hiện bên dưới KHÔNG đổi)
+
+- Giải pháp: [SOL-FE-E2E-004](../solutions/SOL-FE-E2E-004-web-repo-host-binding.md) (frontend) và [SOL-V2-002](../../../../backend-go/bugs/e2e-acceptance/v2/solutions/SOL-V2-002-repo-host-binding-and-no-silent-local.md) (backend).
+- Task frontend: [016](./TASK-FE-E2E-016-pass-dev-server-id-on-add-project.md), [017](./TASK-FE-E2E-017-pass-dev-server-id-on-other-creation-paths.md), [018](./TASK-FE-E2E-018-add-project-host-selection-ux.md), [019](./TASK-FE-E2E-019-show-and-change-repo-host.md), [020](./TASK-FE-E2E-020-bounded-remote-file-browser.md), [021](./TASK-FE-E2E-021-i18n-tests-and-live-spec.md).
+- Task backend: TASK-V2-028 đến 034 ([README](../../../../backend-go/bugs/e2e-acceptance/v2/tasks/README.md)).
+- Quyết định đã chọn: repo luôn gắn dev server, project gắn dev server và repo thừa hưởng, chọn sẵn host duy nhất, repo cũ không tự migrate, Browse folder có giới hạn.
+- Trạng thái vẫn `[ ]` cho tới khi spec `--repro add-project-worktree` XANH.
 
 ## Context
 

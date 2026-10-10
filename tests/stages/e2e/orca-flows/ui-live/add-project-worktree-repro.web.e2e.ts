@@ -1,10 +1,12 @@
 /**
- * Repro of the user's bug (TASK-FE-E2E-015), driven through the real web UI, no shortcut: sign in -> Add Project -> host
- * dev-local-mac -> Browse folder -> pick a git repo -> Add Git Project -> "+" on the new project -> worktree "test-02" -> Create.
- * The user sees "Couldn't create worktree ... WORKTREE_CREATE_FAILED ... chdir <repo>: no such file or directory".
+ * Regression spec of the user's bug (TASK-FE-E2E-015, fixed by SOL-FE-E2E-004), driven through the real web UI, no shortcut:
+ * sign in -> Add Project -> host dev-local-mac -> Browse folder -> pick a git repo -> Add Git Project -> "+" on the new project ->
+ * worktree "test-02" -> Create. Before the fix the user saw "Couldn't create worktree ... WORKTREE_CREATE_FAILED ... chdir <repo>:
+ * no such file or directory", because the repo was saved without the chosen dev server.
  *
- * The repo is a throwaway one made here (never a repo of the user). The final assertions describe the CORRECT behaviour, so this
- * spec is RED while the bug exists and prints "BUG REPRODUCED" with the evidence.
+ * The repo is a throwaway one made here (never a repo of the user). The final assertions describe the CORRECT behaviour: the worktree
+ * is created, and the repo AND the project holding it are bound to the chosen dev server. "BUG REPRODUCED" is printed (with the
+ * evidence) only if the original failure comes back.
  *
  *   ORCA_E2E_LIVE=1 npx playwright test -c tests/configs/playwright.web.config.ts --project=request-live add-project-worktree-repro
  *   python3 tests/stages/e2e/orca-flows/run_ui_flow.py --repro add-project-worktree
@@ -134,7 +136,7 @@ test.describe('Add a project and create a worktree, through the UI (TASK-FE-E2E-
         log(`DIFFERENT OUTCOME (not the reported error): ${JSON.stringify(outcome)}`)
       }
 
-      // The CORRECT behaviour; red while the bug exists.
+      // The CORRECT behaviour; any of these going red is a regression of the host binding.
       expect
         .soft(outcome.kind, `worktree ${WORKTREE_NAME}: the UI must not show an error`)
         .toBe('created')
@@ -151,6 +153,13 @@ test.describe('Add a project and create a worktree, through the UI (TASK-FE-E2E-
         .soft(
           evidence?.devServerId,
           `the repo added from host ${cfg.devServerName} must be bound to that dev server (repo.list devServerId)`
+        )
+        .toBe(devServerId)
+      // The project holding the repo follows the same host (one project per host), so repo and project never disagree.
+      expect
+        .soft(
+          evidence?.projectDevServerId,
+          `the project holding the repo must be bound to ${cfg.devServerName} too (project.list devServerId)`
         )
         .toBe(devServerId)
       failed = testInfo.errors.length > 0

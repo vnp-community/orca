@@ -37,6 +37,36 @@ Ký hiệu: `[x]` xong và đã kiểm chứng, `[~]` làm một phần, `[ ]` c
 - [x] TASK-V2-027 · [`git.status` của worktree task trả rỗng vì gateway giải sai đáp án của agent; `CheckWorktreeDeleteSafety` luôn thấy worktree relay là sạch](./TASK-V2-027-task-worktree-git-status-empty.md)
 - [x] TASK-V2-026 · [Output của agent không tới UI (stream `StreamExecOutput` theo `connectionId` rỗng khi project gắn dev server qua `devServerId`); `platform`/`arch`/`nodeVersion` luôn null (lỗi đọc cột ở repository hai dialect, không phải ở agent)](./TASK-V2-026-agent-output-stream-and-dev-server-platform.md). Xong về mã và test (NATS thật cho đường publish và subscribe, tích hợp hai dialect); chưa chạy trên stack thật, cần redeploy infra-fleet-service, task-service, api-gateway
 
+## SOL-V2-002: repo luôn gắn host, không chạy git "cục bộ" một cách im lặng ([solution](../solutions/SOL-V2-002-repo-host-binding-and-no-silent-local.md); frontend: [SOL-FE-E2E-004](../../../../../frontend/bugs/e2e-acceptance-v1/solutions/SOL-FE-E2E-004-web-repo-host-binding.md))
+
+Gốc: [TASK-FE-E2E-015](../../../../../frontend/bugs/e2e-acceptance-v1/tasks/TASK-FE-E2E-015-web-add-project-drops-dev-server.md) (`WORKTREE_CREATE_FAILED ... chdir ... no such file or directory`). Quyết định đã chọn: repo luôn gắn dev server; project tạo gắn dev server và repo thừa hưởng khi request không nêu; local chỉ qua `ORCA_LOCAL_REPO_ROOT` (mặc định tắt); repo cũ không tự migrate (công cụ dry-run); Browse folder có giới hạn.
+
+Thứ tự và phụ thuộc:
+
+```
+V2-030 (bước 1: SetReadLimit) ─► [FE-016/017/018 lên] ─► V2-028 (warn) ─► V2-031 (báo cáo repo mồ côi)
+                                                              │                    │
+                                                              ▼                    ▼
+                                                        V2-028 (enforce) ◄── V2-029 (strict) ─► V2-032 ─► V2-033 ─► V2-034
+V2-030 (bước 2-3: giới hạn browse) ─► FE-020
+```
+
+- [x] TASK-V2-028 · [project-service: chính sách host của repo (thừa hưởng từ project), `PROJECT_REPO_HOST_REQUIRED`, project gắn dev server không cần repo, `GetRepo` host hiệu lực](./TASK-V2-028-project-repo-host-policy.md)
+- [x] TASK-V2-029 · [git-gateway: một điểm quyết định host, bỏ fallback im lặng về local, `GITGATEWAY_REPO_HOST_UNBOUND`/`GITGATEWAY_DEV_SERVER_UNREACHABLE`](./TASK-V2-029-git-gateway-no-silent-local-dispatch.md)
+- [x] TASK-V2-030 · [infra-fleet nâng giới hạn đọc websocket (32 KiB); `browseDir` có trần mục và `truncated`](./TASK-V2-030-browse-limits-and-websocket-read-limit.md)
+- [x] TASK-V2-031 · [Công cụ báo cáo repo không host và gắn lại dry-run; cải thiện `RebindRepoDevServer`](./TASK-V2-031-unbound-repos-report-and-rebind-tool.md)
+- [~] TASK-V2-032 · [Test hợp đồng và tích hợp hai dialect cho chính sách host](./TASK-V2-032-repo-host-contract-and-two-dialect-tests.md)
+- [~] TASK-V2-033 · [E2E: spec `--repro add-project-worktree` xanh + host ngắt giữa chừng, kênh tắt không host, duyệt thư mục lớn](./TASK-V2-033-e2e-add-project-host-binding-scenarios.md)
+- [~] TASK-V2-034 · [Cấu hình triển khai, quan sát, tài liệu, rollout `warn`→`enforce`, `legacy`→`strict`](./TASK-V2-034-rollout-config-observability-docs.md)
+
+Định nghĩa xong của SOL-V2-002:
+
+- [ ] Spec repro `run_ui_flow.py --repro add-project-worktree` XANH (cùng frontend 016-018); kịch bản mở rộng TASK-V2-033 xanh.
+- [ ] `go test ./...` xanh ở `project-service`, `git-gateway-service`, `api-gateway`, `infra-fleet-service` (trừ lỗi có sẵn đã ghi), tích hợp Postgres và MySQL xanh, `buf lint`/`buf breaking` xanh; vitest agent cho `fs.readDir`.
+- [ ] Không hồi quy: `run_ui_flow.py --real all` 6/6, `run_acceptance.py` như trước.
+- [ ] Tài liệu và cấu hình (TASK-V2-034); rollout đã ghi ngày từng bước.
+- [ ] Dọn dữ liệu: `report_orphan_requests.py` và `report_unbound_repos.py` báo 0 mục thăm dò còn lại; repo thật của người dùng không bị đổi.
+
 ## Kết quả thực thi (2026-10-09)
 
 - e2e đầy đủ: **103 PASS, 0 FAIL, 4 BLOCKED, 1 SKIP** (460 giây, Claude thật). BLOCKED/SKIP: MCP tắt (2), AIS-01/03 (không dựng được đường "không có AI" khi AI sẵn có), TSK-08 tuỳ chọn.

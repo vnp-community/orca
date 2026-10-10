@@ -49,6 +49,34 @@ FE-001 và FE-002 làm trước (P0): chúng làm cho lỗi hợp đồng kế t
 - [x] [TASK-FE-E2E-013](./TASK-FE-E2E-013-task-sheet-fixes.md) P1 · Sheet task của Request: "Open in Git" điều hướng thật, bố cục chật, Escape chỉ đóng sheet, gợi ý tab Result · phụ thuộc: TASK-FE-E2E-011, 012
 - [x] [TASK-FE-E2E-014](./TASK-FE-E2E-014-open-in-git-source-control-empty.md) P1 · "Open in Git" mở Source Control nhưng không có thay đổi (một repo lỗi `worktree.detectedList` làm mất mọi worktree), spawn-helper của node-pty tự sửa quyền · phụ thuộc: TASK-FE-E2E-011, 013
 
+### SOL-FE-E2E-004: web luôn gắn host (dev server) khi tạo project/repo ([solution](../solutions/SOL-FE-E2E-004-web-repo-host-binding.md); backend: [SOL-V2-002](../../../../backend-go/bugs/e2e-acceptance/v2/solutions/SOL-V2-002-repo-host-binding-and-no-silent-local.md))
+
+Quyết định đã chọn: repo luôn gắn dev server, project tạo gắn dev server được chọn và repo thừa hưởng, chọn sẵn host duy nhất, repo cũ không tự migrate (công cụ dry-run), Browse folder có giới hạn.
+
+```
+FE-016 (truyền devServerId) ──► FE-017 (các đường còn lại) ──► FE-021 (i18n, test, spec live)
+FE-016 ──► FE-018 (chọn host) ──► FE-020 (Browse có giới hạn) ──► FE-021
+FE-016 ──► FE-019 (hiển thị/đổi host, lỗi có mã)               ──► FE-021
+TASK-V2-030 ──► FE-020      TASK-V2-028/029 ──► FE-019 (mã lỗi)
+```
+
+- [x] [TASK-FE-E2E-015](./TASK-FE-E2E-015-web-add-project-drops-dev-server.md) P1 · Bug gốc (đã tái hiện bằng spec live `--repro add-project-worktree`, ĐỎ cho tới khi 016 + backend xong)
+- [x] [TASK-FE-E2E-016](./TASK-FE-E2E-016-pass-dev-server-id-on-add-project.md) P0 · Truyền `devServerId` từ hộp thoại Add Project xuống `repo.add` (preload, store, hook), project mặc định theo host · phụ thuộc: không
+- [x] [TASK-FE-E2E-017](./TASK-FE-E2E-017-pass-dev-server-id-on-other-creation-paths.md) P1 · Clone, create, folder không phải git, `addRuntimeRepoRemote`, onboarding, Create New Project mang host · phụ thuộc: 016
+- [x] [TASK-FE-E2E-018](./TASK-FE-E2E-018-add-project-host-selection-ux.md) P0 · Chọn sẵn host duy nhất, bắt chọn khi nhiều, chặn khi không có, giữ lựa chọn khi host ngắt · phụ thuộc: 016
+- [x] [TASK-FE-E2E-019](./TASK-FE-E2E-019-show-and-change-repo-host.md) P1 · Hiển thị host của repo, "Đổi host", lỗi có mã khi tạo worktree · phụ thuộc: 016; mã lỗi TASK-V2-028/029
+- [x] [TASK-FE-E2E-020](./TASK-FE-E2E-020-bounded-remote-file-browser.md) P1 · Browse folder có giới hạn, một lần gọi cho đường dẫn tuyệt đối, lỗi inline · phụ thuộc: TASK-V2-030, 018
+- [x] [TASK-FE-E2E-021](./TASK-FE-E2E-021-i18n-tests-and-live-spec.md) P1 · i18n 5 ngôn ngữ, test hợp đồng, Playwright mock, spec live thành hồi quy · phụ thuộc: 016 đến 020
+
+Định nghĩa xong của SOL-FE-E2E-004:
+
+- [ ] `run_ui_flow.py --repro add-project-worktree` XANH (repo tạm, tự dọn; `repo.list` trả `devServerId` của host đã chọn).
+- [ ] Vitest các file đã đổi xanh; Playwright `request-web` (kể cả spec mới) xanh; `tsc`/`oxlint` sạch trên file đã đổi.
+- [ ] Không hồi quy: `run_ui_flow.py --real all` 6/6.
+- [ ] Chuỗi mới có đủ en/es/ja/ko/zh; không màu/cỡ chữ mới (STYLEGUIDE ở `guides/STYLEGUIDE.md`).
+- [x] Tài liệu: ghi "Kết quả thực thi" vào từng task; TASK-FE-E2E-015 sang `[x]`.
+- [ ] Dọn dữ liệu: 0 repo/project `e2e-ui-repro-*` còn lại; repo thật của người dùng (ví dụ `codex`) không bị đổi.
+
 ## Định nghĩa "xong"
 
 - [~] Vitest của các file đã đổi xanh; `tsc` và `oxlint` sạch trên file đã đổi. Cả bộ `pnpm lint`/`typecheck`/vitest toàn frontend **không xanh** do lỗi có sẵn trên HEAD (thiếu `src/main`, `src/relay`, `window.api`, `jsdom`; `FleetServerStatusBadge`; `RequestBacklogRow`...), đã đối chiếu bằng bản sao HEAD sạch và không có test nào xanh ở HEAD mà đỏ bây giờ.

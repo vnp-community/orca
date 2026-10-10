@@ -20,9 +20,9 @@ const NOISE_RULES: NoiseRule[] = [
   {
     id: 'sidebar-worktrees-of-stale-projects',
     match:
-      /^(Failed to fetch worktrees for repo [0-9a-f-]{36}|Failed to list runtime detected worktrees|\[web-preload-api\] worktree\.detectedList failed for repo [0-9a-f-]{36}): .*WORKTREE_(DETECT|RESOLVE)_FAILED/,
+      /^(Failed to fetch worktrees for repo [0-9a-f-]{36}|Failed to list runtime detected worktrees|\[web-preload-api\] worktree\.detectedList failed for repo [0-9a-f-]{36}): .*(WORKTREE_(DETECT|RESOLVE)_FAILED|GITGATEWAY_(DEV_SERVER_UNREACHABLE|REPO_HOST_UNBOUND|HOST_CHECK_FAILED))/,
     reason:
-      'the sidebar lists worktrees of every project; older projects on the stack point at paths git-gateway cannot open (WORKTREE_DETECT_FAILED) or at dev servers that are gone or disconnected (WORKTREE_RESOLVE_FAILED); data left by earlier runs, not Request code. The sidebar retries them 6 to 14 times per load'
+      'the sidebar lists worktrees of every project; older projects on the stack point at paths git-gateway cannot open (WORKTREE_DETECT_FAILED) or at dev servers that are gone or disconnected (WORKTREE_RESOLVE_FAILED, and since V2-035 GITGATEWAY_DEV_SERVER_UNREACHABLE), or at repos saved before host binding that have no dev server (GITGATEWAY_REPO_HOST_UNBOUND); data left by earlier runs, not Request code. The sidebar retries them 6 to 14 times per load'
   },
   {
     id: 'scm-empty-branch-g5b',
