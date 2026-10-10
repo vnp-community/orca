@@ -30,11 +30,15 @@ export class GatewayRpcError extends Error {
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void }
 
+/** A push frame of a stream channel (the SPA dialect sends them as `streaming` replies with the subscribe call's id). */
+export type StreamFrame = { receivedAt: number; result: unknown }
+
 export class GatewayRpcClient {
   private ws: WebSocket | null = null
   private nextId = 0
   private readonly pending = new Map<string, Pending>()
   private buffer = ''
+  private readonly streams = new Map<string, (frame: StreamFrame) => void>()
   /** How many calls the request-service throttled and we retried, so a too-tight limit shows in the run output. */
   rateLimitRetries = 0
   /** Times the gateway dropped the socket and we logged in again (a restarted gateway looks exactly like this). */
@@ -116,11 +120,16 @@ export class GatewayRpcClient {
         id?: string
         ok?: boolean
         result?: unknown
+        streaming?: boolean
         error?: { code?: string; message?: string }
       }
       try {
         msg = JSON.parse(line)
       } catch {
+        continue
+      }
+      if (msg.id && msg.streaming) {
+        this.streams.get(msg.id)?.({ receivedAt: Date.now(), result: msg.result })
         continue
       }
       const pending = msg.id ? this.pending.get(msg.id) : undefined
@@ -162,6 +171,47 @@ export class GatewayRpcClient {
       })
       this.ws?.send(`${JSON.stringify({ id, authToken: 'cookie-auth', method, params })}\n`)
     })
+  }
+
+  /**
+   * Opens a push subscription (e.g. `task.activity.subscribe`): resolves on the ack, then `onFrame` gets every pushed
+   * frame until `close()` or the end of the socket. The spec uses it to see what the backend broadcasts while the UI shows
+   * (or fails to show) the same thing.
+   */
+  async subscribe(
+    method: string,
+    params: Record<string, unknown>,
+    onFrame: (frame: StreamFrame) => void
+  ): Promise<{ close: () => void }> {
+    if (!this.isOpen && !this.closedByUs) {
+      await this.reconnect()
+    }
+    const id = `live-e2e-sub-${++this.nextId}`
+    this.streams.set(id, onFrame)
+    try {
+      await new Promise<void>((resolveAck, rejectAck) => {
+        const timer = setTimeout(
+          () => rejectAck(new Error(`no ack to ${method} within 15000ms`)),
+          15_000
+        )
+        this.pending.set(id, {
+          resolve: () => {
+            clearTimeout(timer)
+            resolveAck()
+          },
+          reject: (e) => {
+            clearTimeout(timer)
+            rejectAck(e)
+          }
+        })
+        this.ws?.send(`${JSON.stringify({ id, authToken: 'cookie-auth', method, params })}\n`)
+      })
+    } catch (e) {
+      this.streams.delete(id)
+      this.pending.delete(id)
+      throw e
+    }
+    return { close: () => void this.streams.delete(id) }
   }
 
   /** A REQUEST_RATE_LIMITED reply is pacing, not failure: wait what the service asks and retry. */

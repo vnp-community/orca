@@ -8,7 +8,9 @@ CI has no Claude account, so `run_acceptance.py --ai-stub` puts this script wher
   claude --help
   claude auth status --json                         loggedIn follows FAKE_CLAUDE_LOGGED_IN (exit 1 when false, like the real CLI)
   claude -p --output-format json --tools "" [--no-session-persistence] --system-prompt <text> [--model <m>]   prompt on stdin (ai.complete)
-  claude --print <prompt> [--permission-mode plan --tools Read,Glob,Grep]   prompt in argv, plain stdout (agent.execPrompt, read-only analysis)
+  claude --print <prompt> [--output-format stream-json --verbose] [--permission-mode plan --tools Read,Glob,Grep]
+                                                    prompt in argv (agent.execPrompt, read-only analysis); stdout is plain text, or with
+                                                    stream-json one JSON event per line (system init, assistant text, result), like the real CLI
 
 Answers are keyed on the prompts the real request-service builds (classification, Solution, Plan, and the read-only
 diagnosis / findings / answer analyses) and are written to pass the real parsers and validators (ParseClassificationProposal,
@@ -26,6 +28,7 @@ import time
 
 VERSION = "0.0.0-fake-claude"
 MODEL = "fake-claude"
+SESSION_ID = "00000000-0000-0000-0000-00000000fake"
 
 HELP = """Usage: claude [options] [command] [prompt]
 
@@ -33,7 +36,8 @@ Fake Claude Code CLI for CI (not the real product).
 
 Options:
   -p, --print                        Print response and exit
-  --output-format <format>           Output format (only works with --print): "text", "json"
+  --output-format <format>           Output format (only works with --print): "text" (default), "json" (single result), or "stream-json" (realtime streaming)
+  --verbose                          Override verbose mode setting from config
   --tools <tools...>                 Specify the list of available tools; "" disables all tools
   --no-session-persistence           Disable session persistence
   --system-prompt <prompt>           System prompt to use for the session
@@ -98,7 +102,7 @@ def emit(result_text, is_error=False, api_status=None, prompt_len=0):
         "duration_ms": 1,
         "num_turns": 1,
         "result": result_text,
-        "session_id": "00000000-0000-0000-0000-00000000fake",
+        "session_id": SESSION_ID,
         "usage": {"input_tokens": max(1, prompt_len // 4), "output_tokens": max(1, len(result_text) // 4)},
         "modelUsage": {MODEL: {}},
     }
@@ -344,17 +348,45 @@ def run_print_stdin(argv):
     return emit(json.dumps(body), prompt_len=len(prompt))
 
 
+def stream_event(event):
+    sys.stdout.write(json.dumps(event) + "\n")
+    sys.stdout.flush()
+
+
+def stream_result(text, is_error=False):
+    """The `result` event of `--output-format stream-json`: `result` holds what text mode would have printed."""
+    stream_event({"type": "result", "subtype": "success", "is_error": is_error, "duration_ms": 1, "num_turns": 1, "result": text,
+                  "session_id": SESSION_ID, "usage": {"input_tokens": 1, "output_tokens": max(1, len(text) // 4)}})
+
+
 def run_print_arg(argv):
-    """agent.execPrompt: `claude --print <prompt> [flags]`, plain text on stdout (no JSON envelope), cwd is the project's repo."""
+    """agent.execPrompt: `claude --print <prompt> [flags]`, cwd is the project's repo. Plain text on stdout (no JSON envelope), or
+    one JSON event per line with `--output-format stream-json --verbose`."""
     i = argv.index("--print")
     prompt = argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith("--") else ""
     tools = flag_value(argv, "--tools")
     mode = flag_value(argv, "--permission-mode")
+    output_format = flag_value(argv, "--output-format") or "text"
+    verbose = "--verbose" in argv
     kind = prompt_kind(prompt)
     record("print", argv, len(prompt.encode("utf-8")), {"mode": "arg", "tools": tools, "permissionMode": mode, "promptKind": kind,
+                                                         "outputFormat": output_format, "verbose": verbose,
                                                          "prompt": prompt[:6000]})  # test fixture only: lets a failing run be diagnosed
+    if output_format not in ("text", "stream-json"):
+        sys.stderr.write(f"fake claude: --output-format {output_format!r} is not supported with a prompt in argv\n")
+        return 1
+    if output_format == "stream-json" and not verbose:
+        sys.stderr.write("Error: When using --print, --output-format=stream-json requires --verbose\n")  # the real CLI refuses the same way
+        return 1
+    streaming = output_format == "stream-json"
+    if streaming:
+        stream_event({"type": "system", "subtype": "init", "cwd": os.getcwd(), "session_id": SESSION_ID, "model": MODEL,
+                      "tools": sorted(t for t in (tools or "").split(",") if t), "permissionMode": mode or "default"})
     if not logged_in():
-        sys.stdout.write("Not logged in \u00b7 Please run /login\n")
+        if streaming:
+            stream_result("Not logged in \u00b7 Please run /login", is_error=True)
+        else:
+            sys.stdout.write("Not logged in \u00b7 Please run /login\n")
         return 1
     if tools is not None and not set(t for t in tools.split(",") if t) <= READONLY_TOOLS:
         sys.stderr.write(f"fake claude: refusing, --tools {tools!r} contains a tool that can write\n")
@@ -363,6 +395,12 @@ def run_print_arg(argv):
         sys.stderr.write("fake claude: no canned answer for this prompt\n")
         return 1
     body = readonly_answer(prompt, kind.split(":", 1)[1])
+    if streaming:
+        # No tool event: the fixture reads nothing, and the activity stream must not pretend it did.
+        stream_event({"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "text", "text": "Analysing the request (deterministic fixture, no repository file is read)."}]}, "session_id": SESSION_ID})
+        stream_result(json.dumps(body))
+        return 0
     sys.stdout.write(json.dumps(body) + "\n")
     return 0
 

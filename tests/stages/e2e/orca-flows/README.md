@@ -94,7 +94,56 @@ ORCA_E2E_LIVE=1 npx playwright test -c tests/configs/playwright.web.config.ts --
 
 Không có `ORCA_E2E_LIVE=1` spec tự bỏ qua. Cần: stack `deploy/dev` chạy, frontend ở `FRONTEND_HTTP_PORT` (đọc từ `deploy/dev/.env`, hoặc `ORCA_E2E_FRONTEND_URL`), admin từ `.env`/`ORCA_E2E_ADMIN_*`, `git` trên máy chạy test. Nếu có `docker` (đặt `DOCKER_HOST` cho Colima), spec so `RestartCount` của container `orca-go-api-gateway` (`ORCA_E2E_GATEWAY_CONTAINER`) trước và sau, và ghi gap nếu gateway restart. Dữ liệu tạo ra mang tiền tố `e2e-ui-<mmddhhmmss>` (project, repo tạm, Request) và bị dọn ở cuối (Request mở bị huỷ trước khi xoá project).
 
-Ảnh từng bước, ảnh lúc lỗi (`99-at-failure.png`) và `trace.zip` (chỉ khi lỗi hoặc có gap) nằm ở `test-results/` (git bỏ qua); cuối mỗi test in tóm tắt gồm các RPC mà UI bị từ chối. Trace chỉ bật **sau** khi đăng nhập vì trace ghi lại giá trị đã gõ; mật khẩu không bao giờ vào artifact. `ORCA_E2E_EXECUTE_AGENT=1` chưa tự động hoá việc duyệt Plan (spec chỉ ghi chú) vì duyệt sẽ chạy agent AI trên máy dev.
+Ảnh từng bước, ảnh lúc lỗi (`99-at-failure.png`) và `trace.zip` (chỉ khi lỗi hoặc có gap) nằm ở `test-results/` (git bỏ qua); cuối mỗi test in tóm tắt gồm các RPC mà UI bị từ chối. Trace chỉ bật **sau** khi đăng nhập vì trace ghi lại giá trị đã gõ; mật khẩu không bao giờ vào artifact. Test `change_request` ở trên không bao giờ duyệt Plan (chỉ ghi chú nếu `ORCA_E2E_EXECUTE_AGENT=1`) vì duyệt sẽ chạy agent AI trên máy dev; việc duyệt Plan để agent thật thực thi nằm ở nhóm `--real execute` ngay dưới, có lưới an toàn riêng.
+
+## Chạy với Claude Code THẬT, từ UI (`run_ui_flow.py --real`)
+
+Nhóm này (`ui-live/readonly-real.web.e2e.ts`, `ui-live/execute-real.web.e2e.ts`, TASK-FE-E2E-010) chạy agent Claude Code **thật** của dev server, không stub. Báo cáo ghi "AI mode: REAL Claude Code". Thiết kế an toàn và kết quả: `specs/frontend/bugs/e2e-acceptance-v1/tasks/TASK-FE-E2E-010-real-claude-ui-execution-and-readonly.md`.
+
+```bash
+python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real readonly   # question + bug: phân tích chỉ đọc (claude --print --permission-mode plan --tools Read,Glob,Grep)
+python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real execute    # duyệt Plan trên UI, agent thật THỰC THI (claude --dangerously-skip-permissions) trong repo tạm
+python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real monitor    # theo dõi phiên agent trên web (mục dưới)
+python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real all -- --grep "single step"   # lọc test
+```
+
+Vì task-service luôn gửi `trustPreset: "full"` cho `task.execute`, agent chạy `claude --dangerously-skip-permissions` với cwd là worktree: **không có sandbox nào của sản phẩm**. Nên spec tự dựng lưới an toàn (`real-flow-harness.ts`), và đây là điều kiện để được chạy:
+
+| Lớp | Việc làm |
+|---|---|
+| Repo tạm | project gắn vào `os.tmpdir()/e2e-ui-<mmddhhmmss>-real-XXXX/repo` (git init, 1 commit; mẫu ở `ui-live/fixture-repo/template`); worktree của task do git-gateway đặt cạnh nó (`repo-task-<id>`), nên mọi thứ nằm trong một thư mục gốc duy nhất và bị xoá sau. Không bao giờ dùng repo `orca` hay repo của người dùng |
+| Hook chặn | `.claude/settings.json` của repo tạm có hook `PreToolUse` (`tool-guard.mjs`) từ chối đọc/ghi ngoài thư mục gốc, `..`/`~`/`$HOME` thoát ra, mạng, `git push/remote/config`, `sudo`, `curl`... Nó ghi nhật ký mọi lệnh gọi và mọi từ chối; có từ chối thì spec đỏ ngay. Chạy hook bằng đường dẫn tuyệt đối tới `node` (PATH của agent không có `/opt/homebrew/bin`, hook lỗi thì claude BỎ QUA nó, tức fail-open) và có tự kiểm tra trước khi chạy (`selfTestGuard`) với đúng PATH của agent. Giới hạn thật: heuristic cho Bash, không phải sandbox |
+| Dấu vân tay trước/sau | repo `orca` (và `ORCA_E2E_GUARD_PATHS`, mặc định thêm `AGENT_WORK_DIR`): HEAD, refs, worktree list, `.git/config`, mọi file đổi/untracked kèm băm nội dung; danh sách tên trong `$HOME`, `~/Desktop`, thư mục cha của repo; tiến trình `claude --print` còn sót; thư mục tạm còn sót. Khác một byte là đỏ. Cần cây yên tĩnh: spec đợi `ORCA_E2E_QUIET_SECONDS` (mặc định 90 giây) không ai sửa rồi mới bắt đầu. `ORCA_E2E_GUARD_IGNORE=specs/:docs/` bỏ qua tiền tố mà con người sửa trong lúc chạy (chỉ nên đặt cho thư mục tài liệu) |
+| Watchdog | mỗi 15 giây so dấu vân tay nhẹ; vi phạm hoặc hook từ chối thì giết cây tiến trình `claude --print` có cwd trong thư mục tạm (không phải cả nhóm tiến trình, vì sẽ giết cả agent), đóng trang, đỏ |
+| Giới hạn thời gian | hạn cứng `ORCA_E2E_REAL_TIMEOUT_MIN` (mặc định 25 phút thực thi, 15 phút chỉ đọc); task `in_progress` 90 giây mà không có tiến trình claude thì đỏ `TASK-STUCK-IN-PROGRESS`; cổng Phase không mở sau 90 giây thì đỏ `PHASE-GATE-NEVER-OPENED` |
+| Duyệt Plan | trước khi bấm duyệt, spec đọc Plan (tối đa 8 task, không có đường dẫn ngoài repo/cài đặt/mạng/deploy/push) |
+| Dọn | kể cả khi đỏ: giết claude trước, huỷ Request (thử lại tới 90 giây; task kẹt `in_progress` không có tiến trình thì bị huỷ), xoá project, xoá thư mục tạm; sau lượt chạy `report_orphan_requests.py` phải sạch (`run_ui_flow.py` kiểm và trả mã 3 nếu không) |
+
+Điều kiện chạy: `ORCA_E2E_LIVE=1`, `ORCA_E2E_READONLY_ANALYSIS=1` (chỉ đọc) và/hoặc `ORCA_E2E_EXECUTE_AGENT=1` (thực thi), không có `ORCA_E2E_AI_MODE=stub`. `run_ui_flow.py --real` đặt đủ. Thiếu thì spec `skipped`.
+
+Mỗi lượt in số liệu: số lệnh gọi công cụ mà hook thấy, số lần hook từ chối, số vấn đề an toàn, thời lượng. Console của trình duyệt: mọi `error`/`warning` được ghi kèm bước đang chạy vào `console-report.json` và log (`[console:<slug>]`), phân loại theo `ui-live/live-console-audit.ts`; mục ngoài allowlist làm đỏ spec (áp dụng cho cả 3 test cũ).
+
+## Theo dõi phiên agent trên web (`run_ui_flow.py --real monitor`)
+
+Spec `ui-live/agent-session-monitoring-real.web.e2e.ts` (TASK-FE-E2E-011) chạy một Plan một task với Claude Code **thật**, cùng lưới an toàn như nhóm `--real` ở trên, nhưng kiểm điều mà các test trên chưa kiểm: người dùng có theo dõi được **agent** (không chỉ trạng thái task) từ giao diện web hay không.
+
+```bash
+python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real monitor            # chỉ test này
+python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real all                # readonly + execute + monitor
+node --test tests/stages/e2e/orca-flows/ui-live/live-agent-session-judge.test.ts   # luật phán quyết, không cần stack hay AI
+```
+
+Trong lúc agent chạy, spec mở sheet task từ tab Plan (trang chính), mở Cài đặt → Dev Servers ở tab thứ hai, và nghe kênh `task.activity.subscribe` của gateway bằng kết nối riêng (mở trước khi duyệt Plan). Sau khi xong nó tải lại trang, mở lại task, đọc các tab của Request, bấm "Open in Git". Mỗi điều kiện không đạt là một **gap** có mã và chủ sở hữu (`[frontend]`/`[backend]`/`[agent]`), không bao giờ được nới để xanh:
+
+| Mã | Ý nghĩa |
+|---|---|
+| `DEVSERVER-OFFLINE-IN-UI`, `DEVSERVER-NO-BUSY-STATE` | dev server phải online, và trạng thái phải khác nhau giữa "agent đang chạy" và "rảnh" |
+| `UI-NO-PATH-TO-TASK`, `UI-NO-RUNNING-INDICATOR`, `UI-TASK-STATUS-STALE` | đi từ Request tới task đang chạy, thấy "Agent running", trạng thái cập nhật không cần F5 |
+| `AGENT-OUTPUT-NOT-BROADCAST`, `AGENT-OUTPUT-NOT-STREAMED` | backend/agent phải phát output của agent khi nó đang chạy (không chỉ ở cuối) |
+| `UI-AGENT-OUTPUT-NOT-SHOWN`, `UI-AGENT-OUTPUT-NOT-LIVE` | điều backend phát phải hiện trên màn hình task, trong lúc chạy |
+| `UI-NO-SESSION-HISTORY`, `UI-NO-RUN-TRACE`, `UI-NO-WORKTREE-VIEW` | sau khi xong và tải lại, phải xem lại được agent đã làm gì (sửa `src/calc.py`, chạy test) |
+
+Kiểm cứng: không có bí mật (biến có tên PASSWORD/TOKEN/SECRET/KEY của `deploy/dev/.env` và môi trường, dạng `sk-ant-`, khối khoá riêng, `Bearer eyJ`) trong bất kỳ màn hình nào đã đọc hay frame hoạt động (`SECRET-LEAK`, chỉ in tên biến); lỗi console của cả hai trang qua allowlist. Kết quả khảo sát (cái gì có/không có trên web) và danh sách lỗi: `specs/frontend/bugs/e2e-acceptance-v1/tasks/TASK-FE-E2E-011-agent-session-monitoring-in-ui.md`. Kết quả thật (2026-10-10, sau redeploy lần 4): `--real monitor` XANH và `--real all` 6/6 XANH (21.4 phút). Từ UI: panel Agent activity hiện dòng `▸ Read/Edit/Bash` lúc chạy rồi `Finished`, dev server Busy/Idle/healthy/platform, nút "Agent running", tab Result xem lại được, "Open in Git" mở terminal + Source Control liệt kê `src/calc.py` và `tests/test_calc.py`, không lộ bí mật. Còn mở nhưng không làm đỏ: G5d/G5e (bấm vào file đã đổi thì panel diff vỡ; spec ghi annotation `known-gap`, console nằm trong allowlist `diff-view-crash-g5d`), G5b (`scm-empty-branch-g5b`). `ORCA_E2E_LIVE_GAPS=annotate` chỉ ghi lại thay vì làm đỏ. Hai tab của cùng một trình duyệt dùng chung "view gần nhất" của SPA nên spec rời Settings ("Back to app") trước khi tải lại.
 
 ## Bốn trạng thái kết quả
 

@@ -29,6 +29,11 @@ function readEnvFile(path: string): Record<string, string> {
   return values
 }
 
+/** The stack's own env file (deploy/dev/.env) as a map; read by the leak check, never logged. */
+export function readStackEnv(): Record<string, string> {
+  return readEnvFile(STACK_ENV_FILE)
+}
+
 export type LiveStackConfig = {
   gatewayUrl: string
   frontendUrl: string

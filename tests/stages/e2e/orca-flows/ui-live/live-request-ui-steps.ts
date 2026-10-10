@@ -10,6 +10,11 @@ export const detailPane = (page: Page): Locator => page.getByTestId('request-det
 
 export async function openRequestsPage(page: Page): Promise<void> {
   await dismissFirstRunTip(page)
+  // Why: the SPA restores the last view, and another tab of the same browser may have left it on Settings.
+  const back = page.getByRole('button', { name: 'Back to app' })
+  if (await back.isVisible()) {
+    await back.click()
+  }
   const tab = page.getByRole('tab', { name: 'Requests' })
   // Why: the SPA restores the last view on reload, and clicking the active nav button is not needed then.
   if (!(await tab.isVisible())) {
@@ -43,7 +48,9 @@ export async function selectRequestRow(page: Page, title: string): Promise<void>
 export async function reloadAndReopen(page: Page, title: string): Promise<void> {
   // Why: the SPA keeps long-lived connections open and 'load' can take very long; the shell check below is the real readiness test.
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(requestsNavButton(page)).toBeVisible({ timeout: 45_000 })
+  await expect(
+    requestsNavButton(page).or(page.getByRole('button', { name: 'Back to app' }))
+  ).toBeVisible({ timeout: 45_000 })
   await dismissFirstRunTip(page)
   await openRequestsPage(page)
   await selectRequestRow(page, title)
@@ -78,9 +85,18 @@ export async function answerClarificationInPanel(page: Page, answer: string): Pr
       await switches.nth(i).check()
     }
   }
-  const groups = panel.getByRole('radiogroup')
+  // Why: single_choice and boolean are Radix ToggleGroups (role "group" with radio items), `radiogroup` only for native radios.
+  const groups = panel.locator('[role="radiogroup"], [role="group"]').filter({
+    has: page.getByRole('radio')
+  })
   for (let i = 0; i < (await groups.count()); i++) {
-    await groups.nth(i).getByRole('radio').first().click()
+    const radios = groups.nth(i).getByRole('radio')
+    if (
+      (await radios.count()) > 0 &&
+      (await groups.nth(i).locator('[aria-checked="true"]').count()) === 0
+    ) {
+      await radios.first().click()
+    }
   }
   const submit = panel.getByRole('button', { name: /submit answers/i })
   const enabled = await expect(submit)

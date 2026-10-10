@@ -2,13 +2,11 @@
 
 Ký hiệu: `[x]` xong, `[~]` một phần, `[ ]` chưa làm, `[-]` không làm.
 
-## Trạng thái thực thi (2026-10-10)
+## Trạng thái thực thi (2026-10-10, cuối đợt)
 
-**8/8 task đã làm, 1 task có điều kiện còn `[~]` (FE-007).** Thêm TASK-FE-E2E-009 cho các lỗi tìm thấy khi chạy UI thật. Bằng chứng chính: `run_ui_flow.py --ai-stub` 3/3 xanh (change_request, ask-back, question), `ask-back` 6/6 liên tiếp, và `change_request` với Claude thật xanh (có một vòng "Hỏi lại" thật); gateway không restart. Suite Playwright mock `request-web` 35 xanh, 1 skipped có sẵn. Vitest: tất cả test file thay đổi xanh; còn các file đỏ có sẵn trên HEAD (thiếu `src/main`, `src/relay`, `window.api`, `jsdom`...). Chi tiết số liệu ở từng file task.
+**FE-E2E-001..014 đã làm; FE-007 còn `[~]`.** E2E qua UI với **Claude Code thật, không stub** (`run_ui_flow.py --real all`): 6/6 xanh, 21.4 phút — thực thi `change_request` có Phase (5 task phụ thuộc), task có phụ thuộc, task 1 bước; phân tích chỉ đọc `question`, `bug`; theo dõi phiên agent trên web (panel Agent activity có dòng `▸ Read/Edit/Bash` thật, dev server busy/idle + `macOS · arm64`, tab Result "Agent output", Open in Git hiện file đổi, terminal worktree mở được). Với AI stub: 3/3 test request-live xanh, `ask-back` 6/6. Playwright mock `request-web` xanh. Mọi lượt: 0 vi phạm an toàn, 0 Request mồ côi, 0 console error chưa phân loại.
 
-Lỗi sản phẩm tìm thấy nhờ chạy qua UI thật (đều đã sửa): gateway panic `send on closed channel`; `task.list` không phục vụ tab Plan; Solution không tự sinh sau Clarification (consumer thiếu danh tính); phân tích chỉ đọc thiếu `repo_path`; câu hỏi chặn của Solution không có đường trả lời (kênh `clarification.request`); `RequestClarification` bị đánh dấu nội bộ; UI giữ Solution cũ sau khi bị thay.
-
-Còn mở: `ApprovalGates.CheckPlan` (chặn duyệt Plan khi còn giả định chưa xác nhận) chưa được handler duyệt Plan nào gọi, nên UI đã sẵn sàng hiển thị `REQUEST_PLAN_UNCONFIRMED_ASSUMPTIONS` nhưng không có luồng thật phát mã này (cần quyết định nghiệp vụ theo CR-REQ-028); duyệt Plan để thực thi agent AI chưa được e2e.
+Còn mở (chi tiết ở [README backend](../../../../backend-go/bugs/e2e-acceptance/README.md) mục 5): G5b `SCM_EMPTY_BRANCH`; G5d/G5e diff của file đã đổi vỡ (đang ghi `known-gap` trong spec); lịch sử từng dòng hoạt động không được lưu sau khi tải lại; kiểm Electron; vitest/lint toàn frontend đỏ do lỗi có sẵn trên HEAD; quyết định hướng A/B (phiên PTY theo TDD hay `execPrompt`) và B4 (quyền `--dangerously-skip-permissions`).
 
 ## Thứ tự
 
@@ -44,6 +42,12 @@ FE-001 và FE-002 làm trước (P0): chúng làm cho lỗi hợp đồng kế t
 ### Phát sinh khi chạy UI thật
 
 - [x] [TASK-FE-E2E-009](./TASK-FE-E2E-009-ui-live-findings-frontend.md) P1 · Tab Plan, nút Generate solution, thanh duyệt, câu hỏi chặn + "Hỏi lại", lỗi `REQUEST_PLAN_UNCONFIRMED_ASSUMPTIONS`, Solution cũ sau supersede · phụ thuộc: TASK-FE-E2E-004, 005, 006 và các sửa backend TASK-V2-022/023
+
+- [x] [TASK-FE-E2E-010](./TASK-FE-E2E-010-real-claude-ui-execution-and-readonly.md) P0 · E2E thật qua UI với Claude Code thật (không stub): phân tích chỉ đọc, duyệt Plan và thực thi (Phase, phụ thuộc), thiết kế an toàn nhiều lớp
+- [x] [TASK-FE-E2E-011](./TASK-FE-E2E-011-agent-session-monitoring-in-ui.md) P0 · Theo dõi phiên agent trên web (bản đồ, spec `--real monitor`): panel hoạt động, dev server busy, tab Result, Open in Git
+- [x] [TASK-FE-E2E-012](./TASK-FE-E2E-012-agent-live-activity-stream-and-panel.md) P0 · Luồng hoạt động đọc được của agent (stream-json) và panel Agent activity
+- [x] [TASK-FE-E2E-013](./TASK-FE-E2E-013-task-sheet-fixes.md) P1 · Sheet task của Request: "Open in Git" điều hướng thật, bố cục chật, Escape chỉ đóng sheet, gợi ý tab Result · phụ thuộc: TASK-FE-E2E-011, 012
+- [x] [TASK-FE-E2E-014](./TASK-FE-E2E-014-open-in-git-source-control-empty.md) P1 · "Open in Git" mở Source Control nhưng không có thay đổi (một repo lỗi `worktree.detectedList` làm mất mọi worktree), spawn-helper của node-pty tự sửa quyền · phụ thuộc: TASK-FE-E2E-011, 013
 
 ## Định nghĩa "xong"
 

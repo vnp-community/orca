@@ -32,6 +32,9 @@ def _check_ai_complete_call(c: dict, repo: str) -> None:
     assert c["stdinBytes"] > 0, "the prompt was not delivered on stdin"
 
 
+READONLY_PRINT_FLAGS = ["--output-format", "stream-json", "--verbose", "--permission-mode", "plan", "--tools", "Read,Glob,Grep"]
+
+
 def _check_readonly_analysis_call(c: dict, repo: str, stack_env: dict) -> None:
     argv = c["argv"]
     assert argv[0] == "--print" and len(argv) > 1 and not argv[1].startswith("--"), f"read-only analysis argv does not start with `--print <prompt>`: {argv[:2]!r}"
@@ -39,6 +42,9 @@ def _check_readonly_analysis_call(c: dict, repo: str, stack_env: dict) -> None:
     assert c["permissionMode"] == "plan", f"read-only analysis ran with --permission-mode {c['permissionMode']!r}, expected 'plan'"
     tools = set(t for t in (c["tools"] or "").split(",") if t)
     assert tools and tools <= READONLY_TOOLS, f"read-only analysis was given tools {sorted(tools)!r}; only {sorted(READONLY_TOOLS)} may be allowed"
+    # Exact form: the activity stream (stream-json needs --verbose) first, then the read-only guard. An extra or reordered flag is a change to review.
+    assert argv[2:] == READONLY_PRINT_FLAGS, f"read-only analysis flags are {argv[2:]!r}, expected exactly {READONLY_PRINT_FLAGS!r}"
+    assert (c["outputFormat"], c["verbose"]) == ("stream-json", True), f"read-only analysis did not use the activity stream: {c['outputFormat']!r}, verbose={c['verbose']!r}"
     flags = [a for a in argv[2:] if a.startswith("--")]
     forbidden = [f for f in flags if f in ("--dangerously-skip-permissions", "--allow-dangerously-skip-permissions", "--allowedTools", "--allowed-tools")]
     assert not forbidden, f"read-only analysis passed {forbidden!r}"
@@ -91,7 +97,7 @@ def run_after_logged_in_suites(ctx: AcceptanceContext) -> None:
             else:
                 _check_readonly_analysis_call(c, repo, ctx.cfg.stack_env)
     rec.run("AST-02", "Every claude call is locked down: ai.complete = `-p --output-format json --tools \"\"` + empty scratch cwd + stdin; "
-                      "read-only analysis = `--print` with plan mode and read-only tools, in the project's repo, with no secret in the prompt", every_claude_call_was_locked_down)
+                      "read-only analysis = `--print --output-format stream-json --verbose` with plan mode and read-only tools, in the project's repo, with no secret in the prompt", every_claude_call_was_locked_down)
 
     def every_prompt_was_recognised():
         calls = [c for c in _stub(ctx).calls() if c["kind"] == "print"]

@@ -2,7 +2,7 @@ package usecase_test
 
 // Compiled into request-service's usecase package only through `go test -overlay` (see verify-against-request-service.sh),
 // so nothing is added to backend-go. It builds prompts with the REAL prompt builders, runs the fake `claude` on them
-// exactly as the agent does (ai.complete: stdin + JSON envelope; read-only analysis: `--print <prompt>` + plain stdout), and feeds
+// exactly as the agent does (ai.complete: stdin + JSON envelope; read-only analysis: `--print <prompt>` in stream-json mode, answer = the `result` event), and feeds
 // the answer to the REAL parsers and validators. When a prompt or a validator
 // changes in request-service, this fails before the nightly e2e does.
 
@@ -176,15 +176,15 @@ func TestFakeClaude_FeedbackReachesThePlan(t *testing.T) {
 	}
 }
 
-// askFakeClaudeReadonly mirrors agent-print-mode-exec.ts for accessMode=readonly: argv `--print <prompt> --permission-mode plan
-// --tools Read,Glob,Grep`, stdout is the model text itself.
+// askFakeClaudeReadonly mirrors agent-print-mode-exec.ts for accessMode=readonly: argv `--print <prompt> --output-format stream-json
+// --verbose --permission-mode plan --tools Read,Glob,Grep`; the agent hands the caller the `result` event's text as stdout.
 func askFakeClaudeReadonly(t *testing.T, prompt string) string {
 	t.Helper()
 	bin := os.Getenv("FAKE_CLAUDE_BIN")
 	if bin == "" {
 		t.Skip("FAKE_CLAUDE_BIN is not set")
 	}
-	cmd := exec.Command(bin, "--print", prompt, "--permission-mode", "plan", "--tools", "Read,Glob,Grep")
+	cmd := exec.Command(bin, "--print", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "plan", "--tools", "Read,Glob,Grep")
 	cmd.Dir = t.TempDir()
 	cmd.Env = append(os.Environ(), "FAKE_CLAUDE_STATE_DIR="+t.TempDir(), "FAKE_CLAUDE_LOGGED_IN=1")
 	var out, errb bytes.Buffer
@@ -192,7 +192,27 @@ func askFakeClaudeReadonly(t *testing.T, prompt string) string {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("fake claude --print failed: %v\n%s%s", err, out.String(), errb.String())
 	}
-	return out.String()
+	answer, found := "", false
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+		var ev struct {
+			Type    string `json:"type"`
+			IsError bool   `json:"is_error"`
+			Result  string `json:"result"`
+		}
+		if err := json.Unmarshal([]byte(line), &ev); err != nil {
+			t.Fatalf("stream-json line is not JSON: %v\n%s", err, line)
+		}
+		if ev.Type == "result" {
+			if ev.IsError {
+				t.Fatalf("fake claude ended with an error result: %s", ev.Result)
+			}
+			answer, found = ev.Result, true
+		}
+	}
+	if !found {
+		t.Fatalf("no result event in the stream:\n%s", out.String())
+	}
+	return answer + "\n"
 }
 
 func TestFakeClaude_ReadonlyAnalysisPassesTheRealValidators(t *testing.T) {

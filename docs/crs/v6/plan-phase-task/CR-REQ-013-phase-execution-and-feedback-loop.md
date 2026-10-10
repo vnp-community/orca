@@ -31,7 +31,7 @@ README v6 giao cho CR này: `StartPhase`, chạy task lá của Phase đã duy�
 
 ### 2.1 Đơn vị chạy
 
-Task lá của Phase (con trực tiếp của `phase`) hoặc, với Plan không có Phase, con trực tiếp của `plan`; riêng `hotfix` là task `single_task`. Không bao giờ `Execute` trên `plan`/`phase` (bị chặn ở CR-REQ-011). Task có `depends_on` đi Engine 2 qua `selectEngine`, task thường Engine 1; `request-service` không chọn engine.
+Task lá của Phase (con trực tiếp của `phase`) hoặc, với Plan không có Phase, con trực tiếp của `plan`; riêng `hotfix` là task `single_task`. Không bao giờ `Execute` trên `plan`/`phase` (bị chặn ở CR-REQ-011). Task có `request_id` luôn đi Engine 1 (direct agent) kể cả khi có `depends_on`, vì thứ tự do `AdvanceExecution` điều phối (sửa theo TASK-V2-024: trước đó `depends_on` đẩy task sang Engine 2, coordinator không chạy agent và task kẹt `in_progress`); Engine 2 chỉ còn cho task có subtask, hoặc task không thuộc Request có `depends_on`. `request-service` không chọn engine.
 
 ### 2.2 `task-service`: phát sự kiện đầy đủ cho task thuộc Request
 
@@ -81,7 +81,7 @@ Không có Phase (Plan trực tiếp, `task_list`, `hotfix`): consumer sự ki�
 3. Với mỗi task chọn được: hỏi `TypePolicy.PreExecutionGate(task)` (CR-REQ-014; mặc định cho qua). Cổng chưa duyệt thì `OpenApproval` (CR-REQ-009, idempotent theo chủ thể đang `pending`) và dừng task đó, không báo lỗi. `approval.decided` đã duyệt của `pre_deploy` (ops_request) kích lại `AdvanceExecution` qua consumer idempotent dùng `processed_events`.
 4. Worktree dùng chung (xem 2.7): task đầu tiên của Plan chạy trước; sau khi có `worktree_id`, `UpdateTask(worktree_id)` cho các task còn lại trước khi chạy.
 5. `task-service` `Execute(task_id, request_id = "req:<request_id>:<task_id>:<attempt>")`. Lỗi `TASK_EXECUTE_ALREADY_IN_PROGRESS` coi như thành công. `TASK_EXECUTE_NO_CONNECTION`, `TASK_EXECUTE_WORKTREE_FAILED`, `TASK_EXECUTE_FAILED`: không đếm vào số lần thử; thử lại ở vòng đối soát tối đa `REQUEST_DISPATCH_RETRY_WINDOW` (mặc định 15 phút) rồi trả backlog (2.6).
-6. Danh tính khi gọi: người duyệt Phase (`decided_by`), hoặc người duyệt Plan khi không có Phase; cần quyền `execute` trên task (Grant kế thừa theo cây từ người tạo Plan). Thiếu quyền: `REQUEST_EXECUTE_FORBIDDEN`, không tự đổi sang danh tính khác. Cơ chế danh tính service-to-service chưa kiểm chứng (xem mục 6).
+6. Danh tính khi gọi: người bắt đầu Phase, hoặc người duyệt Plan gần nhất khi không có Phase (người báo cáo là phương án cuối); cần quyền `execute` trên task. Chỉ người commit Plan là chủ cây trong task-service, nên trước khi dùng một danh tính, request-service bảo đảm danh tính đó có quyền (`ExecutionAccess`): nếu `ResolvePermission(execute)` từ chối thì ghi một grant mức `user` (đọc, ghi, thực thi; không có `manage`), `apply_tree`, trên gốc cây của Request, dưới danh nghĩa chủ của gốc đó. Danh tính này đã được request-service cho phép (người duyệt qua chính sách duyệt, người bắt đầu qua `StartPhaseAuthorizer`, người báo cáo là chủ Request), nên grant không mở quyền cho ai ngoài những người đó; không ghi được (gốc không có chủ, hoặc chủ không còn quyền quản lý) thì `REQUEST_EXECUTE_FORBIDDEN`, không tự đổi sang danh tính khác. Việc này xảy ra trước khi ghi `phase_starts`, nên không để lại claim của người không chạy được.
 
 ### 2.5 Consumer `ReportTaskOutcome`
 
@@ -198,7 +198,7 @@ Vì mỗi task mặc định có worktree riêng, task sau không thấy thay đ
 - Tự đặt `done` bỏ qua bước review tay của task; `UpdateTask(done)` phát `orca.task.task.completed` cho mỗi task lá nên `notification-service` có thể đẩy thông báo hàng loạt. Cần quyết định có gắn cờ bỏ thông báo cho task thuộc Request.
 - Run Engine 2/3 báo xong bất đồng bộ sau khi link bị đánh dấu `completed` ngay lúc dispatch (CR-TG-008); chỉ `ReportTaskExecutionResult` mới là tín hiệu thật. Phụ thuộc orchestration-service gọi callback đúng (CR-TG-008 ghi chưa thử đầu cuối).
 - Không có RPC dừng run: huỷ Request không dừng agent đang chạy.
-- Quyền `execute` cho người duyệt Phase chưa chắc có trên task do người khác tạo; lỗi ở runtime là `REQUEST_EXECUTE_FORBIDDEN`.
+- Quyền `execute` cho người duyệt Phase trên task do người khác commit: đã xử lý bằng grant mức `user` ở mục 2.4 bước 6 (TASK-V2-025). Còn lại: grant không tự thu hồi khi Request xong, người chủ cây thu hồi bằng `RevokeGrant`; grant theo team và hết hạn chưa được kiểm trong fake của test.
 
 ## 7. Câu hỏi mở
 

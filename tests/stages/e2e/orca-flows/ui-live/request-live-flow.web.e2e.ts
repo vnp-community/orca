@@ -15,12 +15,12 @@
 import { test } from '@playwright/test'
 import {
   answerClarificationIfAsked,
-  approveAnalysis,
   cancelThroughTheUi,
   createClassifyAndConfirm,
   generatePlanThroughTheUi,
   rejectPlanApprovalAndCancel
 } from './live-flow-steps'
+import { approveAnalysis } from './live-analysis-approval-steps'
 import { runLiveFlow } from './live-flow-harness'
 import { isLiveRun, loadLiveStackConfig } from './live-stack-config'
 

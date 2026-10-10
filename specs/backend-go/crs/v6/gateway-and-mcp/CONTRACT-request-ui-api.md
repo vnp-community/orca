@@ -251,6 +251,42 @@ Lỗi của `clarification.request`: `REQUEST_CLARIFICATION_STATE_NOT_ALLOWED` (
 
 Kết quả giữ `{tasks, nextPageToken}`; mỗi task thêm `requestId` (vắng nếu task không thuộc Request). Phạm vi vẫn là tenant của người gọi (task-service không lọc theo grant ở `ListTasks`); Plan và Phase do `CreatePlanTree` cấp quyền owner (`ApplyTree`) cho người tạo Request.
 
+### 2.8 `execution.get` (TASK-V2-025)
+
+Tab Result của sheet task (`useExecutionResult`). Gateway gọi `ListExecutionRecords(task_ids=[taskId], latest_only)` rồi, nếu task không có bản ghi, `GetTaskExecutionOutput(task_id)`; task-service kiểm quyền đọc task ở cả hai lời gọi.
+
+| Kênh | Tham số | Kết quả |
+|---|---|---|
+| `execution.get` | `{taskId, latestOnly?}` | `ExecutionResultView` |
+
+```
+interface ExecutionResultView {          // camelCase; parseExecutionResult của frontend đọc đúng hình này
+  taskId: string
+  attempt?: number                       // vắng khi source = "last_execution_output"
+  parseStatus: 'ok' | 'missing' | 'invalid'
+  status?: 'done' | 'blocked' | 'failed' | 'needs_info'
+  summary?: string                       // đã che bí mật
+  filesChanged: string[]                 // file agent thấy đổi trong worktree trước, rồi file agent tự khai
+  checksRun: { id: string; exit: number }[]
+  failureClass?: string
+  stdoutTail?: string                    // đã che bí mật, tối đa 8 KiB cuối
+  outputs?: Record<string, unknown>      // đã che bí mật trong mọi chuỗi
+  source: 'execution_record' | 'last_execution_output'
+  redacted?: boolean; truncated?: boolean
+}
+```
+
+- `source = "execution_record"`: lượt chạy hợp đồng (CR-REQ-029) có khối kết quả. `verdict` không bao giờ có ở kênh này (là việc của bước kiểm của request-service).
+- `source = "last_execution_output"`: lượt chạy thành công không có khối kết quả (mọi task của Request hiện nay): `parseStatus = "missing"`, `stdoutTail` là stdout của lượt chạy cuối thành công.
+- Chưa có gì để hiện: lỗi `TASK_NOT_FOUND: ...` (UI đọc là `legacy`). Không đủ quyền đọc task: `TASK_FORBIDDEN: ...`. Lỗi khác: `TASK_UNAVAILABLE: ...` (không lộ nội dung lỗi của service).
+- Lượt chạy lỗi không để lại output ở đây (task-service chỉ lưu stdout của lượt thành công); lỗi gần nhất của task nằm ở `backlog.tasks` (`lastError`).
+
+### 2.9 `devServer.list` thêm trạng thái bận, và `devServer.subscribeStatus` (TASK-V2-025)
+
+`devServer.list` và `devServer.listForUser` thêm `activeExecutions: number` và `busy: boolean` vào mỗi dev server (nguồn: số lượt `agent.execPrompt` và `ai.complete` đang chờ trả lời trên phiên sống của dev server; luôn `0`/`false` khi `status != "connected"`). `platform`, `arch`, `nodeVersion` nay lấy từ handshake của agent (null khi chưa biết), `healthStatus` thành `healthy` sau lần handshake đầu.
+
+`devServer.subscribeStatus` (kênh push, không có tham số) đẩy `devServer.statusChanged` với `{devServerId, connected, activeExecutions, busy}` khi dev server nối, rớt, hoặc bắt đầu/kết thúc một lượt chạy. Là ảnh chụp trạng thái (không phải thay đổi) và tạm thời: client nên gọi `devServer.list` một lần khi mở, rồi để sự kiện ghi đè.
+
 ## 3. Sự kiện thời gian thực: `request.subscribe`
 
 - Mở: `request.subscribe {id?}`. Có `id`: chỉ sự kiện của Request đó; không `id`: mọi sự kiện Request trong tenant của người dùng, lọc thêm theo quyền đọc. Gateway gọi `GetRequest` một lần để kiểm quyền khi có `id`.

@@ -144,5 +144,62 @@ class FakeClaudeReadonlyAnalysis(unittest.TestCase):
         self.assertEqual(json.loads(done.stdout)["kind"], "diagnosis")
 
 
+STREAM_ARGS = ["--output-format", "stream-json", "--verbose", "--permission-mode", "plan", "--tools", "Read,Glob,Grep"]
+
+
+class FakeClaudeStreamJson(unittest.TestCase):
+    def ask(self, kind, extra=None, env=None):
+        return run_stub(["--print", READONLY_PROMPT.replace("KIND", kind)] + (STREAM_ARGS if extra is None else extra), env=env)
+
+    @staticmethod
+    def events(done):
+        return [json.loads(line) for line in done.stdout.splitlines()]
+
+    def test_help_advertises_the_flags_the_agent_probes_for_the_activity_stream(self):
+        done, _, _ = run_stub(["--help"])
+        self.assertRegex(done.stdout, r"--output-format[^\n]*stream-json")
+        self.assertRegex(done.stdout, r"(?:^|[\s,])--verbose(?=[\s<=,]|$)")
+
+    def test_emits_init_assistant_text_and_a_result_whose_text_is_the_plain_mode_answer(self):
+        done, calls, _ = self.ask("diagnosis")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        events = self.events(done)
+        self.assertEqual([e["type"] for e in events], ["system", "assistant", "result"])
+        self.assertEqual(events[0]["subtype"], "init")
+        self.assertEqual(events[0]["tools"], ["Glob", "Grep", "Read"])
+        self.assertFalse(events[2]["is_error"])
+        self.assertEqual(json.loads(events[2]["result"])["kind"], "diagnosis")
+        plain, _, _ = self.ask("diagnosis", ["--permission-mode", "plan", "--tools", "Read,Glob,Grep"])
+        self.assertEqual(json.loads(plain.stdout), json.loads(events[2]["result"]))
+        self.assertEqual((calls[-1]["outputFormat"], calls[-1]["verbose"], calls[-1]["mode"]), ("stream-json", True, "arg"))
+
+    def test_the_fixture_claims_no_tool_call_because_it_reads_nothing(self):
+        done, _, _ = self.ask("findings")
+        blocks = [b for e in self.events(done) if e["type"] == "assistant" for b in e["message"]["content"]]
+        self.assertEqual({b["type"] for b in blocks}, {"text"})
+
+    def test_stream_json_without_verbose_is_refused_like_the_real_cli(self):
+        done, _, _ = self.ask("diagnosis", ["--output-format", "stream-json", "--permission-mode", "plan", "--tools", "Read,Glob,Grep"])
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("requires --verbose", done.stderr)
+
+    def test_a_tool_that_can_write_is_still_refused(self):
+        done, _, _ = self.ask("diagnosis", ["--output-format", "stream-json", "--verbose", "--permission-mode", "plan", "--tools", "Read,Edit"])
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("can write", done.stderr)
+        self.assertNotIn("result", [e["type"] for e in self.events(done)])
+
+    def test_logged_out_run_ends_with_an_error_result_event_and_exit_1(self):
+        done, _, _ = self.ask("diagnosis", env={"FAKE_CLAUDE_LOGGED_IN": "0"})
+        result = self.events(done)[-1]
+        self.assertEqual(done.returncode, 1)
+        self.assertTrue(result["is_error"])
+        self.assertIn("Not logged in", result["result"])
+
+    def test_an_unknown_output_format_is_refused(self):
+        done, _, _ = self.ask("diagnosis", ["--output-format", "json", "--permission-mode", "plan", "--tools", "Read,Glob,Grep"])
+        self.assertEqual(done.returncode, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

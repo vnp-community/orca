@@ -43,7 +43,9 @@ function makeScratchRepo(prefix: string): string {
 
 export async function provisionLiveProject(
   rpc: GatewayRpcClient,
-  cfg: LiveStackConfig
+  cfg: LiveStackConfig,
+  // Why: the real-AI specs bring their own fixture repo and remove it themselves after checking it.
+  ownRepoPath = ''
 ): Promise<LiveProject> {
   // Why: after a gateway restart the agent needs a few seconds to reattach; wait instead of failing the run.
   let server: RpcRow | undefined
@@ -65,8 +67,8 @@ export async function provisionLiveProject(
       `dev server '${cfg.devServerName}' is ${server.approvalStatus}/${server.status}; it must be approved and connected`
     )
   }
-  const repoPath = cfg.repoPath || makeScratchRepo(cfg.runPrefix)
-  const ownsRepo = !cfg.repoPath
+  const repoPath = ownRepoPath || cfg.repoPath || makeScratchRepo(cfg.runPrefix)
+  const ownsRepo = !cfg.repoPath && !ownRepoPath
   const name = `${cfg.runPrefix}-project`
   const project = await rpc.call<{ id: string; devServerId?: string }>('project.create', {
     name,
@@ -87,27 +89,71 @@ export async function provisionLiveProject(
       }
       disposed = true
       const problems: string[] = []
+      // Why: a task the agent was still running (or that was just killed) blocks cancel and delete until task-service hears back.
+      // Why: a task whose dispatch went nowhere (no agent run behind it) stays in_progress forever; after 30 s it is cancelled so cleanup can finish.
+      const releaseStuckTasks = async (): Promise<void> => {
+        const tasks = await rpc.call<{ tasks?: RpcRow[] }>('task.list', {
+          projectId: project.id,
+          taskTypes: ['plan', 'phase', 'task', 'bug', 'feature', 'epic'],
+          pageSize: 200
+        })
+        for (const t of tasks.tasks ?? []) {
+          if (t.status === 'in_progress') {
+            await rpc.call('task.update', { id: t.id, status: 'cancelled' }).catch(() => {})
+            problems.push(
+              `released stuck task ${t.id} (${String(t.type)} "${String(t.title).slice(0, 40)}") by cancelling it`
+            )
+          }
+        }
+      }
+      const retrying = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
+        for (let attempt = 0; ; attempt++) {
+          try {
+            await fn()
+            return
+          } catch (e) {
+            const msg = (e as Error).message
+            if (
+              attempt === 10 &&
+              /ACTIVE_EXECUTION|ACTIVE_WORKFLOWS|still has running tasks/.test(msg)
+            ) {
+              await releaseStuckTasks().catch(() => {})
+            }
+            if (
+              attempt < 30 &&
+              /ACTIVE_EXECUTION|ACTIVE_WORKFLOWS|still has running tasks/.test(msg)
+            ) {
+              await new Promise((r) => setTimeout(r, 3_000))
+              continue
+            }
+            problems.push(`${label}: ${msg.slice(0, 120)}`)
+            return
+          }
+        }
+      }
       try {
         const listed = await rpc.call<{ requests?: RpcRow[] }>('request.list', {
           projectId: project.id
         })
         for (const r of listed.requests ?? []) {
           if (r.status !== 'completed' && r.status !== 'cancelled') {
-            await rpc
-              .call('request.cancel', {
-                id: r.id,
-                reason: 'e2e-ui cleanup',
-                expectedVersion: r.version
-              })
-              .catch((e: Error) => problems.push(`cancel ${r.id}: ${e.message.slice(0, 120)}`))
+            await retrying(`cancel ${r.id}`, async () => {
+              const fresh = (await rpc.call<{ request: RpcRow }>('request.get', { id: r.id }))
+                .request
+              if (fresh.status !== 'completed' && fresh.status !== 'cancelled') {
+                await rpc.call('request.cancel', {
+                  id: r.id,
+                  reason: 'e2e-ui cleanup',
+                  expectedVersion: fresh.version
+                })
+              }
+            })
           }
         }
       } catch (e) {
         problems.push(`list requests: ${(e as Error).message.slice(0, 120)}`)
       }
-      await rpc
-        .call('project.delete', { projectId: project.id })
-        .catch((e: Error) => problems.push(`delete project: ${e.message.slice(0, 120)}`))
+      await retrying('delete project', () => rpc.call('project.delete', { projectId: project.id }))
       if (ownsRepo) {
         rmSync(repoPath, { recursive: true, force: true })
       }

@@ -6,7 +6,7 @@ Dành cho agent hoặc người nhận việc tiếp. Đọc hết file này tr�
 
 Mục tiêu của công việc: làm cho luồng Request (CR v6), workflow, task và dev-server/agent chạy ổn định trên stack Docker local, với máy Mac của người dùng làm dev server và **Claude Code đã đăng nhập** làm nguồn AI (không dùng khoá API). Quy trình đã áp dụng: viết bộ e2e nghiệm thu, chạy, thu lỗi, viết đánh giá + giải pháp + checklist, rồi sửa. Đã đi hai vòng (v1, v2).
 
-**Kết quả cuối:** Claude thật: **103 PASS, 0 FAIL, 4 BLOCKED, 1 SKIP**; `run_acceptance.py --strict --ai-stub --allow-blocked MCP-01,MCP-02`: **110 PASS, 0 FAIL, 2 BLOCKED (MCP-01/02, vì `MCP_ENABLED` tắt), 1 SKIP (TSK-08 tuỳ chọn)**. Lúc đầu là 84 PASS, 3 FAIL. Với Claude thật `AIS-01/03` BLOCKED vì không dựng được đường "không có AI"; chế độ stub phủ chúng.
+**Kết quả cuối:** xem mục 5 (e2e thật qua UI 6/6 xanh với Claude Code thật; backend `--ai-stub` 114 PASS, 0 FAIL; Claude thật 103 PASS, 0 FAIL).
 
 ## 2. Bản đồ tài liệu (đọc theo thứ tự)
 
@@ -51,26 +51,31 @@ Bẫy đã gặp, đừng đạp lại:
 - **Vận hành**: giới hạn tốc độ cấu hình được + metric `orca_request_rate_limited_total{class}`; `/readyz` kiểm token nội bộ; `value_type` của câu hỏi Clarification; sức khoẻ dev server làm mới ngay khi agent attach; chủ đề outbox `dev_server.health_degraded` đưa vào stream NATS (migration infra-fleet `0040`); `redeploy-local.sh` tự chạy migration.
 - **Bộ e2e** `tests/stages/e2e/orca-flows` (Python thuần, không cần pip): suite `platform devserver workflow request matrix exits ai plan task notfound`; `report_orphan_requests.py` (chỉ đọc, `--cancel` mới huỷ).
 
-## 5. Việc còn lại, theo thứ tự nên làm
+## 5. Kết quả cuối đợt và việc còn tồn đọng (2026-10-10, đã nghiệm thu bằng e2e thật qua UI)
 
-Đợt hoàn thiện cuối ngày đã xong: 016, 017, 020, 026, 028, 030, 035, V2-011, và các lỗi V2-018..021 (xem [v2/tasks/README.md](./v2/tasks/README.md)). Còn lại:
+**Đã đạt (chạy thật, Claude Code thật trên dev server local, không stub, từ giao diện web):**
+- `run_ui_flow.py --real all`: 6/6 xanh (21.4 phút): thực thi `change_request` có Phase (5 task phụ thuộc), task có phụ thuộc, task 1 bước; phân tích chỉ đọc `question`, `bug`; theo dõi phiên agent (`monitor`). Cộng 3 test request-live (change_request, question; ask-back chỉ có bản stub).
+- Backend `--strict --ai-stub`: 114 PASS, 0 FAIL, 2 BLOCKED (MCP tắt). Claude thật: 103 PASS, 0 FAIL, 4 BLOCKED, 1 SKIP.
+- Trên web theo dõi được: panel Agent activity (dòng `▸ Read/Edit/Bash` thật), trạng thái dev server busy/idle + `macOS · arm64`, tab Result (Agent output), Open in Git (Source Control hiện file đổi), terminal worktree.
+- Thiết kế an toàn e2e thật: repo tạm, hook chặn `PreToolUse`, dấu vân tay trước/sau; mọi lượt 0 vi phạm, 0 Request mồ côi.
+- Lỗi sản phẩm tìm ra và đã sửa nhờ e2e thật: cổng Phase không mở (B1), task phụ thuộc kẹt (B2), danh tính thực thi (Q1), output agent không tới UI (G1), platform dev server (G2), `git.status` worktree rỗng + `CheckWorktreeDeleteSafety` luôn thấy sạch (G5c), một repo hỏng làm mất mọi worktree (G5), gateway panic, v.v. (xem v2/tasks/README.md và frontend tasks).
 
-1. **Frontend + UI live: xong** (2026-10-10, `specs/frontend/bugs/e2e-acceptance-v1/tasks/README.md`): FE-E2E-001..009, spec Playwright live `run_ui_flow.py` (3 test qua UI thật: change_request, ask-back, question) xanh với AI stub và Claude thật. Còn `[~]`: FE-007 (chưa thử với task cũ sau backfill), kiểm trên Electron, và vitest/lint toàn frontend đỏ do lỗi có sẵn trên HEAD.
-1b. **`ApprovalGates.CheckPlan` chưa được nối**: hàm chặn duyệt Plan khi còn giả định `needs_confirmation` chưa xác nhận không được handler duyệt Plan nào gọi (chỉ handler Solution nối `ApprovalGates`), nên `REQUEST_PLAN_UNCONFIRMED_ASSUMPTIONS` không bao giờ phát ra; frontend đã sẵn sàng hiển thị. Cần quyết định nghiệp vụ theo CR-REQ-028 mục `plan_assumption` (và đường "Hỏi lại" cho giả định Plan: `clarification.request source=plan_assumption`, `sourceRef`=id Plan, `questionKey=assumption:<id>`).
-1c. **Sự kiện thời gian thực**: gateway không đẩy `solution.superseded` và `clarification.answered` qua `request.subscribe`, UI phải thăm dò (đã có, giới hạn). Nên đẩy sự kiện để giảm độ trễ và tải.
-1d. **`consumeUntilDone` NAK không trễ** (`common/eventbus`): handler lỗi vĩnh viễn vẫn hot-loop; nên `NakWithDelay` có backoff. Phân tích chỉ đọc mới kiểm với stub, chưa với Claude thật (`ORCA_E2E_READONLY_ANALYSIS=1`); hotfix/security/performance chưa có e2e riêng.
-2. **CI chạy thật (TASK-029, một phần)**: `.github/workflows/orca-flows-e2e.yml` và `backend-go-request-contracts.yml` đã viết, `actionlint` sạch, nhưng **chưa chạy trên runner GitHub**. Cần `workflow_dispatch` thử, rồi 5 đêm xanh liên tiếp trước khi thành cổng chặn. Chưa qua shellcheck.
-3. **README triển khai từ máy sạch (TASK-022)**: `deploy/dev/README.md` đã viết lại và từng lệnh đã kiểm không phá stack, nhưng chưa ai dựng stack theo README từ máy sạch.
-4. **Thực thi sau khi duyệt Plan với agent AI thật**: các test `PLN-*` cố ý *từ chối* Approval để không chạy agent AI trên máy dev. Cần một lượt kiểm tay có chủ đích (`ORCA_E2E_EXECUTE_AGENT=1` cho `TSK-08`) và `StartPhase` với Plan có Phase; hotfix `single_task` mới kiểm bằng stub AI.
-5. **Điểm có chủ đích còn mở của TASK-017**: scm-integration trả 404 của API provider thành `Internal` (cần sentinel "upstream not found" xuyên 5 adapter); git-gateway gộp lỗi hạ tầng project-service thành `WORKTREE_REPO_NOT_FOUND` vì frontend dùng mã đó làm đường lùi mềm — chốt với frontend trước khi đổi.
-6. **Script T2 hỏng sẵn**: `backend-go/ci/request-e2e/run-request-e2e.sh` gọi `tests/request/check_request_flow_types.py` đã bị xoá ở commit `8beb6703d`. `orca-flows` thay phần việc này; nên bỏ script và `request-e2e.yml` hoặc viết lại.
-7. **Bật MCP**: `deploy/dev/.env` đang để trống `AUTH_MCP_PRINCIPAL_CALLER_TOKEN`, `MCP_INTERNAL_CALLER_TOKEN`, `OAUTH_INTERNAL_CALLER_TOKEN`; sau TASK-020 `auth-service`/`mcp-service` fail-closed khi token rỗng. Khi bật MCP (và để mở khoá `MCP-01/02`) phải chạy `deploy/dev/scripts/ensure-mcp-env.sh`. `code-intel-service` không lắp guard dù gateway gửi token (đã ghi, chưa sửa).
-8. **Hotfix đã tạo trước bản sửa V2-011** đang kẹt ở `awaiting_plan_approval` không tự phục hồi: huỷ hoặc trả về backlog rồi mở lại.
-9. **Metric `orca_request_orphan_total`** chưa thấy trên stack thật (chỉ test đơn vị); lô 100 dòng toàn lỗi vĩnh viễn của outbox thông báo chưa có metric đếm dòng bị giữ (chỉ log ERROR).
+**Còn tồn đọng, theo ưu tiên:**
+1. **Quyết định cần người dùng:**
+   - **B4** — task thực thi luôn `--dangerously-skip-permissions` không sandbox (task-service gửi `trustPreset:"full"`). Cần chính sách theo project hoặc sandbox riêng.
+   - **Hướng A (phiên PTY như TDD `specs/frontend/tdd/v5/15-task-graph-ui.md` / HLD C4.9) hay B (giữ `execPrompt`, hiển thị tương đương, cập nhật TDD)** — hiện đang chạy hướng B.
+   - **G7** — hook an toàn của e2e từ chối scratchpad của phiên Claude (ngẫu nhiên); đề xuất cho phép hẹp + dọn 43 thư mục `/private/tmp/claude-501/*e2e-ui*` và 68 bản ghi `~/.claude/projects/*e2e-ui*`.
+   - Xoá 4 project `probe-proj` cũ (repo đã mất) và 2 dev server `dev-local-mac-stub-in/out`.
+   - Nối `ApprovalGates.CheckPlan` vào duyệt Plan (CR-REQ-028 `plan_assumption`).
+2. **Lỗi/gap đã biết chưa sửa:** G5b (`SCM_EMPTY_BRANCH`: frontend gửi `branch/base/repo`, gateway đọc `headBranch/baseBranch`); G5d (`git.upstreamStatus/diff/compare/history` trả snake_case, frontend cần camelCase) và G5e (`RelayExecutor.GetDiff` rỗng, `Commit` thiếu SHA) — xem diff của file đã đổi đang vỡ, được ghi `known-gap` trong spec; `--real monitor` còn một bước thông tin; không giữ lịch sử từng dòng hoạt động sau khi tải lại (cần lưu ở backend); `/readyz` cho auth/mcp/project; đẩy sự kiện `solution.superseded`/`clarification.answered`; `NakWithDelay` cho `consumeUntilDone`; hotfix/security/performance chưa có e2e riêng; điều kiện đua mất chunk đầu `· Session started` nếu infra-fleet chậm.
+3. **Test flaky:** `RQL-13`/`RQL-19` của `run_acceptance.py --ai-stub` đỏ 1 trong 3 lượt đầy đủ ngay sau redeploy/khởi động lại agent (`REQUEST_VERSION_CONFLICT`, expected 4); 3/3 xanh khi chạy riêng suite `request` và 2/2 xanh ở các lượt đầy đủ sau đó. Chưa tách được nguyên nhân (nghi hai lượt phân loại chồng nhau: sự kiện + `request.classify` thủ công của test).
+4. **Hạ tầng/CI:** workflow `orca-flows-e2e.yml`, `backend-go-request-contracts.yml` chưa chạy trên runner GitHub; spec thật (Claude thật) chưa có đường chạy CI (cần tài khoản Claude trên runner); README triển khai chưa dựng thử từ máy sạch; kiểm Electron chưa làm; lint/vitest toàn frontend vẫn đỏ do lỗi có sẵn trên HEAD; script T2 `backend-go/ci/request-e2e/run-request-e2e.sh` hỏng sẵn.
+5. **Bảo mật/vận hành cần theo dõi:** grant `user` request-service tự cấp dưới danh nghĩa chủ cây (không tự thu hồi khi Request xong, audit ghi `granted_by` là chủ cây); task-service vẫn tin metadata `x-user-id`; token rỗng ở auth/mcp/project nay từ chối (cần `ensure-*-env.sh`).
 
 ## 6. Chưa được kiểm chứng (nói thẳng)
 
 - `gitnexus impact` / `detect_changes`: **chưa chạy** (không có công cụ trong phiên). Quy tắc của repo bắt buộc trước khi merge; agent có công cụ nên chạy `detect_changes({scope:"compare", base_ref:"main"})` và ghi blast radius vào PR. Điểm chạm lớn: `common/grpcmw`, `registerRequestChannels`, `AnalysisRunner`, proto `ProjectService`/`AuthService`, `ProposeRequestClassification`, `StartExecution`/`completePhases`, guard `internalcaller` của auth/mcp. Blast radius đã rà tay bằng grep, ghi trong từng file task.
+  - Đã thay bằng `codegraph` (gitnexus vẫn không dùng được): blast radius của cả nhánh so với `main`, test bị ảnh hưởng đã chạy và các điểm rủi ro nằm ở [`IMPACT-CODEGRAPH.md`](./IMPACT-CODEGRAPH.md).
 - Đã kiểm lại ở đợt hoàn thiện: `buf breaking` xanh so với `main`; `buf lint` không tăng cảnh báo (307 có sẵn, giống `main`); `buf generate` cho mã khớp bản commit (chỉ khác header `protoc`). `buf` và CLI `migrate` cài vào thư mục scratchpad của phiên (`go install`), không nằm trong repo.
 - Test tích hợp `project-service` Postgres chạy được: not-found PASS; **14 test worktree FAIL giống hệt trên `main`** (có sẵn).
 - Lỗi có sẵn trên `main`, không do đợt này: `common/tracing` (`TestTraceEventSpanProcessor_OnEnd_ErrorStatusPublishesFailLevel`), test ssh agent/socket của `infra-fleet-service`, `git-gateway-service/localgit` (symlink `/private/var`), nhiều lỗi `tsc` trong `agent/`.

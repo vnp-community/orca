@@ -18,6 +18,8 @@ export class RpcFailure extends Error {
 }
 
 export type FakeRequestBackend = {
+  activitySubs: Set<ActivitySub>
+  statusSubs: Set<{ push: (e: unknown) => void; end: () => void }>
   calls: RpcCall[]
   callsTo: (method: string) => Params[]
   /** Replace or add one channel. */
@@ -27,6 +29,45 @@ export type FakeRequestBackend = {
   handle: (method: string, params: Params) => Promise<unknown>
   has: (method: string) => boolean
   subscribers: Set<(event: unknown) => void>
+  /** `task.activity.subscribe` streams: push a frame to the ones open for a task, or end them (server closes the stream). */
+  activity: {
+    push: (taskId: string, frame: Record<string, unknown>) => void
+    end: (taskId: string) => void
+    openTaskIds: () => string[]
+  }
+  /** `devServer.subscribeStatus` streams: push a `devServer.statusChanged` snapshot, or have the server end them. */
+  devServerStatus: {
+    push: (event: {
+      devServerId: string
+      connected: boolean
+      activeExecutions: number
+      busy: boolean
+    }) => void
+    end: () => void
+    openCount: () => number
+  }
+}
+
+type ActivitySub = { taskId: string; push: (frame: unknown) => void; end: () => void }
+
+/** The frame `task.activity.subscribe` pushes for a direct-agent run (api-gateway TaskActivityFrame); stdout/stderr are cumulative. */
+export function agentOutputFrame(
+  taskId: string,
+  stdout: string,
+  extra: { stderr?: string; requestId?: string } = {}
+): Record<string, unknown> {
+  return {
+    taskId,
+    engine: 'direct_agent',
+    eventType: 'agent_output_partial',
+    payload: {
+      origin_task_id: taskId,
+      request_id: extra.requestId ?? `req:req-1:${taskId}:1`,
+      stdout,
+      stderr: extra.stderr ?? ''
+    },
+    occurredAt: now
+  }
 }
 
 const now = '2026-10-08T09:00:00Z'
@@ -76,6 +117,8 @@ export function createFakeRequestBackend(
 ): FakeRequestBackend {
   const calls: RpcCall[] = []
   const subscribers = new Set<(event: unknown) => void>()
+  const activitySubs = new Set<ActivitySub>()
+  const statusSubs = new Set<{ push: (e: unknown) => void; end: () => void }>()
   const table: Record<string, Handler> = {
     'request.flowStatus': () => ({ enabled: true }),
     'request.list': () => ({ requests: [], nextPageToken: null }),
@@ -91,6 +134,19 @@ export function createFakeRequestBackend(
   return {
     calls,
     subscribers,
+    activitySubs,
+    statusSubs,
+    devServerStatus: {
+      push: (event) => statusSubs.forEach((sub) => sub.push(event)),
+      end: () => [...statusSubs].forEach((sub) => sub.end()),
+      openCount: () => statusSubs.size
+    },
+    activity: {
+      push: (taskId, frame) =>
+        activitySubs.forEach((sub) => sub.taskId === taskId && sub.push(frame)),
+      end: (taskId) => [...activitySubs].forEach((sub) => sub.taskId === taskId && sub.end()),
+      openTaskIds: () => [...activitySubs].map((sub) => sub.taskId)
+    },
     callsTo: (method) => calls.filter((c) => c.method === method).map((c) => c.params),
     on: (method, handler) => {
       table[method] = handler
@@ -147,6 +203,34 @@ export async function mockRequestApp(page: Page, backend: FakeRequestBackend): P
           backend.subscribers.add((event) =>
             send({ id, ok: true, result: event, streaming: true, _meta: meta })
           )
+          continue
+        }
+        if (msg.method === 'devServer.subscribeStatus') {
+          backend.calls.push({ method: msg.method, params: msg.params ?? {} })
+          send({ id, ok: true, result: null, _meta: meta })
+          const sub = {
+            push: (event: unknown) =>
+              send({ id, ok: true, result: event, streaming: true, _meta: meta }),
+            end: () => {
+              backend.statusSubs.delete(sub)
+              send({ id, ok: true, result: { type: 'end' }, streaming: true, _meta: meta })
+            }
+          }
+          backend.statusSubs.add(sub)
+          continue
+        }
+        if (msg.method === 'task.activity.subscribe') {
+          backend.calls.push({ method: msg.method, params: msg.params ?? {} })
+          send({ id, ok: true, result: null, _meta: meta })
+          const sub: ActivitySub = {
+            taskId: String(msg.params?.taskId ?? ''),
+            push: (frame) => send({ id, ok: true, result: frame, streaming: true, _meta: meta }),
+            end: () => {
+              backend.activitySubs.delete(sub)
+              send({ id, ok: true, result: { type: 'end' }, streaming: true, _meta: meta })
+            }
+          }
+          backend.activitySubs.add(sub)
           continue
         }
         // A spec may override a boot channel (e.g. project.list) by registering it on the fake.
