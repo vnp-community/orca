@@ -60,6 +60,17 @@ export function backendFor(world: World): FakeRequestBackend {
         createdAt: world.projects.length + 1
       }
       world.projects.push(project)
+      // Like project-service: a repoPath makes the project's first repo in the same call.
+      if (params.repoPath) {
+        world.repos.push({
+          id: `repo-${world.repos.length + 1}`,
+          projectId: project.id,
+          url: params.repoPath,
+          displayName: params.name,
+          devServerId: params.devServerId ?? '',
+          position: 0
+        })
+      }
       return project
     },
     'repo.add': (params) => {

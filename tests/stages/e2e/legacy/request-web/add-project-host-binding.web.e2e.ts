@@ -1,8 +1,8 @@
 /**
  * Add Project binds the project to the dev server chosen in the dialog (SOL-FE-E2E-004 / TASK-FE-E2E-021),
  * against the web SPA with a mocked gateway. The payloads sent to the gateway are the contract:
- * repo.add (and repo.clone / repo.create) must carry devServerId, and the dialog must never fall back to a
- * host-less "local" add.
+ * project.create (for repo.clone / repo.create too) must carry devServerId and the repo path, and the dialog must never
+ * fall back to a host-less "local" add. Since SOL-FE-E2E-005 every added repo gets its own project.
  *
  *   npx playwright test -c tests/configs/playwright.web.config.ts --project=request-web \
  *     tests/stages/e2e/legacy/request-web/add-project-host-binding.web.e2e.ts
@@ -39,17 +39,15 @@ test.describe('Add Project host binding (mocked gateway)', () => {
     await expect(page.getByPlaceholder('/home/user/project')).toHaveValue('/srv')
     await page.getByRole('button', { name: 'Add Git Project' }).click()
 
-    await expect.poll(() => backend.callsTo('repo.add').length).toBe(1)
-    expect(backend.callsTo('repo.add')[0]).toMatchObject({
-      url: '/srv',
-      devServerId: 'ds-1'
-    })
-    // The project holding the repo is bound to the same host (named after it).
+    // Add Project makes the repo's OWN project, bound to the chosen host (SOL-FE-E2E-005).
+    await expect.poll(() => backend.callsTo('project.create').length).toBe(1)
     expect(backend.callsTo('project.create')[0]).toMatchObject({
-      name: MAC,
+      name: 'srv',
       devServerId: 'ds-1',
+      repoPath: '/srv',
       visibility: 'private'
     })
+    expect(backend.callsTo('repo.add')).toEqual([])
     // The nested-repo scan targets the dialog's host, not a global selection.
     expect(backend.callsTo('projectGroup.scanNested')[0]).toMatchObject({ devServerId: 'ds-1' })
   })
@@ -144,13 +142,18 @@ test.describe('Add Project host binding (mocked gateway)', () => {
     await dialog.locator('input').nth(1).fill('/srv/orca')
     await dialog.getByRole('button', { name: 'Clone', exact: true }).click()
 
-    await expect.poll(() => backend.callsTo('repo.add').length).toBe(1)
+    await expect.poll(() => backend.callsTo('project.create').length).toBe(1)
     expect(backend.callsTo('repo.clone')[0]).toEqual({
       devServerId: 'ds-1',
       url: 'https://github.com/stablyai/orca.git',
       destPath: '/srv/orca'
     })
-    expect(backend.callsTo('repo.add')[0]).toMatchObject({ url: '/srv/orca', devServerId: 'ds-1' })
+    // The clone gets its own project, carrying the checkout path and the same host.
+    expect(backend.callsTo('project.create')[0]).toMatchObject({
+      name: 'orca',
+      devServerId: 'ds-1',
+      repoPath: '/srv/orca'
+    })
   })
 
   test('f: create on the host registers the new repo with the same devServerId', async ({
@@ -166,12 +169,16 @@ test.describe('Add Project host binding (mocked gateway)', () => {
     await dialog.locator('input').nth(1).fill('/srv')
     await dialog.getByRole('button', { name: 'Create project' }).click()
 
-    await expect.poll(() => backend.callsTo('repo.add').length).toBe(1)
+    await expect.poll(() => backend.callsTo('project.create').length).toBe(1)
     expect(backend.callsTo('repo.create')[0]).toEqual({
       devServerId: 'ds-1',
       destPath: '/srv/fresh',
       defaultBranch: ''
     })
-    expect(backend.callsTo('repo.add')[0]).toMatchObject({ url: '/srv/fresh', devServerId: 'ds-1' })
+    expect(backend.callsTo('project.create')[0]).toMatchObject({
+      name: 'fresh',
+      devServerId: 'ds-1',
+      repoPath: '/srv/fresh'
+    })
   })
 })

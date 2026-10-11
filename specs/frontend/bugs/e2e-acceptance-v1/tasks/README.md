@@ -77,6 +77,33 @@ TASK-V2-030 ──► FE-020      TASK-V2-028/029 ──► FE-019 (mã lỗi)
 - [x] Tài liệu: ghi "Kết quả thực thi" vào từng task; TASK-FE-E2E-015 sang `[x]`.
 - [ ] Dọn dữ liệu: 0 repo/project `e2e-ui-repro-*` còn lại; repo thật của người dùng (ví dụ `codex`) không bị đổi.
 
+### SOL-FE-E2E-005: "Add Project" tạo project riêng, chặn trùng repo, ô Answer đọc `answer_markdown` ([solution](../solutions/SOL-FE-E2E-005-add-project-own-project-dedupe-answer-view.md))
+
+Quyết định đã chọn: mỗi Add Project (thư mục có sẵn, clone, create) tạo một project MỚI chứa đúng repo đó, gắn dev server đã chọn, tên mặc định = tên thư mục (sửa được); repo đã đăng ký (cùng dev server + đường dẫn) thì CHẶN và chỉ đường tới project đang chứa; Create request chọn project như hiện có và hiện rõ repo sẽ chạy; dữ liệu cũ không tự di chuyển; project mặc định còn dùng cho onboarding và các nơi khác.
+
+```
+FE-022 (Answer)  ───────────────────────────────────────┐
+FE-023 (project riêng) ──► FE-025 (chặn trùng) ──► FE-026 (i18n, test, mock)
+FE-024 (Create request hiện repo) ──────────────────────┘
+```
+
+Thứ tự thực thi: 022 → 023 → 024 → 025 → 026.
+
+- [x] [TASK-FE-E2E-022](./TASK-FE-E2E-022-answer-view-reads-answer-markdown.md) P0 · AnswerView đọc `answer_markdown` + citations/confidence/assumptions/limitations · phụ thuộc: không
+- [x] [TASK-FE-E2E-023](./TASK-FE-E2E-023-add-project-creates-own-project.md) P0 · Add Project tạo project riêng (có sẵn, clone, create), tên sửa được · phụ thuộc: agent AE (`project.create` tạo repo); có đường bù
+- [x] [TASK-FE-E2E-024](./TASK-FE-E2E-024-create-request-project-and-repo-note.md) P1 · Create request chọn project và hiện repo sẽ chạy · phụ thuộc: không
+- [x] [TASK-FE-E2E-025](./TASK-FE-E2E-025-block-duplicate-repo-registration.md) P0 · Chặn thêm trùng repo, "Mở project đó", ánh xạ `PROJECT_REPO_ALREADY_REGISTERED` · phụ thuộc: 023
+- [x] [TASK-FE-E2E-026](./TASK-FE-E2E-026-i18n-tests-and-mock-specs.md) P1 · i18n 5 ngôn ngữ, vitest, Playwright mock · phụ thuộc: 022 đến 025
+
+Định nghĩa xong của SOL-FE-E2E-005:
+
+- [x] Vitest các file đã đổi xanh (77 tệp / 831 test); Playwright `request-web` (kể cả spec mới) xanh (74 xanh, 1 skipped có sẵn); `tsc`/`oxlint`/`oxfmt` sạch trên file đã đổi (lỗi tsc còn lại là CÓ SẴN).
+- [x] Chuỗi mới có đủ en/es/ja/ko/zh (20 khoá); không màu/cỡ chữ mới.
+- [ ] Add Project hai lần hai thư mục khác nhau → hai project riêng; thêm lại cùng (dev server, đường dẫn) bị chặn có chỉ đường (kiểm live bằng repo tạm, agent AF; CHƯA chạy).
+- [ ] Analysis `question`/`answer` hiện nội dung từ `answer_markdown` (kiểm live, agent AF; CHƯA chạy).
+- [ ] Electron/desktop không đổi hành vi (kiểm bằng vitest payload; chưa kiểm Electron thật).
+- [ ] Dữ liệu cũ không bị đụng ("Demo (this Mac)", "codex", Request #1136).
+
 ## Định nghĩa "xong"
 
 - [~] Vitest của các file đã đổi xanh; `tsc` và `oxlint` sạch trên file đã đổi. Cả bộ `pnpm lint`/`typecheck`/vitest toàn frontend **không xanh** do lỗi có sẵn trên HEAD (thiếu `src/main`, `src/relay`, `window.api`, `jsdom`; `FleetServerStatusBadge`; `RequestBacklogRow`...), đã đối chiếu bằng bản sao HEAD sạch và không có test nào xanh ở HEAD mà đỏ bây giờ.

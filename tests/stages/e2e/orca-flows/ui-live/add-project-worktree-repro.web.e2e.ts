@@ -155,7 +155,10 @@ test.describe('Add a project and create a worktree, through the UI (TASK-FE-E2E-
           `the repo added from host ${cfg.devServerName} must be bound to that dev server (repo.list devServerId)`
         )
         .toBe(devServerId)
-      // The project holding the repo follows the same host (one project per host), so repo and project never disagree.
+      // Add Project makes a project of its own, named after the folder (SOL-FE-E2E-005), so repo and project never disagree.
+      expect
+        .soft(evidence?.projectName, 'Add Project named the project after the folder')
+        .toBe(repo.name)
       expect
         .soft(
           evidence?.projectDevServerId,
@@ -170,7 +173,7 @@ test.describe('Add a project and create a worktree, through the UI (TASK-FE-E2E-
       if (traceOn) {
         await stopTrace(context, testInfo, failed)
       }
-      // Cleanup: only the repo of this run, on every path.
+      // Cleanup: only the repo and the own project of this run, on every path.
       try {
         cleanupProblems = await removeReproRepoFromOrca(rpc, repo.path)
       } catch (e) {
@@ -182,7 +185,7 @@ test.describe('Add a project and create a worktree, through the UI (TASK-FE-E2E-
         log(`cleanup problem: ${p}`)
       }
       log(
-        `cleanup: repo removed from Orca, temp dirs removed (left on disk: ${leftovers.length}), cleanup problems: ${cleanupProblems.length}`
+        `cleanup: repo and its project removed from Orca, temp dirs removed (left on disk: ${leftovers.length}), cleanup problems: ${cleanupProblems.length}`
       )
       writeFileSync(
         testInfo.outputPath('browser-noise.json'),

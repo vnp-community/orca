@@ -5,7 +5,9 @@
  */
 import { test, type BrowserContext, type Page, type TestInfo } from '@playwright/test'
 import { runLiveFlow, type LiveFlow } from './live-flow-harness'
-import { loadLiveStackConfig } from './live-stack-config'
+import type { GatewayRpcClient } from './gateway-rpc-client'
+import type { LiveProject } from './live-project-fixture'
+import { loadLiveStackConfig, type LiveStackConfig } from './live-stack-config'
 import {
   captureGuardedState,
   waitForQuietTree,
@@ -44,8 +46,22 @@ async function waitForNoNewClaude(knownPids: number[], ms: number): Promise<numb
   }
 }
 
+export type RealFlowOptions = {
+  page: Page
+  context: BrowserContext
+  testInfo: TestInfo
+  slug: string
+  mode: RealMode
+  /** Builds the fixture the agent works in (default: the calc sandbox). It must obey the RealFixture contract. */
+  createFixture?: (prefix: string) => RealFixture
+  /** Replaces the scratch project of the default flow (specs that make their projects through the UI). */
+  provision?: (rpc: GatewayRpcClient, cfg: LiveStackConfig) => Promise<LiveProject>
+  /** Runs after the flow, the project cleanup and the fixture removal; returns problems that make the run red. */
+  afterCleanup?: () => Promise<string[]> | string[]
+}
+
 export async function runRealFlow(
-  args: { page: Page; context: BrowserContext; testInfo: TestInfo; slug: string; mode: RealMode },
+  args: RealFlowOptions,
   body: (f: LiveFlow, fixture: RealFixture) => Promise<void>
 ): Promise<void> {
   const cfg = loadLiveStackConfig()
@@ -75,7 +91,7 @@ export async function runRealFlow(
   console.log(
     `[real:${args.slug}] guarded checkout quiet for ${Math.round(quietMs / 1000)}s after waiting ${waited}s`
   )
-  const fixture = createCalcFixture(cfg.runPrefix)
+  const fixture = (args.createFixture ?? createCalcFixture)(cfg.runPrefix)
   try {
     fixture.selfTestGuard()
   } catch (e) {
@@ -107,6 +123,7 @@ export async function runRealFlow(
         testInfo: args.testInfo,
         slug: args.slug,
         repoPath: fixture.repoPath,
+        provision: args.provision,
         beforeDispose: () => {
           killClaudeUnder(fixture.base)
         },
@@ -156,7 +173,11 @@ export async function runRealFlow(
     fixture.dispose()
     const leaks = diffGuardedState(before, captureGuardedState())
     const leftovers = leftoversOf(cfg.runPrefix)
+    const afterProblems = await Promise.resolve(args.afterCleanup?.() ?? []).catch((e: Error) => [
+      `the after-cleanup check failed: ${e.message.slice(0, 200)}`
+    ])
     const problems = [
+      ...afterProblems,
       ...(violation ? [violation] : []),
       ...(lingering.length > 0
         ? [`claude still running inside the fixture at the end (killed ${lingering.join(',')})`]

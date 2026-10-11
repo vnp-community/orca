@@ -44,6 +44,26 @@ const NOISE_RULES: NoiseRule[] = [
       'the terminal canvas reads pixels back under the software GL of headless Chromium; a browser performance notice, not an app error'
   },
   {
+    id: 'radix-dialog-description-add-project',
+    match:
+      /^Warning: Missing `Description` or `aria-describedby=\{undefined\}` for \{DialogContent\}\./,
+    reason:
+      'a dialog of the Add Project flow (AddRepoDialogChrome.tsx wraps it in DialogContent without a description or aria-describedby), so Radix warns on every open; an accessibility warning that predates the add-project fixes, to be fixed in the frontend'
+  },
+  {
+    id: 'scan-nested-agent-method-missing',
+    match: /^Failed to scan nested repos: .*PROJECT_SCAN_NESTED_FAILED/,
+    reason:
+      'project-service ScanNested calls fs.scanNestedRepos on the dev-server agent, which does not implement it (infra-fleet log: "Method not found: fs.scanNestedRepos"; agent/src has no such handler); nested-repo import never works, Add Project carries on without it. Backend/agent gap that predates the add-project fixes (TASK-FE-E2E-027)'
+  },
+  {
+    id: 'profiles-channel-not-in-gateway',
+    match:
+      /^Failed to check project presence in other profiles: .*orcaProfiles\.findProjectProfiles.*not yet implemented/,
+    reason:
+      'orcaProfiles.findProjectProfiles is on the backend-go frontend-compatibility coverage table as not implemented; Add Project only logs it. Backend gap that predates the add-project fixes (TASK-FE-E2E-027)'
+  },
+  {
     id: 'decision-channel-not-served',
     match: /decision\.[a-zA-Z]+.*not yet implemented/,
     reason:

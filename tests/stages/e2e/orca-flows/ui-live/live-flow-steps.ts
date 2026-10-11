@@ -30,14 +30,23 @@ export type RequestUnderTest = { requestId: string; title: string }
 /** Create in the dialog, wait for classification, confirm the given type in the card. */
 export async function createClassifyAndConfirm(
   f: LiveFlow,
-  o: { titleWords: string; body: string; typeLabel: string; typeKey: string; size: string }
+  o: {
+    titleWords: string
+    body: string
+    typeLabel: string
+    typeKey: string
+    size: string
+    /** Replaces the default "open the dialog, pick f.project by name, Create" when the spec checks the dialog itself. */
+    create?: (title: string) => Promise<void>
+  }
 ): Promise<RequestUnderTest> {
   const { rpc, page, shots, gaps, lags, step } = f
   const title = `${f.cfg.runPrefix} ${o.titleWords}`
   let requestId = ''
   await step('create the Request in the dialog', async () => {
     await openRequestsPage(page)
-    await createRequestThroughTheDialog(page, { title, body: o.body, projectName: f.project.name })
+    await (o.create?.(title) ??
+      createRequestThroughTheDialog(page, { title, body: o.body, projectName: f.project.name }))
     await expect(detailHeader(page)).toContainText(title)
     await expect
       .poll(async () => (await findRequestByTitle(rpc, f.project.id, title))?.id ?? '', {

@@ -63,6 +63,8 @@ export async function runLiveFlow(
     timeoutMs?: number
     /** Runs before the project is cleaned up, e.g. to stop an agent that would block the cleanup. */
     beforeDispose?: () => void | Promise<void>
+    /** Replaces the default "one scratch project made through the gateway": for specs whose projects are made through the UI. */
+    provision?: (rpc: GatewayRpcClient, cfg: LiveStackConfig) => Promise<LiveProject>
   },
   body: (flow: LiveFlow) => Promise<void>
 ): Promise<void> {
@@ -94,7 +96,7 @@ export async function runLiveFlow(
   try {
     await step('provision a project bound to the dev server (the only non-UI setup)', async () => {
       await rpc.connect()
-      project = await provisionLiveProject(rpc, cfg, args.repoPath)
+      project = await (args.provision?.(rpc, cfg) ?? provisionLiveProject(rpc, cfg, args.repoPath))
     })
     const shots = new StepShots(page, testInfo)
     await step('sign in through the login form', async () => {

@@ -67,6 +67,31 @@ V2-030 (bước 2-3: giới hạn browse) ─► FE-020
 - [ ] Tài liệu và cấu hình (TASK-V2-034); rollout đã ghi ngày từng bước.
 - [ ] Dọn dữ liệu: `report_orphan_requests.py` và `report_unbound_repos.py` báo 0 mục thăm dò còn lại; repo thật của người dùng không bị đổi.
 
+## SOL-V2-003: "Add Project" tạo project riêng nguyên tử, chặn đăng ký trùng repo, hình dạng tài liệu `answer` ([solution](../solutions/SOL-V2-003-project-own-project-and-repo-dedupe.md))
+
+Gốc: lượt test Request #1136 (ba lỗi: UI `AnswerView` không đọc `answer_markdown`; Add Project phải tạo project riêng gắn dev server; cùng repo bị đăng ký nhiều lần). Quyết định: `project.create` ghi project + owner + repo trong một giao dịch và trả `repo`/`repoId`; khoá vị trí repo = (tenant, dev server, đường dẫn chuẩn hoá) chặn bằng kiểm ứng dụng + cột `registration_key` có chỉ mục UNIQUE chỉ cho bản ghi mới (dữ liệu cũ trùng giữ nguyên); mã `PROJECT_REPO_ALREADY_REGISTERED` (`AlreadyExists`).
+
+Thứ tự và phụ thuộc:
+
+```
+V2-037 (miền + migration + usecase + chuẩn hoá) ─► V2-036 (CreateProject nguyên tử + gateway/proto) ─► V2-039 (tích hợp hai dialect, đua)
+V2-038 (hình dạng answer, test gateway)  — độc lập
+V2-040 (báo cáo repo trùng)              — sau V2-037 (cùng quy tắc chuẩn hoá)
+```
+
+- [x] TASK-V2-036 · [`project.create` tạo project riêng nguyên tử đúng mọi trường hợp, trả đủ id project/repo](./TASK-V2-036-create-project-atomic-own-project-with-repo.md)
+- [x] TASK-V2-037 · [Chặn đăng ký trùng repo: mã `PROJECT_REPO_ALREADY_REGISTERED`, chuẩn hoá đường dẫn, chống đua (migration `0032`)](./TASK-V2-037-repo-location-dedupe-error-and-race.md)
+- [x] TASK-V2-038 · [Xác nhận hình dạng tài liệu `answer` qua `solution.list` cho frontend](./TASK-V2-038-answer-document-shape-through-gateway.md)
+- [x] TASK-V2-039 · [Test tích hợp hai dialect: migration, chống trùng, đua, `CreateWithOwner`](./TASK-V2-039-repo-registration-contract-and-two-dialect-tests.md)
+- [x] TASK-V2-040 · [Công cụ báo cáo repo trùng hiện có (dry-run, chỉ liệt kê)](./TASK-V2-040-duplicate-repos-report-tool.md)
+
+Định nghĩa xong của SOL-V2-003:
+
+- [x] `go build/vet/test ./...` xanh ở `project-service` và `api-gateway` (trừ lỗi có sẵn đã ghi); tích hợp Postgres và MySQL xanh, kể cả test đua (đúng một thành công) và migration up/down/up với dữ liệu trùng sẵn có còn nguyên; `buf lint` giữ 307, `buf breaking` xanh.
+- [x] Mã lỗi và thông điệp đúng định dạng cố định, có test chuỗi chính xác; cô lập tenant và khác dev server không bị coi là trùng.
+- [ ] Frontend (agent khác) tiêu thụ `repo`/`repoId`, thông điệp trùng, `options.answer_markdown`.
+- [ ] Redeploy (người điều phối): migration `0032` + `project-service`, rồi `api-gateway`; chạy `report-duplicate-repos.sh` (chỉ đọc) để biết số bản trùng sẵn có.
+
 ## Kết quả thực thi (2026-10-09)
 
 - e2e đầy đủ: **103 PASS, 0 FAIL, 4 BLOCKED, 1 SKIP** (460 giây, Claude thật). BLOCKED/SKIP: MCP tắt (2), AIS-01/03 (không dựng được đường "không có AI" khi AI sẵn có), TSK-08 tuỳ chọn.

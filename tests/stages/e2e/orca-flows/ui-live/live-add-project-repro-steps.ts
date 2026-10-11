@@ -47,8 +47,8 @@ export type ReproRepo = {
   dispose: () => string[]
 }
 
-/** A throwaway git repo that the folder browser can reach without listing a huge directory. Never a repo of the user. */
-export function createReproRepo(): ReproRepo {
+/** A directory under which throwaway repos stay reachable for the folder browser (no huge ancestor listing). */
+export function browsableTempBase(): string {
   const candidates = [process.env.ORCA_E2E_REPRO_BASE, tmpdir(), '/tmp', homedir()]
     .filter((c): c is string => Boolean(c) && existsSync(c as string))
     .map((c) => realpathSync(c))
@@ -58,6 +58,12 @@ export function createReproRepo(): ReproRepo {
       `no directory whose ancestors are small enough for the folder browser (tried ${candidates.join(', ')}); set ORCA_E2E_REPRO_BASE`
     )
   }
+  return base
+}
+
+/** A throwaway git repo that the folder browser can reach without listing a huge directory. Never a repo of the user. */
+export function createReproRepo(): ReproRepo {
+  const base = browsableTempBase()
   // Why: the repo directory itself carries the unique prefix, so the project row in the sidebar is unambiguous.
   const path = realpathSync(mkdtempSync(join(base, REPRO_PREFIX)))
   const git = (...args: string[]): void => {
@@ -247,7 +253,10 @@ export function containerSeesPath(path: string): boolean | null {
   return out.status === 0
 }
 
-/** Removes only the repo of THIS run (url equals its path) from Orca, then reports anything still named like the repro. */
+/**
+ * Removes only what THIS run made: its repo (url equals its path) and the project Add Project created for it (named like the
+ * repro's folder; a project of the user that merely holds the repo is never deleted). Then reports anything still named like the repro.
+ */
 export async function removeReproRepoFromOrca(
   rpc: GatewayRpcClient,
   repoPath: string
@@ -260,6 +269,12 @@ export async function removeReproRepoFromOrca(
       await rpc
         .call('repo.rm', { repoId: r.id })
         .catch((e: Error) => problems.push(`repo.rm ${r.id}: ${e.message.slice(0, 120)}`))
+    }
+    // Why: since SOL-FE-E2E-005 Add Project makes a project of its own, named after the folder; it goes with the repo.
+    if ((repos ?? []).some((x) => x.url === repoPath) && String(p.name) === basename(repoPath)) {
+      await rpc
+        .call('project.delete', { projectId: p.id })
+        .catch((e: Error) => problems.push(`project.delete ${p.id}: ${e.message.slice(0, 120)}`))
     }
   }
   const after = await rpc.call<RpcRow[]>('project.list', {})

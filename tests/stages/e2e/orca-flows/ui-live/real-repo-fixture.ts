@@ -37,7 +37,7 @@ export type RealFixture = {
   dispose: () => void
 }
 
-function git(cwd: string, args: string[]): string {
+export function fixtureGit(cwd: string, args: string[]): string {
   return execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', ...args], {
     cwd,
     encoding: 'utf8',
@@ -45,11 +45,49 @@ function git(cwd: string, args: string[]): string {
   })
 }
 
-function lines(path: string): string[] {
+export function guardLogLines(path: string): string[] {
   try {
     return readFileSync(path, 'utf8').split('\n').filter(Boolean)
   } catch {
     return []
+  }
+}
+
+/**
+ * Runs the repo's PreToolUse hook exactly as claude would under the agent's PATH (no /opt/homebrew/bin); throws if it would not
+ * block an escape, i.e. if the hook would fail open. `logDir` is the hook's allowedRoot: its audit logs are removed afterwards.
+ */
+export function runToolGuardSelfTest(repoPath: string, settings: string, logDir: string): void {
+  const hook = (
+    JSON.parse(readFileSync(settings, 'utf8')) as {
+      hooks: { PreToolUse: { hooks: { command: string }[] }[] }
+    }
+  ).hooks.PreToolUse[0].hooks[0].command
+  // Same PATH the agent gives claude (agent-config.ts buildToolPath): no /opt/homebrew/bin.
+  const env = {
+    PATH: `${homedir()}/.local/bin:${homedir()}/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/snap/bin`,
+    HOME: homedir(),
+    CLAUDE_PROJECT_DIR: repoPath
+  }
+  const run = (payload: object): number | null =>
+    spawnSync('/bin/sh', ['-c', hook], {
+      cwd: repoPath,
+      env,
+      input: JSON.stringify(payload),
+      timeout: 10_000
+    }).status
+  const inside = run({ tool_name: 'Read', tool_input: { file_path: join(repoPath, 'README.md') } })
+  const outside = run({
+    tool_name: 'Write',
+    tool_input: { file_path: join(homedir(), 'orca-e2e-guard-selftest.txt') }
+  })
+  const escape = run({ tool_name: 'Bash', tool_input: { command: 'cat ../../etc/hosts' } })
+  rmSync(join(logDir, 'tool-guard-calls.log'), { force: true })
+  rmSync(join(logDir, 'tool-guard-denials.log'), { force: true })
+  if (inside !== 0 || outside !== 2 || escape !== 2) {
+    throw new Error(
+      `tool guard self-test failed (read inside=${inside}, write outside=${outside}, ".." escape=${escape}; want 0/2/2): the hook would fail open`
+    )
   }
 }
 
@@ -65,59 +103,24 @@ export function createCalcFixture(prefix: string): RealFixture {
     join(repoPath, '.claude', 'tool-guard.config.json'),
     `${JSON.stringify({ allowedRoot: base })}\n`
   )
-  git(repoPath, ['init', '-q', '-b', 'main'])
-  git(repoPath, ['add', '-A'])
-  git(repoPath, ['commit', '-q', '-m', 'init calc-sandbox'])
+  fixtureGit(repoPath, ['init', '-q', '-b', 'main'])
+  fixtureGit(repoPath, ['add', '-A'])
+  fixtureGit(repoPath, ['commit', '-q', '-m', 'init calc-sandbox'])
   let disposed = false
   return {
     base,
     repoPath,
-    selfTestGuard: () => {
-      const hook = (
-        JSON.parse(readFileSync(settings, 'utf8')) as {
-          hooks: { PreToolUse: { hooks: { command: string }[] }[] }
-        }
-      ).hooks.PreToolUse[0].hooks[0].command
-      // Same PATH the agent gives claude (agent-config.ts buildToolPath): no /opt/homebrew/bin.
-      const env = {
-        PATH: `${homedir()}/.local/bin:${homedir()}/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/snap/bin`,
-        HOME: homedir(),
-        CLAUDE_PROJECT_DIR: repoPath
-      }
-      const run = (payload: object): number | null =>
-        spawnSync('/bin/sh', ['-c', hook], {
-          cwd: repoPath,
-          env,
-          input: JSON.stringify(payload),
-          timeout: 10_000
-        }).status
-      const inside = run({
-        tool_name: 'Read',
-        tool_input: { file_path: join(repoPath, 'README.md') }
-      })
-      const outside = run({
-        tool_name: 'Write',
-        tool_input: { file_path: join(homedir(), 'orca-e2e-guard-selftest.txt') }
-      })
-      const escape = run({ tool_name: 'Bash', tool_input: { command: 'cat ../../etc/hosts' } })
-      rmSync(join(base, 'tool-guard-calls.log'), { force: true })
-      rmSync(join(base, 'tool-guard-denials.log'), { force: true })
-      if (inside !== 0 || outside !== 2 || escape !== 2) {
-        throw new Error(
-          `tool guard self-test failed (read inside=${inside}, write outside=${outside}, ".." escape=${escape}; want 0/2/2): the hook would fail open`
-        )
-      }
-    },
-    guardCalls: () => lines(join(base, 'tool-guard-calls.log')),
-    guardDenials: () => lines(join(base, 'tool-guard-denials.log')),
-    repoStatus: () => git(repoPath, ['status', '--porcelain']).trim(),
-    headSha: () => git(repoPath, ['rev-parse', 'HEAD']).trim(),
+    selfTestGuard: () => runToolGuardSelfTest(repoPath, settings, base),
+    guardCalls: () => guardLogLines(join(base, 'tool-guard-calls.log')),
+    guardDenials: () => guardLogLines(join(base, 'tool-guard-denials.log')),
+    repoStatus: () => fixtureGit(repoPath, ['status', '--porcelain']).trim(),
+    headSha: () => fixtureGit(repoPath, ['rev-parse', 'HEAD']).trim(),
     branches: () =>
-      git(repoPath, ['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
+      fixtureGit(repoPath, ['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
         .split('\n')
         .filter(Boolean),
     worktrees: () =>
-      git(repoPath, ['worktree', 'list', '--porcelain'])
+      fixtureGit(repoPath, ['worktree', 'list', '--porcelain'])
         .split('\n')
         .filter((l) => l.startsWith('worktree '))
         .map((l) => l.slice('worktree '.length)),

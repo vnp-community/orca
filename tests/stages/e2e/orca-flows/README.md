@@ -104,6 +104,7 @@ Nhóm này (`ui-live/readonly-real.web.e2e.ts`, `ui-live/execute-real.web.e2e.ts
 python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real readonly   # question + bug: phân tích chỉ đọc (claude --print --permission-mode plan --tools Read,Glob,Grep)
 python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real execute    # duyệt Plan trên UI, agent thật THỰC THI (claude --dangerously-skip-permissions) trong repo tạm
 python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real monitor    # theo dõi phiên agent trên web (mục dưới)
+python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real addproject # Add Project tạo project riêng, chặn trùng, Request chọn project, Analysis hiện Answer (mục "Add Project tạo project riêng")
 python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real all -- --grep "single step"   # lọc test
 ```
 
@@ -154,9 +155,32 @@ python3 tests/stages/e2e/orca-flows/run_ui_flow.py --repro add-project-worktree
 ORCA_E2E_LIVE=1 npx playwright test -c tests/configs/playwright.web.config.ts --project=request-live add-project-worktree-repro
 ```
 
-Spec in `BUG REPRODUCED` kèm thông báo lỗi nguyên văn trên UI khi khớp `WORKTREE_CREATE_FAILED` + `chdir` + `no such file or directory`, rồi bằng chứng nguyên nhân chỉ đọc: `devServerId` của repo (`repo.list`), project chứa nó, dòng log `orca-go-git-gateway` (nếu có docker), container có thấy thư mục không. Các assert cuối mô tả hành vi ĐÚNG (worktree được tạo, thư mục `<repo>-test-02` có trên đĩa, nằm trong danh sách worktree, repo gắn với `dev-local-mac`) nên spec XANH khi gắn host (SOL-FE-E2E-004 frontend + backend) đã triển khai và ĐỎ nếu repo/project mất dev server trở lại; spec cũng kiểm project chứa repo mang `devServerId` của host đã chọn. Dọn trong `finally`: `repo.rm` đúng repo của lượt chạy, xoá thư mục tạm (cả `<repo>-test-02`), rồi kiểm không còn repo/project `e2e-ui-repro-*`. Ảnh từng bước ở `test-results/` (ngoài git).
+Spec in `BUG REPRODUCED` kèm thông báo lỗi nguyên văn trên UI khi khớp `WORKTREE_CREATE_FAILED` + `chdir` + `no such file or directory`, rồi bằng chứng nguyên nhân chỉ đọc: `devServerId` của repo (`repo.list`), project chứa nó, dòng log `orca-go-git-gateway` (nếu có docker), container có thấy thư mục không. Các assert cuối mô tả hành vi ĐÚNG (worktree được tạo, thư mục `<repo>-test-02` có trên đĩa, nằm trong danh sách worktree, repo gắn với `dev-local-mac`) nên spec XANH khi gắn host (SOL-FE-E2E-004 frontend + backend) đã triển khai và ĐỎ nếu repo/project mất dev server trở lại; spec cũng kiểm project chứa repo mang `devServerId` của host đã chọn. Dọn trong `finally`: `repo.rm` đúng repo của lượt chạy và `project.delete` đúng project Add Project đã tạo cho nó (tên = tên thư mục; từ SOL-FE-E2E-005 Add Project tạo project riêng), xoá thư mục tạm (cả `<repo>-test-02`), rồi kiểm không còn repo/project `e2e-ui-repro-*`; spec cũng khẳng định project mang tên thư mục. Ảnh từng bước ở `test-results/` (ngoài git).
 
 Repo tạm nằm ở thư mục có mọi thư mục cha nhỏ (mặc định `/private/tmp`, hoặc `ORCA_E2E_REPRO_BASE`), KHÔNG phải `$TMPDIR` trên macOS: hộp thoại Browse folder liệt kê mọi thư mục cha của đường dẫn gõ vào, và thư mục có ~1000 mục làm đáp ứng vượt 32 KiB nên agent của dev server bị ngắt kết nối (xem TASK-FE-E2E-015, phát hiện phụ).
+
+## Add Project tạo project riêng, chặn trùng, Request chọn project, ô Answer (`run_ui_flow.py --real addproject`)
+
+Spec `ui-live/add-project-own-project-request-real.web.e2e.ts` (TASK-FE-E2E-027, nghiệm thu SOL-FE-E2E-005) tái hiện đợt test "thêm repo bằng Add Project, tạo Request chọn project, Claude thật phân tích chỉ đọc, đọc ở tab Analysis", hoàn toàn qua giao diện, với Claude Code **thật** (cùng lưới an toàn `--real`: `real-flow-harness.ts`). Hai repo git tạm `/private/tmp/e2e-ui-addproj-<mmddhhmmss>-alpha` (mồi nhử) và `-bravo` (repo được hỏi), mỗi repo có README nhận biết, hàm `alpha_mul/alpha_div` hoặc `bravo_add/bravo_sub`, hook chặn đọc/ghi ngoài thư mục (log của hook trong repo chứng minh claude chạy Ở ĐÂU). Không bao giờ dùng repo/project của người dùng.
+
+```bash
+ORCA_E2E_GUARD_IGNORE='specs/:docs/:frontend/:backend-go/:tests/:deploy/' python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real addproject
+ORCA_E2E_ADDPROJECT_STOP=projects python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real addproject   # chỉ nửa không AI (Add Project + chặn trùng), ~25 giây
+node --test tests/stages/e2e/orca-flows/ui-live/live-answer-snippet.test.ts                              # luật chọn đoạn câu trả lời để so với màn hình, không cần stack
+```
+
+| Bước | Khẳng định (chứng cứ) |
+|---|---|
+| Add Project alpha, rồi bravo (host `dev-local-mac`, Browse folder, Select folder, Add Git Project) | MỖI lần đúng 1 project MỚI, tên = tên thư mục, `devServerId` = dev-local-mac, chứa đúng 1 repo (cũng gắn host); không project cũ nào có thêm repo (`project.list`/`repo.list` trước/sau); UI gửi đúng 1 `project.create {name, devServerId, repoPath}` và không `repo.add`; sidebar có hai project riêng |
+| Add Project alpha lần hai | khối `add-project-duplicate` nêu tên project đang chứa, nút `add-project-open-existing`; không có `project.create`/`repo.*` ghi nào được gửi; số project/repo không đổi; "Open that project" đóng hộp thoại và worktree đang chọn thuộc repo của alpha; đường dẫn gõ có `/` cuối vẫn bị chặn |
+| Gateway `project.create {devServerId, repoPath=alpha}` (kênh tắt, chỉ để kiểm hàng rào; dữ liệu tạm của lượt chạy) | lỗi `PROJECT_REPO_ALREADY_REGISTERED ... already registered in project "<tên>" (<id>)`; không tạo project nào |
+| Requests → Create request | chọn alpha rồi bravo: ghi chú `create-request-repo-note` theo project đang chọn (đúng repo, đường dẫn, host); tạo Request tiêu đề `e2e-ui-<mmddhhmmss> addproj question`; Request thuộc project bravo; Claude thật phân loại, xác nhận `Question` size `S`, trả lời Clarification trên UI |
+| Tab Analysis (không bấm Approve) | `answer-view` hiện nội dung `answer_markdown` (KHÔNG "No data"), một đoạn của câu trả lời trong `solution.list` có trên màn hình, `answer-confidence` dạng `NN%`, nhắc tới hàm/module của bravo, `answer-citations` có tham chiếu file của bravo, không có gì của alpha |
+| Chạy trên repo đúng | log hook của bravo > 0 lệnh gọi chỉ `Read/Glob/Grep`; log hook của alpha rỗng; cả hai repo: cây sạch, HEAD/nhánh/worktree không đổi |
+| Dọn dẹp (cả khi đỏ) | huỷ Request qua UI, rồi `request.cancel` các Request mở của project của lượt chạy, `repo.rm` + `project.delete` CHỈ project/repo mang tên/đường dẫn của lượt chạy (project của người dùng nếu lỡ chứa repo của lượt chạy chỉ bị gỡ repo, không bị xoá), xoá thư mục; kiểm 0 project/repo còn lại, `report_orphan_requests.py` 0 orphaned |
+| Dữ liệu thật của người dùng | chụp trước/sau: mọi project + repo (kể cả 'Demo (this Mac)', 'codex'), mọi Request đã kết thúc (kể cả #1136), và dấu vân tay git (HEAD, refs, worktree, config, file đổi) của MỌI repo đã đăng ký còn trên đĩa (kể cả repo codex) qua `ORCA_E2E_GUARD_PATHS`; khác một byte là đỏ |
+
+Console của trình duyệt qua `live-console-audit.ts` (mục ngoài allowlist làm đỏ). Ba mục mới có lý do trong allowlist, đều có từ trước và không thuộc ba lỗi đã sửa: cảnh báo Radix thiếu `Description` của hộp thoại Add Project (`radix-dialog-description-add-project`), `fs.scanNestedRepos` agent chưa có (`scan-nested-agent-method-missing`), kênh `orcaProfiles.findProjectProfiles` chưa có ở gateway (`profiles-channel-not-in-gateway`).
 
 ## Bốn trạng thái kết quả
 
