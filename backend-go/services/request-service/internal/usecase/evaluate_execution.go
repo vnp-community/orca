@@ -261,9 +261,13 @@ func (e *EvaluateExecution) completePhases(ctx context.Context, req domain.Reque
 			return nil // a Phase is still running: the next one waits
 		}
 	}
-	next, ok := tree.NextPhase(started)
-	if !ok {
-		return nil
+	actor, err := e.Actors.ActorFor(ctx, req, "")
+	if err != nil {
+		return err
+	}
+	next, ok, err := e.nextReadyPhase(ctx, actor, tree, started)
+	if err != nil || !ok {
+		return err
 	}
 	tenantID, _ := tenant.TenantID(ctx)
 	approvals, err := e.Approvals.ListGateApprovals(ctx, tenantID, []string{req.ID})
@@ -274,13 +278,26 @@ func (e *EvaluateExecution) completePhases(ctx context.Context, req domain.Reque
 		latest.Status != domain.ApprovalStatusExpired && latest.Status != domain.ApprovalStatusCancelled {
 		return nil
 	}
-	actor, err := e.Actors.ActorFor(ctx, req, "")
-	if err != nil {
-		return err
-	}
 	// Opening validates the Phase against task-service, which only shows the tree to its owner or a grantee.
 	_, err = e.Open.Execute(asExecutionActor(ctx, actor), OpenApprovalInput{RequestID: req.ID, SubjectType: domain.SubjectPhase, SubjectID: next.ID, RequestedBy: actor})
 	return err
+}
+
+// nextReadyPhase reads the depends_on edges (one GetSubtree) so the gate opens for a Phase whose predecessors are done. A failed
+// read is an error, not a guess: the reconcile loop retries, whereas a wrong gate would never open the one it waits for.
+func (e *EvaluateExecution) nextReadyPhase(ctx context.Context, actor string, tree domain.ExecutionTree, started map[string]bool) (domain.TaskView, bool, error) {
+	var edges []domain.DependsEdge
+	if tree.Plan != nil {
+		sub, err := e.Tasks.GetSubtree(asExecutionActor(ctx, actor), tree.Plan.ID)
+		if err != nil {
+			return domain.TaskView{}, false, err
+		}
+		for _, edge := range sub.DependsOn {
+			edges = append(edges, domain.DependsEdge{From: edge.From, To: edge.To})
+		}
+	}
+	next, ok := tree.NextReadyPhase(started, edges)
+	return next, ok, nil
 }
 
 func taskFinishedStatus(s string) bool {

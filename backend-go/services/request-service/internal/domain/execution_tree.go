@@ -116,3 +116,28 @@ func (t ExecutionTree) NextPhase(started map[string]bool) (TaskView, bool) {
 	}
 	return TaskView{}, false
 }
+
+// NextReadyPhase is NextPhase that skips a Phase waiting on a Phase that has not finished (depends_on: From waits for To),
+// so no Approval is opened for a Phase that cannot start yet. The listing order of task-service is not the dependency
+// order: opening the gate of the dependent Phase first leaves the one it waits for with no gate, and the Request stuck.
+func (t ExecutionTree) NextReadyPhase(started map[string]bool, edges []DependsEdge) (TaskView, bool) {
+	for _, p := range t.Phases {
+		if taskFinished(p.Status) || started[p.ID] || t.waitsOnUnfinishedPhase(p.ID, edges) {
+			continue
+		}
+		return p, true
+	}
+	return TaskView{}, false
+}
+
+func (t ExecutionTree) waitsOnUnfinishedPhase(id string, edges []DependsEdge) bool {
+	for _, e := range edges {
+		if e.From != id {
+			continue
+		}
+		if dep, ok := t.Phase(e.To); ok && !taskFinished(dep.Status) {
+			return true
+		}
+	}
+	return false
+}

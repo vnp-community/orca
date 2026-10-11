@@ -84,6 +84,7 @@ V2-040 (báo cáo repo trùng)              — sau V2-037 (cùng quy tắc chu�
 - [x] TASK-V2-038 · [Xác nhận hình dạng tài liệu `answer` qua `solution.list` cho frontend](./TASK-V2-038-answer-document-shape-through-gateway.md)
 - [x] TASK-V2-039 · [Test tích hợp hai dialect: migration, chống trùng, đua, `CreateWithOwner`](./TASK-V2-039-repo-registration-contract-and-two-dialect-tests.md)
 - [x] TASK-V2-040 · [Công cụ báo cáo repo trùng hiện có (dry-run, chỉ liệt kê)](./TASK-V2-040-duplicate-repos-report-tool.md)
+- [x] TASK-V2-041 · [Cổng duyệt Phase mở cho Phase sẵn sàng (theo `depends_on`), không theo thứ tự liệt kê](./TASK-V2-041-phase-gate-follows-dependencies.md) · P0 · e2e thật lộ ra (TASK-FE-E2E-028)
 
 Định nghĩa xong của SOL-V2-003:
 

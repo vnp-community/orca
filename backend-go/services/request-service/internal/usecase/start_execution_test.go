@@ -120,6 +120,26 @@ func TestStatusConsumer_GatedFlowOpensTheFirstPhaseApprovalOnce(t *testing.T) {
 	}
 }
 
+// task-service does not list Phases in dependency order. The first gate must go to the Phase that can start; a gate for the
+// Phase that waits on another one cannot be started (REQUEST_PHASE_PREDECESSOR_NOT_DONE) and leaves the Request stuck.
+func TestStatusConsumer_FirstPhaseApprovalSkipsAPhaseThatWaitsForAnother(t *testing.T) {
+	r := newExRig(t)
+	req := r.request(domain.RequestTypeChangeRequest, domain.RequestSizeM, domain.RequestStatusExecuting)
+	plan := r.plan(req)
+	dependent := r.phase(req, plan, "tests, after the module")
+	module := r.phase(req, plan, "the module")
+	r.dependsOn(dependent, module)
+	r.leaf(req, dependent, "t-tests", domain.TaskStatusBlocked)
+	r.leaf(req, module, "t-module", domain.TaskStatusOpen)
+
+	if _, err := r.startExec.Execute(lcCtx(), req.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := pendingPhaseApprovals(r); len(got) != 1 || got[0] != module.ID {
+		t.Fatalf("pending phase approvals = %v, want only %s (the phase nothing waits on first), not %s", got, module.ID, dependent.ID)
+	}
+}
+
 func TestStatusConsumer_FlowsWithoutPhaseGateOpenNoPhaseApproval(t *testing.T) {
 	r := newExRig(t)
 	bug := r.request(domain.RequestTypeBug, domain.RequestSizeL, domain.RequestStatusExecuting)
