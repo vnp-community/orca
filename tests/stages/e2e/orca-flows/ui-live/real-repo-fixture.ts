@@ -31,6 +31,8 @@ export type RealFixture = {
   /** `git status --porcelain` of the main checkout of the fixture. */
   repoStatus: () => string
   headSha: () => string
+  /** Every directory a claude of this run may be working in (default: `base`); a fixture whose task worktrees are siblings lists them here. */
+  workRoots?: () => string[]
   /** Branches and worktrees that exist now, for the "something was done" assertions. */
   branches: () => string[]
   worktrees: () => string[]

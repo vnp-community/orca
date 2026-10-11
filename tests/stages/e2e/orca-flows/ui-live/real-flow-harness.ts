@@ -23,6 +23,8 @@ const WATCHDOG_MS = 15_000
 const QUIET_WAIT_MAX_MS = 15 * 60_000
 const CLEANUP_MARGIN_MS = 5 * 60_000
 
+const workRootsOf = (fixture: RealFixture): string[] => fixture.workRoots?.() ?? [fixture.base]
+
 function truthy(name: string): boolean {
   return ['1', 'true', 'yes'].includes((process.env[name] ?? '').toLowerCase())
 }
@@ -111,7 +113,7 @@ export async function runRealFlow(
   const abort = (why: string, page: Page): void => {
     violation ||= why
     console.log(`[real:${args.slug}] ABORT: ${why}`)
-    killClaudeUnder(fixture.base)
+    killClaudeUnder(workRootsOf(fixture))
     // Why: closing the page makes the next UI step of the flow throw, which stops the run at once.
     void page.close({ runBeforeUnload: false }).catch(() => {})
   }
@@ -125,7 +127,7 @@ export async function runRealFlow(
         repoPath: fixture.repoPath,
         provision: args.provision,
         beforeDispose: () => {
-          killClaudeUnder(fixture.base)
+          killClaudeUnder(workRootsOf(fixture))
         },
         timeoutMs: totalMs
       },
@@ -166,7 +168,7 @@ export async function runRealFlow(
       clearInterval(t)
       clearTimeout(t)
     })
-    const lingering = killClaudeUnder(fixture.base)
+    const lingering = killClaudeUnder(workRootsOf(fixture))
     const stray = await waitForNoNewClaude(before.claudePrintPids, 20_000)
     const calls = fixture.guardCalls().length
     const denials = fixture.guardDenials()

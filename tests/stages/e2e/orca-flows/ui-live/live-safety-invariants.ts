@@ -48,7 +48,12 @@ function ignoredPrefixes(): string[] {
 }
 
 /** Everything about one repo that a stray write could change; `cheap` hashes size+mtime instead of content (watchdog polling). */
-export function fingerprintRepo(path: string, cheap = false): RepoFingerprint {
+export function fingerprintRepo(
+  path: string,
+  cheap = false,
+  // Why: the ignore list is for this checkout (people edit docs/ and specs/ during a run); a repo the agent works in ignores nothing.
+  ignore: string[] = ignoredPrefixes()
+): RepoFingerprint {
   const entries = git(path, ['status', '--porcelain=v1', '-z', '--untracked-files=all'])
     .split('\0')
     .filter(Boolean)
@@ -59,7 +64,7 @@ export function fingerprintRepo(path: string, cheap = false): RepoFingerprint {
     if (code[0] === 'R' || code[0] === 'C') {
       i++ // the next -z field is the rename source
     }
-    if (ignoredPrefixes().some((p) => file.startsWith(p))) {
+    if (ignore.some((p) => file.startsWith(p))) {
       continue
     }
     try {
@@ -112,7 +117,14 @@ export function guardedRepoPaths(): string[] {
     .join(':')
     .split(':')
     .filter((p) => p && existsSync(join(p, '.git')))
-  return [...new Set([REPO_ROOT, ...extra].map((p) => realpathSync(p)))]
+  // Why: a repo the run is MEANT to work in has its own rules (live-main-checkout-rules.ts); exact equality would flag the task worktree.
+  const excluded = (process.env.ORCA_E2E_GUARD_EXCLUDE ?? '')
+    .split(':')
+    .filter((p) => p && existsSync(p))
+    .map((p) => realpathSync(p))
+  return [...new Set([REPO_ROOT, ...extra].map((p) => realpathSync(p)))].filter(
+    (p) => !excluded.includes(p)
+  )
 }
 
 export function captureGuardedState(cheap = false): GuardedState {
@@ -229,10 +241,11 @@ function claudeCwd(pid: number): string {
 }
 
 /** True while a claude --print process works somewhere inside `base` (the agent is really running a task there). */
-export function claudeRunningUnder(base: string): boolean {
+export function claudeRunningUnder(base: string | string[]): boolean {
+  const roots = Array.isArray(base) ? base : [base]
   return claudePrintProcesses().some((p) => {
     const cwd = claudeCwd(p.pid)
-    return cwd === base || cwd.startsWith(`${base}/`)
+    return roots.some((root) => cwd === root || cwd.startsWith(`${root}/`))
   })
 }
 
@@ -240,7 +253,8 @@ export function claudeRunningUnder(base: string): boolean {
  * Kills claude --print processes whose working directory is inside `base`, and everything they spawned. Not a process-group
  * kill: the agent starts claude in its own group, so signalling the group would also take the agent down.
  */
-export function killClaudeUnder(base: string): number[] {
+export function killClaudeUnder(base: string | string[]): number[] {
+  const roots = Array.isArray(base) ? base : [base]
   const table = execFileSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' })
     .split('\n')
     .map((l) => /^\s*(\d+)\s+(\d+)/.exec(l))
@@ -260,7 +274,7 @@ export function killClaudeUnder(base: string): number[] {
     } catch {
       continue
     }
-    if (cwd === base || cwd.startsWith(`${base}/`)) {
+    if (roots.some((root) => cwd === root || cwd.startsWith(`${root}/`))) {
       for (const pid of [...descendants(p.pid, table).toReversed(), p.pid]) {
         try {
           process.kill(pid, 'SIGKILL')

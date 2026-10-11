@@ -6,6 +6,8 @@
  */
 import type { BrowserContext } from '@playwright/test'
 import { DevServerTab } from './live-agent-session-devtab'
+import { CALC_TARGETS, type MonitorTargets } from './live-agent-session-targets'
+import { inspectWorktreeInGit } from './live-agent-session-worktree-view'
 import type { LiveFlow } from './live-flow-harness'
 import {
   judgeActivityPanel,
@@ -17,8 +19,6 @@ import {
   judgeRunTrace,
   judgeStatusFollows,
   judgeUiShowsOutput,
-  judgeWorktreeTerminal,
-  judgeWorktreeView,
   linesAddedByRun,
   type ActivityPanelSample,
   type DevServerSample,
@@ -28,8 +28,6 @@ import {
   closeTaskSheet,
   isOnlineLabel,
   openTaskSheetFromPlan,
-  openTaskWorktreeInGit,
-  peekDiffOfChangedFile,
   readAgentActivity,
   readRequestTabs,
   readTaskSheet,
@@ -40,7 +38,7 @@ import type { WorktreeChangeState } from './live-fixture-change-checks'
 import type { PlanTask } from './live-execution-steps'
 import type { RequestUnderTest } from './live-flow-steps'
 import { reloadAndReopen } from './live-request-ui-steps'
-import { findSecrets, loadSecretCatalog } from './live-secret-leak-scan'
+import { scanForSecrets } from './live-secret-leak-scan'
 import { claudeRunningUnder } from './live-safety-invariants'
 import {
   distinctivePhrase,
@@ -84,7 +82,9 @@ export class AgentSessionMonitor {
     context: BrowserContext,
     private readonly r: RequestUnderTest,
     readonly tap: TaskActivityTap,
-    private readonly fixtureBase: string
+    // Why: a fixture whose task worktrees are siblings of the repo (the user's repo) lists them as they appear.
+    private readonly fixtureBase: string | (() => string[]),
+    private readonly targets: MonitorTargets = CALC_TARGETS
   ) {
     this.devTab = new DevServerTab(f, context)
   }
@@ -167,7 +167,11 @@ export class AgentSessionMonitor {
       if (status === 'in_progress') {
         this.devDuring.push(await this.devTab.sample())
         // Why: this loop replaces the driver's own stuck-task check while it runs, so it repeats it.
-        idleSince = claudeRunningUnder(this.fixtureBase) ? 0 : idleSince || Date.now()
+        idleSince = claudeRunningUnder(
+          typeof this.fixtureBase === 'function' ? this.fixtureBase() : this.fixtureBase
+        )
+          ? 0
+          : idleSince || Date.now()
         if (idleSince && Date.now() - idleSince > STUCK_TASK_MS) {
           throw new Error(
             `TASK-STUCK-IN-PROGRESS: the task has been in_progress for ${Math.round(STUCK_TASK_MS / 1000)}s with no claude process running`
@@ -269,52 +273,12 @@ export class AgentSessionMonitor {
     const requestTabs = Object.values(await readRequestTabs(f.page)).join('\n')
     this.texts.push(requestTabs)
     const added = linesAddedByRun(this.baseline, `${requestTabs}\n${joined(sheet)}`)
-    this.add(judgeRunTrace(added))
-    if (await openTaskSheetFromPlan(f.page, this.taskId)) {
-      const gitText = await openTaskWorktreeInGit(f.page, /calc\.py/)
-      const onTask = git.calls.filter((c) => /repo-task/.test(c))
-      this.note(
-        `git/worktree calls seen after the reload: ${git.calls.length}, naming the task worktree: ${onTask.length}; last on task: ${onTask.slice(-2).join(' || ') || 'none'}; last git.status: ${
-          git.calls
-            .filter((c) => c.startsWith('git.status'))
-            .slice(-2)
-            .join(' || ') || 'none'
-        }; methods: ${[...new Set(git.calls.map((c) => c.split(' ')[0]))].join(',')}`
-      )
-      this.texts.push(gitText ?? '')
-      this.note(
-        `worktree on disk: ${worktree.uncommitted.length} uncommitted file(s) [${worktree.uncommitted.join(', ')}], ${worktree.commitsAhead} commit(s) ahead of the base`
-      )
-      this.note(
-        `Open in Git: button ${buttonPresent ? 'present' : 'absent'}; Source Control rows: ${gitText === null ? 'n/a' : `${gitText.length} chars "${gitText.replace(/\s+/g, ' ').slice(0, 160)}"`}`
-      )
-      await f.shots.take('worktree-in-git')
-      this.add(judgeWorktreeView(buttonPresent, gitText))
-      const peek = await peekDiffOfChangedFile(f.page, 'negate')
-      this.note(`diff peek (information only, G5d/G5e): ${peek.text}`)
-      if (!peek.shown) {
-        // Why: backlog evidence, not a verdict of this spec; the crash is the known G5d (git.diff shape) and is allowlisted with that reason.
-        f.testInfo.annotations.push({
-          type: 'known-gap',
-          description: `G5d/G5e: opening a changed file shows no diff (${peek.text})`
-        })
-        console.log(`[known-gap] G5d/G5e: ${peek.text}`)
-      }
-      if (gitText !== null) {
-        await f.page.waitForTimeout(4_000) // the terminal's spawn error arrives a moment after the view opens
-        const body = await f.page.locator('body').innerText()
-        this.note(
-          `worktree terminal: ${judgeWorktreeTerminal(body).length === 0 ? 'no spawn error on the page' : 'SPAWN ERROR on the page'}`
-        )
-        this.add(judgeWorktreeTerminal(body))
-      }
-    } else {
-      await f.shots.take('cannot-reopen-task-sheet')
-      f.gaps.record(
-        'UI-NO-PATH-TO-TASK',
-        '[frontend] after reading the Request tabs the Plan tab no longer offers the task row'
-      )
-    }
+    this.add(judgeRunTrace(added, this.targets.trace))
+    await inspectWorktreeInGit(
+      f,
+      { taskId: this.taskId, targets: this.targets, git, worktree, buttonPresent },
+      { note: (line) => this.note(line), add: (v) => this.add(v), texts: this.texts }
+    )
   }
 
   private async judgeDevServerAfterRun(): Promise<void> {
@@ -331,11 +295,8 @@ export class AgentSessionMonitor {
 
   /** A secret in anything the user can read, or in what the backend broadcast, fails the run outright (not a gap). */
   private leakScan(frameText: string): void {
-    const catalog = loadSecretCatalog()
-    const leaks = findSecrets(catalog, `${this.texts.join('\n')}\n${frameText}`)
-    this.note(
-      `secret scan: ${catalog.values.length} secret-looking variable(s) checked against ${this.texts.length} screen read(s) and the activity frames: ${leaks.length === 0 ? 'clean' : `LEAK ${leaks.join(', ')}`}`
-    )
+    const { note, leaks } = scanForSecrets(this.texts, frameText)
+    this.note(note)
     if (leaks.length > 0) {
       throw new Error(
         `SECRET-LEAK: the agent session screens or activity stream expose ${leaks.join(', ')}`

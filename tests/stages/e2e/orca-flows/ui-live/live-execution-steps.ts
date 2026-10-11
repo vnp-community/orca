@@ -19,6 +19,15 @@ const STUCK_TASK_MS = 90_000
 const UNSAFE_PLAN_TEXT =
   /(\/Users\/|~\/|\$HOME|\brm\s+-rf\b|git\s+push|\bsudo\b|\bcurl\b|\bwget\b|\b(npm|pnpm|yarn)\s+(i|install|add)\b|\bdocker\b|\bdeploy\b|production)/i
 
+/** The text of a Plan row with the repo's own absolute paths and the negated clauses about pushing taken out. */
+function withoutAllowed(text: string, paths: string[]): string {
+  const stripped = paths.reduce((t, p) => t.replaceAll(p, ''), text)
+  return stripped.replace(
+    /\b(do not|don't|never|must not|without)\b[^.]{0,160}\bgit\s+push\b/gi,
+    ''
+  )
+}
+
 export type PlanTask = { id: string; title: string; type: string; status: string; parentId: string }
 
 async function listPlanTasks(f: LiveFlow, r: RequestUnderTest): Promise<RpcRow[]> {
@@ -42,7 +51,9 @@ const asTask = (t: RpcRow): PlanTask => ({
 /** The Plan the AI wrote, read before approving: small, and nothing that reaches outside the throwaway repo. */
 export async function reviewPlanBeforeApproving(
   f: LiveFlow,
-  r: RequestUnderTest
+  r: RequestUnderTest,
+  // Why: when the agent works in a repo that is not a throwaway, its own path and the NEGATED "do not git push" a careful Plan writes are fine.
+  allowed: { paths?: string[] } = {}
 ): Promise<PlanTask[]> {
   let tasks: PlanTask[] = []
   await f.step('review the Plan before approving it (size and safety)', async () => {
@@ -57,7 +68,9 @@ export async function reviewPlanBeforeApproving(
       leaves.length,
       `the Plan stays small (at most ${MAX_LEAF_TASKS} tasks)`
     ).toBeLessThanOrEqual(MAX_LEAF_TASKS)
-    const unsafe = rows.filter((row) => UNSAFE_PLAN_TEXT.test(JSON.stringify(row)))
+    const unsafe = rows.filter((row) =>
+      UNSAFE_PLAN_TEXT.test(withoutAllowed(JSON.stringify(row), allowed.paths ?? []))
+    )
     expect(
       unsafe.map((u) => `${u.type}:${u.title}`),
       'no Plan task mentions paths outside the fixture, installs, network, deploys or pushes'
@@ -113,8 +126,9 @@ async function approveAndStartPhase(
       timeout: UI_REFRESH_GRACE_MS
     })
     await shots.take('phase-gate')
-    await approve.click()
     const start = detailPane(page).getByTestId(`phase-${phaseId}-start`)
+    await expect(start, '"Start phase" stays locked until the Phase is approved').toBeDisabled()
+    await approve.click()
     await expect(start, '"Start phase" enables once the Phase is approved').toBeEnabled({
       timeout: 30_000
     })
@@ -138,7 +152,7 @@ export async function driveExecutionToTheEnd(
   f: LiveFlow,
   r: RequestUnderTest,
   limitMs: number,
-  fixtureBase: string
+  fixtureBase: string | (() => string[])
 ): Promise<ExecutionReport> {
   const report: ExecutionReport = { seen: [], phasesStarted: 0, ranInUi: false }
   const { rpc, page, shots, gaps } = f
@@ -180,7 +194,10 @@ export async function driveExecutionToTheEnd(
       const working = tasks.filter(
         (t) => t.status === 'in_progress' && !['plan', 'phase'].includes(t.type)
       )
-      if (working.length > 0 && !claudeRunningUnder(fixtureBase)) {
+      if (
+        working.length > 0 &&
+        !claudeRunningUnder(typeof fixtureBase === 'function' ? fixtureBase() : fixtureBase)
+      ) {
         idleRunningSince ||= Date.now()
         if (Date.now() - idleRunningSince > STUCK_TASK_MS) {
           throw new Error(
@@ -211,6 +228,14 @@ export async function driveExecutionToTheEnd(
           )
         }
         if (!handledPhases.has(gate.subjectId)) {
+          // Why: every Phase gate can be open at once, but a Phase starts only after the Phases it depends on are done
+          // (REQUEST_PHASE_PREDECESSOR_NOT_DONE); a user approves them in that order, so the driver does too.
+          const deps = await rpc.call<{ id: string }[]>('task.getDependencies', {
+            taskId: gate.subjectId
+          })
+          if (deps.some((d) => tasks.find((t) => t.id === d.id)?.status !== 'done')) {
+            continue
+          }
           handledPhases.add(gate.subjectId)
           await approveAndStartPhase(f, r, gate.subjectId)
           report.phasesStarted++

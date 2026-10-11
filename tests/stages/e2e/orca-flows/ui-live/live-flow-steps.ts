@@ -36,6 +36,10 @@ export async function createClassifyAndConfirm(
     typeLabel: string
     typeKey: string
     size: string
+    /** Set when the type needs it: a hotfix must be Urgent. */
+    urgency?: string
+    /** Set when the type needs it: a hotfix needs a reason for the type. */
+    reason?: string
     /** Replaces the default "open the dialog, pick f.project by name, Create" when the spec checks the dialog itself. */
     create?: (title: string) => Promise<void>
   }
@@ -70,7 +74,7 @@ export async function createClassifyAndConfirm(
     await shots.take('type-confirmation')
   })
   await step(`confirm the type (${o.typeKey}, size ${o.size}) in the card`, async () => {
-    await confirmTypeInCard(page, o.typeLabel, o.size)
+    await confirmTypeInCard(page, o.typeLabel, o.size, o.urgency, o.reason)
     const after = await waitForApiStatus(
       rpc,
       requestId,

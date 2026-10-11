@@ -104,6 +104,20 @@ Thứ tự thực thi: 022 → 023 → 024 → 025 → 026.
 - [ ] Electron/desktop không đổi hành vi (kiểm bằng vitest payload; chưa kiểm Electron thật).
 - [ ] Dữ liệu cũ không bị đụng ("Demo (this Mac)", "codex", Request #1136).
 
+### SOL-FE-E2E-006: e2e thật từ UI trên repo `deepseek-harness` của người dùng; gỡ bộ Playwright mock `request-web` ([solution](../solutions/SOL-FE-E2E-006-real-e2e-on-user-repo-replaces-mocked-request-web.md), [bảng ánh xạ](../COVERAGE-request-web-mock-to-real.md))
+
+Quyết định: không còn spec e2e nào dùng WebSocket/gateway giả; mọi spec đi qua UI thật trên stack local với Claude Code thật; repo của người dùng được bảo vệ bằng dấu vân tay + watchdog + chặn `git push` (không thay được sandbox cho agent: B4 còn chờ người dùng quyết).
+
+- [x] [TASK-FE-E2E-028](./TASK-FE-E2E-028-real-e2e-on-deepseek-harness.md) P1 · 6 spec thật trên `deepseek-harness` + guard repo người dùng + chặn push · hai lỗi sản phẩm do e2e lộ ra đã sửa (cổng Phase backend, tab Plan frontend)
+- [x] [TASK-FE-E2E-029](./TASK-FE-E2E-029-retire-mocked-request-web-and-coverage-matrix.md) P1 · gỡ 15 spec mock (74 test) + project `request-web`; bảng ánh xạ độ phủ · phụ thuộc: 028
+
+Định nghĩa xong của SOL-FE-E2E-006:
+
+- [x] `run_ui_flow.py --real deepseek`: 6 spec xanh (lượt chính thức cuối ghi ở TASK-028); `--real all` (7 spec cũ) xanh 7/7.
+- [x] Repo `deepseek-harness`: HEAD, nhánh, file chưa theo dõi của người dùng, worktree `deepseek-harness-test-01` không đổi; không còn worktree/nhánh của run; không ref `refs/remotes/*` mới.
+- [x] 0 Request mồ côi; không còn project `e2e-ds-*`; agent được khôi phục không còn khối chặn push.
+- [ ] Khoảng trống có chủ đích (24 ca cần tiêm lỗi/điều kiện stack không có) giữ ở cấp component; clone/create trong thư mục tạm chưa làm.
+
 ## Định nghĩa "xong"
 
 - [~] Vitest của các file đã đổi xanh; `tsc` và `oxlint` sạch trên file đã đổi. Cả bộ `pnpm lint`/`typecheck`/vitest toàn frontend **không xanh** do lỗi có sẵn trên HEAD (thiếu `src/main`, `src/relay`, `window.api`, `jsdom`; `FleetServerStatusBadge`; `RequestBacklogRow`...), đã đối chiếu bằng bản sao HEAD sạch và không có test nào xanh ở HEAD mà đỏ bây giờ.

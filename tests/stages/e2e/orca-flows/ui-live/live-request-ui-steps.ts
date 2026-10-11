@@ -111,7 +111,13 @@ export async function answerClarificationInPanel(page: Page, answer: string): Pr
 }
 
 /** The type card: set type/size explicitly (so the flow does not depend on what the AI proposed) and confirm. */
-export async function confirmTypeInCard(page: Page, type: string, size: string): Promise<void> {
+export async function confirmTypeInCard(
+  page: Page,
+  type: string,
+  size: string,
+  urgency?: string,
+  reason?: string
+): Promise<void> {
   const card = page.getByTestId('type-confirmation-card')
   await expect(card).toBeVisible()
   const typeBox = card.getByRole('combobox').first()
@@ -123,6 +129,18 @@ export async function confirmTypeInCard(page: Page, type: string, size: string):
   if ((await sizeBox.innerText()).trim() !== size) {
     await sizeBox.click()
     await page.getByRole('option', { name: size, exact: true }).click()
+  }
+  if (urgency) {
+    // Why: the backend refuses a hotfix that is not urgent (REQUEST_HOTFIX_REQUIRES_URGENT).
+    const urgencyBox = card.getByRole('combobox', { name: 'Urgency' })
+    if ((await urgencyBox.innerText()).trim() !== urgency) {
+      await urgencyBox.click()
+      await page.getByRole('option', { name: urgency, exact: true }).click()
+    }
+  }
+  if (reason) {
+    // Why: the backend requires a reason for a hotfix (REQUEST_REASON_REQUIRED).
+    await card.getByPlaceholder(/Why this type/).fill(reason)
   }
   await card.getByRole('button', { name: 'Confirm type' }).click()
 }

@@ -113,10 +113,17 @@ export function linesAddedByRun(before: string, after: string): string {
 }
 
 /** What a user needs to see afterwards: which files the agent changed and that tests were run (`corpus` = text the run added). */
-export function judgeRunTrace(corpus: string): Verdict[] {
-  const touchedFiles = /src\/calc\.py/i.test(corpus)
-  const ranTests =
-    /(tests?\/test_calc|unittest|pytest|tests? (passed|pass|ran)|ran \d+ tests?)/i.test(corpus)
+export function judgeRunTrace(
+  corpus: string,
+  // Why: the defaults are the calc sandbox; a spec on another repo names its own file and test runner.
+  trace: { file: RegExp; testsRan: RegExp; fileLabel: string } = {
+    file: /src\/calc\.py/i,
+    testsRan: /(tests?\/test_calc|unittest|pytest|tests? (passed|pass|ran)|ran \d+ tests?)/i,
+    fileLabel: 'src/calc.py'
+  }
+): Verdict[] {
+  const touchedFiles = trace.file.test(corpus)
+  const ranTests = trace.testsRan.test(corpus)
   if (touchedFiles && ranTests) {
     return []
   }
@@ -124,12 +131,16 @@ export function judgeRunTrace(corpus: string): Verdict[] {
     {
       code: 'UI-NO-RUN-TRACE',
       owner: 'frontend',
-      text: `no Request or task screen says what the agent did (${touchedFiles ? '' : 'changed file src/calc.py missing'}${!touchedFiles && !ranTests ? '; ' : ''}${ranTests ? '' : 'test run missing'}); check the task Result tab (execution.get) and the Agent activity panel`
+      text: `no Request or task screen says what the agent did (${touchedFiles ? '' : 'changed file ${trace.fileLabel} missing'}${!touchedFiles && !ranTests ? '; ' : ''}${ranTests ? '' : 'test run missing'}); check the task Result tab (execution.get) and the Agent activity panel`
     }
   ]
 }
 
-export function judgeWorktreeView(button: boolean, gitText: string | null): Verdict[] {
+export function judgeWorktreeView(
+  button: boolean,
+  gitText: string | null,
+  changedFile: RegExp = /calc\.py/
+): Verdict[] {
   if (!button) {
     return [
       {
@@ -139,13 +150,13 @@ export function judgeWorktreeView(button: boolean, gitText: string | null): Verd
       }
     ]
   }
-  return gitText && /calc\.py/.test(gitText)
+  return gitText && changedFile.test(gitText)
     ? []
     : [
         {
           code: 'UI-NO-WORKTREE-VIEW',
           owner: 'frontend',
-          text: '"Open in Git" did not land on a Source Control list of the task worktree that shows calc.py'
+          text: `"Open in Git" did not land on a Source Control list of the task worktree that shows ${changedFile.source.replaceAll('\\', '')}`
         }
       ]
 }

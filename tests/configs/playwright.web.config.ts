@@ -46,13 +46,7 @@ export default defineConfig({
       name: 'mcp-web',
       // Why: no testDir here (other suites under tests/e2e run through this project), but
       // code-intel specs need their own fake backend and run only in `code-intel-web`.
-      testIgnore: ['**/code-intel-web/**', '**/request-web/**'],
-      use: { ...devices['Desktop Chrome'] }
-    },
-    {
-      // Why: Request-flow specs run against the mocked WebSocket backend (support/mock-request-ws.ts), never the stack.
-      name: 'request-web',
-      testDir: '../stages/e2e/legacy/request-web',
+      testIgnore: ['**/code-intel-web/**'],
       use: { ...devices['Desktop Chrome'] }
     },
     {

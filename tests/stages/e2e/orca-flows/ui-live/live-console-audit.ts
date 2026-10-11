@@ -64,6 +64,13 @@ const NOISE_RULES: NoiseRule[] = [
       'orcaProfiles.findProjectProfiles is on the backend-go frontend-compatibility coverage table as not implemented; Add Project only logs it. Backend gap that predates the add-project fixes (TASK-FE-E2E-027)'
   },
   {
+    id: 'work-items-github-remote-lookup',
+    match:
+      /^\[workItems\] dropping issues-side error with no resolved source: .*no GitHub remote configured.*WORKTREE_REPO_NOT_FOUND/,
+    reason:
+      'right after a worktree is created on a repo that has a GitHub remote, the work-items panel looks up the remote and git-gateway answers WORKTREE_REPO_NOT_FOUND (repo does not exist); the panel drops the error and shows nothing. Seen only on a repo with a real remote (TASK-FE-E2E-028); a backlog item to look at, not Request code'
+  },
+  {
     id: 'decision-channel-not-served',
     match: /decision\.[a-zA-Z]+.*not yet implemented/,
     reason:

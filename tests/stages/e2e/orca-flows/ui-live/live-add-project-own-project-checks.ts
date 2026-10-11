@@ -40,7 +40,7 @@ export function expectRegistryUnchanged(
 export function expectOwnProject(
   before: RegistrySnapshot,
   after: RegistrySnapshot,
-  folder: SandboxRepo,
+  folder: { name: string; path: string },
   devServerId: string
 ): ProjectWithRepos {
   const known = new Set(before.projects.map((p) => p.id))
@@ -79,7 +79,7 @@ export function expectOwnProject(
 export function expectOwnProjectRpc(
   calls: SentRpc[],
   from: number,
-  folder: SandboxRepo,
+  folder: { name: string; path: string },
   devServerId: string
 ): void {
   const creates = callsTo({ calls }, 'project.create', from)

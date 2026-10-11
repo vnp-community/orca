@@ -182,6 +182,27 @@ node --test tests/stages/e2e/orca-flows/ui-live/live-answer-snippet.test.ts     
 
 Console của trình duyệt qua `live-console-audit.ts` (mục ngoài allowlist làm đỏ). Ba mục mới có lý do trong allowlist, đều có từ trước và không thuộc ba lỗi đã sửa: cảnh báo Radix thiếu `Description` của hộp thoại Add Project (`radix-dialog-description-add-project`), `fs.scanNestedRepos` agent chưa có (`scan-nested-agent-method-missing`), kênh `orcaProfiles.findProjectProfiles` chưa có ở gateway (`profiles-channel-not-in-gateway`).
 
+## Agent ghi mã THẬT trên repo của người dùng, từ UI (`run_ui_flow.py --real deepseek`)
+
+Thay cho bộ Playwright mock `request-web` (đã gỡ, TASK-FE-E2E-029): sáu spec `ui-live/deepseek-*-real.web.e2e.ts` đi qua UI thật, gateway thật, backend thật và Claude Code thật của dev server, trên repo `/Users/datbeohbbh/Desktop/stuff/agentic/deepseek-harness` (đổi bằng `ORCA_E2E_DEEPSEEK_REPO`). Thiết kế an toàn và lý do: `specs/frontend/bugs/e2e-acceptance-v1/solutions/SOL-FE-E2E-006-*.md`; ánh xạ từng ca mock sang spec thật: `specs/frontend/bugs/e2e-acceptance-v1/COVERAGE-request-web-mock-to-real.md`.
+
+```bash
+ORCA_E2E_GUARD_IGNORE='specs/:docs/:frontend/:backend-go/:tests/:deploy/' python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real deepseek            # cả bộ, ~25 phút
+python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real deepseek-ui|deepseek-readonly|deepseek-review|deepseek-execute|deepseek-task              # một phần
+node --test tests/stages/e2e/orca-flows/ui-live/live-main-checkout-rules.test.ts                                                                      # luật bảo vệ repo, không cần stack
+python3 -m unittest tests/stages/e2e/orca-flows/test_agent_push_block.py                                                                              # khối chặn push, không cần stack
+```
+
+| Spec | AI | Khẳng định chính |
+|---|---|---|
+| `deepseek-ui` | không | Add Project trên repo thật (tên mặc định = tên thư mục, sửa được, project riêng gắn host), chặn trùng có/không `/` cuối, "Mở project đó", nhãn host của repo, worktree tạo từ "+" nằm cạnh repo `<repo>-<tên>` và bị gỡ cùng nhánh khi xong |
+| `deepseek-readonly` | thật, chỉ đọc | câu hỏi về `package.json` gốc: câu trả lời chứa tên gói, `engines.node`, số workspaces đọc từ repo lúc chạy; Create request (ghi chú repo/host, không `source`), danh sách, j/k, số chờ duyệt, tab, Escape |
+| `deepseek-review` + `deepseek-hotfix` | thật | tuỳ chọn/so sánh, Reject lý do ngắn bị khoá, Mod+Enter, Request về backlog, Reopen (khởi động lại từ xác nhận loại), Regenerate, chọn phương án (có xử lý khi dịch vụ từ chối vì phương án không trả lời một AC), hotfix không có thanh quyết định |
+| `deepseek-execute` | thật, GHI mã | change_request có Phase: Plan tab khớp `task.list`, Reject ngắn bị khoá, Tree/Graph, "View graph", cổng Phase (Start bị khoá tới khi duyệt, Phase theo thứ tự phụ thuộc), agent viết `scripts/e2e-sandbox/slug.mjs` + test trong worktree task, đọc lại từ đĩa và chạy `node --test`, chỉ thư mục đó thay đổi, task sheet sau run (Result, 1440/700/390 px, Escape) |
+| `deepseek-task` | thật, GHI mã | Plan một task: agent đang chạy hiện trên task sheet, dev server bận rồi rảnh, dòng hoạt động trực tiếp, phát lại sau tải lại, Open in Git thấy file agent đổi, rồi gỡ worktree và Open in Git giải thích đúng |
+
+An toàn (mọi spec `deepseek-*`): checkout chính, mọi ref, worktree của người dùng và thư mục cạnh repo được lấy dấu vân tay, so mỗi 15 giây và sau dọn dẹp; `git push` bị chặn bằng `GIT_CONFIG_*` trong môi trường agent (agent khởi động lại cho run rồi khôi phục); fixture từ chối chạy nếu khối chặn chưa có. Không cài được hook `tool-guard` trong repo này (`.claude/settings.json` bị `.gitignore`), nên agent vẫn chạy `--dangerously-skip-permissions` không sandbox (B4): các biện pháp trên PHÁT HIỆN và DỪNG, không NGĂN mọi ghi ngoài worktree.
+
 ## Bốn trạng thái kết quả
 
 | Trạng thái | Nghĩa |

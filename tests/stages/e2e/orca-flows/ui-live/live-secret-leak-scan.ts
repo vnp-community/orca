@@ -44,3 +44,16 @@ export function findSecrets(catalog: SecretCatalog, text: string): string[] {
   }
   return [...found]
 }
+
+/** The scan the agent-session monitor runs over everything it read from the screen and the activity frames, with its log line. */
+export function scanForSecrets(
+  texts: string[],
+  frameText: string
+): { note: string; leaks: string[] } {
+  const catalog = loadSecretCatalog()
+  const leaks = findSecrets(catalog, `${texts.join('\n')}\n${frameText}`)
+  return {
+    leaks,
+    note: `secret scan: ${catalog.values.length} secret-looking variable(s) checked against ${texts.length} screen read(s) and the activity frames: ${leaks.length === 0 ? 'clean' : `LEAK ${leaks.join(', ')}`}`
+  }
+}

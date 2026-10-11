@@ -9,6 +9,8 @@
   python3 run_ui_flow.py --real monitor  # REAL Claude Code executes a one-task Plan while the spec watches the agent through the UI (TASK-FE-E2E-011)
   python3 run_ui_flow.py --real addproject # REAL Claude Code, read-only: Add Project makes its own project per repo, a duplicate folder is refused, a Request in that project is answered from the right repo (TASK-FE-E2E-027)
   python3 run_ui_flow.py --real all      # all four; never combined with --ai-stub
+  python3 run_ui_flow.py --real deepseek # REAL Claude Code working on the USER's repo deepseek-harness through the UI (TASK-FE-E2E-028): Add Project, Requests, read-only analysis, review controls, execution with Phases, live agent session; `git push` is blocked for the whole run
+  python3 run_ui_flow.py --real deepseek-ui|deepseek-readonly|deepseek-review|deepseek-execute|deepseek-task   # one part of it
   python3 run_ui_flow.py --repro add-project-worktree  # no AI: Add Project (host dev-local-mac) -> worktree "test-02" through the UI on a throwaway repo (TASK-FE-E2E-015); regression spec: GREEN once the host binding of SOL-FE-E2E-004 is deployed, RED if repo/project lose their dev server again
 
 The agent switch is the same StubbedAgent run_acceptance.py uses, so the stub behaves identically in both runners.
@@ -25,22 +27,31 @@ import subprocess
 import sys
 import time
 
+from agent_push_block import PushBlockedAgent
 from ai_stub_agent_switch import StubAgentError, StubbedAgent
 from orca_stack_config import REPO_ROOT, load_config
 
 PLAYWRIGHT_CONFIG = "tests/configs/playwright.web.config.ts"
 REAL_SPECS = {
-    "readonly": ["readonly-real"],
-    "execute": ["execute-real"],
+    # Why: Playwright reads these as regexes on the file path; a bare "readonly-real" also matches deepseek-readonly-real.
+    "readonly": ["/readonly-real"],
+    "execute": ["/execute-real"],
     "monitor": ["agent-session-monitoring-real"],
     "addproject": ["add-project-own-project-request-real"],
-    "all": ["readonly-real", "execute-real", "agent-session-monitoring-real", "add-project-own-project-request-real"],
+    "all": ["/readonly-real", "/execute-real", "agent-session-monitoring-real", "add-project-own-project-request-real"],
+    # The user's repo deepseek-harness (ORCA_E2E_DEEPSEEK_REPO overrides the path); the agent runs with `git push` blocked.
+    "deepseek-ui": ["deepseek-ui-real"],
+    "deepseek-readonly": ["deepseek-readonly-real"],
+    "deepseek-review": ["deepseek-review-real", "deepseek-hotfix-real"],
+    "deepseek-execute": ["deepseek-execute-real"],
+    "deepseek-task": ["deepseek-task-real"],
+    "deepseek": ["deepseek-ui-real", "deepseek-readonly-real", "deepseek-review-real", "deepseek-hotfix-real", "deepseek-execute-real", "deepseek-task-real"],
 }
 # Why: no AI and no Request: UI-only regression specs of reported bugs; each prints BUG REPRODUCED and fails if the bug comes back.
 REPRO_SPECS = {"add-project-worktree": ["add-project-worktree-repro"]}
 # Why: these approve a Plan, which runs a real agent that WRITES to the throwaway repo; read-only analysis does not need the flag
 # (addproject only reads: it never approves the analysis).
-EXECUTING = ("execute", "monitor", "all")
+EXECUTING = ("execute", "monitor", "all", "deepseek-execute", "deepseek-task", "deepseek")
 
 
 def run_playwright(env: dict[str, str], extra: list[str]) -> int:
@@ -84,6 +95,7 @@ def main() -> int:
         args.playwright_args = [*REAL_SPECS[args.real], *args.playwright_args]
         print(f"AI mode: REAL Claude Code (dev server '{env.get('ORCA_E2E_DEV_SERVER_NAME', cfg.dev_server_name)}'); specs: {', '.join(REAL_SPECS[args.real])}")
     stub: StubbedAgent | None = None
+    blocked: PushBlockedAgent | None = None
     restore_failed = False
     try:
         if args.ai_stub:
@@ -97,19 +109,33 @@ def main() -> int:
             env["ORCA_E2E_DEV_SERVER_NAME"] = stub.current_cfg.dev_server_name
             env["ORCA_E2E_AI_MODE"] = "stub"
             print(f"AI mode: STUB (wiring only, not AI quality); dev server {stub.current_cfg.dev_server_name}")
+        if args.real and args.real.startswith("deepseek"):
+            try:
+                blocked = PushBlockedAgent(cfg)
+                print("restarting the agent with `git push` blocked (the repo has a real GitHub remote) ...")
+                blocked.start()
+            except StubAgentError as exc:
+                print(f"cannot start the agent with the push block: {exc}", file=sys.stderr)
+                return 2
         code = run_playwright(env, args.playwright_args)
         if args.real:
             code = code or check_no_orphans()
         return code
     finally:
+        if blocked:
+            try:
+                print(blocked.restore())
+            except StubAgentError as exc:
+                restore_failed = True
+                print(f"WARNING: the agent could not be restored: {exc}\n         run: bash deploy/dev/scripts/start-local-agent.sh", file=sys.stderr)
         if stub:
             try:
                 print(stub.restore())
             except StubAgentError as exc:
                 restore_failed = True
                 print(f"WARNING: the agent could not be restored: {exc}\n         run: bash deploy/dev/scripts/start-local-agent.sh", file=sys.stderr)
-            if restore_failed:
-                sys.exit(3)
+        if restore_failed:
+            sys.exit(3)
 
 
 if __name__ == "__main__":
