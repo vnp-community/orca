@@ -2430,6 +2430,82 @@ describe('web repos preload API', () => {
       expect('repo' in result && result.repo.devServerId).toBe('ds-1')
     })
 
+    it('add with projectName creates a NEW project for the repo instead of reusing the host project', async () => {
+      const { api, calls } = await installWithBackend({
+        'project.list': () => [{ id: 'proj-ds1', name: 'Demo (this Mac)', createdAt: 1 }],
+        'repo.list': (params) =>
+          (params as { projectId: string }).projectId === 'proj-own'
+            ? { repos: [repoView({ projectId: 'proj-own' })] }
+            : { repos: [repoView({ id: 'repo-old', url: '/srv/other' })] },
+        'project.create': () => ({ id: 'proj-own' })
+      })
+
+      const result = await api.add({ path: '/srv/app', devServerId: 'ds-1', projectName: 'My App' })
+
+      expect(calls.find((call) => call.method === 'project.create')?.params).toEqual({
+        name: 'My App',
+        devServerId: 'ds-1',
+        repoPath: '/srv/app',
+        visibility: 'private'
+      })
+      expect(calls.some((call) => call.method === 'repo.add')).toBe(false)
+      expect('repo' in result && result.repo.projectId).toBe('proj-own')
+    })
+
+    it('clone and create with projectName register the new checkout in their own project', async () => {
+      const { api, calls } = await installWithBackend({
+        'project.list': () => [],
+        'repo.clone': () => ({ worktreePath: '/srv/cloned', defaultBranch: 'main' }),
+        'repo.create': () => ({ path: '/srv/made', defaultBranch: 'main' }),
+        'project.create': (params) => ({ id: `proj-${(params as { name: string }).name}` }),
+        'repo.list': (params) => {
+          const projectId = (params as { projectId: string }).projectId
+          return {
+            repos: [
+              repoView({
+                projectId,
+                url: projectId === 'proj-cloned' ? '/srv/cloned' : '/srv/made'
+              })
+            ]
+          }
+        }
+      })
+
+      await api.clone({
+        url: 'https://example.com/o/cloned.git',
+        destination: '/srv/cloned',
+        devServerId: 'ds-1',
+        projectName: 'cloned'
+      })
+      await api.create({
+        parentPath: '/srv',
+        name: 'made',
+        kind: 'git',
+        devServerId: 'ds-1',
+        projectName: 'made'
+      })
+
+      const created = calls.filter((call) => call.method === 'project.create')
+      expect(created.map((call) => call.params)).toEqual([
+        { name: 'cloned', devServerId: 'ds-1', repoPath: '/srv/cloned', visibility: 'private' },
+        { name: 'made', devServerId: 'ds-1', repoPath: '/srv/made', visibility: 'private' }
+      ])
+      expect(calls.some((call) => call.method === 'repo.add')).toBe(false)
+    })
+
+    it('add with projectName refuses a folder already registered on that host, writing nothing', async () => {
+      const { api, calls } = await installWithBackend({
+        'project.list': () => [{ id: 'proj-ds1', name: 'Demo (this Mac)', createdAt: 1 }],
+        'repo.list': () => ({ repos: [repoView({ url: '/srv/app/' })] })
+      })
+
+      await expect(
+        api.add({ path: '/srv/app', devServerId: 'ds-1', projectName: 'My App' })
+      ).rejects.toThrow(/already added in project "Demo \(this Mac\)"/)
+      expect(calls.some((call) => call.method === 'project.create')).toBe(false)
+      expect(calls.some((call) => call.method === 'repo.add')).toBe(false)
+    })
+
     it('add creates a project bound to the host (named after it) when none exists', async () => {
       const { api, calls } = await installWithBackend({
         'project.list': () => [{ id: 'proj-legacy', createdAt: 1, devServerId: 'local-mac' }],

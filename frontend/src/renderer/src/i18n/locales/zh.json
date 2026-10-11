@@ -253,7 +253,9 @@
           "15cf5319ec": "已在 {{hostName}} 上检查 {{path}}，但该主机未报告可用文件夹。",
           "2dcd706774": "该项目也存在于另一个配置文件中",
           "presenceProfileOverflow": "{{names}} 及另外 {{count}} 个",
-          "setupProjectCloneDevServerUnsupported": "尚不支持将新仓库克隆到开发服务器。请改为添加现有文件夹。"
+          "setupProjectCloneDevServerUnsupported": "尚不支持将新仓库克隆到开发服务器。请改为添加现有文件夹。",
+          "repoAlreadyAdded": "项目已添加",
+          "openExistingProject": "打开项目"
         },
         "settings": {
           "e12dab333b": "切换服务器失败",
@@ -612,6 +614,13 @@
         "devServerNotFound": "该开发服务器已不存在。请选择其他服务器。",
         "forbidden": "您没有权限更改此项目的开发服务器。",
         "failed": "无法更改开发服务器。"
+      },
+      "ownProjectRegistration": {
+        "repoAddFailed": "项目“{{name}}”已创建，但无法添加其仓库：{{message}}"
+      },
+      "registeredRepoLookup": {
+        "alreadyInProject": "此文件夹已添加到该开发服务器上的项目“{{project}}”中。",
+        "alreadyAdded": "此文件夹已添加到该开发服务器上。"
       }
     },
     "hooks": {
@@ -3717,7 +3726,10 @@
           "0adf083af7": "浏览服务器",
           "8efa930eb5": "从选定的运行时服务器添加另一个项目。",
           "39bd249b3a": "添加项目",
-          "0f8aba944c": "导航到目录并单击“选择”以选择它。"
+          "0f8aba944c": "导航到目录并单击“选择”以选择它。",
+          "projectName": "项目名称",
+          "projectNamePlaceholder": "默认使用文件夹名称",
+          "projectNameHint": "将在所选主机上为此文件夹创建一个新项目。"
         },
         "AddRepoStartSteps": {
           "acf895cb42": "添加一个项目以开始使用 Orca。",
@@ -4749,6 +4761,11 @@
           "cancel": "取消",
           "saving": "正在保存…",
           "confirm": "使用此开发服务器"
+        },
+        "AddRepoDuplicateNotice": {
+          "message": "此文件夹已添加到该开发服务器上的项目“{{project}}”中，因此没有重复添加。",
+          "messageUnknownProject": "此文件夹已添加到该开发服务器上，因此没有重复添加。",
+          "open": "打开该项目"
         }
       },
       "shared": {
@@ -13290,7 +13307,12 @@
         },
         "AnswerView": {
           "answer": "答复",
-          "citations": "引用"
+          "citations": "引用",
+          "confidence": "置信度：{{percent}}%",
+          "assumptions": "假设",
+          "limitations": "局限性",
+          "followUp": "建议的后续事项",
+          "followUpWithType": "{{title}}（{{type}}）"
         },
         "DiagnosisView": {
           "rootCause": "根本原因",
@@ -14103,6 +14125,12 @@
           "reasonRequired": "每个选中的问题都需要理由。",
           "cancel": "取消",
           "submit": "发送给报告人"
+        },
+        "CreateRequestProjectRepoNote": {
+          "noRepo": "此项目还没有仓库，因此其中的请求无法运行。请先为项目添加仓库。",
+          "runsOnWithHost": "请求将在 {{host}} 上的仓库 {{repo}}（{{path}}）中运行。",
+          "runsOn": "请求将在仓库 {{repo}}（{{path}}）中运行。",
+          "firstOfMany": "这是该项目 {{count}} 个仓库中的第一个。"
         }
       },
       "reviewMap": {

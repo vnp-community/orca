@@ -253,7 +253,9 @@
           "15cf5319ec": "{{path}} は {{hostName}} でチェックされましたが、そのホストは使用可能なフォルダーを報告しませんでした。",
           "2dcd706774": "プロジェクトは別のプロファイルにも存在します",
           "presenceProfileOverflow": "{{names}} 他 {{count}} 件",
-          "setupProjectCloneDevServerUnsupported": "開発サーバーへの新しいリポジトリのクローンはまだサポートされていません。代わりに既存のフォルダーを追加してください。"
+          "setupProjectCloneDevServerUnsupported": "開発サーバーへの新しいリポジトリのクローンはまだサポートされていません。代わりに既存のフォルダーを追加してください。",
+          "repoAlreadyAdded": "プロジェクトは追加済みです",
+          "openExistingProject": "プロジェクトを開く"
         },
         "settings": {
           "e12dab333b": "サーバーの切り替えに失敗しました",
@@ -612,6 +614,13 @@
         "devServerNotFound": "その開発サーバーは存在しません。別のサーバーを選択してください。",
         "forbidden": "このプロジェクトの開発サーバーを変更する権限がありません。",
         "failed": "開発サーバーを変更できませんでした。"
+      },
+      "ownProjectRegistration": {
+        "repoAddFailed": "プロジェクト「{{name}}」は作成されましたが、リポジトリを追加できませんでした: {{message}}"
+      },
+      "registeredRepoLookup": {
+        "alreadyInProject": "このフォルダーはこの開発サーバー上のプロジェクト「{{project}}」に追加済みです。",
+        "alreadyAdded": "このフォルダーはこの開発サーバーに追加済みです。"
       }
     },
     "hooks": {
@@ -3717,7 +3726,10 @@
           "0adf083af7": "サーバーを参照する",
           "8efa930eb5": "選択したランタイム サーバーから別のプロジェクトを追加します。",
           "39bd249b3a": "プロジェクトを追加する",
-          "0f8aba944c": "ディレクトリに移動し、「選択」をクリックして選択します。"
+          "0f8aba944c": "ディレクトリに移動し、「選択」をクリックして選択します。",
+          "projectName": "プロジェクト名",
+          "projectNamePlaceholder": "既定ではフォルダー名になります",
+          "projectNameHint": "選択したホスト上のこのフォルダー用に新しいプロジェクトが作成されます。"
         },
         "AddRepoStartSteps": {
           "acf895cb42": "Orca の使用を開始するには、プロジェクトを追加します。",
@@ -4749,6 +4761,11 @@
           "cancel": "キャンセル",
           "saving": "保存中…",
           "confirm": "この開発サーバーを使用"
+        },
+        "AddRepoDuplicateNotice": {
+          "message": "このフォルダーはこの開発サーバー上のプロジェクト「{{project}}」に追加済みのため、再度追加されませんでした。",
+          "messageUnknownProject": "このフォルダーはこの開発サーバーに追加済みのため、再度追加されませんでした。",
+          "open": "そのプロジェクトを開く"
         }
       },
       "shared": {
@@ -13290,7 +13307,12 @@
         },
         "AnswerView": {
           "answer": "回答",
-          "citations": "引用"
+          "citations": "引用",
+          "confidence": "信頼度: {{percent}}%",
+          "assumptions": "前提",
+          "limitations": "制約事項",
+          "followUp": "推奨される次のステップ",
+          "followUpWithType": "{{title}}（{{type}}）"
         },
         "DiagnosisView": {
           "rootCause": "根本原因",
@@ -14103,6 +14125,12 @@
           "reasonRequired": "選択した質問にはすべて理由が必要です。",
           "cancel": "キャンセル",
           "submit": "報告者に送信"
+        },
+        "CreateRequestProjectRepoNote": {
+          "noRepo": "このプロジェクトにはまだリポジトリがないため、リクエストを実行できません。先にプロジェクトへリポジトリを追加してください。",
+          "runsOnWithHost": "リクエストは {{host}} 上のリポジトリ {{repo}}（{{path}}）で実行されます。",
+          "runsOn": "リクエストはリポジトリ {{repo}}（{{path}}）で実行されます。",
+          "firstOfMany": "このプロジェクトの {{count}} 件のリポジトリのうち最初のものです。"
         }
       },
       "reviewMap": {

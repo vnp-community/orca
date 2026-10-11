@@ -1,4 +1,5 @@
 import type { Repo } from '../../../shared/types'
+import { registerRepoInOwnProject } from '@/lib/own-project-registration'
 import { callRuntimeRpc, type getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import {
   getOrCreateDefaultProject,
@@ -16,7 +17,7 @@ type EnvironmentTarget = Extract<ReturnType<typeof getActiveRuntimeTarget>, { ki
  */
 export async function cloneRepoOntoDevServer(
   target: EnvironmentTarget,
-  args: { devServerId: string | null; url: string; destPath: string }
+  args: { devServerId: string | null; url: string; destPath: string; projectName?: string }
 ): Promise<Repo> {
   const devServerId = args.devServerId?.trim() || null
   const cloned = await callRuntimeRpc<{ worktreePath?: string; defaultBranch?: string }>(
@@ -25,13 +26,23 @@ export async function cloneRepoOntoDevServer(
     { devServerId: devServerId ?? '', url: args.url, destPath: args.destPath },
     { timeoutMs: 10 * 60_000 }
   )
+  const registeredPath = cloned?.worktreePath || args.destPath
+  // Why projectName: Add Project gives each repo its own project; without it keep the host default.
+  if (devServerId && args.projectName !== undefined) {
+    return mergeRepoViewIntoRepo(
+      await registerRepoInOwnProject(
+        (method, params, timeoutMs) => callRuntimeRpc(target, method, params, { timeoutMs }),
+        { devServerId, path: registeredPath, projectName: args.projectName }
+      )
+    )
+  }
   const projectId = await getOrCreateDefaultProject(target, devServerId)
   const view = await callRuntimeRpc<RemoteRepoView>(
     target,
     'repo.add',
     {
       projectId,
-      url: cloned?.worktreePath || args.destPath,
+      url: registeredPath,
       displayName: repoDisplayNameFromUrl(args.url),
       ...(devServerId ? { devServerId } : {})
     },

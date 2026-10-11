@@ -136,6 +136,89 @@ describe('useAddRepoServerPathFlow', () => {
       undefined,
       expect.objectContaining({ devServerId: 'ds-1' })
     )
-    expect(mocks.addRepoPath).toHaveBeenCalledWith('/server/docs', 'git', { devServerId: 'ds-1' })
+    // Why ownProject: Add Project creates a new project named after the folder (SOL-FE-E2E-005).
+    expect(mocks.addRepoPath).toHaveBeenCalledWith('/server/docs', 'git', {
+      devServerId: 'ds-1',
+      ownProject: { name: 'docs' }
+    })
+  })
+
+  it('sends the project name the user typed', async () => {
+    mocks.stateValues = ['/server/docs', false, '  Billing  ']
+    mocks.addRepoPath.mockResolvedValue(makeRepo({ kind: 'folder' }))
+    const { useAddRepoServerPathFlow } = await import('./useAddRepoServerPathFlow')
+
+    const result = useAddRepoServerPathFlow({
+      devServerId: 'ds-1',
+      addRepoPath: mocks.addRepoPath,
+      closeModal: mocks.closeModal,
+      fetchWorktrees: mocks.fetchWorktrees,
+      getNestedRepoRuntimeKind: mocks.getNestedRepoRuntimeKind,
+      scanNestedRepos: mocks.scanNestedRepos,
+      setActiveNestedScanId: mocks.setActiveNestedScanId,
+      setNestedScanInProgress: mocks.setNestedScanInProgress,
+      showNestedRepoReview: mocks.showNestedRepoReview,
+      onGitRepoReady: mocks.onGitRepoReady,
+      setAddProjectBusyLabel: mocks.setAddProjectBusyLabel
+    })
+    await result.handleAddServerPath('folder')
+
+    expect(mocks.addRepoPath).toHaveBeenCalledWith('/server/docs', 'folder', {
+      devServerId: 'ds-1',
+      ownProject: { name: 'Billing' }
+    })
+  })
+
+  it('blocks an already registered folder: no scan, no add, and exposes the match', async () => {
+    const match = { repoId: 'r-old', projectId: 'p-old', projectName: 'Old project' }
+    const findRegisteredRepo = vi.fn().mockResolvedValue(match)
+    const { useAddRepoServerPathFlow } = await import('./useAddRepoServerPathFlow')
+
+    const result = useAddRepoServerPathFlow({
+      devServerId: 'ds-1',
+      findRegisteredRepo,
+      addRepoPath: mocks.addRepoPath,
+      closeModal: mocks.closeModal,
+      fetchWorktrees: mocks.fetchWorktrees,
+      getNestedRepoRuntimeKind: mocks.getNestedRepoRuntimeKind,
+      scanNestedRepos: mocks.scanNestedRepos,
+      setActiveNestedScanId: mocks.setActiveNestedScanId,
+      setNestedScanInProgress: mocks.setNestedScanInProgress,
+      showNestedRepoReview: mocks.showNestedRepoReview,
+      onGitRepoReady: mocks.onGitRepoReady,
+      setAddProjectBusyLabel: mocks.setAddProjectBusyLabel
+    })
+    await result.handleAddServerPath('git')
+
+    expect(findRegisteredRepo).toHaveBeenCalledWith({ devServerId: 'ds-1', path: '/server/docs' })
+    expect(mocks.scanNestedRepos).not.toHaveBeenCalled()
+    expect(mocks.addRepoPath).not.toHaveBeenCalled()
+    expect(mocks.stateSetters[3]).toHaveBeenCalledWith(match)
+  })
+
+  it('opens the project that already holds the folder', async () => {
+    const match = { repoId: 'r-old', projectId: 'p-old', projectName: 'Old project' }
+    mocks.stateValues = ['/server/docs', false, null, match]
+    const onOpenRegisteredRepo = vi.fn()
+    const { useAddRepoServerPathFlow } = await import('./useAddRepoServerPathFlow')
+
+    const result = useAddRepoServerPathFlow({
+      devServerId: 'ds-1',
+      onOpenRegisteredRepo,
+      addRepoPath: mocks.addRepoPath,
+      closeModal: mocks.closeModal,
+      fetchWorktrees: mocks.fetchWorktrees,
+      getNestedRepoRuntimeKind: mocks.getNestedRepoRuntimeKind,
+      scanNestedRepos: mocks.scanNestedRepos,
+      setActiveNestedScanId: mocks.setActiveNestedScanId,
+      setNestedScanInProgress: mocks.setNestedScanInProgress,
+      showNestedRepoReview: mocks.showNestedRepoReview,
+      onGitRepoReady: mocks.onGitRepoReady,
+      setAddProjectBusyLabel: mocks.setAddProjectBusyLabel
+    })
+    result.openDuplicate()
+
+    expect(result.duplicate).toEqual(match)
+    expect(onOpenRegisteredRepo).toHaveBeenCalledWith(match)
   })
 })

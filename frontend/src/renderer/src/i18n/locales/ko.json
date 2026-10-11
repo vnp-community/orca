@@ -253,7 +253,9 @@
           "15cf5319ec": "{{path}}이(가) {{hostName}}에서 확인되었지만 해당 호스트가 사용 가능한 폴더를 보고하지 않았습니다.",
           "2dcd706774": "프로젝트가 다른 프로필에도 있습니다",
           "presenceProfileOverflow": "{{names}} 외 {{count}}개",
-          "setupProjectCloneDevServerUnsupported": "개발 서버에 새 저장소를 복제하는 기능은 아직 지원되지 않습니다. 대신 기존 폴더를 추가하세요."
+          "setupProjectCloneDevServerUnsupported": "개발 서버에 새 저장소를 복제하는 기능은 아직 지원되지 않습니다. 대신 기존 폴더를 추가하세요.",
+          "repoAlreadyAdded": "이미 추가된 프로젝트입니다",
+          "openExistingProject": "프로젝트 열기"
         },
         "settings": {
           "e12dab333b": "서버를 전환하지 못했습니다.",
@@ -612,6 +614,13 @@
         "devServerNotFound": "해당 개발 서버가 더 이상 존재하지 않습니다. 다른 서버를 선택하세요.",
         "forbidden": "이 프로젝트의 개발 서버를 변경할 권한이 없습니다.",
         "failed": "개발 서버를 변경하지 못했습니다."
+      },
+      "ownProjectRegistration": {
+        "repoAddFailed": "\"{{name}}\" 프로젝트는 만들어졌지만 저장소를 추가하지 못했습니다: {{message}}"
+      },
+      "registeredRepoLookup": {
+        "alreadyInProject": "이 폴더는 이 개발 서버의 \"{{project}}\" 프로젝트에 이미 추가되어 있습니다.",
+        "alreadyAdded": "이 폴더는 이 개발 서버에 이미 추가되어 있습니다."
       }
     },
     "hooks": {
@@ -3717,7 +3726,10 @@
           "0adf083af7": "서버 찾아보기",
           "8efa930eb5": "선택한 호스트에서 다른 프로젝트를 추가하세요.",
           "39bd249b3a": "프로젝트 추가",
-          "0f8aba944c": "디렉터리로 이동한 후 선택을 클릭하여 선택합니다."
+          "0f8aba944c": "디렉터리로 이동한 후 선택을 클릭하여 선택합니다.",
+          "projectName": "프로젝트 이름",
+          "projectNamePlaceholder": "기본값은 폴더 이름입니다",
+          "projectNameHint": "선택한 호스트의 이 폴더용으로 새 프로젝트가 만들어집니다."
         },
         "AddRepoStartSteps": {
           "acf895cb42": "Orca를 시작하려면 프로젝트를 추가하세요.",
@@ -4749,6 +4761,11 @@
           "cancel": "취소",
           "saving": "저장 중…",
           "confirm": "이 개발 서버 사용"
+        },
+        "AddRepoDuplicateNotice": {
+          "message": "이 폴더는 이 개발 서버의 \"{{project}}\" 프로젝트에 이미 추가되어 있어 다시 추가하지 않았습니다.",
+          "messageUnknownProject": "이 폴더는 이 개발 서버에 이미 추가되어 있어 다시 추가하지 않았습니다.",
+          "open": "해당 프로젝트 열기"
         }
       },
       "shared": {
@@ -13290,7 +13307,12 @@
         },
         "AnswerView": {
           "answer": "답변",
-          "citations": "인용"
+          "citations": "인용",
+          "confidence": "신뢰도: {{percent}}%",
+          "assumptions": "가정",
+          "limitations": "한계",
+          "followUp": "권장 후속 작업",
+          "followUpWithType": "{{title}} ({{type}})"
         },
         "DiagnosisView": {
           "rootCause": "근본 원인",
@@ -14103,6 +14125,12 @@
           "reasonRequired": "선택한 질문마다 사유가 필요합니다.",
           "cancel": "취소",
           "submit": "보고자에게 보내기"
+        },
+        "CreateRequestProjectRepoNote": {
+          "noRepo": "이 프로젝트에는 아직 저장소가 없어 요청을 실행할 수 없습니다. 먼저 프로젝트에 저장소를 추가하세요.",
+          "runsOnWithHost": "요청은 {{host}}의 저장소 {{repo}}({{path}})에서 실행됩니다.",
+          "runsOn": "요청은 저장소 {{repo}}({{path}})에서 실행됩니다.",
+          "firstOfMany": "이 프로젝트의 저장소 {{count}}개 중 첫 번째입니다."
         }
       },
       "reviewMap": {

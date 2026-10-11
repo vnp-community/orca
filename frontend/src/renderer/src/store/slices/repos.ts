@@ -94,6 +94,11 @@ import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/worksp
 import { formatFolderWorkspaceCreateError } from '../../lib/folder-workspace-path-status'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { requireDevServerIdForWeb, resolveProjectIdForDevServer } from '@/lib/repo-host-binding'
+import { registerRepoInOwnProject } from '@/lib/own-project-registration'
+import {
+  parseRepoAlreadyRegistered,
+  type RepoAlreadyRegisteredError
+} from '@/lib/registered-repo-lookup'
 
 const ERROR_TOAST_DURATION = 60_000
 const SAFE_AUTO_FORK_SYNC_COOLDOWN_MS = 10 * 60 * 1000
@@ -1673,7 +1678,12 @@ type FolderWorkspacePathStatusRouteOptions = {
   runtimeEnvironmentId?: string | null
   devServerId?: string | null
 }
-type AddRepoPathRouteOptions = { runtimeEnvironmentId?: string | null; devServerId?: string | null }
+type AddRepoPathRouteOptions = {
+  runtimeEnvironmentId?: string | null
+  devServerId?: string | null
+  // Add Project: put this repo in a NEW project of this name instead of the host's default project.
+  ownProject?: { name: string }
+}
 
 // Why a one-time warning: an explicit host from the caller is authoritative; the global selection
 // is only a fallback for callers without dialog context and is lost on reload. Path-status
@@ -1701,6 +1711,23 @@ function getFolderWorkspacePathStatusRouteSettings(
   return options && 'runtimeEnvironmentId' in options
     ? { activeRuntimeEnvironmentId: options.runtimeEnvironmentId ?? null }
     : fallbackSettings
+}
+
+// Safety net behind the dialog's own pre-check (cross-tab race, or a caller without the dialog).
+function notifyRepoAlreadyRegistered(duplicate: RepoAlreadyRegisteredError): void {
+  toast.error(translate('auto.store.slices.repos.repoAlreadyAdded', 'Project already added'), {
+    description: duplicate.message,
+    duration: ERROR_TOAST_DURATION,
+    action: {
+      label: translate('auto.store.slices.repos.openExistingProject', 'Open project'),
+      onClick: () => {
+        // Why lazy: open-registered-repo imports the store root, which imports this slice.
+        void import('@/lib/open-registered-repo').then(({ openRegisteredRepo }) =>
+          openRegisteredRepo({ repoId: duplicate.repoId, projectId: duplicate.projectId })
+        )
+      }
+    }
+  })
 }
 
 function getAddRepoPathRouteSettings(
@@ -3115,7 +3142,8 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           const result = await window.api.repos.add({
             path,
             kind,
-            ...(devServerId ? { devServerId } : {})
+            ...(devServerId ? { devServerId } : {}),
+            ...(devServerId && options?.ownProject ? { projectName: options.ownProject.name } : {})
           })
           if ('error' in result) {
             throw new Error(result.error)
@@ -3131,22 +3159,35 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           // below work through the same call. The bare repoView response
           // has no `kind` field (project-service doesn't model one) — set
           // it back from the caller's own already-known kind.
-          const projectId = await getOrCreateDefaultProject(target, devServerId)
-          repo = {
-            ...mergeRepoViewIntoRepo(
-              await callRuntimeRpc<RemoteRepoView>(
-                target,
-                'repo.add',
-                {
-                  projectId,
-                  url: path,
-                  displayName: repoDisplayNameFromUrl(path),
-                  ...(devServerId ? { devServerId } : {})
-                },
-                { timeoutMs: 15_000 }
-              )
-            ),
-            kind
+          if (devServerId && options?.ownProject) {
+            repo = {
+              ...mergeRepoViewIntoRepo(
+                await registerRepoInOwnProject(
+                  (method, params, timeoutMs) =>
+                    callRuntimeRpc(target, method, params, { timeoutMs }),
+                  { devServerId, path, projectName: options.ownProject.name }
+                )
+              ),
+              kind
+            }
+          } else {
+            const projectId = await getOrCreateDefaultProject(target, devServerId)
+            repo = {
+              ...mergeRepoViewIntoRepo(
+                await callRuntimeRpc<RemoteRepoView>(
+                  target,
+                  'repo.add',
+                  {
+                    projectId,
+                    url: path,
+                    displayName: repoDisplayNameFromUrl(path),
+                    ...(devServerId ? { devServerId } : {})
+                  },
+                  { timeoutMs: 15_000 }
+                )
+              ),
+              kind
+            }
           }
         }
       } catch (err) {
@@ -3187,7 +3228,8 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         openModal('confirm-non-git-folder', {
           folderPath: path,
           ...(target.kind === 'environment' ? { runtimeEnvironmentId: target.environmentId } : {}),
-          ...(devServerId ? { devServerId } : {})
+          ...(devServerId ? { devServerId } : {}),
+          ...(devServerId && options?.ownProject ? { projectName: options.ownProject.name } : {})
         })
         return null
       }
@@ -3232,6 +3274,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       }
       return repo
     } catch (err) {
+      const duplicate = parseRepoAlreadyRegistered(err)
+      if (duplicate) {
+        notifyRepoAlreadyRegistered(duplicate)
+        return null
+      }
       console.error('Failed to add project:', err)
       const message = err instanceof Error ? err.message : String(err)
       const duration = ERROR_TOAST_DURATION

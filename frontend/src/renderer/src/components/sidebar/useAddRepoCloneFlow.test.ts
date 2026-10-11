@@ -95,6 +95,42 @@ function makeRepo(overrides: Partial<Repo> = {}): Repo {
   }
 }
 
+// Add Project registers a clone in its OWN project (SOL-FE-E2E-005): project.create carries the
+// path and host, and repo.list reads the repo back. `existing` are projects the caller already has.
+function ownProjectRpc(
+  repoId: string,
+  options: { existing?: { id: string; name: string; devServerId: string }[]; hostId: string }
+): (target: unknown, method: string, params?: unknown) => Promise<unknown> {
+  return async (_target, method, params) => {
+    if (method === 'project.list') {
+      return options.existing ?? []
+    }
+    if (method === 'repo.clone') {
+      return { worktreePath: '/srv', defaultBranch: 'main' }
+    }
+    if (method === 'project.create') {
+      return { id: 'own-project' }
+    }
+    if (method === 'repo.list') {
+      return (params as { projectId: string }).projectId === 'own-project'
+        ? {
+            repos: [
+              {
+                id: repoId,
+                projectId: 'own-project',
+                url: '/srv',
+                displayName: 'orca',
+                position: 0,
+                devServerId: options.hostId
+              }
+            ]
+          }
+        : { repos: [] }
+    }
+    throw new Error(`Unexpected runtime method ${method}`)
+  }
+}
+
 describe('useAddRepoCloneFlow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -198,34 +234,12 @@ describe('useAddRepoCloneFlow', () => {
     // project.repos row) — useAddRepoCloneFlow now also resolves the implicit
     // default project (project.list) and calls repo.add to register it. All
     // three calls share this one mocked callRuntimeRpc, so branch on method.
-    mocks.callRuntimeRpc.mockImplementation(async (_target: unknown, method: string) => {
-      if (method === 'project.list') {
-        return [
-          {
-            id: 'default-project',
-            name: 'My Repos',
-            defaultBranch: 'main',
-            devServerId: 'ds-1',
-            visibility: 'private',
-            createdAt: 1,
-            updatedAt: 1
-          }
-        ]
-      }
-      if (method === 'repo.clone') {
-        return { worktreePath: '/srv', defaultBranch: 'main' }
-      }
-      if (method === 'repo.add') {
-        return {
-          id: repo.id,
-          projectId: 'default-project',
-          url: '/srv',
-          displayName: 'orca',
-          position: 0
-        }
-      }
-      throw new Error(`Unexpected runtime method ${method}`)
-    })
+    mocks.callRuntimeRpc.mockImplementation(
+      ownProjectRpc(repo.id, {
+        existing: [{ id: 'default-project', name: 'My Repos', devServerId: 'ds-1' }],
+        hostId: 'ds-1'
+      })
+    )
     mocks.fetchWorktrees.mockResolvedValue(true)
     const { useAddRepoCloneFlow } = await import('./useAddRepoCloneFlow')
 
@@ -255,12 +269,18 @@ describe('useAddRepoCloneFlow', () => {
       },
       { timeoutMs: 10 * 60_000 }
     )
+    // Own project, not the host's shared default project; it carries the clone's path and host.
     expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'env-1' },
+      'project.create',
+      { name: 'orca', devServerId: 'ds-1', repoPath: '/srv', visibility: 'private' },
+      { timeoutMs: 30_000 }
+    )
+    expect(mocks.callRuntimeRpc).not.toHaveBeenCalledWith(
+      expect.anything(),
       'repo.add',
-      // The catalog row carries the same host as the clone (SOL-FE-E2E-004).
-      { projectId: 'default-project', url: '/srv', displayName: 'orca', devServerId: 'ds-1' },
-      { timeoutMs: 15_000 }
+      expect.anything(),
+      expect.anything()
     )
     expect(mocks.cloneLocal).not.toHaveBeenCalled()
     expect(mocks.cloneRemote).not.toHaveBeenCalled()
@@ -280,34 +300,7 @@ describe('useAddRepoCloneFlow', () => {
   it('clones through a picked dev server with no explicit runtime environment', async () => {
     const repo = makeRepo({ id: 'runtime-repo', executionHostId: 'runtime:env-1' })
     mocks.storeState.settings.activeRuntimeEnvironmentId = 'session-auth'
-    mocks.callRuntimeRpc.mockImplementation(async (_target: unknown, method: string) => {
-      if (method === 'project.list') {
-        return [
-          {
-            id: 'default-project',
-            name: 'My Repos',
-            defaultBranch: 'main',
-            devServerId: '',
-            visibility: 'private',
-            createdAt: 1,
-            updatedAt: 1
-          }
-        ]
-      }
-      if (method === 'repo.clone') {
-        return { worktreePath: '/srv', defaultBranch: 'main' }
-      }
-      if (method === 'repo.add') {
-        return {
-          id: repo.id,
-          projectId: 'default-project',
-          url: '/srv',
-          displayName: 'orca',
-          position: 0
-        }
-      }
-      throw new Error(`Unexpected runtime method ${method}`)
-    })
+    mocks.callRuntimeRpc.mockImplementation(ownProjectRpc(repo.id, { hostId: 'ds-1' }))
     mocks.fetchWorktrees.mockResolvedValue(true)
     const { useAddRepoCloneFlow } = await import('./useAddRepoCloneFlow')
 
@@ -340,33 +333,15 @@ describe('useAddRepoCloneFlow', () => {
     expect(mocks.onGitRepoReady).toHaveBeenCalledWith(repo.id, 'clone_url')
   })
 
-  it('registers the clone in a new project bound to the picked dev server when none exists', async () => {
+  it('registers the clone in its own project even when the host already has one', async () => {
     const repo = makeRepo({ id: 'runtime-repo', executionHostId: 'runtime:env-1' })
-    mocks.callRuntimeRpc.mockImplementation(async (_target: unknown, method: string) => {
-      if (method === 'project.list') {
-        // Only a project on another host: it must not be reused for ds-2.
-        return [{ id: 'other-project', name: 'Other', devServerId: 'ds-1', createdAt: 1 }]
-      }
-      if (method === 'devServer.list') {
-        return [{ id: 'ds-2', name: 'Mac Studio' }]
-      }
-      if (method === 'project.create') {
-        return { id: 'ds-2-project' }
-      }
-      if (method === 'repo.clone') {
-        return { worktreePath: '/srv', defaultBranch: 'main' }
-      }
-      if (method === 'repo.add') {
-        return {
-          id: repo.id,
-          projectId: 'ds-2-project',
-          url: '/srv',
-          displayName: 'orca',
-          position: 0
-        }
-      }
-      throw new Error(`Unexpected runtime method ${method}`)
-    })
+    mocks.callRuntimeRpc.mockImplementation(
+      ownProjectRpc(repo.id, {
+        // A project on the same host must NOT be reused: Requests run on a project's first repo.
+        existing: [{ id: 'host-project', name: 'Mac Studio', devServerId: 'ds-2' }],
+        hostId: 'ds-2'
+      })
+    )
     mocks.fetchWorktrees.mockResolvedValue(true)
     const { useAddRepoCloneFlow } = await import('./useAddRepoCloneFlow')
 
@@ -384,14 +359,47 @@ describe('useAddRepoCloneFlow', () => {
     expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'env-1' },
       'project.create',
-      { name: 'Mac Studio', devServerId: 'ds-2', visibility: 'private' },
-      { timeoutMs: 15_000 }
+      { name: 'orca', devServerId: 'ds-2', repoPath: '/srv', visibility: 'private' },
+      { timeoutMs: 30_000 }
     )
-    expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
-      { kind: 'environment', environmentId: 'env-1' },
-      'repo.add',
-      { projectId: 'ds-2-project', url: '/srv', displayName: 'orca', devServerId: 'ds-2' },
-      { timeoutMs: 15_000 }
+    expect(mocks.onGitRepoReady).toHaveBeenCalledWith(repo.id, 'clone_url')
+  })
+
+  it('stops with the project name when the cloned folder is already registered', async () => {
+    mocks.callRuntimeRpc.mockImplementation(async (_target: unknown, method: string) => {
+      if (method === 'repo.clone') {
+        return { worktreePath: '/srv', defaultBranch: 'main' }
+      }
+      if (method === 'project.list') {
+        return [{ id: 'old-project', name: 'Old project', devServerId: 'ds-2' }]
+      }
+      if (method === 'repo.list') {
+        return {
+          repos: [{ id: 'r-old', projectId: 'old-project', url: '/srv/', devServerId: 'ds-2' }]
+        }
+      }
+      throw new Error(`Unexpected runtime method ${method}`)
+    })
+    const { useAddRepoCloneFlow } = await import('./useAddRepoCloneFlow')
+
+    const result = useAddRepoCloneFlow({
+      step: 'clone',
+      activeRuntimeEnvironmentId: 'env-1',
+      sshTargetId: null,
+      devServerId: 'ds-2',
+      workspaceDir: '/local/workspace',
+      fetchWorktrees: mocks.fetchWorktrees,
+      onGitRepoReady: mocks.onGitRepoReady
+    })
+    await result.handleClone()
+
+    expect(mocks.callRuntimeRpc).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'project.create',
+      expect.anything(),
+      expect.anything()
     )
+    expect(mocks.onGitRepoReady).not.toHaveBeenCalled()
+    expect(mocks.stateSetters[3]).toHaveBeenCalledWith(expect.stringContaining('Old project'))
   })
 })

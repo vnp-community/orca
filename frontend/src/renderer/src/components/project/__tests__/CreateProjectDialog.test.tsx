@@ -327,16 +327,84 @@ describe('CreateProjectDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 
-  // BUG-FE-PW-001
-  describe('duplicate repo warning', () => {
-    it('warns when repoPath + devServerId already exist in the sidebar', async () => {
+  // BUG-FE-PW-001, SOL-FE-E2E-005: a repo already registered on that host is blocked, not warned about
+  describe('duplicate repo is blocked', () => {
+    const existingRepo = {
+      id: 'repo-old',
+      projectId: 'p-existing',
+      path: '/home/user/repo',
+      executionHostId: 'devServer:ds-1',
+      displayName: 'my-repo'
+    }
+
+    function mockStoreRepos(repos: Record<string, unknown>[]): void {
       vi.mocked(useAppStore.getState).mockReturnValue({
         settings: {},
-        repos: [
-          { path: '/home/user/repo', executionHostId: 'devServer:ds-1', displayName: 'my-repo' }
-        ],
+        repos,
         projects: []
-      } as MockAppState)
+      } as never)
+    }
+
+    function mockProjectList(): void {
+      vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
+        if (method === 'devServer.list') {
+          return devServers
+        }
+        if (method === 'project.list') {
+          return [{ id: 'p-existing', name: 'Existing project' }]
+        }
+        return null
+      })
+    }
+
+    it('blocks submit and names the project that already holds repoPath + devServerId', async () => {
+      mockStoreRepos([existingRepo])
+      mockProjectList()
+
+      const createsBefore = projectCreateCalls()
+      await act(async () => {
+        render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
+      })
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My Project' } })
+      fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
+      // Trailing slash and the same folder: still the same repo.
+      fireEvent.change(screen.getByLabelText('Repo Path'), {
+        target: { value: '/home/user/repo/' }
+      })
+
+      expect(await screen.findByTestId('cp-duplicate-repo-blocked')).toHaveTextContent(
+        'Existing project'
+      )
+      expect(screen.getByRole('button', { name: /create project/i })).toBeDisabled()
+      fireEvent.submit(screen.getByRole('button', { name: /create project/i }).closest('form')!)
+      expect(projectCreateCalls()).toBe(createsBefore)
+    })
+
+    it('Open that project hands the project id to the caller and closes the dialog', async () => {
+      mockStoreRepos([existingRepo])
+      mockProjectList()
+      const onOpenExistingProject = vi.fn()
+
+      await act(async () => {
+        render(
+          <CreateProjectDialog
+            open
+            onOpenChange={onOpenChange}
+            onCreated={onCreated}
+            onOpenExistingProject={onOpenExistingProject}
+          />
+        )
+      })
+      fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
+      fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
+      fireEvent.click(await screen.findByTestId('cp-open-existing-project'))
+
+      expect(onOpenExistingProject).toHaveBeenCalledWith('p-existing')
+      expect(onOpenChange).toHaveBeenCalledWith(false)
+    })
+
+    it('does not block when the path matches but the dev server differs', async () => {
+      mockStoreRepos([{ ...existingRepo, executionHostId: 'devServer:ds-2' }])
 
       await act(async () => {
         render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
@@ -344,28 +412,10 @@ describe('CreateProjectDialog', () => {
       fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
       fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
 
-      expect(await screen.findByTestId('cp-duplicate-repo-warning')).toHaveTextContent('my-repo')
+      expect(screen.queryByTestId('cp-duplicate-repo-blocked')).not.toBeInTheDocument()
     })
 
-    it('does not warn when the path matches but the dev server differs', async () => {
-      vi.mocked(useAppStore.getState).mockReturnValue({
-        settings: {},
-        repos: [
-          { path: '/home/user/repo', executionHostId: 'devServer:ds-2', displayName: 'my-repo' }
-        ],
-        projects: []
-      } as MockAppState)
-
-      await act(async () => {
-        render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
-      })
-      fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
-      fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
-
-      expect(screen.queryByTestId('cp-duplicate-repo-warning')).not.toBeInTheDocument()
-    })
-
-    it('does not warn, and submits normally, when there is no matching repo', async () => {
+    it('does not block, and submits normally, when there is no matching repo', async () => {
       await act(async () => {
         render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
       })
@@ -373,9 +423,41 @@ describe('CreateProjectDialog', () => {
       fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
       fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
 
-      expect(screen.queryByTestId('cp-duplicate-repo-warning')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('cp-duplicate-repo-blocked')).not.toBeInTheDocument()
       const submit = screen.getByRole('button', { name: /create project/i })
       await waitFor(() => expect(submit).not.toBeDisabled())
+    })
+
+    it('shows the same block when the backend reports PROJECT_REPO_ALREADY_REGISTERED', async () => {
+      vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
+        if (method === 'devServer.list') {
+          return devServers
+        }
+        if (method === 'project.create') {
+          throw new Error(
+            'PROJECT_REPO_ALREADY_REGISTERED: /home/user/repo already in project Server side (p-srv)'
+          )
+        }
+        return null
+      })
+
+      await act(async () => {
+        render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
+      })
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My Project' } })
+      fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
+      fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
+      const submit = screen.getByRole('button', { name: /create project/i })
+      await waitFor(() => expect(submit).not.toBeDisabled())
+      await act(async () => {
+        fireEvent.click(submit)
+      })
+
+      expect(await screen.findByTestId('cp-duplicate-repo-blocked')).toHaveTextContent(
+        'Server side'
+      )
+      expect(onCreated).not.toHaveBeenCalled()
+      expect(submit).toBeDisabled()
     })
   })
 

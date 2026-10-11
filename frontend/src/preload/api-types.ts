@@ -986,10 +986,12 @@ export type PreloadApi = {
     list: () => Promise<Repo[]>
     // Why: error union matches the IPC handler's return shape; renderer callers branch on `'error' in result`.
     // devServerId: web-only host binding (ignored by Electron); web rejects an add without one.
+    // projectName: web-only; given, the repo goes into a NEW project of that name instead of the host's default project.
     add: (args: {
       path: string
       kind?: 'git' | 'folder'
       devServerId?: string
+      projectName?: string
     }) => Promise<{ repo: Repo } | { error: string }>
     remove: (args: { repoId: string }) => Promise<void>
     // Forget a project on one execution host only, leaving the same repo id on
@@ -1026,7 +1028,12 @@ export type PreloadApi = {
     pickFolder: () => Promise<string | null>
     pickFolders: () => Promise<string[]>
     pickDirectory: () => Promise<string | null>
-    clone: (args: { url: string; destination: string; devServerId?: string }) => Promise<Repo>
+    clone: (args: {
+      url: string
+      destination: string
+      devServerId?: string
+      projectName?: string
+    }) => Promise<Repo>
     cloneRemote: (args: { connectionId: string; url: string; destination: string }) => Promise<Repo>
     createRemote: (args: {
       connectionId: string
@@ -1049,6 +1056,7 @@ export type PreloadApi = {
       name: string
       kind: 'git' | 'folder'
       devServerId?: string
+      projectName?: string
     }) => Promise<{ repo: Repo } | { error: string }>
     isGitAvailable: () => Promise<boolean>
     getDefaultCreateProjectParent: () => Promise<string>

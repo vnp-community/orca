@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { cloneRepoOntoDevServer } from '@/lib/clone-repo-onto-dev-server'
+import { deriveProjectNameFromPath } from '@/lib/own-project-registration'
 import type { AddRepoExistingWorkspaceSource } from '../../../../shared/telemetry-events'
 import type { Repo } from '../../../../shared/types'
 import { getCloneDestinationAutoFill } from './clone-defaults'
@@ -119,6 +120,7 @@ export function useAddRepoCloneFlow({
     if (!trimmedUrl || !cloneDestination.trim()) {
       return
     }
+    const cloneProjectName = deriveProjectNameFromPath(trimmedUrl, '')
     const requestHostToken = hostTokenRef.current
     const gen = ++cloneGenRef.current
     setIsCloning(true)
@@ -161,13 +163,15 @@ export function useAddRepoCloneFlow({
               return cloneRepoOntoDevServer(target, {
                 devServerId: devServerId ?? null,
                 url: trimmedUrl,
-                destPath: cloneDestination.trim()
+                destPath: cloneDestination.trim(),
+                // Why: Add Project gives each cloned repo its own project, named after the repo.
+                ...(devServerId ? { projectName: cloneProjectName } : {})
               })
             })()
           : ((await window.api.repos.clone({
               url: trimmedUrl,
               destination: cloneDestination.trim(),
-              ...(devServerId ? { devServerId } : {})
+              ...(devServerId ? { devServerId, projectName: cloneProjectName } : {})
             })) as Repo)
       if (gen !== cloneGenRef.current || requestHostToken !== hostTokenRef.current) {
         return

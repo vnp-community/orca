@@ -253,7 +253,9 @@
           "15cf5319ec": "{{path}} se verificó en {{hostName}}, pero ese host no reportó ninguna carpeta utilizable.",
           "2dcd706774": "El proyecto también existe en otro perfil",
           "presenceProfileOverflow": "{{names}} +{{count}} más",
-          "setupProjectCloneDevServerUnsupported": "Aún no se admite clonar un repositorio nuevo en un servidor de desarrollo. Agregue una carpeta existente."
+          "setupProjectCloneDevServerUnsupported": "Aún no se admite clonar un repositorio nuevo en un servidor de desarrollo. Agregue una carpeta existente.",
+          "repoAlreadyAdded": "El proyecto ya está añadido",
+          "openExistingProject": "Abrir proyecto"
         },
         "settings": {
           "e12dab333b": "No se pudo cambiar de servidor",
@@ -612,6 +614,13 @@
         "devServerNotFound": "Ese servidor de desarrollo ya no existe. Elija otro.",
         "forbidden": "No tiene permiso para cambiar el servidor de desarrollo de este proyecto.",
         "failed": "No se pudo cambiar el servidor de desarrollo."
+      },
+      "ownProjectRegistration": {
+        "repoAddFailed": "Se creó el proyecto \"{{name}}\", pero no se pudo añadir su repositorio: {{message}}"
+      },
+      "registeredRepoLookup": {
+        "alreadyInProject": "Esta carpeta ya está añadida en el proyecto \"{{project}}\" de este servidor de desarrollo.",
+        "alreadyAdded": "Esta carpeta ya está añadida en este servidor de desarrollo."
       }
     },
     "hooks": {
@@ -3736,7 +3745,10 @@
           "0adf083af7": "Explorar host",
           "8efa930eb5": "Agrega otro proyecto del host seleccionado.",
           "39bd249b3a": "Agregar un proyecto",
-          "0f8aba944c": "Navega hasta un directorio y haz clic en Seleccionar para elegirlo."
+          "0f8aba944c": "Navega hasta un directorio y haz clic en Seleccionar para elegirlo.",
+          "projectName": "Nombre del proyecto",
+          "projectNamePlaceholder": "Por defecto, el nombre de la carpeta",
+          "projectNameHint": "Se crea un proyecto nuevo para esta carpeta en el host seleccionado."
         },
         "AddRepoStartSteps": {
           "87596c1446": "Otras formas de agregar",
@@ -4749,6 +4761,11 @@
           "cancel": "Cancelar",
           "saving": "Guardando…",
           "confirm": "Usar este servidor de desarrollo"
+        },
+        "AddRepoDuplicateNotice": {
+          "message": "Esta carpeta ya está añadida en el proyecto \"{{project}}\" de este servidor de desarrollo, por lo que no se añadió de nuevo.",
+          "messageUnknownProject": "Esta carpeta ya está añadida en este servidor de desarrollo, por lo que no se añadió de nuevo.",
+          "open": "Abrir ese proyecto"
         }
       },
       "shared": {
@@ -13290,7 +13307,12 @@
         },
         "AnswerView": {
           "answer": "Respuesta",
-          "citations": "Citas"
+          "citations": "Citas",
+          "confidence": "Confianza: {{percent}}%",
+          "assumptions": "Suposiciones",
+          "limitations": "Limitaciones",
+          "followUp": "Seguimiento sugerido",
+          "followUpWithType": "{{title}} ({{type}})"
         },
         "DiagnosisView": {
           "rootCause": "Causa raíz",
@@ -14103,6 +14125,12 @@
           "reasonRequired": "Cada pregunta seleccionada necesita un motivo.",
           "cancel": "Cancelar",
           "submit": "Enviar a quien reportó"
+        },
+        "CreateRequestProjectRepoNote": {
+          "noRepo": "Este proyecto aún no tiene ningún repositorio, por lo que una solicitud en él no puede ejecutarse. Añade primero un repositorio al proyecto.",
+          "runsOnWithHost": "La solicitud se ejecuta en el repositorio {{repo}} ({{path}}) de {{host}}.",
+          "runsOn": "La solicitud se ejecuta en el repositorio {{repo}} ({{path}}).",
+          "firstOfMany": "Es el primero de los {{count}} repositorios de este proyecto."
         }
       },
       "reviewMap": {

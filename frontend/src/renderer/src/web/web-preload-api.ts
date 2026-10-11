@@ -156,6 +156,7 @@ import {
 import { normalizeContextualTourIds, type ContextualTourId } from '../../../shared/contextual-tours'
 import { translate } from '@/i18n/i18n'
 import { requireRepoDevServerId, resolveProjectIdForDevServer } from '@/lib/repo-host-binding'
+import { registerRepoInOwnProject } from '@/lib/own-project-registration'
 import { getDefaultCreateProjectParent } from '@/components/sidebar/create-project-defaults'
 
 const SETTINGS_STORAGE_KEY = 'orca.web.settings.v1'
@@ -1502,27 +1503,49 @@ async function getOrCreateDefaultProjectId(devServerId: string): Promise<string>
   return projectId
 }
 
+// Why projectName selects the path: Add Project gives every repo its own project (Requests run on a
+// project's first repo); callers without a name keep the host's shared default project.
+async function registerRepoOnDevServer(args: {
+  devServerId: string
+  url: string
+  displayName: string
+  projectName?: string
+}): Promise<RemoteRepoView> {
+  if (args.projectName !== undefined) {
+    return registerRepoInOwnProject(callRuntimeResult, {
+      devServerId: args.devServerId,
+      path: args.url,
+      projectName: args.projectName
+    })
+  }
+  const projectId = await getOrCreateDefaultProjectId(args.devServerId)
+  return callRuntimeResult<RemoteRepoView>('repo.add', {
+    projectId,
+    url: args.url,
+    displayName: args.displayName,
+    devServerId: args.devServerId
+  })
+}
+
 function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
   return {
     list: async () => {
       const views = await fetchAllRemoteRepoViews()
       return views.map((view) => mergeRepoViewIntoRepo(view))
     },
-    add: async ({ path, kind, devServerId }) => {
+    add: async ({ path, kind, devServerId, projectName }) => {
       // Why before any RPC: a missing host must not leave an orphan project behind.
       const hostId = requireRepoDevServerId(devServerId)
       invalidateRuntimeWorktreeCaches()
-      const projectId = await getOrCreateDefaultProjectId(hostId)
-      const displayName = repoDisplayNameFromUrl(path)
       // Why a bare RemoteRepoView, not {repo: ...}: channels_repo_ssh_
       // status_workspace.go's repo.add handler returns toRepoView(...)
       // directly — confirmed live (an earlier version of this fix wrapped
       // it and crashed on `result.repo` being undefined).
-      const view = await callRuntimeResult<RemoteRepoView>('repo.add', {
-        projectId,
+      const view = await registerRepoOnDevServer({
+        devServerId: hostId,
         url: path,
-        displayName,
-        devServerId: hostId
+        displayName: repoDisplayNameFromUrl(path),
+        projectName
       })
       return { repo: { ...mergeRepoViewIntoRepo(view), ...(kind ? { kind } : {}) } }
     },
@@ -1569,7 +1592,7 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
     pickFolder: () => Promise.resolve(null),
     pickFolders: () => Promise.resolve([]),
     pickDirectory: () => Promise.resolve(null),
-    clone: async ({ url, destination, devServerId }) => {
+    clone: async ({ url, destination, devServerId, projectName }) => {
       const hostId = requireRepoDevServerId(devServerId)
       invalidateRuntimeWorktreeCaches()
       // Why two calls: repo.clone only puts the checkout on the host (fields devServerId/destPath);
@@ -1579,12 +1602,11 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
         { devServerId: hostId, url, destPath: destination },
         10 * 60_000
       )
-      const projectId = await getOrCreateDefaultProjectId(hostId)
-      const view = await callRuntimeResult<RemoteRepoView>('repo.add', {
-        projectId,
+      const view = await registerRepoOnDevServer({
+        devServerId: hostId,
         url: cloned?.worktreePath || destination,
         displayName: repoDisplayNameFromUrl(url),
-        devServerId: hostId
+        projectName
       })
       return mergeRepoViewIntoRepo(view)
     },
@@ -1602,17 +1624,15 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
     addRemote: async ({ remotePath, displayName, kind, devServerId }) => {
       const hostId = requireRepoDevServerId(devServerId)
       invalidateRuntimeWorktreeCaches()
-      const projectId = await getOrCreateDefaultProjectId(hostId)
       // Bare RemoteRepoView — see add()'s doc comment above.
-      const view = await callRuntimeResult<RemoteRepoView>('repo.add', {
-        projectId,
+      const view = await registerRepoOnDevServer({
+        devServerId: hostId,
         url: remotePath,
-        displayName: displayName || repoDisplayNameFromUrl(remotePath),
-        devServerId: hostId
+        displayName: displayName || repoDisplayNameFromUrl(remotePath)
       })
       return { repo: { ...mergeRepoViewIntoRepo(view), ...(kind ? { kind } : {}) } }
     },
-    create: async ({ parentPath, name, kind, devServerId }) => {
+    create: async ({ parentPath, name, kind, devServerId, projectName }) => {
       const hostId = requireRepoDevServerId(devServerId)
       invalidateRuntimeWorktreeCaches()
       const destPath = `${parentPath.replace(/[/\\]+$/, '')}/${name}`
@@ -1629,12 +1649,11 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
         })
         createdPath = created?.path || destPath
       }
-      const projectId = await getOrCreateDefaultProjectId(hostId)
-      const view = await callRuntimeResult<RemoteRepoView>('repo.add', {
-        projectId,
+      const view = await registerRepoOnDevServer({
+        devServerId: hostId,
         url: createdPath,
         displayName: name,
-        devServerId: hostId
+        projectName
       })
       return { repo: { ...mergeRepoViewIntoRepo(view), kind } }
     },

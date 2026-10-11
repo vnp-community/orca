@@ -10,7 +10,9 @@ import {
 } from '../../../../shared/nested-repo-telemetry'
 import type { AddRepoExistingWorkspaceSource } from '../../../../shared/telemetry-events'
 import type { NestedRepoScanResult, Repo } from '../../../../shared/types'
+import { deriveProjectNameFromPath } from '@/lib/own-project-registration'
 import { createNestedRepoScanId } from './add-repo-dialog-types'
+import type { RegisteredRepoMatch } from './add-repo-duplicate-lookup'
 
 type ShowNestedRepoReview = (args: {
   scan: NestedRepoScanResult
@@ -33,15 +35,23 @@ export function useAddRepoServerPathFlow({
   setNestedScanInProgress,
   showNestedRepoReview,
   onGitRepoReady,
-  setAddProjectBusyLabel
+  setAddProjectBusyLabel,
+  findRegisteredRepo,
+  onOpenRegisteredRepo
 }: {
   // Host picked in the Add Project dialog; it must reach repo.add, not only the folder browser.
   devServerId?: string | null
   addRepoPath: (
     path: string,
     kind?: 'git' | 'folder',
-    options?: { devServerId?: string | null }
+    options?: { devServerId?: string | null; ownProject?: { name: string } }
   ) => Promise<Repo | null>
+  // Blocks adding a folder that is already a repo on this host (SOL-FE-E2E-005).
+  findRegisteredRepo?: (args: {
+    devServerId: string
+    path: string
+  }) => Promise<RegisteredRepoMatch | null>
+  onOpenRegisteredRepo?: (match: RegisteredRepoMatch) => void | Promise<void>
   closeModal: () => void
   fetchWorktrees: (repoId: string, options?: { requireAuthoritative?: boolean }) => Promise<unknown>
   getNestedRepoRuntimeKind: (connectionId: string | null) => NestedRepoTelemetryRuntimeKind
@@ -63,18 +73,41 @@ export function useAddRepoServerPathFlow({
   serverPath: string
   isAddingServerPath: boolean
   setServerPath: Dispatch<SetStateAction<string>>
+  projectName: string
+  setProjectName: (name: string) => void
+  duplicate: RegisteredRepoMatch | null
+  openDuplicate: () => void
   resetServerPathFlow: () => void
   handleAddServerPath: (kind: 'git' | 'folder') => Promise<void>
 } {
-  const [serverPath, setServerPath] = useState('')
+  const [serverPath, setServerPathState] = useState('')
   const [isAddingServerPath, setIsAddingServerPath] = useState(false)
+  const [editedProjectName, setEditedProjectName] = useState<string | null>(null)
+  const [duplicate, setDuplicate] = useState<RegisteredRepoMatch | null>(null)
   const serverAddGenRef = useRef(0)
+
+  // Why: a new path is a new question, so a previous "already added" answer no longer applies.
+  const setServerPath: Dispatch<SetStateAction<string>> = useCallback((value) => {
+    setServerPathState(value)
+    setDuplicate(null)
+  }, [])
+
+  // Why derived, not stored: the name follows the folder until the user types their own.
+  const projectName = editedProjectName ?? deriveProjectNameFromPath(serverPath, '')
 
   const resetServerPathFlow = useCallback((): void => {
     serverAddGenRef.current++
-    setServerPath('')
+    setServerPathState('')
+    setEditedProjectName(null)
+    setDuplicate(null)
     setIsAddingServerPath(false)
   }, [])
+
+  const openDuplicate = useCallback((): void => {
+    if (duplicate) {
+      void onOpenRegisteredRepo?.(duplicate)
+    }
+  }, [duplicate, onOpenRegisteredRepo])
 
   const handleAddServerPath = useCallback(
     async (kind: 'git' | 'folder'): Promise<void> => {
@@ -86,6 +119,16 @@ export function useAddRepoServerPathFlow({
       setIsAddingServerPath(true)
       setAddProjectBusyLabel(kind === 'git' ? 'Scanning for repositories...' : 'Opening folder...')
       try {
+        if (devServerId && findRegisteredRepo) {
+          const match = await findRegisteredRepo({ devServerId, path })
+          if (gen !== serverAddGenRef.current) {
+            return
+          }
+          if (match) {
+            setDuplicate(match)
+            return
+          }
+        }
         if (kind === 'git') {
           const attemptId = createNestedRepoTelemetryAttemptId()
           const runtimeKind = getNestedRepoRuntimeKind(null)
@@ -151,8 +194,12 @@ export function useAddRepoServerPathFlow({
           }
         }
         setAddProjectBusyLabel(kind === 'git' ? 'Opening project...' : 'Opening folder...')
+        // Why ownProject: each added repo gets its own project; Requests run on a project's first repo.
         const repo = devServerId
-          ? await addRepoPath(path, kind, { devServerId })
+          ? await addRepoPath(path, kind, {
+              devServerId,
+              ownProject: { name: projectName.trim() }
+            })
           : await addRepoPath(path, kind)
         if (gen !== serverAddGenRef.current) {
           return
@@ -185,8 +232,10 @@ export function useAddRepoServerPathFlow({
       closeModal,
       devServerId,
       fetchWorktrees,
+      findRegisteredRepo,
       getNestedRepoRuntimeKind,
       onGitRepoReady,
+      projectName,
       scanNestedRepos,
       serverPath,
       setActiveNestedScanId,
@@ -196,5 +245,15 @@ export function useAddRepoServerPathFlow({
     ]
   )
 
-  return { serverPath, isAddingServerPath, setServerPath, resetServerPathFlow, handleAddServerPath }
+  return {
+    serverPath,
+    isAddingServerPath,
+    setServerPath,
+    projectName,
+    setProjectName: setEditedProjectName,
+    duplicate,
+    openDuplicate,
+    resetServerPathFlow,
+    handleAddServerPath
+  }
 }

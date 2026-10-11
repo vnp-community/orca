@@ -253,7 +253,9 @@
           "15cf5319ec": "{{path}} was checked on {{hostName}}, but that host did not report a usable folder.",
           "2dcd706774": "Project also exists in another profile",
           "presenceProfileOverflow": "{{names}} +{{count}} more",
-          "setupProjectCloneDevServerUnsupported": "Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead."
+          "setupProjectCloneDevServerUnsupported": "Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.",
+          "repoAlreadyAdded": "Project already added",
+          "openExistingProject": "Open project"
         },
         "settings": {
           "e12dab333b": "Failed to switch servers",
@@ -612,6 +614,13 @@
         "devServerNotFound": "That dev server no longer exists. Choose another one.",
         "forbidden": "You do not have permission to change this project’s dev server.",
         "failed": "Failed to change the dev server."
+      },
+      "ownProjectRegistration": {
+        "repoAddFailed": "Project \"{{name}}\" was created, but its repo could not be added: {{message}}"
+      },
+      "registeredRepoLookup": {
+        "alreadyInProject": "This folder is already added in project \"{{project}}\" on this dev server.",
+        "alreadyAdded": "This folder is already added on this dev server."
       }
     },
     "hooks": {
@@ -3752,7 +3761,10 @@
           "0adf083af7": "Browse host",
           "8efa930eb5": "Add another project from the selected host.",
           "39bd249b3a": "Add a project",
-          "0f8aba944c": "Navigate to a directory and click Select to choose it."
+          "0f8aba944c": "Navigate to a directory and click Select to choose it.",
+          "projectName": "Project name",
+          "projectNamePlaceholder": "Defaults to the folder name",
+          "projectNameHint": "A new project is created for this folder on the selected host."
         },
         "AddRepoStartSteps": {
           "87596c1446": "Other ways to add",
@@ -4749,6 +4761,11 @@
           "cancel": "Cancel",
           "saving": "Saving…",
           "confirm": "Use this dev server"
+        },
+        "AddRepoDuplicateNotice": {
+          "message": "This folder is already added in project \"{{project}}\" on this dev server, so it was not added again.",
+          "messageUnknownProject": "This folder is already added on this dev server, so it was not added again.",
+          "open": "Open that project"
         }
       },
       "shared": {
@@ -13290,7 +13307,12 @@
         },
         "AnswerView": {
           "answer": "Answer",
-          "citations": "Citations"
+          "citations": "Citations",
+          "confidence": "Confidence: {{percent}}%",
+          "assumptions": "Assumptions",
+          "limitations": "Limitations",
+          "followUp": "Suggested follow-up",
+          "followUpWithType": "{{title}} ({{type}})"
         },
         "DiagnosisView": {
           "rootCause": "Root cause",
@@ -14103,6 +14125,12 @@
           "reasonRequired": "Every selected question needs a reason.",
           "cancel": "Cancel",
           "submit": "Send to reporter"
+        },
+        "CreateRequestProjectRepoNote": {
+          "noRepo": "This project has no repo yet, so a request in it cannot run. Add a repo to the project first.",
+          "runsOnWithHost": "The request runs on repo {{repo}} ({{path}}) on {{host}}.",
+          "runsOn": "The request runs on repo {{repo}} ({{path}}).",
+          "firstOfMany": "It is the first of this project's {{count}} repos."
         }
       },
       "reviewMap": {

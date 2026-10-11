@@ -23,6 +23,9 @@ type AddRepoDialogStepContentProps = {
   nestedScanId: string | null
   serverPath: string
   isAddingServerPath: boolean
+  serverProjectName?: string
+  onServerProjectNameChange?: (name: string) => void
+  serverPathDuplicate?: { projectName: string; onOpen: () => void } | null
   cloneUrl: string
   cloneDestination: string
   cloneError: string | null
@@ -95,6 +98,9 @@ export function AddRepoDialogStepContent({
   nestedScanId,
   serverPath,
   isAddingServerPath,
+  serverProjectName,
+  onServerProjectNameChange,
+  serverPathDuplicate = null,
   cloneUrl,
   cloneDestination,
   cloneError,
@@ -185,6 +191,9 @@ export function AddRepoDialogStepContent({
         addProjectBusyLabel={addProjectBusyLabel}
         hostSelector={hostSelector}
         initialBrowsing
+        projectName={serverProjectName}
+        onProjectNameChange={onServerProjectNameChange}
+        duplicate={serverPathDuplicate}
         onServerPathChange={onServerPathChange}
         onAddServerPath={onAddServerPath}
         onOpenCloneStep={onOpenCloneStep}

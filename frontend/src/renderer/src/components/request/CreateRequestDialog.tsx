@@ -37,6 +37,7 @@ import { useRequestCooldown } from '../../hooks/useRequestCooldown'
 import { parseRequest } from '../../../../shared/request-wire-parsers'
 import { REQUEST_RPC_METHODS } from '../../../../shared/request-rpc-methods'
 import { requestErrorMessageForError } from './request-error-message'
+import { CreateRequestProjectRepoNote } from './CreateRequestProjectRepoNote'
 import { FILTERABLE_TYPES } from './request-list-filters'
 import { REQUEST_BODY_MAX, REQUEST_TITLE_MAX } from './create-request-from-issue'
 import type { CreateRequestParams } from './create-request-from-issue'
@@ -213,6 +214,7 @@ export function CreateRequestDialog({
                 {translate(`${T}projectRequired`, 'Choose the project this request belongs to.')}
               </p>
             )}
+            <CreateRequestProjectRepoNote projectId={projectId} />
           </div>
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-1.5">

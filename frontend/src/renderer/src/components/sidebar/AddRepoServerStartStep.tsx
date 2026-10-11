@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { RemoteFileBrowser } from './RemoteFileBrowser'
+import { AddRepoDuplicateNotice } from './AddRepoDuplicateNotice'
 import { translate } from '@/i18n/i18n'
 
 type AddRepoServerPathStartStepProps = {
@@ -17,6 +18,11 @@ type AddRepoServerPathStartStepProps = {
   addProjectBusyLabel: string | null
   hostSelector?: ReactNode
   initialBrowsing?: boolean
+  // Add Project creates a new project per repo; the name defaults to the folder name (SOL-FE-E2E-005).
+  projectName?: string
+  onProjectNameChange?: (name: string) => void
+  // Set when the folder is already a repo on this host: Add is blocked and this points at it.
+  duplicate?: { projectName: string; onOpen: () => void } | null
   onServerPathChange: (path: string) => void
   onAddServerPath: (kind: 'git' | 'folder') => void
   onOpenCloneStep: () => void
@@ -32,6 +38,9 @@ export function AddRepoServerPathStartStep({
   addProjectBusyLabel,
   hostSelector,
   initialBrowsing = false,
+  projectName,
+  onProjectNameChange,
+  duplicate = null,
   onServerPathChange,
   onAddServerPath,
   onOpenCloneStep,
@@ -253,6 +262,40 @@ export function AddRepoServerPathStartStep({
             </Tooltip>
           </div>
         </div>
+        {devServerId && onProjectNameChange ? (
+          <div className="space-y-1">
+            <label
+              htmlFor="server-project-name"
+              className="block text-[11px] font-medium text-muted-foreground"
+            >
+              {translate(
+                'auto.components.sidebar.AddRepoServerStartStep.projectName',
+                'Project name'
+              )}
+            </label>
+            <Input
+              id="server-project-name"
+              data-testid="add-project-name"
+              value={projectName ?? ''}
+              onChange={(event) => onProjectNameChange(event.target.value)}
+              placeholder={translate(
+                'auto.components.sidebar.AddRepoServerStartStep.projectNamePlaceholder',
+                'Defaults to the folder name'
+              )}
+              disabled={isAddingServerPath}
+              spellCheck={false}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              {translate(
+                'auto.components.sidebar.AddRepoServerStartStep.projectNameHint',
+                'A new project is created for this folder on the selected host.'
+              )}
+            </p>
+          </div>
+        ) : null}
+        {duplicate ? (
+          <AddRepoDuplicateNotice projectName={duplicate.projectName} onOpen={duplicate.onOpen} />
+        ) : null}
         <div className="grid grid-cols-2 gap-2">
           <Button
             onClick={() => onAddServerPath('git')}

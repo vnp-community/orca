@@ -200,6 +200,11 @@ export function ProjectSwitcher() {
       <CreateProjectDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
+        onOpenExistingProject={(projectId) => {
+          switchProject(projectId).catch(() => {
+            toast.error('Could not switch to that project. Select it from the list.')
+          })
+        }}
         onCreated={(created) => {
           void refetchProjects()
           // Why: the project row is already created at this point — a
