@@ -1,5 +1,13 @@
 # BACKLOG-004: Wire up `browser.profileImportFromBrowser`'s real cookie-import orchestration
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — không đổi** · Backlog ship: (không chặn GA, P2)
+>
+> wscompat đã đăng ký tên method (`channels_browser_profiles.go`) nhưng không tìm thấy handler `handleBrowserProfileImportFromBrowser` ở `agent/` (CodeGraph). Phần orchestration thật và kiểm thử trên trình duyệt/keychain thật vẫn chưa làm.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/backend-go/bugs/missing-v3/tasks/TASK-025-agent-browser-profile-import-from-browser.md` (`[partial]`)
 **Priority:** Low — narrow feature (importing cookies from a locally-installed browser into Orca's managed browser profile, on the *dev-server* host); the safe groundwork is already done
 **Blocked on:** Needs real-browser / live-OS-keychain testing before it's safe to ship, which this environment can't provide

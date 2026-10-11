@@ -1,5 +1,13 @@
 # BACKLOG-001: Ephemeral VM `ssh`-connection-type lifecycle
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — không đổi** · Backlog ship: SHIP-CLI-04
+>
+> `channels_ephemeral_vm.go` vẫn trả `INFRA_EPHEMERAL_VM_SSH_UNSUPPORTED` cho recipe `ssh`; `agent/` chưa có SSH client outbound. Không ảnh hưởng luồng hằng ngày; nếu Ephemeral VM ngoài phạm vi v1 thì ẩn khỏi UI.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/backend-go/bugs/missing-v3/tasks/TASK-006-ephemeral-vm-ssh-lifecycle-blocked-on-agent.md` (SOL-004 Group 2b)
 **Priority:** Low — the other connection type (`orca-server`) already ships in full; this is the narrower, secondary path
 **Blocked on:** A new `agent/` capability that does not exist today

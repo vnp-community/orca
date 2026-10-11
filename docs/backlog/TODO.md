@@ -10,6 +10,12 @@ Xem thêm [`README.md`](./README.md) trong cùng thư mục — danh sách
 `BACKLOG-XXX.md` có cấu trúc hơn (mỗi mục 1 file, format tiếng Anh, style
 audit kỹ thuật), độc lập với danh sách này.
 
+> **Rà soát 2026-10-11** (tra CodeGraph/git log, chưa chạy test; chi tiết ở [`SHIP-BACKLOG.md`](./SHIP-BACKLOG.md)):
+> - §1 Phase 5 (Ephemeral VM): kênh `ephemeralVm.provision` và `files.browseServerDir` đã có ở gateway; recipe `ssh` vẫn `INFRA_EPHEMERAL_VM_SSH_UNSUPPORTED`. Còn mở, ngoài phạm vi v1 nếu D-06/CLI-04 chốt như vậy.
+> - §2 Phase 9 (RepoGroup): vẫn **đã revert**, không thay đổi.
+> - §3 Phase 10 (`dev_server_id` sang Repo): **phần lớn đã được giải quyết** bởi chuỗi host-binding 2026-10-11 (`a3cd5199c`, `dd1f70056`, `b2c8ad696`, `12b4569b9`: repo luôn gắn dev server, đổi host theo repo, Add Project tạo project riêng, chặn trùng repo). Còn lại: dọn dead code đã liệt kê bên dưới và xác nhận bỏ gộp multi-host — chưa kiểm lại từng dòng.
+> - §4, §5: chưa xác minh lại, giữ nguyên.
+
 ## 1. Phase 5 — Port Ephemeral VM Runtime (F18) sang Dev Server Agent
 
 **Trạng thái**: mới khảo sát kiến trúc, chưa viết code.

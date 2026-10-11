@@ -1,5 +1,13 @@
 # BACKLOG-024: Every automation action except `create_pr` will fail to dispatch — missing `connectionId` resolution
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — High, xác nhận còn nguyên** · Backlog ship: SHIP-WF-01
+>
+> `automation-service` không có resolver `connectionId` (chỉ xuất hiện trong test `run_now_e2e_test.go`). Mọi action trừ `create_pr` vẫn thiếu trường bắt buộc khi gửi sang `workflow-service`. Là việc P0 nếu Automation nằm trong gói bán.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/frontend/crs/v4/automation/tasks/FE-TASK-AUTO-002-actions-type-plumbing.md` ("Kết quả thực tế", Phát hiện 3)
 **Priority:** High — this silently breaks the end-to-end automation feature at runtime even though every layer's own tests pass
 **Blocked on:** A new CR/task to resolve automation's `runContext`/`executionTargetId` into `workflow-service`'s required `connectionId` — not yet scoped anywhere

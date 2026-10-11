@@ -1,5 +1,13 @@
 # BACKLOG-020: Automations "PR merged" trigger — needs a detection-mechanism decision + trigger_depth design
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟡 NARROWED — cơ chế phát hiện đã có** · Backlog ship: SHIP-WF-02
+>
+> Hướng webhook đã được xây: `scm-integration-service` có use case `ReceiveWebhook`, `webhookverify`, `webhook_delivery_repository` và route `/v1/scm/webhooks/{provider}`; sự kiện 'PR/MR merged' được phát cho `issue-status-sync` (`receive_webhook.go`). Còn lại: nối sự kiện này vào `automation-service` `HandleExternalTrigger` và thiết kế `trigger_depth`.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/backend-go/crs/v4/automations/tasks/TASK-BE-AUTO-009-pr-merged-source-and-circular-guard.md` (full survey detail, including the confirmed absence of any existing mechanism)
 **Priority:** Low-Medium — automation triggers on other events already work; this is the one still-missing trigger source
 **Blocked on:** **A product/architecture decision** (webhook vs. polling, re-estimated at real scope) plus **an open design question** (how `trigger_depth` propagates through an automation chain that has zero real callers today)

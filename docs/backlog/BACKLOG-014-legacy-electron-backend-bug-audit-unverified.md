@@ -1,5 +1,13 @@
 # BACKLOG-014: Legacy Electron/Node backend has ~70 unverified bug findings from a 5-6-week-old audit round — never re-checked, and that backend is confirmed still live in production
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — hạ ưu tiên (D-01 chốt 2026-10-11: desktop sau GA)** · Backlog ship: SHIP-CLI-01 (P2)
+>
+> Chưa có đợt xác minh nào thêm. Bối cảnh đổi: luồng chính được nghiệm thu là web + backend-go. Quyết định D-01 (2026-10-11): bản giao khách đầu tiên là web + Dev Server Agent, desktop ưu tiên thấp hơn — nên ~68 finding chưa xác minh không chặn ship; chỉ làm khi desktop được đưa vào lộ trình.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** Consolidates 4 top-level index files that lived loose at `specs/` root (not under any of `specs/{backend,backend-go,frontend,agent,emulator}/`'s organized trees): `BUGS-INDEX.md`, `TERMINAL-BUGS-INDEX.md`, `AUDIT-REPORT-batch2-domains.md`, `AUDIT-REPORT-batch3-runtime-domains.md`. Deleted after this entry was written — their content is summarized below; the underlying per-bug detail files (`specs/{backend,frontend,agent}/bugs/hld-v1/`, `agent-orchestration/`, `terminals/`, etc.) were NOT deleted and NOT individually re-verified in this pass (out of scope — see "What this doesn't cover").
 **Priority:** Medium — real, plausible bugs in code that's confirmed still serving production traffic, but severity/currency is unverified, not confirmed-critical
 **Blocked on:** A re-verification pass (is each finding still true against current code) before any of it is actionable — same "audit went stale" pattern `specs/backend-go/bugs/missing-v1/README.md`/`logic-v1/README.md` explicitly warn about for their own domain

@@ -1,5 +1,13 @@
 # BACKLOG-012: Dev-server-backed worktree with no `infra.connections` row silently falls back to LOCAL git exec inside git-gateway-service's own container
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟢 RESOLVED (code) — còn dữ liệu cũ** · Backlog ship: SHIP-GIT-05
+>
+> Commit `a3cd5199c` (host-binding): repo luôn gắn dev server và git-gateway không còn rơi im lặng về exec cục bộ; repo cũ có `dev_server_id` rỗng nay báo `GITGATEWAY_REPO_HOST_UNBOUND` (`git-gateway-service/.../host_dispatch_status.go`). Nguyên nhân gốc 'vì sao không có hàng `infra.connections`' chưa được chẩn đoán riêng; triệu chứng bị chặn bằng cách bắt buộc gắn host. Việc còn lại: chạy `deploy/dev/scripts/rebind-unbound-repos.sh` (dry-run trước) trên dữ liệu thật và xác nhận Git panel.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Priority:** Medium-High — breaks the Git panel (status/branches/commit-message/etc.) for **every** dev-server-backed worktree in this production deployment today (confirmed system-wide, not one worktree — see update below).
 **Blocked on:** Root cause of *why* the provisioning flow never populates `infra.connections` is not yet diagnosed — needs a code trace before a fix can be scoped. Likely engineering work once diagnosed, not a product decision.
 **Origin:** Discovered live in production (b15.openledger.vn) as the very next failure exposed once **BACKLOG-011** (`GITGATEWAY_RESOLVE_FAILED`) was fixed and deployed — this is what was underneath it, unmasked, not a regression the fix introduced.

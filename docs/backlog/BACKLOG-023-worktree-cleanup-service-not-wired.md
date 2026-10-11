@@ -1,5 +1,13 @@
 # BACKLOG-023: `WorktreeCleanupService` built and tested, deliberately NOT wired to auto-run — needs explicit go-ahead
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — xác nhận chưa wire** · Backlog ship: SHIP-GIT-06
+>
+> `WorktreeCleanupService` chỉ có định nghĩa và test trong `desktop/src/main/automations/`, không có nơi khởi tạo (CodeGraph/grep). Lưu ý (D-01: web là bề mặt ship đầu tiên): dịch vụ ở phía desktop nên không phục vụ bản web; luồng web chưa có cơ chế dọn worktree tương đương — cần quyết định chính sách cho cả hai.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/frontend/crs/v4/automation/tasks/FE-TASK-AUTO-008-worktree-cleanup-service-decision.md` (FE-AUTO-SOL-006, CR-AUTO-006)
 **Priority:** Medium-High — once wired, this runs unattended and deletes real user worktrees; low priority to build further until someone explicitly wants the feature live
 **Blocked on:** **Explicit user/product authorization** to enable auto-deletion — not an engineering gap

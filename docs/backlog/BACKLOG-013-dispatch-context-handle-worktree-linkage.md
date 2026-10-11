@@ -1,5 +1,13 @@
 # BACKLOG-013: `agentSession.listActive`'s dispatch contexts can't be keyed onto `remoteAgentSessions` (worktreeId vs. assigneeHandle) — RESOLVED (backend half)
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟡 UNBLOCKED** · Backlog ship: SHIP-UX-03
+>
+> Đã có caller thật cho `CreateDispatchContext`: `TickDispatch` (`tick_dispatch.go`). Cần xác minh coordinator có truyền `worktree_id`, rồi mới làm `mapDispatchContextsToSessions` ở frontend. Backend phần `worktree_id` vẫn đúng như đã ghi.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/frontend/crs/v3/storage/tasks/FE-TASK-STORAGE-012-hydrate-dev-servers-and-agent-sessions.md` (remote-agent-sessions.ts half)
 **Priority:** Low — blocked on the same unimplemented coordinator/dispatch stack as BACKLOG-009/017, not on frontend engineering time (see "Update session 3" below)
 **Status:** Backend RESOLVED 2026-09-08 — user picked option 1 ("add a `worktree_id` field to `dispatch_contexts`"). Frontend mapping intentionally NOT implemented — would wire dead UI to a data source with zero real producers today.

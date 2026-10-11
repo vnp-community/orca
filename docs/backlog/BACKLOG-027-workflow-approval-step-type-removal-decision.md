@@ -1,5 +1,13 @@
 # BACKLOG-027: `WorkflowStepType`'s `'approval'` — pending a product decision on removal, not a technical blocker
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — chờ quyết định sản phẩm** · Backlog ship: SHIP-WF-06
+>
+> Không đổi.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/frontend/crs/v4/workflow/tasks/FE-TASK-004-step-type-vocabulary-fix.md` (CR-WF-006)
 **Priority:** Low — purely a naming/scope cleanup question, nothing is broken by leaving it as-is
 **Blocked on:** **Product confirmation** on whether `'approval'` should be removed from `WorkflowStepType`

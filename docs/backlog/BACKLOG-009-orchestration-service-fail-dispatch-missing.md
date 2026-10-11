@@ -1,5 +1,13 @@
 # BACKLOG-009: `orchestration-service` has no real caller for its new `FailDispatch` RPC yet
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟢 RESOLVED (code) — chờ e2e xác nhận** · Backlog ship: SHIP-CORE-08
+>
+> Tiền đề của bản cập nhật 2026-09-08 không còn đúng: `TickDispatch` đã tồn tại (`orchestration-service/internal/usecase/tick_dispatch.go`), được dựng và chạy theo ticker 2 giây trong `cmd/server/main.go`, và gọi `FailDispatch` khi dispatch lỗi (`tick_dispatch.go`, trường `fail`). `StartCoordinatorRun`, `ListPendingDecisionGates` và các RPC liên quan đã có ở proto/usecase/gRPC. Còn lại: test e2e của circuit-breaker (3 lỗi → `circuit_broken`, lỗi transport không tính) trên đường thật. Sau khi xác nhận, xoá file theo quy ước README.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/backend-go/crs/v3/storage/tasks/TASK-BE-STORAGE-011-dispatch-failure-classification.md` and `TASK-BE-STORAGE-012-explicit-teardown-and-integration-tests.md` (BE-SOL-STORAGE-003, CR-STORAGE-008b)
 **Priority:** Low-Medium (downgraded from Medium) — the circuit-breaker mechanism itself is now real and tested; what remains is only "who calls it", a narrower question than before
 **Blocked on:** The caller's *design* is no longer unknown (see "Update 2026-09-08 (session 2)" below — `TASK-TASKV1-005-10`'s spec already names the exact call site), but the entire stack that call site depends on (`TASK-TASKV1-005-01..09`: `CoordinatorRun` lifecycle domain/repo/usecases, `WorkerDispatcher`/`TaskServiceReporter` adapters, the tick-loop's own supporting RPCs) is **unbuilt** — spec-only, confirmed by reading the actual code, not the spec. This is now an implementation-scope question, not a design one.

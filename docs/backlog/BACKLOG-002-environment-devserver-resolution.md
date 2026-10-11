@@ -1,5 +1,13 @@
 # BACKLOG-002: Resolve a bare runtime `environmentId` to a dev server
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟡 UNBLOCKED — cần xác minh** · Backlog ship: SHIP-CLI-04
+>
+> Điều kiện chặn đã được gỡ: kênh `ephemeralVm.provision` nay tồn tại (`channels_ephemeral_vm.go`, `registerEphemeralVmProvisionChannel`) và `files.browseServerDir` đã đăng ký ở `channels_files.go`. Còn phải xác minh `environment_id` có được ghi thật và `terminal.create` với `runtime:<environmentId>` có resolve được không. Chưa chạy test.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/backend-go/bugs/missing-v3/tasks/TASK-022-environment-devserver-resolution-blocked-on-ephemeralvm.md` (SOL-008 Part 2); also the root cause of `files.browseServerDir`'s remaining gap in `specs/backend-go/bugs/missing-v3/BUG-015-files-createfile-watch-browseserverdir-not-implemented.md`
 **Priority:** Medium — affects two real, user-facing features once `ephemeralVm.provision` exists
 **Blocked on:** `ephemeralVm.provision` (does not exist anywhere in this codebase yet)

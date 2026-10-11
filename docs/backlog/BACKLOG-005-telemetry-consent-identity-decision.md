@@ -1,5 +1,13 @@
 # BACKLOG-005: `telemetry.track` — pick a consent/identity model for backend-go, then implement it
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — chờ quyết định** · Backlog ship: SHIP-D-08
+>
+> `telemetry.track` ở `channels_telemetry.go` vẫn `return nil, nil`. Cần quyết định sản phẩm/riêng tư trước khi code (TASK-016/017/018).
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/backend-go/bugs/missing-v3/BUG-014-telemetry-track-no-op.md`, `specs/backend-go/bugs/missing-v3/solutions/SOL-014-telemetry-track.md`, decision doc at `specs/backend-go/bugs/missing-v3/decisions/DECISION-telemetry-consent-identity-model.md` (full detail — this file summarizes it)
 **Priority:** Low until decided — genuinely blocked on a human call, not on engineering time
 **Blocked on:** **A product/privacy decision**, not `agent/` or any missing backend capability

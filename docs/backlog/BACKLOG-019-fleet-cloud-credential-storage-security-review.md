@@ -1,5 +1,13 @@
 # BACKLOG-019: Cloud provider credential storage design — needs security sign-off before any code
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — chờ sign-off** · Backlog ship: SHIP-SEC-02
+>
+> Không đổi; chưa xác minh lại code. Cần chỉ định người review bảo mật trước khi có task code.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/backend-go/crs/v4/fleet-provisioning/tasks/TASK-BE-FLEET-009-cloud-credential-storage-design-security-review.md`, design doc at `specs/backend-go/crs/v4/fleet-provisioning/solutions/BE-FLEET-SOL-004-cloud-credential-storage-design.md` (full detail)
 **Priority:** Medium — the one item keeping F31 Fleet Provisioning's backend-go work below fully done (13/14 tasks)
 **Blocked on:** **A human security review sign-off**, not engineering time — CR-FLEET-002 self-rates this "High" risk (first time backend-go would hold a raw, long-lived third-party credential, not just a short-lived Vault SSH cert)
