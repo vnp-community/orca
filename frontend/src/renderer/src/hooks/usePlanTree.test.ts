@@ -147,4 +147,24 @@ describe('usePlanTree', () => {
     })
     expect(callRuntimeRpc.mock.calls.length).toBe(initial + 1)
   })
+  it('keeps polling after the Request completed while the tree still shows unfinished work, then stops', async () => {
+    vi.useFakeTimers()
+    const work = (status: string) => ({ ...t('w1', 'task', 'plan1'), status })
+    callRuntimeRpc.mockResolvedValueOnce({ tasks: [t('plan1', 'plan'), work('in_progress')] })
+    renderHook(() => usePlanTree({ ...baseReq, status: 'completed' }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(callRuntimeRpc).toHaveBeenCalledTimes(1)
+    // task-service had not derived "done" yet when the status event arrived; the next poll sees it.
+    callRuntimeRpc.mockResolvedValue({ tasks: [t('plan1', 'plan'), work('done')] })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PLAN_TREE_POLL_MS)
+    })
+    expect(callRuntimeRpc).toHaveBeenCalledTimes(2)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PLAN_TREE_POLL_MS * 3)
+    })
+    expect(callRuntimeRpc).toHaveBeenCalledTimes(2)
+  })
 })

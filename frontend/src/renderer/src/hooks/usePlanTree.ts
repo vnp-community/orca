@@ -23,6 +23,8 @@ export const PLAN_TREE_PAGE_SIZE = 200
 export const PLAN_TREE_MAX_PAGES = 20
 export const PLAN_TREE_POLL_MS = 15_000
 
+const FINISHED_STATUSES = new Set<string>(['done', 'cancelled'])
+
 const REFRESH_EVENT_RE =
   /(plan\.generated|phase\.started|phase\.completed|approval\.[a-z_]+|request\.status_changed)$/
 
@@ -118,8 +120,13 @@ export function usePlanTree(request: OrcaRequest): UsePlanTreeResult {
     }
   })
 
-  // Polling is only a fallback while executing; skipped when the tab is hidden.
-  const executing = request.status === 'executing'
+  // Polling is only a fallback while executing; skipped when the tab is hidden. It also runs after the Request completed for as
+  // long as the tree still shows unfinished work: the status event can reach us before task-service has the derived "done"
+  // statuses, and with no later event the tab would keep an old percentage until reloaded.
+  const settling =
+    request.status === 'completed' &&
+    tasks.some((x) => x.type !== 'plan' && x.type !== 'phase' && !FINISHED_STATUSES.has(x.status))
+  const executing = request.status === 'executing' || settling
   useEffect(() => {
     if (!executing || !planTaskId) {
       return
