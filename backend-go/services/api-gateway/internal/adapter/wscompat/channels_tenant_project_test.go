@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -613,11 +615,84 @@ func TestProjectCreateChannel_Success(t *testing.T) {
 		gotAddMemberReq.GetRole() != projectv1.ProjectRole_PROJECT_ROLE_OWNER {
 		t.Errorf("want AddMember(project=p1, user=user-1, role=OWNER), got %+v", gotAddMemberReq)
 	}
-	proj, ok := result.(projectView)
+	proj, ok := result.(projectCreateView)
 	if !ok || proj.ID != "p1" {
 		t.Fatalf("unexpected result: %+v", result)
 	}
 	assertJSONKeys(t, result, "id", "devServerId", "defaultBranch", "createdAt", "updatedAt")
+	if proj.Repo != nil || proj.RepoID != "" {
+		t.Errorf("no repo_path was sent, so no repo may be reported: %+v", proj)
+	}
+}
+
+// project.create must hand the frontend the repo written with the project,
+// under the same camelCase names repo.add uses, so it never has to list repos.
+func TestProjectCreateChannel_ReturnsTheRepoCreatedWithTheProject(t *testing.T) {
+	fake := &fakeProjectServiceClient2{
+		createProjectFunc: func(ctx context.Context, in *projectv1.CreateProjectRequest) (*projectv1.CreateProjectResponse, error) {
+			return &projectv1.CreateProjectResponse{
+				Project: &projectv1.Project{Id: "p1", DevServerId: "ds-1", Name: "My Project"},
+				Repo:    &projectv1.Repo{Id: "r1", ProjectId: "p1", Url: "/srv/repo", DisplayName: "My Project", DevServerId: "ds-1"},
+			}, nil
+		},
+		addMemberFunc: func(ctx context.Context, in *projectv1.AddMemberRequest) (*projectv1.AddMemberResponse, error) {
+			return &projectv1.AddMemberResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerProjectChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"name": "My Project", "devServerId": "ds-1", "repoPath": "/srv/repo", "visibility": "team"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "project.create", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		ID          string `json:"id"`
+		DevServerID string `json:"devServerId"`
+		RepoID      string `json:"repoId"`
+		Repo        struct {
+			ID, ProjectID, URL, DevServerID string
+		} `json:"repo"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "p1" || got.DevServerID != "ds-1" || got.RepoID != "r1" {
+		t.Errorf("result = %s", raw)
+	}
+	var repoOnly struct {
+		Repo map[string]any `json:"repo"`
+	}
+	_ = json.Unmarshal(raw, &repoOnly)
+	for _, k := range []string{"id", "projectId", "url", "displayName", "devServerId"} {
+		if _, ok := repoOnly.Repo[k]; !ok {
+			t.Errorf("repo view lacks %q: %s", k, raw)
+		}
+	}
+}
+
+// A duplicate repo is rejected by project-service; the gateway must pass its
+// fixed-format message through untouched (the frontend parses it).
+func TestProjectCreateChannel_PassesTheAlreadyRegisteredErrorThrough(t *testing.T) {
+	msg := `PROJECT_REPO_ALREADY_REGISTERED: repo /srv/repo on dev server ds-1 is already registered in project "Alpha" (p0)`
+	fake := &fakeProjectServiceClient2{
+		createProjectFunc: func(ctx context.Context, in *projectv1.CreateProjectRequest) (*projectv1.CreateProjectResponse, error) {
+			return nil, status.Error(codes.AlreadyExists, msg)
+		},
+	}
+	r := NewRegistry()
+	registerProjectChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"name": "x", "devServerId": "ds-1", "repoPath": "/srv/repo"})
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "project.create", args)
+	if err == nil || !strings.Contains(err.Error(), msg) || status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("want the AlreadyExists status with the original message, got %v", err)
+	}
 }
 
 // TestProjectCreateChannel_AddMemberFailure_PropagatesError covers the

@@ -55,6 +55,57 @@ func (r *Repository) Create(ctx context.Context, p domain.Project) (domain.Proje
 	return out, nil
 }
 
+// CreateWithOwner writes project, creator membership and first repo in one
+// transaction: a repo that cannot be stored (including a lost race on its
+// registration key) must not leave a project behind.
+func (r *Repository) CreateWithOwner(ctx context.Context, p domain.Project, owner domain.ProjectMember, repo *domain.Repo) (domain.Project, *domain.Repo, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Project{}, nil, fmt.Errorf("postgres: begin create project transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	created, err := scanProject(tx.QueryRow(ctx, `
+		INSERT INTO project.projects (id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by, issue_status_sync_enabled, jira_project_key, jira_site_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING `+projectColumns,
+		p.ID, p.TenantID, p.Name, nullableString(p.DevServerID), p.Description, p.DefaultBranch, p.Visibility, nullableString(p.CreatedBy), p.IssueStatusSyncEnabled, p.JiraProjectKey, p.JiraSiteID,
+	))
+	if err != nil {
+		return domain.Project{}, nil, fmt.Errorf("postgres: insert project: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO project.project_members (project_id, user_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (project_id, user_id) DO UPDATE SET role = EXCLUDED.role
+	`, created.ID, owner.UserID, string(owner.Role)); err != nil {
+		return domain.Project{}, nil, fmt.Errorf("postgres: insert project owner: %w", err)
+	}
+
+	var createdRepo *domain.Repo
+	if repo != nil {
+		row, err := scanRepo(tx.QueryRow(ctx, `
+			INSERT INTO project.repos (id, project_id, url, display_name, position, dev_server_id, registration_key)
+			VALUES ($1, $2, $3, $4, 0, $5, $6)
+			RETURNING `+repoColumns,
+			repo.ID, created.ID, repo.URL, repo.DisplayName, nullableString(repo.DevServerID), nullableString(repo.RegistrationKey),
+		))
+		if isRepoRegistrationConflict(err) {
+			return domain.Project{}, nil, fmt.Errorf("postgres: insert project repo: %w", domain.ErrRepoAlreadyRegistered)
+		}
+		if err != nil {
+			return domain.Project{}, nil, fmt.Errorf("postgres: insert project repo: %w", err)
+		}
+		createdRepo = &row
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Project{}, nil, fmt.Errorf("postgres: commit create project transaction: %w", err)
+	}
+	return created, createdRepo, nil
+}
+
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT `+projectColumns+`

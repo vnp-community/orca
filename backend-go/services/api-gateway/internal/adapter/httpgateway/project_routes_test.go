@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -601,6 +602,58 @@ func projectTestRouter(client projectv1.ProjectServiceClient) chi.Router {
 
 // withTestIdentity is shared across this package's route tests —
 // git_routes_test.go defines it.
+
+// The REST create must pass the host and path through and return the repo it
+// created, next to the project's own fields (same body shape as before).
+func TestHandleCreateProject_ForwardsRepoAndReturnsIt(t *testing.T) {
+	fake := &fakeProjectServiceClient{
+		createProjectResp: &projectv1.CreateProjectResponse{
+			Project: &projectv1.Project{Id: "proj-1", TenantId: "tenant-1", Name: "orca", DevServerId: "ds-1"},
+			Repo:    &projectv1.Repo{Id: "repo-1", ProjectId: "proj-1", Url: "/srv/orca", DevServerId: "ds-1"},
+		},
+	}
+	router := projectTestRouter(fake)
+
+	body := `{"name":"orca","dev_server_id":"ds-1","repo_path":"/srv/orca"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", bytes.NewBufferString(body))
+	req = withTestIdentity(req, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d; body=%s", rec.Code, rec.Body.String())
+	}
+	if fake.lastCreateProjectReq.GetDevServerId() != "ds-1" || fake.lastCreateProjectReq.GetRepoPath() != "/srv/orca" {
+		t.Fatalf("host and path must reach project-service: %+v", fake.lastCreateProjectReq)
+	}
+	var got struct {
+		ID   string `json:"id"`
+		Repo struct {
+			ID  string `json:"id"`
+			URL string `json:"url"`
+		} `json:"repo"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshaling: %v; body=%s", err, rec.Body.String())
+	}
+	if got.ID != "proj-1" || got.Repo.ID != "repo-1" || got.Repo.URL != "/srv/orca" {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+}
+
+func TestHandleCreateProject_AlreadyRegisteredIsAConflict(t *testing.T) {
+	fake := &fakeProjectServiceClient{createProjectErr: status.Error(codes.AlreadyExists, "PROJECT_REPO_ALREADY_REGISTERED: repo /x on dev server d is already registered in another project")}
+	router := projectTestRouter(fake)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", bytes.NewBufferString(`{"name":"orca","dev_server_id":"d","repo_path":"/x"}`))
+	req = withTestIdentity(req, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "PROJECT_REPO_ALREADY_REGISTERED") {
+		t.Fatalf("status = %d, body=%s; want 409 carrying the code", rec.Code, rec.Body.String())
+	}
+}
 
 func TestHandleCreateProject_SuccessRoundTrip(t *testing.T) {
 	fake := &fakeProjectServiceClient{

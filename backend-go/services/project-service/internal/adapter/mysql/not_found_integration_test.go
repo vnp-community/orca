@@ -55,7 +55,7 @@ func TestRepositories_UnknownID_ReturnDomainNotFound(t *testing.T) {
 			{"Repo.GetRepo", domain.ErrRepoNotFound, func() error { _, err := repos.GetRepo(ctx, id); return err }},
 			{"Repo.Update", domain.ErrRepoNotFound, func() error { _, err := repos.Update(ctx, domain.Repo{ID: id}); return err }},
 			{"Repo.UpdateDevServerID", domain.ErrRepoNotFound, func() error {
-				_, err := repos.UpdateDevServerID(ctx, id, uuid.NewString())
+				_, err := repos.UpdateDevServerID(ctx, id, uuid.NewString(), "")
 				return err
 			}},
 			{"Repo.ReassignProject", domain.ErrRepoNotFound, func() error {

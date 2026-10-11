@@ -215,6 +215,9 @@ message CreateProjectRequest {
 
 message CreateProjectResponse {
   Project project = 1;
+  // repo is the project's first repo, written in the same transaction as the
+  // project; unset when the request had no repo_path.
+  Repo repo = 2;
 }
 
 message GetProjectRequest {

@@ -205,9 +205,12 @@ func (r *ProjectGroupRepository) ImportNested(ctx context.Context, tenantID, cre
 		}
 
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO repos (id, project_id, url, display_name, position, dev_server_id, created_at)
-			VALUES (?, ?, ?, ?, 0, ?, ?)
-		`, uuid.NewString(), p.ID, c.Path, name, nullableString(devServerID), now); err != nil {
+			INSERT INTO repos (id, project_id, url, display_name, position, dev_server_id, registration_key, created_at)
+			VALUES (?, ?, ?, ?, 0, ?, ?, ?)
+		`, uuid.NewString(), p.ID, c.Path, name, nullableString(devServerID), nullableString(domain.RepoRegistrationKey(tenantID, devServerID, c.Path)), now); err != nil {
+			if isRepoRegistrationConflict(err) {
+				return nil, nil, fmt.Errorf("mysql: insert imported repo: %w", domain.ErrRepoAlreadyRegistered)
+			}
 			return nil, nil, fmt.Errorf("mysql: insert imported repo: %w", err)
 		}
 

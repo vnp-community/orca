@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -29,6 +30,7 @@ type RebindRepoDevServer struct {
 	taskChecker     TaskExecutionChecker
 	devServers      DevServerLister
 	policy          RepoHostPolicy
+	guard           repoLocationGuard
 }
 
 func NewRebindRepoDevServer(repos RepoRepository, membership MembershipRepository, opa OPAClient, workflowChecker WorkflowExecutionChecker, taskChecker TaskExecutionChecker, devServers DevServerLister, policy RepoHostPolicy) *RebindRepoDevServer {
@@ -40,6 +42,7 @@ func NewRebindRepoDevServer(repos RepoRepository, membership MembershipRepositor
 		taskChecker:     taskChecker,
 		devServers:      devServers,
 		policy:          policy,
+		guard:           repoLocationGuard{repos: repos, members: membership},
 	}
 }
 
@@ -96,7 +99,20 @@ func (uc *RebindRepoDevServer) Execute(ctx context.Context, in RebindRepoDevServ
 		}
 	}
 
-	updated, err := uc.repos.UpdateDevServerID(ctx, in.RepoID, in.NewDevServerID)
+	// Same host: nothing moves, so nothing to dedupe (also keeps legacy
+	// duplicates operable). A new host must not already hold this path.
+	if strings.EqualFold(existing.DevServerID, in.NewDevServerID) {
+		return existing, nil
+	}
+	if err := uc.guard.ensureFree(ctx, tenantID, in.NewDevServerID, existing.URL, existing.ID); err != nil {
+		return domain.Repo{}, err
+	}
+
+	newKey := domain.RepoRegistrationKey(tenantID, in.NewDevServerID, existing.URL)
+	updated, err := uc.repos.UpdateDevServerID(ctx, in.RepoID, in.NewDevServerID, newKey)
+	if raced := uc.guard.translateWriteError(ctx, err, tenantID, in.NewDevServerID, existing.URL, existing.ID); raced != nil {
+		return domain.Repo{}, raced
+	}
 	if errors.Is(err, domain.ErrRepoNotFound) {
 		return domain.Repo{}, apperrors.New(apperrors.KindNotFound, "PROJECT_REPO_NOT_FOUND", "repo not found", err)
 	}

@@ -26,10 +26,11 @@ type ImportNestedInput struct {
 type ImportNested struct {
 	groupRepo ProjectGroupRepository
 	policy    RepoHostPolicy
+	guard     repoLocationGuard
 }
 
-func NewImportNested(groupRepo ProjectGroupRepository, policy RepoHostPolicy) *ImportNested {
-	return &ImportNested{groupRepo: groupRepo, policy: policy}
+func NewImportNested(groupRepo ProjectGroupRepository, repos RepoRepository, members MembershipRepository, policy RepoHostPolicy) *ImportNested {
+	return &ImportNested{groupRepo: groupRepo, policy: policy, guard: repoLocationGuard{repos: repos, members: members}}
 }
 
 func (uc *ImportNested) Execute(ctx context.Context, in ImportNestedInput) ([]domain.ProjectGroup, []domain.Project, error) {
@@ -48,6 +49,21 @@ func (uc *ImportNested) Execute(ctx context.Context, in ImportNestedInput) ([]do
 		}
 	}
 
+	// All-or-nothing import: refuse the whole selection if any candidate is
+	// already registered on this host, or listed twice.
+	seen := make(map[string]struct{}, len(in.Selected))
+	for _, c := range in.Selected {
+		loc := domain.NormalizeRepoLocation(c.Path)
+		if _, dup := seen[loc]; dup {
+			return nil, nil, apperrors.New(apperrors.KindInvalidArgument, CodeImportNestedDuplicatePath,
+				"the same folder is selected more than once: "+c.Path, nil)
+		}
+		seen[loc] = struct{}{}
+		if err := uc.guard.ensureFree(ctx, tenantID, in.DevServerID, c.Path, ""); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	if in.ParentGroupID != "" {
 		if _, err := uc.groupRepo.GetProjectGroup(ctx, tenantID, in.ParentGroupID); err != nil {
 			if errors.Is(err, domain.ErrProjectGroupNotFound) {
@@ -58,6 +74,15 @@ func (uc *ImportNested) Execute(ctx context.Context, in ImportNestedInput) ([]do
 	}
 
 	groups, projects, err := uc.groupRepo.ImportNested(ctx, tenantID, userID, in.DevServerID, in.ParentGroupID, in.Selected)
+	if errors.Is(err, domain.ErrRepoAlreadyRegistered) {
+		// Lost a race on one candidate: name it by re-running the pre-check.
+		for _, c := range in.Selected {
+			if guardErr := uc.guard.ensureFree(ctx, tenantID, in.DevServerID, c.Path, ""); guardErr != nil {
+				return nil, nil, guardErr
+			}
+		}
+		return nil, nil, apperrors.New(apperrors.KindAborted, CodeRepoRegistrationConflict, "a repository in this selection was registered by a concurrent request; retry", err)
+	}
 	if err != nil {
 		return nil, nil, apperrors.New(apperrors.KindInternal, "PROJECT_IMPORT_NESTED_FAILED", "failed to import nested repos", err)
 	}

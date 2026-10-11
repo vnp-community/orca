@@ -21,6 +21,11 @@ import (
 // database-per-service rule.
 type ProjectRepository interface {
 	Create(ctx context.Context, project domain.Project) (domain.Project, error)
+	// CreateWithOwner writes the project, its creator's owner membership and
+	// (when repo != nil) its first repo in ONE transaction, so a failed repo
+	// never leaves a project behind. Returns domain.ErrRepoAlreadyRegistered
+	// (wrapped) when the repo's registration key is already taken.
+	CreateWithOwner(ctx context.Context, project domain.Project, owner domain.ProjectMember, repo *domain.Repo) (domain.Project, *domain.Repo, error)
 	Get(ctx context.Context, tenantID, id string) (domain.Project, error)
 	// List returns only projects userID is a member of — see
 	// usecase.ListProjects.Execute's doc comment for why this is not just
@@ -132,7 +137,9 @@ type TaskExecutionChecker interface {
 type RepoRepository interface {
 	// AddRepo persists repo and assigns it the next position within its
 	// project (MAX(position)+1, or 0 for the first repo) — position is
-	// never caller-supplied on add, only via ReorderRepos afterward.
+	// never caller-supplied on add, only via ReorderRepos afterward. Returns
+	// domain.ErrRepoAlreadyRegistered (wrapped) when repo.RegistrationKey is
+	// already taken (the race-proof backstop of the usecase pre-check).
 	AddRepo(ctx context.Context, repo domain.Repo) (domain.Repo, error)
 	// ListRepos returns a project's repos ordered by position.
 	ListRepos(ctx context.Context, projectID string) ([]domain.Repo, error)
@@ -164,9 +171,16 @@ type RepoRepository interface {
 	Update(ctx context.Context, repo domain.Repo) (domain.Repo, error)
 	// UpdateDevServerID rebinds a single repo to a new dev server — the only
 	// write path for repos.dev_server_id (see usecase.RebindRepoDevServer),
-	// analogous to ProjectRepository.UpdateDevServerID one tier down. Returns
-	// domain.ErrRepoNotFound (wrapped) if no repo matches.
-	UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error)
+	// analogous to ProjectRepository.UpdateDevServerID one tier down.
+	// registrationKey is the key of the NEW location (the host is part of it).
+	// Returns domain.ErrRepoNotFound (wrapped) if no repo matches and
+	// domain.ErrRepoAlreadyRegistered (wrapped) if the key is taken.
+	UpdateDevServerID(ctx context.Context, repoID, devServerID, registrationKey string) (domain.Repo, error)
+	// FindRepoAtLocation returns a repo of tenantID on devServerID ("" = no
+	// dev server) whose normalised url equals normalizedURL, other than
+	// excludeRepoID. Reads the real columns (not registration_key) so repos
+	// registered before the key existed still count as occupying the location.
+	FindRepoAtLocation(ctx context.Context, tenantID, devServerID, normalizedURL, excludeRepoID string) (domain.RepoConflict, bool, error)
 	// ReassignProject moves repo into a different project, appending it at
 	// the end of that project's list (same position convention AddRepo uses
 	// for a brand-new repo) and clearing any repo_members grants (scoped to

@@ -37,10 +37,11 @@ type AddRepo struct {
 	opa        OPAClient
 	devServers DevServerLister
 	policy     RepoHostPolicy
+	guard      repoLocationGuard
 }
 
 func NewAddRepo(repo RepoRepository, projects ProjectDirectory, opa OPAClient, devServers DevServerLister, policy RepoHostPolicy) *AddRepo {
-	return &AddRepo{repo: repo, projects: projects, opa: opa, devServers: devServers, policy: policy}
+	return &AddRepo{repo: repo, projects: projects, opa: opa, devServers: devServers, policy: policy, guard: repoLocationGuard{repos: repo, members: projects}}
 }
 
 func (uc *AddRepo) Execute(ctx context.Context, in AddRepoInput) (domain.Repo, error) {
@@ -87,7 +88,16 @@ func (uc *AddRepo) Execute(ctx context.Context, in AddRepoInput) (domain.Repo, e
 		return domain.Repo{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_REPO_INVALID", err.Error(), err)
 	}
 
+	// One registration per (tenant, host, path) across all projects.
+	if err := uc.guard.ensureFree(ctx, tenantID, devServerID, in.URL, ""); err != nil {
+		return domain.Repo{}, err
+	}
+	r.RegistrationKey = domain.RepoRegistrationKey(tenantID, devServerID, in.URL)
+
 	created, err := uc.repo.AddRepo(ctx, r)
+	if raced := uc.guard.translateWriteError(ctx, err, tenantID, devServerID, in.URL, ""); raced != nil {
+		return domain.Repo{}, raced
+	}
 	if err != nil {
 		return domain.Repo{}, apperrors.New(apperrors.KindInternal, "PROJECT_ADD_REPO_FAILED", "failed to persist repo", err)
 	}

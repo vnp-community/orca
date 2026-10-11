@@ -5,11 +5,33 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+
+	mysqldriver "github.com/go-sql-driver/mysql"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
 
-const repoColumns = `id, project_id, url, display_name, position, dev_server_id, hook_settings`
+const repoColumns = `id, project_id, url, display_name, position, dev_server_id, hook_settings, registration_key`
+
+// repoRegistrationKeyIndex is the unique index that makes "one registration
+// per (tenant, dev server, path)" race-proof (migrations/0032).
+const repoRegistrationKeyIndex = "uq_repos_registration_key"
+
+const addRepoDeadlockRetries = 5
+
+// isMySQLDeadlock reports ER_LOCK_DEADLOCK (1213): the statement was rolled back whole and may be retried.
+func isMySQLDeadlock(err error) bool {
+	var mysqlErr *mysqldriver.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1213
+}
+
+// isRepoRegistrationConflict reports ER_DUP_ENTRY (1062) on that index only,
+// so a duplicate primary key is never mislabelled as a duplicate repo.
+func isRepoRegistrationConflict(err error) bool {
+	var mysqlErr *mysqldriver.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 && strings.Contains(mysqlErr.Message, repoRegistrationKeyIndex)
+}
 
 // RepoRepository implements usecase.RepoRepository against `repos` —
 // mirrors postgres.RepoRepository's one-struct-per-entity layout.
@@ -27,11 +49,25 @@ func NewRepoRepository(db *sql.DB) *RepoRepository {
 // RETURNING: re-SELECT by id afterward (id is caller-supplied, always
 // known).
 func (r *RepoRepository) AddRepo(ctx context.Context, repo domain.Repo) (domain.Repo, error) {
-	if _, err := r.db.ExecContext(ctx, `
-		INSERT INTO repos (id, project_id, url, display_name, position, dev_server_id)
-		SELECT ?, ?, ?, ?, COALESCE(MAX(position) + 1, 0), ?
-		FROM repos WHERE project_id = ?
-	`, repo.ID, repo.ProjectID, repo.URL, repo.DisplayName, nullableString(repo.DevServerID), repo.ProjectID); err != nil {
+	// InnoDB's INSERT ... SELECT takes shared next-key locks on the rows it
+	// reads while the unique-key check takes its own: several clients inserting
+	// the same registration key can deadlock (1213). The victim is rolled back
+	// whole, so retrying lets it see the winner and fail with the real conflict.
+	var err error
+	for attempt := 0; attempt < addRepoDeadlockRetries; attempt++ {
+		_, err = r.db.ExecContext(ctx, `
+			INSERT INTO repos (id, project_id, url, display_name, position, dev_server_id, registration_key)
+			SELECT ?, ?, ?, ?, COALESCE(MAX(position) + 1, 0), ?, ?
+			FROM repos WHERE project_id = ?
+		`, repo.ID, repo.ProjectID, repo.URL, repo.DisplayName, nullableString(repo.DevServerID), nullableString(repo.RegistrationKey), repo.ProjectID)
+		if !isMySQLDeadlock(err) {
+			break
+		}
+	}
+	if err != nil {
+		if isRepoRegistrationConflict(err) {
+			return domain.Repo{}, fmt.Errorf("mysql: insert repo: %w", domain.ErrRepoAlreadyRegistered)
+		}
 		return domain.Repo{}, fmt.Errorf("mysql: insert repo: %w", err)
 	}
 	return r.GetRepo(ctx, repo.ID)
@@ -151,19 +187,25 @@ func (r *RepoRepository) Update(ctx context.Context, repo domain.Repo) (domain.R
 		return domain.Repo{}, err
 	}
 	if _, err := r.db.ExecContext(ctx, `
-		UPDATE repos SET url = ?, display_name = ?, hook_settings = ? WHERE id = ?
-	`, repo.URL, repo.DisplayName, nullableString(repo.HookSettings), repo.ID); err != nil {
+		UPDATE repos SET url = ?, display_name = ?, hook_settings = ?, registration_key = ? WHERE id = ?
+	`, repo.URL, repo.DisplayName, nullableString(repo.HookSettings), nullableString(repo.RegistrationKey), repo.ID); err != nil {
+		if isRepoRegistrationConflict(err) {
+			return domain.Repo{}, fmt.Errorf("mysql: update repo: %w", domain.ErrRepoAlreadyRegistered)
+		}
 		return domain.Repo{}, fmt.Errorf("mysql: update repo: %w", err)
 	}
 	return r.GetRepo(ctx, repo.ID)
 }
 
 // UpdateDevServerID is the ONLY write path for a repo's dev_server_id.
-func (r *RepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error) {
+func (r *RepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServerID, registrationKey string) (domain.Repo, error) {
 	if _, err := existingRepoOrNotFound(ctx, r.db, repoID); err != nil {
 		return domain.Repo{}, err
 	}
-	if _, err := r.db.ExecContext(ctx, `UPDATE repos SET dev_server_id = ? WHERE id = ?`, nullableString(devServerID), repoID); err != nil {
+	if _, err := r.db.ExecContext(ctx, `UPDATE repos SET dev_server_id = ?, registration_key = ? WHERE id = ?`, nullableString(devServerID), nullableString(registrationKey), repoID); err != nil {
+		if isRepoRegistrationConflict(err) {
+			return domain.Repo{}, fmt.Errorf("mysql: update repo dev_server_id: %w", domain.ErrRepoAlreadyRegistered)
+		}
 		return domain.Repo{}, fmt.Errorf("mysql: update repo dev_server_id: %w", err)
 	}
 	return r.GetRepo(ctx, repoID)
@@ -235,6 +277,38 @@ func (r *RepoRepository) ReassignProject(ctx context.Context, repoID, fromProjec
 	return out, nil
 }
 
+// FindRepoAtLocation: see postgres.RepoRepository.FindRepoAtLocation. MySQL has
+// no RLS, so the tenant filter through projects.tenant_id is the only isolation.
+func (r *RepoRepository) FindRepoAtLocation(ctx context.Context, tenantID, devServerID, normalizedURL, excludeRepoID string) (domain.RepoConflict, bool, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT r.id, r.project_id, r.url, p.name, p.visibility, COALESCE(r.dev_server_id, '')
+		FROM repos r
+		JOIN projects p ON p.id = r.project_id
+		WHERE p.tenant_id = ?
+		  AND COALESCE(r.dev_server_id, '') = ?
+		  AND r.id <> ?
+		ORDER BY p.created_at, r.position, r.id
+	`, tenantID, strings.ToLower(devServerID), excludeRepoID)
+	if err != nil {
+		return domain.RepoConflict{}, false, fmt.Errorf("mysql: query repos at location: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var c domain.RepoConflict
+		if err := rows.Scan(&c.RepoID, &c.ProjectID, &c.URL, &c.ProjectName, &c.ProjectVisibility, &c.DevServerID); err != nil {
+			return domain.RepoConflict{}, false, fmt.Errorf("mysql: scan repo at location: %w", err)
+		}
+		if domain.NormalizeRepoLocation(c.URL) == normalizedURL {
+			return c, true, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return domain.RepoConflict{}, false, fmt.Errorf("mysql: iterate repos at location: %w", err)
+	}
+	return domain.RepoConflict{}, false, nil
+}
+
 func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 	res, err := r.db.ExecContext(ctx, `DELETE FROM repos WHERE id = ?`, repoID)
 	if err != nil {
@@ -252,14 +326,15 @@ func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 
 func scanRepo(row rowScanner) (domain.Repo, error) {
 	var repo domain.Repo
-	var devServerID, hookSettings sql.NullString
+	var devServerID, hookSettings, registrationKey sql.NullString
 	if err := row.Scan(
-		&repo.ID, &repo.ProjectID, &repo.URL, &repo.DisplayName, &repo.Position, &devServerID, &hookSettings,
+		&repo.ID, &repo.ProjectID, &repo.URL, &repo.DisplayName, &repo.Position, &devServerID, &hookSettings, &registrationKey,
 	); err != nil {
 		return domain.Repo{}, err
 	}
 	repo.DevServerID = devServerID.String
 	repo.HookSettings = hookSettings.String
+	repo.RegistrationKey = registrationKey.String
 	return repo, nil
 }
 

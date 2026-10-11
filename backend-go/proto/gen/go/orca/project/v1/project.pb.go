@@ -378,8 +378,11 @@ func (x *CreateProjectRequest) GetRepoPath() string {
 }
 
 type CreateProjectResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Project       *Project               `protobuf:"bytes,1,opt,name=project,proto3" json:"project,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Project *Project               `protobuf:"bytes,1,opt,name=project,proto3" json:"project,omitempty"`
+	// repo is the project's first repo, written in the same transaction as the
+	// project; unset when the request had no repo_path.
+	Repo          *Repo `protobuf:"bytes,2,opt,name=repo,proto3" json:"repo,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -417,6 +420,13 @@ func (*CreateProjectResponse) Descriptor() ([]byte, []int) {
 func (x *CreateProjectResponse) GetProject() *Project {
 	if x != nil {
 		return x.Project
+	}
+	return nil
+}
+
+func (x *CreateProjectResponse) GetRepo() *Repo {
+	if x != nil {
+		return x.Repo
 	}
 	return nil
 }
@@ -7433,9 +7443,10 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"visibility\x18\x05 \x01(\tR\n" +
 	"visibility\x12\"\n" +
 	"\rdev_server_id\x18\x06 \x01(\tR\vdevServerId\x12\x1b\n" +
-	"\trepo_path\x18\a \x01(\tR\brepoPath\"K\n" +
+	"\trepo_path\x18\a \x01(\tR\brepoPath\"v\n" +
 	"\x15CreateProjectResponse\x122\n" +
-	"\aproject\x18\x01 \x01(\v2\x18.orca.project.v1.ProjectR\aproject\"#\n" +
+	"\aproject\x18\x01 \x01(\v2\x18.orca.project.v1.ProjectR\aproject\x12)\n" +
+	"\x04repo\x18\x02 \x01(\v2\x15.orca.project.v1.RepoR\x04repo\"#\n" +
 	"\x11GetProjectRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"H\n" +
 	"\x12GetProjectResponse\x122\n" +
@@ -8170,189 +8181,190 @@ var file_orca_project_v1_project_proto_depIdxs = []int32{
 	133, // 0: orca.project.v1.Project.created_at:type_name -> google.protobuf.Timestamp
 	133, // 1: orca.project.v1.Project.updated_at:type_name -> google.protobuf.Timestamp
 	2,   // 2: orca.project.v1.CreateProjectResponse.project:type_name -> orca.project.v1.Project
-	2,   // 3: orca.project.v1.GetProjectResponse.project:type_name -> orca.project.v1.Project
-	2,   // 4: orca.project.v1.ListProjectsResponse.projects:type_name -> orca.project.v1.Project
-	0,   // 5: orca.project.v1.AddMemberRequest.role:type_name -> orca.project.v1.ProjectRole
-	0,   // 6: orca.project.v1.Member.role:type_name -> orca.project.v1.ProjectRole
-	11,  // 7: orca.project.v1.ListMembersResponse.members:type_name -> orca.project.v1.Member
-	0,   // 8: orca.project.v1.UpdateMemberRoleRequest.role:type_name -> orca.project.v1.ProjectRole
-	11,  // 9: orca.project.v1.UpdateMemberRoleResponse.member:type_name -> orca.project.v1.Member
-	2,   // 10: orca.project.v1.RebindDevServerResponse.project:type_name -> orca.project.v1.Project
-	26,  // 11: orca.project.v1.RebindRepoDevServerResponse.repo:type_name -> orca.project.v1.Repo
-	2,   // 12: orca.project.v1.UpdateProjectResponse.project:type_name -> orca.project.v1.Project
-	26,  // 13: orca.project.v1.AddRepoResponse.repo:type_name -> orca.project.v1.Repo
-	26,  // 14: orca.project.v1.ListReposResponse.repos:type_name -> orca.project.v1.Repo
-	26,  // 15: orca.project.v1.UpdateRepoResponse.repo:type_name -> orca.project.v1.Repo
-	26,  // 16: orca.project.v1.AssignRepoToProjectResponse.repo:type_name -> orca.project.v1.Repo
-	26,  // 17: orca.project.v1.GetRepoResponse.repo:type_name -> orca.project.v1.Repo
-	1,   // 18: orca.project.v1.RepoMember.role:type_name -> orca.project.v1.RepoRole
-	1,   // 19: orca.project.v1.AddRepoMemberRequest.role:type_name -> orca.project.v1.RepoRole
-	41,  // 20: orca.project.v1.AddRepoMemberResponse.member:type_name -> orca.project.v1.RepoMember
-	41,  // 21: orca.project.v1.ListRepoMembersResponse.members:type_name -> orca.project.v1.RepoMember
-	1,   // 22: orca.project.v1.UpdateRepoMemberRoleRequest.role:type_name -> orca.project.v1.RepoRole
-	41,  // 23: orca.project.v1.UpdateRepoMemberRoleResponse.member:type_name -> orca.project.v1.RepoMember
-	133, // 24: orca.project.v1.SparsePreset.created_at:type_name -> google.protobuf.Timestamp
-	133, // 25: orca.project.v1.SparsePreset.updated_at:type_name -> google.protobuf.Timestamp
-	50,  // 26: orca.project.v1.ListSparsePresetsResponse.presets:type_name -> orca.project.v1.SparsePreset
-	50,  // 27: orca.project.v1.SaveSparsePresetResponse.preset:type_name -> orca.project.v1.SparsePreset
-	134, // 28: orca.project.v1.Worktree.metadata:type_name -> google.protobuf.Struct
-	57,  // 29: orca.project.v1.RecordWorktreeCreatedResponse.worktree:type_name -> orca.project.v1.Worktree
-	133, // 30: orca.project.v1.ListWorktreesRequest.older_than:type_name -> google.protobuf.Timestamp
-	57,  // 31: orca.project.v1.ListWorktreesResponse.worktrees:type_name -> orca.project.v1.Worktree
-	57,  // 32: orca.project.v1.SetWorktreeActivationResponse.worktree:type_name -> orca.project.v1.Worktree
-	57,  // 33: orca.project.v1.RenameWorktreeResponse.worktree:type_name -> orca.project.v1.Worktree
-	57,  // 34: orca.project.v1.GetWorktreeByIdempotencyKeyResponse.worktree:type_name -> orca.project.v1.Worktree
-	134, // 35: orca.project.v1.UpdateWorktreeMetaRequest.metadata:type_name -> google.protobuf.Struct
-	57,  // 36: orca.project.v1.UpdateWorktreeMetaResponse.worktree:type_name -> orca.project.v1.Worktree
-	57,  // 37: orca.project.v1.SetWorktreeLineageResponse.worktree:type_name -> orca.project.v1.Worktree
-	78,  // 38: orca.project.v1.ListWorktreeLineageResponse.lineage:type_name -> orca.project.v1.WorktreeLineageEntry
-	79,  // 39: orca.project.v1.CreateProjectGroupResponse.group:type_name -> orca.project.v1.ProjectGroup
-	79,  // 40: orca.project.v1.UpdateProjectGroupResponse.group:type_name -> orca.project.v1.ProjectGroup
-	79,  // 41: orca.project.v1.ListProjectGroupsResponse.groups:type_name -> orca.project.v1.ProjectGroup
-	133, // 42: orca.project.v1.FolderWorkspace.created_at:type_name -> google.protobuf.Timestamp
-	88,  // 43: orca.project.v1.CreateFolderWorkspaceResponse.folder_workspace:type_name -> orca.project.v1.FolderWorkspace
-	88,  // 44: orca.project.v1.UpdateFolderWorkspaceResponse.folder_workspace:type_name -> orca.project.v1.FolderWorkspace
-	88,  // 45: orca.project.v1.ListFolderWorkspacesResponse.folder_workspaces:type_name -> orca.project.v1.FolderWorkspace
-	79,  // 46: orca.project.v1.MoveProjectResponse.group:type_name -> orca.project.v1.ProjectGroup
-	102, // 47: orca.project.v1.ScanNestedResponse.candidates:type_name -> orca.project.v1.NestedRepoCandidate
-	102, // 48: orca.project.v1.ImportNestedRequest.selected:type_name -> orca.project.v1.NestedRepoCandidate
-	79,  // 49: orca.project.v1.ImportNestedResponse.created_groups:type_name -> orca.project.v1.ProjectGroup
-	2,   // 50: orca.project.v1.ImportNestedResponse.created_projects:type_name -> orca.project.v1.Project
-	106, // 51: orca.project.v1.CreateHostSetupResponse.setup:type_name -> orca.project.v1.HostSetup
-	106, // 52: orca.project.v1.ListHostSetupsResponse.setups:type_name -> orca.project.v1.HostSetup
-	106, // 53: orca.project.v1.UpdateHostSetupResponse.setup:type_name -> orca.project.v1.HostSetup
-	106, // 54: orca.project.v1.SetupExistingFolderResponse.setup:type_name -> orca.project.v1.HostSetup
-	2,   // 55: orca.project.v1.SetupExistingFolderResponse.project:type_name -> orca.project.v1.Project
-	123, // 56: orca.project.v1.GetMobileWorktreeStatusResponse.worktrees:type_name -> orca.project.v1.MobileWorktreeStatus
-	133, // 57: orca.project.v1.SourceProject.linked_at:type_name -> google.protobuf.Timestamp
-	124, // 58: orca.project.v1.LinkSourceProjectResponse.source_project:type_name -> orca.project.v1.SourceProject
-	124, // 59: orca.project.v1.ListSourceProjectsResponse.source_projects:type_name -> orca.project.v1.SourceProject
-	2,   // 60: orca.project.v1.GetSharedProjectDataResponse.project:type_name -> orca.project.v1.Project
-	26,  // 61: orca.project.v1.GetSharedProjectDataResponse.repos:type_name -> orca.project.v1.Repo
-	57,  // 62: orca.project.v1.GetSharedProjectDataResponse.worktrees:type_name -> orca.project.v1.Worktree
-	3,   // 63: orca.project.v1.ProjectService.CreateProject:input_type -> orca.project.v1.CreateProjectRequest
-	5,   // 64: orca.project.v1.ProjectService.GetProject:input_type -> orca.project.v1.GetProjectRequest
-	7,   // 65: orca.project.v1.ProjectService.ListProjects:input_type -> orca.project.v1.ListProjectsRequest
-	9,   // 66: orca.project.v1.ProjectService.AddMember:input_type -> orca.project.v1.AddMemberRequest
-	12,  // 67: orca.project.v1.ProjectService.ListMembers:input_type -> orca.project.v1.ListMembersRequest
-	14,  // 68: orca.project.v1.ProjectService.RemoveMember:input_type -> orca.project.v1.RemoveMemberRequest
-	16,  // 69: orca.project.v1.ProjectService.UpdateMemberRole:input_type -> orca.project.v1.UpdateMemberRoleRequest
-	18,  // 70: orca.project.v1.ProjectService.RebindDevServer:input_type -> orca.project.v1.RebindDevServerRequest
-	20,  // 71: orca.project.v1.ProjectService.RebindRepoDevServer:input_type -> orca.project.v1.RebindRepoDevServerRequest
-	22,  // 72: orca.project.v1.ProjectService.UpdateProject:input_type -> orca.project.v1.UpdateProjectRequest
-	24,  // 73: orca.project.v1.ProjectService.DeleteProject:input_type -> orca.project.v1.DeleteProjectRequest
-	27,  // 74: orca.project.v1.ProjectService.AddRepo:input_type -> orca.project.v1.AddRepoRequest
-	29,  // 75: orca.project.v1.ProjectService.ListRepos:input_type -> orca.project.v1.ListReposRequest
-	31,  // 76: orca.project.v1.ProjectService.ReorderRepos:input_type -> orca.project.v1.ReorderReposRequest
-	33,  // 77: orca.project.v1.ProjectService.RemoveRepo:input_type -> orca.project.v1.RemoveRepoRequest
-	35,  // 78: orca.project.v1.ProjectService.UpdateRepo:input_type -> orca.project.v1.UpdateRepoRequest
-	37,  // 79: orca.project.v1.ProjectService.AssignRepoToProject:input_type -> orca.project.v1.AssignRepoToProjectRequest
-	39,  // 80: orca.project.v1.ProjectService.GetRepo:input_type -> orca.project.v1.GetRepoRequest
-	42,  // 81: orca.project.v1.ProjectService.AddRepoMember:input_type -> orca.project.v1.AddRepoMemberRequest
-	44,  // 82: orca.project.v1.ProjectService.ListRepoMembers:input_type -> orca.project.v1.ListRepoMembersRequest
-	46,  // 83: orca.project.v1.ProjectService.RemoveRepoMember:input_type -> orca.project.v1.RemoveRepoMemberRequest
-	48,  // 84: orca.project.v1.ProjectService.UpdateRepoMemberRole:input_type -> orca.project.v1.UpdateRepoMemberRoleRequest
-	51,  // 85: orca.project.v1.ProjectService.ListSparsePresets:input_type -> orca.project.v1.ListSparsePresetsRequest
-	53,  // 86: orca.project.v1.ProjectService.SaveSparsePreset:input_type -> orca.project.v1.SaveSparsePresetRequest
-	55,  // 87: orca.project.v1.ProjectService.RemoveSparsePreset:input_type -> orca.project.v1.RemoveSparsePresetRequest
-	59,  // 88: orca.project.v1.ProjectService.RecordWorktreeCreated:input_type -> orca.project.v1.RecordWorktreeCreatedRequest
-	61,  // 89: orca.project.v1.ProjectService.RecordWorktreeRemoved:input_type -> orca.project.v1.RecordWorktreeRemovedRequest
-	64,  // 90: orca.project.v1.ProjectService.ListWorktrees:input_type -> orca.project.v1.ListWorktreesRequest
-	58,  // 91: orca.project.v1.ProjectService.GetWorktree:input_type -> orca.project.v1.GetWorktreeRequest
-	66,  // 92: orca.project.v1.ProjectService.SetWorktreeActivation:input_type -> orca.project.v1.SetWorktreeActivationRequest
-	68,  // 93: orca.project.v1.ProjectService.RenameWorktree:input_type -> orca.project.v1.RenameWorktreeRequest
-	72,  // 94: orca.project.v1.ProjectService.UpdateWorktreeMeta:input_type -> orca.project.v1.UpdateWorktreeMetaRequest
-	74,  // 95: orca.project.v1.ProjectService.SetWorktreeLineage:input_type -> orca.project.v1.SetWorktreeLineageRequest
-	76,  // 96: orca.project.v1.ProjectService.ListWorktreeLineage:input_type -> orca.project.v1.ListWorktreeLineageRequest
-	70,  // 97: orca.project.v1.ProjectService.GetWorktreeByIdempotencyKey:input_type -> orca.project.v1.GetWorktreeByIdempotencyKeyRequest
-	80,  // 98: orca.project.v1.ProjectService.CreateProjectGroup:input_type -> orca.project.v1.CreateProjectGroupRequest
-	82,  // 99: orca.project.v1.ProjectService.UpdateProjectGroup:input_type -> orca.project.v1.UpdateProjectGroupRequest
-	84,  // 100: orca.project.v1.ProjectService.DeleteProjectGroup:input_type -> orca.project.v1.DeleteProjectGroupRequest
-	86,  // 101: orca.project.v1.ProjectService.ListProjectGroups:input_type -> orca.project.v1.ListProjectGroupsRequest
-	89,  // 102: orca.project.v1.ProjectService.CreateFolderWorkspace:input_type -> orca.project.v1.CreateFolderWorkspaceRequest
-	91,  // 103: orca.project.v1.ProjectService.UpdateFolderWorkspace:input_type -> orca.project.v1.UpdateFolderWorkspaceRequest
-	93,  // 104: orca.project.v1.ProjectService.DeleteFolderWorkspace:input_type -> orca.project.v1.DeleteFolderWorkspaceRequest
-	95,  // 105: orca.project.v1.ProjectService.ListFolderWorkspaces:input_type -> orca.project.v1.ListFolderWorkspacesRequest
-	97,  // 106: orca.project.v1.ProjectService.GetFolderWorkspacePathStatus:input_type -> orca.project.v1.GetFolderWorkspacePathStatusRequest
-	99,  // 107: orca.project.v1.ProjectService.MoveProject:input_type -> orca.project.v1.MoveProjectRequest
-	101, // 108: orca.project.v1.ProjectService.ScanNested:input_type -> orca.project.v1.ScanNestedRequest
-	104, // 109: orca.project.v1.ProjectService.ImportNested:input_type -> orca.project.v1.ImportNestedRequest
-	107, // 110: orca.project.v1.ProjectService.CreateHostSetup:input_type -> orca.project.v1.CreateHostSetupRequest
-	109, // 111: orca.project.v1.ProjectService.ListHostSetups:input_type -> orca.project.v1.ListHostSetupsRequest
-	111, // 112: orca.project.v1.ProjectService.UpdateHostSetup:input_type -> orca.project.v1.UpdateHostSetupRequest
-	113, // 113: orca.project.v1.ProjectService.DeleteHostSetup:input_type -> orca.project.v1.DeleteHostSetupRequest
-	115, // 114: orca.project.v1.ProjectService.SetupExistingFolder:input_type -> orca.project.v1.SetupExistingFolderRequest
-	119, // 115: orca.project.v1.ProjectService.GetProjectContext:input_type -> orca.project.v1.GetProjectContextRequest
-	117, // 116: orca.project.v1.ProjectService.ResolveProjectAccess:input_type -> orca.project.v1.ResolveProjectAccessRequest
-	121, // 117: orca.project.v1.ProjectService.GetMobileWorktreeStatus:input_type -> orca.project.v1.GetMobileWorktreeStatusRequest
-	125, // 118: orca.project.v1.ProjectService.LinkSourceProject:input_type -> orca.project.v1.LinkSourceProjectRequest
-	127, // 119: orca.project.v1.ProjectService.UnlinkSourceProject:input_type -> orca.project.v1.UnlinkSourceProjectRequest
-	129, // 120: orca.project.v1.ProjectService.ListSourceProjects:input_type -> orca.project.v1.ListSourceProjectsRequest
-	131, // 121: orca.project.v1.ProjectService.GetSharedProjectData:input_type -> orca.project.v1.GetSharedProjectDataRequest
-	4,   // 122: orca.project.v1.ProjectService.CreateProject:output_type -> orca.project.v1.CreateProjectResponse
-	6,   // 123: orca.project.v1.ProjectService.GetProject:output_type -> orca.project.v1.GetProjectResponse
-	8,   // 124: orca.project.v1.ProjectService.ListProjects:output_type -> orca.project.v1.ListProjectsResponse
-	10,  // 125: orca.project.v1.ProjectService.AddMember:output_type -> orca.project.v1.AddMemberResponse
-	13,  // 126: orca.project.v1.ProjectService.ListMembers:output_type -> orca.project.v1.ListMembersResponse
-	15,  // 127: orca.project.v1.ProjectService.RemoveMember:output_type -> orca.project.v1.RemoveMemberResponse
-	17,  // 128: orca.project.v1.ProjectService.UpdateMemberRole:output_type -> orca.project.v1.UpdateMemberRoleResponse
-	19,  // 129: orca.project.v1.ProjectService.RebindDevServer:output_type -> orca.project.v1.RebindDevServerResponse
-	21,  // 130: orca.project.v1.ProjectService.RebindRepoDevServer:output_type -> orca.project.v1.RebindRepoDevServerResponse
-	23,  // 131: orca.project.v1.ProjectService.UpdateProject:output_type -> orca.project.v1.UpdateProjectResponse
-	25,  // 132: orca.project.v1.ProjectService.DeleteProject:output_type -> orca.project.v1.DeleteProjectResponse
-	28,  // 133: orca.project.v1.ProjectService.AddRepo:output_type -> orca.project.v1.AddRepoResponse
-	30,  // 134: orca.project.v1.ProjectService.ListRepos:output_type -> orca.project.v1.ListReposResponse
-	32,  // 135: orca.project.v1.ProjectService.ReorderRepos:output_type -> orca.project.v1.ReorderReposResponse
-	34,  // 136: orca.project.v1.ProjectService.RemoveRepo:output_type -> orca.project.v1.RemoveRepoResponse
-	36,  // 137: orca.project.v1.ProjectService.UpdateRepo:output_type -> orca.project.v1.UpdateRepoResponse
-	38,  // 138: orca.project.v1.ProjectService.AssignRepoToProject:output_type -> orca.project.v1.AssignRepoToProjectResponse
-	40,  // 139: orca.project.v1.ProjectService.GetRepo:output_type -> orca.project.v1.GetRepoResponse
-	43,  // 140: orca.project.v1.ProjectService.AddRepoMember:output_type -> orca.project.v1.AddRepoMemberResponse
-	45,  // 141: orca.project.v1.ProjectService.ListRepoMembers:output_type -> orca.project.v1.ListRepoMembersResponse
-	47,  // 142: orca.project.v1.ProjectService.RemoveRepoMember:output_type -> orca.project.v1.RemoveRepoMemberResponse
-	49,  // 143: orca.project.v1.ProjectService.UpdateRepoMemberRole:output_type -> orca.project.v1.UpdateRepoMemberRoleResponse
-	52,  // 144: orca.project.v1.ProjectService.ListSparsePresets:output_type -> orca.project.v1.ListSparsePresetsResponse
-	54,  // 145: orca.project.v1.ProjectService.SaveSparsePreset:output_type -> orca.project.v1.SaveSparsePresetResponse
-	56,  // 146: orca.project.v1.ProjectService.RemoveSparsePreset:output_type -> orca.project.v1.RemoveSparsePresetResponse
-	60,  // 147: orca.project.v1.ProjectService.RecordWorktreeCreated:output_type -> orca.project.v1.RecordWorktreeCreatedResponse
-	62,  // 148: orca.project.v1.ProjectService.RecordWorktreeRemoved:output_type -> orca.project.v1.RecordWorktreeRemovedResponse
-	65,  // 149: orca.project.v1.ProjectService.ListWorktrees:output_type -> orca.project.v1.ListWorktreesResponse
-	57,  // 150: orca.project.v1.ProjectService.GetWorktree:output_type -> orca.project.v1.Worktree
-	67,  // 151: orca.project.v1.ProjectService.SetWorktreeActivation:output_type -> orca.project.v1.SetWorktreeActivationResponse
-	69,  // 152: orca.project.v1.ProjectService.RenameWorktree:output_type -> orca.project.v1.RenameWorktreeResponse
-	73,  // 153: orca.project.v1.ProjectService.UpdateWorktreeMeta:output_type -> orca.project.v1.UpdateWorktreeMetaResponse
-	75,  // 154: orca.project.v1.ProjectService.SetWorktreeLineage:output_type -> orca.project.v1.SetWorktreeLineageResponse
-	77,  // 155: orca.project.v1.ProjectService.ListWorktreeLineage:output_type -> orca.project.v1.ListWorktreeLineageResponse
-	71,  // 156: orca.project.v1.ProjectService.GetWorktreeByIdempotencyKey:output_type -> orca.project.v1.GetWorktreeByIdempotencyKeyResponse
-	81,  // 157: orca.project.v1.ProjectService.CreateProjectGroup:output_type -> orca.project.v1.CreateProjectGroupResponse
-	83,  // 158: orca.project.v1.ProjectService.UpdateProjectGroup:output_type -> orca.project.v1.UpdateProjectGroupResponse
-	85,  // 159: orca.project.v1.ProjectService.DeleteProjectGroup:output_type -> orca.project.v1.DeleteProjectGroupResponse
-	87,  // 160: orca.project.v1.ProjectService.ListProjectGroups:output_type -> orca.project.v1.ListProjectGroupsResponse
-	90,  // 161: orca.project.v1.ProjectService.CreateFolderWorkspace:output_type -> orca.project.v1.CreateFolderWorkspaceResponse
-	92,  // 162: orca.project.v1.ProjectService.UpdateFolderWorkspace:output_type -> orca.project.v1.UpdateFolderWorkspaceResponse
-	94,  // 163: orca.project.v1.ProjectService.DeleteFolderWorkspace:output_type -> orca.project.v1.DeleteFolderWorkspaceResponse
-	96,  // 164: orca.project.v1.ProjectService.ListFolderWorkspaces:output_type -> orca.project.v1.ListFolderWorkspacesResponse
-	98,  // 165: orca.project.v1.ProjectService.GetFolderWorkspacePathStatus:output_type -> orca.project.v1.GetFolderWorkspacePathStatusResponse
-	100, // 166: orca.project.v1.ProjectService.MoveProject:output_type -> orca.project.v1.MoveProjectResponse
-	103, // 167: orca.project.v1.ProjectService.ScanNested:output_type -> orca.project.v1.ScanNestedResponse
-	105, // 168: orca.project.v1.ProjectService.ImportNested:output_type -> orca.project.v1.ImportNestedResponse
-	108, // 169: orca.project.v1.ProjectService.CreateHostSetup:output_type -> orca.project.v1.CreateHostSetupResponse
-	110, // 170: orca.project.v1.ProjectService.ListHostSetups:output_type -> orca.project.v1.ListHostSetupsResponse
-	112, // 171: orca.project.v1.ProjectService.UpdateHostSetup:output_type -> orca.project.v1.UpdateHostSetupResponse
-	114, // 172: orca.project.v1.ProjectService.DeleteHostSetup:output_type -> orca.project.v1.DeleteHostSetupResponse
-	116, // 173: orca.project.v1.ProjectService.SetupExistingFolder:output_type -> orca.project.v1.SetupExistingFolderResponse
-	120, // 174: orca.project.v1.ProjectService.GetProjectContext:output_type -> orca.project.v1.ProjectContext
-	118, // 175: orca.project.v1.ProjectService.ResolveProjectAccess:output_type -> orca.project.v1.ResolveProjectAccessResponse
-	122, // 176: orca.project.v1.ProjectService.GetMobileWorktreeStatus:output_type -> orca.project.v1.GetMobileWorktreeStatusResponse
-	126, // 177: orca.project.v1.ProjectService.LinkSourceProject:output_type -> orca.project.v1.LinkSourceProjectResponse
-	128, // 178: orca.project.v1.ProjectService.UnlinkSourceProject:output_type -> orca.project.v1.UnlinkSourceProjectResponse
-	130, // 179: orca.project.v1.ProjectService.ListSourceProjects:output_type -> orca.project.v1.ListSourceProjectsResponse
-	132, // 180: orca.project.v1.ProjectService.GetSharedProjectData:output_type -> orca.project.v1.GetSharedProjectDataResponse
-	122, // [122:181] is the sub-list for method output_type
-	63,  // [63:122] is the sub-list for method input_type
-	63,  // [63:63] is the sub-list for extension type_name
-	63,  // [63:63] is the sub-list for extension extendee
-	0,   // [0:63] is the sub-list for field type_name
+	26,  // 3: orca.project.v1.CreateProjectResponse.repo:type_name -> orca.project.v1.Repo
+	2,   // 4: orca.project.v1.GetProjectResponse.project:type_name -> orca.project.v1.Project
+	2,   // 5: orca.project.v1.ListProjectsResponse.projects:type_name -> orca.project.v1.Project
+	0,   // 6: orca.project.v1.AddMemberRequest.role:type_name -> orca.project.v1.ProjectRole
+	0,   // 7: orca.project.v1.Member.role:type_name -> orca.project.v1.ProjectRole
+	11,  // 8: orca.project.v1.ListMembersResponse.members:type_name -> orca.project.v1.Member
+	0,   // 9: orca.project.v1.UpdateMemberRoleRequest.role:type_name -> orca.project.v1.ProjectRole
+	11,  // 10: orca.project.v1.UpdateMemberRoleResponse.member:type_name -> orca.project.v1.Member
+	2,   // 11: orca.project.v1.RebindDevServerResponse.project:type_name -> orca.project.v1.Project
+	26,  // 12: orca.project.v1.RebindRepoDevServerResponse.repo:type_name -> orca.project.v1.Repo
+	2,   // 13: orca.project.v1.UpdateProjectResponse.project:type_name -> orca.project.v1.Project
+	26,  // 14: orca.project.v1.AddRepoResponse.repo:type_name -> orca.project.v1.Repo
+	26,  // 15: orca.project.v1.ListReposResponse.repos:type_name -> orca.project.v1.Repo
+	26,  // 16: orca.project.v1.UpdateRepoResponse.repo:type_name -> orca.project.v1.Repo
+	26,  // 17: orca.project.v1.AssignRepoToProjectResponse.repo:type_name -> orca.project.v1.Repo
+	26,  // 18: orca.project.v1.GetRepoResponse.repo:type_name -> orca.project.v1.Repo
+	1,   // 19: orca.project.v1.RepoMember.role:type_name -> orca.project.v1.RepoRole
+	1,   // 20: orca.project.v1.AddRepoMemberRequest.role:type_name -> orca.project.v1.RepoRole
+	41,  // 21: orca.project.v1.AddRepoMemberResponse.member:type_name -> orca.project.v1.RepoMember
+	41,  // 22: orca.project.v1.ListRepoMembersResponse.members:type_name -> orca.project.v1.RepoMember
+	1,   // 23: orca.project.v1.UpdateRepoMemberRoleRequest.role:type_name -> orca.project.v1.RepoRole
+	41,  // 24: orca.project.v1.UpdateRepoMemberRoleResponse.member:type_name -> orca.project.v1.RepoMember
+	133, // 25: orca.project.v1.SparsePreset.created_at:type_name -> google.protobuf.Timestamp
+	133, // 26: orca.project.v1.SparsePreset.updated_at:type_name -> google.protobuf.Timestamp
+	50,  // 27: orca.project.v1.ListSparsePresetsResponse.presets:type_name -> orca.project.v1.SparsePreset
+	50,  // 28: orca.project.v1.SaveSparsePresetResponse.preset:type_name -> orca.project.v1.SparsePreset
+	134, // 29: orca.project.v1.Worktree.metadata:type_name -> google.protobuf.Struct
+	57,  // 30: orca.project.v1.RecordWorktreeCreatedResponse.worktree:type_name -> orca.project.v1.Worktree
+	133, // 31: orca.project.v1.ListWorktreesRequest.older_than:type_name -> google.protobuf.Timestamp
+	57,  // 32: orca.project.v1.ListWorktreesResponse.worktrees:type_name -> orca.project.v1.Worktree
+	57,  // 33: orca.project.v1.SetWorktreeActivationResponse.worktree:type_name -> orca.project.v1.Worktree
+	57,  // 34: orca.project.v1.RenameWorktreeResponse.worktree:type_name -> orca.project.v1.Worktree
+	57,  // 35: orca.project.v1.GetWorktreeByIdempotencyKeyResponse.worktree:type_name -> orca.project.v1.Worktree
+	134, // 36: orca.project.v1.UpdateWorktreeMetaRequest.metadata:type_name -> google.protobuf.Struct
+	57,  // 37: orca.project.v1.UpdateWorktreeMetaResponse.worktree:type_name -> orca.project.v1.Worktree
+	57,  // 38: orca.project.v1.SetWorktreeLineageResponse.worktree:type_name -> orca.project.v1.Worktree
+	78,  // 39: orca.project.v1.ListWorktreeLineageResponse.lineage:type_name -> orca.project.v1.WorktreeLineageEntry
+	79,  // 40: orca.project.v1.CreateProjectGroupResponse.group:type_name -> orca.project.v1.ProjectGroup
+	79,  // 41: orca.project.v1.UpdateProjectGroupResponse.group:type_name -> orca.project.v1.ProjectGroup
+	79,  // 42: orca.project.v1.ListProjectGroupsResponse.groups:type_name -> orca.project.v1.ProjectGroup
+	133, // 43: orca.project.v1.FolderWorkspace.created_at:type_name -> google.protobuf.Timestamp
+	88,  // 44: orca.project.v1.CreateFolderWorkspaceResponse.folder_workspace:type_name -> orca.project.v1.FolderWorkspace
+	88,  // 45: orca.project.v1.UpdateFolderWorkspaceResponse.folder_workspace:type_name -> orca.project.v1.FolderWorkspace
+	88,  // 46: orca.project.v1.ListFolderWorkspacesResponse.folder_workspaces:type_name -> orca.project.v1.FolderWorkspace
+	79,  // 47: orca.project.v1.MoveProjectResponse.group:type_name -> orca.project.v1.ProjectGroup
+	102, // 48: orca.project.v1.ScanNestedResponse.candidates:type_name -> orca.project.v1.NestedRepoCandidate
+	102, // 49: orca.project.v1.ImportNestedRequest.selected:type_name -> orca.project.v1.NestedRepoCandidate
+	79,  // 50: orca.project.v1.ImportNestedResponse.created_groups:type_name -> orca.project.v1.ProjectGroup
+	2,   // 51: orca.project.v1.ImportNestedResponse.created_projects:type_name -> orca.project.v1.Project
+	106, // 52: orca.project.v1.CreateHostSetupResponse.setup:type_name -> orca.project.v1.HostSetup
+	106, // 53: orca.project.v1.ListHostSetupsResponse.setups:type_name -> orca.project.v1.HostSetup
+	106, // 54: orca.project.v1.UpdateHostSetupResponse.setup:type_name -> orca.project.v1.HostSetup
+	106, // 55: orca.project.v1.SetupExistingFolderResponse.setup:type_name -> orca.project.v1.HostSetup
+	2,   // 56: orca.project.v1.SetupExistingFolderResponse.project:type_name -> orca.project.v1.Project
+	123, // 57: orca.project.v1.GetMobileWorktreeStatusResponse.worktrees:type_name -> orca.project.v1.MobileWorktreeStatus
+	133, // 58: orca.project.v1.SourceProject.linked_at:type_name -> google.protobuf.Timestamp
+	124, // 59: orca.project.v1.LinkSourceProjectResponse.source_project:type_name -> orca.project.v1.SourceProject
+	124, // 60: orca.project.v1.ListSourceProjectsResponse.source_projects:type_name -> orca.project.v1.SourceProject
+	2,   // 61: orca.project.v1.GetSharedProjectDataResponse.project:type_name -> orca.project.v1.Project
+	26,  // 62: orca.project.v1.GetSharedProjectDataResponse.repos:type_name -> orca.project.v1.Repo
+	57,  // 63: orca.project.v1.GetSharedProjectDataResponse.worktrees:type_name -> orca.project.v1.Worktree
+	3,   // 64: orca.project.v1.ProjectService.CreateProject:input_type -> orca.project.v1.CreateProjectRequest
+	5,   // 65: orca.project.v1.ProjectService.GetProject:input_type -> orca.project.v1.GetProjectRequest
+	7,   // 66: orca.project.v1.ProjectService.ListProjects:input_type -> orca.project.v1.ListProjectsRequest
+	9,   // 67: orca.project.v1.ProjectService.AddMember:input_type -> orca.project.v1.AddMemberRequest
+	12,  // 68: orca.project.v1.ProjectService.ListMembers:input_type -> orca.project.v1.ListMembersRequest
+	14,  // 69: orca.project.v1.ProjectService.RemoveMember:input_type -> orca.project.v1.RemoveMemberRequest
+	16,  // 70: orca.project.v1.ProjectService.UpdateMemberRole:input_type -> orca.project.v1.UpdateMemberRoleRequest
+	18,  // 71: orca.project.v1.ProjectService.RebindDevServer:input_type -> orca.project.v1.RebindDevServerRequest
+	20,  // 72: orca.project.v1.ProjectService.RebindRepoDevServer:input_type -> orca.project.v1.RebindRepoDevServerRequest
+	22,  // 73: orca.project.v1.ProjectService.UpdateProject:input_type -> orca.project.v1.UpdateProjectRequest
+	24,  // 74: orca.project.v1.ProjectService.DeleteProject:input_type -> orca.project.v1.DeleteProjectRequest
+	27,  // 75: orca.project.v1.ProjectService.AddRepo:input_type -> orca.project.v1.AddRepoRequest
+	29,  // 76: orca.project.v1.ProjectService.ListRepos:input_type -> orca.project.v1.ListReposRequest
+	31,  // 77: orca.project.v1.ProjectService.ReorderRepos:input_type -> orca.project.v1.ReorderReposRequest
+	33,  // 78: orca.project.v1.ProjectService.RemoveRepo:input_type -> orca.project.v1.RemoveRepoRequest
+	35,  // 79: orca.project.v1.ProjectService.UpdateRepo:input_type -> orca.project.v1.UpdateRepoRequest
+	37,  // 80: orca.project.v1.ProjectService.AssignRepoToProject:input_type -> orca.project.v1.AssignRepoToProjectRequest
+	39,  // 81: orca.project.v1.ProjectService.GetRepo:input_type -> orca.project.v1.GetRepoRequest
+	42,  // 82: orca.project.v1.ProjectService.AddRepoMember:input_type -> orca.project.v1.AddRepoMemberRequest
+	44,  // 83: orca.project.v1.ProjectService.ListRepoMembers:input_type -> orca.project.v1.ListRepoMembersRequest
+	46,  // 84: orca.project.v1.ProjectService.RemoveRepoMember:input_type -> orca.project.v1.RemoveRepoMemberRequest
+	48,  // 85: orca.project.v1.ProjectService.UpdateRepoMemberRole:input_type -> orca.project.v1.UpdateRepoMemberRoleRequest
+	51,  // 86: orca.project.v1.ProjectService.ListSparsePresets:input_type -> orca.project.v1.ListSparsePresetsRequest
+	53,  // 87: orca.project.v1.ProjectService.SaveSparsePreset:input_type -> orca.project.v1.SaveSparsePresetRequest
+	55,  // 88: orca.project.v1.ProjectService.RemoveSparsePreset:input_type -> orca.project.v1.RemoveSparsePresetRequest
+	59,  // 89: orca.project.v1.ProjectService.RecordWorktreeCreated:input_type -> orca.project.v1.RecordWorktreeCreatedRequest
+	61,  // 90: orca.project.v1.ProjectService.RecordWorktreeRemoved:input_type -> orca.project.v1.RecordWorktreeRemovedRequest
+	64,  // 91: orca.project.v1.ProjectService.ListWorktrees:input_type -> orca.project.v1.ListWorktreesRequest
+	58,  // 92: orca.project.v1.ProjectService.GetWorktree:input_type -> orca.project.v1.GetWorktreeRequest
+	66,  // 93: orca.project.v1.ProjectService.SetWorktreeActivation:input_type -> orca.project.v1.SetWorktreeActivationRequest
+	68,  // 94: orca.project.v1.ProjectService.RenameWorktree:input_type -> orca.project.v1.RenameWorktreeRequest
+	72,  // 95: orca.project.v1.ProjectService.UpdateWorktreeMeta:input_type -> orca.project.v1.UpdateWorktreeMetaRequest
+	74,  // 96: orca.project.v1.ProjectService.SetWorktreeLineage:input_type -> orca.project.v1.SetWorktreeLineageRequest
+	76,  // 97: orca.project.v1.ProjectService.ListWorktreeLineage:input_type -> orca.project.v1.ListWorktreeLineageRequest
+	70,  // 98: orca.project.v1.ProjectService.GetWorktreeByIdempotencyKey:input_type -> orca.project.v1.GetWorktreeByIdempotencyKeyRequest
+	80,  // 99: orca.project.v1.ProjectService.CreateProjectGroup:input_type -> orca.project.v1.CreateProjectGroupRequest
+	82,  // 100: orca.project.v1.ProjectService.UpdateProjectGroup:input_type -> orca.project.v1.UpdateProjectGroupRequest
+	84,  // 101: orca.project.v1.ProjectService.DeleteProjectGroup:input_type -> orca.project.v1.DeleteProjectGroupRequest
+	86,  // 102: orca.project.v1.ProjectService.ListProjectGroups:input_type -> orca.project.v1.ListProjectGroupsRequest
+	89,  // 103: orca.project.v1.ProjectService.CreateFolderWorkspace:input_type -> orca.project.v1.CreateFolderWorkspaceRequest
+	91,  // 104: orca.project.v1.ProjectService.UpdateFolderWorkspace:input_type -> orca.project.v1.UpdateFolderWorkspaceRequest
+	93,  // 105: orca.project.v1.ProjectService.DeleteFolderWorkspace:input_type -> orca.project.v1.DeleteFolderWorkspaceRequest
+	95,  // 106: orca.project.v1.ProjectService.ListFolderWorkspaces:input_type -> orca.project.v1.ListFolderWorkspacesRequest
+	97,  // 107: orca.project.v1.ProjectService.GetFolderWorkspacePathStatus:input_type -> orca.project.v1.GetFolderWorkspacePathStatusRequest
+	99,  // 108: orca.project.v1.ProjectService.MoveProject:input_type -> orca.project.v1.MoveProjectRequest
+	101, // 109: orca.project.v1.ProjectService.ScanNested:input_type -> orca.project.v1.ScanNestedRequest
+	104, // 110: orca.project.v1.ProjectService.ImportNested:input_type -> orca.project.v1.ImportNestedRequest
+	107, // 111: orca.project.v1.ProjectService.CreateHostSetup:input_type -> orca.project.v1.CreateHostSetupRequest
+	109, // 112: orca.project.v1.ProjectService.ListHostSetups:input_type -> orca.project.v1.ListHostSetupsRequest
+	111, // 113: orca.project.v1.ProjectService.UpdateHostSetup:input_type -> orca.project.v1.UpdateHostSetupRequest
+	113, // 114: orca.project.v1.ProjectService.DeleteHostSetup:input_type -> orca.project.v1.DeleteHostSetupRequest
+	115, // 115: orca.project.v1.ProjectService.SetupExistingFolder:input_type -> orca.project.v1.SetupExistingFolderRequest
+	119, // 116: orca.project.v1.ProjectService.GetProjectContext:input_type -> orca.project.v1.GetProjectContextRequest
+	117, // 117: orca.project.v1.ProjectService.ResolveProjectAccess:input_type -> orca.project.v1.ResolveProjectAccessRequest
+	121, // 118: orca.project.v1.ProjectService.GetMobileWorktreeStatus:input_type -> orca.project.v1.GetMobileWorktreeStatusRequest
+	125, // 119: orca.project.v1.ProjectService.LinkSourceProject:input_type -> orca.project.v1.LinkSourceProjectRequest
+	127, // 120: orca.project.v1.ProjectService.UnlinkSourceProject:input_type -> orca.project.v1.UnlinkSourceProjectRequest
+	129, // 121: orca.project.v1.ProjectService.ListSourceProjects:input_type -> orca.project.v1.ListSourceProjectsRequest
+	131, // 122: orca.project.v1.ProjectService.GetSharedProjectData:input_type -> orca.project.v1.GetSharedProjectDataRequest
+	4,   // 123: orca.project.v1.ProjectService.CreateProject:output_type -> orca.project.v1.CreateProjectResponse
+	6,   // 124: orca.project.v1.ProjectService.GetProject:output_type -> orca.project.v1.GetProjectResponse
+	8,   // 125: orca.project.v1.ProjectService.ListProjects:output_type -> orca.project.v1.ListProjectsResponse
+	10,  // 126: orca.project.v1.ProjectService.AddMember:output_type -> orca.project.v1.AddMemberResponse
+	13,  // 127: orca.project.v1.ProjectService.ListMembers:output_type -> orca.project.v1.ListMembersResponse
+	15,  // 128: orca.project.v1.ProjectService.RemoveMember:output_type -> orca.project.v1.RemoveMemberResponse
+	17,  // 129: orca.project.v1.ProjectService.UpdateMemberRole:output_type -> orca.project.v1.UpdateMemberRoleResponse
+	19,  // 130: orca.project.v1.ProjectService.RebindDevServer:output_type -> orca.project.v1.RebindDevServerResponse
+	21,  // 131: orca.project.v1.ProjectService.RebindRepoDevServer:output_type -> orca.project.v1.RebindRepoDevServerResponse
+	23,  // 132: orca.project.v1.ProjectService.UpdateProject:output_type -> orca.project.v1.UpdateProjectResponse
+	25,  // 133: orca.project.v1.ProjectService.DeleteProject:output_type -> orca.project.v1.DeleteProjectResponse
+	28,  // 134: orca.project.v1.ProjectService.AddRepo:output_type -> orca.project.v1.AddRepoResponse
+	30,  // 135: orca.project.v1.ProjectService.ListRepos:output_type -> orca.project.v1.ListReposResponse
+	32,  // 136: orca.project.v1.ProjectService.ReorderRepos:output_type -> orca.project.v1.ReorderReposResponse
+	34,  // 137: orca.project.v1.ProjectService.RemoveRepo:output_type -> orca.project.v1.RemoveRepoResponse
+	36,  // 138: orca.project.v1.ProjectService.UpdateRepo:output_type -> orca.project.v1.UpdateRepoResponse
+	38,  // 139: orca.project.v1.ProjectService.AssignRepoToProject:output_type -> orca.project.v1.AssignRepoToProjectResponse
+	40,  // 140: orca.project.v1.ProjectService.GetRepo:output_type -> orca.project.v1.GetRepoResponse
+	43,  // 141: orca.project.v1.ProjectService.AddRepoMember:output_type -> orca.project.v1.AddRepoMemberResponse
+	45,  // 142: orca.project.v1.ProjectService.ListRepoMembers:output_type -> orca.project.v1.ListRepoMembersResponse
+	47,  // 143: orca.project.v1.ProjectService.RemoveRepoMember:output_type -> orca.project.v1.RemoveRepoMemberResponse
+	49,  // 144: orca.project.v1.ProjectService.UpdateRepoMemberRole:output_type -> orca.project.v1.UpdateRepoMemberRoleResponse
+	52,  // 145: orca.project.v1.ProjectService.ListSparsePresets:output_type -> orca.project.v1.ListSparsePresetsResponse
+	54,  // 146: orca.project.v1.ProjectService.SaveSparsePreset:output_type -> orca.project.v1.SaveSparsePresetResponse
+	56,  // 147: orca.project.v1.ProjectService.RemoveSparsePreset:output_type -> orca.project.v1.RemoveSparsePresetResponse
+	60,  // 148: orca.project.v1.ProjectService.RecordWorktreeCreated:output_type -> orca.project.v1.RecordWorktreeCreatedResponse
+	62,  // 149: orca.project.v1.ProjectService.RecordWorktreeRemoved:output_type -> orca.project.v1.RecordWorktreeRemovedResponse
+	65,  // 150: orca.project.v1.ProjectService.ListWorktrees:output_type -> orca.project.v1.ListWorktreesResponse
+	57,  // 151: orca.project.v1.ProjectService.GetWorktree:output_type -> orca.project.v1.Worktree
+	67,  // 152: orca.project.v1.ProjectService.SetWorktreeActivation:output_type -> orca.project.v1.SetWorktreeActivationResponse
+	69,  // 153: orca.project.v1.ProjectService.RenameWorktree:output_type -> orca.project.v1.RenameWorktreeResponse
+	73,  // 154: orca.project.v1.ProjectService.UpdateWorktreeMeta:output_type -> orca.project.v1.UpdateWorktreeMetaResponse
+	75,  // 155: orca.project.v1.ProjectService.SetWorktreeLineage:output_type -> orca.project.v1.SetWorktreeLineageResponse
+	77,  // 156: orca.project.v1.ProjectService.ListWorktreeLineage:output_type -> orca.project.v1.ListWorktreeLineageResponse
+	71,  // 157: orca.project.v1.ProjectService.GetWorktreeByIdempotencyKey:output_type -> orca.project.v1.GetWorktreeByIdempotencyKeyResponse
+	81,  // 158: orca.project.v1.ProjectService.CreateProjectGroup:output_type -> orca.project.v1.CreateProjectGroupResponse
+	83,  // 159: orca.project.v1.ProjectService.UpdateProjectGroup:output_type -> orca.project.v1.UpdateProjectGroupResponse
+	85,  // 160: orca.project.v1.ProjectService.DeleteProjectGroup:output_type -> orca.project.v1.DeleteProjectGroupResponse
+	87,  // 161: orca.project.v1.ProjectService.ListProjectGroups:output_type -> orca.project.v1.ListProjectGroupsResponse
+	90,  // 162: orca.project.v1.ProjectService.CreateFolderWorkspace:output_type -> orca.project.v1.CreateFolderWorkspaceResponse
+	92,  // 163: orca.project.v1.ProjectService.UpdateFolderWorkspace:output_type -> orca.project.v1.UpdateFolderWorkspaceResponse
+	94,  // 164: orca.project.v1.ProjectService.DeleteFolderWorkspace:output_type -> orca.project.v1.DeleteFolderWorkspaceResponse
+	96,  // 165: orca.project.v1.ProjectService.ListFolderWorkspaces:output_type -> orca.project.v1.ListFolderWorkspacesResponse
+	98,  // 166: orca.project.v1.ProjectService.GetFolderWorkspacePathStatus:output_type -> orca.project.v1.GetFolderWorkspacePathStatusResponse
+	100, // 167: orca.project.v1.ProjectService.MoveProject:output_type -> orca.project.v1.MoveProjectResponse
+	103, // 168: orca.project.v1.ProjectService.ScanNested:output_type -> orca.project.v1.ScanNestedResponse
+	105, // 169: orca.project.v1.ProjectService.ImportNested:output_type -> orca.project.v1.ImportNestedResponse
+	108, // 170: orca.project.v1.ProjectService.CreateHostSetup:output_type -> orca.project.v1.CreateHostSetupResponse
+	110, // 171: orca.project.v1.ProjectService.ListHostSetups:output_type -> orca.project.v1.ListHostSetupsResponse
+	112, // 172: orca.project.v1.ProjectService.UpdateHostSetup:output_type -> orca.project.v1.UpdateHostSetupResponse
+	114, // 173: orca.project.v1.ProjectService.DeleteHostSetup:output_type -> orca.project.v1.DeleteHostSetupResponse
+	116, // 174: orca.project.v1.ProjectService.SetupExistingFolder:output_type -> orca.project.v1.SetupExistingFolderResponse
+	120, // 175: orca.project.v1.ProjectService.GetProjectContext:output_type -> orca.project.v1.ProjectContext
+	118, // 176: orca.project.v1.ProjectService.ResolveProjectAccess:output_type -> orca.project.v1.ResolveProjectAccessResponse
+	122, // 177: orca.project.v1.ProjectService.GetMobileWorktreeStatus:output_type -> orca.project.v1.GetMobileWorktreeStatusResponse
+	126, // 178: orca.project.v1.ProjectService.LinkSourceProject:output_type -> orca.project.v1.LinkSourceProjectResponse
+	128, // 179: orca.project.v1.ProjectService.UnlinkSourceProject:output_type -> orca.project.v1.UnlinkSourceProjectResponse
+	130, // 180: orca.project.v1.ProjectService.ListSourceProjects:output_type -> orca.project.v1.ListSourceProjectsResponse
+	132, // 181: orca.project.v1.ProjectService.GetSharedProjectData:output_type -> orca.project.v1.GetSharedProjectDataResponse
+	123, // [123:182] is the sub-list for method output_type
+	64,  // [64:123] is the sub-list for method input_type
+	64,  // [64:64] is the sub-list for extension type_name
+	64,  // [64:64] is the sub-list for extension extendee
+	0,   // [0:64] is the sub-list for field type_name
 }
 
 func init() { file_orca_project_v1_project_proto_init() }

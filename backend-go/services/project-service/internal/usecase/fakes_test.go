@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -52,6 +54,11 @@ type fakeProjectRepository struct {
 	// ProfileResolver visibility filter but ListForMember itself is always
 	// called).
 	listForMemberCalls int
+
+	// repoSink receives CreateWithOwner's repo, so a test can read it from the
+	// same fakeRepoRepository the usecase's repo port uses.
+	repoSink             *fakeRepoRepository
+	createWithOwnerCalls int
 }
 
 func newFakeProjectRepository() *fakeProjectRepository {
@@ -64,6 +71,30 @@ func (f *fakeProjectRepository) Create(ctx context.Context, p domain.Project) (d
 	}
 	f.projects[p.ID] = p
 	return p, nil
+}
+
+// CreateWithOwner mimics the real one-transaction write: any failure leaves
+// neither the project nor the repo behind.
+func (f *fakeProjectRepository) CreateWithOwner(ctx context.Context, p domain.Project, owner domain.ProjectMember, repo *domain.Repo) (domain.Project, *domain.Repo, error) {
+	f.createWithOwnerCalls++
+	if f.createErr != nil {
+		return domain.Project{}, nil, f.createErr
+	}
+	var created *domain.Repo
+	if repo != nil {
+		sink := f.repoSink
+		if sink == nil {
+			sink = newFakeRepoRepository()
+		}
+		r, err := sink.AddRepo(ctx, *repo)
+		if err != nil {
+			return domain.Project{}, nil, err
+		}
+		created = &r
+	}
+	f.projects[p.ID] = p
+	f.members = append(f.members, owner)
+	return p, created, nil
 }
 
 func (f *fakeProjectRepository) Get(ctx context.Context, tenantID, id string) (domain.Project, error) {
@@ -384,15 +415,67 @@ type fakeRepoRepository struct {
 	removeMemberErr          error
 	updateMemberRoleErr      error
 	listIDsWithMembershipErr error
+
+	// projectDirectory lets FindRepoAtLocation answer tenant/name/visibility
+	// like the real JOIN; nil skips the tenant filter.
+	projectDirectory *fakeProjectRepository
+	// skipFinds makes the first N FindRepoAtLocation calls miss, simulating the
+	// pre-check running before a concurrent request registered the location.
+	skipFinds int
 }
 
 func newFakeRepoRepository() *fakeRepoRepository {
 	return &fakeRepoRepository{repos: map[string]domain.Repo{}}
 }
 
+// keyTaken mimics the unique index on repos.registration_key (empty = NULL).
+func (f *fakeRepoRepository) keyTaken(key, exceptRepoID string) bool {
+	if key == "" {
+		return false
+	}
+	for _, r := range f.repos {
+		if r.ID != exceptRepoID && r.RegistrationKey == key {
+			return true
+		}
+	}
+	return false
+}
+
+// FindRepoAtLocation implements usecase.RepoRepository.FindRepoAtLocation.
+func (f *fakeRepoRepository) FindRepoAtLocation(ctx context.Context, tenantID, devServerID, normalizedURL, excludeRepoID string) (domain.RepoConflict, bool, error) {
+	if f.skipFinds > 0 {
+		f.skipFinds--
+		return domain.RepoConflict{}, false, nil
+	}
+	ids := make([]string, 0, len(f.repos))
+	for id := range f.repos {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		r := f.repos[id]
+		if r.ID == excludeRepoID || !strings.EqualFold(r.DevServerID, devServerID) || domain.NormalizeRepoLocation(r.URL) != normalizedURL {
+			continue
+		}
+		c := domain.RepoConflict{RepoID: r.ID, ProjectID: r.ProjectID, URL: r.URL, DevServerID: r.DevServerID}
+		if f.projectDirectory != nil {
+			p, ok := f.projectDirectory.projects[r.ProjectID]
+			if !ok || p.TenantID != tenantID {
+				continue
+			}
+			c.ProjectName, c.ProjectVisibility = p.Name, p.Visibility
+		}
+		return c, true, nil
+	}
+	return domain.RepoConflict{}, false, nil
+}
+
 func (f *fakeRepoRepository) AddRepo(ctx context.Context, repo domain.Repo) (domain.Repo, error) {
 	if f.addErr != nil {
 		return domain.Repo{}, f.addErr
+	}
+	if f.keyTaken(repo.RegistrationKey, repo.ID) {
+		return domain.Repo{}, domain.ErrRepoAlreadyRegistered
 	}
 	next := int32(0)
 	for _, r := range f.repos {
@@ -464,12 +547,15 @@ func (f *fakeRepoRepository) Update(ctx context.Context, repo domain.Repo) (doma
 	if _, ok := f.repos[repo.ID]; !ok {
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
+	if f.keyTaken(repo.RegistrationKey, repo.ID) {
+		return domain.Repo{}, domain.ErrRepoAlreadyRegistered
+	}
 	f.repos[repo.ID] = repo
 	return repo, nil
 }
 
 // UpdateDevServerID implements usecase.RepoRepository.UpdateDevServerID.
-func (f *fakeRepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error) {
+func (f *fakeRepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServerID, registrationKey string) (domain.Repo, error) {
 	if f.updateDevServerErr != nil {
 		return domain.Repo{}, f.updateDevServerErr
 	}
@@ -477,7 +563,11 @@ func (f *fakeRepoRepository) UpdateDevServerID(ctx context.Context, repoID, devS
 	if !ok {
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
+	if f.keyTaken(registrationKey, repoID) {
+		return domain.Repo{}, domain.ErrRepoAlreadyRegistered
+	}
 	r.DevServerID = devServerID
+	r.RegistrationKey = registrationKey
 	f.repos[repoID] = r
 	return r, nil
 }

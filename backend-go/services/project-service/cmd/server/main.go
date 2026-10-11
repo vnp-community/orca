@@ -344,7 +344,7 @@ func run() error {
 	listProjectGroupsUC := usecase.NewListProjectGroups(projectGroupRepo)
 	moveProjectUC := usecase.NewMoveProject(repo, projectGroupRepo, opa)
 	scanNestedUC := usecase.NewScanNested(devServerRelay)
-	importNestedUC := usecase.NewImportNested(projectGroupRepo, repoHostPolicy)
+	importNestedUC := usecase.NewImportNested(projectGroupRepo, repoRepo, repo, repoHostPolicy)
 
 	createHostSetupUC := usecase.NewCreateHostSetup(hostSetupRepo, devServerLister)
 	listHostSetupsUC := usecase.NewListHostSetups(hostSetupRepo)

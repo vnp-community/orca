@@ -238,7 +238,7 @@ func New(deps Deps) *Server {
 // rule. The wire field exists for forward compatibility with a future
 // admin/cross-tenant path, not used here.
 func (s *Server) CreateProject(ctx context.Context, req *projectv1.CreateProjectRequest) (*projectv1.CreateProjectResponse, error) {
-	project, err := s.createProject.Execute(ctx, usecase.CreateProjectInput{
+	project, repo, err := s.createProject.Execute(ctx, usecase.CreateProjectInput{
 		Name:          req.GetName(),
 		Description:   req.GetDescription(),
 		DefaultBranch: req.GetDefaultBranch(),
@@ -249,7 +249,11 @@ func (s *Server) CreateProject(ctx context.Context, req *projectv1.CreateProject
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &projectv1.CreateProjectResponse{Project: toProtoProject(project)}, nil
+	resp := &projectv1.CreateProjectResponse{Project: toProtoProject(project)}
+	if repo != nil {
+		resp.Repo = toProtoRepo(*repo)
+	}
+	return resp, nil
 }
 
 func (s *Server) GetProject(ctx context.Context, req *projectv1.GetProjectRequest) (*projectv1.GetProjectResponse, error) {

@@ -379,6 +379,24 @@ type projectView struct {
 	JiraSiteID     string `json:"jiraSiteId"`
 }
 
+// projectCreateView is project.create's result: the project plus the repo
+// project-service wrote in the same transaction, so the caller never has to
+// list repos to learn its id. repo/repoId are absent when no repo_path was sent.
+type projectCreateView struct {
+	projectView
+	Repo   *repoView `json:"repo,omitempty"`
+	RepoID string    `json:"repoId,omitempty"`
+}
+
+func toProjectCreateView(resp *projectv1.CreateProjectResponse) projectCreateView {
+	out := projectCreateView{projectView: toProjectView(resp.GetProject())}
+	if r := resp.GetRepo(); r != nil {
+		v := toRepoView(r)
+		out.Repo, out.RepoID = &v, v.ID
+	}
+	return out
+}
+
 func toProjectView(p *projectv1.Project) projectView {
 	return projectView{
 		ID: p.GetId(), Name: p.GetName(), Description: p.GetDescription(),
@@ -485,7 +503,7 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 		}); err != nil {
 			return nil, fmt.Errorf("project.create: creator membership: %w", err)
 		}
-		return toProjectView(resp.GetProject()), nil
+		return toProjectCreateView(resp), nil
 	})
 
 	r.Register("project.get", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
