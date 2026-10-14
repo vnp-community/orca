@@ -41,3 +41,9 @@ Mỗi dòng kèm `code` (`REQUEST_ENGINE_*`, `REQUEST_KNOWLEDGE_*`) và gợi ý
 
 - `solution_agent` bật nhưng dev server không tải được hub, không có đường dẫn repo hay không đọc được khả năng: Solution đi `ai.complete` như cũ và ghi log lý do.
 - Engine `openspec` mà dev server thiếu `openspec` hoặc agent quá cũ: run thất bại với mã `REQUEST_ENGINE_*` kèm gợi ý, Request không bị hỏng.
+
+## Chạy task của một Plan OpenSpec
+
+Task của Plan do engine `openspec` viết chạy trên đường hợp đồng của task-service: agent kết thúc bằng một khối kết quả có nonce, Orca đọc `status`, `checks_run`, `knowledge` và `writeback`; nếu dev server có `agent.execPrompt.knowledgeHub` thì agent còn đọc được đồ thị tri thức từ **thư mục gốc của repo** (không phải worktree của task). Task có dòng `Verify:` chỉ được coi là xong khi `checks_run` có ít nhất một kiểm tra thoát với mã 0; báo `done` mà không có bằng chứng thì tính là một lần thất bại (`VERIFY_NOT_PASSED`, được thử lại theo số lần tối đa). Xem kết quả bằng `orca plan result <task-id>`; phần `knowledge`/`writeback` là lời của agent, Orca không kiểm.
+
+**Rủi ro đã biết (B4):** mọi lần thực thi task vẫn chạy với `trustPreset: full` (agent không có người duyệt từng lệnh). Cổng duyệt Plan và Phase, kiểm phạm vi `Code:` và bằng chứng `checks_run` là các lớp bù, không thay thế việc xem diff trước khi merge.

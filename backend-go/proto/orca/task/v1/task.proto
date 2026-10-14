@@ -352,6 +352,13 @@ message TaskServiceExecuteRequest {
   // result_nonce: minted by request-service per attempt so a result block injected through
   // Request content cannot be mistaken for the agent's. Non-empty selects the contract path.
   string result_nonce = 4;
+  // use_knowledge_hub: the agent also gets the project's knowledge graph over MCP, read from the project's repository root
+  // (never from the task's worktree and never from a caller-given path). Only the contract path honours it, and the caller
+  // asks only when the dev server's agent reports agent.execPrompt.knowledgeHub.
+  bool use_knowledge_hub = 5;
+  // require_passing_check: a "done" result must list at least one check with exit 0 in checks_run; without one the run
+  // counts as a failed attempt. Set for tasks whose spec names a Verify step.
+  bool require_passing_check = 6;
 }
 
 message TaskServiceExecuteResponse {

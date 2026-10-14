@@ -106,7 +106,8 @@ func (w *executionWiring) close() {
 // (CR-REQ-015) and starts their background parts: the task-outcome, status and gate consumers (need NATS) and
 // the reconcile loop.
 func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, log *slog.Logger, stores *requestStores,
-	lifecycle *requestLifecycle, approval *approvalWiring, tasks *executionTasks, bus *commoneventbus.Consumer) (*executionWiring, error) {
+	lifecycle *requestLifecycle, approval *approvalWiring, tasks *executionTasks, bus *commoneventbus.Consumer,
+	contractRuns usecase.ContractRunPlanner) (*executionWiring, error) {
 	w := &executionWiring{}
 	ex := stores.execution
 	settings := usecase.ExecutionSettings{
@@ -140,7 +141,7 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	actors := &usecase.ApprovalExecutionActors{Approvals: ex.gateApprovals, PhaseStarts: ex.phaseStarts, Access: access}
 	advance := &usecase.AdvanceExecution{
 		Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Policies: policies,
-		Approvals: opener, Settings: settings, Log: log,
+		Approvals: opener, Settings: settings, Contract: contractRuns, Log: log,
 	}
 	evaluate := &usecase.EvaluateExecution{
 		Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Checks: ex.checks, Approvals: ex.gateApprovals, Open: opener,
@@ -208,4 +209,10 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	run("request-status", eventbusadapter.NewRequestStatusConsumer(bus, startExecution).Run)
 	run("approval-gate", eventbusadapter.NewApprovalDecidedConsumer(bus, resume).Run)
 	return w, nil
+}
+
+// wireContractRuns puts the tasks of an OpenSpec plan on the contract path. Without the dev server stack there is no agent
+// to ask about the knowledge hub, and the plain run stays as it was.
+func wireContractRuns(solution *solutionWiring) usecase.ContractRunPlanner {
+	return usecase.OpenSpecContractRuns{Knowledge: usecase.CapabilityKnowledgeProbe{Conns: solution.conns, Caps: solution.caps}}
 }

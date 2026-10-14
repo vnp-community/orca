@@ -31,6 +31,30 @@ type executionResultView struct {
 	Source    string `json:"source"`
 	Redacted  bool   `json:"redacted,omitempty"`
 	Truncated bool   `json:"truncated,omitempty"`
+	// Knowledge and Writeback are what the agent reported reading in the knowledge graph and touching in the design
+	// documents. They are the agent's word, redacted like the rest, and absent when the run reported none.
+	Knowledge *resultKnowledgeView `json:"knowledge,omitempty"`
+	Writeback *resultWritebackView `json:"writeback,omitempty"`
+}
+
+type resultKnowledgeView struct {
+	Available bool     `json:"available"`
+	Snapshot  string   `json:"snapshot,omitempty"`
+	Read      []string `json:"read"`
+	Gaps      []string `json:"gaps"`
+	Conflicts []string `json:"conflicts"`
+}
+
+type resultWritebackView struct {
+	Documents  []string `json:"documents"`
+	ProposalID string   `json:"proposalId,omitempty"`
+	ProposalOK bool     `json:"proposalOk"`
+	Touched    []string `json:"touched"`
+}
+
+// ExecutionResultFor is execution.get for callers outside the channel registry (the REST route of the CLI).
+func ExecutionResultFor(ctx context.Context, client taskv1.TaskServiceClient, taskID string) (any, error) {
+	return executionResultFor(ctx, client, taskID)
 }
 
 type checkRunView struct {
@@ -114,6 +138,19 @@ func executionRecordView(rec *taskv1.ExecutionRecord) *executionResultView {
 		FilesChanged []string                   `json:"files_changed"`
 		ChecksRun    []checkRunView             `json:"checks_run"`
 		Outputs      map[string]json.RawMessage `json:"outputs"`
+		Knowledge    *struct {
+			Available bool     `json:"available"`
+			Snapshot  string   `json:"snapshot"`
+			Read      []string `json:"read"`
+			Gaps      []string `json:"gaps"`
+			Conflicts []string `json:"conflicts"`
+		} `json:"knowledge"`
+		Writeback *struct {
+			Documents  []string `json:"documents"`
+			ProposalID string   `json:"proposal_id"`
+			ProposalOK bool     `json:"proposal_ok"`
+			Touched    []string `json:"touched"`
+		} `json:"writeback"`
 	}
 	if rec.GetResultJson() != "" && json.Unmarshal([]byte(rec.GetResultJson()), &result) == nil {
 		view.Status = result.Status
@@ -121,6 +158,12 @@ func executionRecordView(rec *taskv1.ExecutionRecord) *executionResultView {
 		view.ChecksRun = append(view.ChecksRun, result.ChecksRun...)
 		view.FilesChanged = appendUnique(view.FilesChanged, result.FilesChanged...)
 		view.Outputs = redactedOutputs(result.Outputs)
+		if k := result.Knowledge; k != nil {
+			view.Knowledge = &resultKnowledgeView{Available: k.Available, Snapshot: k.Snapshot, Read: redactedList(k.Read), Gaps: redactedList(k.Gaps), Conflicts: redactedList(k.Conflicts)}
+		}
+		if w := result.Writeback; w != nil {
+			view.Writeback = &resultWritebackView{Documents: redactedList(w.Documents), ProposalID: w.ProposalID, ProposalOK: w.ProposalOK, Touched: redactedList(w.Touched)}
+		}
 	}
 	// What the agent saw change in the worktree is better evidence than what it says it changed, so it comes first.
 	var changes struct {
@@ -182,4 +225,14 @@ func redactJSONStrings(v any) any {
 		}
 	}
 	return v
+}
+
+// redactedList is never nil, so the JSON always carries an array, and no entry leaks a secret the agent quoted.
+func redactedList(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		r, _ := secretscan.Redact(s)
+		out = append(out, r)
+	}
+	return out
 }

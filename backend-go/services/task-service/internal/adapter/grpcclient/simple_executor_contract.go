@@ -35,7 +35,10 @@ type agentParsedResult struct {
 	Detail string          `json:"detail,omitempty"`
 }
 
-type contractRunOptions struct{ nonce string }
+type contractRunOptions struct {
+	nonce                                string
+	useKnowledgeHub, requirePassingCheck bool
+}
 
 func (o *contractRunOptions) apply(p *agentExecPromptParams) {
 	p.ResultBlock = &resultBlockParam{Nonce: o.nonce}
@@ -72,14 +75,11 @@ func (s *SimpleExecutor) ExecuteWithContract(ctx context.Context, in usecase.Con
 	if s.records == nil {
 		return usecase.ContractExecuteOutput{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_CONTRACT_UNAVAILABLE", "execution records are not configured", nil)
 	}
-	if strings.TrimSpace(in.Prompt) == "" {
-		return usecase.ContractExecuteOutput{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_EXECUTE_PROMPT_REQUIRED", "a contract run needs the prompt built from the task spec", nil)
-	}
 	// Full trust is acceptable only because request-service gates readiness and verifies afterwards.
 	if !strings.HasPrefix(in.RequestID, contractRequestPrefix) {
 		return usecase.ContractExecuteOutput{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_CONTRACT_REQUIRES_REQUEST", "contract runs must come from a request execution", nil)
 	}
-	result, runErr := s.runAgentPrompt(ctx, in.TenantID, in.TaskID, in.RequestID, in.WorktreePath, in.Prompt, &contractRunOptions{nonce: in.ResultNonce})
+	result, runErr := s.runAgentPrompt(ctx, in.TenantID, in.TaskID, in.RequestID, in.WorktreePath, in.Prompt, &contractRunOptions{nonce: in.ResultNonce, useKnowledgeHub: in.UseKnowledgeHub, requirePassingCheck: in.RequirePassingCheck})
 	var relayErr *relayError
 	if runErr != nil && !errors.As(runErr, &relayErr) {
 		return usecase.ContractExecuteOutput{}, runErr
@@ -97,7 +97,7 @@ func (s *SimpleExecutor) ExecuteWithContract(ctx context.Context, in usecase.Con
 	if relayErr != nil {
 		parsed = domain.ParsedExecution{Status: domain.ParseStatusMissing, Code: domain.ResultCodeBlockMissing}
 	}
-	class, code := domain.ClassifyRunFailure(result.TimedOut, result.ExitCode, parsed, runErr)
+	class, code := domain.ClassifyRunFailureChecked(result.TimedOut, result.ExitCode, parsed, runErr, in.RequirePassingCheck)
 
 	rec, insertErr := s.records.InsertExecutionRecord(ctx, domain.ExecutionRecord{
 		TenantID: in.TenantID, TaskID: in.TaskID, ExecutionLinkID: in.ExecutionLinkID, Attempt: max(in.Attempt, 1),

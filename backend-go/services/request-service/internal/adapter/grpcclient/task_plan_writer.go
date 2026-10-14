@@ -53,19 +53,18 @@ func planTreeRequest(in usecase.PlanTreeInput) *taskv1.CreatePlanTreeRequest {
 		RequestId: in.Request.ID, ProjectId: in.Request.ProjectID, Title: in.Proposal.Title, Description: in.Proposal.Summary,
 		AiPlanJson: in.AIPlanJSON, CreatorId: in.CreatorID, SupersedesPlanId: in.SupersedesPlanID,
 	}
-	aiContext := planTaskContext(in)
 	for _, ph := range in.Proposal.Phases {
 		p := &taskv1.PlanTreePhase{Title: ph.Title, Description: ph.Description}
 		for _, i := range ph.DependsOnPhaseIndices {
 			p.DependsOnPhaseIndices = append(p.DependsOnPhaseIndices, int32(i))
 		}
 		for _, t := range ph.Tasks {
-			p.Tasks = append(p.Tasks, planTreeTask(t, aiContext))
+			p.Tasks = append(p.Tasks, planTreeTask(t, planTaskContext(in, t)))
 		}
 		req.Phases = append(req.Phases, p)
 	}
 	for _, t := range in.Proposal.Tasks {
-		req.Tasks = append(req.Tasks, planTreeTask(t, aiContext))
+		req.Tasks = append(req.Tasks, planTreeTask(t, planTaskContext(in, t)))
 	}
 	return req
 }
@@ -84,16 +83,53 @@ func planTreeTask(t domain.TaskProposal, aiContext string) *taskv1.PlanTreeTask 
 	return out
 }
 
-// planTaskContext is what every task of the Plan tells the agent about its origin: which Request, and the Plan's own summary.
-func planTaskContext(in usecase.PlanTreeInput) string {
+// planTaskContext is what a task of the Plan tells the agent about its origin: which Request, the acceptance criteria this task
+// serves (their text, since the id alone says nothing), and the Plan's own summary. The criteria come before the summary so
+// the 2000 character ceiling cuts the summary first.
+func planTaskContext(in usecase.PlanTreeInput, t domain.TaskProposal) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "REQ-%d: %s", in.Request.Number, in.Request.Title)
+	if lines := servedCriteria(in.Request, t.Satisfies); len(lines) > 0 {
+		b.WriteString("\nAcceptance criteria this task serves:\n" + strings.Join(lines, "\n"))
+	}
 	if s := strings.TrimSpace(in.Proposal.Summary); s != "" {
 		b.WriteString("\n" + s)
 	}
 	out := b.String()
 	if utf8.RuneCountInString(out) > maxAIContextRunes {
 		out = string([]rune(out)[:maxAIContextRunes])
+	}
+	return out
+}
+
+// maxCriterionRunes bounds one criterion so a long one cannot push the rest out of the context.
+const maxCriterionRunes = 300
+
+// servedCriteria renders "- AC-1: text" for each id the task serves that is an active criterion of the Request.
+func servedCriteria(r domain.Request, ids []string) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+	content, err := domain.ContentFromRequest(r)
+	if err != nil {
+		return nil
+	}
+	text := map[string]string{}
+	for _, it := range content.AcceptanceCriteria.Items {
+		if it.Status == domain.ACStatusActive {
+			text[it.ID] = it.Text
+		}
+	}
+	var out []string
+	for _, id := range ids {
+		t, ok := text[id]
+		if !ok {
+			continue
+		}
+		if utf8.RuneCountInString(t) > maxCriterionRunes {
+			t = string([]rune(t)[:maxCriterionRunes]) + "..."
+		}
+		out = append(out, "- "+id+": "+strings.Join(strings.Fields(t), " "))
 	}
 	return out
 }
@@ -138,7 +174,7 @@ func (c *TaskClient) CreateFixTask(ctx context.Context, in usecase.PlanTreeInput
 	t := in.Proposal.Tasks[0]
 	req := &taskv1.CreateTaskRequest{
 		Title: t.Title, ProjectId: in.Request.ProjectID, Description: t.Description, TaskType: t.TaskType, PromptTemplate: t.PromptTemplate,
-		AiContext: planTaskContext(in), CreatorId: in.CreatorID, RequestId: in.Request.ID, Labels: domain.EffectiveLabels(t),
+		AiContext: planTaskContext(in, t), CreatorId: in.CreatorID, RequestId: in.Request.ID, Labels: domain.EffectiveLabels(t),
 	}
 	if t.EstimatedHours > 0 {
 		req.EstimatedHours = wrapperspb.Double(t.EstimatedHours)

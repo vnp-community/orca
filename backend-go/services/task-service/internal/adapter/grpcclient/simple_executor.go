@@ -281,6 +281,8 @@ type agentExecPromptParams struct {
 	ResultBlock    *resultBlockParam `json:"resultBlock,omitempty"`
 	ReportChanges  bool              `json:"reportChanges,omitempty"`
 	MaxOutputBytes int               `json:"maxOutputBytes,omitempty"`
+	// KnowledgeRoot is the project's repository root, where .tdd-agent/ lives; the agent builds the MCP config itself.
+	KnowledgeRoot string `json:"knowledgeRoot,omitempty"`
 }
 
 // agentExecPromptResult mirrors agent-print-mode-exec.ts's real
@@ -352,7 +354,7 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 	// WorktreeProvisioner.EnsureWorktree before this call. connectionID/
 	// devServerID/connected are still exactly what this call is for —
 	// unchanged from BUG-026's fix.
-	connectionID, _, _, devServerID, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
+	connectionID, repoRoot, _, devServerID, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil {
 		return agentExecPromptResult{}, fmt.Errorf("simple_executor: resolve connection: %w", err)
 	}
@@ -383,6 +385,10 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 	effectivePrompt := prompt
 	if effectivePrompt == "" {
 		effectivePrompt = buildExecutePrompt(task, parent, completedDeps)
+		if opts != nil {
+			// A contract run without a caller-built prompt gets the default one plus the way to report back.
+			effectivePrompt += domain.ContractPromptSuffix(opts.nonce, opts.requirePassingCheck, opts.useKnowledgeHub && repoRoot != "")
+		}
 	}
 	params := agentExecPromptParams{
 		Prompt:       effectivePrompt,
@@ -437,6 +443,11 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 
 	if opts != nil {
 		opts.apply(&params)
+		// The repository root, not the task's worktree: the graph is built for the project's checkout, and the root comes
+		// from the project's connection, never from the caller.
+		if opts.useKnowledgeHub && repoRoot != "" {
+			params.KnowledgeRoot = repoRoot
+		}
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

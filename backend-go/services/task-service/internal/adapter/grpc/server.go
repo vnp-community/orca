@@ -284,10 +284,11 @@ func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermi
 
 func (s *Server) Execute(ctx context.Context, req *taskv1.TaskServiceExecuteRequest) (*taskv1.TaskServiceExecuteResponse, error) {
 	result, err := s.executeTask.Execute(ctx, usecase.ExecuteTaskInput{
-		TaskID:      req.GetTaskId(),
-		RequestID:   req.GetRequestId(),
-		Prompt:      req.GetPrompt(),
-		ResultNonce: req.GetResultNonce(),
+		TaskID:          req.GetTaskId(),
+		RequestID:       req.GetRequestId(),
+		Prompt:          req.GetPrompt(),
+		ResultNonce:     req.GetResultNonce(),
+		UseKnowledgeHub: req.GetUseKnowledgeHub(), RequirePassingCheck: req.GetRequirePassingCheck(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

@@ -22,6 +22,9 @@ type ExecuteTaskInput struct {
 	// close with an ORCA_RESULT block carrying this nonce. Attempt 0 is derived from RequestID.
 	ResultNonce string
 	Attempt     int
+	// UseKnowledgeHub gives the contract run's agent the project's knowledge graph; RequirePassingCheck makes a "done"
+	// without a passing check a failed attempt. Both apply to the contract path only.
+	UseKnowledgeHub, RequirePassingCheck bool
 }
 
 // ExecuteResult replaces the bare execution-ref string Execute used to

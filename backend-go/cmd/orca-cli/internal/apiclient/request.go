@@ -128,6 +128,12 @@ func (c *Client) StartPhase(ctx context.Context, id, phaseTaskID string) (Docume
 	return c.postDoc(ctx, requestPath(id, "/phases/"+url.PathEscape(phaseTaskID)+"/start"), nil)
 }
 
+// GetTaskExecution reads the newest run's result of one task: status, checks, files, and what the agent reported reading
+// in the knowledge graph.
+func (c *Client) GetTaskExecution(ctx context.Context, taskID string) (Document, error) {
+	return c.getDoc(ctx, "/v1/tasks/"+url.PathEscape(taskID)+"/execution", nil)
+}
+
 func (c *Client) GetTaskSubtree(ctx context.Context, rootTaskID string) (Document, error) {
 	return c.getDoc(ctx, "/v1/tasks/"+url.PathEscape(rootTaskID)+"/subtree", nil)
 }

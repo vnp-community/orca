@@ -120,6 +120,24 @@ func TestExecuteTask_PromptOverrideAllowedForRequestTaskWithDeps(t *testing.T) {
 	}
 }
 
+func TestExecuteTask_ContractPathCarriesTheKnowledgeAndVerifyFlagsAndAPlainRunIgnoresThem(t *testing.T) {
+	f := newContractFixture(t)
+	in := ExecuteTaskInput{TaskID: "task-1", RequestID: "req:r:task-1:1", ResultNonce: "abcdef0123456789", UseKnowledgeHub: true, RequirePassingCheck: true}
+	if _, err := f.uc.Execute(f.ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.contract.got; !got.UseKnowledgeHub || !got.RequirePassingCheck || got.Prompt != "" {
+		t.Fatalf("contract input: %+v", got)
+	}
+	plain := newContractFixture(t)
+	if _, err := plain.uc.Execute(plain.ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1", UseKnowledgeHub: true, RequirePassingCheck: true}); err != nil {
+		t.Fatal(err)
+	}
+	if plain.contract.runs != 0 || !plain.simple.called {
+		t.Fatalf("flags without a nonce must not select the contract path: contract=%d simple=%v", plain.contract.runs, plain.simple.called)
+	}
+}
+
 func TestExecuteTask_NoNonce_UsesPlainExecutor(t *testing.T) {
 	f := newContractFixture(t)
 	if _, err := f.uc.Execute(f.ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {

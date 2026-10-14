@@ -77,18 +77,13 @@ func TestExecuteWithContract_SendsResultBlockAndReportChanges(t *testing.T) {
 	}
 }
 
-func TestExecuteWithContract_RequiresRequestPrefixAndPrompt(t *testing.T) {
+func TestExecuteWithContract_RequiresRequestPrefix(t *testing.T) {
 	relay := relayWith(map[string]any{"stdout": "", "exitCode": 0})
 	exec, _ := contractExec(t, relay)
 	in := contractIn()
 	in.RequestID = "plain-1"
 	_, err := exec.ExecuteWithContract(ctxWithTenant(t), in)
 	if err == nil || !strings.Contains(err.Error(), "TASK_EXECUTE_CONTRACT_REQUIRES_REQUEST") {
-		t.Fatalf("got %v", err)
-	}
-	in = contractIn()
-	in.Prompt = "  "
-	if _, err = exec.ExecuteWithContract(ctxWithTenant(t), in); err == nil || !strings.Contains(err.Error(), "TASK_EXECUTE_PROMPT_REQUIRED") {
 		t.Fatalf("got %v", err)
 	}
 	if relay.gotRelay != nil {
@@ -223,5 +218,136 @@ func TestExecute_PlainRunUnchangedByContractRefactor(t *testing.T) {
 	}
 	if strings.Contains(relay.gotRelay.GetParamsJson(), "resultBlock") || strings.Contains(relay.gotRelay.GetParamsJson(), "reportChanges") {
 		t.Fatalf("plain params must not carry contract fields: %s", relay.gotRelay.GetParamsJson())
+	}
+}
+
+func sentParams(t *testing.T, relay *fakeInfraFleetServiceClient) agentExecPromptParams {
+	t.Helper()
+	var sent agentExecPromptParams
+	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sent); err != nil {
+		t.Fatal(err)
+	}
+	return sent
+}
+
+func TestExecuteWithContract_WithoutAPromptTheDefaultOneTellsTheAgentHowToReport(t *testing.T) {
+	verified := `{"schema_version":1,"status":"done","summary":"ok","checks_run":[{"id":"go test","exit":0}]}`
+	relay := relayWith(map[string]any{"stdout": stdoutWith(verified), "exitCode": 0})
+	exec, _ := contractExec(t, relay)
+	in := contractIn()
+	in.Prompt, in.RequirePassingCheck, in.UseKnowledgeHub = "", true, true
+	if _, err := exec.ExecuteWithContract(ctxWithTenant(t), in); err != nil {
+		t.Fatal(err)
+	}
+	p := sentParams(t, relay).Prompt
+	for _, want := range []string{"ORCA_RESULT_BEGIN " + contractNonce, "ORCA_RESULT_END " + contractNonce, "checks_run", "Verify step", "tdd-agent", `"knowledge"`, `"writeback"`} {
+		if !strings.Contains(p, want) {
+			t.Errorf("default contract prompt lacks %q:\n%s", want, p)
+		}
+	}
+	// A caller-built prompt is the caller's to complete: nothing is appended to it.
+	relay = relayWith(map[string]any{"stdout": stdoutWith(doneBody), "exitCode": 0})
+	exec, _ = contractExec(t, relay)
+	if _, err := exec.ExecuteWithContract(ctxWithTenant(t), contractIn()); err != nil || sentParams(t, relay).Prompt != "implement it" {
+		t.Fatalf("err=%v prompt=%q", err, sentParams(t, relay).Prompt)
+	}
+	// Without the hub or a Verify step the prompt does not talk about them.
+	relay = relayWith(map[string]any{"stdout": stdoutWith(doneBody), "exitCode": 0})
+	exec, _ = contractExec(t, relay)
+	in = contractIn()
+	in.Prompt = ""
+	if _, err := exec.ExecuteWithContract(ctxWithTenant(t), in); err != nil {
+		t.Fatal(err)
+	}
+	if p := sentParams(t, relay).Prompt; strings.Contains(p, "tdd-agent") || strings.Contains(p, "Verify step") || strings.Contains(p, `"knowledge"`) {
+		t.Fatalf("plain contract prompt mentions what was not asked for:\n%s", p)
+	}
+}
+
+func TestExecuteWithContract_TheKnowledgeRootIsTheRepoRootAndOnlyWhenAsked(t *testing.T) {
+	cases := []struct {
+		name    string
+		ask     bool
+		repo    string
+		wantKey string
+	}{
+		{"asked", true, "/srv/repo", "/srv/repo"},
+		{"not asked", false, "/srv/repo", ""},
+		{"asked but the connection has no repo path", true, "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			relay := relayWith(map[string]any{"stdout": stdoutWith(doneBody), "exitCode": 0})
+			tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "T"}}}
+			resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: tc.repo, connected: true}
+			exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay).WithExecutionRecords(&memoryRecords{})
+			in := contractIn()
+			in.WorktreePath, in.UseKnowledgeHub = "/srv/task-worktree", tc.ask
+			if _, err := exec.ExecuteWithContract(ctxWithTenant(t), in); err != nil {
+				t.Fatal(err)
+			}
+			sent := sentParams(t, relay)
+			if sent.KnowledgeRoot != tc.wantKey || sent.WorktreePath != "/srv/task-worktree" {
+				t.Fatalf("knowledgeRoot=%q worktree=%q", sent.KnowledgeRoot, sent.WorktreePath)
+			}
+		})
+	}
+}
+
+func TestExecuteWithContract_DoneNeedsAPassingCheckOnlyWhenTheTaskHasAVerifyStep(t *testing.T) {
+	noCheck := `{"schema_version":1,"status":"done","summary":"ok"}`
+	failing := `{"schema_version":1,"status":"done","summary":"ok","checks_run":[{"id":"go test","exit":1}]}`
+	passing := `{"schema_version":1,"status":"done","summary":"ok","checks_run":[{"id":"go test","exit":1},{"id":"go test ./...","exit":0}]}`
+	cases := []struct {
+		name, body string
+		require    bool
+		wantCode   string
+	}{
+		{"no check, no verify step", noCheck, false, ""},
+		{"no check, verify step", noCheck, true, "VERIFY_NOT_PASSED"},
+		{"only a failing check, verify step", failing, true, "VERIFY_NOT_PASSED"},
+		{"a failing check, no verify step", failing, false, ""},
+		{"a passing check, verify step", passing, true, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			relay := relayWith(map[string]any{"stdout": stdoutWith(tc.body), "exitCode": 0})
+			exec, recs := contractExec(t, relay)
+			in := contractIn()
+			in.RequirePassingCheck = tc.require
+			_, err := exec.ExecuteWithContract(ctxWithTenant(t), in)
+			var failure *usecase.ExecutionFailure
+			switch {
+			case tc.wantCode == "" && err != nil:
+				t.Fatalf("unexpected failure: %v", err)
+			case tc.wantCode != "" && (!errors.As(err, &failure) || failure.Code != tc.wantCode || failure.Class != domain.FailureAgentDefect):
+				t.Fatalf("err = %v, want agent_defect %s", err, tc.wantCode)
+			}
+			if r := recs.recs[0]; (tc.wantCode == "") != (r.FailureClass == "") {
+				t.Fatalf("record class = %q", r.FailureClass)
+			}
+		})
+	}
+}
+
+func TestExecuteWithContract_KnowledgeAndWritebackAreStoredAndLongNotesDoNotFailTheRun(t *testing.T) {
+	long := strings.Repeat("x", 5000)
+	body := `{"schema_version":1,"status":"done","summary":"ok","checks_run":[{"id":"go test","exit":0}],` +
+		`"knowledge":{"available":true,"snapshot":"snap-1","read":["FR-1","ADR-12"],"gaps":["` + long + `"],"conflicts":[]},` +
+		`"writeback":{"documents":["docs/tdd/a.md"],"proposal_id":"cs-1","proposal_ok":true,"touched":["FR-1"]}}`
+	relay := relayWith(map[string]any{"stdout": stdoutWith(body), "exitCode": 0})
+	exec, recs := contractExec(t, relay)
+	if _, err := exec.ExecuteWithContract(ctxWithTenant(t), contractIn()); err != nil {
+		t.Fatalf("a long note failed the run: %v", err)
+	}
+	stored := string(recs.recs[0].Result)
+	for _, want := range []string{`"snapshot":"snap-1"`, `"ADR-12"`, `"proposal_id":"cs-1"`, `"touched":["FR-1"]`} {
+		if !strings.Contains(stored, want) {
+			t.Errorf("stored result lacks %s: %.200s", want, stored)
+		}
+	}
+	parsed := domain.ParseExecutionResult(stdoutWith(body), contractNonce, nil)
+	if parsed.Status != domain.ParseStatusOK || len(parsed.Result.Knowledge.Gaps[0]) != 600 || !parsed.Result.Writeback.ProposalOK {
+		t.Fatalf("parsed = %+v", parsed.Result)
 	}
 }

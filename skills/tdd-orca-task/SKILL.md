@@ -35,7 +35,7 @@ to date, say which source and how it limits what you cite.
 
 ## The result you return
 
-If the prompt gives a result block (`ORCA_RESULT_BEGIN <nonce>` ... `ORCA_RESULT_END <nonce>`), put your report there as one JSON object with the keys the prompt names; add `knowledge` (`snapshot`, `read`, `gaps`, `conflicts`, `available`), `verification` (a list of `{command, exit}`) and `writeback` (`documents`, `proposal_id`, `proposal_ok`, `touched`) to it. Use the nonce exactly as given and never print the markers anywhere else. When there is no result block, finish with this plain text block instead (omit a line only if it is empty):
+If the prompt gives a result block (`ORCA_RESULT_BEGIN <nonce>` ... `ORCA_RESULT_END <nonce>`), put your report there as one JSON object with exactly the keys the prompt names and no others (Orca refuses a block with an unknown key). Besides `status`, `summary`, `files_changed` and `questions` it carries `checks_run` (every check you ran, as `{"id": "<the command>", "exit": <its real exit code>}`; a task with a Verify step is accepted as done only when one of them exited 0), `knowledge` (`available`, `snapshot`, `read`, `gaps`, `conflicts`) and `writeback` (`documents`, `proposal_id`, `proposal_ok`, `touched`). Use the nonce exactly as given and never print the markers anywhere else. When there is no result block, finish with this plain text block instead (omit a line only if it is empty):
 
 ```
 Knowledge: snapshot <id>

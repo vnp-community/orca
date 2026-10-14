@@ -129,3 +129,33 @@ func TestExecutionGet_TaskIDIsRequired(t *testing.T) {
 		t.Fatal("expected an error")
 	}
 }
+
+func TestExecutionGet_ShowsWhatTheAgentReadAndTouchedInTheKnowledgeGraph_RedactedAndNeverNull(t *testing.T) {
+	c := &executionTaskClient{records: []*taskv1.ExecutionRecord{{
+		TaskId: "t1", Attempt: 1, ParseStatus: "ok", CreatedAt: timestamppb.Now(),
+		ResultJson: `{"schema_version":1,"status":"done","summary":"s","checks_run":[{"id":"go test","exit":0}],` +
+			`"knowledge":{"available":true,"snapshot":"snap-1","read":["FR-1"],"gaps":["token AKIAIOSFODNN7EXAMPLE missing"]},` +
+			`"writeback":{"documents":["docs/tdd/a.md"],"proposal_id":"cs-1","proposal_ok":true}}`,
+	}}}
+	out, err := executionGet(t, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, _ := out["knowledge"].(map[string]any)
+	w, _ := out["writeback"].(map[string]any)
+	if k["available"] != true || k["snapshot"] != "snap-1" || len(k["read"].([]any)) != 1 || k["conflicts"] == nil {
+		t.Fatalf("knowledge = %v", k)
+	}
+	if gaps := k["gaps"].([]any); len(gaps) != 1 || strings.Contains(gaps[0].(string), "AKIAIOSFODNN7EXAMPLE") {
+		t.Fatalf("a secret the agent quoted must not reach the reader: %v", gaps)
+	}
+	if w["proposalId"] != "cs-1" || w["proposalOk"] != true || w["touched"] == nil || len(w["documents"].([]any)) != 1 {
+		t.Fatalf("writeback = %v", w)
+	}
+	// A run that reported neither block shows neither.
+	c.records[0].ResultJson = `{"schema_version":1,"status":"done","summary":"s"}`
+	out, _ = executionGet(t, c)
+	if _, has := out["knowledge"]; has {
+		t.Fatalf("knowledge appeared without a report: %v", out)
+	}
+}

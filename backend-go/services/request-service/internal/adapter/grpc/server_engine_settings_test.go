@@ -12,7 +12,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type memEngineRows struct{ rows map[string]domain.ProjectEngineSettings }
+type memEngineRows struct {
+	rows map[string]domain.ProjectEngineSettings
+}
 
 func (m *memEngineRows) Get(_ context.Context, id string) (domain.ProjectEngineSettings, bool, error) {
 	s, ok := m.rows[id]

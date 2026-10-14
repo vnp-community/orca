@@ -11,7 +11,7 @@ import (
 
 func newPlanCmd(e flowEnv) *cobra.Command {
 	cmd := &cobra.Command{Use: "plan", Short: "the execution plan of a Request: generate it, read its tree, start a Phase"}
-	cmd.AddCommand(newPlanGenerateCmd(e), newPlanProposalCmd(e), newPlanBundleCmd(e), newPlanTreeCmd(e), newPlanStartPhaseCmd(e))
+	cmd.AddCommand(newPlanGenerateCmd(e), newPlanProposalCmd(e), newPlanBundleCmd(e), newPlanResultCmd(e), newPlanTreeCmd(e), newPlanStartPhaseCmd(e))
 	return cmd
 }
 
@@ -108,6 +108,17 @@ func newPlanStartPhaseCmd(e flowEnv) *cobra.Command {
 			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
 				return cli.StartPhase(ctx, args[0], args[1])
 			}, nil)
+		},
+	}
+}
+
+func newPlanResultCmd(e flowEnv) *cobra.Command {
+	return &cobra.Command{
+		Use: "result <task-id>", Short: "how a task's newest run ended: checks, files, and what the agent reports reading in the knowledge graph", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
+				return cli.GetTaskExecution(ctx, args[0])
+			}, renderTaskResult)
 		},
 	}
 }

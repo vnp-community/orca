@@ -18,6 +18,7 @@ type ContractExecuteInput struct {
 	ExecutionLinkID                                                string
 	Attempt                                                        int
 	SpecDigest, PacketDigest, TemplateVersion                      string
+	UseKnowledgeHub, RequirePassingCheck                           bool
 }
 
 type ContractExecuteOutput struct {
@@ -75,6 +76,7 @@ func (uc *ExecuteTask) runContractAgent(ctx context.Context, tenantID string, in
 	out, err := uc.contract.ExecuteWithContract(ctx, ContractExecuteInput{
 		TenantID: tenantID, TaskID: in.TaskID, RequestID: in.RequestID, WorktreePath: worktreePath, Prompt: in.Prompt,
 		ResultNonce: in.ResultNonce, ExecutionLinkID: linkID, Attempt: in.Attempt,
+		UseKnowledgeHub: in.UseKnowledgeHub, RequirePassingCheck: in.RequirePassingCheck,
 	})
 	if err != nil {
 		_ = uc.links.Complete(ctx, tenantID, linkID, "failed")

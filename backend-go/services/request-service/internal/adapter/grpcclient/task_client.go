@@ -130,12 +130,26 @@ func (c *TaskClient) GetSubtree(ctx context.Context, rootID string) (usecase.Sub
 
 // Execute maps task-service's dispatch failures onto the domain errors AdvanceExecution branches on.
 func (c *TaskClient) Execute(ctx context.Context, taskID, executionRequestID string) error {
+	return c.execute(ctx, &taskv1.TaskServiceExecuteRequest{TaskId: taskID, RequestId: executionRequestID})
+}
+
+var _ usecase.ContractTaskClient = (*TaskClient)(nil)
+
+// ExecuteContract dispatches a run that must end in a result block fenced by run.ResultNonce.
+func (c *TaskClient) ExecuteContract(ctx context.Context, taskID, executionRequestID string, run usecase.ContractRun) error {
+	return c.execute(ctx, &taskv1.TaskServiceExecuteRequest{
+		TaskId: taskID, RequestId: executionRequestID, ResultNonce: run.ResultNonce,
+		UseKnowledgeHub: run.UseKnowledgeHub, RequirePassingCheck: run.RequirePassingCheck,
+	})
+}
+
+func (c *TaskClient) execute(ctx context.Context, req *taskv1.TaskServiceExecuteRequest) error {
 	ctx, cancel, err := callContext(ctx, true, taskDispatchTimeout)
 	if err != nil {
 		return err
 	}
 	defer cancel()
-	_, err = c.client.Execute(ctx, &taskv1.TaskServiceExecuteRequest{TaskId: taskID, RequestId: executionRequestID})
+	_, err = c.client.Execute(ctx, req)
 	if err == nil {
 		return nil
 	}

@@ -137,3 +137,54 @@ func firstOr(s, fallback string) string {
 	}
 	return s
 }
+
+// renderTaskResult shows how a task's newest run ended. The knowledge and writeback blocks are the agent's own report:
+// they are printed as such and nothing here checks them.
+func renderTaskResult(doc apiclient.Document) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "task %s  attempt %d  result block: %s", doc.Str("taskId"), doc.Int("attempt"), firstOr(doc.Str("parseStatus"), "missing"))
+	if s := doc.Str("status"); s != "" {
+		fmt.Fprintf(&b, "  status: %s", s)
+	}
+	if fc := doc.Str("failureClass"); fc != "" {
+		fmt.Fprintf(&b, "  FAILED (%s)", fc)
+	}
+	b.WriteString("\n")
+	if s := doc.Str("summary"); s != "" {
+		fmt.Fprintf(&b, "  %s\n", s)
+	}
+	for _, c := range doc.Docs("checksRun") {
+		verdict := "passed"
+		if c.Int("exit") != 0 {
+			verdict = fmt.Sprintf("failed (exit %d)", c.Int("exit"))
+		}
+		fmt.Fprintf(&b, "  check: %s: %s\n", c.Str("id"), verdict)
+	}
+	if files := doc.Strs("filesChanged"); len(files) > 0 {
+		fmt.Fprintf(&b, "  files changed: %s\n", strings.Join(files, ", "))
+	}
+	if k := doc.Doc("knowledge"); k != nil {
+		if !k.Bool("available") {
+			b.WriteString("  knowledge graph: the agent says it was not available\n")
+		} else {
+			fmt.Fprintf(&b, "  knowledge graph (agent's report): read %d element(s) from snapshot %s\n", len(k.Strs("read")), firstOr(k.Str("snapshot"), "(unnamed)"))
+		}
+		for _, line := range k.Strs("conflicts") {
+			fmt.Fprintf(&b, "    conflict: %s\n", line)
+		}
+		for _, line := range k.Strs("gaps") {
+			fmt.Fprintf(&b, "    gap: %s\n", line)
+		}
+	}
+	if w := doc.Doc("writeback"); w != nil {
+		fmt.Fprintf(&b, "  writeback (agent's report): %d document(s) touched", len(w.Strs("documents")))
+		if id := w.Str("proposalId"); id != "" {
+			fmt.Fprintf(&b, ", proposal %s (%s)", id, map[bool]string{true: "ok", false: "not accepted"}[w.Bool("proposalOk")])
+		}
+		b.WriteString("\n")
+	}
+	if doc.Str("source") == "last_execution_output" {
+		b.WriteString("  (no result block: showing the last output)\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
+}

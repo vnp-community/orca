@@ -168,7 +168,7 @@ func run(ctx context.Context, cfg config.Config) error {
 	defer classification.close()
 	rollout.StartSampler(lifecycleCtx, &lifecycleWG)
 	approval.BindConfirm(classification.confirm)
-	execution, err := wireExecution(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, approval, execTasks, busConsumer)
+	execution, err := wireExecution(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, approval, execTasks, busConsumer, wireContractRuns(solution))
 	if err != nil {
 		return err
 	}

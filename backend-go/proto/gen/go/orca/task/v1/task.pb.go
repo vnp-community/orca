@@ -1805,9 +1805,16 @@ type TaskServiceExecuteRequest struct {
 	Prompt string `protobuf:"bytes,3,opt,name=prompt,proto3" json:"prompt,omitempty"`
 	// result_nonce: minted by request-service per attempt so a result block injected through
 	// Request content cannot be mistaken for the agent's. Non-empty selects the contract path.
-	ResultNonce   string `protobuf:"bytes,4,opt,name=result_nonce,json=resultNonce,proto3" json:"result_nonce,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ResultNonce string `protobuf:"bytes,4,opt,name=result_nonce,json=resultNonce,proto3" json:"result_nonce,omitempty"`
+	// use_knowledge_hub: the agent also gets the project's knowledge graph over MCP, read from the project's repository root
+	// (never from the task's worktree and never from a caller-given path). Only the contract path honours it, and the caller
+	// asks only when the dev server's agent reports agent.execPrompt.knowledgeHub.
+	UseKnowledgeHub bool `protobuf:"varint,5,opt,name=use_knowledge_hub,json=useKnowledgeHub,proto3" json:"use_knowledge_hub,omitempty"`
+	// require_passing_check: a "done" result must list at least one check with exit 0 in checks_run; without one the run
+	// counts as a failed attempt. Set for tasks whose spec names a Verify step.
+	RequirePassingCheck bool `protobuf:"varint,6,opt,name=require_passing_check,json=requirePassingCheck,proto3" json:"require_passing_check,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *TaskServiceExecuteRequest) Reset() {
@@ -1866,6 +1873,20 @@ func (x *TaskServiceExecuteRequest) GetResultNonce() string {
 		return x.ResultNonce
 	}
 	return ""
+}
+
+func (x *TaskServiceExecuteRequest) GetUseKnowledgeHub() bool {
+	if x != nil {
+		return x.UseKnowledgeHub
+	}
+	return false
+}
+
+func (x *TaskServiceExecuteRequest) GetRequirePassingCheck() bool {
+	if x != nil {
+		return x.RequirePassingCheck
+	}
+	return false
 }
 
 type TaskServiceExecuteResponse struct {
@@ -5204,13 +5225,15 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x16\n" +
 	"\x06action\x18\x03 \x01(\tR\x06action\"^\n" +
 	"\x19ResolvePermissionResponse\x12A\n" +
-	"\x0feffective_level\x18\x01 \x01(\x0e2\x18.orca.task.v1.GrantLevelR\x0eeffectiveLevel\"\x8e\x01\n" +
+	"\x0feffective_level\x18\x01 \x01(\x0e2\x18.orca.task.v1.GrantLevelR\x0eeffectiveLevel\"\xee\x01\n" +
 	"\x19TaskServiceExecuteRequest\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x02 \x01(\tR\trequestId\x12\x16\n" +
 	"\x06prompt\x18\x03 \x01(\tR\x06prompt\x12!\n" +
-	"\fresult_nonce\x18\x04 \x01(\tR\vresultNonce\"W\n" +
+	"\fresult_nonce\x18\x04 \x01(\tR\vresultNonce\x12*\n" +
+	"\x11use_knowledge_hub\x18\x05 \x01(\bR\x0fuseKnowledgeHub\x122\n" +
+	"\x15require_passing_check\x18\x06 \x01(\bR\x13requirePassingCheck\"W\n" +
 	"\x1aTaskServiceExecuteResponse\x12#\n" +
 	"\rexecution_ref\x18\x01 \x01(\tR\fexecutionRef\x12\x14\n" +
 	"\x05async\x18\x02 \x01(\bR\x05async\";\n" +

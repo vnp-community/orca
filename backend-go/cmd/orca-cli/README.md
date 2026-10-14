@@ -29,6 +29,7 @@ orca plan generate $R                                       # propose → chờ 
 orca plan proposal $R                                       # trạng thái run và kế hoạch; với engine openspec: nhánh, commit, kết quả kiểm, tham chiếu tri thức
 orca plan bundle $R                                         # (openspec) danh sách tệp của gói OpenSpec đứng sau kế hoạch
 orca plan bundle $R --file tasks.md                         # đọc một tệp: proposal.md, design.md, specs/<capability>/spec.md, tasks.md
+orca plan result <task-id>                                   # kết quả lượt chạy mới nhất của task: kiểm tra, tệp, và điều agent báo đã đọc/ghi trong đồ thị tri thức
 orca plan tree $R                                           # phase, task, trạng thái, "(after ...)"
 orca approval approve <plan-gate-id>
 orca approval list $R --subject phase                       # cột "subject" là id của Phase
