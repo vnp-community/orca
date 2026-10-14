@@ -55,6 +55,7 @@ Lệnh có từ trước: `worktree create`, `agent status|send|wait`, `snapshot
 
 ## Đã biết chưa làm được
 
+- **Lệnh dành cho admin** (`orca engine set`): token của `orca login` hiện chưa mang claim `role` nên request-service coi người gọi không phải admin (`REQUEST_FORBIDDEN: admin role required`). Dùng phiên web của admin (kênh `request.engineSettingsSet` hoặc UI) cho tới khi token mang role; `orca engine show` đọc được bình thường.
 - **Phương án rủi ro cao**: `solution choose` báo `requiresConfirmation`, nhưng gateway chưa có kênh xác nhận (nhập lại tiêu đề), nên duyệt bị từ chối (`REQUEST_DECISION_NOT_EFFECTIVE`). Chọn phương án khuyến nghị hoặc xác nhận trên UI. (TASK-FE-E2E-028)
 - **Dừng một task đang chạy**: chưa có lệnh/REST. `request cancel` bị chặn (`REQUEST_CANCEL_BLOCKED_ACTIVE_EXECUTION`) tới khi các task chạy xong.
 - **Project/repo/dev server**: chưa có lệnh `project`; tạo bằng UI hoặc REST (`/v1/projects`). Project không có repo trên dev server đang kết nối thì các bước AI trả `REQUEST_SOLUTION_NO_CONNECTION`.

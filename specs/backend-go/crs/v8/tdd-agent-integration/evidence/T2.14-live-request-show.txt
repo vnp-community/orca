@@ -1,0 +1,6 @@
+#1232  b4785966-0b27-4cf7-a88d-2e121386ea30  T2.14 live: nối AI nền
+status: awaiting_analysis_approval   type: change_request   size: M   urgency: normal   version: 9
+classification: Replacing a 501 stub with a real OpenAI-compatible AI provider integration, encrypted key storage, feature flag gating, and shared SSRF protection is new product behaviour spanning several areas.
+runs:
+  b5b02eb8-2bf8-4f9c-a022-f5dd53a484d1  solution  succeeded  engine native
+      agent: 26 knowledge tool call(s) (kg_get_element x15, kg_neighbors x1, kg_query x1, kg_search x8, kg_snapshots x1), 34 other tool call(s) · 61 turn(s) · 6m15s · $2.64
