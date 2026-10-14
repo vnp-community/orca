@@ -380,15 +380,17 @@ func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, ba
 }
 
 // branchExistsLocally reports whether branch already exists as a local ref
-// (`git show-ref --verify --quiet refs/heads/<branch>`, exit 0 = exists).
+// (`git rev-parse --verify --quiet refs/heads/<branch>`, exit 0 = exists).
 // Any error (missing ref, or an unexpected relay/git failure) is treated as
 // "does not exist" — CreateWorktree then falls back to its original
 // createBranch=true behavior, the same outcome as before this check
-// existed. show-ref is confirmed whitelisted on the relay's git.exec
-// surface — see ListLocalBranches' doc comment above.
+// existed. rev-parse, not show-ref: the agent's git.exec allowlist
+// (ALLOWED_GIT_SUBCOMMANDS in agent-git-handler.ts) refuses show-ref, so with it
+// the answer was always "does not exist" and a worktree for an existing branch
+// (a removed proposal worktree being recreated) failed on `-b`.
 func (r *RelayExecutor) branchExistsLocally(ctx context.Context, repoPath, branch string) bool {
 	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
-		"args": []string{"show-ref", "--verify", "--quiet", "refs/heads/" + branch},
+		"args": []string{"rev-parse", "--verify", "--quiet", "refs/heads/" + branch},
 		"cwd":  repoPath,
 	}, nil)
 	return err == nil
@@ -1258,6 +1260,9 @@ func (r *RelayExecutor) Stat(ctx context.Context, repoPath, relPath string) (dom
 	err := r.relay(ctx, repoPath, "fs.stat", map[string]any{
 		"path": filepath.Join(repoPath, relPath),
 	}, &result)
+	if status.Code(err) == codes.NotFound {
+		return domain.FileStat{Exists: false}, nil // the same answer the local executor gives for a missing path
+	}
 	return result, err
 }
 

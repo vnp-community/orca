@@ -157,3 +157,21 @@ func TestAgentErrorDataForTrailer_ShrinksLargeData(t *testing.T) {
 		t.Errorf("expected code preserved, got %v", decoded["code"])
 	}
 }
+
+func TestMapAgentExecError_AMissingPathOfAFileMethodIsNotFound(t *testing.T) {
+	missing := &domain.AgentRPCError{Code: -33003, Message: "Not found: /Users/someone/repo/a.go"}
+	for _, method := range []string{"fs.stat", "fs.readFile", "fs.statViaHiddenTarget"} {
+		err := MapAgentExecError(method, fmt.Errorf("exec: %w", missing))
+		var ae *apperrors.AppError
+		if !errors.As(err, &ae) || ae.Kind != apperrors.KindNotFound || ae.Code != "INFRA_AGENT_PATH_NOT_FOUND" || strings.Contains(ae.Message, "/Users/") {
+			t.Fatalf("%s: %v", method, err)
+		}
+	}
+	// Only file methods read the code that way; any other failure keeps its shape.
+	for method, err := range map[string]error{"git.status": missing, "fs.stat": &domain.AgentRPCError{Code: -32000, Message: "boom"}} {
+		var ae *apperrors.AppError
+		if got := MapAgentExecError(method, err); !errors.As(got, &ae) || ae.Kind != apperrors.KindInternal || ae.Code != "INFRA_AGENT_EXEC_FAILED" {
+			t.Fatalf("%s: %v", method, got)
+		}
+	}
+}

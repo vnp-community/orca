@@ -1500,8 +1500,8 @@ func TestRelayExecutor_ListWorktreePaths_SendsCwdAndParsesWorktreesShape(t *test
 // rev-parse HEAD follow-up for HeadSHA. ──
 
 // newCreateWorktreeFake builds a fake whose git.exec calls are distinguished
-// by their args (branchExistsLocally's "show-ref" precheck vs the HeadSHA
-// "rev-parse" follow-up), since both share the method name "git.exec" —
+// by their args (branchExistsLocally's "rev-parse --verify" precheck vs the HeadSHA
+// "rev-parse HEAD" follow-up), since both share the method name "git.exec" —
 // relayRespByMethod alone can't tell them apart. branchExists controls the
 // precheck's outcome: true = relay succeeds (branch found, createBranch
 // should end up false), false = relay errors (not found, createBranch
@@ -1515,7 +1515,7 @@ func newCreateWorktreeFake(branchExists bool, revParseStdout string) *fakeInfraF
 		switch {
 		case in.GetMethod() == "git.worktree.add":
 			return &infrafleetv1.RelayResponse{ResultJson: string(worktreeAddResp)}, nil
-		case strings.Contains(in.GetParamsJson(), "show-ref"):
+		case strings.Contains(in.GetParamsJson(), "--verify"): // branchExistsLocally: rev-parse --verify
 			if branchExists {
 				return &infrafleetv1.RelayResponse{ResultJson: "{}"}, nil
 			}
@@ -1536,7 +1536,7 @@ func TestRelayExecutor_CreateWorktree_SendsCorrectMethodAndParams(t *testing.T) 
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(fake.gotRelayRequests) != 3 {
-		t.Fatalf("want 3 relay calls (show-ref precheck + git.worktree.add + git.exec rev-parse), got %d", len(fake.gotRelayRequests))
+		t.Fatalf("want 3 relay calls (rev-parse --verify precheck + git.worktree.add + git.exec rev-parse), got %d", len(fake.gotRelayRequests))
 	}
 
 	addReq := fake.gotRelayRequests[1]

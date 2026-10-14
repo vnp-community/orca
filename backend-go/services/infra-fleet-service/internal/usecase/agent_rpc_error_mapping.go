@@ -12,6 +12,9 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
+// agentPathNotFoundCode is AgentErrorCode.PathNotFound of the agent's wire protocol (agent/src/shared/agent-wire-protocol.ts).
+const agentPathNotFoundCode = -33003
+
 var allowedAgentErrorCodes = map[string]apperrors.Kind{
 	"CODEINTEL_TOOL_UNAVAILABLE":    apperrors.KindFailedPrecondition,
 	"CODEINTEL_INDEX_MISSING":       apperrors.KindFailedPrecondition,
@@ -77,6 +80,13 @@ func mapAIExecError(err error) error {
 func MapAgentExecError(method string, err error) error {
 	if method == "ai.complete" {
 		return mapAIExecError(err)
+	}
+	if strings.HasPrefix(method, "fs.") {
+		var rpcErr *domain.AgentRPCError
+		if errors.As(err, &rpcErr) && rpcErr.Code == agentPathNotFoundCode {
+			// A missing path is an answer, not a relay failure: callers such as git-gateway's StatFile turn it into exists=false.
+			return apperrors.New(apperrors.KindNotFound, "INFRA_AGENT_PATH_NOT_FOUND", "path not found on the dev server", err)
+		}
 	}
 	if !strings.HasPrefix(method, "codeintel.") && !strings.HasPrefix(method, "quality.") {
 		return apperrors.New(apperrors.KindInternal, "INFRA_AGENT_EXEC_FAILED", "failed to relay to dev server agent", err)
