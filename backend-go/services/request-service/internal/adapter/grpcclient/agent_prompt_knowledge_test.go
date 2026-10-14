@@ -80,3 +80,50 @@ func TestClassifyAgentRelayError_KnowledgeHub(t *testing.T) {
 		t.Fatal("an unrelated error must stay unrelated")
 	}
 }
+
+func TestBuildAgentParams_WriteProfileRunsInAWorktreeWithoutFullTrust(t *testing.T) {
+	m := paramsJSON(t, usecase.AgentPromptInput{Prompt: "p", RepoPath: "/wt", WriteProfile: "openspec-author", ResultNonce: "abcdefghijklmnop", KnowledgeRoot: "/proj"})
+	if m["accessMode"] != "write" || m["workspaceKind"] != "worktree" || m["reportChanges"] != true || m["permissionProfile"] != "openspec-author" {
+		t.Fatalf("%v", m)
+	}
+	if m["trustPreset"] != "default" {
+		t.Fatalf("the profile run must never ask for full trust: %v", m)
+	}
+	rb, _ := m["resultBlock"].(map[string]any)
+	if rb["nonce"] != "abcdefghijklmnop" || m["knowledgeRoot"] != "/proj" || m["maxOutputBytes"] == nil {
+		t.Fatalf("%v", m)
+	}
+}
+
+func TestBuildAgentParams_NoProfileNoResultBlockMeansNoSuchKeys(t *testing.T) {
+	m := paramsJSON(t, usecase.AgentPromptInput{Prompt: "p"})
+	for _, k := range []string{"permissionProfile", "resultBlock", "accessMode", "workspaceKind"} {
+		if _, ok := m[k]; ok {
+			t.Fatalf("%s must be absent for an ordinary run: %v", k, m)
+		}
+	}
+}
+
+func TestAgentPromptRelay_ReadOnlyAndWriteProfileCannotBeCombined(t *testing.T) {
+	infra := &fakeAgentInfra{result: `{"exitCode":0}`}
+	_, err := NewAgentPromptRelay(infra).ExecPrompt(ctxWithIdentity(), usecase.AnalysisConnection{ConnectionID: "c"},
+		usecase.AgentPromptInput{Prompt: "p", ReadOnlyEnforced: true, WriteProfile: "openspec-author"})
+	if err == nil || len(infra.relay) != 0 {
+		t.Fatalf("must refuse before any call: %v", err)
+	}
+}
+
+func TestParseAgentResult_ResultBlock(t *testing.T) {
+	ok, err := parseAgentResult(`{"exitCode":0,"parsed":{"ok":true,"value":{"changeId":"req-1","phases":2}}}`)
+	if err != nil || string(ok.ResultBlock) != `{"changeId":"req-1","phases":2}` || ok.ResultBlockCode != "" {
+		t.Fatalf("%+v %v", ok, err)
+	}
+	bad, err := parseAgentResult(`{"exitCode":0,"parsed":{"ok":false,"code":"RESULT_BLOCK_MISSING"}}`)
+	if err != nil || len(bad.ResultBlock) != 0 || bad.ResultBlockCode != "RESULT_BLOCK_MISSING" {
+		t.Fatalf("%+v %v", bad, err)
+	}
+	none, _ := parseAgentResult(`{"exitCode":0}`)
+	if len(none.ResultBlock) != 0 || none.ResultBlockCode != "" {
+		t.Fatalf("an agent that sent no parsed field leaves both empty: %+v", none)
+	}
+}

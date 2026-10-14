@@ -30,6 +30,7 @@ import { parseResultBlock } from './agent-result-block-parser'
 import { captureSnapshot, diffSnapshots } from './agent-worktree-change-snapshot'
 import { createExecPromptOutputCapture } from './agent-exec-prompt-output-capture'
 import { resolveKnowledgeHub } from './agent-exec-prompt-knowledge-hub'
+import { profileAllowedTools, profileArgs } from './agent-permission-profiles'
 import { DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS, MIN_TIMEOUT_MS } from './agent-exec-prompt-timeouts'
 
 type PrintModeExecResult = {
@@ -200,7 +201,13 @@ export async function handleAgentExecPrompt(
   if (streamJson) {
     args.push('--output-format', 'stream-json', '--verbose')
   }
-  if (options.accessMode === 'write' && trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
+  if (options.permissionProfile) {
+    args.push(...profileArgs(options.permissionProfile))
+    // A named profile is the whole permission story of the run; full trust would void it.
+    if (trustPresetFull) {
+      warnings.push('TRUST_PRESET_IGNORED_PROFILE')
+    }
+  } else if (options.accessMode === 'write' && trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
     args.push(YOLO_TUI_AGENT_ARGS.claude)
   } else if (options.accessMode === 'readonly') {
     args.push(...readonlyArgs)
@@ -234,14 +241,26 @@ export async function handleAgentExecPrompt(
   // Why: the root is checked and the MCP config written as late as possible so the file only lives
   // for the spawn itself; `.finally` below removes it on every path, including a throwing spawn.
   let hubCleanup: (() => Promise<void>) | undefined
+  const profileTools = options.permissionProfile
+    ? profileAllowedTools(options.permissionProfile)
+    : []
   if (options.knowledgeRoot !== null) {
-    const hub = await resolveKnowledgeHub('agent.execPrompt', id, options, flags, config.workDir)
+    const hub = await resolveKnowledgeHub(
+      'agent.execPrompt',
+      id,
+      options,
+      flags,
+      config.workDir,
+      profileTools
+    )
     if ('error' in hub) {
       span.fail('knowledge hub unavailable')
       return hub.error
     }
     args.push(...hub.args)
     hubCleanup = hub.cleanup
+  } else if (profileTools.length > 0) {
+    args.push('--allowedTools', profileTools.join(','))
   }
 
   span.step('subprocess-spawn', { binary: spec.binary, cwd: spawnCwd })

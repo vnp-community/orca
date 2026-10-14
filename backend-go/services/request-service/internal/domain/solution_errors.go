@@ -81,6 +81,12 @@ const (
 	RunErrNoRepoPath        = "REQUEST_ANALYSIS_NO_REPO_PATH"
 	RunErrAnalysisNoConn    = "REQUEST_ANALYSIS_NO_CONNECTION"
 	RunErrInternal          = "REQUEST_SOLUTION_INTERNAL_ERROR"
+	// Plan runs of the openspec engine.
+	RunErrSpecOutOfScope    = "REQUEST_SPEC_RUN_OUT_OF_SCOPE"
+	RunErrSpecAgentOld      = "REQUEST_ENGINE_AGENT_UNSUPPORTED"
+	RunErrSpecAgentFailed   = "REQUEST_OPENSPEC_AGENT_FAILED"
+	RunErrSpecTimeout       = "REQUEST_OPENSPEC_TIMEOUT"
+	RunErrSpecInvalidOutput = "REQUEST_OPENSPEC_INVALID_OUTPUT"
 	// Hotfix only: the fix task or its pre_deploy approval could not be created when the diagnosis finished.
 	RunErrHotfixFixTask  = "REQUEST_HOTFIX_FIX_TASK_FAILED"
 	RunErrHotfixApproval = "REQUEST_HOTFIX_APPROVAL_FAILED"

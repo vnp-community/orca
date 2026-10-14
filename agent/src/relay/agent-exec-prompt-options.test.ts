@@ -200,3 +200,30 @@ describe('agent-exec-prompt-options knowledge hub', () => {
     }
   })
 })
+
+describe('agent-exec-prompt-options permission profile', () => {
+  it('defaults to no profile and accepts a known one in write mode', () => {
+    expect(
+      parseExecPromptOptions({}).ok && parseExecPromptOptions({}).value.permissionProfile
+    ).toBeNull()
+    const res = parseExecPromptOptions({
+      accessMode: 'write',
+      permissionProfile: 'openspec-author'
+    })
+    expect(res.ok && res.value.permissionProfile).toBe('openspec-author')
+    const implicit = parseExecPromptOptions({ permissionProfile: 'openspec-author' })
+    expect(implicit.ok && implicit.value.permissionProfile).toBe('openspec-author')
+  })
+
+  it.each([
+    ['an unknown profile', { permissionProfile: 'root' }],
+    ['a non-string profile', { permissionProfile: 3 }],
+    ['read-only mode', { accessMode: 'readonly', permissionProfile: 'openspec-author' }]
+  ])('rejects %s', (_name, params) => {
+    const res = parseExecPromptOptions(params)
+    expect(res.ok).toBe(false)
+    if (!res.ok) {
+      expect(res.error.code).toBe('INVALID_PERMISSION_PROFILE')
+    }
+  })
+})

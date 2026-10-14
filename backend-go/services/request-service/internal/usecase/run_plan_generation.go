@@ -120,11 +120,16 @@ func (w *RunPlanGeneration) finish(ctx context.Context, run domain.AnalysisRun, 
 	if err != nil {
 		return err
 	}
-	return w.tx.InTx(ctx, func(ctx context.Context) error {
+	return finishPlanRun(ctx, w.tx, w.runs, w.owner, w.now(), run, encoded)
+}
+
+// finishPlanRun records the encoded proposal on the run in one transaction; both plan workers end here.
+func finishPlanRun(ctx context.Context, tx TxRunner, runs AnalysisRunStore, owner string, at time.Time, run domain.AnalysisRun, encoded string) error {
+	return tx.InTx(ctx, func(ctx context.Context) error {
 		done := run
-		done.Succeed(w.now())
+		done.Succeed(at)
 		done.RawOutput = &encoded
-		ok, err := w.runs.FinishOwned(ctx, done, w.owner)
+		ok, err := runs.FinishOwned(ctx, done, owner)
 		if err != nil {
 			return err
 		}

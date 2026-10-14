@@ -12,6 +12,9 @@ const (
 // FeatureKnowledgeHub mirrors infra-fleet's domain.FeatureKnowledgeHub; the agent declares it after the code exists.
 const FeatureKnowledgeHub = "agent.execPrompt.knowledgeHub"
 
+// FeaturePermissionProfile is declared by agents that run a write run under a named profile instead of full trust.
+const FeaturePermissionProfile = "agent.execPrompt.permissionProfile"
+
 var ErrReadonlyUnsupported = errors.New("readonly unsupported by agent")
 
 func SelectReadonlyRoute(c DevServerCapability, requireEnforced bool) (ReadonlyRoute, error) {
@@ -33,4 +36,15 @@ func SelectReadonlyRoute(c DevServerCapability, requireEnforced bool) (ReadonlyR
 // run without the knowledge graph, hiding the loss.
 func SupportsKnowledgeHub(c DevServerCapability) bool {
 	return c.HasFeature(FeatureKnowledgeHub)
+}
+
+// SupportsOpenSpecAuthoring reports whether the agent can run the openspec engine safely: a write run in a worktree under
+// a named permission profile, with changes and the result block reported back.
+func SupportsOpenSpecAuthoring(c DevServerCapability) bool {
+	for _, f := range []string{"agent.execPrompt", "agent.execPrompt.workspaceKind", "agent.execPrompt.changes", "agent.execPrompt.resultBlock", FeaturePermissionProfile} {
+		if !c.HasFeature(f) {
+			return false
+		}
+	}
+	return true
 }

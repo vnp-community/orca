@@ -39,6 +39,12 @@ type solutionWiring struct {
 	projects  usecase.ProjectContextReader
 	settings  usecase.AnalysisSettings
 	owner     string
+	// Clients the openspec engine needs on top of the above; nil when the service addresses are not configured.
+	agent usecase.AgentPromptRunner
+	caps  usecase.DevServerCapabilityReader
+	infra infrafleetv1.InfraFleetServiceClient
+	proj  projectv1.ProjectServiceClient
+	git   gitgatewayv1.GitGatewayServiceClient
 }
 
 // wireSolution builds solution generation and read-only analysis (CR-REQ-007/008) and starts the lease-recovery sweeper.
@@ -57,6 +63,9 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		projects  usecase.ProjectContextReader
 		caps      usecase.DevServerCapabilityReader
 		probe     usecase.RepoStateProbe
+		infraC    infrafleetv1.InfraFleetServiceClient
+		projectC  projectv1.ProjectServiceClient
+		gitC      gitgatewayv1.GitGatewayServiceClient
 	)
 	if cfg.InfraFleetServiceAddr != "" && cfg.ProjectServiceAddr != "" {
 		infraConn, err := grpcclient.Dial(cfg.InfraFleetServiceAddr)
@@ -87,6 +96,7 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		agent = grpcclient.NewAgentPromptRelay(infra)
 		projects = grpcclient.NewProjectContextResolver(projectClient)
 		caps = grpcclient.NewInfraCapabilityClient(infra, 10*time.Second)
+		infraC, projectC = infra, projectClient
 	} else {
 		log.Warn("INFRA_FLEET_SERVICE_ADDR or PROJECT_SERVICE_ADDR unset: GenerateSolution will fail with a no-connection error")
 	}
@@ -96,7 +106,8 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 			return nil, err
 		}
 		w.closers = append(w.closers, func() { _ = gitConn.Close() })
-		probe = grpcclient.NewRepoStateProbe(gitgatewayv1.NewGitGatewayServiceClient(gitConn))
+		gitC = gitgatewayv1.NewGitGatewayServiceClient(gitConn)
+		probe = grpcclient.NewRepoStateProbe(gitC)
 	} else {
 		log.Warn("GIT_GATEWAY_SERVICE_ADDR unset: read-only analyses record repo_check=skipped")
 	}
@@ -117,6 +128,7 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	w.writer = writer
 	w.runner = usecase.NewAnalysisRunner(stores.analysisRuns, stores.solutions, stores.tx, generation, readonly, settings, owner)
 	w.conns, w.completer, w.projects, w.settings, w.owner = conns, completer, projects, settings, owner
+	w.agent, w.caps, w.infra, w.proj, w.git = agent, caps, infraC, projectC, gitC
 
 	// Reporter and admins steer analysis; whoever the pending approval's snapshot lets decide may also choose the option.
 	auth := usecase.ApproverAwareAuthorizer{

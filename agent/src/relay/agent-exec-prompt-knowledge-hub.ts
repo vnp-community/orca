@@ -114,6 +114,8 @@ export async function prepareKnowledgeHub(opts: {
   root: string
   proposeChangesets: boolean
   workDir: string
+  /** Tool rules of the run's own permission profile; claude takes one --allowedTools, so they are merged into it. */
+  extraAllowedTools?: readonly string[]
 }): Promise<KnowledgeHubPrepared> {
   const checked = await checkRoot(opts.root)
   if (!checked.ok) {
@@ -142,7 +144,9 @@ export async function prepareKnowledgeHub(opts: {
       configPath,
       '--strict-mcp-config',
       '--allowedTools',
-      knowledgeHubAllowedTools(opts.proposeChangesets).join(','),
+      [...(opts.extraAllowedTools ?? []), ...knowledgeHubAllowedTools(opts.proposeChangesets)].join(
+        ','
+      ),
       '--disallowedTools',
       knowledgeHubBlockedTools(opts.proposeChangesets).join(',')
     ],
@@ -174,7 +178,8 @@ export async function resolveKnowledgeHub(
   id: string | number | null,
   options: Pick<ExecPromptOptions, 'knowledgeRoot' | 'proposeChangesets'>,
   flags: ClaudeFlagSupport | null,
-  workDir: string
+  workDir: string,
+  extraAllowedTools: readonly string[] = []
 ): Promise<{ args: string[]; cleanup: () => Promise<void> } | { error: object }> {
   const unsupported = knowledgeHubUnsupportedReason(flags)
   if (unsupported) {
@@ -191,7 +196,8 @@ export async function resolveKnowledgeHub(
   const prepared = await prepareKnowledgeHub({
     root: options.knowledgeRoot ?? '',
     proposeChangesets: options.proposeChangesets,
-    workDir
+    workDir,
+    extraAllowedTools
   })
   if (!prepared.ok) {
     return { error: knowledgeHubError(id, method, prepared.code, prepared.message) }

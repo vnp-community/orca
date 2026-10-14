@@ -215,3 +215,18 @@ func TestAnalysisMode_AgentSharesOneCapAndTheEngineFollowsTheMode(t *testing.T) 
 		t.Fatal("only agent_proposal belongs to the openspec engine")
 	}
 }
+
+func TestGeneratePlan_OpenSpecFailsFastWhenTheServerHasNoSuchEngine(t *testing.T) {
+	k := planKitWithPin(&stubPinner{engine: domain.EngineOpenSpec}, fakeConns{conn: AnalysisConnection{ConnectionID: "c", RepoPath: "/repo"}})
+	k.generate.registry = NewDefaultEngineRegistry()
+	req := k.w.seedRequest(domain.RequestTypeChangeRequest, domain.RequestStatusPlanning)
+	k.w.seedApprovedSolution(req.ID, domain.SolutionKindSolution)
+	_, err := k.generate.Execute(k.w.ctx(), GeneratePlanInput{RequestID: req.ID})
+	if errCode(err) != "REQUEST_ENGINE_UNAVAILABLE" || len(k.w.runs) != 0 {
+		t.Fatalf("want REQUEST_ENGINE_UNAVAILABLE and no run, got %v runs=%d", err, len(k.w.runs))
+	}
+	k.generate.registry = registryWith(&scriptedEngine{})
+	if _, err := k.generate.Execute(k.w.ctx(), GeneratePlanInput{RequestID: req.ID}); err != nil {
+		t.Fatalf("with the engine registered the run starts: %v", err)
+	}
+}

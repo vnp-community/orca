@@ -211,3 +211,38 @@ describe('handleAgentExecPrompt with a knowledge root', () => {
     expect(spawnMock).not.toHaveBeenCalled()
   })
 })
+
+describe('handleAgentExecPrompt with a permission profile', () => {
+  const profile = { accessMode: 'write', permissionProfile: 'openspec-author' }
+
+  it('uses acceptEdits and a fixed tool list instead of full trust, even when full trust is asked for', async () => {
+    const out = await run({ ...profile, trustPreset: 'full' })
+    const args = spawnMock.mock.calls[0]?.[1] as string[]
+    expect(args).not.toContain('--dangerously-skip-permissions')
+    expect(args[args.indexOf('--permission-mode') + 1]).toBe('acceptEdits')
+    expect(args[args.indexOf('--tools') + 1]).toBe('Read,Glob,Grep,Write,Edit,Bash')
+    expect(args[args.indexOf('--allowedTools') + 1]).toContain('Bash(openspec:*)')
+    expect(args[args.indexOf('--allowedTools') + 1]).not.toContain('mcp__')
+    expect((out.result as { warnings?: string[] }).warnings).toContain(
+      'TRUST_PRESET_IGNORED_PROFILE'
+    )
+  })
+
+  it('merges the profile tools with the knowledge hub tools into one --allowedTools', async () => {
+    await run({ ...profile, knowledgeRoot: root })
+    const args = spawnMock.mock.calls[0]?.[1] as string[]
+    expect(args.filter((a) => a === '--allowedTools')).toHaveLength(1)
+    const allowed = args[args.indexOf('--allowedTools') + 1]
+    expect(allowed).toContain('Write')
+    expect(allowed).toContain('Bash(openspec:*)')
+    expect(allowed).toContain('mcp__tdd-agent__kg_search')
+    expect(allowed).not.toContain('changeset_propose')
+  })
+
+  it('leaves the default write handling alone without a profile', async () => {
+    await run({ accessMode: 'write', trustPreset: 'full' })
+    const args = spawnMock.mock.calls[0]?.[1] as string[]
+    expect(args).toContain('--dangerously-skip-permissions')
+    expect(args).not.toContain('--permission-mode')
+  })
+})

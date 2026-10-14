@@ -11,6 +11,8 @@ var (
 	ErrEngineClaudeMissing          = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ENGINE_CLAUDE_MISSING", "claude missing", nil)
 	ErrEngineClaudeNotAuthenticated = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ENGINE_CLAUDE_NOT_AUTHENTICATED", "claude not authenticated", nil)
 
+	ErrEngineUnavailable = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ENGINE_UNAVAILABLE", "this server has no worker for the project's engine; ask an administrator to finish its configuration", nil)
+
 	ErrEngineOverrideNotAllowed = apperrors.New(apperrors.KindPermissionDenied, "REQUEST_ENGINE_OVERRIDE_NOT_ALLOWED", "override not allowed", nil)
 
 	ErrEngineRepoNotResolved         = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ENGINE_REPO_NOT_RESOLVED", "repo not resolved", nil)

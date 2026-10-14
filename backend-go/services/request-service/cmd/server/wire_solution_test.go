@@ -91,7 +91,7 @@ func TestAnalysisSettings_MapsConfigAndKeepsDefaults(t *testing.T) {
 		AgentReadonlyTimeoutMS: 5, AgentReadonlyMaxPerProject: 6, RequireEnforcedReadonly: true,
 	})
 	want := usecase.AnalysisSettings{AICompleteTimeout: time.Second, LeaseTTL: 2 * time.Second, Heartbeat: 3 * time.Second, RecoveryInterval: 4 * time.Second,
-		AgentTimeoutMS: 5, HotfixTimeoutMS: d.HotfixTimeoutMS, MaxAgentRunsPerProject: 6, UseAgentReadonlyFlag: false, RequireEnforcedReadonly: true}
+		AgentTimeoutMS: 5, HotfixTimeoutMS: d.HotfixTimeoutMS, SpecTimeoutMS: d.SpecTimeoutMS, MaxAgentRunsPerProject: 6, UseAgentReadonlyFlag: false, RequireEnforcedReadonly: true}
 	if got != want {
 		t.Fatalf("got %+v\nwant %+v", got, want)
 	}

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	requestgrpc "github.com/stablyai/orca-go/services/request-service/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/request-service/internal/adapter/grpcclient"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 )
@@ -32,6 +33,7 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 		Policies: execution.Policies, Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Settings: solution.settings, Owner: solution.owner,
 	})
 	solution.runner.WithPlanWorker(worker)
+	registry := wireOpenSpecEngine(log, stores, solution, execution.Policies, limits)
 
 	bindHotfixFixTask(log, solution, approval, execution, tasks, limits)
 
@@ -40,7 +42,7 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 			Requests: stores.requests, Solutions: stores.solutions, Runs: stores.analysisRuns, Conns: solution.conns, Auth: auth,
 			Approvals: lifecycle.Canceller, Transition: lifecycle.Transition, Tx: stores.tx, Spawner: solution.runner,
 			Settings: solution.settings, LeaseOwner: solution.owner,
-			Pin: usecase.NewPinSolutionEngine(stores.requests, stores.engineSettings),
+			Pin: usecase.NewPinSolutionEngine(stores.requests, stores.engineSettings), Registry: registry,
 		}),
 		Get: usecase.NewGetPlanProposal(stores.requests, stores.analysisRuns),
 	}
@@ -64,4 +66,26 @@ func bindHotfixFixTask(log *slog.Logger, solution *solutionWiring, approval *app
 		return
 	}
 	solution.writer.WithHotfixFixTasks(usecase.NewEnsureHotfixFixTask(tasks.client, writer, execution.Policies, limits))
+}
+
+// wireOpenSpecEngine registers the openspec engine and its plan worker when the services it drives are configured: the
+// dev server relay (agent and exec), project-service and git-gateway. Without them the registry stays empty, and
+// GeneratePlan refuses a Request pinned to openspec instead of starting a run nothing can execute.
+func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solutionWiring, policies usecase.PlanPolicies, limits domain.PlanLimits) usecase.EngineRegistry {
+	registry := usecase.NewDefaultEngineRegistry()
+	if solution.infra == nil || solution.proj == nil || solution.git == nil || solution.caps == nil {
+		log.Warn("openspec engine is off: INFRA_FLEET_SERVICE_ADDR, PROJECT_SERVICE_ADDR and GIT_GATEWAY_SERVICE_ADDR must all be set")
+		return registry
+	}
+	workspace := grpcclient.NewProposalWorkspace(solution.git, solution.proj)
+	gate := usecase.NewEngineReadinessGate(solution.conns, grpcclient.NewDevServerExecutor(solution.infra), os.Getenv("REQUEST_OPENSPEC_MIN_VERSION"))
+	engine := usecase.NewOpenSpecEngine(usecase.OpenSpecEngineDeps{
+		Gate: gate, Workspace: workspace, Agent: solution.agent, Conns: solution.conns, Caps: solution.caps, Settings: solution.settings,
+	})
+	registry.Register(engine)
+	solution.runner.WithProposalWorker(usecase.NewRunProposalGeneration(usecase.RunProposalGenerationDeps{
+		Requests: stores.requests, Solutions: stores.solutions, Registry: registry, Projects: solution.projects, Policies: policies,
+		EngineSettings: stores.engineSettings, Workspace: workspace, Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
+	}))
+	return registry
 }

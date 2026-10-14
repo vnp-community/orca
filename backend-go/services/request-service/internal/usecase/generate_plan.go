@@ -38,6 +38,7 @@ type GeneratePlan struct {
 	settings   AnalysisSettings
 	leaseOwner string
 	pin        EnginePinner
+	registry   EngineRegistry
 	now        func() time.Time
 	newID      func() string
 }
@@ -56,11 +57,13 @@ type GeneratePlanDeps struct {
 	LeaseOwner string
 	// Pin decides the engine of the Request; nil means every Request uses the native engine.
 	Pin EnginePinner
+	// Registry, when set, is asked whether the pinned engine exists on this server before a run is started.
+	Registry EngineRegistry
 }
 
 func NewGeneratePlan(d GeneratePlanDeps) *GeneratePlan {
 	return &GeneratePlan{requests: d.Requests, solutions: d.Solutions, runs: d.Runs, conns: d.Conns, auth: d.Auth, approvals: d.Approvals,
-		transition: d.Transition, tx: d.Tx, spawner: d.Spawner, settings: d.Settings.withDefaults(), leaseOwner: d.LeaseOwner, pin: d.Pin,
+		transition: d.Transition, tx: d.Tx, spawner: d.Spawner, settings: d.Settings.withDefaults(), leaseOwner: d.LeaseOwner, pin: d.Pin, registry: d.Registry,
 		now: func() time.Time { return time.Now().UTC() }, newID: uuid.NewString}
 }
 
@@ -155,6 +158,11 @@ func (uc *GeneratePlan) modeFor(ctx context.Context, requestID, projectID string
 	}
 	if engine != domain.EngineOpenSpec {
 		return domain.AnalysisModeComplete, nil
+	}
+	if uc.registry != nil {
+		if _, err := uc.registry.For(engine); err != nil {
+			return "", domain.ErrEngineUnavailable
+		}
 	}
 	if conn.RepoPath == "" {
 		return "", domain.ErrAnalysisNoRepoPath()

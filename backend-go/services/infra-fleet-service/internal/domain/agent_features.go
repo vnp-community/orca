@@ -1,15 +1,16 @@
 package domain
 
 const (
-	FeatureAgentExecPrompt = "agent.execPrompt"
-	FeatureReadonly        = "agent.execPrompt.readonly"
-	FeatureWorkspaceKind   = "agent.execPrompt.workspaceKind"
-	FeatureChanges         = "agent.execPrompt.changes"
-	FeatureResultBlock     = "agent.execPrompt.resultBlock"
-	FeatureKnowledgeHub    = "agent.execPrompt.knowledgeHub"
-	FeatureCapabilities    = "agent.capabilities"
-	FeatureAIComplete      = "ai.complete"
-	FeatureAICompleteUsage = "ai.complete.usage"
+	FeatureAgentExecPrompt   = "agent.execPrompt"
+	FeatureReadonly          = "agent.execPrompt.readonly"
+	FeatureWorkspaceKind     = "agent.execPrompt.workspaceKind"
+	FeatureChanges           = "agent.execPrompt.changes"
+	FeatureResultBlock       = "agent.execPrompt.resultBlock"
+	FeatureKnowledgeHub      = "agent.execPrompt.knowledgeHub"
+	FeaturePermissionProfile = "agent.execPrompt.permissionProfile"
+	FeatureCapabilities      = "agent.capabilities"
+	FeatureAIComplete        = "ai.complete"
+	FeatureAICompleteUsage   = "ai.complete.usage"
 )
 
 // SanitizeAgentFeatures bỏ chuỗi rỗng, quá dài, trùng, không phải ASCII in được, giới hạn 64 phần tử.

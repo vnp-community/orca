@@ -15,6 +15,8 @@ type AnalysisSettings struct {
 	// AgentTimeoutMS bounds one read-only agent run; HotfixTimeoutMS is the shorter hotfix budget.
 	AgentTimeoutMS  int
 	HotfixTimeoutMS int
+	// SpecTimeoutMS bounds one OpenSpec authoring run; it equals the agent's own 15 minute ceiling, since a longer ask is cut there.
+	SpecTimeoutMS int
 	// MaxAgentRunsPerProject caps concurrent read-only runs on one dev server (a double click once dropped its connection).
 	MaxAgentRunsPerProject int
 	// UseAgentReadonlyFlag lets the runner send accessMode=readonly to agents that advertise it; off forces prompt-only runs.
@@ -31,6 +33,7 @@ func DefaultAnalysisSettings() AnalysisSettings {
 		RecoveryInterval:       30 * time.Second,
 		AgentTimeoutMS:         600_000,
 		HotfixTimeoutMS:        300_000,
+		SpecTimeoutMS:          900_000,
 		MaxAgentRunsPerProject: 2,
 		UseAgentReadonlyFlag:   true,
 	}
@@ -56,6 +59,9 @@ func (s AnalysisSettings) withDefaults() AnalysisSettings {
 	}
 	if s.HotfixTimeoutMS <= 0 {
 		s.HotfixTimeoutMS = d.HotfixTimeoutMS
+	}
+	if s.SpecTimeoutMS <= 0 {
+		s.SpecTimeoutMS = d.SpecTimeoutMS
 	}
 	if s.MaxAgentRunsPerProject <= 0 {
 		s.MaxAgentRunsPerProject = d.MaxAgentRunsPerProject

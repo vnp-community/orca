@@ -55,6 +55,13 @@ type agentExecPromptParams struct {
 	// Only for agents that advertise agent.execPrompt.knowledgeHub; the agent builds the MCP config itself.
 	KnowledgeRoot     string `json:"knowledgeRoot,omitempty"`
 	ProposeChangesets bool   `json:"proposeChangesets,omitempty"`
+	// Write runs under a named profile: the agent chooses every flag from the name, so no tool rule travels.
+	PermissionProfile string       `json:"permissionProfile,omitempty"`
+	ResultBlock       *resultBlock `json:"resultBlock,omitempty"`
+}
+
+type resultBlock struct {
+	Nonce string `json:"nonce"`
 }
 
 // buildAgentParams fixes trust and env: the env holds two ids and never a token or credential.
@@ -67,12 +74,21 @@ func buildAgentParams(in usecase.AgentPromptInput) agentExecPromptParams {
 	if in.KnowledgeRoot != "" {
 		p.KnowledgeRoot, p.ProposeChangesets = in.KnowledgeRoot, in.ProposeChangesets
 	}
-	if in.ReadOnlyEnforced {
+	if in.ResultNonce != "" {
+		p.ResultBlock = &resultBlock{Nonce: in.ResultNonce}
+	}
+	switch {
+	case in.ReadOnlyEnforced:
 		// With accessMode=readonly the agent drops any trust preset, so none is sent.
 		p.AccessMode, p.WorkspaceKind, p.ReportChanges, p.MaxOutputBytes = "readonly", "repo_root", true, maxOutputBytesAsk
-		return p
+	case in.WriteProfile != "":
+		// The profile is the whole permission story of a write run; the default trust preset is sent only so the agent never
+		// sees an empty one, and it ignores it under a profile.
+		p.AccessMode, p.WorkspaceKind, p.ReportChanges, p.MaxOutputBytes = "write", "worktree", true, maxOutputBytesAsk
+		p.PermissionProfile, p.TrustPreset = in.WriteProfile, trustPresetDefault
+	default:
+		p.TrustPreset = trustPresetDefault
 	}
-	p.TrustPreset = trustPresetDefault
 	return p
 }
 
@@ -90,9 +106,18 @@ type agentExecPromptResult struct {
 		HeadMoved    bool              `json:"headMoved"`
 		ChangedFiles []json.RawMessage `json:"changedFiles"`
 	} `json:"changes"`
+	// Parsed is the agent's reading of the result block: {"ok":true,"value":{...}} or {"ok":false,"code":"..."}.
+	Parsed *struct {
+		OK    bool            `json:"ok"`
+		Value json.RawMessage `json:"value"`
+		Code  string          `json:"code"`
+	} `json:"parsed"`
 }
 
 func (r *AgentPromptRelay) ExecPrompt(ctx context.Context, conn usecase.AnalysisConnection, in usecase.AgentPromptInput) (usecase.AgentPromptResult, error) {
+	if in.ReadOnlyEnforced && in.WriteProfile != "" {
+		return usecase.AgentPromptResult{}, errors.New("grpcclient: a run cannot be both read-only and a write profile")
+	}
 	tctx, err := withTenantMetadata(ctx)
 	if err != nil {
 		return usecase.AgentPromptResult{}, err
@@ -151,6 +176,13 @@ func parseAgentResult(resultJSON string) (usecase.AgentPromptResult, error) {
 	}
 	if r.Changes != nil {
 		out.ChangesAvailable, out.HeadMoved, out.ChangedFiles = r.Changes.Available, r.Changes.HeadMoved, len(r.Changes.ChangedFiles)
+	}
+	if r.Parsed != nil {
+		if r.Parsed.OK {
+			out.ResultBlock = []byte(r.Parsed.Value)
+		} else {
+			out.ResultBlockCode = r.Parsed.Code
+		}
 	}
 	return out, nil
 }

@@ -112,6 +112,11 @@ type AgentPromptInput struct {
 	KnowledgeRoot string
 	// ProposeChangesets additionally lets the agent call changeset_propose (a dry run that never commits).
 	ProposeChangesets bool
+	// WriteProfile asks for a write run under a named permission profile (never full trust): the agent edits files inside
+	// RepoPath, which must then be a git worktree. Mutually exclusive with ReadOnlyEnforced.
+	WriteProfile string
+	// ResultNonce asks the agent for a structured result block fenced by this nonce (see the tdd-orca-task skill).
+	ResultNonce string
 }
 
 type AgentPromptResult struct {
@@ -126,6 +131,9 @@ type AgentPromptResult struct {
 	ChangesAvailable  bool
 	HeadMoved         bool
 	ChangedFiles      int
+	// ResultBlock is the JSON object between the nonce markers; empty when none was found, with the reason in ResultBlockCode.
+	ResultBlock     []byte
+	ResultBlockCode string
 }
 
 type AgentPromptRunner interface {

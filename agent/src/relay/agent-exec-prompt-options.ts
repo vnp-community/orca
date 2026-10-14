@@ -6,6 +6,7 @@
 // circular dependency (dispatcher dynamically imports this module).
 
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
+import { isPermissionProfileName, type PermissionProfileName } from './agent-permission-profiles'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ export type ExecPromptErrorCode =
   | 'INVALID_MAX_OUTPUT_BYTES'
   | 'INVALID_KNOWLEDGE_ROOT'
   | 'INVALID_PROPOSE_CHANGESETS'
+  | 'INVALID_PERMISSION_PROFILE'
 
 export type ExecPromptOptions = {
   accessMode: 'write' | 'readonly'
@@ -37,6 +39,8 @@ export type ExecPromptOptions = {
   /** Absolute project path holding `.tdd-agent/`; null when the caller sent none. */
   knowledgeRoot: string | null
   proposeChangesets: boolean
+  /** A named write profile (no full trust); null means the default trust handling. */
+  permissionProfile: PermissionProfileName | null
 }
 
 type ParseError = { code: ExecPromptErrorCode; message: string }
@@ -204,6 +208,30 @@ export function parseExecPromptOptions(
     }
   }
 
+  const rawProfile = params['permissionProfile']
+  let permissionProfile: PermissionProfileName | null = null
+  if ('permissionProfile' in params && rawProfile !== undefined) {
+    if (!isPermissionProfileName(rawProfile)) {
+      return {
+        ok: false,
+        error: {
+          code: 'INVALID_PERMISSION_PROFILE',
+          message: `permissionProfile must be a known profile name, got ${JSON.stringify(rawProfile)}`
+        }
+      }
+    }
+    if (accessMode !== 'write') {
+      return {
+        ok: false,
+        error: {
+          code: 'INVALID_PERMISSION_PROFILE',
+          message: 'permissionProfile applies to accessMode "write" only'
+        }
+      }
+    }
+    permissionProfile = rawProfile
+  }
+
   return {
     ok: true,
     value: {
@@ -214,7 +242,8 @@ export function parseExecPromptOptions(
       resultBlockNonce,
       maxOutputBytes,
       knowledgeRoot,
-      proposeChangesets
+      proposeChangesets,
+      permissionProfile
     }
   }
 }
