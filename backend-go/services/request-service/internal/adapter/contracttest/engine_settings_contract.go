@@ -56,6 +56,22 @@ func RunEngineSettingsContract(t *testing.T, repo usecase.EngineSettingsReposito
 			t.Fatalf("read: %+v", read)
 		}
 	})
+	t.Run("the solution-agent switch is stored, read back and can be turned off again", func(t *testing.T) {
+		on := mk(domain.EngineNative, "")
+		on.SolutionAgent = true
+		if _, err := repo.Upsert(ctx, on, 2); err != nil {
+			t.Fatal(err)
+		}
+		if read, _, _ := repo.Get(ctx, project); !read.SolutionAgent || read.Version != 3 {
+			t.Fatalf("read: %+v", read)
+		}
+		if _, err := repo.Upsert(ctx, mk(domain.EngineNative, ""), 3); err != nil {
+			t.Fatal(err)
+		}
+		if read, _, _ := repo.Get(ctx, project); read.SolutionAgent || read.Version != 4 {
+			t.Fatalf("read: %+v", read)
+		}
+	})
 	t.Run("update at a stale version never overwrites", func(t *testing.T) {
 		if _, err := repo.Upsert(ctx, mk(domain.EngineOpenSpec, ""), 1); !errors.Is(err, domain.ErrEngineSettingsVersionConflict) {
 			t.Fatalf("got %v", err)

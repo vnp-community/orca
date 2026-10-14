@@ -137,7 +137,8 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	w.generate = usecase.NewGenerateSolution(usecase.GenerateSolutionDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Runs: stores.analysisRuns, Conns: conns, Auth: auth, Approvals: lifecycle.Canceller,
 		Transition: transition, Tx: stores.tx, Spawner: w.runner, Settings: settings, LeaseOwner: owner,
-	}).WithDecisions(artifacts).WithEnginePin(usecase.NewPinSolutionEngine(stores.requests, stores.engineSettings))
+	}).WithDecisions(artifacts).WithEnginePin(usecase.NewPinSolutionEngine(stores.requests, stores.engineSettings)).
+		WithSolutionAgent(stores.engineSettings, caps)
 	w.list = usecase.NewListSolutions(stores.requests, stores.solutions, stores.analysisRuns)
 	w.choose = usecase.NewChooseSolutionOption(stores.requests, stores.solutions, stores.approvals, auth, stores.tx).
 		WithDecisions(recordDecision, selfChoicePolicy(stores))

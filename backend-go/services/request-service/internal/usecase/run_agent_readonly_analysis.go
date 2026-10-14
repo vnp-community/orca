@@ -84,7 +84,8 @@ func (a *RunAgentReadonlyAnalysis) Execute(ctx context.Context, run domain.Analy
 		return newFailure(run, domain.RunErrNoRepoPath, "the project's default repository has no folder path on its dev server")
 	}
 
-	enforced, err := a.enforcement(ctx, conn)
+	profile := a.capability(ctx, conn)
+	enforced, err := a.enforcement(profile)
 	if err != nil {
 		return newFailure(run, domain.RunErrAgentTooOld, "the dev server agent cannot enforce read-only mode")
 	}
@@ -102,6 +103,9 @@ func (a *RunAgentReadonlyAnalysis) Execute(ctx context.Context, run domain.Analy
 		Answers:        answeredForPrompt(ctx, a.answers, req.ID),
 	}
 	in.ProjectName, in.RepoURL = projectFacts(ctx, a.projects, req.ProjectID)
+	// Only the Solution reads the knowledge graph; the other kinds keep their prompt and tools unchanged.
+	in.AgentSolution = kind == domain.SolutionKindSolution
+	in.UseKnowledge = in.AgentSolution && domain.SupportsKnowledgeHub(profile)
 	timeoutMS := a.settings.AgentTimeoutMS
 	if req.Type == domain.RequestTypeHotfix {
 		timeoutMS = a.settings.HotfixTimeoutMS
@@ -109,10 +113,21 @@ func (a *RunAgentReadonlyAnalysis) Execute(ctx context.Context, run domain.Analy
 
 	var lastRaw string
 	for {
-		res, err := a.agent.ExecPrompt(ctx, conn, AgentPromptInput{
+		call := AgentPromptInput{
 			StepID: run.ID, Prompt: BuildSolutionPrompt(in), RepoPath: conn.RepoPath, RequestID: req.ID, ProjectID: req.ProjectID,
 			TimeoutMS: timeoutMS, ReadOnlyEnforced: enforced,
-		})
+		}
+		if in.UseKnowledge {
+			call.KnowledgeRoot = conn.RepoPath
+		}
+		res, err := a.agent.ExecPrompt(ctx, conn, call)
+		if err != nil && in.UseKnowledge && errors.Is(err, ErrAgentKnowledgeHubUnavailable) {
+			// The run did not start, so asking again without the graph costs nothing; the prompt then says the graph is absent.
+			slog.WarnContext(ctx, "knowledge hub unavailable; proposing without it", slog.String("run_id", run.ID), slog.Any("error", err))
+			in.UseKnowledge = false
+			call.Prompt, call.KnowledgeRoot = BuildSolutionPrompt(in), ""
+			res, err = a.agent.ExecPrompt(ctx, conn, call)
+		}
 		if err != nil {
 			return agentCallFailure(run, err)
 		}
@@ -122,6 +137,9 @@ func (a *RunAgentReadonlyAnalysis) Execute(ctx context.Context, run domain.Analy
 			return f
 		}
 		doc, verr := parseAnalysisOutput(kind, res.Stdout, in.MinOptions)
+		if verr == nil && in.AgentSolution {
+			doc, verr = settleDesignReferences(doc, in.UseKnowledge)
+		}
 		if verr == nil {
 			return a.writer.Persist(ctx, PersistAnalysisInput{Run: run, Doc: doc, Raw: res.Stdout})
 		}
@@ -134,19 +152,24 @@ func (a *RunAgentReadonlyAnalysis) Execute(ctx context.Context, run domain.Analy
 	}
 }
 
-// enforcement picks the route. A missing or unreadable capability profile means an agent that cannot be trusted to enforce.
-func (a *RunAgentReadonlyAnalysis) enforcement(ctx context.Context, conn AnalysisConnection) (bool, error) {
-	var profile domain.DevServerCapability
-	if a.settings.UseAgentReadonlyFlag && a.caps != nil {
-		got, err := a.caps.Get(ctx, DevServerRef{ConnectionID: conn.ConnectionID, DevServerID: conn.DevServerID}, false)
-		switch {
-		case err == nil:
-			profile = got
-		case errors.Is(err, ErrCapabilityNotAvailable):
-		default:
-			slog.WarnContext(ctx, "capability profile unreadable; treating the agent as prompt-only", slog.Any("error", err))
-		}
+// capability reads the agent's profile; an unreadable or missing one is an empty profile, which no feature can be assumed from.
+func (a *RunAgentReadonlyAnalysis) capability(ctx context.Context, conn AnalysisConnection) domain.DevServerCapability {
+	if !a.settings.UseAgentReadonlyFlag || a.caps == nil {
+		return domain.DevServerCapability{}
 	}
+	got, err := a.caps.Get(ctx, DevServerRef{ConnectionID: conn.ConnectionID, DevServerID: conn.DevServerID}, false)
+	switch {
+	case err == nil:
+		return got
+	case errors.Is(err, ErrCapabilityNotAvailable):
+	default:
+		slog.WarnContext(ctx, "capability profile unreadable; treating the agent as prompt-only", slog.Any("error", err))
+	}
+	return domain.DevServerCapability{}
+}
+
+// enforcement picks the route. A missing or unreadable capability profile means an agent that cannot be trusted to enforce.
+func (a *RunAgentReadonlyAnalysis) enforcement(profile domain.DevServerCapability) (bool, error) {
 	route, err := domain.SelectReadonlyRoute(profile, a.settings.RequireEnforcedReadonly)
 	if err != nil {
 		return false, err

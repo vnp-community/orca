@@ -30,10 +30,10 @@ func (r *ProjectEngineSettingsRepository) Get(ctx context.Context, projectID str
 		var engine string
 		var minVer *string
 		err := db.QueryRow(ctx, `
-			SELECT tenant_id::text, project_id::text, solution_engine, openspec_min_version, updated_by::text, updated_at, version
+			SELECT tenant_id::text, project_id::text, solution_engine, openspec_min_version, solution_agent, updated_by::text, updated_at, version
 			FROM request.project_engine_settings
 			WHERE tenant_id = $1 AND project_id = $2`, tenantID, projectID).Scan(
-			&s.TenantID, &s.ProjectID, &engine, &minVer, &s.UpdatedBy, &s.UpdatedAt, &s.Version,
+			&s.TenantID, &s.ProjectID, &engine, &minVer, &s.SolutionAgent, &s.UpdatedBy, &s.UpdatedAt, &s.Version,
 		)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -64,9 +64,9 @@ func (r *ProjectEngineSettingsRepository) Upsert(ctx context.Context, s domain.P
 		}
 		if expectedVersion == 0 {
 			tag, err := db.Exec(ctx, `
-				INSERT INTO request.project_engine_settings (tenant_id, project_id, solution_engine, openspec_min_version, updated_by, updated_at, version)
-				VALUES ($1, $2, $3, $4, $5, $6, 1)
-				ON CONFLICT DO NOTHING`, tenantID, s.ProjectID, string(s.Engine), minVer, s.UpdatedBy, s.UpdatedAt)
+				INSERT INTO request.project_engine_settings (tenant_id, project_id, solution_engine, openspec_min_version, solution_agent, updated_by, updated_at, version)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
+				ON CONFLICT DO NOTHING`, tenantID, s.ProjectID, string(s.Engine), minVer, s.SolutionAgent, s.UpdatedBy, s.UpdatedAt)
 			if err != nil {
 				return fmt.Errorf("postgres: insert engine settings: %w", err)
 			}
@@ -78,9 +78,9 @@ func (r *ProjectEngineSettingsRepository) Upsert(ctx context.Context, s domain.P
 		}
 		tag, err := db.Exec(ctx, `
 			UPDATE request.project_engine_settings
-			SET solution_engine = $4, openspec_min_version = $5, updated_by = $6, updated_at = $7, version = version + 1
+			SET solution_engine = $4, openspec_min_version = $5, solution_agent = $6, updated_by = $7, updated_at = $8, version = version + 1
 			WHERE tenant_id = $1 AND project_id = $2 AND version = $3`,
-			tenantID, s.ProjectID, expectedVersion, string(s.Engine), minVer, s.UpdatedBy, s.UpdatedAt)
+			tenantID, s.ProjectID, expectedVersion, string(s.Engine), minVer, s.SolutionAgent, s.UpdatedBy, s.UpdatedAt)
 		if err != nil {
 			return fmt.Errorf("postgres: update engine settings: %w", err)
 		}

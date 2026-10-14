@@ -11,9 +11,11 @@ type ProjectEngineSettings struct {
 	ProjectID  string
 	Engine     EngineName
 	MinVersion string
-	UpdatedBy  string
-	UpdatedAt  time.Time
-	Version    int64
+	// SolutionAgent makes the Solution of a Request run through the read-only agent with the project's knowledge graph.
+	SolutionAgent bool
+	UpdatedBy     string
+	UpdatedAt     time.Time
+	Version       int64
 }
 
 var versionRegex = regexp.MustCompile(`^\d+\.\d+\.\d+$`)

@@ -94,6 +94,7 @@ func renderSolutions(doc apiclient.Document) string {
 		if reason := s.Str("options", "recommendation", "reason"); reason != "" {
 			fmt.Fprintf(&b, "  why recommended: %s\n", reason)
 		}
+		writeDesignReferences(&b, s.Doc("options", "design_references"))
 	}
 	for _, r := range doc.Docs("runs") {
 		fmt.Fprintf(&b, "run %s  %s  %s %s\n", r.Str("id"), r.Str("kind"), r.Str("status"), r.Str("errorCode"))
@@ -102,6 +103,24 @@ func renderSolutions(doc apiclient.Document) string {
 		return "no solutions"
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// writeDesignReferences says what the agent read in the project's knowledge graph; absent for a Solution written without an agent.
+func writeDesignReferences(b *strings.Builder, ref apiclient.Document) {
+	if ref == nil {
+		return
+	}
+	if !ref.Bool("available") {
+		b.WriteString("  knowledge graph: not available for this solution\n")
+	} else {
+		fmt.Fprintf(b, "  knowledge graph: read %d element(s) from snapshot %s\n", len(ref.Strs("read")), firstOr(ref.Str("snapshot"), "(unnamed)"))
+	}
+	for _, line := range ref.Strs("conflicts") {
+		fmt.Fprintf(b, "    conflict: %s\n", line)
+	}
+	for _, line := range ref.Strs("gaps") {
+		fmt.Fprintf(b, "    gap: %s\n", line)
+	}
 }
 
 // renderChosenOption says what the choice did and, for a high-risk option, why approval will still be refused.

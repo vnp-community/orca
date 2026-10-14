@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 	"unicode/utf8"
 
@@ -47,6 +48,16 @@ type GenerateSolution struct {
 	newID      func() string
 	decisions  DecisionSuperseder
 	pin        EnginePinner
+	// engineSettings and caps decide whether a project's Solution is written by the read-only agent with the knowledge graph.
+	engineSettings EngineSettingsRepository
+	caps           DevServerCapabilityReader
+}
+
+// WithSolutionAgent lets a project that turned on solution_agent have its Solution written by the read-only agent with the
+// knowledge graph. Without it, or when the project did not opt in, kind=solution keeps using ai.complete.
+func (uc *GenerateSolution) WithSolutionAgent(settings EngineSettingsRepository, caps DevServerCapabilityReader) *GenerateSolution {
+	uc.engineSettings, uc.caps = settings, caps
+	return uc
 }
 
 // WithEnginePin fixes the Request's engine at its first generation; without it the Request stays unpinned (native).
@@ -83,11 +94,15 @@ func NewGenerateSolution(d GenerateSolutionDeps) *GenerateSolution {
 	}
 }
 
-// modeFor follows the registry: solutions use ai.complete, every other kind reads the repo through the agent.
-func modeFor(kind domain.SolutionKind, override domain.AnalysisMode) (domain.AnalysisMode, error) {
+// modeFor follows the registry: solutions use ai.complete unless the project opted into the agent, every other kind reads
+// the repo through the agent.
+func modeFor(kind domain.SolutionKind, override domain.AnalysisMode, solutionAgent bool) (domain.AnalysisMode, error) {
 	if kind == domain.SolutionKindSolution {
-		if override == domain.AnalysisModeAgentReadonly {
+		switch {
+		case override == domain.AnalysisModeAgentReadonly && !solutionAgent:
 			return "", domain.ErrSolutionModeNotAllowed()
+		case override == domain.AnalysisModeAgentReadonly, override == "" && solutionAgent:
+			return domain.AnalysisModeAgentReadonly, nil
 		}
 		return domain.AnalysisModeComplete, nil
 	}
@@ -95,6 +110,39 @@ func modeFor(kind domain.SolutionKind, override domain.AnalysisMode) (domain.Ana
 		return domain.AnalysisModeComplete, nil
 	}
 	return domain.AnalysisModeAgentReadonly, nil
+}
+
+// solutionAgentOn reports the project's opt-in; a settings row that cannot be read counts as "off" so Solutions never stop
+// working because of an unrelated read error.
+func (uc *GenerateSolution) solutionAgentOn(ctx context.Context, projectID string) bool {
+	if uc.engineSettings == nil {
+		return false
+	}
+	s, found, err := uc.engineSettings.Get(ctx, projectID)
+	if err != nil {
+		slog.WarnContext(ctx, "project engine settings unreadable; the Solution keeps using ai.complete", slog.String("project_id", projectID), slog.Any("error", err))
+		return false
+	}
+	return found && s.SolutionAgent
+}
+
+// keepCompleteWithoutKnowledgeHub falls back to ai.complete for a project that opted in when this dev server cannot give the
+// agent the knowledge graph (or has no repository folder): the old path still works there, and the reason is logged.
+func (uc *GenerateSolution) keepCompleteWithoutKnowledgeHub(ctx context.Context, conn AnalysisConnection) (string, bool) {
+	if conn.RepoPath == "" {
+		return "the default repository has no folder path on its dev server", true
+	}
+	if uc.caps == nil {
+		return "no capability information is available", true
+	}
+	profile, err := uc.caps.Get(ctx, DevServerRef{ConnectionID: conn.ConnectionID, DevServerID: conn.DevServerID}, false)
+	if err != nil {
+		return "the agent's capabilities could not be read", true
+	}
+	if !domain.SupportsKnowledgeHub(profile) {
+		return "the dev server agent cannot load the knowledge hub", true
+	}
+	return "", false
 }
 
 func (uc *GenerateSolution) Execute(ctx context.Context, in GenerateSolutionInput) (GenerateSolutionResult, error) {
@@ -163,6 +211,13 @@ func (uc *GenerateSolution) start(ctx context.Context, in GenerateSolutionInput,
 			return GenerateSolutionResult{}, domain.AnalysisRun{}, domain.ErrSolutionNoConnection()
 		}
 		return GenerateSolutionResult{}, domain.AnalysisRun{}, err
+	}
+	if kind == domain.SolutionKindSolution && in.Mode == "" && mode == domain.AnalysisModeAgentReadonly {
+		// The project opted in, nobody asked for the agent by name: stay on ai.complete where the agent cannot serve it.
+		if why, keep := uc.keepCompleteWithoutKnowledgeHub(ctx, conn); keep {
+			slog.WarnContext(ctx, "solution_agent is on but the agent route is unavailable; using ai.complete", slog.String("request_id", req.ID), slog.String("reason", why))
+			mode = domain.AnalysisModeComplete
+		}
 	}
 	if mode == domain.AnalysisModeAgentReadonly && conn.RepoPath == "" {
 		return GenerateSolutionResult{}, domain.AnalysisRun{}, domain.ErrAnalysisNoRepoPath()
@@ -259,7 +314,7 @@ func (uc *GenerateSolution) prepare(ctx context.Context, in GenerateSolutionInpu
 	if !ok {
 		return domain.Request{}, "", "", domain.ErrSolutionKindNotAllowed(req.Type)
 	}
-	mode, err := modeFor(kind, in.Mode)
+	mode, err := modeFor(kind, in.Mode, kind == domain.SolutionKindSolution && uc.solutionAgentOn(ctx, req.ProjectID))
 	if err != nil {
 		return domain.Request{}, "", "", err
 	}

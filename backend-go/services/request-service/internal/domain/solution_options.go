@@ -26,6 +26,8 @@ type SolutionOptions struct {
 	OpenQuestions  []OpenQuestion `json:"open_questions,omitempty"`
 	// RequirementCoverage maps each active AC of the Request to the options that satisfy it (CR-REQ-027).
 	RequirementCoverage []CoverageEntry `json:"requirement_coverage,omitempty"`
+	// DesignReferences records what the agent read in the project's knowledge graph; nil when the run had no agent.
+	DesignReferences *DesignReferences `json:"design_references,omitempty"`
 }
 
 // Assumption accepts the old plain-string form and the structured form; ids let a clarification answer one by key.
@@ -208,6 +210,9 @@ func (o SolutionOptions) Validate(minOptions int) error {
 		return optionsErr("recommendation.option_id %q must match the recommended option %q", o.Recommendation.OptionID, recommended)
 	}
 	if err := o.validateStructuredItems(); err != nil {
+		return err
+	}
+	if err := o.DesignReferences.validate(); err != nil {
 		return err
 	}
 	raw, err := json.Marshal(o)

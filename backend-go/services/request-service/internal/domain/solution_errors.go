@@ -50,7 +50,7 @@ func ErrSolutionFeedbackTooLong() error {
 }
 
 func ErrSolutionModeNotAllowed() error {
-	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_SOLUTION_MODE_NOT_ALLOWED", "a solution with options is only generated in complete mode", nil)
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_SOLUTION_MODE_NOT_ALLOWED", "a solution with options is generated in complete mode unless the project turned on solution_agent", nil)
 }
 
 func ErrAnalysisNoConnection() error {

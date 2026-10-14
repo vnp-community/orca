@@ -74,3 +74,15 @@ func (d Document) Bool(path ...string) bool {
 	v, _ := d.at(path).(bool)
 	return v
 }
+
+// Strs reads a nested array of strings; anything that is not a string is skipped.
+func (d Document) Strs(path ...string) []string {
+	list, _ := d.at(path).([]any)
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		if v, ok := item.(string); ok {
+			out = append(out, v)
+		}
+	}
+	return out
+}
