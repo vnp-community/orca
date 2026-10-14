@@ -39,21 +39,22 @@ type BundleFinding struct {
 // RunProposalGeneration is the worker of agent_proposal plan runs: an agent writes an OpenSpec change, and the Plan is read
 // from its tasks.md. It writes nothing to task-service; a person reviews the proposal and CommitPlan writes it.
 type RunProposalGeneration struct {
-	requests  RequestRepository
-	solutions SolutionStore
-	registry  EngineRegistry
-	projects  ProjectContextReader
-	policies  PlanPolicies
-	settings  EngineSettingsRepository
-	checker   BundleChecker
-	workspace ProposalWorkspace
-	changes   OpenSpecChangeRepository
-	newID     func() string
-	runs      AnalysisRunStore
-	tx        TxRunner
-	limits    domain.PlanLimits
-	owner     string
-	now       func() time.Time
+	requests       RequestRepository
+	solutions      SolutionStore
+	registry       EngineRegistry
+	projects       ProjectContextReader
+	policies       PlanPolicies
+	engineSettings EngineSettingsRepository
+	checker        BundleChecker
+	workspace      ProposalWorkspace
+	changes        OpenSpecChangeRepository
+	timing         AnalysisSettings
+	newID          func() string
+	runs           AnalysisRunStore
+	tx             TxRunner
+	limits         domain.PlanLimits
+	owner          string
+	now            func() time.Time
 }
 
 var _ AnalysisWorker = (*RunProposalGeneration)(nil)
@@ -67,8 +68,10 @@ type RunProposalGenerationDeps struct {
 	Policies PlanPolicies
 	// EngineSettings may be nil; the readiness check then uses the server's default minimum version.
 	EngineSettings EngineSettingsRepository
-	Checker        BundleChecker
-	Workspace      ProposalWorkspace
+	// Settings supplies SpecTotalTimeoutMS, the bound of one run with its retry.
+	Settings  AnalysisSettings
+	Checker   BundleChecker
+	Workspace ProposalWorkspace
 	// Changes stores what the change was built from; the proposal cannot be recorded without it.
 	Changes OpenSpecChangeRepository
 	Runs    AnalysisRunStore
@@ -79,7 +82,7 @@ type RunProposalGenerationDeps struct {
 
 func NewRunProposalGeneration(d RunProposalGenerationDeps) *RunProposalGeneration {
 	return &RunProposalGeneration{requests: d.Requests, solutions: d.Solutions, registry: d.Registry, projects: d.Projects, policies: d.Policies,
-		settings: d.EngineSettings, checker: d.Checker, workspace: d.Workspace, changes: d.Changes, newID: uuid.NewString, runs: d.Runs, tx: d.Tx, limits: d.Limits, owner: d.Owner, now: func() time.Time { return time.Now().UTC() }}
+		engineSettings: d.EngineSettings, timing: d.Settings.withDefaults(), checker: d.Checker, workspace: d.Workspace, changes: d.Changes, newID: uuid.NewString, runs: d.Runs, tx: d.Tx, limits: d.Limits, owner: d.Owner, now: func() time.Time { return time.Now().UTC() }}
 }
 
 func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.AnalysisRun) error {
@@ -108,7 +111,7 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 	if !hasChange || !domain.ValidChangeID(changeID) {
 		changeID = domain.NewChangeID(req.Number, req.Title)
 	}
-	in := ProposalInput{Run: run, Request: req, ChangeID: changeID, Shape: shape, Limits: w.limits, Feedback: run.Feedback, Settings: w.engineSettings(ctx, req.ProjectID)}
+	in := ProposalInput{Run: run, Request: req, ChangeID: changeID, Shape: shape, Limits: w.limits, Feedback: run.Feedback, Settings: w.projectEngineSettings(ctx, req.ProjectID)}
 	in.ProjectName, in.RepoURL = projectFacts(ctx, w.projects, req.ProjectID)
 	if sol, ok := latestApprovedAnalysis(ctx, w.solutions, req.ID); ok {
 		in.Analysis = approvedAnalysisText(sol)
@@ -119,6 +122,9 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 	if err != nil {
 		return newFailure(run, RunErrEngineUnavailable, err.Error())
 	}
+	// Each attempt has its own budget inside the agent call; this bounds the run with its retry.
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(w.timing.SpecTotalTimeoutMS)*time.Millisecond)
+	defer cancel()
 	for {
 		res, err := engine.GenerateProposal(ctx, in)
 		if err != nil {
@@ -163,11 +169,11 @@ func (w *RunProposalGeneration) proposalEngine() (ProposalEngine, error) {
 	return pe, nil
 }
 
-func (w *RunProposalGeneration) engineSettings(ctx context.Context, projectID string) *domain.ProjectEngineSettings {
-	if w.settings == nil {
+func (w *RunProposalGeneration) projectEngineSettings(ctx context.Context, projectID string) *domain.ProjectEngineSettings {
+	if w.engineSettings == nil {
 		return nil
 	}
-	s, found, err := w.settings.Get(ctx, projectID)
+	s, found, err := w.engineSettings.Get(ctx, projectID)
 	if err != nil || !found {
 		return nil
 	}

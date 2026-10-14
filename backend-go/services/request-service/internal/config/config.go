@@ -36,11 +36,14 @@ type Config struct {
 	// ApprovalSubjects limits which subject types need a handler; empty means all.
 	ApprovalSubjects []string
 	// Analysis tunables (CR-REQ-007/008); zero values mean the defaults in usecase.DefaultAnalysisSettings.
-	AICompleteTimeout          time.Duration
-	AnalysisLeaseTTL           time.Duration
-	AnalysisHeartbeat          time.Duration
-	AnalysisRecoveryInterval   time.Duration
-	AgentReadonlyTimeoutMS     int
+	AICompleteTimeout        time.Duration
+	AnalysisLeaseTTL         time.Duration
+	AnalysisHeartbeat        time.Duration
+	AnalysisRecoveryInterval time.Duration
+	AgentReadonlyTimeoutMS   int
+	// SpecTimeoutMS bounds one OpenSpec authoring run; SpecTotalTimeoutMS bounds the run with its one retry.
+	SpecTimeoutMS              int
+	SpecTotalTimeoutMS         int
 	AgentReadonlyMaxPerProject int
 	// AgentReadonlyUseAgentFlag defaults to true: set false to force prompt-only runs on every agent.
 	AgentReadonlyUseAgentFlag bool
@@ -158,6 +161,8 @@ func Load() Config {
 	c.AnalysisHeartbeat = envDuration("REQUEST_ANALYSIS_HEARTBEAT")
 	c.AnalysisRecoveryInterval = envDuration("REQUEST_ANALYSIS_RECOVERY_INTERVAL")
 	c.AgentReadonlyTimeoutMS = envPositiveInt("REQUEST_AGENT_READONLY_TIMEOUT_MS")
+	c.SpecTimeoutMS = envPositiveInt("REQUEST_SPEC_TIMEOUT_MS")
+	c.SpecTotalTimeoutMS = envPositiveInt("REQUEST_SPEC_TOTAL_TIMEOUT_MS")
 	c.AgentReadonlyMaxPerProject = envPositiveInt("REQUEST_AGENT_READONLY_MAX_PER_PROJECT")
 	if s := os.Getenv("REQUEST_AGENT_READONLY_USE_AGENT_FLAG"); s != "" {
 		if b, err := strconv.ParseBool(s); err == nil {

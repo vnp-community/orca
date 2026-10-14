@@ -253,7 +253,7 @@ func TestRunProposalGeneration_RequestThatLeftPlanningIsNotWritten(t *testing.T)
 func TestRunProposalGeneration_UsesProjectSettingsForTheReadinessMinimum(t *testing.T) {
 	eng := &scriptedEngine{answers: []ProposalResult{answer(tasksDoc(twoPhaseBody))}}
 	k, run, w := proposalKit(t, eng, nil)
-	w.settings = openspecSettings(k.w.requests[run.RequestID].ProjectID)
+	w.engineSettings = openspecSettings(k.w.requests[run.RequestID].ProjectID)
 	if err := w.Execute(k.w.ctx(), run); err != nil {
 		t.Fatal(err)
 	}

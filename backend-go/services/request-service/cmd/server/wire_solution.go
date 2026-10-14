@@ -185,6 +185,12 @@ func analysisSettings(cfg config.Config) usecase.AnalysisSettings {
 	if cfg.AgentReadonlyTimeoutMS > 0 {
 		s.AgentTimeoutMS = cfg.AgentReadonlyTimeoutMS
 	}
+	if cfg.SpecTimeoutMS > 0 {
+		s.SpecTimeoutMS = cfg.SpecTimeoutMS
+	}
+	if cfg.SpecTotalTimeoutMS > 0 {
+		s.SpecTotalTimeoutMS = cfg.SpecTotalTimeoutMS
+	}
 	if cfg.AgentReadonlyMaxPerProject > 0 {
 		s.MaxAgentRunsPerProject = cfg.AgentReadonlyMaxPerProject
 	}

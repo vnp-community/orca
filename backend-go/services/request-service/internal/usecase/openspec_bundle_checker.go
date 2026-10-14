@@ -9,8 +9,9 @@ import (
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
-// openSpecValidateTimeoutMs bounds `openspec validate`; it reads a handful of small files.
-const openSpecValidateTimeoutMs = 60_000
+// openSpecValidateTimeoutMs bounds `openspec validate`; it reads a handful of small files. It stays under the 30 second
+// default the dev server client gives agent.exec, so a hung validate is reported as timed out by the agent, not cut off.
+const openSpecValidateTimeoutMs = 25_000
 
 // maxValidateFindings keeps the retry note short: the first few errors are what the agent needs.
 const maxValidateFindings = 8

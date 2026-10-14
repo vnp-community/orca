@@ -71,9 +71,29 @@ func (w waiter) analysisRun(ctx context.Context, cli *apiclient.Client, requestI
 	}
 }
 
+// Plan run budgets: the AI call plus its retry, or an agent authoring an OpenSpec change (two attempts under the server's own
+// total budget). The server reports the engine on the first poll, so the CLI can wait as long as that engine may take.
+const (
+	nativePlanRunTimeout   = 4 * time.Minute
+	openSpecPlanRunTimeout = 18 * time.Minute
+)
+
+// planRunTimeout is the wait for an engine when the caller gave no --timeout.
+func planRunTimeout(engine string) time.Duration {
+	if engine == "openspec" {
+		return openSpecPlanRunTimeout
+	}
+	return nativePlanRunTimeout
+}
+
 // planProposal polls request.planProposal until the run produced a proposal; a failed run is an error.
+// A zero timeout means "as long as the run's engine may take".
 func (w waiter) planProposal(ctx context.Context, cli *apiclient.Client, requestID, runID string, timeout time.Duration) (apiclient.Document, error) {
-	deadline := time.Now().Add(timeout)
+	start := time.Now()
+	budget := timeout
+	if budget == 0 {
+		budget = planRunTimeout("")
+	}
 	for {
 		doc, err := cli.GetPlanProposal(ctx, requestID, runID)
 		if err != nil {
@@ -89,7 +109,10 @@ func (w waiter) planProposal(ctx context.Context, cli *apiclient.Client, request
 		if doc.Str("status") != "running" && doc["proposal"] != nil {
 			return doc, nil
 		}
-		if err := w.sleep(ctx, deadline, "the plan run", timeout); err != nil {
+		if timeout == 0 {
+			budget = planRunTimeout(doc.Str("engine"))
+		}
+		if err := w.sleep(ctx, start.Add(budget), "the plan run", budget); err != nil {
 			return nil, err
 		}
 	}

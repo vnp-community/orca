@@ -44,7 +44,7 @@ func TestExecTimeoutForMethod_Table(t *testing.T) {
 		{"quality.coverage", 0},
 
 		// Agent exec prompt
-		{"agent.execPrompt", 15 * time.Minute},
+		{"agent.execPrompt", 16 * time.Minute},
 
 		// Generic non-codeintel methods
 		{"ports.scan", 0},

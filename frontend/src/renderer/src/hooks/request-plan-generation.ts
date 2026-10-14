@@ -18,6 +18,7 @@ type ProposeValue = {
   errorCode?: string
   errorMessage?: string
   proposal?: unknown
+  engine?: string
   rawAiResponse?: string
   alreadyExists?: boolean
 }
@@ -25,10 +26,14 @@ type ProposeValue = {
 export const PLAN_RUN_POLL_INTERVAL_MS = 2000
 // Why: the AI call plus its one corrective retry (the backend suite waits the same 240s).
 export const PLAN_RUN_TIMEOUT_MS = 240_000
+// Why: an agent authoring an OpenSpec change runs up to two attempts under the server's own 18-minute ceiling.
+export const PLAN_RUN_OPENSPEC_TIMEOUT_MS = 18 * 60_000
 const MAX_CONSECUTIVE_POLL_FAILURES = 3
 
 export type PlanGenerationOptions = {
   feedback?: string
+  /** Called once the server says which engine writes the plan (the first poll). */
+  onEngine?: (engine: string) => void
   /** Seam for tests; defaults to a real timer. */
   sleep?: (ms: number) => Promise<void>
   now?: () => number
@@ -56,9 +61,11 @@ function runFailure(view: ProposeValue): Result<never> {
 async function waitForProposal(
   id: string,
   runId: string,
-  { sleep = realSleep, now = Date.now }: PlanGenerationOptions
+  { sleep = realSleep, now = Date.now, onEngine }: PlanGenerationOptions
 ): Promise<Result<ProposeValue>> {
-  const deadline = now() + PLAN_RUN_TIMEOUT_MS
+  const startedAt = now()
+  let budget = PLAN_RUN_TIMEOUT_MS
+  let engine = ''
   let failures = 0
   for (;;) {
     await sleep(PLAN_RUN_POLL_INTERVAL_MS)
@@ -74,6 +81,11 @@ async function waitForProposal(
     } else {
       failures = 0
       const view = polled.value
+      if (view.engine && view.engine !== engine) {
+        engine = view.engine
+        budget = engine === 'openspec' ? PLAN_RUN_OPENSPEC_TIMEOUT_MS : PLAN_RUN_TIMEOUT_MS
+        onEngine?.(engine)
+      }
       if (view.status === 'failed') {
         return runFailure(view)
       }
@@ -87,7 +99,7 @@ async function waitForProposal(
         })
       }
     }
-    if (now() >= deadline) {
+    if (now() - startedAt >= budget) {
       return runFailure({
         errorCode: 'REQUEST_AI_COMPLETE_TIMEOUT',
         errorMessage: 'the plan run did not finish in time'

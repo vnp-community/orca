@@ -7,6 +7,7 @@ vi.mock('../runtime/request-rpc-client', () => ({
 
 import {
   PLAN_RUN_POLL_INTERVAL_MS,
+  PLAN_RUN_OPENSPEC_TIMEOUT_MS,
   PLAN_RUN_TIMEOUT_MS,
   generatePlanProposeCommit
 } from './request-plan-generation'
@@ -151,6 +152,27 @@ describe('generatePlanProposeCommit', () => {
       error: { kind: 'unavailable', backendCode: 'REQUEST_AI_COMPLETE_TIMEOUT' }
     })
     expect(clock).toBeGreaterThanOrEqual(PLAN_RUN_TIMEOUT_MS)
+  })
+
+  it('waits as long as an agent-authored OpenSpec change may take, and tells the caller the engine', async () => {
+    script({
+      'request.generatePlan:propose': [ok({ runId: 'run1', proposal: null })],
+      'request.planProposal': [ok({ status: 'running', engine: 'openspec', proposal: null })]
+    })
+    let clock = 0
+    const sleep = async (ms: number) => {
+      clock += ms
+    }
+    const engines: string[] = []
+    const res = await generatePlanProposeCommit('r1', {
+      sleep,
+      now: () => clock,
+      onEngine: (e) => engines.push(e)
+    })
+    expect(res).toMatchObject({ ok: false, error: { backendCode: 'REQUEST_AI_COMPLETE_TIMEOUT' } })
+    expect(clock).toBeGreaterThanOrEqual(PLAN_RUN_OPENSPEC_TIMEOUT_MS)
+    expect(clock).toBeLessThan(PLAN_RUN_OPENSPEC_TIMEOUT_MS + 10_000)
+    expect(engines).toEqual(['openspec'])
   })
 
   it('reports a succeeded run without a proposal instead of committing nothing', async () => {

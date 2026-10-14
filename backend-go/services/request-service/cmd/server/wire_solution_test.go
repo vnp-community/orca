@@ -95,6 +95,14 @@ func TestAnalysisSettings_MapsConfigAndKeepsDefaults(t *testing.T) {
 	if got != want {
 		t.Fatalf("got %+v\nwant %+v", got, want)
 	}
+	spec := analysisSettings(config.Config{SpecTimeoutMS: 300_000})
+	if spec.SpecTimeoutMS != 300_000 || spec.SpecTotalTimeoutMS != 0 {
+		t.Fatalf("the total is left unset so the use cases derive it from the attempt budget: %+v", spec)
+	}
+	pinned := analysisSettings(config.Config{SpecTimeoutMS: 300_000, SpecTotalTimeoutMS: 400_000})
+	if pinned.SpecTotalTimeoutMS != 400_000 {
+		t.Fatalf("%+v", pinned)
+	}
 }
 
 func TestLateApprovalOpener(t *testing.T) {
