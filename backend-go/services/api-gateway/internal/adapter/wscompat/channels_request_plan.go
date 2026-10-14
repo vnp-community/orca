@@ -18,6 +18,7 @@ func (c requestChannels) registerPlan(r *Registry) {
 	c.handle(r, "request.generatePlan", requestChannelOpts{timeout: requestAIChannelTimeout, ai: true}, c.generatePlan)
 	c.handle(r, "request.planProposal", requestChannelOpts{timeout: requestRPCTimeout}, c.planProposal)
 	c.handle(r, "request.planBundleFile", requestChannelOpts{timeout: requestRPCTimeout}, c.planBundleFile)
+	c.handle(r, "request.cleanupProposal", requestChannelOpts{timeout: requestRPCTimeout}, c.cleanupProposal)
 	c.registerEngine(r)
 	c.handle(r, "request.startPhase", requestChannelOpts{timeout: requestStartPhaseTimeout}, func(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
 		in, err := decodeRequestArgs[struct {
@@ -175,4 +176,21 @@ func (c requestChannels) planBundleFile(ctx context.Context, _ Identity, args []
 		Content string `json:"content"`
 		Omitted bool   `json:"omitted"`
 	}{resp.GetPath(), resp.GetContent(), resp.GetOmitted()}, nil
+}
+
+// cleanupProposal removes the worktree of the Request's OpenSpec proposal; the branch and the stored change stay.
+func (c requestChannels) cleanupProposal(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
+	in, err := decodeRequestArgs[requestIDArgs](args)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.req.CleanupRequestProposal(ctx, &requestv1.CleanupRequestProposalRequest{RequestId: in.ID})
+	if err != nil {
+		return nil, err
+	}
+	return struct {
+		Removed   bool   `json:"removed"`
+		Abandoned bool   `json:"abandoned"`
+		Branch    string `json:"branch"`
+	}{resp.GetRemoved(), resp.GetAbandoned(), resp.GetBranch()}, nil
 }

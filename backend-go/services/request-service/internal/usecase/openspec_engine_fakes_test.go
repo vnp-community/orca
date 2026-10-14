@@ -207,9 +207,14 @@ type fakeChanges struct {
 	byReq  map[string]domain.OpenSpecChange
 	err    error
 	upsert int
+	// status and updated answer ListWithWorkspace; tests set them by request id.
+	status  map[string]domain.RequestStatus
+	updated map[string]time.Time
 }
 
-func newFakeChanges() *fakeChanges { return &fakeChanges{byReq: map[string]domain.OpenSpecChange{}} }
+func newFakeChanges() *fakeChanges {
+	return &fakeChanges{byReq: map[string]domain.OpenSpecChange{}, status: map[string]domain.RequestStatus{}, updated: map[string]time.Time{}}
+}
 
 func (f *fakeChanges) GetByRequest(_ context.Context, requestID string) (domain.OpenSpecChange, bool, error) {
 	f.mu.Lock()
@@ -240,4 +245,17 @@ func (f *fakeChanges) UpdateSync(context.Context, string, domain.SyncState, stri
 
 func (f *fakeChanges) ListPendingSync(context.Context, int) ([]domain.OpenSpecChange, error) {
 	return nil, nil
+}
+
+// ListWithWorkspace reads the request status through status (request id to status), updated through updated.
+func (f *fakeChanges) ListWithWorkspace(context.Context, int) ([]ProposalCleanupCandidate, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []ProposalCleanupCandidate
+	for _, c := range f.byReq {
+		if c.WorkspaceID != "" {
+			out = append(out, ProposalCleanupCandidate{Change: c, RequestStatus: f.status[c.RequestID], UpdatedAt: f.updated[c.RequestID]})
+		}
+	}
+	return out, nil
 }

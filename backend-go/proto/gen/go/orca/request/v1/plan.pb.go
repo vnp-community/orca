@@ -1697,6 +1697,113 @@ func (x *ListRequestChecksResponse) GetChecks() []*RequestCheck {
 	return nil
 }
 
+// CleanupRequestProposal removes the worktree of a Request's OpenSpec proposal. The branch and the stored change stay.
+type CleanupRequestProposalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CleanupRequestProposalRequest) Reset() {
+	*x = CleanupRequestProposalRequest{}
+	mi := &file_orca_request_v1_plan_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CleanupRequestProposalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CleanupRequestProposalRequest) ProtoMessage() {}
+
+func (x *CleanupRequestProposalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_plan_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CleanupRequestProposalRequest.ProtoReflect.Descriptor instead.
+func (*CleanupRequestProposalRequest) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *CleanupRequestProposalRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type CleanupRequestProposalResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// False when there was no worktree to remove.
+	Removed bool `protobuf:"varint,1,opt,name=removed,proto3" json:"removed,omitempty"`
+	// True when the change was also marked abandoned (the Request is cancelled).
+	Abandoned     bool   `protobuf:"varint,2,opt,name=abandoned,proto3" json:"abandoned,omitempty"`
+	Branch        string `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CleanupRequestProposalResponse) Reset() {
+	*x = CleanupRequestProposalResponse{}
+	mi := &file_orca_request_v1_plan_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CleanupRequestProposalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CleanupRequestProposalResponse) ProtoMessage() {}
+
+func (x *CleanupRequestProposalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_plan_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CleanupRequestProposalResponse.ProtoReflect.Descriptor instead.
+func (*CleanupRequestProposalResponse) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *CleanupRequestProposalResponse) GetRemoved() bool {
+	if x != nil {
+		return x.Removed
+	}
+	return false
+}
+
+func (x *CleanupRequestProposalResponse) GetAbandoned() bool {
+	if x != nil {
+		return x.Abandoned
+	}
+	return false
+}
+
+func (x *CleanupRequestProposalResponse) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
 var File_orca_request_v1_plan_proto protoreflect.FileDescriptor
 
 const file_orca_request_v1_plan_proto_rawDesc = "" +
@@ -1844,7 +1951,14 @@ const file_orca_request_v1_plan_proto_rawDesc = "" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\"R\n" +
 	"\x19ListRequestChecksResponse\x125\n" +
-	"\x06checks\x18\x01 \x03(\v2\x1d.orca.request.v1.RequestCheckR\x06checksBDZBgithub.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1b\x06proto3"
+	"\x06checks\x18\x01 \x03(\v2\x1d.orca.request.v1.RequestCheckR\x06checks\">\n" +
+	"\x1dCleanupRequestProposalRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\"p\n" +
+	"\x1eCleanupRequestProposalResponse\x12\x18\n" +
+	"\aremoved\x18\x01 \x01(\bR\aremoved\x12\x1c\n" +
+	"\tabandoned\x18\x02 \x01(\bR\tabandoned\x12\x16\n" +
+	"\x06branch\x18\x03 \x01(\tR\x06branchBDZBgithub.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1b\x06proto3"
 
 var (
 	file_orca_request_v1_plan_proto_rawDescOnce sync.Once
@@ -1858,37 +1972,39 @@ func file_orca_request_v1_plan_proto_rawDescGZIP() []byte {
 	return file_orca_request_v1_plan_proto_rawDescData
 }
 
-var file_orca_request_v1_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_orca_request_v1_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_orca_request_v1_plan_proto_goTypes = []any{
-	(*TaskProposal)(nil),               // 0: orca.request.v1.TaskProposal
-	(*PhaseProposal)(nil),              // 1: orca.request.v1.PhaseProposal
-	(*PlanProposal)(nil),               // 2: orca.request.v1.PlanProposal
-	(*GeneratePlanRequest)(nil),        // 3: orca.request.v1.GeneratePlanRequest
-	(*GeneratePlanResponse)(nil),       // 4: orca.request.v1.GeneratePlanResponse
-	(*GetPlanProposalRequest)(nil),     // 5: orca.request.v1.GetPlanProposalRequest
-	(*GetPlanProposalResponse)(nil),    // 6: orca.request.v1.GetPlanProposalResponse
-	(*PlanBundle)(nil),                 // 7: orca.request.v1.PlanBundle
-	(*PlanBundleFile)(nil),             // 8: orca.request.v1.PlanBundleFile
-	(*PlanCheck)(nil),                  // 9: orca.request.v1.PlanCheck
-	(*PlanKnowledge)(nil),              // 10: orca.request.v1.PlanKnowledge
-	(*GetPlanBundleFileRequest)(nil),   // 11: orca.request.v1.GetPlanBundleFileRequest
-	(*GetPlanBundleFileResponse)(nil),  // 12: orca.request.v1.GetPlanBundleFileResponse
-	(*CommitPlanRequest)(nil),          // 13: orca.request.v1.CommitPlanRequest
-	(*CommitPlanResponse)(nil),         // 14: orca.request.v1.CommitPlanResponse
-	(*StartPhaseRequest)(nil),          // 15: orca.request.v1.StartPhaseRequest
-	(*StartPhaseResponse)(nil),         // 16: orca.request.v1.StartPhaseResponse
-	(*ReportTaskOutcomeRequest)(nil),   // 17: orca.request.v1.ReportTaskOutcomeRequest
-	(*ReportTaskOutcomeResponse)(nil),  // 18: orca.request.v1.ReportTaskOutcomeResponse
-	(*RequestCheck)(nil),               // 19: orca.request.v1.RequestCheck
-	(*RecordRequestCheckRequest)(nil),  // 20: orca.request.v1.RecordRequestCheckRequest
-	(*RecordRequestCheckResponse)(nil), // 21: orca.request.v1.RecordRequestCheckResponse
-	(*ListRequestChecksRequest)(nil),   // 22: orca.request.v1.ListRequestChecksRequest
-	(*ListRequestChecksResponse)(nil),  // 23: orca.request.v1.ListRequestChecksResponse
-	(*wrapperspb.DoubleValue)(nil),     // 24: google.protobuf.DoubleValue
-	(*timestamppb.Timestamp)(nil),      // 25: google.protobuf.Timestamp
+	(*TaskProposal)(nil),                   // 0: orca.request.v1.TaskProposal
+	(*PhaseProposal)(nil),                  // 1: orca.request.v1.PhaseProposal
+	(*PlanProposal)(nil),                   // 2: orca.request.v1.PlanProposal
+	(*GeneratePlanRequest)(nil),            // 3: orca.request.v1.GeneratePlanRequest
+	(*GeneratePlanResponse)(nil),           // 4: orca.request.v1.GeneratePlanResponse
+	(*GetPlanProposalRequest)(nil),         // 5: orca.request.v1.GetPlanProposalRequest
+	(*GetPlanProposalResponse)(nil),        // 6: orca.request.v1.GetPlanProposalResponse
+	(*PlanBundle)(nil),                     // 7: orca.request.v1.PlanBundle
+	(*PlanBundleFile)(nil),                 // 8: orca.request.v1.PlanBundleFile
+	(*PlanCheck)(nil),                      // 9: orca.request.v1.PlanCheck
+	(*PlanKnowledge)(nil),                  // 10: orca.request.v1.PlanKnowledge
+	(*GetPlanBundleFileRequest)(nil),       // 11: orca.request.v1.GetPlanBundleFileRequest
+	(*GetPlanBundleFileResponse)(nil),      // 12: orca.request.v1.GetPlanBundleFileResponse
+	(*CommitPlanRequest)(nil),              // 13: orca.request.v1.CommitPlanRequest
+	(*CommitPlanResponse)(nil),             // 14: orca.request.v1.CommitPlanResponse
+	(*StartPhaseRequest)(nil),              // 15: orca.request.v1.StartPhaseRequest
+	(*StartPhaseResponse)(nil),             // 16: orca.request.v1.StartPhaseResponse
+	(*ReportTaskOutcomeRequest)(nil),       // 17: orca.request.v1.ReportTaskOutcomeRequest
+	(*ReportTaskOutcomeResponse)(nil),      // 18: orca.request.v1.ReportTaskOutcomeResponse
+	(*RequestCheck)(nil),                   // 19: orca.request.v1.RequestCheck
+	(*RecordRequestCheckRequest)(nil),      // 20: orca.request.v1.RecordRequestCheckRequest
+	(*RecordRequestCheckResponse)(nil),     // 21: orca.request.v1.RecordRequestCheckResponse
+	(*ListRequestChecksRequest)(nil),       // 22: orca.request.v1.ListRequestChecksRequest
+	(*ListRequestChecksResponse)(nil),      // 23: orca.request.v1.ListRequestChecksResponse
+	(*CleanupRequestProposalRequest)(nil),  // 24: orca.request.v1.CleanupRequestProposalRequest
+	(*CleanupRequestProposalResponse)(nil), // 25: orca.request.v1.CleanupRequestProposalResponse
+	(*wrapperspb.DoubleValue)(nil),         // 26: google.protobuf.DoubleValue
+	(*timestamppb.Timestamp)(nil),          // 27: google.protobuf.Timestamp
 }
 var file_orca_request_v1_plan_proto_depIdxs = []int32{
-	24, // 0: orca.request.v1.TaskProposal.estimated_hours:type_name -> google.protobuf.DoubleValue
+	26, // 0: orca.request.v1.TaskProposal.estimated_hours:type_name -> google.protobuf.DoubleValue
 	0,  // 1: orca.request.v1.PhaseProposal.tasks:type_name -> orca.request.v1.TaskProposal
 	1,  // 2: orca.request.v1.PlanProposal.phases:type_name -> orca.request.v1.PhaseProposal
 	0,  // 3: orca.request.v1.PlanProposal.tasks:type_name -> orca.request.v1.TaskProposal
@@ -1899,8 +2015,8 @@ var file_orca_request_v1_plan_proto_depIdxs = []int32{
 	10, // 8: orca.request.v1.GetPlanProposalResponse.knowledge:type_name -> orca.request.v1.PlanKnowledge
 	8,  // 9: orca.request.v1.PlanBundle.files:type_name -> orca.request.v1.PlanBundleFile
 	2,  // 10: orca.request.v1.CommitPlanRequest.proposal:type_name -> orca.request.v1.PlanProposal
-	25, // 11: orca.request.v1.ReportTaskOutcomeRequest.occurred_at:type_name -> google.protobuf.Timestamp
-	25, // 12: orca.request.v1.RequestCheck.created_at:type_name -> google.protobuf.Timestamp
+	27, // 11: orca.request.v1.ReportTaskOutcomeRequest.occurred_at:type_name -> google.protobuf.Timestamp
+	27, // 12: orca.request.v1.RequestCheck.created_at:type_name -> google.protobuf.Timestamp
 	19, // 13: orca.request.v1.RecordRequestCheckResponse.check:type_name -> orca.request.v1.RequestCheck
 	19, // 14: orca.request.v1.ListRequestChecksResponse.checks:type_name -> orca.request.v1.RequestCheck
 	15, // [15:15] is the sub-list for method output_type
@@ -1921,7 +2037,7 @@ func file_orca_request_v1_plan_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_request_v1_plan_proto_rawDesc), len(file_orca_request_v1_plan_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

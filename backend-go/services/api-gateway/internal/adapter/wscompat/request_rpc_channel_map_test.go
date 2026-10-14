@@ -44,6 +44,7 @@ var requestServiceRPCChannels = map[string]rpcDisposition{
 	"GeneratePlan":             viaChannel("request.generatePlan"),
 	"GetPlanProposal":          viaChannel("request.planProposal"),
 	"GetPlanBundleFile":        viaChannel("request.planBundleFile"),
+	"CleanupRequestProposal":   viaChannel("request.cleanupProposal"),
 	"CommitPlan":               viaChannel("request.generatePlan"), // mode=commit
 	"StartPhase":               viaChannel("request.startPhase"),
 	"ReportTaskOutcome":        internalRPC("task-service reports phase outcomes"),

@@ -186,6 +186,14 @@ func (f *fakeRequestClient) GetPlanProposal(ctx context.Context, in *requestv1.G
 	return &requestv1.GetPlanProposalResponse{RunId: in.GetRunId(), Status: "succeeded", Proposal: &requestv1.PlanProposal{Title: "P", Phases: []*requestv1.PhaseProposal{{Title: "ph", Tasks: []*requestv1.TaskProposal{{Title: "t", TaskType: "task", EstimatedHours: wrapperspb.Double(2)}}}}}}, nil
 }
 
+func (f *fakeRequestClient) CleanupRequestProposal(ctx context.Context, in *requestv1.CleanupRequestProposalRequest, _ ...grpc.CallOption) (*requestv1.CleanupRequestProposalResponse, error) {
+	f.rec(ctx, "CleanupRequestProposal", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.CleanupRequestProposalResponse{Removed: true, Branch: "request/1-proposal"}, nil
+}
+
 func (f *fakeRequestClient) GetProjectEngineSettings(ctx context.Context, in *requestv1.GetProjectEngineSettingsRequest, _ ...grpc.CallOption) (*requestv1.GetProjectEngineSettingsResponse, error) {
 	f.rec(ctx, "GetProjectEngineSettings", in)
 	if f.err != nil {

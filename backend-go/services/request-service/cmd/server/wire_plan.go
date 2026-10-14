@@ -47,6 +47,17 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 		Get:    usecase.NewGetPlanProposal(stores.requests, stores.analysisRuns).WithChanges(stores.openspecChanges),
 		Bundle: usecase.NewGetPlanBundleFile(stores.requests, stores.openspecChanges),
 	}
+	if solution.workspace != nil {
+		retention, warning := domain.ProposalRetentionFromEnv(os.Getenv)
+		if warning != "" {
+			log.Warn(warning)
+		}
+		solution.janitor = &usecase.ProposalJanitor{
+			Changes: stores.openspecChanges, Requests: stores.requests, Runs: stores.analysisRuns, Workspace: solution.workspace,
+			Tenants: stores.retention, Retention: retention, Log: log,
+		}
+		out.Cleanup = usecase.NewCleanupProposal(stores.requests, solution.janitor)
+	}
 	if !approval.Enabled || approval.Open == nil {
 		log.Warn("approval is off: CommitPlan is unavailable because a committed Plan has nobody to approve it")
 		return out, nil
@@ -79,6 +90,7 @@ func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solut
 		return registry
 	}
 	workspace := grpcclient.NewProposalWorkspace(solution.git, solution.proj)
+	solution.workspace = workspace
 	executor := grpcclient.NewDevServerExecutor(solution.infra)
 	gate := usecase.NewEngineReadinessGate(solution.conns, executor, os.Getenv("REQUEST_OPENSPEC_MIN_VERSION")).
 		WithCapabilities(solution.caps).WithRepoFiles(workspace).WithRepoState(grpcclient.NewRepoStateProbe(solution.git)).

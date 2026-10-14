@@ -45,8 +45,11 @@ type solutionWiring struct {
 	infra infrafleetv1.InfraFleetServiceClient
 	// gate is the readiness check shared by the openspec engine and the settings RPC; nil when the dev server stack is not configured.
 	gate *usecase.EngineReadinessGate
-	proj projectv1.ProjectServiceClient
-	git  gitgatewayv1.GitGatewayServiceClient
+	// workspace and janitor exist only when the openspec engine is configured: the janitor removes the proposal worktrees.
+	workspace *grpcclient.ProposalWorkspace
+	janitor   *usecase.ProposalJanitor
+	proj      projectv1.ProjectServiceClient
+	git       gitgatewayv1.GitGatewayServiceClient
 }
 
 // wireSolution builds solution generation and read-only analysis (CR-REQ-007/008) and starts the lease-recovery sweeper.

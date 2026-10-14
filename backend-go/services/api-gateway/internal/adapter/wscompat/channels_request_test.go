@@ -179,6 +179,12 @@ func requestChannelCases() []requestChannelCase {
 				mustEqual(t, m.GetPath(), "tasks.md")
 				mustEqual(t, res["content"], "# tasks\n")
 			}},
+		{channel: "request.cleanupProposal", args: `{"id":"r1"}`, rpc: "CleanupRequestProposal", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, in proto.Message) {
+				mustEqual(t, in.(*requestv1.CleanupRequestProposalRequest).GetRequestId(), "r1")
+				mustEqual(t, res["removed"], true)
+				mustEqual(t, res["branch"], "request/1-proposal")
+			}},
 		{channel: "request.engineSettings", args: `{"projectId":"p1","check":true}`, rpc: "GetProjectEngineSettings", lo: short[0], hi: short[1],
 			check: func(t *testing.T, res map[string]any, in proto.Message) {
 				m := in.(*requestv1.GetProjectEngineSettingsRequest)
@@ -418,7 +424,7 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"approval.get", "approval.list", "approval.listPending", "approval.approve", "approval.reject", "approval.cancel",
 		"backlog.requests", "backlog.tasks", "backlog.execute",
 		// CONTRACT 2.5 and the plan proposal reader.
-		"request.links", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet",
+		"request.links", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal",
 		// CR-REQ-028: the channels useClarifications.ts calls.
 		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel", "clarification.request",
 	}

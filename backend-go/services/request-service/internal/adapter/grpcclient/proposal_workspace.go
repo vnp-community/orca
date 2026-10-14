@@ -30,7 +30,7 @@ func NewProposalWorkspace(git gitgatewayv1.GitGatewayServiceClient, projects pro
 	return &ProposalWorkspace{git: git, projects: projects, now: func() time.Time { return time.Now().UTC() }}
 }
 
-func proposalBranch(number int64) string { return fmt.Sprintf("request/%d-proposal", number) }
+func proposalBranch(number int64) string { return domain.ProposalBranch(number) }
 
 func (w *ProposalWorkspace) Ensure(ctx context.Context, in usecase.EnsureWorkspaceInput) (usecase.Workspace, error) {
 	if in.ProjectID == "" || in.RequestID == "" || in.RequestNumber <= 0 {

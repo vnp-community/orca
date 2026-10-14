@@ -40,6 +40,7 @@ var requestFlowRoutes = []requestFlowRoute{
 	{http.MethodPost, "/{id}/plan", "request.generatePlan", byID},
 	{http.MethodGet, "/{id}/plan/bundle", "request.planProposal", byID}, // the proposal view carries the bundle listing, checks and knowledge
 	{http.MethodGet, "/{id}/plan/bundle/file", "request.planBundleFile", byID},
+	{http.MethodPost, "/{id}/proposal/cleanup", "request.cleanupProposal", byID},
 	{http.MethodPost, "/{id}/phases/{phaseTaskId}/start", "request.startPhase", phaseStart},
 	{http.MethodGet, "/{id}/clarifications", "clarification.list", byRequest},
 }

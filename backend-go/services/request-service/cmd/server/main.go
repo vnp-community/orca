@@ -177,6 +177,10 @@ func run(ctx context.Context, cfg config.Config) error {
 	if err != nil {
 		return err
 	}
+	if solution.janitor != nil {
+		lifecycle.Cancel.WithProposalCleanup(solution.janitor)
+		startProposalJanitor(lifecycleCtx, &lifecycleWG, log, solution.janitor)
+	}
 	artifact, err := wireArtifact(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, intake, classification, busConsumer, dirs, solution)
 	if err != nil {
 		return err

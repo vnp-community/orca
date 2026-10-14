@@ -1648,6 +1648,10 @@
     "kind": "unary"
   },
   {
+    "name": "request.cleanupProposal",
+    "kind": "unary"
+  },
+  {
     "name": "request.confirmType",
     "kind": "unary"
   },

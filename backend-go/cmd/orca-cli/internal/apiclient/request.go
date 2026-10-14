@@ -124,6 +124,11 @@ func (c *Client) GetPlanBundleFile(ctx context.Context, id, path string) (Docume
 	return c.getDoc(ctx, requestPath(id, "/plan/bundle/file"), url.Values{"path": {path}})
 }
 
+// CleanupProposal removes the worktree of the Request's OpenSpec proposal; the branch and the stored change stay.
+func (c *Client) CleanupProposal(ctx context.Context, id string) (Document, error) {
+	return c.postDoc(ctx, requestPath(id, "/proposal/cleanup"), nil)
+}
+
 func (c *Client) StartPhase(ctx context.Context, id, phaseTaskID string) (Document, error) {
 	return c.postDoc(ctx, requestPath(id, "/phases/"+url.PathEscape(phaseTaskID)+"/start"), nil)
 }

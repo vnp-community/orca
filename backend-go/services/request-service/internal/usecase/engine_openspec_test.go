@@ -85,6 +85,27 @@ func TestOpenSpecEngine_AuthorsTheChangeInAFreshWorktree(t *testing.T) {
 	}
 }
 
+func TestOpenSpecEngine_ReportsTheWorktreeBeforeTheAgentRunsSoAFailureStillLeavesARecord(t *testing.T) {
+	k := newEngineKit(authoringFeatures)
+	var seen []Workspace
+	k.in.OnWorkspace = func(ws Workspace) { seen = append(seen, ws) }
+	k.agent.results = []AgentPromptResult{{ExitCode: 1}} // the agent fails after the worktree exists
+	if _, err := k.e.GenerateProposal(context.Background(), k.in); err == nil {
+		t.Fatal("the run was meant to fail")
+	}
+	if len(seen) != 1 || seen[0].WorktreeID != k.ws.ws.WorktreeID {
+		t.Fatalf("OnWorkspace calls = %+v", seen)
+	}
+	// A retry that reuses the worktree does not announce it again.
+	seen = nil
+	reuse := k.ws.ws
+	k.in.Workspace = &reuse
+	_, _ = k.e.GenerateProposal(context.Background(), k.in)
+	if len(seen) != 0 {
+		t.Fatalf("a reused worktree was announced again: %+v", seen)
+	}
+}
+
 func TestOpenSpecEngine_ARetryReusesTheWorktreeAndKeepsTheFiles(t *testing.T) {
 	k := newEngineKit(authoringFeatures)
 	k.agentWritesTasks(goodTasksMD)

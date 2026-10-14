@@ -197,3 +197,16 @@ message ListRequestChecksRequest {
 message ListRequestChecksResponse {
   repeated RequestCheck checks = 1;
 }
+
+// CleanupRequestProposal removes the worktree of a Request's OpenSpec proposal. The branch and the stored change stay.
+message CleanupRequestProposalRequest {
+  string request_id = 1;
+}
+
+message CleanupRequestProposalResponse {
+  // False when there was no worktree to remove.
+  bool removed = 1;
+  // True when the change was also marked abandoned (the Request is cancelled).
+  bool abandoned = 2;
+  string branch = 3;
+}

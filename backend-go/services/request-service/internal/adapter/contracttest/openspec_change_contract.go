@@ -143,4 +143,40 @@ func RunOpenSpecChangeContract(t *testing.T, env Env, repo usecase.OpenSpecChang
 			t.Fatalf("limit not applied: %d", len(limited))
 		}
 	})
+
+	t.Run("ListWithWorkspace returns only the tenant's changes that still hold a worktree, with the Request status", func(t *testing.T) {
+		tctx := CtxForTenant(newTenant())
+		mk := func(workspace string) (domain.OpenSpecChange, domain.Request) {
+			r := createRequest(t, env, tctx, nil)
+			c, err := repo.Upsert(tctx, domain.OpenSpecChange{ID: uuid.NewString(), RequestID: r.ID, ChangeID: "req-1-x", Status: domain.ChangeStatusPreparing,
+				SyncState: domain.SyncStateInSync, WorkspaceID: workspace})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return c, r
+		}
+		held, heldReq := mk("wt-held")
+		mk("") // released: no worktree
+		other := CtxForTenant(newTenant())
+		otherReq := createRequest(t, env, other, nil)
+		if _, err := repo.Upsert(other, domain.OpenSpecChange{ID: uuid.NewString(), RequestID: otherReq.ID, ChangeID: "req-9-x", Status: domain.ChangeStatusPreparing,
+			SyncState: domain.SyncStateInSync, WorkspaceID: "wt-other"}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := repo.ListWithWorkspace(tctx, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 1 || got[0].Change.ID != held.ID || got[0].Change.WorkspaceID != "wt-held" || got[0].RequestStatus != heldReq.Status || got[0].UpdatedAt.IsZero() {
+			t.Fatalf("got %+v, want only the held change of this tenant (request status %q)", got, heldReq.Status)
+		}
+		// Releasing the worktree takes the change out of the list.
+		held.WorkspaceID = ""
+		if _, err := repo.Upsert(tctx, held); err != nil {
+			t.Fatal(err)
+		}
+		if again, _ := repo.ListWithWorkspace(tctx, 10); len(again) != 0 {
+			t.Fatalf("a released change is still listed: %+v", again)
+		}
+	})
 }

@@ -31,8 +31,16 @@ type fakeFlowClient struct {
 	plans      []*requestv1.GetPlanProposalRequest
 	bundles    []*requestv1.GetPlanBundleFileRequest
 	bundleErr  error
+	cleanups   []*requestv1.CleanupRequestProposalRequest
 	engineGets []*requestv1.GetProjectEngineSettingsRequest
 	engineSets []*requestv1.SetProjectEngineSettingsRequest
+}
+
+func (f *fakeFlowClient) CleanupRequestProposal(_ context.Context, in *requestv1.CleanupRequestProposalRequest, _ ...grpc.CallOption) (*requestv1.CleanupRequestProposalResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.cleanups = append(f.cleanups, in)
+	return &requestv1.CleanupRequestProposalResponse{Removed: true, Branch: "request/1-proposal"}, nil
 }
 
 func (f *fakeFlowClient) GetProjectEngineSettings(_ context.Context, in *requestv1.GetProjectEngineSettingsRequest, _ ...grpc.CallOption) (*requestv1.GetProjectEngineSettingsResponse, error) {
@@ -303,5 +311,20 @@ func TestProjectEngineRoutes_CoexistWithTheProjectRoutes(t *testing.T) {
 				t.Fatalf("engine route shadowed: %d %s", rec.Code, rec.Body.String())
 			}
 		})
+	}
+}
+
+func TestRequestFlowRoutes_ProposalCleanupPostsTheRequestId(t *testing.T) {
+	f := &fakeFlowClient{}
+	r := flowRouter(f)
+	rec := doRequestRoute(r, http.MethodPost, "/v1/requests/r1/proposal/cleanup", `{"id":"OTHER"}`, routesIdentity)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"removed":true`) || !strings.Contains(rec.Body.String(), "request/1-proposal") {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	if len(f.cleanups) != 1 || f.cleanups[0].GetRequestId() != "r1" {
+		t.Fatalf("a body must not redirect the cleanup to another Request: %+v", f.cleanups)
+	}
+	if rec := doRequestRoute(r, http.MethodPost, "/v1/requests/r1/proposal/cleanup", "", nil); rec.Code != http.StatusUnauthorized || len(f.cleanups) != 1 {
+		t.Fatalf("anonymous: %d", rec.Code)
 	}
 }

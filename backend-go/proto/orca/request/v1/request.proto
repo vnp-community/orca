@@ -325,6 +325,7 @@ service RequestService {
   rpc GetPlanProposal(GetPlanProposalRequest) returns (GetPlanProposalResponse);
   // Reads one file of the authored OpenSpec change behind a Plan (the proposal, design, specs or tasks).
   rpc GetPlanBundleFile(GetPlanBundleFileRequest) returns (GetPlanBundleFileResponse);
+  rpc CleanupRequestProposal(CleanupRequestProposalRequest) returns (CleanupRequestProposalResponse);
   rpc CommitPlan(CommitPlanRequest) returns (CommitPlanResponse);
   rpc StartPhase(StartPhaseRequest) returns (StartPhaseResponse);
   rpc ReportTaskOutcome(ReportTaskOutcomeRequest) returns (ReportTaskOutcomeResponse);

@@ -27,11 +27,17 @@ const openSpecChangeColumns = `id, request_id, change_id, COALESCE(branch, ''), 
 	bundle_json, COALESCE(workspace_id, ''), version`
 
 func scanOpenSpecChange(row rowScanner) (domain.OpenSpecChange, error) {
+	return scanOpenSpecChangeInto(row)
+}
+
+// scanOpenSpecChangeInto reads the change columns and then any extra destinations the query selected after them.
+func scanOpenSpecChangeInto(row rowScanner, extra ...any) (domain.OpenSpecChange, error) {
 	var c domain.OpenSpecChange
 	var status, syncState string
 	var read, gaps, conflicts, bundle []byte
-	if err := row.Scan(&c.ID, &c.RequestID, &c.ChangeID, &c.Branch, &status, &syncState, &c.Commit, &c.TasksMDDigest, &c.KGAvailable,
-		&c.KGSnapshot, &read, &gaps, &conflicts, &c.SkillHash, &bundle, &c.WorkspaceID, &c.Version); err != nil {
+	dest := append([]any{&c.ID, &c.RequestID, &c.ChangeID, &c.Branch, &status, &syncState, &c.Commit, &c.TasksMDDigest, &c.KGAvailable,
+		&c.KGSnapshot, &read, &gaps, &conflicts, &c.SkillHash, &bundle, &c.WorkspaceID, &c.Version}, extra...)
+	if err := row.Scan(dest...); err != nil {
 		return domain.OpenSpecChange{}, err
 	}
 	c.Status, c.SyncState = domain.ChangeStatus(status), domain.SyncState(syncState)
@@ -181,6 +187,40 @@ func (r *OpenSpecChangeRepository) ListPendingSync(ctx context.Context, limit in
 			out = append(out, c)
 		}
 		return rows.Err()
+	})
+	return out, err
+}
+
+// ListWithWorkspace lists the tenant's changes that still hold a worktree. The Request status comes from a second query so
+// the change columns stay unambiguous.
+func (r *OpenSpecChangeRepository) ListWithWorkspace(ctx context.Context, limit int) ([]usecase.ProposalCleanupCandidate, error) {
+	var out []usecase.ProposalCleanupCandidate
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		rows, err := db.QueryContext(ctx, `SELECT `+openSpecChangeColumns+`, updated_at FROM openspec_changes
+			WHERE tenant_id = ? AND COALESCE(workspace_id, '') <> '' ORDER BY updated_at, id LIMIT ?`, tenantID, limit)
+		if err != nil {
+			return fmt.Errorf("mysql: list openspec changes with a worktree: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var cand usecase.ProposalCleanupCandidate
+			if cand.Change, err = scanOpenSpecChangeInto(rows, &cand.UpdatedAt); err != nil {
+				return err
+			}
+			out = append(out, cand)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		for i := range out {
+			var st string
+			err := db.QueryRowContext(ctx, `SELECT status FROM requests WHERE tenant_id = ? AND id = ?`, tenantID, out[i].Change.RequestID).Scan(&st)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("mysql: read request status: %w", err)
+			}
+			out[i].RequestStatus = domain.RequestStatus(st)
+		}
+		return nil
 	})
 	return out, err
 }

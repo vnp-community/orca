@@ -110,3 +110,8 @@ func ErrPlanBundlePathInvalid(path string) error {
 func ErrPlanBundleFileNotFound(path string) error {
 	return apperrors.New(apperrors.KindNotFound, "REQUEST_PLAN_BUNDLE_FILE_NOT_FOUND", "the change has no file "+path, nil)
 }
+
+// ErrProposalRunActive refuses a cleanup while a plan run writes in the proposal worktree.
+func ErrProposalRunActive(requestID string) error {
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_PROPOSAL_RUN_ACTIVE", "a plan run of this Request is still writing in the proposal worktree; wait for it to finish", nil)
+}

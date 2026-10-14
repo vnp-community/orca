@@ -15,7 +15,7 @@ import (
 func newRequestCmd(e flowEnv) *cobra.Command {
 	cmd := &cobra.Command{Use: "request", Short: "create and drive Requests (the same steps as the UI)"}
 	cmd.AddCommand(newRequestCreateCmd(e), newRequestListCmd(e), newRequestShowCmd(e), newRequestClassifyCmd(e),
-		newRequestConfirmTypeCmd(e), newRequestCancelCmd(e), newRequestReopenCmd(e), newRequestWaitCmd(e))
+		newRequestConfirmTypeCmd(e), newRequestCancelCmd(e), newRequestReopenCmd(e), newRequestWaitCmd(e), newRequestCleanupCmd(e))
 	return cmd
 }
 
@@ -191,4 +191,28 @@ func newRequestWaitCmd(e flowEnv) *cobra.Command {
 	cmd.Flags().StringVar(&until, "until", "", "comma-separated statuses to wait for")
 	cmd.Flags().DurationVar(&timeout, "timeout", 10*time.Minute, "give up after this long (exit 1, WAIT_TIMEOUT)")
 	return cmd
+}
+
+// newRequestCleanupCmd removes the worktree of a Request's OpenSpec proposal. The branch and the stored change stay, so the
+// plan can still be read with `orca plan bundle`.
+func newRequestCleanupCmd(e flowEnv) *cobra.Command {
+	return &cobra.Command{
+		Use: "cleanup <request-id>", Short: "remove the worktree of the Request's OpenSpec proposal (the branch and the stored change stay)", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
+				return cli.CleanupProposal(ctx, args[0])
+			}, renderProposalCleanup)
+		},
+	}
+}
+
+func renderProposalCleanup(doc apiclient.Document) string {
+	branch := firstOr(doc.Str("branch"), "(no proposal branch)")
+	switch {
+	case doc.Bool("removed") && doc.Bool("abandoned"):
+		return "removed the proposal worktree and marked the change abandoned; branch " + branch + " is kept"
+	case doc.Bool("removed"):
+		return "removed the proposal worktree; branch " + branch + " is kept"
+	}
+	return "no proposal worktree to remove (" + branch + ")"
 }

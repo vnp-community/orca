@@ -27,11 +27,17 @@ const openSpecChangeColumns = `id::text, request_id::text, change_id, COALESCE(b
 	bundle_json, COALESCE(workspace_id, ''), version`
 
 func scanOpenSpecChange(row pgx.Row) (domain.OpenSpecChange, error) {
+	return scanOpenSpecChangeInto(row)
+}
+
+// scanOpenSpecChangeInto reads the change columns and then any extra destinations the query selected after them.
+func scanOpenSpecChangeInto(row pgx.Row, extra ...any) (domain.OpenSpecChange, error) {
 	var c domain.OpenSpecChange
 	var status, syncState string
 	var read, gaps, conflicts, bundle []byte
-	if err := row.Scan(&c.ID, &c.RequestID, &c.ChangeID, &c.Branch, &status, &syncState, &c.Commit, &c.TasksMDDigest, &c.KGAvailable,
-		&c.KGSnapshot, &read, &gaps, &conflicts, &c.SkillHash, &bundle, &c.WorkspaceID, &c.Version); err != nil {
+	dest := append([]any{&c.ID, &c.RequestID, &c.ChangeID, &c.Branch, &status, &syncState, &c.Commit, &c.TasksMDDigest, &c.KGAvailable,
+		&c.KGSnapshot, &read, &gaps, &conflicts, &c.SkillHash, &bundle, &c.WorkspaceID, &c.Version}, extra...)
+	if err := row.Scan(dest...); err != nil {
 		return domain.OpenSpecChange{}, err
 	}
 	c.Status, c.SyncState = domain.ChangeStatus(status), domain.SyncState(syncState)
@@ -183,4 +189,60 @@ func (r *OpenSpecChangeRepository) ListPendingSync(ctx context.Context, limit in
 		return rows.Err()
 	})
 	return out, err
+}
+
+// ListWithWorkspace lists the tenant's changes that still hold a worktree. The Request status comes from a second query so
+// the change columns stay unambiguous.
+func (r *OpenSpecChangeRepository) ListWithWorkspace(ctx context.Context, limit int) ([]usecase.ProposalCleanupCandidate, error) {
+	var out []usecase.ProposalCleanupCandidate
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		rows, err := db.Query(ctx, `SELECT `+openSpecChangeColumns+`, updated_at FROM request.openspec_changes
+			WHERE tenant_id = $1 AND COALESCE(workspace_id, '') <> '' ORDER BY updated_at, id LIMIT $2`, tenantID, limit)
+		if err != nil {
+			return fmt.Errorf("postgres: list openspec changes with a worktree: %w", err)
+		}
+		defer rows.Close()
+		ids := []string{}
+		for rows.Next() {
+			var cand usecase.ProposalCleanupCandidate
+			cand.Change, cand.UpdatedAt, err = scanOpenSpecChangeWithTime(rows)
+			if err != nil {
+				return err
+			}
+			out = append(out, cand)
+			ids = append(ids, cand.Change.RequestID)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		rows.Close()
+		if len(ids) == 0 {
+			return nil
+		}
+		statuses := map[string]domain.RequestStatus{}
+		srows, err := db.Query(ctx, `SELECT id::text, status FROM request.requests WHERE tenant_id = $1 AND id = ANY($2::uuid[])`, tenantID, ids)
+		if err != nil {
+			return fmt.Errorf("postgres: read request statuses: %w", err)
+		}
+		defer srows.Close()
+		for srows.Next() {
+			var id, st string
+			if err := srows.Scan(&id, &st); err != nil {
+				return err
+			}
+			statuses[id] = domain.RequestStatus(st)
+		}
+		for i := range out {
+			out[i].RequestStatus = statuses[out[i].Change.RequestID]
+		}
+		return srows.Err()
+	})
+	return out, err
+}
+
+// scanOpenSpecChangeWithTime scans the change columns and the updated_at that follows them.
+func scanOpenSpecChangeWithTime(row pgx.Rows) (domain.OpenSpecChange, time.Time, error) {
+	var updated time.Time
+	c, err := scanOpenSpecChangeInto(row, &updated)
+	return c, updated, err
 }

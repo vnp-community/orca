@@ -110,6 +110,7 @@ var flowMethodClass = map[string]flowClass{
 	requestSvc + "ChooseSolutionOption":    classAdvance,
 	requestSvc + "GeneratePlan":            classAdvance,
 	requestSvc + "CommitPlan":              classAdvance,
+	requestSvc + "CleanupRequestProposal":  classAdvance,
 	requestSvc + "StartPhase":              classAdvance,
 	requestSvc + "RecordRequestCheck":      classAdvance,
 	requestSvc + "RequestClarification":    classAdvance,

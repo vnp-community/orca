@@ -47,3 +47,18 @@ Mỗi dòng kèm `code` (`REQUEST_ENGINE_*`, `REQUEST_KNOWLEDGE_*`) và gợi ý
 Task của Plan do engine `openspec` viết chạy trên đường hợp đồng của task-service: agent kết thúc bằng một khối kết quả có nonce, Orca đọc `status`, `checks_run`, `knowledge` và `writeback`; nếu dev server có `agent.execPrompt.knowledgeHub` thì agent còn đọc được đồ thị tri thức từ **thư mục gốc của repo** (không phải worktree của task). Task có dòng `Verify:` chỉ được coi là xong khi `checks_run` có ít nhất một kiểm tra thoát với mã 0; báo `done` mà không có bằng chứng thì tính là một lần thất bại (`VERIFY_NOT_PASSED`, được thử lại theo số lần tối đa). Xem kết quả bằng `orca plan result <task-id>`; phần `knowledge`/`writeback` là lời của agent, Orca không kiểm.
 
 **Rủi ro đã biết (B4):** mọi lần thực thi task vẫn chạy với `trustPreset: full` (agent không có người duyệt từng lệnh). Cổng duyệt Plan và Phase, kiểm phạm vi `Code:` và bằng chứng `checks_run` là các lớp bù, không thay thế việc xem diff trước khi merge.
+
+## Dọn worktree của proposal
+
+Mỗi lần `plan generate` bằng engine `openspec` tạo một worktree trên nhánh cục bộ `request/<số>-proposal` (không bao giờ đẩy lên remote). Quy tắc dọn, chạy tức thì khi huỷ Request và định kỳ 10 phút một lần:
+
+| Tình huống | Worktree | Nhánh và gói đã lưu |
+|---|---|---|
+| Request bị huỷ | gỡ ngay; gói chuyển `abandoned` | giữ |
+| Request hoàn thành | gỡ sau `REQUEST_PROPOSAL_RETENTION` (mặc định 7 ngày; đổi bằng `72h` hoặc `3d`), hoặc ngay khi gói đã `archived` | giữ |
+| Run lỗi (worktree giữ lại để điều tra) | gỡ sau thời hạn trên; gói vẫn `preparing` vì Request còn thể thử lại | giữ |
+| Request còn hoạt động, gói `ready` | giữ | giữ |
+
+Worktree của một run **đang chạy** không bao giờ bị đụng, và chỉ gỡ worktree nằm đúng trên nhánh `request/<số>-proposal` của chính Request đó. Gỡ tay (chủ Request hoặc admin): `orca request cleanup <request-id>`; gói vẫn đọc được bằng `orca plan bundle`.
+
+Kiểm tra mồ côi: `python3 tests/stages/e2e/orca-flows/report_orphan_worktrees.py --repo <đường dẫn repo của project>` (thoát 1 nếu có worktree của Request đã huỷ hoặc không còn tồn tại; worktree của Request đã hoàn thành chỉ được liệt kê).

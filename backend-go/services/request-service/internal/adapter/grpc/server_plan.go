@@ -19,6 +19,8 @@ type PlanUseCases struct {
 	Commit   *usecase.CommitPlan
 	// Bundle reads one file of the authored OpenSpec change; nil when the openspec engine is not configured.
 	Bundle *usecase.GetPlanBundleFile
+	// Cleanup removes the proposal worktree on request; nil when the openspec engine is not configured.
+	Cleanup *usecase.CleanupProposal
 }
 
 // WithPlan attaches the Plan handlers; without it those RPCs stay Unimplemented.
@@ -156,4 +158,16 @@ func taskProposalsToProto(in []domain.TaskProposal) []*requestv1.TaskProposal {
 		out = append(out, tp)
 	}
 	return out
+}
+
+// CleanupRequestProposal removes the worktree of the Request's proposal and keeps its branch and stored change.
+func (s *Server) CleanupRequestProposal(ctx context.Context, req *requestv1.CleanupRequestProposalRequest) (*requestv1.CleanupRequestProposalResponse, error) {
+	if s.plan.Cleanup == nil {
+		return nil, status.Error(codes.Unimplemented, "CleanupRequestProposal is not wired")
+	}
+	rel, err := s.plan.Cleanup.Execute(ctx, req.GetRequestId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &requestv1.CleanupRequestProposalResponse{Removed: rel.Removed, Abandoned: rel.Abandoned, Branch: rel.Branch}, nil
 }

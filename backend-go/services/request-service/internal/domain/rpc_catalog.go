@@ -105,6 +105,7 @@ var Catalog = map[string]Entry{
 	reqSvc + "GetPlanProposal":                  onRequest(GroupRead, "request_id", RateRead, false),
 	reqSvc + "GetPlanBundleFile":                onRequest(GroupRead, "request_id", RateRead, false),
 	reqSvc + "CommitPlan":                       onRequest(GroupPlan, "request_id", RateWrite, false),
+	reqSvc + "CleanupRequestProposal":           onRequest(GroupPlan, "request_id", RateWrite, false),
 	reqSvc + "StartPhase":                       onRequest(GroupExecute, "request_id", RateAI, false),
 	reqSvc + "ReportTaskOutcome":                unlocated(GroupInternal, RateNone, false),
 	reqSvc + "RecordRequestCheck":               unlocated(GroupInternal, RateNone, false),

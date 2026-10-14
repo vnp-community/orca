@@ -79,6 +79,9 @@ type ProposalInput struct {
 	// RetryNote and Workspace are set on the second attempt: the agent fixes the files already in place.
 	RetryNote string
 	Workspace *Workspace
+	// OnWorkspace is told about the worktree as soon as it exists, so a run that fails afterwards still leaves a record the
+	// cleanup can find. It must not fail the run.
+	OnWorkspace func(Workspace)
 }
 
 // AgentReport is what the agent says about its own run in the result block. Orca treats it as data to show and to
@@ -200,6 +203,9 @@ func (e *openspecEngine) prepare(ctx context.Context, run domain.AnalysisRun, re
 	})
 	if err != nil {
 		return Workspace{}, workspaceFailure(run, err)
+	}
+	if in.OnWorkspace != nil {
+		in.OnWorkspace(ws)
 	}
 	if err := e.ws.DiscardAll(ctx, ws); err != nil {
 		return Workspace{}, workspaceFailure(run, err)

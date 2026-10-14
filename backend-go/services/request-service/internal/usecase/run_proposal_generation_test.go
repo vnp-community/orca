@@ -17,11 +17,16 @@ type scriptedEngine struct {
 	answers    []ProposalResult
 	errs       []error
 	inputs     []ProposalInput
+	// announce is the worktree the engine reports through OnWorkspace before it can fail, as the real one does.
+	announce *Workspace
 }
 
 func (e *scriptedEngine) GenerateProposal(_ context.Context, in ProposalInput) (ProposalResult, error) {
 	n := len(e.inputs)
 	e.inputs = append(e.inputs, in)
+	if e.announce != nil && in.OnWorkspace != nil {
+		in.OnWorkspace(*e.announce)
+	}
 	if n < len(e.errs) && e.errs[n] != nil {
 		return ProposalResult{}, e.errs[n]
 	}

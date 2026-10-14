@@ -175,4 +175,14 @@ type OpenSpecChangeRepository interface {
 	Upsert(ctx context.Context, c domain.OpenSpecChange) (domain.OpenSpecChange, error)
 	UpdateSync(ctx context.Context, id string, state domain.SyncState, digest string, at *time.Time, expectedVersion int64) error
 	ListPendingSync(ctx context.Context, limit int) ([]domain.OpenSpecChange, error)
+	// ListWithWorkspace returns the tenant's changes that still hold a worktree, oldest first, with the status of their Request.
+	ListWithWorkspace(ctx context.Context, limit int) ([]ProposalCleanupCandidate, error)
+}
+
+// ProposalCleanupCandidate is a change that still holds a worktree, with what the cleanup policy needs to decide about it.
+type ProposalCleanupCandidate struct {
+	Change        domain.OpenSpecChange
+	RequestStatus domain.RequestStatus
+	// UpdatedAt is when the change row last changed: a failed run's leftover is aged from here.
+	UpdatedAt time.Time
 }
