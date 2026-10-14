@@ -66,8 +66,10 @@ func (e *openspecEngine) GeneratePlan(ctx context.Context, p ProjectRef, in Plan
 type ProposalInput struct {
 	Run     domain.AnalysisRun
 	Request domain.Request
-	Shape   domain.PlanShape
-	Limits  domain.PlanLimits
+	// ChangeID is the directory under openspec/changes/; the worker fixes it at the Request's first generation.
+	ChangeID string
+	Shape    domain.PlanShape
+	Limits   domain.PlanLimits
 	// Analysis is the approved Solution as text; Feedback the reviewer's guidance on a regenerate.
 	Analysis, Feedback string
 	ProjectName        string
@@ -106,6 +108,8 @@ type ProposalResult struct {
 	// TasksMD is the raw file the Plan is read from.
 	TasksMD string
 	Report  AgentReport
+	// SkillHash names the installed knowledge skills the agent worked under; empty when the agent did not report them all.
+	SkillHash string
 	// KnowledgeRequested says whether the agent was given the project's knowledge graph for this attempt.
 	KnowledgeRequested bool
 }
@@ -139,7 +143,10 @@ func (e *openspecEngine) GenerateProposal(ctx context.Context, in ProposalInput)
 		ws = &fresh
 	}
 
-	changeID, ref := OpenSpecChangeID(req.Number), OpenSpecRef(req.Number)
+	changeID, ref := in.ChangeID, OpenSpecRef(req.Number)
+	if !domain.ValidChangeID(changeID) {
+		return ProposalResult{}, newFailure(run, domain.RunErrInternal, "the change id is not valid")
+	}
 	useKnowledge := domain.SupportsKnowledgeHub(profile)
 	res, requested, f := e.runAgent(ctx, run, req, in, conn, *ws, changeID, ref, useKnowledge)
 	if f != nil {
@@ -157,7 +164,7 @@ func (e *openspecEngine) GenerateProposal(ctx context.Context, in ProposalInput)
 		f.Raw = res.Stdout
 		return ProposalResult{}, f
 	}
-	return ProposalResult{ChangeID: changeID, Ref: ref, Workspace: *ws, TasksMD: string(raw), Report: parseAgentReport(res.ResultBlock), KnowledgeRequested: requested}, nil
+	return ProposalResult{ChangeID: changeID, Ref: ref, Workspace: *ws, TasksMD: string(raw), Report: parseAgentReport(res.ResultBlock), KnowledgeRequested: requested, SkillHash: profile.SkillHash(domain.KnowledgeSkillNames)}, nil
 }
 
 // capability reads the agent's profile; an unreadable profile means the engine cannot show the agent is safe, so it refuses.
@@ -189,7 +196,7 @@ func (e *openspecEngine) prepare(ctx context.Context, run domain.AnalysisRun, re
 		}
 	}
 	ws, err := e.ws.Ensure(ctx, EnsureWorkspaceInput{
-		TenantID: run.TenantID, ProjectID: req.ProjectID, RequestID: req.ID, RequestNumber: req.Number, ChangeID: OpenSpecChangeID(req.Number),
+		TenantID: run.TenantID, ProjectID: req.ProjectID, RequestID: req.ID, RequestNumber: req.Number, ChangeID: in.ChangeID,
 	})
 	if err != nil {
 		return Workspace{}, workspaceFailure(run, err)

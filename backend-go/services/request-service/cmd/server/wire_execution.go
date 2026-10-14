@@ -74,10 +74,10 @@ func dialExecutionTasks(cfg config.Config, log *slog.Logger) (*executionTasks, e
 	return t, nil
 }
 
-func (t *executionTasks) subjectArtifacts() map[domain.SubjectType]usecase.SubjectArtifacts {
+func (t *executionTasks) subjectArtifacts(changes usecase.OpenSpecChangeRepository) map[domain.SubjectType]usecase.SubjectArtifacts {
 	return map[domain.SubjectType]usecase.SubjectArtifacts{
-		domain.SubjectPlan:      &usecase.PlanArtifacts{Tasks: t.client},
-		domain.SubjectTaskList:  &usecase.PlanArtifacts{Tasks: t.client},
+		domain.SubjectPlan:      &usecase.PlanArtifacts{Tasks: t.client, Changes: changes},
+		domain.SubjectTaskList:  &usecase.PlanArtifacts{Tasks: t.client, Changes: changes},
 		domain.SubjectPhase:     &usecase.PhaseArtifacts{Tasks: t.client},
 		domain.SubjectPreDeploy: &usecase.PreDeployArtifacts{Tasks: t.client},
 	}

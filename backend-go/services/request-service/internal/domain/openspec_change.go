@@ -1,8 +1,11 @@
 package domain
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -34,9 +37,42 @@ var ErrOpenSpecChangeStateInvalid = apperrors.New(apperrors.KindFailedPreconditi
 type OpenSpecChange struct {
 	ID        string
 	RequestID string
+	// ChangeID is the directory name under openspec/changes/; it is fixed at the first generation of the Request.
+	ChangeID  string
+	Branch    string
 	Status    ChangeStatus
 	SyncState SyncState
 	Commit    string
+	// TasksMDDigest is PlanRegionDigest of the committed tasks.md.
+	TasksMDDigest string
+	// The knowledge fields are what the authoring agent reported it read; they are data for the reviewer, not facts Orca verified.
+	KGAvailable bool
+	KGSnapshot  string
+	KGReadIDs   []string
+	KGGaps      []string
+	KGConflicts []string
+	// SkillHash names the installed skill versions the agent worked under.
+	SkillHash string
+	// Bundle holds the committed files of the change by path relative to the change directory, so the proposal can be read
+	// after its worktree is gone. Only text under the size caps is kept.
+	Bundle      map[string]string
+	WorkspaceID string
+	Version     int64
+}
+
+// BundleDigest is a stable hash of the stored files: the plan gate folds it into its subject digest, so a change edited
+// after the approver opened it no longer matches what was shown.
+func (c OpenSpecChange) BundleDigest() string {
+	paths := make([]string, 0, len(c.Bundle))
+	for p := range c.Bundle {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	h := sha256.New()
+	for _, p := range paths {
+		fmt.Fprintf(h, "%d:%s\n%d:%s\n", len(p), p, len(c.Bundle[p]), c.Bundle[p])
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func (c *OpenSpecChange) MarkReady() error {

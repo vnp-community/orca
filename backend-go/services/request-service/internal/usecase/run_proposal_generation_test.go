@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -11,9 +12,11 @@ import (
 
 // scriptedEngine plays the openspec engine: one scripted answer per attempt.
 type scriptedEngine struct {
-	answers []ProposalResult
-	errs    []error
-	inputs  []ProposalInput
+	ws         *fakeWorkspace
+	afterWrite func(dir string)
+	answers    []ProposalResult
+	errs       []error
+	inputs     []ProposalInput
 }
 
 func (e *scriptedEngine) GenerateProposal(_ context.Context, in ProposalInput) (ProposalResult, error) {
@@ -22,10 +25,23 @@ func (e *scriptedEngine) GenerateProposal(_ context.Context, in ProposalInput) (
 	if n < len(e.errs) && e.errs[n] != nil {
 		return ProposalResult{}, e.errs[n]
 	}
+	a := e.answers[len(e.answers)-1]
 	if n < len(e.answers) {
-		return e.answers[n], nil
+		a = e.answers[n]
 	}
-	return e.answers[len(e.answers)-1], nil
+	a.ChangeID = in.ChangeID
+	if e.ws != nil { // act as the agent: leave the files of the change in the worktree
+		dir := "openspec/changes/" + in.ChangeID + "/"
+		e.ws.changed = nil
+		e.ws.write(dir+"tasks.md", a.TasksMD)
+		e.ws.write(dir+"proposal.md", "## Why\nx\n")
+		e.ws.write(dir+"specs/ai/spec.md", "### Requirement: x\n")
+		if e.afterWrite != nil {
+			e.afterWrite(dir)
+		}
+		a.Workspace = e.ws.ws
+	}
+	return a, nil
 }
 
 func (e *scriptedEngine) Name() domain.EngineName { return domain.EngineOpenSpec }
@@ -76,6 +92,11 @@ func (c *stubChecker) Check(context.Context, BundleCheckInput) ([]BundleFinding,
 	return nil, nil
 }
 
+type proposalFixtures struct {
+	ws      *fakeWorkspace
+	changes *fakeChanges
+}
+
 func proposalKit(t *testing.T, eng *scriptedEngine, checker BundleChecker) (*planKit, domain.AnalysisRun, *RunProposalGeneration) {
 	t.Helper()
 	k := newPlanKit(fakeConns{conn: AnalysisConnection{ConnectionID: "c", RepoPath: "/srv/repo"}})
@@ -93,10 +114,13 @@ func proposalKit(t *testing.T, eng *scriptedEngine, checker BundleChecker) (*pla
 	if run.Mode != domain.AnalysisModeAgentProposal {
 		t.Fatalf("setup: run mode %s", run.Mode)
 	}
+	ws, changes := newFakeWorkspace(), newFakeChanges()
+	eng.ws = ws
 	w := NewRunProposalGeneration(RunProposalGenerationDeps{
 		Requests: k.w, Solutions: fakeSolutions{k.w}, Registry: registryWith(eng), Policies: fakePolicies{domain.NewPolicyRegistry(domain.PolicyDeps{})},
-		Checker: checker, Runs: fakeRuns{k.w}, Tx: k.w, Limits: domain.DefaultPlanLimits, Owner: testOwner,
+		Checker: checker, Workspace: ws, Changes: changes, Runs: fakeRuns{k.w}, Tx: k.w, Limits: domain.DefaultPlanLimits, Owner: testOwner,
 	})
+	k.proposal = &proposalFixtures{ws: ws, changes: changes}
 	return k, run, w
 }
 
@@ -276,3 +300,187 @@ func (nativeOnly) GeneratePlan(context.Context, ProjectRef, PlanInput) (string, 
 	return "", ErrEngineStepNotSupported
 }
 func (nativeOnly) OnRequestCompleted(context.Context, ProjectRef, CompletionInput) error { return nil }
+
+func TestRunProposalGeneration_CommitsTheChangeAndRecordsWhatItWasBuiltFrom(t *testing.T) {
+	eng := &scriptedEngine{answers: []ProposalResult{func() ProposalResult {
+		a := answer(tasksDoc(twoPhaseBody))
+		a.SkillHash = "tdd-knowledge=1,tdd-orca-task=4"
+		a.KnowledgeRequested = true
+		a.Report = AgentReport{Present: true, Knowledge: KnowledgeReport{Available: true, Snapshot: "snap-000001", Read: []string{"FR-SYS-07", "ADR-12"}, Gaps: []string{"quota"}, Conflicts: []string{"ADR-12"}}}
+		return a
+	}()}}
+	k, run, w := proposalKit(t, eng, nil)
+	if err := w.Execute(k.w.ctx(), run); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	fx := k.proposal
+	if len(fx.ws.commits) != 1 || !strings.HasPrefix(fx.ws.commits[0], "proposal: REQ-1 ") {
+		t.Fatalf("commits = %v", fx.ws.commits)
+	}
+	prefix := "openspec/changes/" + eng.inputs[0].ChangeID + "/"
+	for _, p := range fx.ws.committed[0] {
+		if !strings.HasPrefix(p, prefix) {
+			t.Fatalf("only paths of the change are committed, got %s", p)
+		}
+	}
+	change, found, _ := fx.changes.GetByRequest(context.Background(), run.RequestID)
+	if !found || change.Status != domain.ChangeStatusReady || change.SyncState != domain.SyncStateInSync || change.Commit != "sha-1" || change.Branch != "request/42-proposal" {
+		t.Fatalf("%+v", change)
+	}
+	if change.ChangeID != eng.inputs[0].ChangeID || !domain.ValidChangeID(change.ChangeID) || change.WorkspaceID != "wt-1" {
+		t.Fatalf("%+v", change)
+	}
+	if change.TasksMDDigest != domain.PlanRegionDigest(tasksDoc(twoPhaseBody)) || change.SkillHash != "tdd-knowledge=1,tdd-orca-task=4" {
+		t.Fatalf("%+v", change)
+	}
+	if !change.KGAvailable || change.KGSnapshot != "snap-000001" || len(change.KGReadIDs) != 2 || len(change.KGGaps) != 1 || len(change.KGConflicts) != 1 {
+		t.Fatalf("what the agent said it read must be kept: %+v", change)
+	}
+	if len(change.Bundle) != 3 || change.Bundle["tasks.md"] != tasksDoc(twoPhaseBody) || change.Bundle["proposal.md"] == "" {
+		t.Fatalf("bundle paths are relative to the change: %v", change.Bundle)
+	}
+}
+
+func TestRunProposalGeneration_FillsEveryTaskPromptAndKeepsTheCriteria(t *testing.T) {
+	eng := &scriptedEngine{answers: []ProposalResult{answer(tasksDoc(twoPhaseBody))}}
+	k, run, w := proposalKit(t, eng, nil)
+	if err := w.Execute(k.w.ctx(), run); err != nil {
+		t.Fatal(err)
+	}
+	p, err := DecodePlanProposal(*k.w.runs[run.ID].RawOutput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := p.Phases[0].Tasks[0]
+	if !strings.Contains(first.PromptTemplate, "task T1.1 of the OpenSpec change "+eng.inputs[0].ChangeID) || !strings.Contains(first.PromptTemplate, "git show request/42-proposal:") {
+		t.Fatalf("the prompt must name the task, the change and the branch: %q", first.PromptTemplate)
+	}
+	if len(first.Satisfies) != 1 || first.Satisfies[0] != "AC-1" || !strings.Contains(first.PromptTemplate, "acceptance criteria AC-1") {
+		t.Fatalf("ac= must survive storage and reach the prompt: %+v", first)
+	}
+	if !strings.Contains(p.Phases[1].Tasks[0].PromptTemplate, "task T2.1") {
+		t.Fatal("ids are positional per phase")
+	}
+}
+
+func TestRunProposalGeneration_ARegenerateKeepsTheChangeIDAndTheRow(t *testing.T) {
+	eng := &scriptedEngine{answers: []ProposalResult{answer(tasksDoc(twoPhaseBody))}}
+	k, run, w := proposalKit(t, eng, nil)
+	if err := w.Execute(k.w.ctx(), run); err != nil {
+		t.Fatal(err)
+	}
+	first, _, _ := k.proposal.changes.GetByRequest(context.Background(), run.RequestID)
+	r := k.w.requests[run.RequestID]
+	r.Title = "Hoàn toàn khác" // the title is edited between generations
+	k.w.requests[run.RequestID] = r
+	run2 := run
+	run2.ID = "run-2"
+	k.w.runs[run2.ID] = run2
+	if err := w.Execute(k.w.ctx(), run2); err != nil {
+		t.Fatal(err)
+	}
+	second, _, _ := k.proposal.changes.GetByRequest(context.Background(), run.RequestID)
+	if eng.inputs[1].ChangeID != eng.inputs[0].ChangeID || second.ChangeID != first.ChangeID || second.ID != first.ID || second.Version != first.Version+1 {
+		t.Fatalf("the directory, branch and row are fixed at the first generation: %+v / %+v", first, second)
+	}
+}
+
+func TestRunProposalGeneration_ACommitThatFailsRecordsNothing(t *testing.T) {
+	eng := &scriptedEngine{answers: []ProposalResult{answer(tasksDoc(twoPhaseBody))}}
+	k, run, w := proposalKit(t, eng, nil)
+	k.proposal.ws.commitErr = errors.New("git refused")
+	f, ok := asFailure(w.Execute(k.w.ctx(), run))
+	if !ok || f.Code != domain.RunErrSpecAgentFailed || strings.Contains(f.Message, "git refused") {
+		t.Fatalf("%+v", f)
+	}
+	if _, found, _ := k.proposal.changes.GetByRequest(context.Background(), run.RequestID); found {
+		t.Fatal("a change that is not on its branch must not be recorded as ready")
+	}
+	if k.w.runs[run.ID].RawOutput != nil {
+		t.Fatal("and the run must not carry a proposal")
+	}
+}
+
+func TestRunProposalGeneration_AStoreFailureRollsTheRunBack(t *testing.T) {
+	eng := &scriptedEngine{answers: []ProposalResult{answer(tasksDoc(twoPhaseBody))}}
+	k, run, w := proposalKit(t, eng, nil)
+	k.proposal.changes.err = errors.New("db down")
+	if err := w.Execute(k.w.ctx(), run); err == nil {
+		t.Fatal("must fail")
+	}
+	if k.w.runs[run.ID].Status == domain.RunStatusSucceeded {
+		t.Fatal("the run must not succeed when its change could not be recorded")
+	}
+}
+
+func TestRunProposalGeneration_OversizeFilesAreKeptAsMarkers(t *testing.T) {
+	eng := &scriptedEngine{answers: []ProposalResult{answer(tasksDoc(twoPhaseBody))}}
+	k, run, w := proposalKit(t, eng, nil)
+	big := strings.Repeat("x", MaxProposalReadBytes)
+	eng.afterWrite = func(dir string) {
+		for i := 0; i < 6; i++ {
+			k.proposal.ws.write(fmt.Sprintf("%sspecs/cap%d/spec.md", dir, i), big)
+		}
+	}
+	if err := w.Execute(k.w.ctx(), run); err != nil {
+		t.Fatal(err)
+	}
+	change, _, _ := k.proposal.changes.GetByRequest(context.Background(), run.RequestID)
+	omitted, whole := 0, 0
+	total := 0
+	for _, v := range change.Bundle {
+		total += len(v)
+		if strings.HasPrefix(v, "<omitted size=") {
+			omitted++
+		} else {
+			whole++
+		}
+	}
+	if omitted == 0 || total > maxBundleBytes+4096 {
+		t.Fatalf("the stored bundle stays under its budget: omitted=%d total=%d", omitted, total)
+	}
+	if len(change.Bundle) != 9 || change.Bundle["tasks.md"] == "" {
+		t.Fatalf("every file is listed, the small ones whole: %d files", len(change.Bundle))
+	}
+}
+
+func TestOpenSpecChange_BundleDigestDependsOnContentNotOrder(t *testing.T) {
+	c := domain.OpenSpecChange{Bundle: map[string]string{"tasks.md": "a", "design.md": "b"}}
+	same := domain.OpenSpecChange{Bundle: map[string]string{"design.md": "b", "tasks.md": "a"}}
+	other := domain.OpenSpecChange{Bundle: map[string]string{"tasks.md": "a", "design.md": "B"}}
+	if c.BundleDigest() != same.BundleDigest() || c.BundleDigest() == other.BundleDigest() {
+		t.Fatal("the digest depends on content, not on map order")
+	}
+	if (domain.OpenSpecChange{}).BundleDigest() == c.BundleDigest() {
+		t.Fatal("an empty bundle differs from a real one")
+	}
+}
+
+func TestRunProposalGeneration_TheStoredProposalGoesThroughCommitPlanWithOrderAndDependencies(t *testing.T) {
+	eng := &scriptedEngine{answers: []ProposalResult{answer(tasksDoc(twoPhaseBody))}}
+	k, run, w := proposalKit(t, eng, nil)
+	if err := w.Execute(k.w.ctx(), run); err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := DecodePlanProposal(*k.w.runs[run.ID].RawOutput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := k.commit.Execute(k.w.ctx(), CommitPlanInput{RequestID: run.RequestID, Proposal: proposal})
+	if err != nil || res.PlanTaskID == "" || len(res.PhaseTaskIDs) != 2 || len(res.TaskIDs) != 3 {
+		t.Fatalf("commit: %+v %v", res, err)
+	}
+	sent := k.writer.calls[0].Proposal
+	if len(sent.Phases) != 2 || sent.Phases[0].Title != "Nền" || sent.Phases[1].Tasks[0].Title != "Nối service" {
+		t.Fatalf("phase and task order must follow tasks.md: %+v", sent)
+	}
+	if got := sent.Phases[0].Tasks[1].DependsOnIndices; len(got) != 1 || got[0] != 0 {
+		t.Fatalf("T1.2 depends on T1.1: %v", got)
+	}
+	if got := sent.Phases[1].DependsOnPhaseIndices; len(got) != 1 || got[0] != 0 {
+		t.Fatalf("PH-2 starts after PH-1: %v", got)
+	}
+	if !strings.Contains(sent.Phases[0].Tasks[0].Description, "Serves: FR-1") || sent.Phases[0].Tasks[0].PromptTemplate == "" {
+		t.Fatalf("the task contract and the standing prompt must reach task-service: %+v", sent.Phases[0].Tasks[0])
+	}
+}

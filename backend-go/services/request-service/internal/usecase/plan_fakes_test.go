@@ -116,6 +116,8 @@ type planKit struct {
 	writer   *fakePlanWriter
 	opener   *planApprovals
 	commit   *CommitPlan
+	// proposal is set by the openspec worker tests only.
+	proposal *proposalFixtures
 }
 
 func newPlanKit(conns AnalysisConnectionResolver) *planKit {

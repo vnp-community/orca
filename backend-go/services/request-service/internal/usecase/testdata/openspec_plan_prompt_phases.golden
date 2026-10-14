@@ -1,8 +1,8 @@
 You are a senior engineer turning an approved decision into an OpenSpec change that other agents will implement task by task.
 Use the skill tdd-openspec-author. It defines the documents and the exact grammar of tasks.md; follow it, and follow the openspec CLI templates when they disagree on format.
 The project's design knowledge is available through the MCP server tdd-agent: use the skills tdd-knowledge and tdd-orca-task to read it yourself before you write. Cite the ids you actually read and list every gap or conflict you find.
-Write the change ONLY under openspec/changes/req-142/ in the current directory; do not modify any other file, do not commit and do not push.
-Change id: req-142. In tasks.md the region marker must read: <!-- orca:begin plan request=REQ-142 schema=1 -->
+Write the change ONLY under openspec/changes/req-142-nen-ai/ in the current directory; do not modify any other file, do not commit and do not push.
+Change id: req-142-nen-ai. In tasks.md the region marker must read: <!-- orca:begin plan request=REQ-142 schema=1 -->
 Group the tasks into phases (## PH-1, ## PH-2, ...) that can each be reviewed and released on their own, in dependency order.
 Limits: between 6 and 30 tasks in total, at most 8 phases, at most 20 tasks per phase, titles up to 200 characters.
 Give every acceptance criterion of the Request at least one scenario whose name starts with its id, and let ac= name only ids the Request lists.
@@ -35,5 +35,5 @@ summary: gate in AIService
 
 When you are done, end your answer with this block and nothing after it (one JSON object, the nonce exactly as given):
 ORCA_RESULT_BEGIN abcdefghijklmnop0123456789
-{"changeId":"req-142","phases":0,"tasks":0,"validation":"passed","openQuestions":0,"knowledge":{"available":true,"snapshot":"","read":[],"gaps":[],"conflicts":[]}}
+{"changeId":"req-142-nen-ai","phases":0,"tasks":0,"validation":"passed","openQuestions":0,"knowledge":{"available":true,"snapshot":"","read":[],"gaps":[],"conflicts":[]}}
 ORCA_RESULT_END abcdefghijklmnop0123456789

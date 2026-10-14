@@ -71,3 +71,51 @@ func TestPlanArtifacts_Refusals(t *testing.T) {
 		t.Fatal("a task-service outage must refuse, not approve blind")
 	}
 }
+
+func TestPlanArtifacts_DigestCoversTheOpenSpecChange(t *testing.T) {
+	req := domain.Request{ID: "r1", Type: domain.RequestTypeChangeRequest}
+	tasks, plan, _ := planTree(req)
+	req.PlanTaskID = plan.ID
+	changes := newFakeChanges()
+	a := &PlanArtifacts{Tasks: tasks, Changes: changes}
+	plain := &PlanArtifacts{Tasks: tasks}
+
+	_, noChange, err := a.Describe(context.Background(), req, domain.SubjectPlan, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, base, _ := plain.Describe(context.Background(), req, domain.SubjectPlan, "")
+	if noChange != base {
+		t.Fatal("a Request without an authored change keeps exactly the old digest")
+	}
+
+	change := domain.OpenSpecChange{ID: "c1", RequestID: req.ID, ChangeID: "req-1-x", Status: domain.ChangeStatusReady, TasksMDDigest: "d1", Bundle: map[string]string{"tasks.md": "a"}}
+	changes.Upsert(context.Background(), change)
+	_, withChange, _ := a.Describe(context.Background(), req, domain.SubjectPlan, "")
+	if withChange == base {
+		t.Fatal("the approver must be approving the change too")
+	}
+	_, again, _ := a.Describe(context.Background(), req, domain.SubjectPlan, "")
+	if again != withChange {
+		t.Fatal("the digest must be stable")
+	}
+
+	change.Bundle = map[string]string{"tasks.md": "edited after the gate opened"}
+	changes.Upsert(context.Background(), change)
+	_, edited, _ := a.Describe(context.Background(), req, domain.SubjectPlan, "")
+	if edited == withChange {
+		t.Fatal("a change regenerated or edited after the gate opened must make the old decision stale")
+	}
+
+	change.Status = domain.ChangeStatusAbandoned
+	changes.Upsert(context.Background(), change)
+	_, abandoned, _ := a.Describe(context.Background(), req, domain.SubjectPlan, "")
+	if abandoned != base {
+		t.Fatal("an abandoned change is not part of what is approved")
+	}
+
+	changes.err = errors.New("db down")
+	if _, _, err := a.Describe(context.Background(), req, domain.SubjectPlan, ""); err == nil {
+		t.Fatal("an unreadable change must not silently weaken the digest")
+	}
+}

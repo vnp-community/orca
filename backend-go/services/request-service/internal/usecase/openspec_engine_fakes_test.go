@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
@@ -17,6 +18,8 @@ type fakeWorkspace struct {
 	ensured   int
 	discarded int
 	commits   []string
+	commitErr error
+	committed [][]string
 	removed   int
 	ensureErr error
 	discErr   error
@@ -117,10 +120,15 @@ func (f *fakeWorkspace) DiscardAll(context.Context, Workspace) error {
 	return f.discErr
 }
 
-func (f *fakeWorkspace) Commit(_ context.Context, _ Workspace, message string, _ []string) (string, error) {
+func (f *fakeWorkspace) Commit(_ context.Context, _ Workspace, message string, paths []string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.commitErr != nil {
+		return "", f.commitErr
+	}
 	f.commits = append(f.commits, message)
+	f.committed = append(f.committed, paths)
+	f.changed = nil // a commit leaves the worktree clean
 	return "sha-1", nil
 }
 
@@ -191,4 +199,45 @@ type fakeGateExec struct{ res ExecResult }
 
 func (g fakeGateExec) Exec(context.Context, AnalysisConnection, ExecInput) (ExecResult, error) {
 	return g.res, nil
+}
+
+// fakeChanges is the OpenSpec change table in memory, with the real repositories' upsert semantics.
+type fakeChanges struct {
+	mu     sync.Mutex
+	byReq  map[string]domain.OpenSpecChange
+	err    error
+	upsert int
+}
+
+func newFakeChanges() *fakeChanges { return &fakeChanges{byReq: map[string]domain.OpenSpecChange{}} }
+
+func (f *fakeChanges) GetByRequest(_ context.Context, requestID string) (domain.OpenSpecChange, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c, ok := f.byReq[requestID]
+	return c, ok, f.err
+}
+
+func (f *fakeChanges) Upsert(_ context.Context, c domain.OpenSpecChange) (domain.OpenSpecChange, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return domain.OpenSpecChange{}, f.err
+	}
+	f.upsert++
+	if prev, ok := f.byReq[c.RequestID]; ok {
+		c.ID, c.Version = prev.ID, prev.Version+1
+	} else {
+		c.Version = 1
+	}
+	f.byReq[c.RequestID] = c
+	return c, nil
+}
+
+func (f *fakeChanges) UpdateSync(context.Context, string, domain.SyncState, string, *time.Time, int64) error {
+	return nil
+}
+
+func (f *fakeChanges) ListPendingSync(context.Context, int) ([]domain.OpenSpecChange, error) {
+	return nil, nil
 }

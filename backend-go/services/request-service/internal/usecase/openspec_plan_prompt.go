@@ -51,9 +51,6 @@ func TaskRangeFor(size domain.RequestSize, limits domain.PlanLimits) (minTasks, 
 	return minTasks, maxTasks
 }
 
-// OpenSpecChangeID is the directory name of the change under openspec/changes/: lowercase, stable per Request.
-func OpenSpecChangeID(number int64) string { return fmt.Sprintf("req-%d", number) }
-
 // OpenSpecRef is how a Request is named inside tasks.md.
 func OpenSpecRef(number int64) string { return fmt.Sprintf("REQ-%d", number) }
 

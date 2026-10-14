@@ -2,11 +2,14 @@ package usecase
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
@@ -44,6 +47,8 @@ type RunProposalGeneration struct {
 	settings  EngineSettingsRepository
 	checker   BundleChecker
 	workspace ProposalWorkspace
+	changes   OpenSpecChangeRepository
+	newID     func() string
 	runs      AnalysisRunStore
 	tx        TxRunner
 	limits    domain.PlanLimits
@@ -64,15 +69,17 @@ type RunProposalGenerationDeps struct {
 	EngineSettings EngineSettingsRepository
 	Checker        BundleChecker
 	Workspace      ProposalWorkspace
-	Runs           AnalysisRunStore
-	Tx             TxRunner
-	Limits         domain.PlanLimits
-	Owner          string
+	// Changes stores what the change was built from; the proposal cannot be recorded without it.
+	Changes OpenSpecChangeRepository
+	Runs    AnalysisRunStore
+	Tx      TxRunner
+	Limits  domain.PlanLimits
+	Owner   string
 }
 
 func NewRunProposalGeneration(d RunProposalGenerationDeps) *RunProposalGeneration {
 	return &RunProposalGeneration{requests: d.Requests, solutions: d.Solutions, registry: d.Registry, projects: d.Projects, policies: d.Policies,
-		settings: d.EngineSettings, checker: d.Checker, workspace: d.Workspace, runs: d.Runs, tx: d.Tx, limits: d.Limits, owner: d.Owner, now: func() time.Time { return time.Now().UTC() }}
+		settings: d.EngineSettings, checker: d.Checker, workspace: d.Workspace, changes: d.Changes, newID: uuid.NewString, runs: d.Runs, tx: d.Tx, limits: d.Limits, owner: d.Owner, now: func() time.Time { return time.Now().UTC() }}
 }
 
 func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.AnalysisRun) error {
@@ -92,7 +99,16 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 		return newFailure(run, "REQUEST_PLAN_NOT_APPLICABLE", "this request type has no Plan")
 	}
 
-	in := ProposalInput{Run: run, Request: req, Shape: shape, Limits: w.limits, Feedback: run.Feedback, Settings: w.engineSettings(ctx, req.ProjectID)}
+	existing, hasChange, err := w.changes.GetByRequest(ctx, req.ID)
+	if err != nil {
+		return err
+	}
+	// The change id is fixed at the first generation: a regenerate after the title was edited must reuse the same directory and branch.
+	changeID := existing.ChangeID
+	if !hasChange || !domain.ValidChangeID(changeID) {
+		changeID = domain.NewChangeID(req.Number, req.Title)
+	}
+	in := ProposalInput{Run: run, Request: req, ChangeID: changeID, Shape: shape, Limits: w.limits, Feedback: run.Feedback, Settings: w.engineSettings(ctx, req.ProjectID)}
 	in.ProjectName, in.RepoURL = projectFacts(ctx, w.projects, req.ProjectID)
 	if sol, ok := latestApprovedAnalysis(ctx, w.solutions, req.ID); ok {
 		in.Analysis = approvedAnalysisText(sol)
@@ -120,7 +136,7 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 				// REQUEST_SPEC_REPORT_MISSING: worth knowing, never a reason to refuse a change that passed every check.
 				slog.WarnContext(ctx, "the authoring agent left no result block", slog.String("run_id", run.ID), slog.String("code", "REQUEST_SPEC_REPORT_MISSING"))
 			}
-			return w.finish(ctx, run, proposal)
+			return w.finish(ctx, run, req, res, proposal, existing, hasChange)
 		}
 		if rerr := run.RecordAttempt(); rerr != nil {
 			f := newFailure(run, domain.RunErrSpecInvalidOutput, "the agent did not leave a valid change after a retry: "+problems[0])
@@ -167,6 +183,7 @@ func (w *RunProposalGeneration) assemble(ctx context.Context, req domain.Request
 	}
 	proposal.Title = req.Title
 	proposal.Summary = "OpenSpec change " + res.ChangeID
+	proposal = FillTaskPrompts(proposal, TaskPromptContext{Ref: res.Ref, ChangeID: res.ChangeID, Branch: res.Workspace.Branch})
 	proposal = domain.NormalizePlanProposal(proposal)
 	if err := domain.ValidatePlanProposal(req.Type, shape, w.limits, proposal); err != nil {
 		if !planErrorIsModelFault(err) {
@@ -207,10 +224,96 @@ func violationLines(v []domain.Violation) []string {
 	return out
 }
 
-func (w *RunProposalGeneration) finish(ctx context.Context, run domain.AnalysisRun, p domain.PlanProposal) error {
+// Caps on what is kept of the change in the database: every file is read as a proposal document, and the total stays small
+// enough for a row. A file beyond the budget is kept as a marker with its size and hash, so the list and the digest stay whole.
+const (
+	maxBundleBytes     = 1 << 20
+	maxReportedEntries = 200
+	maxReportedRunes   = 500
+)
+
+// finish commits the change to its branch, reads the files back, records what the change was built from and stores the
+// proposal on the run, the last two in one transaction. The commit comes first: a change that is not on the branch must
+// not be recorded as ready.
+func (w *RunProposalGeneration) finish(ctx context.Context, run domain.AnalysisRun, req domain.Request, res ProposalResult, p domain.PlanProposal, prev domain.OpenSpecChange, hasPrev bool) error {
 	encoded, err := EncodePlanProposal(p)
 	if err != nil {
 		return err
 	}
-	return finishPlanRun(ctx, w.tx, w.runs, w.owner, w.now(), run, encoded)
+	sha, bundle, err := w.commitAndRead(ctx, req, res)
+	if err != nil {
+		slog.WarnContext(ctx, "could not commit the proposal to its branch", slog.String("run_id", run.ID), slog.Any("error", err))
+		return newFailure(run, domain.RunErrSpecAgentFailed, "the change could not be committed to its branch")
+	}
+	change := domain.OpenSpecChange{
+		ID: w.newID(), RequestID: req.ID, ChangeID: res.ChangeID, Branch: res.Workspace.Branch, Status: domain.ChangeStatusReady,
+		SyncState: domain.SyncStateInSync, Commit: sha, TasksMDDigest: domain.PlanRegionDigest(res.TasksMD),
+		KGAvailable: res.Report.Present && res.Report.Knowledge.Available && res.KnowledgeRequested, KGSnapshot: clip(res.Report.Knowledge.Snapshot, maxReportedRunes),
+		KGReadIDs: boundedList(res.Report.Knowledge.Read), KGGaps: boundedList(res.Report.Knowledge.Gaps), KGConflicts: boundedList(res.Report.Knowledge.Conflicts),
+		SkillHash: res.SkillHash, Bundle: bundle, WorkspaceID: res.Workspace.WorktreeID,
+	}
+	if hasPrev {
+		change.ID = prev.ID
+	}
+	return w.tx.InTx(ctx, func(ctx context.Context) error {
+		if _, err := w.changes.Upsert(ctx, change); err != nil {
+			return err
+		}
+		return finishPlanRun(ctx, w.tx, w.runs, w.owner, w.now(), run, encoded)
+	})
+}
+
+// commitAndRead commits every changed path of the (already scope-checked) worktree and reads the change's files back.
+func (w *RunProposalGeneration) commitAndRead(ctx context.Context, req domain.Request, res ProposalResult) (string, map[string]string, error) {
+	changed, err := w.workspace.ChangedPaths(ctx, res.Workspace)
+	if err != nil {
+		return "", nil, err
+	}
+	prefix := "openspec/changes/" + res.ChangeID + "/"
+	var paths []string
+	for _, c := range changed {
+		if !strings.HasPrefix(c.Path, prefix) {
+			return "", nil, fmt.Errorf("a path outside the change appeared after the scope check: %s", c.Path)
+		}
+		paths = append(paths, c.Path)
+	}
+	if len(paths) == 0 {
+		return "", nil, fmt.Errorf("the worktree has nothing to commit")
+	}
+	sha, err := w.workspace.Commit(ctx, res.Workspace, "proposal: "+res.Ref+" "+clip(req.Title, 100), paths)
+	if err != nil {
+		return "", nil, err
+	}
+	bundle := map[string]string{}
+	budget := maxBundleBytes
+	for _, p := range paths {
+		b, err := w.workspace.ReadFile(ctx, res.Workspace, p, MaxProposalReadBytes)
+		if err != nil {
+			return "", nil, fmt.Errorf("read back %s: %w", p, err)
+		}
+		rel := strings.TrimPrefix(p, prefix)
+		if len(b) > budget {
+			bundle[rel] = omittedMarker(b)
+			continue
+		}
+		budget -= len(b)
+		bundle[rel] = string(b)
+	}
+	return sha, bundle, nil
+}
+
+func omittedMarker(b []byte) string {
+	sum := sha256.Sum256(b)
+	return fmt.Sprintf("<omitted size=%d sha256=%s>", len(b), hex.EncodeToString(sum[:]))
+}
+
+func boundedList(in []string) []string {
+	if len(in) > maxReportedEntries {
+		in = in[:maxReportedEntries]
+	}
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		out = append(out, clip(s, maxReportedRunes))
+	}
+	return out
 }

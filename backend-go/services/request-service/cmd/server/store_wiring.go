@@ -35,11 +35,13 @@ type requestStores struct {
 	analysisRuns usecase.AnalysisRunStore
 	// engineSettings holds the per-project engine choice; the Request pins its engine from it at the first generation.
 	engineSettings usecase.EngineSettingsRepository
-	links          usecase.RequestLinkRepository
-	idempotency    usecase.RequestIdempotencyRepository
-	processed      usecase.ProcessedEventRepository
-	classRuns      usecase.ClassificationRunRepository
-	artifact       artifactStores
+	// openspecChanges is the authored OpenSpec change of a Request: its files, branch, commit and what it was built from.
+	openspecChanges usecase.OpenSpecChangeRepository
+	links           usecase.RequestLinkRepository
+	idempotency     usecase.RequestIdempotencyRepository
+	processed       usecase.ProcessedEventRepository
+	classRuns       usecase.ClassificationRunRepository
+	artifact        artifactStores
 	// Rollout (CR-REQ-024/025): flag row, active-source lookup, cross-tenant gauge counts.
 	flowSettings usecase.FlowSettingsRepository
 	sourceFinder usecase.ActiveSourceFinder
@@ -64,35 +66,36 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 		base := postgresadapter.New(pool)
 		healthSrv.Register("postgres", func() error { return probeWithTimeout(pool.Ping) })
 		return &requestStores{
-			outbox:         base,
-			outboxWriter:   base,
-			tx:             base,
-			txScope:        base,
-			approvals:      postgresadapter.NewApprovalRepository(base),
-			approvers:      postgresadapter.NewApproverRepository(base),
-			policies:       postgresadapter.NewPolicyRepository(base),
-			locker:         postgresadapter.NewRequestLocker(base),
-			returns:        postgresadapter.NewReturnHistoryRepository(base),
-			requests:       postgresadapter.NewRequestRepository(base),
-			history:        postgresadapter.NewRequestTypeHistoryRepository(base),
-			solutions:      postgresadapter.NewSolutionRecordRepository(base),
-			analysisRuns:   postgresadapter.NewAnalysisRunRepository(base),
-			engineSettings: postgresadapter.NewProjectEngineSettingsRepository(base),
-			links:          postgresadapter.NewRequestLinkRepository(base),
-			idempotency:    postgresadapter.NewRequestIdempotencyRepository(base),
-			processed:      postgresadapter.NewProcessedEventRepository(base),
-			classRuns:      postgresadapter.NewClassificationRunRepository(base),
-			artifact:       postgresArtifactStores(base),
-			flowSettings:   postgresadapter.NewFlowSettingsRepository(base),
-			sourceFinder:   postgresadapter.NewSourceLookup(base),
-			samples:        postgresadapter.NewMetricsSamples(base),
-			auditOutbox:    postgresadapter.NewAuditOutboxRepository(base),
-			nonces:         postgresadapter.NewWebhookNonceRepository(base),
-			secFlags:       postgresadapter.NewSecurityFlagRepository(base),
-			concurrency:    postgresadapter.NewConcurrencyCountRepository(base),
-			retention:      postgresadapter.NewRetentionRepository(base),
-			execution:      postgresExecutionStores(base),
-			close:          pool.Close,
+			outbox:          base,
+			outboxWriter:    base,
+			tx:              base,
+			txScope:         base,
+			approvals:       postgresadapter.NewApprovalRepository(base),
+			approvers:       postgresadapter.NewApproverRepository(base),
+			policies:        postgresadapter.NewPolicyRepository(base),
+			locker:          postgresadapter.NewRequestLocker(base),
+			returns:         postgresadapter.NewReturnHistoryRepository(base),
+			requests:        postgresadapter.NewRequestRepository(base),
+			history:         postgresadapter.NewRequestTypeHistoryRepository(base),
+			solutions:       postgresadapter.NewSolutionRecordRepository(base),
+			analysisRuns:    postgresadapter.NewAnalysisRunRepository(base),
+			engineSettings:  postgresadapter.NewProjectEngineSettingsRepository(base),
+			openspecChanges: postgresadapter.NewOpenSpecChangeRepository(base),
+			links:           postgresadapter.NewRequestLinkRepository(base),
+			idempotency:     postgresadapter.NewRequestIdempotencyRepository(base),
+			processed:       postgresadapter.NewProcessedEventRepository(base),
+			classRuns:       postgresadapter.NewClassificationRunRepository(base),
+			artifact:        postgresArtifactStores(base),
+			flowSettings:    postgresadapter.NewFlowSettingsRepository(base),
+			sourceFinder:    postgresadapter.NewSourceLookup(base),
+			samples:         postgresadapter.NewMetricsSamples(base),
+			auditOutbox:     postgresadapter.NewAuditOutboxRepository(base),
+			nonces:          postgresadapter.NewWebhookNonceRepository(base),
+			secFlags:        postgresadapter.NewSecurityFlagRepository(base),
+			concurrency:     postgresadapter.NewConcurrencyCountRepository(base),
+			retention:       postgresadapter.NewRetentionRepository(base),
+			execution:       postgresExecutionStores(base),
+			close:           pool.Close,
 		}, nil
 	case dbcapability.DialectMySQL:
 		mysqlDSN, err := toMySQLDriverDSN(dsn)
@@ -109,35 +112,36 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 		base := mysqladapter.New(db)
 		healthSrv.Register("mysql", func() error { return probeWithTimeout(db.PingContext) })
 		return &requestStores{
-			outbox:         base,
-			outboxWriter:   base,
-			tx:             base,
-			txScope:        base,
-			approvals:      mysqladapter.NewApprovalRepository(base),
-			approvers:      mysqladapter.NewApproverRepository(base),
-			policies:       mysqladapter.NewPolicyRepository(base),
-			locker:         mysqladapter.NewRequestLocker(base),
-			returns:        mysqladapter.NewReturnHistoryRepository(base),
-			requests:       mysqladapter.NewRequestRepository(base),
-			history:        mysqladapter.NewRequestTypeHistoryRepository(base),
-			solutions:      mysqladapter.NewSolutionRecordRepository(base),
-			analysisRuns:   mysqladapter.NewAnalysisRunRepository(base),
-			engineSettings: mysqladapter.NewProjectEngineSettingsRepository(base),
-			links:          mysqladapter.NewRequestLinkRepository(base),
-			idempotency:    mysqladapter.NewRequestIdempotencyRepository(base),
-			processed:      mysqladapter.NewProcessedEventRepository(base),
-			classRuns:      mysqladapter.NewClassificationRunRepository(base),
-			artifact:       mysqlArtifactStores(base),
-			flowSettings:   mysqladapter.NewFlowSettingsRepository(base),
-			sourceFinder:   mysqladapter.NewSourceLookup(base),
-			samples:        mysqladapter.NewMetricsSamples(base),
-			auditOutbox:    mysqladapter.NewAuditOutboxRepository(base),
-			nonces:         mysqladapter.NewWebhookNonceRepository(base),
-			secFlags:       mysqladapter.NewSecurityFlagRepository(base),
-			concurrency:    mysqladapter.NewConcurrencyCountRepository(base),
-			retention:      mysqladapter.NewRetentionRepository(base),
-			execution:      mysqlExecutionStores(base),
-			close:          func() { _ = db.Close() },
+			outbox:          base,
+			outboxWriter:    base,
+			tx:              base,
+			txScope:         base,
+			approvals:       mysqladapter.NewApprovalRepository(base),
+			approvers:       mysqladapter.NewApproverRepository(base),
+			policies:        mysqladapter.NewPolicyRepository(base),
+			locker:          mysqladapter.NewRequestLocker(base),
+			returns:         mysqladapter.NewReturnHistoryRepository(base),
+			requests:        mysqladapter.NewRequestRepository(base),
+			history:         mysqladapter.NewRequestTypeHistoryRepository(base),
+			solutions:       mysqladapter.NewSolutionRecordRepository(base),
+			analysisRuns:    mysqladapter.NewAnalysisRunRepository(base),
+			engineSettings:  mysqladapter.NewProjectEngineSettingsRepository(base),
+			openspecChanges: mysqladapter.NewOpenSpecChangeRepository(base),
+			links:           mysqladapter.NewRequestLinkRepository(base),
+			idempotency:     mysqladapter.NewRequestIdempotencyRepository(base),
+			processed:       mysqladapter.NewProcessedEventRepository(base),
+			classRuns:       mysqladapter.NewClassificationRunRepository(base),
+			artifact:        mysqlArtifactStores(base),
+			flowSettings:    mysqladapter.NewFlowSettingsRepository(base),
+			sourceFinder:    mysqladapter.NewSourceLookup(base),
+			samples:         mysqladapter.NewMetricsSamples(base),
+			auditOutbox:     mysqladapter.NewAuditOutboxRepository(base),
+			nonces:          mysqladapter.NewWebhookNonceRepository(base),
+			secFlags:        mysqladapter.NewSecurityFlagRepository(base),
+			concurrency:     mysqladapter.NewConcurrencyCountRepository(base),
+			retention:       mysqladapter.NewRetentionRepository(base),
+			execution:       mysqlExecutionStores(base),
+			close:           func() { _ = db.Close() },
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported database dialect: %s", dialect)

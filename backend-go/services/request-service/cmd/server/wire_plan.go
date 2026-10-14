@@ -86,7 +86,7 @@ func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solut
 	registry.Register(engine)
 	solution.runner.WithProposalWorker(usecase.NewRunProposalGeneration(usecase.RunProposalGenerationDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Registry: registry, Projects: solution.projects, Policies: policies,
-		EngineSettings: stores.engineSettings, Workspace: workspace, Checker: usecase.NewOpenSpecBundleChecker(executor, solution.conns, limits), Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
+		EngineSettings: stores.engineSettings, Workspace: workspace, Changes: stores.openspecChanges, Checker: usecase.NewOpenSpecBundleChecker(executor, solution.conns, limits), Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
 	}))
 	return registry
 }

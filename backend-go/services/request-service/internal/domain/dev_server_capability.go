@@ -2,6 +2,8 @@ package domain
 
 import (
 	"encoding/json"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -37,7 +39,39 @@ type DevServerCapability struct {
 	// AISources names where ai.complete can get credentials ("env_key", "cli_session"); known only when the agent reports it.
 	AISources      []string
 	AISourcesKnown bool
-	ProbedAt       time.Time
+	// Skills are the knowledge-hub skills the agent found under ~/.claude/skills (name and content hash only).
+	Skills      map[string]SkillStatus
+	SkillsKnown bool
+	ProbedAt    time.Time
+}
+
+// SkillStatus is one skill as the agent reports it.
+type SkillStatus struct {
+	Installed bool
+	// SHA256 is a prefix of the content hash; empty when the skill is not installed.
+	SHA256 string
+}
+
+// KnowledgeSkillNames are the skills the engine relies on; the agent reports exactly these and nothing else.
+var KnowledgeSkillNames = []string{"tdd-knowledge", "tdd-knowledge-writeback", "tdd-openspec-author", "tdd-orca-task"}
+
+// SkillHash names the installed skill versions in one string, so a stored change says which instructions the agent worked
+// under. It is empty unless every named skill is installed.
+func (c DevServerCapability) SkillHash(names []string) string {
+	if !c.SkillsKnown {
+		return ""
+	}
+	sorted := append([]string(nil), names...)
+	sort.Strings(sorted)
+	parts := make([]string, 0, len(sorted))
+	for _, n := range sorted {
+		st, ok := c.Skills[n]
+		if !ok || !st.Installed || st.SHA256 == "" {
+			return ""
+		}
+		parts = append(parts, n+"="+st.SHA256)
+	}
+	return strings.Join(parts, ",")
 }
 
 func (c DevServerCapability) HasFeature(name string) bool {
@@ -116,6 +150,11 @@ func ParseCapabilityProfile(source string, degraded, connected bool, buildVersio
 			Present bool   `json:"present"`
 		} `json:"env"`
 		AISources []string `json:"aiSources"`
+		Skills    []struct {
+			Name      string `json:"name"`
+			Installed bool   `json:"installed"`
+			SHA256    string `json:"sha256"`
+		} `json:"skills"`
 	}
 
 	// Try minimal structural check first
@@ -166,6 +205,14 @@ func ParseCapabilityProfile(source string, degraded, connected bool, buildVersio
 		c.EnvKnown = true
 		for _, e := range root.Env {
 			c.EnvPresent[e.Name] = e.Present
+		}
+	}
+
+	if _, ok := m["skills"]; ok {
+		c.SkillsKnown = true
+		c.Skills = make(map[string]SkillStatus, len(root.Skills))
+		for _, sk := range root.Skills {
+			c.Skills[sk.Name] = SkillStatus{Installed: sk.Installed, SHA256: sk.SHA256}
 		}
 	}
 

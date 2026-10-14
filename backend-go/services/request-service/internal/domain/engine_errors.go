@@ -18,6 +18,9 @@ var (
 	ErrEngineRepoNotResolved         = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ENGINE_REPO_NOT_RESOLVED", "repo not resolved", nil)
 	ErrEngineSettingsVersionConflict = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ENGINE_SETTINGS_VERSION_CONFLICT", "settings version conflict", nil)
 
+	ErrOpenSpecChangeNotFound        = apperrors.New(apperrors.KindNotFound, "REQUEST_OPENSPEC_CHANGE_NOT_FOUND", "openspec change not found", nil)
+	ErrOpenSpecChangeVersionConflict = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_OPENSPEC_CHANGE_VERSION_CONFLICT", "openspec change version conflict", nil)
+
 	ErrOpenSpecInvalidOutput    = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_OPENSPEC_INVALID_OUTPUT", "invalid output", nil)
 	ErrOpenSpecAgentFailed      = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_OPENSPEC_AGENT_FAILED", "agent failed", nil)
 	ErrOpenSpecTimeout          = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_OPENSPEC_TIMEOUT", "timeout", nil)

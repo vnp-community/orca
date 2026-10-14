@@ -20,7 +20,7 @@ func openSpecPromptInput() OpenSpecPlanPromptInput {
 	}
 	min, max := TaskRangeFor(req.Size, domain.DefaultPlanLimits)
 	return OpenSpecPlanPromptInput{
-		Request: req, Ref: OpenSpecRef(142), ChangeID: OpenSpecChangeID(142), Shape: domain.ShapePlanPhases, Limits: domain.DefaultPlanLimits,
+		Request: req, Ref: OpenSpecRef(142), ChangeID: "req-142-nen-ai", Shape: domain.ShapePlanPhases, Limits: domain.DefaultPlanLimits,
 		MinTasks: min, MaxTasks: max, ProjectName: "TMS", RepoURL: "/srv/tms", Analysis: "chosen option: B\nsummary: gate in AIService\n",
 		KnowledgeAvailable: true, ResultNonce: "abcdefghijklmnop0123456789",
 	}
@@ -56,7 +56,7 @@ func TestBuildOpenSpecPlanPrompt_Golden(t *testing.T) {
 func TestBuildOpenSpecPlanPrompt_Contract(t *testing.T) {
 	p := BuildOpenSpecPlanPrompt(openSpecPromptInput())
 	for _, must := range []string{
-		"openspec/changes/req-142/", "request=REQ-142 schema=1", "tdd-openspec-author", "tdd-knowledge", "between 6 and 30 tasks",
+		"openspec/changes/req-142-nen-ai/", "request=REQ-142 schema=1", "tdd-openspec-author", "tdd-knowledge", "between 6 and 30 tasks",
 		"ORCA_RESULT_BEGIN abcdefghijklmnop0123456789", "ORCA_RESULT_END abcdefghijklmnop0123456789", "openspec validate --strict",
 		"do not commit and do not push", "<approved_decision>",
 	} {
@@ -100,7 +100,7 @@ func TestTaskRangeFor_StaysInsideTheLimits(t *testing.T) {
 }
 
 func TestOpenSpecNames(t *testing.T) {
-	if OpenSpecChangeID(7) != "req-7" || OpenSpecRef(7) != "REQ-7" {
-		t.Fatal("names are stable per Request number")
+	if OpenSpecRef(7) != "REQ-7" {
+		t.Fatal("the ref is stable per Request number")
 	}
 }

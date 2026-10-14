@@ -19,7 +19,7 @@ const goodTasksMD = `<!-- orca:begin plan request=REQ-42 schema=1 -->
 <!-- orca:end plan -->
 `
 
-const changeTasksPath = "openspec/changes/req-42/tasks.md"
+const changeTasksPath = "openspec/changes/req-42-add-ai/tasks.md"
 
 type engineKit struct {
 	ws    *fakeWorkspace
@@ -36,7 +36,7 @@ func newEngineKit(features []string) *engineKit {
 		Gate: gate, Workspace: ws, Agent: agent, Conns: conns, Caps: specCaps{features: features}, NewNonce: func() string { return "nonce0123456789abcdef" },
 	})
 	req := domain.Request{ID: "req-uuid", ProjectID: "proj", Number: 42, Title: "Add AI", Type: domain.RequestTypeChangeRequest, Size: domain.RequestSizeL}
-	in := ProposalInput{Run: domain.AnalysisRun{ID: "run-1", TenantID: "t1"}, Request: req, Shape: domain.ShapePlanPhases, Limits: domain.DefaultPlanLimits}
+	in := ProposalInput{Run: domain.AnalysisRun{ID: "run-1", TenantID: "t1"}, Request: req, ChangeID: "req-42-add-ai", Shape: domain.ShapePlanPhases, Limits: domain.DefaultPlanLimits}
 	return &engineKit{ws: ws, agent: agent, e: e, in: in}
 }
 
@@ -61,7 +61,7 @@ func TestOpenSpecEngine_AuthorsTheChangeInAFreshWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.ChangeID != "req-42" || res.Ref != "REQ-42" || res.TasksMD != goodTasksMD || res.Workspace.WorktreeID != "wt-1" {
+	if res.ChangeID != "req-42-add-ai" || res.Ref != "REQ-42" || res.TasksMD != goodTasksMD || res.Workspace.WorktreeID != "wt-1" {
 		t.Fatalf("result = %+v", res)
 	}
 	if !res.Report.Present || res.Report.Knowledge.Snapshot != "snap-1" || len(res.Report.Knowledge.Read) != 1 || !res.KnowledgeRequested {
@@ -77,7 +77,7 @@ func TestOpenSpecEngine_AuthorsTheChangeInAFreshWorktree(t *testing.T) {
 	if in.KnowledgeRoot != "/srv/repo" {
 		t.Fatalf("the graph lives in the project checkout, not in the proposal worktree: %q", in.KnowledgeRoot)
 	}
-	if !strings.Contains(in.Prompt, "openspec/changes/req-42/") || !strings.Contains(in.Prompt, "request=REQ-42") || !strings.Contains(in.Prompt, "ORCA_RESULT_BEGIN nonce0123456789abcdef") {
+	if !strings.Contains(in.Prompt, "openspec/changes/req-42-add-ai/") || !strings.Contains(in.Prompt, "request=REQ-42") || !strings.Contains(in.Prompt, "ORCA_RESULT_BEGIN nonce0123456789abcdef") {
 		t.Fatalf("prompt: %s", in.Prompt)
 	}
 	if in.TimeoutMS != 900_000 || in.ProposeChangesets {

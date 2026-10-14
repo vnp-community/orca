@@ -34,6 +34,8 @@ type taskDocument struct {
 	DependsOnIndices []int    `json:"depends_on_indices,omitempty"`
 	Labels           []string `json:"labels,omitempty"`
 	Irreversible     bool     `json:"irreversible,omitempty"`
+	// Satisfies lists the acceptance criteria a task serves (ac= in an OpenSpec tasks.md); the model-written plan leaves it empty.
+	Satisfies []string `json:"satisfies,omitempty"`
 }
 
 func (d planDocument) proposal() domain.PlanProposal {
@@ -51,7 +53,7 @@ func tasksOf(in []taskDocument) []domain.TaskProposal {
 	for _, t := range in {
 		out = append(out, domain.TaskProposal{
 			Title: t.Title, Description: t.Description, TaskType: t.TaskType, EstimatedHours: t.EstimatedHours, PromptTemplate: t.PromptTemplate,
-			DependsOnIndices: t.DependsOnIndices, Labels: t.Labels, Irreversible: t.Irreversible,
+			DependsOnIndices: t.DependsOnIndices, Labels: t.Labels, Irreversible: t.Irreversible, Satisfies: t.Satisfies,
 		})
 	}
 	return out
@@ -70,7 +72,7 @@ func taskDocsOf(in []domain.TaskProposal) []taskDocument {
 	for _, t := range in {
 		out = append(out, taskDocument{
 			Title: t.Title, Description: t.Description, TaskType: t.TaskType, EstimatedHours: t.EstimatedHours, PromptTemplate: t.PromptTemplate,
-			DependsOnIndices: t.DependsOnIndices, Labels: t.Labels, Irreversible: t.Irreversible,
+			DependsOnIndices: t.DependsOnIndices, Labels: t.Labels, Irreversible: t.Irreversible, Satisfies: t.Satisfies,
 		})
 	}
 	return out

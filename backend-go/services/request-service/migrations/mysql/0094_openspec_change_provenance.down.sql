@@ -1,0 +1,10 @@
+ALTER TABLE openspec_changes
+    DROP COLUMN workspace_id,
+    DROP COLUMN bundle_json,
+    DROP COLUMN skill_hash,
+    DROP COLUMN kg_conflicts,
+    DROP COLUMN kg_gaps,
+    DROP COLUMN kg_read_ids,
+    DROP COLUMN kg_snapshot,
+    DROP COLUMN kg_available,
+    DROP COLUMN tasks_md_digest;
