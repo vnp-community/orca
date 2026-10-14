@@ -298,6 +298,9 @@ func (r *RelayExecutor) Commit(ctx context.Context, repoPath, message string, pa
 	if err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": []string{"rev-parse", "HEAD"}, "cwd": repoPath}, &head); err != nil {
 		return domain.CommitResult{}, err
 	}
+	if err := head.failed("git rev-parse HEAD"); err != nil {
+		return domain.CommitResult{}, err
+	}
 	return domain.CommitResult{CommitSHA: strings.TrimSpace(head.Stdout)}, nil
 }
 
@@ -381,8 +384,12 @@ func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, ba
 	if baseRef != "" {
 		params["baseRef"] = baseRef
 	}
-	if err := r.relay(ctx, repoPath, "git.worktree.add", params, nil); err != nil {
+	var added gitExecResult
+	if err := r.relay(ctx, repoPath, "git.worktree.add", params, &added); err != nil {
 		return domain.WorktreeCreateResult{}, err
+	}
+	if err := added.failed("git worktree add"); err != nil {
+		return domain.WorktreeCreateResult{}, err // not followed by rev-parse in a directory that was never made
 	}
 
 	// The agent's git.worktree.add has no structured result to unmarshal
@@ -398,6 +405,9 @@ func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, ba
 	if err != nil {
 		return domain.WorktreeCreateResult{}, err
 	}
+	if err := execResult.failed("git rev-parse HEAD"); err != nil {
+		return domain.WorktreeCreateResult{}, err
+	}
 	return domain.WorktreeCreateResult{Path: targetPath, HeadSHA: strings.TrimSpace(execResult.Stdout)}, nil
 }
 
@@ -411,11 +421,12 @@ func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, ba
 // the answer was always "does not exist" and a worktree for an existing branch
 // (a removed proposal worktree being recreated) failed on `-b`.
 func (r *RelayExecutor) branchExistsLocally(ctx context.Context, repoPath, branch string) bool {
+	var res gitExecResult
 	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
 		"args": []string{"rev-parse", "--verify", "--quiet", "refs/heads/" + branch},
 		"cwd":  repoPath,
-	}, nil)
-	return err == nil
+	}, &res)
+	return err == nil && res.ExitCode == 0 // a missing ref is exit 1, which the agent still answers as a success
 }
 
 // sanitizeBranchForRelayPath mirrors localgit.Executor's own
@@ -908,6 +919,17 @@ func (r *RelayExecutor) Checkout(ctx context.Context, repoPath, branch string) (
 type gitExecResult struct {
 	Stdout string `json:"stdout"`
 	Stderr string `json:"stderr"`
+	// ExitCode is git's own exit status. The agent answers a git command that failed (exit 1, 128...) as a successful RPC with
+	// this code, so a caller that only looks at the RPC error cannot tell a failed command from a good one.
+	ExitCode int `json:"exitCode"`
+}
+
+// failed is the error for a git command that ran and did not succeed, nil when it succeeded.
+func (g gitExecResult) failed(what string) error {
+	if g.ExitCode == 0 {
+		return nil
+	}
+	return fmt.Errorf("relay: %s exited with %d: %s", what, g.ExitCode, strings.TrimSpace(g.Stderr))
 }
 
 // ListLocalBranches composes a richer per-branch listing (upstream/ahead/

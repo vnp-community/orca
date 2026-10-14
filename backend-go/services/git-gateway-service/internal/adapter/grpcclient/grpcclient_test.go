@@ -1535,9 +1535,10 @@ func newCreateWorktreeFake(branchExists bool, revParseStdout string) *fakeInfraF
 			return &infrafleetv1.RelayResponse{ResultJson: string(worktreeAddResp)}, nil
 		case strings.Contains(in.GetParamsJson(), "--verify"): // branchExistsLocally: rev-parse --verify
 			if branchExists {
-				return &infrafleetv1.RelayResponse{ResultJson: "{}"}, nil
+				return &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":0}`}, nil
 			}
-			return nil, errors.New("git exit 1: ref not found")
+			// The real agent answers a missing ref as a successful RPC carrying git's exit code 1.
+			return &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":1}`}, nil
 		default: // the rev-parse HEAD follow-up
 			return &infrafleetv1.RelayResponse{ResultJson: string(revParseResp)}, nil
 		}

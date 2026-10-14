@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -69,5 +70,35 @@ func TestRelayExecutor_StatReadsTheAgentsAnswer(t *testing.T) {
 	got, err := r.Stat(ctx, "/repo", "docs")
 	if err != nil || !got.Exists || !got.IsDirectory || got.SizeBytes != 4096 || got.ModifiedAtUnixMs != 1791972000000 {
 		t.Fatalf("%+v %v", got, err)
+	}
+}
+
+// The agent answers `git rev-parse --verify` of a branch that is not there as a successful call with exit code 1; reading only the
+// RPC error made every branch look present, and `git worktree add <path> <missing branch>` then failed.
+func TestRelayExecutor_BranchExistsReadsGitsExitCode(t *testing.T) {
+	ctx := usecase.WithDevServerID(ctxWithTenant(t), "ds-1")
+	missing := NewRelayExecutor(&fakeInfraFleetServiceClient{relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":1}`}})
+	if missing.branchExistsLocally(ctx, "/repo", "task/x") {
+		t.Fatal("exit code 1 means the branch is not there")
+	}
+}
+
+func TestRelayExecutor_CreateWorktree_AFailedWorktreeAddIsAnErrorWithGitsStderr(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{}
+	fake.relayRespFunc = func(in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+		if in.GetMethod() == "git.worktree.add" {
+			return &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"fatal: invalid reference: task/x","exitCode":128}`}, nil
+		}
+		return &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":1}`}, nil
+	}
+	r := NewRelayExecutor(fake)
+	_, err := r.CreateWorktree(ctxWithTenant(t), "/repo", "task/x", "origin/main", "")
+	if err == nil || !strings.Contains(err.Error(), "invalid reference") {
+		t.Fatalf("err = %v", err)
+	}
+	for _, req := range fake.gotRelayRequests {
+		if strings.Contains(req.GetParamsJson(), `"cwd":"/repo-task-x"`) {
+			t.Fatalf("no rev-parse may run in a directory that was never made: %v", req.GetParamsJson())
+		}
 	}
 }
