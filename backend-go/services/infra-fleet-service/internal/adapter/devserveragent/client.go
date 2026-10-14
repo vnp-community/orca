@@ -445,7 +445,7 @@ func (c *Client) Exec(ctx context.Context, devServer domain.DevServer, method st
 	if err != nil {
 		var rpcErr *JSONRPCError
 		if errors.As(err, &rpcErr) {
-			if IsStructuredErrorMethod(method) {
+			if IsStructuredErrorMethod(method) || isMissingPathOfFileMethod(method, rpcErr) {
 				return nil, &domain.AgentRPCError{
 					Code:    rpcErr.Code,
 					Message: rpcErr.Message,

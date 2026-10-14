@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -275,15 +276,36 @@ func (r *RelayExecutor) GetDiff(ctx context.Context, repoPath, filePath string, 
 }
 
 func (r *RelayExecutor) Commit(ctx context.Context, repoPath, message string, paths []string) (domain.CommitResult, error) {
-	var result domain.CommitResult
 	// NOTE: "paths" is sent but the real agent ignores it — commit assumes
 	// pre-staged content (via a prior git.stage/git.bulkStage call, see
 	// TASK-208). Left in the wire payload for now rather than silently
 	// dropping the Go signature's paths param — harmless either way.
-	err := r.relay(ctx, repoPath, "git.commit", map[string]any{
+	// The agent answers {success, error?} and no sha, and reports a failed commit (nothing staged, a hook) as success=false:
+	// both were lost when the answer was read straight into CommitResult, so a commit looked done and had no sha.
+	var wire struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+	}
+	if err := r.relay(ctx, repoPath, "git.commit", map[string]any{
 		"worktreePath": repoPath, "message": message,
-	}, &result)
-	return result, err
+	}, &wire); err != nil {
+		return domain.CommitResult{}, err
+	}
+	if !wire.Success {
+		return domain.CommitResult{}, fmt.Errorf("relay: git commit failed: %s", firstNonEmpty(wire.Error, "no reason given"))
+	}
+	var head gitExecResult
+	if err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": []string{"rev-parse", "HEAD"}, "cwd": repoPath}, &head); err != nil {
+		return domain.CommitResult{}, err
+	}
+	return domain.CommitResult{CommitSHA: strings.TrimSpace(head.Stdout)}, nil
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
 
 func (r *RelayExecutor) Push(ctx context.Context, repoPath, remote, branch string) (domain.PushResult, error) {
@@ -1255,15 +1277,29 @@ func (r *RelayExecutor) Delete(ctx context.Context, repoPath, relPath string, re
 	}, nil)
 }
 
+// Stat reads the agent's fs.stat answer, which is {path, size, mtime, isDir, isFile, isLink, mode} and has no "exists": a
+// successful answer means the path is there, an agent "path not found" (NotFound once infra-fleet types it) means it is not.
+// Decoding it into domain.FileStat directly read every field as zero, so every path looked missing.
 func (r *RelayExecutor) Stat(ctx context.Context, repoPath, relPath string) (domain.FileStat, error) {
-	var result domain.FileStat
+	var result struct {
+		Size  int64  `json:"size"`
+		MTime string `json:"mtime"`
+		IsDir bool   `json:"isDir"`
+	}
 	err := r.relay(ctx, repoPath, "fs.stat", map[string]any{
 		"path": filepath.Join(repoPath, relPath),
 	}, &result)
 	if status.Code(err) == codes.NotFound {
 		return domain.FileStat{Exists: false}, nil // the same answer the local executor gives for a missing path
 	}
-	return result, err
+	if err != nil {
+		return domain.FileStat{}, err
+	}
+	out := domain.FileStat{Exists: true, IsDirectory: result.IsDir, SizeBytes: result.Size}
+	if t, perr := time.Parse(time.RFC3339Nano, result.MTime); perr == nil {
+		out.ModifiedAtUnixMs = t.UnixMilli()
+	}
+	return out, nil
 }
 
 func (r *RelayExecutor) Search(ctx context.Context, repoPath string, opts domain.SearchOptions) ([]domain.SearchMatch, error) {

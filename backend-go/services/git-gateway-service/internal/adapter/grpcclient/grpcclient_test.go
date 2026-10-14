@@ -604,14 +604,20 @@ func TestRelayExecutor_Stat_AgentErrorEnvelope_NumericCode(t *testing.T) {
 	}
 }
 
+// commitFake answers like the real agent: git.commit says {success, error?} and nothing else, and the sha comes from git.exec.
+func commitFake(commitReply string) *fakeInfraFleetServiceClient {
+	fake := &fakeInfraFleetServiceClient{}
+	fake.relayRespFunc = func(in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+		if in.GetMethod() == "git.commit" {
+			return &infrafleetv1.RelayResponse{ResultJson: commitReply}, nil
+		}
+		return &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"abc123\n","stderr":"","exitCode":0}`}, nil
+	}
+	return fake
+}
+
 func TestRelayExecutor_Commit_Success(t *testing.T) {
-	resultJSON, err := json.Marshal(map[string]any{"commitSha": "abc123"})
-	if err != nil {
-		t.Fatalf("marshal fixture: %v", err)
-	}
-	fake := &fakeInfraFleetServiceClient{
-		relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)},
-	}
+	fake := commitFake(`{"success":true}`)
 	r := NewRelayExecutor(fake)
 
 	result, err := r.Commit(ctxWithTenant(t), "/repo", "my message", []string{"a.txt"})
@@ -619,18 +625,30 @@ func TestRelayExecutor_Commit_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result.CommitSHA != "abc123" {
-		t.Errorf("expected commitSha=abc123, got %q", result.CommitSHA)
+		t.Errorf("the sha must come from rev-parse HEAD after the commit, got %q", result.CommitSHA)
 	}
-	if fake.gotRelay.GetMethod() != "git.commit" {
-		t.Errorf("expected method=git.commit, got %q", fake.gotRelay.GetMethod())
+	if len(fake.gotRelayRequests) != 2 || fake.gotRelayRequests[0].GetMethod() != "git.commit" || fake.gotRelayRequests[1].GetMethod() != "git.exec" {
+		t.Fatalf("calls %v", fake.gotRelayRequests)
 	}
-
 	var params map[string]any
-	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+	if err := json.Unmarshal([]byte(fake.gotRelayRequests[0].GetParamsJson()), &params); err != nil {
 		t.Fatalf("unmarshal params: %v", err)
 	}
 	if params["message"] != "my message" {
 		t.Errorf("expected message param, got %+v", params)
+	}
+}
+
+// The agent reports a commit that did not happen (nothing staged, a hook) as success=false; that is not a commit.
+func TestRelayExecutor_Commit_AFailedCommitIsAnError(t *testing.T) {
+	fake := commitFake(`{"success":false,"error":"nothing to commit"}`)
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.Commit(ctxWithTenant(t), "/repo", "m", nil); err == nil || !strings.Contains(err.Error(), "nothing to commit") {
+		t.Fatalf("err = %v", err)
+	}
+	if len(fake.gotRelayRequests) != 1 {
+		t.Fatalf("no sha is read for a commit that did not happen: %d calls", len(fake.gotRelayRequests))
 	}
 }
 

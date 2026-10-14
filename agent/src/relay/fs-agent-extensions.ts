@@ -64,6 +64,14 @@ export async function handleFsReadDir(
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     span.fail(err, { path: absPath })
+    // Same stable code fs.stat gives a missing path: callers tell "not there" from a real failure without reading the message.
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {
+        jsonrpc: '2.0',
+        id,
+        error: { code: AgentErrorCode.PathNotFound, message: `Not found: ${absPath}` }
+      }
+    }
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }

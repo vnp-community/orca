@@ -20,7 +20,8 @@ Orca **không** gọi MCP hay đồ thị tri thức; agent mà Orca chạy trê
    ```
 
    Cập nhật từng skill: `npx skills update <tên> --global`. Máy chủ có thể trỏ nguồn khác bằng `REQUEST_SKILLS_REPOSITORY_URL` (hiện trong gợi ý sửa lỗi).
-4. **Agent Orca** đủ mới (báo `agent.execPrompt.knowledgeHub`, `agent.execPrompt.permissionProfile`, ...). Agent cũ không bị hỏng: chỉ không dùng được hai cờ.
+4. **Thư mục làm việc của agent** (`AGENT_WORK_DIR`) phải chứa cả repo lẫn các worktree nằm cạnh nó: worktree proposal và worktree task là `<repo>-<nhánh>` cạnh repo, và agent từ chối ghi tệp ngoài thư mục này (`Path outside project root`), nên một repo đứng ngoài khiến run `plan generate` thất bại sau khi đã tốn chi phí. Kiểm trước khi chạy agent thật bằng `python3 tests/stages/e2e/orca-flows/workspace_probe.py --worktree-id <id> --worktree-path <thư mục>` trên worktree proposal của một Request thử: nó chạy đúng các lời gọi tệp và git mà Orca dùng (stat, đọc, ghi, commit, huỷ) và không tốn lượt AI.
+5. **Agent Orca** đủ mới (báo `agent.execPrompt.knowledgeHub`, `agent.execPrompt.permissionProfile`, ...). Agent cũ không bị hỏng: chỉ không dùng được hai cờ.
 
 ## Bật và kiểm tra
 

@@ -1,4 +1,5 @@
 // src/relay/__tests__/fs-agent-extensions.test.ts
+import { AgentErrorCode } from '../../shared/agent-wire-protocol'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -69,6 +70,16 @@ describe('handleFsReadDir', () => {
       makeConfig()
     )) as RpcResponse<ReadDirResult>
     expect(resp.result?.entries).toHaveLength(2)
+  })
+
+  it('answers a directory that is not there with the stable PathNotFound code, like fs.stat', async () => {
+    const resp = (await handleFsReadDir(
+      1,
+      { path: join(tmpDir, 'no', 'such', 'dir') },
+      makeConfig()
+    )) as RpcResponse<ReadDirResult>
+    expect(resp.error?.code).toBe(AgentErrorCode.PathNotFound)
+    expect(resp.error?.message).toContain('Not found')
   })
 
   it('directories appear before files in result (sorted)', async () => {

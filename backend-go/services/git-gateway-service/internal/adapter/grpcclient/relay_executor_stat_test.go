@@ -59,3 +59,15 @@ func TestRelayExecutor_BranchExistsIsAskedWithASubcommandTheAgentAllows(t *testi
 		}
 	}
 }
+
+// The agent's fs.stat answer has no "exists" and calls the fields size, mtime and isDir; reading it into FileStat as is made every
+// path that exists look missing.
+func TestRelayExecutor_StatReadsTheAgentsAnswer(t *testing.T) {
+	r := NewRelayExecutor(&fakeInfraFleetServiceClient{relayByDevServerResp: &infrafleetv1.RelayResponse{
+		ResultJson: `{"path":"/repo/docs","size":4096,"mtime":"2026-10-14T10:00:00.000Z","isDir":true,"isFile":false,"isLink":false,"mode":"40755"}`}})
+	ctx := usecase.WithDevServerID(ctxWithTenant(t), "ds-1")
+	got, err := r.Stat(ctx, "/repo", "docs")
+	if err != nil || !got.Exists || !got.IsDirectory || got.SizeBytes != 4096 || got.ModifiedAtUnixMs != 1791972000000 {
+		t.Fatalf("%+v %v", got, err)
+	}
+}
