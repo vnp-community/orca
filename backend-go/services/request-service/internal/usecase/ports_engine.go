@@ -1,9 +1,8 @@
 package usecase
 
-import (
-	"context"
-)
+import "context"
 
+// ExecInput is one command for the dev server's agent.exec: a binary and its arguments, never a shell string.
 type ExecInput struct {
 	Binary    string
 	Args      []string
@@ -12,33 +11,16 @@ type ExecInput struct {
 	TimeoutMs int
 }
 
-type ExecPromptInput struct {
-	Prompt       string
-	WorktreePath string
-	TrustPreset  string
-	Env          map[string]string
-	TimeoutMs    int
-}
-
 type ExecResult struct {
 	Stdout   string
 	Stderr   string
 	ExitCode int
 	TimedOut bool
+	// SpawnError is set when the binary could not be started (for example it is not installed).
+	SpawnError string
 }
 
+// DevServerExecutor runs a short command on the dev server that holds the project's repo.
 type DevServerExecutor interface {
-	Exec(ctx context.Context, connectionID string, in ExecInput) (ExecResult, error)
-	ExecPrompt(ctx context.Context, connectionID string, in ExecPromptInput) (ExecResult, error)
-}
-
-type Connection struct {
-	Connected    bool
-	ConnectionID string
-	DevServerID  string
-	RepoPath     string
-}
-
-type ConnectionResolver interface {
-	Resolve(ctx context.Context, projectID string) (Connection, error)
+	Exec(ctx context.Context, conn AnalysisConnection, in ExecInput) (ExecResult, error)
 }
