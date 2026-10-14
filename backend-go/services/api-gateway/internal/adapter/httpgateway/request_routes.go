@@ -32,12 +32,15 @@ func mountRequestRoutes(r chi.Router, req requestv1.RequestServiceClient, appr r
 		sub.Post("/", h.create)
 		sub.Get("/", h.list)
 		sub.Get("/{id}", h.get)
+		h.mountFlow(sub, requestFlowRoutes)
 	})
 	r.Route("/v1/approvals", func(sub chi.Router) {
 		sub.Get("/pending", h.listPending)
 		sub.Post("/{id}/approve", h.decide("approval.approve"))
 		sub.Post("/{id}/reject", h.decide("approval.reject"))
+		h.mountFlow(sub, approvalFlowRoutes)
 	})
+	r.Route("/v1/clarifications", func(sub chi.Router) { h.mountFlow(sub, clarificationFlowRoutes) })
 }
 
 type requestRoutes struct{ reg *wscompat.Registry }
