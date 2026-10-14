@@ -27,6 +27,8 @@ import time
 from pathlib import Path
 
 MAX_HASHED_BYTES = 16 * 1024 * 1024
+# Files the operating system rewrites on its own (Finder); a change to them is not the agent touching the repo.
+OS_NOISE = {".DS_Store"}
 
 
 def git(repo: str | Path, *args: str) -> str:
@@ -66,6 +68,8 @@ def fingerprint(worktree: str | Path) -> dict:
         xy, name = entry[:2], entry[3:]
         if xy[0] in "RC":
             skip_next = True
+        if Path(name).name in OS_NOISE:
+            continue
         files[name] = f"{xy}:{file_hash(root / name)}"
     return {"head": head, "branch": branch, "config": hashlib.sha256(config.encode()).hexdigest(), "files": files}
 

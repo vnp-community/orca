@@ -76,6 +76,10 @@ class PilotGuardTest(unittest.TestCase):
                 problems, _ = pg.compare(self.before, self.now())
                 self.assertTrue(problems, f"{name} must be a violation")
 
+    def test_a_finder_file_is_not_a_change(self) -> None:
+        (self.main / ".DS_Store").write_text("noise")
+        self.assertEqual(pg.compare(self.before, self.now()), ([], []))
+
     def test_a_worktree_outside_the_allowed_place_is_a_violation(self) -> None:
         elsewhere = Path(self.tmp.name) / "somewhere-else"
         sh(self.main, "worktree", "add", "-q", "-b", "stray", str(elsewhere))
