@@ -39,7 +39,7 @@ If the prompt gives a result block (`ORCA_RESULT_BEGIN <nonce>` ... `ORCA_RESULT
 
 ```
 Knowledge: snapshot <id>
-Read: <ids>
+Read: <ids, each written in full: no ranges such as BRL-25..32, no family prefixes>
 Gaps: <ids or open questions>
 Conflicts: <decision/constraint ids the work contradicts, one line each>
 Verification: <command> => <result>
