@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	// The agent kills a prompt run at its own 15 minute ceiling and then reports it; the Go side waits one minute longer so that
+	// The agent kills a prompt run at its own 30 minute ceiling and then reports it; the Go side waits one minute longer so that
 	// report is read instead of racing a simultaneous deadline.
-	execPromptTimeout = 16 * time.Minute
+	execPromptTimeout = 31 * time.Minute
 	// ai.complete may run a model for a minute or more (a Solution or Plan is a long structured answer). The agent bounds
 	// its own call at 120s, so this must be longer or the Go side gives up on a call that was about to succeed.
 	aiCompleteTimeout    = 150 * time.Second

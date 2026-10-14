@@ -4,7 +4,7 @@ import "testing"
 
 func TestAnalysisSettings_SpecBudgets(t *testing.T) {
 	d := AnalysisSettings{}.withDefaults()
-	if d.SpecTimeoutMS != 900_000 || d.SpecTotalTimeoutMS != 2*900_000+120_000 {
+	if d.SpecTimeoutMS != 1_800_000 || d.SpecTotalTimeoutMS != 2*1_800_000+120_000 {
 		t.Fatalf("defaults: %+v", d)
 	}
 	short := AnalysisSettings{SpecTimeoutMS: 300_000}.withDefaults()

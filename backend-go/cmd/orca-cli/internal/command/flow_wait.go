@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,6 +19,17 @@ type waiter struct {
 
 func defaultWaiter() waiter { return waiter{interval: 2 * time.Second, progress: os.Stderr} }
 
+// pollError tells a person whose sign-in ran out while they waited that the work itself goes on. The token lasts about ten
+// minutes and the CLI holds no way to renew it, while an agent run takes longer than that.
+func pollError(err error, readWith string) error {
+	var cliErr *apiclient.CLIError
+	if errors.As(err, &cliErr) && cliErr.StatusCode == 401 {
+		return &apiclient.CLIError{StatusCode: 401, Code: cliErr.Code, Message: cliErr.Message +
+			" (the sign-in token expired while waiting; the run goes on: sign in again with `orca login` and read it with `" + readWith + "`)"}
+	}
+	return err
+}
+
 func waitTimeout(what string, d time.Duration) error {
 	return &apiclient.CLIError{StatusCode: 408, Code: "WAIT_TIMEOUT", Message: fmt.Sprintf("%s did not finish within %s", what, d)}
 }
@@ -32,7 +44,7 @@ func (w waiter) requestStatus(ctx context.Context, cli *apiclient.Client, id str
 	for {
 		doc, err := cli.GetRequest(ctx, id)
 		if err != nil {
-			return nil, err
+			return nil, pollError(err, "orca request show "+id)
 		}
 		status := doc.Str("request", "status")
 		if until[status] || terminalRequestStatuses[status] {
@@ -54,7 +66,7 @@ func (w waiter) analysisRun(ctx context.Context, cli *apiclient.Client, requestI
 	for {
 		doc, err := cli.ListSolutions(ctx, requestID, nil)
 		if err != nil {
-			return nil, err
+			return nil, pollError(err, "orca solution list "+requestID)
 		}
 		for _, run := range doc.Docs("runs") {
 			if run.Str("id") != runID || run.Str("finishedAt") == "" {
@@ -75,7 +87,7 @@ func (w waiter) analysisRun(ctx context.Context, cli *apiclient.Client, requestI
 // total budget). The server reports the engine on the first poll, so the CLI can wait as long as that engine may take.
 const (
 	nativePlanRunTimeout   = 4 * time.Minute
-	openSpecPlanRunTimeout = 18 * time.Minute
+	openSpecPlanRunTimeout = 64 * time.Minute
 )
 
 // planRunTimeout is the wait for an engine when the caller gave no --timeout.
@@ -97,7 +109,7 @@ func (w waiter) planProposal(ctx context.Context, cli *apiclient.Client, request
 	for {
 		doc, err := cli.GetPlanProposal(ctx, requestID, runID)
 		if err != nil {
-			return nil, err
+			return nil, pollError(err, "orca plan proposal "+requestID)
 		}
 		if doc.Str("status") == "failed" {
 			code := doc.Str("errorCode")

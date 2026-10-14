@@ -80,7 +80,7 @@ func TestOpenSpecEngine_AuthorsTheChangeInAFreshWorktree(t *testing.T) {
 	if !strings.Contains(in.Prompt, "openspec/changes/req-42-add-ai/") || !strings.Contains(in.Prompt, "request=REQ-42") || !strings.Contains(in.Prompt, "ORCA_RESULT_BEGIN nonce0123456789abcdef") {
 		t.Fatalf("prompt: %s", in.Prompt)
 	}
-	if in.TimeoutMS != 900_000 || in.ProposeChangesets {
+	if in.TimeoutMS != 1_800_000 || in.ProposeChangesets {
 		t.Fatalf("timeout %d propose %v", in.TimeoutMS, in.ProposeChangesets)
 	}
 }

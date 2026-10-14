@@ -43,7 +43,7 @@ func newPlanGenerateCmd(e flowEnv) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&feedback, "feedback", "", "what the plan should do differently")
-	cmd.Flags().DurationVar(&timeout, "timeout", 0, "give up on the run after this long (default 4m, 18m when an agent authors an OpenSpec change)")
+	cmd.Flags().DurationVar(&timeout, "timeout", 0, "give up on the run after this long (default 4m, 64m when an agent authors an OpenSpec change)")
 	return cmd
 }
 

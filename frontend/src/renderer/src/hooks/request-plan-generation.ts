@@ -27,7 +27,7 @@ export const PLAN_RUN_POLL_INTERVAL_MS = 2000
 // Why: the AI call plus its one corrective retry (the backend suite waits the same 240s).
 export const PLAN_RUN_TIMEOUT_MS = 240_000
 // Why: an agent authoring an OpenSpec change runs up to two attempts under the server's own 18-minute ceiling.
-export const PLAN_RUN_OPENSPEC_TIMEOUT_MS = 18 * 60_000
+export const PLAN_RUN_OPENSPEC_TIMEOUT_MS = 64 * 60_000
 const MAX_CONSECUTIVE_POLL_FAILURES = 3
 
 export type PlanGenerationOptions = {
