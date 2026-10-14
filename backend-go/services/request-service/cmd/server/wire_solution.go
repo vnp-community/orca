@@ -48,6 +48,9 @@ type solutionWiring struct {
 	// readonly is the agent worker of the read-only kinds and of the Solution; observer receives the engine metrics.
 	readonly *usecase.RunAgentReadonlyAnalysis
 	observer usecase.EngineObserver
+	// executor runs short commands on the dev server; tasksSync keeps tasks.md and the archive of OpenSpec changes up to date.
+	executor  usecase.DevServerExecutor
+	tasksSync *usecase.TasksMdSyncer
 	// workspace and janitor exist only when the openspec engine is configured: the janitor removes the proposal worktrees.
 	workspace *grpcclient.ProposalWorkspace
 	janitor   *usecase.ProposalJanitor

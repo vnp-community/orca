@@ -42,7 +42,14 @@ type ReportTaskOutcome struct {
 	Tx        TxRunner
 	Outbox    OutboxWriter
 	Settings  ExecutionSettings
-	Log       *slog.Logger
+	// TaskSync may be nil; it is told a task succeeded so tasks.md of an OpenSpec change can catch up.
+	TaskSync TaskSucceededNotifier
+	Log      *slog.Logger
+}
+
+// TaskSucceededNotifier is *TasksMdSyncer.
+type TaskSucceededNotifier interface {
+	OnTaskSucceeded(ctx context.Context, requestID string) error
 }
 
 func (uc *ReportTaskOutcome) log() *slog.Logger {
@@ -108,6 +115,12 @@ func (uc *ReportTaskOutcome) Execute(ctx context.Context, in ReportTaskOutcomeIn
 	})
 	if err != nil || duplicate {
 		return err
+	}
+	if outcome == domain.OutcomeSucceeded && uc.TaskSync != nil {
+		// Best effort: the sweep derives the ticks from task state, so a missed notice only delays them.
+		if err := uc.TaskSync.OnTaskSucceeded(ctx, req.ID); err != nil {
+			uc.log().Warn("tasks.md sync could not be scheduled", slog.String("request_id", req.ID), slog.String("error", truncateForLog(err.Error())))
+		}
 	}
 	if !executing {
 		return nil // a run that finishes after the Request left executing is only recorded

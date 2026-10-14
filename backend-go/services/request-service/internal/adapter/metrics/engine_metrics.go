@@ -15,6 +15,8 @@ const (
 	PreflightFailuresTotal = "request_engine_preflight_failures_total"
 	KnowledgeToolCalls     = "request_knowledge_tool_calls_total"
 	SpecViolationsTotal    = "request_spec_check_violations_total"
+	TasksDriftTotal        = "request_engine_drift_total"
+	TasksSyncTotal         = "request_engine_sync_total"
 )
 
 // knownKnowledgeTools is what a read-only tdd-agent server offers. A tool name outside it, from a stream Orca does not
@@ -31,6 +33,8 @@ type engineSeries struct {
 	preflight  *prometheus.CounterVec
 	toolCalls  *prometheus.CounterVec
 	violations *prometheus.CounterVec
+	drift      prometheus.Counter
+	sync       *prometheus.CounterVec
 }
 
 func newEngineSeries(reg *prometheus.Registry) engineSeries {
@@ -44,11 +48,18 @@ func newEngineSeries(reg *prometheus.Registry) engineSeries {
 		violations: prometheus.NewCounterVec(prometheus.CounterOpts{Name: SpecViolationsTotal,
 			Help: "Structure problems found in an authored OpenSpec change, by code."}, []string{"code"}),
 	}
-	reg.MustRegister(e.runs, e.preflight, e.toolCalls, e.violations)
+	e.drift = prometheus.NewCounter(prometheus.CounterOpts{Name: TasksDriftTotal,
+		Help: "Plan regions of tasks.md found edited by hand and restored."})
+	e.sync = prometheus.NewCounterVec(prometheus.CounterOpts{Name: TasksSyncTotal,
+		Help: "tasks.md sync and archive steps that ended, by step (tasks, archive) and result (done, failed, gave_up)."}, []string{"step", "result"})
+	reg.MustRegister(e.runs, e.preflight, e.toolCalls, e.violations, e.drift, e.sync)
 	return e
 }
 
-var _ usecase.EngineObserver = (*Set)(nil)
+var (
+	_ usecase.EngineObserver = (*Set)(nil)
+	_ usecase.SyncObserver   = (*Set)(nil)
+)
 
 func (s *Set) RunFinished(engine, kind, result string) {
 	s.engine.runs.WithLabelValues(engine, kind, result).Inc()
@@ -70,3 +81,7 @@ func (s *Set) KnowledgeToolCalls(stats domain.RunStats) {
 }
 
 func (s *Set) SpecViolation(code string) { s.engine.violations.WithLabelValues(code).Inc() }
+
+func (s *Set) TasksDrift() { s.engine.drift.Inc() }
+
+func (s *Set) SyncFinished(step, result string) { s.engine.sync.WithLabelValues(step, result).Inc() }

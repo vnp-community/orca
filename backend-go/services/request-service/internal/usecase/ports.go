@@ -173,8 +173,9 @@ type EngineSettingsRepository interface {
 type OpenSpecChangeRepository interface {
 	GetByRequest(ctx context.Context, requestID string) (domain.OpenSpecChange, bool, error)
 	Upsert(ctx context.Context, c domain.OpenSpecChange) (domain.OpenSpecChange, error)
-	UpdateSync(ctx context.Context, id string, state domain.SyncState, digest string, at *time.Time, expectedVersion int64) error
-	ListPendingSync(ctx context.Context, limit int) ([]domain.OpenSpecChange, error)
+	UpdateSync(ctx context.Context, id string, u domain.SyncUpdate, expectedVersion int64) error
+	// ListSyncWork returns the tenant's ready changes that are due: tasks.md to catch up, or a completed Request to archive.
+	ListSyncWork(ctx context.Context, limit int) ([]domain.OpenSpecChange, error)
 	// ListWithWorkspace returns the tenant's changes that still hold a worktree, oldest first, with the status of their Request.
 	ListWithWorkspace(ctx context.Context, limit int) ([]ProposalCleanupCandidate, error)
 }

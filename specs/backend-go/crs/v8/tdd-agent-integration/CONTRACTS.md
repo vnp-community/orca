@@ -38,6 +38,12 @@ Task của Request ghim `openspec` đi đường hợp đồng của task-servic
 
 `ProposalJanitor`: huỷ ⇒ gỡ worktree + gói `abandoned`; hoàn thành ⇒ sau `REQUEST_PROPOSAL_RETENTION` (mặc định 7 ngày) hoặc khi `archived`; run lỗi ⇒ sau cùng thời hạn (gói giữ `preparing`); không đụng worktree của run đang chạy; chỉ gỡ worktree đúng nhánh của Request. Gỡ tay: `orca request cleanup`. Báo mồ côi: `tests/stages/e2e/orca-flows/report_orphan_worktrees.py`.
 
+## 5b. Đồng bộ `tasks.md` và archive (T3.3)
+
+`TasksMdSyncer` (quét 30 s, bắt đầu sau 45 s; `ReportTaskOutcome` chỉ báo "có task xong" để quét sớm, mất thông báo chỉ làm chậm). Mỗi task của Plan openspec mang nhãn `spec:t<p>.<q>` (đặt lúc dựng Plan; task-service chuyển thường). Task xong = có run `succeeded` hoặc người đã đặt `done`. Bộ đồng bộ **tick** dòng `- [ ] T<p>.<q>` trong vùng `orca:begin/end plan` của `openspec/changes/<id>/tasks.md` trên nhánh proposal, chỉ commit `tasks.md`, **không bao giờ bỏ tick**, không đụng `tasks_md_digest`/bundle (cổng duyệt Plan vẫn khớp). Vùng bị sửa tay (digest vùng khác `tasks_sync_digest`, hoặc khác vùng trong bundle khi chưa đồng bộ lần nào) ⇒ khôi phục vùng đã lưu rồi tick lại, tăng `request_engine_drift_total`; văn bản ngoài vùng giữ nguyên từng byte. Bỏ qua khi có run plan đang chạy.
+
+Khi Request `completed` và gói còn `ready`: chạy `openspec archive <id> --yes` với `cwd` = worktree proposal (qua `agent.exec`), **kiểm vùng ghi** (chỉ `openspec/changes/**` và `openspec/specs/**`, vi phạm ⇒ huỷ sạch và coi là lỗi), commit, `MarkArchived(sha)`. Không push, không mở PR. Lỗi (kể cả worktree đã gỡ, Ensure lại) ⇒ thử lại sau 30 s, 2 phút, 10 phút, 30 phút, 2 giờ (`tasks_sync_attempts`, `tasks_sync_error`, `tasks_sync_next_retry_at`); lần thứ 5 ⇒ `tasks_sync_state=failed`, dừng thử, **Request vẫn `completed`**. Thay thế `OpenSpecArchiveConsumer` và `RegisterOpenSpecConsumers` (đã xoá): archive do vòng quét nhận ra Request `completed`, nên không cần khử trùng `processed_events` mà vẫn lặp lại an toàn.
+
 ## 6. Giao diện (gRPC, kênh WS, REST, CLI)
 
 | RPC | Kênh | REST | CLI |
@@ -53,7 +59,7 @@ Kênh mới đều **ngoài** công cụ MCP (`excluded_channels.yaml`). `orca e
 
 ## 7. Cơ sở dữ liệu (cả Postgres và MySQL)
 
-`0094_openspec_change_provenance` (cột tri thức, bundle, `workspace_id` của `openspec_changes`), `0095_project_solution_agent` (`project_engine_settings.solution_agent`), `0096_analysis_run_stats` (`analysis_runs.run_stats`: tên tool và số lần, số liệu usage; xếp loại "không có nội dung"). Nền: `0007_solution_engines`.
+`0094_openspec_change_provenance` (cột tri thức, bundle, `workspace_id` của `openspec_changes`), `0095_project_solution_agent` (`project_engine_settings.solution_agent`), `0096_analysis_run_stats` (`analysis_runs.run_stats`: tên tool và số lần, số liệu usage; xếp loại "không có nội dung"), `0097_openspec_change_sync_progress` (`openspec_changes.tasks_sync_attempts`). Nền: `0007_solution_engines`.
 
 ## 8. Cấu hình
 
@@ -61,7 +67,7 @@ Kênh mới đều **ngoài** công cụ MCP (`excluded_channels.yaml`). `orca e
 
 ## 9. Metric (Prometheus, request-service)
 
-`request_engine_runs_total{engine,kind,result}`, `request_engine_preflight_failures_total{code}`, `request_knowledge_tool_calls_total{tool}` (tên ngoài danh sách đã biết gộp vào `other`), `request_spec_check_violations_total{code}`. Không nhãn nào mang tenant, Request hay nội dung.
+`request_engine_runs_total{engine,kind,result}`, `request_engine_preflight_failures_total{code}`, `request_knowledge_tool_calls_total{tool}` (tên ngoài danh sách đã biết gộp vào `other`), `request_spec_check_violations_total{code}`, `request_engine_drift_total`, `request_engine_sync_total{step,result}` (step `tasks|archive`, result `done|failed|gave_up`). Không nhãn nào mang tenant, Request hay nội dung.
 
 ## 10. Mã lỗi và gợi ý sửa
 
@@ -83,4 +89,4 @@ Kênh mới đều **ngoài** công cụ MCP (`excluded_channels.yaml`). `orca e
 
 ## 11. Chưa làm
 
-Giai đoạn 3 (đề xuất ghi ngược `changeset_propose`, đồng bộ `tasks.md` hai chiều và archive sau `request.completed`, danh sách bàn giao khi hoàn thành); Giai đoạn 4 (e2e ba bước trên pilot, cài skill toàn cục, bật cờ cho pilot); web UI (nhãn engine, `design_references`, thống kê run: T5.4); ghi `skill_hash` vào run của Solution bằng agent (chỉ có ở change OpenSpec); token CLI mang `role`.
+Giai đoạn 3 còn lại (danh sách bàn giao khi hoàn thành: T3.4 phần trạng thái archive/đồng bộ); Giai đoạn 4 (e2e ba bước trên pilot, cài skill toàn cục, bật cờ cho pilot); web UI (nhãn engine, `design_references`, thống kê run: T5.4); ghi `skill_hash` vào run của Solution bằng agent (chỉ có ở change OpenSpec); token CLI mang `role`.

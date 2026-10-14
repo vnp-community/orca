@@ -24,7 +24,8 @@ func NewOpenSpecChangeRepository(r *Repository) *OpenSpecChangeRepository {
 
 const openSpecChangeColumns = `id::text, request_id::text, change_id, COALESCE(branch, ''), status, tasks_sync_state, COALESCE(commit_sha, ''),
 	COALESCE(tasks_md_digest, ''), kg_available, COALESCE(kg_snapshot, ''), kg_read_ids, kg_gaps, kg_conflicts, COALESCE(skill_hash, ''),
-	bundle_json, COALESCE(workspace_id, ''), version`
+	bundle_json, COALESCE(workspace_id, ''),
+	COALESCE(tasks_sync_digest, ''), COALESCE(tasks_sync_error, ''), tasks_sync_attempts, tasks_sync_next_retry_at, version`
 
 func scanOpenSpecChange(row pgx.Row) (domain.OpenSpecChange, error) {
 	return scanOpenSpecChangeInto(row)
@@ -36,7 +37,8 @@ func scanOpenSpecChangeInto(row pgx.Row, extra ...any) (domain.OpenSpecChange, e
 	var status, syncState string
 	var read, gaps, conflicts, bundle []byte
 	dest := append([]any{&c.ID, &c.RequestID, &c.ChangeID, &c.Branch, &status, &syncState, &c.Commit, &c.TasksMDDigest, &c.KGAvailable,
-		&c.KGSnapshot, &read, &gaps, &conflicts, &c.SkillHash, &bundle, &c.WorkspaceID, &c.Version}, extra...)
+		&c.KGSnapshot, &read, &gaps, &conflicts, &c.SkillHash, &bundle, &c.WorkspaceID,
+		&c.SyncDigest, &c.SyncError, &c.SyncAttempts, &c.SyncNextRetryAt, &c.Version}, extra...)
 	if err := row.Scan(dest...); err != nil {
 		return domain.OpenSpecChange{}, err
 	}
@@ -91,16 +93,21 @@ func (r *OpenSpecChangeRepository) Upsert(ctx context.Context, c domain.OpenSpec
 		}
 		if _, err := db.Exec(ctx, `
 			INSERT INTO request.openspec_changes (id, tenant_id, request_id, change_id, branch, status, tasks_sync_state, commit_sha,
-				tasks_md_digest, kg_available, kg_snapshot, kg_read_ids, kg_gaps, kg_conflicts, skill_hash, bundle_json, workspace_id)
-			VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, NULLIF($8, ''), NULLIF($9, ''), $10, NULLIF($11, ''), $12, $13, $14, NULLIF($15, ''), $16, NULLIF($17, ''))
+				tasks_md_digest, kg_available, kg_snapshot, kg_read_ids, kg_gaps, kg_conflicts, skill_hash, bundle_json, workspace_id,
+				tasks_sync_digest, tasks_sync_error, tasks_sync_attempts, tasks_sync_next_retry_at)
+			VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, NULLIF($8, ''), NULLIF($9, ''), $10, NULLIF($11, ''), $12, $13, $14, NULLIF($15, ''), $16, NULLIF($17, ''),
+				NULLIF($18, ''), NULLIF($19, ''), $20, $21)
 			ON CONFLICT (tenant_id, request_id) DO UPDATE SET
 				change_id = EXCLUDED.change_id, branch = EXCLUDED.branch, status = EXCLUDED.status, tasks_sync_state = EXCLUDED.tasks_sync_state,
 				commit_sha = EXCLUDED.commit_sha, tasks_md_digest = EXCLUDED.tasks_md_digest, kg_available = EXCLUDED.kg_available,
 				kg_snapshot = EXCLUDED.kg_snapshot, kg_read_ids = EXCLUDED.kg_read_ids, kg_gaps = EXCLUDED.kg_gaps, kg_conflicts = EXCLUDED.kg_conflicts,
 				skill_hash = EXCLUDED.skill_hash, bundle_json = EXCLUDED.bundle_json, workspace_id = EXCLUDED.workspace_id,
+				tasks_sync_digest = EXCLUDED.tasks_sync_digest, tasks_sync_error = EXCLUDED.tasks_sync_error,
+				tasks_sync_attempts = EXCLUDED.tasks_sync_attempts, tasks_sync_next_retry_at = EXCLUDED.tasks_sync_next_retry_at,
 				updated_at = now(), version = request.openspec_changes.version + 1`,
 			c.ID, tenantID, c.RequestID, c.ChangeID, c.Branch, string(c.Status), string(c.SyncState), c.Commit, c.TasksMDDigest, c.KGAvailable,
-			c.KGSnapshot, read, gaps, conflicts, c.SkillHash, bundle, c.WorkspaceID); err != nil {
+			c.KGSnapshot, read, gaps, conflicts, c.SkillHash, bundle, c.WorkspaceID,
+			c.SyncDigest, c.SyncError, c.SyncAttempts, c.SyncNextRetryAt); err != nil {
 			return fmt.Errorf("postgres: upsert openspec change: %w", err)
 		}
 		out, err = scanOpenSpecChange(db.QueryRow(ctx, `SELECT `+openSpecChangeColumns+` FROM request.openspec_changes WHERE tenant_id = $1 AND request_id = $2`, tenantID, c.RequestID))
@@ -141,15 +148,16 @@ func nonNilStrings(in []string) []string {
 }
 
 // UpdateSync moves the sync state of the change at expectedVersion; a stale version is a conflict, never a silent overwrite.
-func (r *OpenSpecChangeRepository) UpdateSync(ctx context.Context, id string, state domain.SyncState, digest string, at *time.Time, expectedVersion int64) error {
+func (r *OpenSpecChangeRepository) UpdateSync(ctx context.Context, id string, u domain.SyncUpdate, expectedVersion int64) error {
 	return r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
 		if notUUID(id) {
 			return domain.ErrOpenSpecChangeNotFound
 		}
 		tag, err := db.Exec(ctx, `
 			UPDATE request.openspec_changes
-			SET tasks_sync_state = $4, tasks_sync_digest = NULLIF($5, ''), tasks_sync_next_retry_at = $6, updated_at = now(), version = version + 1
-			WHERE id = $1 AND tenant_id = $2 AND version = $3`, id, tenantID, expectedVersion, string(state), digest, at)
+			SET tasks_sync_state = $4, tasks_sync_digest = NULLIF($5, ''), tasks_sync_error = NULLIF($6, ''), tasks_sync_attempts = $7,
+				tasks_sync_next_retry_at = $8, updated_at = now(), version = version + 1
+			WHERE id = $1 AND tenant_id = $2 AND version = $3`, id, tenantID, expectedVersion, string(u.State), u.Digest, u.Error, u.Attempts, u.NextRetryAt)
 		if err != nil {
 			return fmt.Errorf("postgres: update openspec change sync: %w", err)
 		}
@@ -167,13 +175,15 @@ func (r *OpenSpecChangeRepository) UpdateSync(ctx context.Context, id string, st
 	})
 }
 
-// ListPendingSync lists ready changes whose tasks.md still has to catch up with task progress and whose retry time has come.
-func (r *OpenSpecChangeRepository) ListPendingSync(ctx context.Context, limit int) ([]domain.OpenSpecChange, error) {
+// ListSyncWork lists ready changes that have something to do and whose retry time has come: tasks.md still has to catch up
+// with task progress, or the Request is completed and the change is waiting to be archived. A failed change is left alone.
+func (r *OpenSpecChangeRepository) ListSyncWork(ctx context.Context, limit int) ([]domain.OpenSpecChange, error) {
 	var out []domain.OpenSpecChange
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
 		rows, err := db.Query(ctx, `SELECT `+openSpecChangeColumns+` FROM request.openspec_changes
-			WHERE tenant_id = $1 AND status = 'ready' AND tasks_sync_state IN ('pending', 'failed')
+			WHERE tenant_id = $1 AND status = 'ready' AND tasks_sync_state <> 'failed'
 				AND (tasks_sync_next_retry_at IS NULL OR tasks_sync_next_retry_at <= now())
+				AND (tasks_sync_state = 'pending' OR request_id IN (SELECT id FROM request.requests WHERE tenant_id = $1 AND status = 'completed'))
 			ORDER BY updated_at, id LIMIT $2`, tenantID, limit)
 		if err != nil {
 			return fmt.Errorf("postgres: list pending openspec changes: %w", err)

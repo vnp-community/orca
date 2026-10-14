@@ -182,6 +182,9 @@ func run(ctx context.Context, cfg config.Config) error {
 		lifecycle.Cancel.WithProposalCleanup(solution.janitor)
 		startProposalJanitor(lifecycleCtx, &lifecycleWG, log, solution.janitor)
 	}
+	if solution.tasksSync != nil {
+		startTasksMdSync(lifecycleCtx, &lifecycleWG, solution.tasksSync)
+	}
 	artifact, err := wireArtifact(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, intake, classification, busConsumer, dirs, solution)
 	if err != nil {
 		return err

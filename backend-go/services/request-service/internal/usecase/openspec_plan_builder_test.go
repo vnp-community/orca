@@ -57,3 +57,25 @@ func TestFillTaskPrompts_NumbersTasksPerContainerAndKeepsTheRest(t *testing.T) {
 		t.Fatalf("%+v", empty)
 	}
 }
+
+func TestFillTaskPrompts_LabelsEachTaskWithItsTasksMdLine(t *testing.T) {
+	in := domain.PlanProposal{Phases: []domain.PhaseProposal{
+		{Title: "a", Tasks: []domain.TaskProposal{{Title: "x", Labels: []string{"test:regression"}}, {Title: "y"}}},
+		{Title: "b", Tasks: []domain.TaskProposal{{Title: "z"}}},
+	}}
+	got := FillTaskPrompts(in, builderCtx)
+	for _, c := range []struct {
+		task domain.TaskProposal
+		want string
+	}{{got.Phases[0].Tasks[0], "T1.1"}, {got.Phases[0].Tasks[1], "T1.2"}, {got.Phases[1].Tasks[0], "T2.1"}} {
+		if ref, ok := domain.SpecRefFromLabels(c.task.Labels); !ok || ref != c.want {
+			t.Fatalf("%s: labels %v", c.want, c.task.Labels)
+		}
+	}
+	if len(got.Phases[0].Tasks[0].Labels) != 2 || got.Phases[0].Tasks[0].Labels[0] != "test:regression" {
+		t.Fatalf("the labels the author set must stay: %v", got.Phases[0].Tasks[0].Labels)
+	}
+	if len(in.Phases[0].Tasks[0].Labels) != 1 {
+		t.Fatal("the input proposal must not be modified")
+	}
+}

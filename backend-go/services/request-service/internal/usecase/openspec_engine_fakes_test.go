@@ -239,12 +239,37 @@ func (f *fakeChanges) Upsert(_ context.Context, c domain.OpenSpecChange) (domain
 	return c, nil
 }
 
-func (f *fakeChanges) UpdateSync(context.Context, string, domain.SyncState, string, *time.Time, int64) error {
-	return nil
+func (f *fakeChanges) UpdateSync(_ context.Context, id string, u domain.SyncUpdate, expectedVersion int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for req, c := range f.byReq {
+		if c.ID != id {
+			continue
+		}
+		if c.Version != expectedVersion {
+			return domain.ErrOpenSpecChangeVersionConflict
+		}
+		c.SyncState, c.SyncDigest, c.SyncError, c.SyncAttempts, c.SyncNextRetryAt = u.State, u.Digest, u.Error, u.Attempts, u.NextRetryAt
+		c.Version++
+		f.byReq[req] = c
+		return nil
+	}
+	return domain.ErrOpenSpecChangeNotFound
 }
 
-func (f *fakeChanges) ListPendingSync(context.Context, int) ([]domain.OpenSpecChange, error) {
-	return nil, nil
+// ListSyncWork answers like the repositories: ready, not given up, due, and either pending or of a completed Request.
+func (f *fakeChanges) ListSyncWork(context.Context, int) ([]domain.OpenSpecChange, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []domain.OpenSpecChange
+	for _, c := range f.byReq {
+		due := c.SyncNextRetryAt == nil || !c.SyncNextRetryAt.After(time.Now())
+		if c.Status == domain.ChangeStatusReady && c.SyncState != domain.SyncStateFailed && due &&
+			(c.SyncState == domain.SyncStatePending || f.status[c.RequestID] == domain.RequestStatusCompleted) {
+			out = append(out, c)
+		}
+	}
+	return out, nil
 }
 
 // ListWithWorkspace reads the request status through status (request id to status), updated through updated.

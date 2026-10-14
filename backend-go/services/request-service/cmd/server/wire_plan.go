@@ -57,6 +57,17 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 			Tenants: stores.retention, Retention: retention, Log: log,
 		}
 		out.Cleanup = usecase.NewCleanupProposal(stores.requests, solution.janitor)
+		if solution.executor != nil {
+			sync := &usecase.TasksMdSyncer{
+				Changes: stores.openspecChanges, Requests: stores.requests, Tasks: tasks.client, Outcomes: stores.execution.outcomes,
+				Runs: stores.analysisRuns, Workspace: solution.workspace, Exec: solution.executor, Conns: solution.conns, Tenants: stores.retention, Log: log,
+			}
+			if obs, ok := solution.observer.(usecase.SyncObserver); ok {
+				sync.Observer = obs
+			}
+			solution.tasksSync = sync
+			execution.taskSync.set(sync)
+		}
 	}
 	if !approval.Enabled || approval.Open == nil {
 		log.Warn("approval is off: CommitPlan is unavailable because a committed Plan has nobody to approve it")
@@ -92,6 +103,7 @@ func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solut
 	workspace := grpcclient.NewProposalWorkspace(solution.git, solution.proj)
 	solution.workspace = workspace
 	executor := grpcclient.NewDevServerExecutor(solution.infra)
+	solution.executor = executor
 	gate := usecase.NewEngineReadinessGate(solution.conns, executor, os.Getenv("REQUEST_OPENSPEC_MIN_VERSION")).
 		WithCapabilities(solution.caps).WithRepoFiles(workspace).WithRepoState(grpcclient.NewRepoStateProbe(solution.git)).
 		WithSkillsRepository(os.Getenv("REQUEST_SKILLS_REPOSITORY_URL")).WithObserver(solution.observer)

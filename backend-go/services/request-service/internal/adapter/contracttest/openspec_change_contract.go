@@ -87,48 +87,73 @@ func RunOpenSpecChangeContract(t *testing.T, env Env, repo usecase.OpenSpecChang
 		}
 	})
 
-	t.Run("UpdateSync is a compare-and-set on the version", func(t *testing.T) {
+	t.Run("UpdateSync is a compare-and-set on the version and stores the whole sync progress", func(t *testing.T) {
 		cur, _, _ := repo.GetByRequest(ctx, req.ID)
 		retry := time.Now().UTC().Add(time.Minute).Truncate(time.Second)
-		if err := repo.UpdateSync(ctx, cur.ID, domain.SyncStateFailed, "d2", &retry, cur.Version); err != nil {
+		up := domain.SyncUpdate{State: domain.SyncStatePending, Digest: "d2", Error: "archive exited 1", Attempts: 2, NextRetryAt: &retry}
+		if err := repo.UpdateSync(ctx, cur.ID, up, cur.Version); err != nil {
 			t.Fatal(err)
 		}
-		if err := repo.UpdateSync(ctx, cur.ID, domain.SyncStateInSync, "d3", nil, cur.Version); !errors.Is(err, domain.ErrOpenSpecChangeVersionConflict) {
+		if err := repo.UpdateSync(ctx, cur.ID, domain.SyncUpdate{State: domain.SyncStateInSync, Digest: "d3"}, cur.Version); !errors.Is(err, domain.ErrOpenSpecChangeVersionConflict) {
 			t.Fatalf("a stale version must conflict: %v", err)
 		}
-		if err := repo.UpdateSync(ctx, uuid.NewString(), domain.SyncStateInSync, "", nil, 1); !errors.Is(err, domain.ErrOpenSpecChangeNotFound) {
+		if err := repo.UpdateSync(ctx, uuid.NewString(), domain.SyncUpdate{State: domain.SyncStateInSync}, 1); !errors.Is(err, domain.ErrOpenSpecChangeNotFound) {
 			t.Fatalf("an unknown id: %v", err)
 		}
 		after, _, _ := repo.GetByRequest(ctx, req.ID)
-		if after.SyncState != domain.SyncStateFailed || after.Version != cur.Version+1 {
+		if after.SyncState != domain.SyncStatePending || after.Version != cur.Version+1 || after.SyncDigest != "d2" || after.SyncError != "archive exited 1" ||
+			after.SyncAttempts != 2 || after.SyncNextRetryAt == nil || !after.SyncNextRetryAt.Equal(retry) {
 			t.Fatalf("%+v", after)
+		}
+		// Clearing the progress reads back as empty, not as NULL text.
+		if err := repo.UpdateSync(ctx, after.ID, domain.SyncUpdate{State: domain.SyncStateInSync}, after.Version); err != nil {
+			t.Fatal(err)
+		}
+		clear, _, _ := repo.GetByRequest(ctx, req.ID)
+		if clear.SyncDigest != "" || clear.SyncError != "" || clear.SyncAttempts != 0 || clear.SyncNextRetryAt != nil {
+			t.Fatalf("%+v", clear)
 		}
 	})
 
-	t.Run("ListPendingSync returns only ready changes that are due", func(t *testing.T) {
+	t.Run("an upsert carries the sync progress it was given", func(t *testing.T) {
+		cur, _, _ := repo.GetByRequest(ctx, req.ID)
+		cur.SyncDigest, cur.SyncAttempts = "dd", 3
+		got, err := repo.Upsert(ctx, cur)
+		if err != nil || got.SyncDigest != "dd" || got.SyncAttempts != 3 {
+			t.Fatalf("%+v %v", got, err)
+		}
+	})
+
+	t.Run("ListSyncWork returns the ready changes that are due, and the completed Requests waiting to be archived", func(t *testing.T) {
 		tctx := CtxForTenant(newTenant())
-		mk := func(state domain.SyncState, status domain.ChangeStatus) domain.OpenSpecChange {
-			r := createRequest(t, env, tctx, nil)
+		mkFor := func(state domain.SyncState, status domain.ChangeStatus, reqStatus domain.RequestStatus) (domain.OpenSpecChange, domain.Request) {
+			r := createRequest(t, env, tctx, func(r *domain.Request) { r.Status = reqStatus })
 			c, err := repo.Upsert(tctx, domain.OpenSpecChange{ID: uuid.NewString(), RequestID: r.ID, ChangeID: "req-1-x", Status: status, SyncState: state})
 			if err != nil {
 				t.Fatal(err)
 			}
-			return c
+			return c, r
 		}
-		pending := mk(domain.SyncStatePending, domain.ChangeStatusReady)
-		inSync := mk(domain.SyncStateInSync, domain.ChangeStatusReady)
-		archived := mk(domain.SyncStatePending, domain.ChangeStatusArchived)
-		later := mk(domain.SyncStateFailed, domain.ChangeStatusReady)
+		mk := func(state domain.SyncState, status domain.ChangeStatus) (domain.OpenSpecChange, domain.Request) {
+			return mkFor(state, status, domain.RequestStatusExecuting)
+		}
+		toArchive, _ := mkFor(domain.SyncStateInSync, domain.ChangeStatusReady, domain.RequestStatusCompleted)
+		completedGaveUp, _ := mkFor(domain.SyncStateFailed, domain.ChangeStatusReady, domain.RequestStatusCompleted)
+		pending, _ := mk(domain.SyncStatePending, domain.ChangeStatusReady)
+		inSync, _ := mk(domain.SyncStateInSync, domain.ChangeStatusReady)
+		archived, _ := mk(domain.SyncStatePending, domain.ChangeStatusArchived)
+		gaveUp, _ := mk(domain.SyncStateFailed, domain.ChangeStatusReady)
+		later, _ := mk(domain.SyncStatePending, domain.ChangeStatusReady)
 		future := time.Now().UTC().Add(time.Hour)
-		if err := repo.UpdateSync(tctx, later.ID, domain.SyncStateFailed, "x", &future, later.Version); err != nil {
+		if err := repo.UpdateSync(tctx, later.ID, domain.SyncUpdate{State: domain.SyncStatePending, Attempts: 1, NextRetryAt: &future}, later.Version); err != nil {
 			t.Fatal(err)
 		}
-		due := mk(domain.SyncStateFailed, domain.ChangeStatusReady)
+		due, _ := mk(domain.SyncStatePending, domain.ChangeStatusReady)
 		past := time.Now().UTC().Add(-time.Minute)
-		if err := repo.UpdateSync(tctx, due.ID, domain.SyncStateFailed, "x", &past, due.Version); err != nil {
+		if err := repo.UpdateSync(tctx, due.ID, domain.SyncUpdate{State: domain.SyncStatePending, Attempts: 1, NextRetryAt: &past}, due.Version); err != nil {
 			t.Fatal(err)
 		}
-		got, err := repo.ListPendingSync(tctx, 10)
+		got, err := repo.ListSyncWork(tctx, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -136,10 +161,10 @@ func RunOpenSpecChangeContract(t *testing.T, env Env, repo usecase.OpenSpecChang
 		for _, c := range got {
 			ids[c.ID] = true
 		}
-		if !ids[pending.ID] || !ids[due.ID] || ids[inSync.ID] || ids[archived.ID] || ids[later.ID] {
-			t.Fatalf("got %v; want pending %s and due %s only", ids, pending.ID, due.ID)
+		if !ids[pending.ID] || !ids[due.ID] || !ids[toArchive.ID] || ids[completedGaveUp.ID] || ids[inSync.ID] || ids[archived.ID] || ids[later.ID] || ids[gaveUp.ID] {
+			t.Fatalf("got %v; want pending %s, due %s and the completed one %s only", ids, pending.ID, due.ID, toArchive.ID)
 		}
-		if limited, _ := repo.ListPendingSync(tctx, 1); len(limited) != 1 {
+		if limited, _ := repo.ListSyncWork(tctx, 1); len(limited) != 1 {
 			t.Fatalf("limit not applied: %d", len(limited))
 		}
 	})

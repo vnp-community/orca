@@ -93,6 +93,8 @@ type executionWiring struct {
 	Server requestgrpc.ExecutionUseCases
 	// Policies are shared with CommitPlan, which runs each type's plan preconditions.
 	Policies *domain.PolicyRegistry
+	// taskSync is filled by wirePlan, which owns the workspace the sync writes in; until then a succeeded task is only recorded.
+	taskSync *taskSyncSlot
 	closers  []func()
 }
 
@@ -108,7 +110,7 @@ func (w *executionWiring) close() {
 func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, log *slog.Logger, stores *requestStores,
 	lifecycle *requestLifecycle, approval *approvalWiring, tasks *executionTasks, bus *commoneventbus.Consumer,
 	contractRuns usecase.ContractRunPlanner) (*executionWiring, error) {
-	w := &executionWiring{}
+	w := &executionWiring{taskSync: &taskSyncSlot{}}
 	ex := stores.execution
 	settings := usecase.ExecutionSettings{
 		MaxParallelTasks: cfg.MaxParallelTasks, MaxTaskAttempts: cfg.MaxTaskAttempts, AutoCompleteTasks: cfg.AutoCompleteTasks,
@@ -150,7 +152,7 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	}
 	report := &usecase.ReportTaskOutcome{
 		Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, Processed: stores.processed, Evaluate: evaluate,
-		Tx: stores.tx, Outbox: stores.outboxWriter, Settings: settings, Log: log,
+		Tx: stores.tx, Outbox: stores.outboxWriter, Settings: settings, TaskSync: w.taskSync, Log: log,
 	}
 	startExecution := &usecase.StartExecution{Requests: stores.requests, Evaluate: evaluate}
 	resume := &usecase.ResumeAfterGate{Requests: stores.requests, Evaluate: evaluate}

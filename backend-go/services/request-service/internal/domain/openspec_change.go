@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -57,7 +58,22 @@ type OpenSpecChange struct {
 	// after its worktree is gone. Only text under the size caps is kept.
 	Bundle      map[string]string
 	WorkspaceID string
-	Version     int64
+	// SyncDigest is the digest of the plan region Orca last wrote to tasks.md; a region that no longer matches was edited by hand.
+	SyncDigest   string
+	SyncError    string
+	SyncAttempts int
+	// SyncNextRetryAt is when a failed sync or archive is tried again; nil means as soon as the sweep comes by.
+	SyncNextRetryAt *time.Time
+	Version         int64
+}
+
+// SyncUpdate is the part of a change that the tasks.md sync and the archive step move, written at an expected version.
+type SyncUpdate struct {
+	State       SyncState
+	Digest      string
+	Error       string
+	Attempts    int
+	NextRetryAt *time.Time
 }
 
 // BundleDigest is a stable hash of the stored files: the plan gate folds it into its subject digest, so a change edited

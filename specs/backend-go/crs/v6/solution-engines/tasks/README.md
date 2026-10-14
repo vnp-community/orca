@@ -25,7 +25,7 @@
 | 026-04 readiness gate | xong, mở rộng | thêm agent, skill, `.tdd-agent`, cache 10 phút, tách blocker và gap tri thức |
 | 026-05 giao diện engine, ghim | xong | `engine_override` từ client chỉ nhận `native` |
 | 026-06 `openspecEngine.GenerateAnalysis` | **không làm theo hướng này** | SOL-TDD-002: Solution không dùng engine `openspec`; dùng agent chỉ đọc có KG (cờ `solution_agent`). Phần `ProposalWorkspace`, kiểm phạm vi ghi và `GenerateProposal` (Plan) đã xong |
-| 026-07 `GeneratePlan`, `TasksMdSyncer`, archive | một phần | `GeneratePlan` do agent viết change: xong. `TasksMdSyncer` và archive sau `request.completed`: chưa (T3.3) |
+| 026-07 `GeneratePlan`, `TasksMdSyncer`, archive | xong | `GeneratePlan` do agent viết change (T2.4 đến T2.8); `TasksMdSyncer` quét 30 s tick `tasks.md`, archive thật khi `completed`, thử lại 5 lần rồi `failed` (T3.3, xem CONTRACTS.md mục 5b của v8) |
 | 026-08 RPC, metric, audit | xong | RPC (admin, audit bền), kênh và REST, bốn series metric, tích hợp hai dialect |
 
 ## Thứ tự phụ thuộc

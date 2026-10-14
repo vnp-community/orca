@@ -33,7 +33,7 @@ func BuildTaskPromptTemplate(c TaskPromptContext, taskID string, t domain.TaskPr
 	return b.String()
 }
 
-// FillTaskPrompts sets PromptTemplate on every task of the proposal. Ids are positional, like the ones in tasks.md.
+// FillTaskPrompts sets PromptTemplate and the spec label on every task of the proposal. Ids are positional, like the ones in tasks.md.
 func FillTaskPrompts(p domain.PlanProposal, c TaskPromptContext) domain.PlanProposal {
 	out := p
 	out.Tasks = fillTasks(p.Tasks, 1, c)
@@ -52,7 +52,10 @@ func fillTasks(in []domain.TaskProposal, container int, c TaskPromptContext) []d
 	}
 	out := make([]domain.TaskProposal, len(in))
 	for j, t := range in {
-		t.PromptTemplate = BuildTaskPromptTemplate(c, fmt.Sprintf("T%d.%d", container, j+1), t)
+		ref := fmt.Sprintf("T%d.%d", container, j+1)
+		t.PromptTemplate = BuildTaskPromptTemplate(c, ref, t)
+		// The label is how tasks.md is ticked later: the task carries the line it came from.
+		t.Labels = append(append([]string(nil), t.Labels...), domain.SpecLabel(ref))
 		out[j] = t
 	}
 	return out
