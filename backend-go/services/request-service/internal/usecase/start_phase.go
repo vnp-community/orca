@@ -68,7 +68,7 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 	if err != nil {
 		return StartPhaseResult{}, err
 	}
-	tree := domain.BuildExecutionTree(tasks)
+	tree := domain.BuildExecutionTreeOf(req.PlanTaskID, tasks)
 
 	if in.PhaseTaskID == "" {
 		return uc.startWholePlan(ctx, req, tasks, tree, in, actor)

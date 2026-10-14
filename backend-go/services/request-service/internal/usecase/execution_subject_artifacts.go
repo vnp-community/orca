@@ -64,7 +64,7 @@ func (a *PreDeployArtifacts) Describe(ctx context.Context, req domain.Request, _
 	if err != nil {
 		return "", "", domain.ErrExecutionTaskServiceUnavailable(err)
 	}
-	tree := domain.BuildExecutionTree(tasks)
+	tree := domain.BuildExecutionTreeOf(req.PlanTaskID, tasks)
 	switch req.Type {
 	case domain.RequestTypeHotfix:
 		return a.describeHotfix(req, tree, hintedID)

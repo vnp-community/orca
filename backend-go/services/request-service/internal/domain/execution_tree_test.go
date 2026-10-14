@@ -55,3 +55,25 @@ func TestNextReadyPhase(t *testing.T) {
 		}
 	})
 }
+
+func TestBuildExecutionTreeOf_ReadsOnlyTheCurrentPlanOfARequestPlannedTwice(t *testing.T) {
+	tasks := []TaskView{
+		{ID: "plan-old", Type: TaskTypePlan}, {ID: "ph-old", Type: TaskTypePhase, ParentID: "plan-old"}, {ID: "t-old", Type: "task", ParentID: "ph-old", Status: TaskStatusDone},
+		{ID: "plan-new", Type: TaskTypePlan}, {ID: "ph-a", Type: TaskTypePhase, ParentID: "plan-new"}, {ID: "ph-b", Type: TaskTypePhase, ParentID: "plan-new"},
+		{ID: "t-a", Type: "task", ParentID: "ph-a"},
+	}
+	all := BuildExecutionTree(tasks)
+	if all.Plan == nil || all.Plan.ID != "plan-old" || len(all.Phases) != 3 {
+		t.Fatalf("the unscoped read mixes both plans: %+v", all.Plan)
+	}
+	cur := BuildExecutionTreeOf("plan-new", tasks)
+	if cur.Plan == nil || cur.Plan.ID != "plan-new" || len(cur.Phases) != 2 || len(cur.Leaves) != 1 || cur.Leaves[0].ID != "t-a" {
+		t.Fatalf("the current plan only: plan=%+v phases=%d leaves=%d", cur.Plan, len(cur.Phases), len(cur.Leaves))
+	}
+	if again := BuildExecutionTreeOf("", tasks); len(again.Phases) != 3 {
+		t.Fatal("no plan id reads everything, as before")
+	}
+	if unknown := BuildExecutionTreeOf("not-a-task", tasks); len(unknown.Phases) != 3 {
+		t.Fatal("a plan id that matches nothing reads everything rather than an empty tree")
+	}
+}

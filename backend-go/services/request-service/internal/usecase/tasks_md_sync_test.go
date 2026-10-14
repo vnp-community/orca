@@ -212,6 +212,26 @@ func TestTasksMdSyncer_TicksOnlyDoneTasksInsideThePlanRegion(t *testing.T) {
 	}
 }
 
+// A Request planned again keeps the tasks of its earlier Plan, with the same spec labels; their progress is not this Plan's.
+func TestTasksMdSyncer_IgnoresTheTasksOfAnEarlierPlanOfTheSameRequest(t *testing.T) {
+	w := newSyncWorld(t)
+	w.reqs.req.PlanTaskID = "plan-new"
+	w.tasks.tasks = []domain.TaskView{
+		{ID: "plan-old", Type: domain.TaskTypePlan}, {ID: "old-1", Type: "task", ParentID: "plan-old", Labels: []string{"spec:t1.1"}},
+		{ID: "plan-new", Type: domain.TaskTypePlan}, {ID: "new-1", Type: "task", ParentID: "plan-new", Labels: []string{"spec:t1.1"}},
+		{ID: "new-2", Type: "task", ParentID: "plan-new", Labels: []string{"spec:t1.2"}},
+	}
+	w.done["old-1"], w.done["new-2"] = true, true // the old T1.1 is done; in the current plan only T1.2 is
+	w.build()
+	if _, err := w.s.Flush(context.Background(), "req-1"); err != nil {
+		t.Fatal(err)
+	}
+	md := w.tasksMd()
+	if !strings.Contains(md, "- [ ] T1.1 one") || !strings.Contains(md, "- [x] T1.2 two") {
+		t.Fatalf("only the current plan's progress is ticked:\n%s", md)
+	}
+}
+
 func TestTasksMdSyncer_AUserDoneTaskAndASecondPassTickWithoutDuplicates(t *testing.T) {
 	w := newSyncWorld(t)
 	w.tasks.tasks[1].Status = domain.TaskStatusDone // marked done by hand: no run outcome

@@ -223,15 +223,16 @@ func (s *TasksMdSyncer) workspace(ctx context.Context, change domain.OpenSpecCha
 func tasksMdPath(changeID string) string { return "openspec/changes/" + changeID + "/" + tasksMDName }
 
 // doneRefs lists the tasks.md lines whose Plan task has a succeeded run. A task the user marked done by hand counts too.
-func (s *TasksMdSyncer) doneRefs(ctx context.Context, requestID string) ([]string, error) {
+func (s *TasksMdSyncer) doneRefs(ctx context.Context, requestID, planTaskID string) ([]string, error) {
 	tasks, err := s.Tasks.ListTasks(ctx, ListTasksQuery{RequestIDs: []string{requestID}, TaskTypes: executionTaskTypes})
 	if err != nil {
 		return nil, err
 	}
 	var refs []string
-	for _, t := range tasks {
+	// Only the Plan the Request runs now: an earlier Plan of the same Request has tasks with the same labels, done or not.
+	for _, t := range domain.BuildExecutionTreeOf(planTaskID, tasks).Leaves {
 		ref, ok := domain.SpecRefFromLabels(t.Labels)
-		if !ok || !t.IsWorkingTask() {
+		if !ok {
 			continue
 		}
 		done := t.Status == domain.TaskStatusDone
@@ -250,7 +251,7 @@ func (s *TasksMdSyncer) doneRefs(ctx context.Context, requestID string) ([]strin
 // syncTasks ticks the done tasks in the proposal's tasks.md and commits only that file. A plan region that no longer
 // matches what Orca last wrote was edited by hand: the stored region is put back first, then the ticks are re-applied.
 func (s *TasksMdSyncer) syncTasks(ctx context.Context, change *domain.OpenSpecChange, req domain.Request) (int, error) {
-	refs, err := s.doneRefs(ctx, req.ID)
+	refs, err := s.doneRefs(ctx, req.ID, req.PlanTaskID)
 	if err != nil {
 		return 0, fmt.Errorf("read task progress: %w", err)
 	}

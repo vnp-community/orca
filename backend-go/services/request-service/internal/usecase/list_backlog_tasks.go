@@ -111,7 +111,7 @@ func (uc *ListBacklogTasks) Execute(ctx context.Context, in ListBacklogTasksInpu
 
 	var entries []backlogEntry
 	for _, r := range visible {
-		entries = append(entries, uc.classify(r, domain.BuildExecutionTree(byRequest[r.ID]), index, in.View)...)
+		entries = append(entries, uc.classify(r, domain.BuildExecutionTreeOf(r.PlanTaskID, byRequest[r.ID]), index, in.View)...)
 	}
 	if in.View == domain.BacklogViewExecute {
 		if entries, err = uc.selectForExecute(ctx, entries); err != nil {

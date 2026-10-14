@@ -85,7 +85,7 @@ func (uc *AdvanceExecution) Execute(ctx context.Context, in AdvanceInput) (Advan
 	if err != nil {
 		return AdvanceResult{}, err
 	}
-	return uc.run(ctx, req, domain.BuildExecutionTree(tasks), in)
+	return uc.run(ctx, req, domain.BuildExecutionTreeOf(req.PlanTaskID, tasks), in)
 }
 
 // run is Execute without the lock and the reads; EvaluateExecution calls it holding both.

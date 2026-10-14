@@ -66,7 +66,7 @@ func (e *EvaluateExecution) Run(ctx context.Context, req domain.Request) error {
 	if err != nil {
 		return err
 	}
-	tree := domain.BuildExecutionTree(tasks)
+	tree := domain.BuildExecutionTreeOf(req.PlanTaskID, tasks)
 	started, err := startedPhases(ctx, e.PhaseStarts, req.ID)
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func (e *EvaluateExecution) Run(ctx context.Context, req domain.Request) error {
 		if rerr != nil {
 			return errors.Join(err, rerr)
 		}
-		tree = domain.BuildExecutionTree(tasks)
+		tree = domain.BuildExecutionTreeOf(req.PlanTaskID, tasks)
 	}
 	if err != nil {
 		return err
