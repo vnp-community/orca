@@ -43,6 +43,7 @@ var requestServiceRPCChannels = map[string]rpcDisposition{
 	"SetProjectEngineSettings": deferredRPC("CR-REQ-026 engine settings UI"),
 	"GeneratePlan":             viaChannel("request.generatePlan"),
 	"GetPlanProposal":          viaChannel("request.planProposal"),
+	"GetPlanBundleFile":        viaChannel("request.planBundleFile"),
 	"CommitPlan":               viaChannel("request.generatePlan"), // mode=commit
 	"StartPhase":               viaChannel("request.startPhase"),
 	"ReportTaskOutcome":        internalRPC("task-service reports phase outcomes"),

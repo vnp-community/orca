@@ -100,6 +100,11 @@ func (c *Client) GetPlanProposal(ctx context.Context, id, runID string) (Documen
 	return c.getDoc(ctx, requestPath(id, "/plan"), q)
 }
 
+// GetPlanBundleFile reads one file of the authored OpenSpec change behind a Plan (path relative to the change).
+func (c *Client) GetPlanBundleFile(ctx context.Context, id, path string) (Document, error) {
+	return c.getDoc(ctx, requestPath(id, "/plan/bundle/file"), url.Values{"path": {path}})
+}
+
 func (c *Client) StartPhase(ctx context.Context, id, phaseTaskID string) (Document, error) {
 	return c.postDoc(ctx, requestPath(id, "/phases/"+url.PathEscape(phaseTaskID)+"/start"), nil)
 }

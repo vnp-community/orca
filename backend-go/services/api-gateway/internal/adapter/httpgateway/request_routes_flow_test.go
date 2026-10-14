@@ -3,11 +3,14 @@ package httpgateway
 import (
 	"context"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 )
@@ -25,6 +28,9 @@ type fakeFlowClient struct {
 	phases     []*requestv1.StartPhaseRequest
 	answers    []*requestv1.AnswerClarificationRequest
 	cancels    []*requestv1.CancelRequestRequest
+	plans      []*requestv1.GetPlanProposalRequest
+	bundles    []*requestv1.GetPlanBundleFileRequest
+	bundleErr  error
 }
 
 func (f *fakeFlowClient) CancelRequest(_ context.Context, in *requestv1.CancelRequestRequest, _ ...grpc.CallOption) (*requestv1.CancelRequestResponse, error) {
@@ -74,6 +80,28 @@ func (f *fakeFlowClient) AnswerClarification(_ context.Context, in *requestv1.An
 	defer f.mu.Unlock()
 	f.answers = append(f.answers, in)
 	return &requestv1.AnswerClarificationResponse{Clarification: &requestv1.Clarification{Id: in.GetClarificationId()}, RequestStatus: "analyzing"}, nil
+}
+
+func (f *fakeFlowClient) GetPlanProposal(_ context.Context, in *requestv1.GetPlanProposalRequest, _ ...grpc.CallOption) (*requestv1.GetPlanProposalResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.plans = append(f.plans, in)
+	return &requestv1.GetPlanProposalResponse{
+		RunId: "run-1", Status: "succeeded", Engine: "openspec",
+		Bundle:    &requestv1.PlanBundle{ChangeId: "req-1-x", Branch: "request/1-proposal", Commit: "abc", Files: []*requestv1.PlanBundleFile{{Path: "tasks.md", Size: 10}}},
+		Checks:    []*requestv1.PlanCheck{{Code: "KNOWLEDGE_CONFLICT", Message: "ADR-12", Severity: "warning"}},
+		Knowledge: &requestv1.PlanKnowledge{Available: true, Snapshot: "snap-1", Read: []string{"FR-1"}},
+	}, nil
+}
+
+func (f *fakeFlowClient) GetPlanBundleFile(_ context.Context, in *requestv1.GetPlanBundleFileRequest, _ ...grpc.CallOption) (*requestv1.GetPlanBundleFileResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.bundles = append(f.bundles, in)
+	if f.bundleErr != nil {
+		return nil, f.bundleErr
+	}
+	return &requestv1.GetPlanBundleFileResponse{Path: in.GetPath(), Content: "# tasks\n"}, nil
 }
 
 func flowRouter(f *fakeFlowClient) http.Handler {
@@ -149,5 +177,51 @@ func TestRequestFlowRoutes_BadInput(t *testing.T) {
 	// A JSON null body is an empty argument set, not a nil-map write.
 	if rec := doRequestRoute(r, http.MethodPost, "/v1/requests/r1/cancel", `null`, routesIdentity); rec.Code != http.StatusOK || f.cancels[0].GetRequestId() != "r1" {
 		t.Errorf("null body: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRequestFlowRoutes_PlanBundle(t *testing.T) {
+	f := &fakeFlowClient{}
+	r := flowRouter(f)
+	rec := doRequestRoute(r, http.MethodGet, "/v1/requests/r1/plan/bundle?runId=run-1", "", routesIdentity)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("bundle: %d %s", rec.Code, rec.Body.String())
+	}
+	for _, want := range []string{`"engine":"openspec"`, `"changeId":"req-1-x"`, `"branch":"request/1-proposal"`, `"tasks.md"`, `KNOWLEDGE_CONFLICT`, `"snapshot":"snap-1"`} {
+		if !strings.Contains(rec.Body.String(), want) {
+			t.Errorf("body lacks %s: %s", want, rec.Body.String())
+		}
+	}
+	if in := f.plans[0]; in.GetRequestId() != "r1" || in.GetRunId() != "run-1" {
+		t.Errorf("rpc = %+v", in)
+	}
+
+	rec = doRequestRoute(r, http.MethodGet, "/v1/requests/r1/plan/bundle/file?path=specs%2Fai%2Fspec.md", "", routesIdentity)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"content":"# tasks\n"`) {
+		t.Fatalf("file: %d %s", rec.Code, rec.Body.String())
+	}
+	if in := f.bundles[0]; in.GetRequestId() != "r1" || in.GetPath() != "specs/ai/spec.md" {
+		t.Errorf("rpc = %+v", in)
+	}
+}
+
+func TestRequestFlowRoutes_PlanBundleFileInputAndErrors(t *testing.T) {
+	f := &fakeFlowClient{}
+	r := flowRouter(f)
+	if rec := doRequestRoute(r, http.MethodGet, "/v1/requests/r1/plan/bundle/file", "", routesIdentity); rec.Code != http.StatusBadRequest || len(f.bundles) != 0 {
+		t.Errorf("no path: %d rpcs=%d", rec.Code, len(f.bundles))
+	}
+	if rec := doRequestRoute(r, http.MethodGet, "/v1/requests/r1/plan/bundle/file?path=tasks.md", "", nil); rec.Code != http.StatusUnauthorized || len(f.bundles) != 0 {
+		t.Errorf("anonymous: %d rpcs=%d", rec.Code, len(f.bundles))
+	}
+	// The gateway does not decide what lies inside the change: it forwards the path and request-service refuses it.
+	f.bundleErr = status.Error(codes.InvalidArgument, "the path must name a file inside the change")
+	rec := doRequestRoute(r, http.MethodGet, "/v1/requests/r1/plan/bundle/file?path=..%2F..%2Fetc%2Fpasswd", "", routesIdentity)
+	if rec.Code != http.StatusBadRequest || len(f.bundles) != 1 || f.bundles[0].GetPath() != "../../etc/passwd" {
+		t.Errorf("a bad path must come back as 400 from the service: %d %s %+v", rec.Code, rec.Body.String(), f.bundles)
+	}
+	f.bundleErr = status.Error(codes.NotFound, "no such file")
+	if rec := doRequestRoute(r, http.MethodGet, "/v1/requests/r1/plan/bundle/file?path=x.md", "", routesIdentity); rec.Code != http.StatusNotFound {
+		t.Errorf("missing file: %d", rec.Code)
 	}
 }

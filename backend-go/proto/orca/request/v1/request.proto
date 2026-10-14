@@ -323,6 +323,8 @@ service RequestService {
   // Plan, Phase and execution (CR-REQ-012 to 014). GeneratePlan is the asynchronous PROPOSE step.
   rpc GeneratePlan(GeneratePlanRequest) returns (GeneratePlanResponse);
   rpc GetPlanProposal(GetPlanProposalRequest) returns (GetPlanProposalResponse);
+  // Reads one file of the authored OpenSpec change behind a Plan (the proposal, design, specs or tasks).
+  rpc GetPlanBundleFile(GetPlanBundleFileRequest) returns (GetPlanBundleFileResponse);
   rpc CommitPlan(CommitPlanRequest) returns (CommitPlanResponse);
   rpc StartPhase(StartPhaseRequest) returns (StartPhaseResponse);
   rpc ReportTaskOutcome(ReportTaskOutcomeRequest) returns (ReportTaskOutcomeResponse);

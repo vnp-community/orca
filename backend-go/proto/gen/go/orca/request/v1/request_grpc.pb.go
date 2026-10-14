@@ -43,6 +43,7 @@ const (
 	RequestService_SetProjectEngineSettings_FullMethodName         = "/orca.request.v1.RequestService/SetProjectEngineSettings"
 	RequestService_GeneratePlan_FullMethodName                     = "/orca.request.v1.RequestService/GeneratePlan"
 	RequestService_GetPlanProposal_FullMethodName                  = "/orca.request.v1.RequestService/GetPlanProposal"
+	RequestService_GetPlanBundleFile_FullMethodName                = "/orca.request.v1.RequestService/GetPlanBundleFile"
 	RequestService_CommitPlan_FullMethodName                       = "/orca.request.v1.RequestService/CommitPlan"
 	RequestService_StartPhase_FullMethodName                       = "/orca.request.v1.RequestService/StartPhase"
 	RequestService_ReportTaskOutcome_FullMethodName                = "/orca.request.v1.RequestService/ReportTaskOutcome"
@@ -127,6 +128,8 @@ type RequestServiceClient interface {
 	// Plan, Phase and execution (CR-REQ-012 to 014). GeneratePlan is the asynchronous PROPOSE step.
 	GeneratePlan(ctx context.Context, in *GeneratePlanRequest, opts ...grpc.CallOption) (*GeneratePlanResponse, error)
 	GetPlanProposal(ctx context.Context, in *GetPlanProposalRequest, opts ...grpc.CallOption) (*GetPlanProposalResponse, error)
+	// Reads one file of the authored OpenSpec change behind a Plan (the proposal, design, specs or tasks).
+	GetPlanBundleFile(ctx context.Context, in *GetPlanBundleFileRequest, opts ...grpc.CallOption) (*GetPlanBundleFileResponse, error)
 	CommitPlan(ctx context.Context, in *CommitPlanRequest, opts ...grpc.CallOption) (*CommitPlanResponse, error)
 	StartPhase(ctx context.Context, in *StartPhaseRequest, opts ...grpc.CallOption) (*StartPhaseResponse, error)
 	ReportTaskOutcome(ctx context.Context, in *ReportTaskOutcomeRequest, opts ...grpc.CallOption) (*ReportTaskOutcomeResponse, error)
@@ -424,6 +427,16 @@ func (c *requestServiceClient) GetPlanProposal(ctx context.Context, in *GetPlanP
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetPlanProposalResponse)
 	err := c.cc.Invoke(ctx, RequestService_GetPlanProposal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) GetPlanBundleFile(ctx context.Context, in *GetPlanBundleFileRequest, opts ...grpc.CallOption) (*GetPlanBundleFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPlanBundleFileResponse)
+	err := c.cc.Invoke(ctx, RequestService_GetPlanBundleFile_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -944,6 +957,8 @@ type RequestServiceServer interface {
 	// Plan, Phase and execution (CR-REQ-012 to 014). GeneratePlan is the asynchronous PROPOSE step.
 	GeneratePlan(context.Context, *GeneratePlanRequest) (*GeneratePlanResponse, error)
 	GetPlanProposal(context.Context, *GetPlanProposalRequest) (*GetPlanProposalResponse, error)
+	// Reads one file of the authored OpenSpec change behind a Plan (the proposal, design, specs or tasks).
+	GetPlanBundleFile(context.Context, *GetPlanBundleFileRequest) (*GetPlanBundleFileResponse, error)
 	CommitPlan(context.Context, *CommitPlanRequest) (*CommitPlanResponse, error)
 	StartPhase(context.Context, *StartPhaseRequest) (*StartPhaseResponse, error)
 	ReportTaskOutcome(context.Context, *ReportTaskOutcomeRequest) (*ReportTaskOutcomeResponse, error)
@@ -1078,6 +1093,9 @@ func (UnimplementedRequestServiceServer) GeneratePlan(context.Context, *Generate
 }
 func (UnimplementedRequestServiceServer) GetPlanProposal(context.Context, *GetPlanProposalRequest) (*GetPlanProposalResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPlanProposal not implemented")
+}
+func (UnimplementedRequestServiceServer) GetPlanBundleFile(context.Context, *GetPlanBundleFileRequest) (*GetPlanBundleFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPlanBundleFile not implemented")
 }
 func (UnimplementedRequestServiceServer) CommitPlan(context.Context, *CommitPlanRequest) (*CommitPlanResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CommitPlan not implemented")
@@ -1669,6 +1687,24 @@ func _RequestService_GetPlanProposal_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RequestServiceServer).GetPlanProposal(ctx, req.(*GetPlanProposalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_GetPlanBundleFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlanBundleFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).GetPlanBundleFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_GetPlanBundleFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).GetPlanBundleFile(ctx, req.(*GetPlanBundleFileRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2614,6 +2650,10 @@ var RequestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPlanProposal",
 			Handler:    _RequestService_GetPlanProposal_Handler,
+		},
+		{
+			MethodName: "GetPlanBundleFile",
+			Handler:    _RequestService_GetPlanBundleFile_Handler,
 		},
 		{
 			MethodName: "CommitPlan",

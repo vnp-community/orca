@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 )
@@ -16,6 +17,7 @@ const maxPlanProposalBytes = 256 * 1024
 func (c requestChannels) registerPlan(r *Registry) {
 	c.handle(r, "request.generatePlan", requestChannelOpts{timeout: requestAIChannelTimeout, ai: true}, c.generatePlan)
 	c.handle(r, "request.planProposal", requestChannelOpts{timeout: requestRPCTimeout}, c.planProposal)
+	c.handle(r, "request.planBundleFile", requestChannelOpts{timeout: requestRPCTimeout}, c.planBundleFile)
 	c.handle(r, "request.startPhase", requestChannelOpts{timeout: requestStartPhaseTimeout}, func(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
 		in, err := decodeRequestArgs[struct {
 			ID          string `json:"id"`
@@ -116,5 +118,60 @@ func (c requestChannels) planProposal(ctx context.Context, _ Identity, args []js
 	if err != nil {
 		return nil, err
 	}
-	return planProposalView(resp.GetRunId(), resp.GetStatus(), resp.GetErrorCode(), resp.GetErrorMessage(), resp.GetProposal(), resp.GetRawAiResponse()), nil
+	out := planProposalView(resp.GetRunId(), resp.GetStatus(), resp.GetErrorCode(), resp.GetErrorMessage(), resp.GetProposal(), resp.GetRawAiResponse())
+	addPlanEngineView(out, resp)
+	return out, nil
+}
+
+// addPlanEngineView adds what an openspec Plan carries beyond the proposal. A native Plan gets only engine, so no field
+// appears empty and reads as "nothing found".
+func addPlanEngineView(out map[string]any, resp *requestv1.GetPlanProposalResponse) {
+	if resp.GetEngine() != "" {
+		out["engine"] = resp.GetEngine()
+	}
+	if resp.GetBundle() != nil {
+		out["bundle"] = protoJSON(resp.GetBundle())
+	}
+	if len(resp.GetChecks()) > 0 {
+		checks := make([]json.RawMessage, 0, len(resp.GetChecks()))
+		for _, c := range resp.GetChecks() {
+			checks = append(checks, protoJSON(c))
+		}
+		out["checks"] = checks
+	}
+	if resp.GetKnowledge() != nil {
+		out["knowledge"] = protoJSON(resp.GetKnowledge())
+	}
+}
+
+func protoJSON(m proto.Message) json.RawMessage {
+	b, err := protojson.MarshalOptions{EmitUnpopulated: true}.Marshal(m)
+	if err != nil {
+		return json.RawMessage("null")
+	}
+	return b
+}
+
+// planBundleFile reads one file of the authored change. The path is passed through untouched: request-service is the one
+// that decides what lies inside the change.
+func (c requestChannels) planBundleFile(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
+	in, err := decodeRequestArgs[struct {
+		ID   string `json:"id"`
+		Path string `json:"path"`
+	}](args)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(in.Path) == "" {
+		return nil, invalidRequestArg("path is required")
+	}
+	resp, err := c.req.GetPlanBundleFile(ctx, &requestv1.GetPlanBundleFileRequest{RequestId: in.ID, Path: in.Path})
+	if err != nil {
+		return nil, err
+	}
+	return struct {
+		Path    string `json:"path"`
+		Content string `json:"content"`
+		Omitted bool   `json:"omitted"`
+	}{resp.GetPath(), resp.GetContent(), resp.GetOmitted()}, nil
 }

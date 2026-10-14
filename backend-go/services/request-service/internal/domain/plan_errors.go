@@ -98,3 +98,15 @@ func ErrPlanSupersedeMismatch() error {
 func ErrPlanNotCommitted(requestID string) error {
 	return planInvalid("REQUEST_PLAN_NOT_COMMITTED", "request "+requestID+" has no committed Plan to approve")
 }
+
+func ErrPlanBundleNotFound(requestID string) error {
+	return apperrors.New(apperrors.KindNotFound, "REQUEST_PLAN_BUNDLE_NOT_FOUND", "request "+requestID+" has no authored OpenSpec change", nil)
+}
+
+func ErrPlanBundlePathInvalid(path string) error {
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_PLAN_BUNDLE_PATH_INVALID", "the path must name a file inside the change: "+path, nil)
+}
+
+func ErrPlanBundleFileNotFound(path string) error {
+	return apperrors.New(apperrors.KindNotFound, "REQUEST_PLAN_BUNDLE_FILE_NOT_FOUND", "the change has no file "+path, nil)
+}

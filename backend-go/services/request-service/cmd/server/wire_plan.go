@@ -44,7 +44,8 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 			Settings: solution.settings, LeaseOwner: solution.owner,
 			Pin: usecase.NewPinSolutionEngine(stores.requests, stores.engineSettings), Registry: registry,
 		}),
-		Get: usecase.NewGetPlanProposal(stores.requests, stores.analysisRuns),
+		Get:    usecase.NewGetPlanProposal(stores.requests, stores.analysisRuns).WithChanges(stores.openspecChanges),
+		Bundle: usecase.NewGetPlanBundleFile(stores.requests, stores.openspecChanges),
 	}
 	if !approval.Enabled || approval.Open == nil {
 		log.Warn("approval is off: CommitPlan is unavailable because a committed Plan has nobody to approve it")

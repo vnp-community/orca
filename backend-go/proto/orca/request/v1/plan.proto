@@ -64,6 +64,61 @@ message GetPlanProposalResponse {
   string error_message = 4;
   PlanProposal proposal = 5;
   string raw_ai_response = 6;
+  // native | openspec. The fields below are set only for the openspec engine, whose Plan is read from an authored change.
+  string engine = 7;
+  PlanBundle bundle = 8;
+  repeated PlanCheck checks = 9;
+  PlanKnowledge knowledge = 10;
+}
+
+// PlanBundle names the OpenSpec change a Plan was read from. Its files stay readable after the worktree is gone.
+message PlanBundle {
+  string change_id = 1;
+  string branch = 2;
+  string commit = 3;
+  string tasks_md_digest = 4;
+  repeated PlanBundleFile files = 5;
+}
+
+message PlanBundleFile {
+  // Relative to the change directory, for example tasks.md or specs/ai/spec.md.
+  string path = 1;
+  int64 size = 2;
+  // True when the file was too large to keep; only its size and hash are stored.
+  bool omitted = 3;
+}
+
+// PlanCheck is one finding shown to the approver. error means the change was refused; Orca never stores such a proposal,
+// so approvers see warning and info only.
+message PlanCheck {
+  string code = 1;
+  string where = 2;
+  string message = 3;
+  // info | warning | error
+  string severity = 4;
+}
+
+// PlanKnowledge is what the authoring agent reported about the project's design knowledge. It is the agent's word, not a
+// fact Orca checked.
+message PlanKnowledge {
+  bool available = 1;
+  string snapshot = 2;
+  repeated string read = 3;
+  repeated string gaps = 4;
+  repeated string conflicts = 5;
+  string skill_hash = 6;
+}
+
+message GetPlanBundleFileRequest {
+  string request_id = 1;
+  // A path inside the change, relative to it (tasks.md) or in full (openspec/changes/<id>/tasks.md).
+  string path = 2;
+}
+
+message GetPlanBundleFileResponse {
+  string path = 1;
+  string content = 2;
+  bool omitted = 3;
 }
 
 message CommitPlanRequest {

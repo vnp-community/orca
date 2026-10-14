@@ -172,6 +172,13 @@ func requestChannelCases() []requestChannelCase {
 					t.Errorf("proposal = %v", res["proposal"])
 				}
 			}},
+		{channel: "request.planBundleFile", args: `{"id":"r1","path":"tasks.md"}`, rpc: "GetPlanBundleFile", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, in proto.Message) {
+				m := in.(*requestv1.GetPlanBundleFileRequest)
+				mustEqual(t, m.GetRequestId(), "r1")
+				mustEqual(t, m.GetPath(), "tasks.md")
+				mustEqual(t, res["content"], "# tasks\n")
+			}},
 		{channel: "request.startPhase", args: `{"id":"r1","phaseTaskId":"ph1"}`, rpc: "StartPhase", lo: mid[0], hi: mid[1],
 			check: func(t *testing.T, res map[string]any, _ proto.Message) {
 				if res["dispatchedTaskIds"] == nil {
@@ -387,7 +394,7 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"approval.get", "approval.list", "approval.listPending", "approval.approve", "approval.reject", "approval.cancel",
 		"backlog.requests", "backlog.tasks", "backlog.execute",
 		// CONTRACT 2.5 and the plan proposal reader.
-		"request.links", "request.flow", "request.checks", "request.planProposal",
+		"request.links", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile",
 		// CR-REQ-028: the channels useClarifications.ts calls.
 		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel", "clarification.request",
 	}

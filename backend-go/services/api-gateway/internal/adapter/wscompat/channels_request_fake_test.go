@@ -186,6 +186,14 @@ func (f *fakeRequestClient) GetPlanProposal(ctx context.Context, in *requestv1.G
 	return &requestv1.GetPlanProposalResponse{RunId: in.GetRunId(), Status: "succeeded", Proposal: &requestv1.PlanProposal{Title: "P", Phases: []*requestv1.PhaseProposal{{Title: "ph", Tasks: []*requestv1.TaskProposal{{Title: "t", TaskType: "task", EstimatedHours: wrapperspb.Double(2)}}}}}}, nil
 }
 
+func (f *fakeRequestClient) GetPlanBundleFile(ctx context.Context, in *requestv1.GetPlanBundleFileRequest, _ ...grpc.CallOption) (*requestv1.GetPlanBundleFileResponse, error) {
+	f.rec(ctx, "GetPlanBundleFile", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetPlanBundleFileResponse{Path: in.GetPath(), Content: "# tasks\n"}, nil
+}
+
 func (f *fakeRequestClient) CommitPlan(ctx context.Context, in *requestv1.CommitPlanRequest, _ ...grpc.CallOption) (*requestv1.CommitPlanResponse, error) {
 	f.rec(ctx, "CommitPlan", in)
 	if f.err != nil {

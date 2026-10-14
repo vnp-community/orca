@@ -11,7 +11,7 @@ import (
 
 func newPlanCmd(e flowEnv) *cobra.Command {
 	cmd := &cobra.Command{Use: "plan", Short: "the execution plan of a Request: generate it, read its tree, start a Phase"}
-	cmd.AddCommand(newPlanGenerateCmd(e), newPlanProposalCmd(e), newPlanTreeCmd(e), newPlanStartPhaseCmd(e))
+	cmd.AddCommand(newPlanGenerateCmd(e), newPlanProposalCmd(e), newPlanBundleCmd(e), newPlanTreeCmd(e), newPlanStartPhaseCmd(e))
 	return cmd
 }
 
@@ -54,9 +54,30 @@ func newPlanProposalCmd(e flowEnv) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
 				return cli.GetPlanProposal(ctx, args[0], run)
-			}, nil)
+			}, renderPlanProposal)
 		},
 	}
+	cmd.Flags().StringVar(&run, "run", "", "run id (default: the latest)")
+	return cmd
+}
+
+// newPlanBundleCmd reads the OpenSpec change a plan was authored as: the file list, or one file's text.
+func newPlanBundleCmd(e flowEnv) *cobra.Command {
+	var file, run string
+	cmd := &cobra.Command{
+		Use: "bundle <request-id>", Short: "the OpenSpec change behind a plan: its files, or one file with --file (read it before you approve the plan)", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if file != "" {
+				return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
+					return cli.GetPlanBundleFile(ctx, args[0], file)
+				}, renderBundleFile)
+			}
+			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
+				return cli.GetPlanProposal(ctx, args[0], run)
+			}, renderPlanBundle)
+		},
+	}
+	cmd.Flags().StringVar(&file, "file", "", "print this file of the change (for example tasks.md or specs/<capability>/spec.md)")
 	cmd.Flags().StringVar(&run, "run", "", "run id (default: the latest)")
 	return cmd
 }

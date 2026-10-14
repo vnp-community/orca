@@ -17,6 +17,8 @@ type PlanUseCases struct {
 	Generate *usecase.GeneratePlan
 	Get      *usecase.GetPlanProposal
 	Commit   *usecase.CommitPlan
+	// Bundle reads one file of the authored OpenSpec change; nil when the openspec engine is not configured.
+	Bundle *usecase.GetPlanBundleFile
 }
 
 // WithPlan attaches the Plan handlers; without it those RPCs stay Unimplemented.
@@ -43,12 +45,36 @@ func (s *Server) GetPlanProposal(ctx context.Context, req *requestv1.GetPlanProp
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	out := &requestv1.GetPlanProposalResponse{
-		RunId: v.RunID, Status: v.Status, ErrorCode: v.ErrorCode, ErrorMessage: v.ErrorMessage, RawAiResponse: v.Raw,
+		RunId: v.RunID, Status: v.Status, ErrorCode: v.ErrorCode, ErrorMessage: v.ErrorMessage, RawAiResponse: v.Raw, Engine: v.Engine,
 	}
 	if v.Proposal != nil {
 		out.Proposal = toProtoPlanProposal(*v.Proposal)
 	}
+	if v.Bundle != nil {
+		b := &requestv1.PlanBundle{ChangeId: v.Bundle.ChangeID, Branch: v.Bundle.Branch, Commit: v.Bundle.Commit, TasksMdDigest: v.Bundle.TasksMDDigest}
+		for _, f := range v.Bundle.Files {
+			b.Files = append(b.Files, &requestv1.PlanBundleFile{Path: f.Path, Size: f.Size, Omitted: f.Omitted})
+		}
+		out.Bundle = b
+	}
+	for _, c := range v.Checks {
+		out.Checks = append(out.Checks, &requestv1.PlanCheck{Code: c.Code, Where: c.Where, Message: c.Message, Severity: c.Severity})
+	}
+	if k := v.Knowledge; k != nil {
+		out.Knowledge = &requestv1.PlanKnowledge{Available: k.Available, Snapshot: k.Snapshot, Read: k.Read, Gaps: k.Gaps, Conflicts: k.Conflicts, SkillHash: k.SkillHash}
+	}
 	return out, nil
+}
+
+func (s *Server) GetPlanBundleFile(ctx context.Context, req *requestv1.GetPlanBundleFileRequest) (*requestv1.GetPlanBundleFileResponse, error) {
+	if s.plan.Bundle == nil {
+		return nil, status.Error(codes.Unimplemented, "GetPlanBundleFile is not wired")
+	}
+	f, err := s.plan.Bundle.Execute(ctx, req.GetRequestId(), req.GetPath())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &requestv1.GetPlanBundleFileResponse{Path: f.Path, Content: f.Content, Omitted: f.Omitted}, nil
 }
 
 func (s *Server) CommitPlan(ctx context.Context, req *requestv1.CommitPlanRequest) (*requestv1.CommitPlanResponse, error) {

@@ -26,6 +26,9 @@ orca solution choose $R <solution-id> --option opt-1        # phương án khôn
 orca approval list $R --subject solution
 orca approval approve <approval-id>                         # đọc version + digest ngay trước khi duyệt
 orca plan generate $R                                       # propose → chờ AI → commit
+orca plan proposal $R                                       # trạng thái run và kế hoạch; với engine openspec: nhánh, commit, kết quả kiểm, tham chiếu tri thức
+orca plan bundle $R                                         # (openspec) danh sách tệp của gói OpenSpec đứng sau kế hoạch
+orca plan bundle $R --file tasks.md                         # đọc một tệp: proposal.md, design.md, specs/<capability>/spec.md, tasks.md
 orca plan tree $R                                           # phase, task, trạng thái, "(after ...)"
 orca approval approve <plan-gate-id>
 orca approval list $R --subject phase                       # cột "subject" là id của Phase
@@ -34,6 +37,8 @@ orca plan start-phase $R <phase-task-id>                    # giao task cho agen
 ```
 
 `orca approval pending` liệt kê gate đang chờ bạn ở mọi Request. `approve` / `reject` mặc định duyệt đúng `version` + `digest` đọc lúc đó (in ra stderr); truyền cả `--version` và `--digest` nếu muốn duyệt đúng cái bạn đã xem. `reject` bắt buộc có `--comment`.
+
+Với engine `openspec` (kế hoạch do agent viết thành một change OpenSpec trên nhánh `request/<số>-proposal`), hãy đọc gói bằng `orca plan bundle` trước khi chạy `orca approval approve <plan-gate-id>`: quyết định duyệt gắn với digest của cả gói, nên sinh lại hoặc sửa gói sau khi mở cổng làm quyết định cũ không còn hiệu lực. Engine `native` không có gói; `orca plan bundle` nói rõ điều đó.
 
 Lệnh có từ trước: `worktree create`, `agent status|send|wait`, `snapshot`, `daemon status|stop`, `serve`.
 

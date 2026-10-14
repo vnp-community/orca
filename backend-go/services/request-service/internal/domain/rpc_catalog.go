@@ -103,6 +103,7 @@ var Catalog = map[string]Entry{
 	reqSvc + "SetProjectEngineSettings":         unlocated(GroupAdmin, RateWrite, false),
 	reqSvc + "GeneratePlan":                     onRequest(GroupPlan, "request_id", RateAI, false),
 	reqSvc + "GetPlanProposal":                  onRequest(GroupRead, "request_id", RateRead, false),
+	reqSvc + "GetPlanBundleFile":                onRequest(GroupRead, "request_id", RateRead, false),
 	reqSvc + "CommitPlan":                       onRequest(GroupPlan, "request_id", RateWrite, false),
 	reqSvc + "StartPhase":                       onRequest(GroupExecute, "request_id", RateAI, false),
 	reqSvc + "ReportTaskOutcome":                unlocated(GroupInternal, RateNone, false),
