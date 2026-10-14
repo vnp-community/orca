@@ -24,6 +24,10 @@ type PlanProposalView struct {
 	Bundle    *PlanBundleView
 	Checks    []PlanCheckView
 	Knowledge *PlanKnowledgeView
+	// Stats is what the run's agent calls reported (tool call counts and usage); nil when none did. ElapsedMS is the run's
+	// wall-clock time from start to finish, 0 while it runs.
+	Stats     *domain.RunStats
+	ElapsedMS int64
 }
 
 // PlanBundleView names the authored OpenSpec change behind a Plan.
@@ -80,7 +84,10 @@ func (uc *GetPlanProposal) Execute(ctx context.Context, requestID, runID string)
 	if err != nil {
 		return PlanProposalView{}, err
 	}
-	view := PlanProposalView{RunID: run.ID, Status: string(run.Status), Engine: string(run.Mode.EngineFor())}
+	view := PlanProposalView{RunID: run.ID, Status: string(run.Status), Engine: string(run.Mode.EngineFor()), Stats: run.Stats}
+	if run.FinishedAt != nil {
+		view.ElapsedMS = run.FinishedAt.Sub(run.StartedAt).Milliseconds()
+	}
 	switch run.Status {
 	case domain.RunStatusFailed:
 		view.ErrorCode, view.ErrorMessage = derefStr(run.ErrorCode), derefStr(run.ErrorMessage)

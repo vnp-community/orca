@@ -67,6 +67,25 @@ message AnalysisRun {
   google.protobuf.Timestamp finished_at = 7;
   string engine = 8;
   string proposal_branch = 9;
+  // Set only for an agent run that reported anything.
+  RunStats stats = 10;
+}
+
+// RunStats is what an agent run says about itself: how often it called each tool (names and numbers only, never what a tool
+// read or returned) and claude's usage figures. It is evidence for a reviewer, not a verdict.
+message RunStats {
+  map<string, int32> tool_calls = 1;
+  // How many of those calls went to the knowledge graph's tools.
+  int32 knowledge_tool_calls = 2;
+  int32 turns = 3;
+  int64 duration_ms = 4;
+  // cost_usd means something only when has_cost is true: a cost claude did not report is "not reported", never zero.
+  bool has_cost = 5;
+  double cost_usd = 6;
+  int64 input_tokens = 7;
+  int64 output_tokens = 8;
+  int64 cache_read_tokens = 9;
+  int64 cache_creation_tokens = 10;
 }
 
 message GenerateSolutionRequest {

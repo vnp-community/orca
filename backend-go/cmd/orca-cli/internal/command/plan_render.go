@@ -62,6 +62,9 @@ func renderPlanProposal(doc apiclient.Document) string {
 	if code := doc.Str("errorCode"); code != "" {
 		fmt.Fprintf(&b, "error %s: %s\n", code, doc.Str("errorMessage"))
 	}
+	if line := renderRunStats(doc.Doc("stats"), doc.Int("elapsedMs")); line != "" {
+		fmt.Fprintf(&b, "agent: %s\n", line)
+	}
 	if p := doc.Doc("proposal"); p != nil {
 		fmt.Fprintf(&b, "plan  %s\n", p.Str("title"))
 		phases, tasks := doc.Docs("proposal", "phases"), 0

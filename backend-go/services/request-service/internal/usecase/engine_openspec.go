@@ -27,6 +27,8 @@ type OpenSpecEngineDeps struct {
 	// Caps may be nil; the engine then cannot prove the agent is safe to run and refuses.
 	Caps     DevServerCapabilityReader
 	Settings AnalysisSettings
+	// Observer may be nil; it receives the knowledge tool calls of each agent call.
+	Observer EngineObserver
 	// NewNonce fences the agent's result block; production uses a random value per attempt.
 	NewNonce func() string
 }
@@ -82,6 +84,8 @@ type ProposalInput struct {
 	// OnWorkspace is told about the worktree as soon as it exists, so a run that fails afterwards still leaves a record the
 	// cleanup can find. It must not fail the run.
 	OnWorkspace func(Workspace)
+	// Stats collects the tool calls and usage of every agent call of the run, failed attempts included.
+	Stats *domain.RunStats
 }
 
 // AgentReport is what the agent says about its own run in the result block. Orca treats it as data to show and to
@@ -231,7 +235,14 @@ func (e *openspecEngine) runAgent(ctx context.Context, run domain.AnalysisRun, r
 			// The agent reads the graph from the project checkout, where .tdd-agent/ lives, not from the proposal worktree.
 			input.KnowledgeRoot = conn.RepoPath
 		}
-		return e.d.Agent.ExecPrompt(ctx, conn, input)
+		res, err := e.d.Agent.ExecPrompt(ctx, conn, input)
+		if err == nil {
+			if in.Stats != nil {
+				*in.Stats = in.Stats.Merge(res.Stats)
+			}
+			observerOrNoop(e.d.Observer).KnowledgeToolCalls(res.Stats)
+		}
+		return res, err
 	}
 	res, err := call(useKnowledge)
 	if err != nil && useKnowledge && errors.Is(err, ErrAgentKnowledgeHubUnavailable) {

@@ -54,6 +54,7 @@ func RunSolutionContract(t *testing.T, newEnv func(t *testing.T) SolutionEnv) {
 		{"RunUniqueIndexes", solRunUniqueIndexes},
 		{"StartRunSemantics", solStartRunSemantics},
 		{"PlanRunNeedsNoDraftSolution", solPlanRunWithoutDraft},
+		{"FinishedRunKeepsItsToolCallsAndUsage", solRunStatsRoundTrip},
 		{"ConcurrentStartsShareOneRun", solConcurrentStarts},
 		{"AgentGateAllowsExactlyTheMaximum", solAgentGate},
 		{"AgentGateIsSharedAcrossAgentModes", solAgentGateSharedAcrossModes},
@@ -503,6 +504,50 @@ func solPlanRunWithoutDraft(t *testing.T, env SolutionEnv) {
 	got, err := env.AnalysisRuns.Get(k.ctx, run.ID)
 	if err != nil || got.Status != domain.RunStatusSucceeded || got.RawOutput == nil || *got.RawOutput != raw {
 		t.Fatalf("plan run read back: %+v %v", got, err)
+	}
+}
+
+func solRunStatsRoundTrip(t *testing.T, env SolutionEnv) {
+	k := newSolKit(t, env)
+	r := k.seed(t, domain.RequestTypeChangeRequest, domain.RequestStatusPlanning)
+	run, _ := startInput(t, k, r, domain.AnalysisModeAgentProposal, domain.RunKindPlan, "")
+	run.SolutionID = ""
+	res, err := startIn(t, k, run, domain.Solution{}, 0)
+	if err != nil || !res.Created {
+		t.Fatalf("start: %+v %v", res, err)
+	}
+	cost := 0.75
+	done := res.Run
+	done.Succeed(time.Now())
+	done.Stats = &domain.RunStats{
+		ToolCalls: map[string]int{domain.KnowledgeToolPrefix + "kg_search": 3, "Read": 5},
+		Usage:     &domain.RunUsage{Turns: 7, DurationMS: 4200, CostUSD: &cost, OutputTokens: 321},
+	}
+	if ok, err := env.AnalysisRuns.FinishOwned(k.ctx, done, "w-test"); err != nil || !ok {
+		t.Fatalf("finish: %v %v", ok, err)
+	}
+	got, err := env.AnalysisRuns.Get(k.ctx, res.Run.ID)
+	if err != nil || got.Stats == nil || got.Stats.KnowledgeCalls() != 3 || got.Stats.ToolCalls["Read"] != 5 {
+		t.Fatalf("stats read back: %+v %v", got.Stats, err)
+	}
+	if u := got.Stats.Usage; u == nil || u.Turns != 7 || u.DurationMS != 4200 || u.CostUSD == nil || *u.CostUSD != 0.75 || u.OutputTokens != 321 {
+		t.Fatalf("usage read back: %+v", got.Stats.Usage)
+	}
+	// A run with nothing to say stores nothing and reads back as no stats, not as an empty object.
+	plain := k.seed(t, domain.RequestTypeChangeRequest, domain.RequestStatusPlanning)
+	pr, _ := startInput(t, k, plain, domain.AnalysisModeComplete, domain.RunKindPlan, "")
+	pr.SolutionID = ""
+	pres, err := startIn(t, k, pr, domain.Solution{}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finished := pres.Run
+	finished.Succeed(time.Now())
+	if ok, err := env.AnalysisRuns.FinishOwned(k.ctx, finished, "w-test"); err != nil || !ok {
+		t.Fatalf("finish plain: %v %v", ok, err)
+	}
+	if got, _ := env.AnalysisRuns.Get(k.ctx, pres.Run.ID); got.Stats != nil {
+		t.Fatalf("a run without stats read back %+v", got.Stats)
 	}
 }
 

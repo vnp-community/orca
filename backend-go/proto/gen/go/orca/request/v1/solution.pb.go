@@ -373,8 +373,10 @@ type AnalysisRun struct {
 	FinishedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
 	Engine         string                 `protobuf:"bytes,8,opt,name=engine,proto3" json:"engine,omitempty"`
 	ProposalBranch string                 `protobuf:"bytes,9,opt,name=proposal_branch,json=proposalBranch,proto3" json:"proposal_branch,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Set only for an agent run that reported anything.
+	Stats         *RunStats `protobuf:"bytes,10,opt,name=stats,proto3" json:"stats,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AnalysisRun) Reset() {
@@ -470,6 +472,133 @@ func (x *AnalysisRun) GetProposalBranch() string {
 	return ""
 }
 
+func (x *AnalysisRun) GetStats() *RunStats {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+// RunStats is what an agent run says about itself: how often it called each tool (names and numbers only, never what a tool
+// read or returned) and claude's usage figures. It is evidence for a reviewer, not a verdict.
+type RunStats struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ToolCalls map[string]int32       `protobuf:"bytes,1,rep,name=tool_calls,json=toolCalls,proto3" json:"tool_calls,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	// How many of those calls went to the knowledge graph's tools.
+	KnowledgeToolCalls int32 `protobuf:"varint,2,opt,name=knowledge_tool_calls,json=knowledgeToolCalls,proto3" json:"knowledge_tool_calls,omitempty"`
+	Turns              int32 `protobuf:"varint,3,opt,name=turns,proto3" json:"turns,omitempty"`
+	DurationMs         int64 `protobuf:"varint,4,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	// cost_usd means something only when has_cost is true: a cost claude did not report is "not reported", never zero.
+	HasCost             bool    `protobuf:"varint,5,opt,name=has_cost,json=hasCost,proto3" json:"has_cost,omitempty"`
+	CostUsd             float64 `protobuf:"fixed64,6,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
+	InputTokens         int64   `protobuf:"varint,7,opt,name=input_tokens,json=inputTokens,proto3" json:"input_tokens,omitempty"`
+	OutputTokens        int64   `protobuf:"varint,8,opt,name=output_tokens,json=outputTokens,proto3" json:"output_tokens,omitempty"`
+	CacheReadTokens     int64   `protobuf:"varint,9,opt,name=cache_read_tokens,json=cacheReadTokens,proto3" json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens int64   `protobuf:"varint,10,opt,name=cache_creation_tokens,json=cacheCreationTokens,proto3" json:"cache_creation_tokens,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *RunStats) Reset() {
+	*x = RunStats{}
+	mi := &file_orca_request_v1_solution_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunStats) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunStats) ProtoMessage() {}
+
+func (x *RunStats) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_solution_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunStats.ProtoReflect.Descriptor instead.
+func (*RunStats) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *RunStats) GetToolCalls() map[string]int32 {
+	if x != nil {
+		return x.ToolCalls
+	}
+	return nil
+}
+
+func (x *RunStats) GetKnowledgeToolCalls() int32 {
+	if x != nil {
+		return x.KnowledgeToolCalls
+	}
+	return 0
+}
+
+func (x *RunStats) GetTurns() int32 {
+	if x != nil {
+		return x.Turns
+	}
+	return 0
+}
+
+func (x *RunStats) GetDurationMs() int64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *RunStats) GetHasCost() bool {
+	if x != nil {
+		return x.HasCost
+	}
+	return false
+}
+
+func (x *RunStats) GetCostUsd() float64 {
+	if x != nil {
+		return x.CostUsd
+	}
+	return 0
+}
+
+func (x *RunStats) GetInputTokens() int64 {
+	if x != nil {
+		return x.InputTokens
+	}
+	return 0
+}
+
+func (x *RunStats) GetOutputTokens() int64 {
+	if x != nil {
+		return x.OutputTokens
+	}
+	return 0
+}
+
+func (x *RunStats) GetCacheReadTokens() int64 {
+	if x != nil {
+		return x.CacheReadTokens
+	}
+	return 0
+}
+
+func (x *RunStats) GetCacheCreationTokens() int64 {
+	if x != nil {
+		return x.CacheCreationTokens
+	}
+	return 0
+}
+
 type GenerateSolutionRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	RequestId      string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -485,7 +614,7 @@ type GenerateSolutionRequest struct {
 
 func (x *GenerateSolutionRequest) Reset() {
 	*x = GenerateSolutionRequest{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[2]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -497,7 +626,7 @@ func (x *GenerateSolutionRequest) String() string {
 func (*GenerateSolutionRequest) ProtoMessage() {}
 
 func (x *GenerateSolutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[2]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -510,7 +639,7 @@ func (x *GenerateSolutionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateSolutionRequest.ProtoReflect.Descriptor instead.
 func (*GenerateSolutionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{2}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GenerateSolutionRequest) GetRequestId() string {
@@ -558,7 +687,7 @@ type GenerateSolutionResponse struct {
 
 func (x *GenerateSolutionResponse) Reset() {
 	*x = GenerateSolutionResponse{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[3]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +699,7 @@ func (x *GenerateSolutionResponse) String() string {
 func (*GenerateSolutionResponse) ProtoMessage() {}
 
 func (x *GenerateSolutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[3]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +712,7 @@ func (x *GenerateSolutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateSolutionResponse.ProtoReflect.Descriptor instead.
 func (*GenerateSolutionResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{3}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GenerateSolutionResponse) GetSolutionId() string {
@@ -613,7 +742,7 @@ type ListSolutionsRequest struct {
 
 func (x *ListSolutionsRequest) Reset() {
 	*x = ListSolutionsRequest{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[4]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -625,7 +754,7 @@ func (x *ListSolutionsRequest) String() string {
 func (*ListSolutionsRequest) ProtoMessage() {}
 
 func (x *ListSolutionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[4]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -638,7 +767,7 @@ func (x *ListSolutionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSolutionsRequest.ProtoReflect.Descriptor instead.
 func (*ListSolutionsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{4}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListSolutionsRequest) GetRequestId() string {
@@ -687,7 +816,7 @@ type ListSolutionsResponse struct {
 
 func (x *ListSolutionsResponse) Reset() {
 	*x = ListSolutionsResponse{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[5]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -699,7 +828,7 @@ func (x *ListSolutionsResponse) String() string {
 func (*ListSolutionsResponse) ProtoMessage() {}
 
 func (x *ListSolutionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[5]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -712,7 +841,7 @@ func (x *ListSolutionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSolutionsResponse.ProtoReflect.Descriptor instead.
 func (*ListSolutionsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{5}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListSolutionsResponse) GetSolutions() []*Solution {
@@ -751,7 +880,7 @@ type ChooseSolutionOptionRequest struct {
 
 func (x *ChooseSolutionOptionRequest) Reset() {
 	*x = ChooseSolutionOptionRequest{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[6]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -763,7 +892,7 @@ func (x *ChooseSolutionOptionRequest) String() string {
 func (*ChooseSolutionOptionRequest) ProtoMessage() {}
 
 func (x *ChooseSolutionOptionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[6]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -776,7 +905,7 @@ func (x *ChooseSolutionOptionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChooseSolutionOptionRequest.ProtoReflect.Descriptor instead.
 func (*ChooseSolutionOptionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{6}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ChooseSolutionOptionRequest) GetRequestId() string {
@@ -828,7 +957,7 @@ type ChooseSolutionOptionResponse struct {
 
 func (x *ChooseSolutionOptionResponse) Reset() {
 	*x = ChooseSolutionOptionResponse{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[7]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -840,7 +969,7 @@ func (x *ChooseSolutionOptionResponse) String() string {
 func (*ChooseSolutionOptionResponse) ProtoMessage() {}
 
 func (x *ChooseSolutionOptionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[7]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -853,7 +982,7 @@ func (x *ChooseSolutionOptionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChooseSolutionOptionResponse.ProtoReflect.Descriptor instead.
 func (*ChooseSolutionOptionResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{7}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ChooseSolutionOptionResponse) GetSolution() *Solution {
@@ -899,7 +1028,7 @@ type ProjectEngineSettings struct {
 
 func (x *ProjectEngineSettings) Reset() {
 	*x = ProjectEngineSettings{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[8]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -911,7 +1040,7 @@ func (x *ProjectEngineSettings) String() string {
 func (*ProjectEngineSettings) ProtoMessage() {}
 
 func (x *ProjectEngineSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[8]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -924,7 +1053,7 @@ func (x *ProjectEngineSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectEngineSettings.ProtoReflect.Descriptor instead.
 func (*ProjectEngineSettings) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{8}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ProjectEngineSettings) GetProjectId() string {
@@ -973,7 +1102,7 @@ type GetProjectEngineSettingsRequest struct {
 
 func (x *GetProjectEngineSettingsRequest) Reset() {
 	*x = GetProjectEngineSettingsRequest{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[9]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -985,7 +1114,7 @@ func (x *GetProjectEngineSettingsRequest) String() string {
 func (*GetProjectEngineSettingsRequest) ProtoMessage() {}
 
 func (x *GetProjectEngineSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[9]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -998,7 +1127,7 @@ func (x *GetProjectEngineSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProjectEngineSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetProjectEngineSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{9}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetProjectEngineSettingsRequest) GetProjectId() string {
@@ -1026,7 +1155,7 @@ type GetProjectEngineSettingsResponse struct {
 
 func (x *GetProjectEngineSettingsResponse) Reset() {
 	*x = GetProjectEngineSettingsResponse{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[10]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1038,7 +1167,7 @@ func (x *GetProjectEngineSettingsResponse) String() string {
 func (*GetProjectEngineSettingsResponse) ProtoMessage() {}
 
 func (x *GetProjectEngineSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[10]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1051,7 +1180,7 @@ func (x *GetProjectEngineSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProjectEngineSettingsResponse.ProtoReflect.Descriptor instead.
 func (*GetProjectEngineSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{10}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetProjectEngineSettingsResponse) GetSettings() *ProjectEngineSettings {
@@ -1081,7 +1210,7 @@ type SetProjectEngineSettingsRequest struct {
 
 func (x *SetProjectEngineSettingsRequest) Reset() {
 	*x = SetProjectEngineSettingsRequest{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[11]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1093,7 +1222,7 @@ func (x *SetProjectEngineSettingsRequest) String() string {
 func (*SetProjectEngineSettingsRequest) ProtoMessage() {}
 
 func (x *SetProjectEngineSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[11]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1106,7 +1235,7 @@ func (x *SetProjectEngineSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetProjectEngineSettingsRequest.ProtoReflect.Descriptor instead.
 func (*SetProjectEngineSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{11}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SetProjectEngineSettingsRequest) GetProjectId() string {
@@ -1155,7 +1284,7 @@ type SetProjectEngineSettingsResponse struct {
 
 func (x *SetProjectEngineSettingsResponse) Reset() {
 	*x = SetProjectEngineSettingsResponse{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[12]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1167,7 +1296,7 @@ func (x *SetProjectEngineSettingsResponse) String() string {
 func (*SetProjectEngineSettingsResponse) ProtoMessage() {}
 
 func (x *SetProjectEngineSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[12]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1180,7 +1309,7 @@ func (x *SetProjectEngineSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetProjectEngineSettingsResponse.ProtoReflect.Descriptor instead.
 func (*SetProjectEngineSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{12}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SetProjectEngineSettingsResponse) GetSettings() *ProjectEngineSettings {
@@ -1214,7 +1343,7 @@ type EnginePreflight struct {
 
 func (x *EnginePreflight) Reset() {
 	*x = EnginePreflight{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[13]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1226,7 +1355,7 @@ func (x *EnginePreflight) String() string {
 func (*EnginePreflight) ProtoMessage() {}
 
 func (x *EnginePreflight) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[13]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1239,7 +1368,7 @@ func (x *EnginePreflight) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnginePreflight.ProtoReflect.Descriptor instead.
 func (*EnginePreflight) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{13}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *EnginePreflight) GetRan() bool {
@@ -1302,7 +1431,7 @@ type EnginePreflightNote struct {
 
 func (x *EnginePreflightNote) Reset() {
 	*x = EnginePreflightNote{}
-	mi := &file_orca_request_v1_solution_proto_msgTypes[14]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1314,7 +1443,7 @@ func (x *EnginePreflightNote) String() string {
 func (*EnginePreflightNote) ProtoMessage() {}
 
 func (x *EnginePreflightNote) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_solution_proto_msgTypes[14]
+	mi := &file_orca_request_v1_solution_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1327,7 +1456,7 @@ func (x *EnginePreflightNote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnginePreflightNote.ProtoReflect.Descriptor instead.
 func (*EnginePreflightNote) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{14}
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *EnginePreflightNote) GetCode() string {
@@ -1378,7 +1507,7 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\x16input_request_revision\x18\x0e \x01(\x05R\x14inputRequestRevision\x12%\n" +
 	"\x0econtent_digest\x18\x0f \x01(\tR\rcontentDigest\x12\x16\n" +
 	"\x06engine\x18\x10 \x01(\tR\x06engine\x12'\n" +
-	"\x0fproposal_branch\x18\x11 \x01(\tR\x0eproposalBranch\"\xe5\x02\n" +
+	"\x0fproposal_branch\x18\x11 \x01(\tR\x0eproposalBranch\"\x96\x03\n" +
 	"\vAnalysisRun\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x121\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x1d.orca.request.v1.SolutionKindR\x04kind\x12\x16\n" +
@@ -1391,7 +1520,26 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\vfinished_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"finishedAt\x12\x16\n" +
 	"\x06engine\x18\b \x01(\tR\x06engine\x12'\n" +
-	"\x0fproposal_branch\x18\t \x01(\tR\x0eproposalBranch\"\xea\x01\n" +
+	"\x0fproposal_branch\x18\t \x01(\tR\x0eproposalBranch\x12/\n" +
+	"\x05stats\x18\n" +
+	" \x01(\v2\x19.orca.request.v1.RunStatsR\x05stats\"\xd8\x03\n" +
+	"\bRunStats\x12G\n" +
+	"\n" +
+	"tool_calls\x18\x01 \x03(\v2(.orca.request.v1.RunStats.ToolCallsEntryR\ttoolCalls\x120\n" +
+	"\x14knowledge_tool_calls\x18\x02 \x01(\x05R\x12knowledgeToolCalls\x12\x14\n" +
+	"\x05turns\x18\x03 \x01(\x05R\x05turns\x12\x1f\n" +
+	"\vduration_ms\x18\x04 \x01(\x03R\n" +
+	"durationMs\x12\x19\n" +
+	"\bhas_cost\x18\x05 \x01(\bR\ahasCost\x12\x19\n" +
+	"\bcost_usd\x18\x06 \x01(\x01R\acostUsd\x12!\n" +
+	"\finput_tokens\x18\a \x01(\x03R\vinputTokens\x12#\n" +
+	"\routput_tokens\x18\b \x01(\x03R\foutputTokens\x12*\n" +
+	"\x11cache_read_tokens\x18\t \x01(\x03R\x0fcacheReadTokens\x122\n" +
+	"\x15cache_creation_tokens\x18\n" +
+	" \x01(\x03R\x13cacheCreationTokens\x1a<\n" +
+	"\x0eToolCallsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xea\x01\n" +
 	"\x17GenerateSolutionRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12'\n" +
@@ -1496,52 +1644,56 @@ func file_orca_request_v1_solution_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_request_v1_solution_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_orca_request_v1_solution_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_orca_request_v1_solution_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_orca_request_v1_solution_proto_goTypes = []any{
 	(SolutionKind)(0),                        // 0: orca.request.v1.SolutionKind
 	(SolutionStatus)(0),                      // 1: orca.request.v1.SolutionStatus
 	(AnalysisMode)(0),                        // 2: orca.request.v1.AnalysisMode
 	(*Solution)(nil),                         // 3: orca.request.v1.Solution
 	(*AnalysisRun)(nil),                      // 4: orca.request.v1.AnalysisRun
-	(*GenerateSolutionRequest)(nil),          // 5: orca.request.v1.GenerateSolutionRequest
-	(*GenerateSolutionResponse)(nil),         // 6: orca.request.v1.GenerateSolutionResponse
-	(*ListSolutionsRequest)(nil),             // 7: orca.request.v1.ListSolutionsRequest
-	(*ListSolutionsResponse)(nil),            // 8: orca.request.v1.ListSolutionsResponse
-	(*ChooseSolutionOptionRequest)(nil),      // 9: orca.request.v1.ChooseSolutionOptionRequest
-	(*ChooseSolutionOptionResponse)(nil),     // 10: orca.request.v1.ChooseSolutionOptionResponse
-	(*ProjectEngineSettings)(nil),            // 11: orca.request.v1.ProjectEngineSettings
-	(*GetProjectEngineSettingsRequest)(nil),  // 12: orca.request.v1.GetProjectEngineSettingsRequest
-	(*GetProjectEngineSettingsResponse)(nil), // 13: orca.request.v1.GetProjectEngineSettingsResponse
-	(*SetProjectEngineSettingsRequest)(nil),  // 14: orca.request.v1.SetProjectEngineSettingsRequest
-	(*SetProjectEngineSettingsResponse)(nil), // 15: orca.request.v1.SetProjectEngineSettingsResponse
-	(*EnginePreflight)(nil),                  // 16: orca.request.v1.EnginePreflight
-	(*EnginePreflightNote)(nil),              // 17: orca.request.v1.EnginePreflightNote
-	(*timestamppb.Timestamp)(nil),            // 18: google.protobuf.Timestamp
+	(*RunStats)(nil),                         // 5: orca.request.v1.RunStats
+	(*GenerateSolutionRequest)(nil),          // 6: orca.request.v1.GenerateSolutionRequest
+	(*GenerateSolutionResponse)(nil),         // 7: orca.request.v1.GenerateSolutionResponse
+	(*ListSolutionsRequest)(nil),             // 8: orca.request.v1.ListSolutionsRequest
+	(*ListSolutionsResponse)(nil),            // 9: orca.request.v1.ListSolutionsResponse
+	(*ChooseSolutionOptionRequest)(nil),      // 10: orca.request.v1.ChooseSolutionOptionRequest
+	(*ChooseSolutionOptionResponse)(nil),     // 11: orca.request.v1.ChooseSolutionOptionResponse
+	(*ProjectEngineSettings)(nil),            // 12: orca.request.v1.ProjectEngineSettings
+	(*GetProjectEngineSettingsRequest)(nil),  // 13: orca.request.v1.GetProjectEngineSettingsRequest
+	(*GetProjectEngineSettingsResponse)(nil), // 14: orca.request.v1.GetProjectEngineSettingsResponse
+	(*SetProjectEngineSettingsRequest)(nil),  // 15: orca.request.v1.SetProjectEngineSettingsRequest
+	(*SetProjectEngineSettingsResponse)(nil), // 16: orca.request.v1.SetProjectEngineSettingsResponse
+	(*EnginePreflight)(nil),                  // 17: orca.request.v1.EnginePreflight
+	(*EnginePreflightNote)(nil),              // 18: orca.request.v1.EnginePreflightNote
+	nil,                                      // 19: orca.request.v1.RunStats.ToolCallsEntry
+	(*timestamppb.Timestamp)(nil),            // 20: google.protobuf.Timestamp
 }
 var file_orca_request_v1_solution_proto_depIdxs = []int32{
 	0,  // 0: orca.request.v1.Solution.kind:type_name -> orca.request.v1.SolutionKind
 	1,  // 1: orca.request.v1.Solution.status:type_name -> orca.request.v1.SolutionStatus
-	18, // 2: orca.request.v1.Solution.created_at:type_name -> google.protobuf.Timestamp
+	20, // 2: orca.request.v1.Solution.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: orca.request.v1.AnalysisRun.kind:type_name -> orca.request.v1.SolutionKind
-	18, // 4: orca.request.v1.AnalysisRun.started_at:type_name -> google.protobuf.Timestamp
-	18, // 5: orca.request.v1.AnalysisRun.finished_at:type_name -> google.protobuf.Timestamp
-	2,  // 6: orca.request.v1.GenerateSolutionRequest.analysis_mode:type_name -> orca.request.v1.AnalysisMode
-	0,  // 7: orca.request.v1.ListSolutionsRequest.kind:type_name -> orca.request.v1.SolutionKind
-	1,  // 8: orca.request.v1.ListSolutionsRequest.status:type_name -> orca.request.v1.SolutionStatus
-	3,  // 9: orca.request.v1.ListSolutionsResponse.solutions:type_name -> orca.request.v1.Solution
-	4,  // 10: orca.request.v1.ListSolutionsResponse.runs:type_name -> orca.request.v1.AnalysisRun
-	3,  // 11: orca.request.v1.ChooseSolutionOptionResponse.solution:type_name -> orca.request.v1.Solution
-	11, // 12: orca.request.v1.GetProjectEngineSettingsResponse.settings:type_name -> orca.request.v1.ProjectEngineSettings
-	16, // 13: orca.request.v1.GetProjectEngineSettingsResponse.preflight:type_name -> orca.request.v1.EnginePreflight
-	11, // 14: orca.request.v1.SetProjectEngineSettingsResponse.settings:type_name -> orca.request.v1.ProjectEngineSettings
-	16, // 15: orca.request.v1.SetProjectEngineSettingsResponse.preflight:type_name -> orca.request.v1.EnginePreflight
-	17, // 16: orca.request.v1.EnginePreflight.blockers:type_name -> orca.request.v1.EnginePreflightNote
-	17, // 17: orca.request.v1.EnginePreflight.gaps:type_name -> orca.request.v1.EnginePreflightNote
-	18, // [18:18] is the sub-list for method output_type
-	18, // [18:18] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	20, // 4: orca.request.v1.AnalysisRun.started_at:type_name -> google.protobuf.Timestamp
+	20, // 5: orca.request.v1.AnalysisRun.finished_at:type_name -> google.protobuf.Timestamp
+	5,  // 6: orca.request.v1.AnalysisRun.stats:type_name -> orca.request.v1.RunStats
+	19, // 7: orca.request.v1.RunStats.tool_calls:type_name -> orca.request.v1.RunStats.ToolCallsEntry
+	2,  // 8: orca.request.v1.GenerateSolutionRequest.analysis_mode:type_name -> orca.request.v1.AnalysisMode
+	0,  // 9: orca.request.v1.ListSolutionsRequest.kind:type_name -> orca.request.v1.SolutionKind
+	1,  // 10: orca.request.v1.ListSolutionsRequest.status:type_name -> orca.request.v1.SolutionStatus
+	3,  // 11: orca.request.v1.ListSolutionsResponse.solutions:type_name -> orca.request.v1.Solution
+	4,  // 12: orca.request.v1.ListSolutionsResponse.runs:type_name -> orca.request.v1.AnalysisRun
+	3,  // 13: orca.request.v1.ChooseSolutionOptionResponse.solution:type_name -> orca.request.v1.Solution
+	12, // 14: orca.request.v1.GetProjectEngineSettingsResponse.settings:type_name -> orca.request.v1.ProjectEngineSettings
+	17, // 15: orca.request.v1.GetProjectEngineSettingsResponse.preflight:type_name -> orca.request.v1.EnginePreflight
+	12, // 16: orca.request.v1.SetProjectEngineSettingsResponse.settings:type_name -> orca.request.v1.ProjectEngineSettings
+	17, // 17: orca.request.v1.SetProjectEngineSettingsResponse.preflight:type_name -> orca.request.v1.EnginePreflight
+	18, // 18: orca.request.v1.EnginePreflight.blockers:type_name -> orca.request.v1.EnginePreflightNote
+	18, // 19: orca.request.v1.EnginePreflight.gaps:type_name -> orca.request.v1.EnginePreflightNote
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_orca_request_v1_solution_proto_init() }
@@ -1555,7 +1707,7 @@ func file_orca_request_v1_solution_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_request_v1_solution_proto_rawDesc), len(file_orca_request_v1_solution_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   15,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

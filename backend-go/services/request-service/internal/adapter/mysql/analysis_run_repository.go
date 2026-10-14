@@ -24,7 +24,7 @@ func NewAnalysisRunRepository(r *Repository) *AnalysisRunRepository {
 var _ usecase.AnalysisRunStore = (*AnalysisRunRepository)(nil)
 
 const analysisRunColumns = `id, tenant_id, request_id, kind, mode, status, idempotency_key, attempt, lease_owner, lease_expires_at,
-	error_code, error_message, raw_output, started_at, finished_at, solution_id, project_id, actor_id, feedback, enforcement, repo_check`
+	error_code, error_message, raw_output, started_at, finished_at, solution_id, project_id, actor_id, feedback, enforcement, repo_check, run_stats`
 
 func scanAnalysisRun(row rowScanner) (domain.AnalysisRun, error) {
 	var (
@@ -32,9 +32,10 @@ func scanAnalysisRun(row rowScanner) (domain.AnalysisRun, error) {
 		kind, mode, status                                                                            string
 		idem, owner, errCode, errMsg, raw, solutionID, projectID, actorID, feedback, enforcement, rep sql.NullString
 		leaseExpires, finished                                                                        sql.NullTime
+		stats                                                                                         []byte
 	)
 	err := row.Scan(&r.ID, &r.TenantID, &r.RequestID, &kind, &mode, &status, &idem, &r.Attempt, &owner, &leaseExpires,
-		&errCode, &errMsg, &raw, &r.StartedAt, &finished, &solutionID, &projectID, &actorID, &feedback, &enforcement, &rep)
+		&errCode, &errMsg, &raw, &r.StartedAt, &finished, &solutionID, &projectID, &actorID, &feedback, &enforcement, &rep, &stats)
 	if err != nil {
 		return domain.AnalysisRun{}, err
 	}
@@ -42,6 +43,7 @@ func scanAnalysisRun(row rowScanner) (domain.AnalysisRun, error) {
 	r.IdempotencyKey, r.LeaseOwner, r.ErrorCode, r.ErrorMessage, r.RawOutput = nullStringPtr(idem), nullStringPtr(owner), nullStringPtr(errCode), nullStringPtr(errMsg), nullStringPtr(raw)
 	r.SolutionID, r.ProjectID, r.ActorID = solutionID.String, projectID.String, actorID.String
 	r.Feedback, r.Enforcement, r.RepoCheck = feedback.String, enforcement.String, rep.String
+	r.Stats = domain.DecodeRunStats(stats)
 	r.StartedAt = r.StartedAt.UTC()
 	if leaseExpires.Valid {
 		t := leaseExpires.Time.UTC()
@@ -195,14 +197,22 @@ func (r *AnalysisRunRepository) RenewLease(ctx context.Context, runID, owner str
 }
 
 func (r *AnalysisRunRepository) FinishOwned(ctx context.Context, run domain.AnalysisRun, owner string) (bool, error) {
+	raw, err := domain.EncodeRunStats(run.Stats)
+	if err != nil {
+		return false, fmt.Errorf("mysql: encode run stats: %w", err)
+	}
+	var stats any // NULL when the run has nothing to say
+	if raw != nil {
+		stats = string(raw)
+	}
 	ok := false
-	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+	err = r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
 		res, err := db.ExecContext(ctx, `UPDATE analysis_runs
 			SET status = ?, attempt = ?, error_code = ?, error_message = ?, raw_output = ?, enforcement = ?, repo_check = ?,
-				finished_at = CURRENT_TIMESTAMP(6), lease_owner = NULL, lease_expires_at = NULL
+				run_stats = ?, finished_at = CURRENT_TIMESTAMP(6), lease_owner = NULL, lease_expires_at = NULL
 			WHERE tenant_id = ? AND id = ? AND status = 'running' AND lease_owner = ?`,
 			string(run.Status), run.Attempt, ptrArg(run.ErrorCode), ptrArg(run.ErrorMessage), ptrArg(run.RawOutput),
-			nullIfEmpty(run.Enforcement), nullIfEmpty(run.RepoCheck), tenantID, run.ID, owner)
+			nullIfEmpty(run.Enforcement), nullIfEmpty(run.RepoCheck), stats, tenantID, run.ID, owner)
 		if err != nil {
 			return fmt.Errorf("mysql: finish analysis run: %w", err)
 		}

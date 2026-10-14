@@ -65,6 +65,7 @@ func (s *Server) GetPlanProposal(ctx context.Context, req *requestv1.GetPlanProp
 	if k := v.Knowledge; k != nil {
 		out.Knowledge = &requestv1.PlanKnowledge{Available: k.Available, Snapshot: k.Snapshot, Read: k.Read, Gaps: k.Gaps, Conflicts: k.Conflicts, SkillHash: k.SkillHash}
 	}
+	out.Stats, out.ElapsedMs = toProtoRunStats(v.Stats), v.ElapsedMS
 	return out, nil
 }
 

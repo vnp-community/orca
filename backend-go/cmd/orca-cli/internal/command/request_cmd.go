@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -81,10 +82,43 @@ func newRequestShowCmd(e flowEnv) *cobra.Command {
 		Use: "show <request-id>", Short: "show one Request", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
-				return cli.GetRequest(ctx, args[0])
-			}, renderRequest)
+				doc, err := cli.GetRequest(ctx, args[0])
+				if err != nil {
+					return nil, err
+				}
+				// What the agent runs of this Request did is part of knowing where it stands; a failed read must not hide the Request.
+				if solutions, serr := cli.ListSolutions(ctx, args[0], nil); serr == nil {
+					doc["analysisRuns"] = solutions["runs"]
+				}
+				return doc, nil
+			}, renderRequestShow)
 		},
 	}
+}
+
+// renderRequestShow is renderRequest plus the latest analysis and plan runs with what their agent calls reported.
+func renderRequestShow(doc apiclient.Document) string {
+	out := renderRequest(doc)
+	runs := doc.Docs("analysisRuns")
+	if len(runs) == 0 {
+		return out
+	}
+	var b strings.Builder
+	b.WriteString(out + "\nruns:")
+	for i, r := range runs {
+		if i == 3 {
+			fmt.Fprintf(&b, "\n  ... %d older run(s)", len(runs)-3)
+			break
+		}
+		fmt.Fprintf(&b, "\n  %s  %s  %s", r.Str("id"), firstOr(r.Str("kind"), "run"), r.Str("status"))
+		if e := r.Str("engine"); e != "" {
+			fmt.Fprintf(&b, "  engine %s", e)
+		}
+		if line := renderRunStats(r.Doc("stats"), 0); line != "" {
+			fmt.Fprintf(&b, "\n      agent: %s", line)
+		}
+	}
+	return b.String()
 }
 
 func newRequestClassifyCmd(e flowEnv) *cobra.Command {

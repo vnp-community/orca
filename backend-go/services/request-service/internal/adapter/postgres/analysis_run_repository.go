@@ -23,22 +23,24 @@ func NewAnalysisRunRepository(r *Repository) *AnalysisRunRepository {
 var _ usecase.AnalysisRunStore = (*AnalysisRunRepository)(nil)
 
 const analysisRunColumns = `id, tenant_id, request_id, kind, mode, status, idempotency_key, attempt, lease_owner, lease_expires_at,
-	error_code, error_message, raw_output, started_at, finished_at, solution_id, project_id, actor_id, feedback, enforcement, repo_check`
+	error_code, error_message, raw_output, started_at, finished_at, solution_id, project_id, actor_id, feedback, enforcement, repo_check, run_stats`
 
 func scanAnalysisRun(row pgx.Row) (domain.AnalysisRun, error) {
 	var (
 		r                                                          domain.AnalysisRun
 		kind, mode, status                                         string
 		solutionID, projectID, actorID, feedback, enforcement, rep *string
+		stats                                                      []byte
 	)
 	err := row.Scan(&r.ID, &r.TenantID, &r.RequestID, &kind, &mode, &status, &r.IdempotencyKey, &r.Attempt, &r.LeaseOwner, &r.LeaseExpiresAt,
-		&r.ErrorCode, &r.ErrorMessage, &r.RawOutput, &r.StartedAt, &r.FinishedAt, &solutionID, &projectID, &actorID, &feedback, &enforcement, &rep)
+		&r.ErrorCode, &r.ErrorMessage, &r.RawOutput, &r.StartedAt, &r.FinishedAt, &solutionID, &projectID, &actorID, &feedback, &enforcement, &rep, &stats)
 	if err != nil {
 		return domain.AnalysisRun{}, err
 	}
 	r.Kind, r.Mode, r.Status = domain.RunKind(kind), domain.AnalysisMode(mode), domain.RunStatus(status)
 	r.SolutionID, r.ProjectID, r.ActorID = derefString(solutionID), derefString(projectID), derefString(actorID)
 	r.Feedback, r.Enforcement, r.RepoCheck = derefString(feedback), derefString(enforcement), derefString(rep)
+	r.Stats = domain.DecodeRunStats(stats)
 	r.StartedAt = r.StartedAt.UTC()
 	if r.LeaseExpiresAt != nil {
 		t := r.LeaseExpiresAt.UTC()
@@ -164,14 +166,22 @@ func (r *AnalysisRunRepository) RenewLease(ctx context.Context, runID, owner str
 }
 
 func (r *AnalysisRunRepository) FinishOwned(ctx context.Context, run domain.AnalysisRun, owner string) (bool, error) {
+	raw, err := domain.EncodeRunStats(run.Stats)
+	if err != nil {
+		return false, fmt.Errorf("postgres: encode run stats: %w", err)
+	}
+	var stats any // NULL when the run has nothing to say
+	if raw != nil {
+		stats = string(raw)
+	}
 	ok := false
-	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+	err = r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
 		tag, err := db.Exec(ctx, `UPDATE request.analysis_runs
 			SET status = $4, attempt = $5, error_code = $6, error_message = $7, raw_output = $8, enforcement = $9, repo_check = $10,
-				finished_at = now(), lease_owner = NULL, lease_expires_at = NULL
+				run_stats = $11, finished_at = now(), lease_owner = NULL, lease_expires_at = NULL
 			WHERE tenant_id = $1 AND id = $2 AND status = 'running' AND lease_owner = $3`,
 			tenantID, run.ID, owner, string(run.Status), run.Attempt, run.ErrorCode, run.ErrorMessage, run.RawOutput,
-			nullIfEmpty(run.Enforcement), nullIfEmpty(run.RepoCheck))
+			nullIfEmpty(run.Enforcement), nullIfEmpty(run.RepoCheck), stats)
 		if err != nil {
 			return fmt.Errorf("postgres: finish analysis run: %w", err)
 		}
@@ -191,7 +201,7 @@ func (r *AnalysisRunRepository) ClaimExpired(ctx context.Context, owner string, 
 			UPDATE request.analysis_runs a SET lease_owner = $2, lease_expires_at = now() + make_interval(secs => $3)
 			FROM due WHERE a.id = due.id
 			RETURNING a.id, a.tenant_id, a.request_id, a.kind, a.mode, a.status, a.idempotency_key, a.attempt, a.lease_owner, a.lease_expires_at,
-				a.error_code, a.error_message, a.raw_output, a.started_at, a.finished_at, a.solution_id, a.project_id, a.actor_id, a.feedback, a.enforcement, a.repo_check`,
+				a.error_code, a.error_message, a.raw_output, a.started_at, a.finished_at, a.solution_id, a.project_id, a.actor_id, a.feedback, a.enforcement, a.repo_check, a.run_stats`,
 			batch, owner, ttl.Seconds())
 		if err != nil {
 			return err

@@ -148,6 +148,9 @@ type AnalysisRunView struct {
 	ErrorMessage string `json:"errorMessage,omitempty"`
 	StartedAt    string `json:"startedAt"`
 	FinishedAt   string `json:"finishedAt,omitempty"`
+	// Engine is native or openspec; Stats is set for an agent run that reported anything.
+	Engine string        `json:"engine,omitempty"`
+	Stats  *RunStatsView `json:"stats,omitempty"`
 }
 
 func solutionViews(ss []*requestv1.Solution) []SolutionView {
@@ -165,6 +168,7 @@ func analysisRunViews(rs []*requestv1.AnalysisRun) []AnalysisRunView {
 			ID: r.GetId(), Kind: enumLower(r.GetKind().String(), "SOLUTION_KIND_"), Status: r.GetStatus(),
 			ErrorCode: r.GetErrorCode(), ErrorMessage: r.GetErrorMessage(),
 			StartedAt: rfc3339(r.GetStartedAt()), FinishedAt: rfc3339(r.GetFinishedAt()),
+			Engine: r.GetEngine(), Stats: runStatsView(r.GetStats()),
 		})
 	}
 	return out

@@ -62,6 +62,92 @@ function makeParser(overrides: Partial<ClaudeStreamActivityOptions> = {}): {
   return { parser, emitted, lines: () => emitted.join('').split('\n').filter(Boolean) }
 }
 
+describe('ClaudeStreamActivityParser tool calls and usage', () => {
+  const kg = 'mcp__tdd-agent__kg_get_element'
+
+  it('counts calls per tool name, never their input or output', () => {
+    const { parser } = makeParser()
+    parser.push(
+      Buffer.from(
+        line(init) +
+          line(toolUse('t1', kg, { id: 'FR-SYS-07' })) +
+          line(toolResult('t1', 'SECRET DOCUMENT TEXT')) +
+          line(toolUse('t2', kg, { id: 'ADR-12' })) +
+          line(toolUse('t3', 'Read', { file_path: '/work/repo/a.go' })) +
+          line(result('done'))
+      )
+    )
+    const out = parser.finish()
+    expect(out.toolCalls).toEqual({ [kg]: 2, Read: 1 })
+    expect(JSON.stringify(out.toolCalls)).not.toContain('FR-SYS-07')
+    expect(JSON.stringify(out.toolCalls)).not.toContain('SECRET')
+  })
+
+  it('reads the usage figures claude reports and leaves out the ones it does not', () => {
+    const { parser } = makeParser()
+    parser.push(
+      Buffer.from(
+        line(init) +
+          line(
+            result('ok', {
+              total_cost_usd: 0.8123,
+              usage: { input_tokens: 1200, output_tokens: 340, cache_read_input_tokens: 9000 }
+            })
+          )
+      )
+    )
+    expect(parser.finish().usage).toEqual({
+      turns: 2,
+      durationMs: 5732,
+      costUsd: 0.8123,
+      inputTokens: 1200,
+      outputTokens: 340,
+      cacheReadTokens: 9000
+    })
+  })
+
+  it('reports no cost rather than guessing one', () => {
+    const { parser } = makeParser()
+    parser.push(Buffer.from(line(init) + line(result('ok'))))
+    const usage = parser.finish().usage
+    expect(usage).toEqual({ turns: 2, durationMs: 5732 })
+    expect(usage).not.toHaveProperty('costUsd')
+  })
+
+  it('ignores nonsense figures and gives no usage when the result event has none', () => {
+    const { parser } = makeParser()
+    parser.push(
+      Buffer.from(
+        line(init) +
+          line({
+            type: 'result',
+            subtype: 'success',
+            is_error: false,
+            result: 'x',
+            num_turns: -3,
+            total_cost_usd: 'free',
+            usage: { input_tokens: Number.NaN }
+          })
+      )
+    )
+    expect(parser.finish().usage).toBeNull()
+  })
+
+  it('stops tracking new tool names after a ceiling and counts the rest as other', () => {
+    const { parser } = makeParser()
+    let input = line(init)
+    for (let i = 0; i < 70; i++) {
+      input += line(toolUse(`id${i}`, `tool_${i}`, {}))
+    }
+    input += line(toolUse('last', 'tool_0', {}))
+    parser.push(Buffer.from(input + line(result('ok'))))
+    const calls = parser.finish().toolCalls
+    expect(Object.keys(calls)).toHaveLength(65)
+    expect(calls['(other)']).toBe(6)
+    expect(calls['tool_0']).toBe(2)
+  })
+})
+
 describe('ClaudeStreamActivityParser', () => {
   it('turns a full tool session into readable activity lines', () => {
     const { parser, lines } = makeParser()
@@ -322,7 +408,9 @@ describe('resolveFinalStdout', () => {
     resultText: null,
     isError: false,
     assistantText: '',
-    errorNote: null
+    errorNote: null,
+    toolCalls: {},
+    usage: null
   }
 
   it('returns the result text with the trailing newline text mode used to print', () => {

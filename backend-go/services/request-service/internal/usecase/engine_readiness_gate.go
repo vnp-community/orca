@@ -58,6 +58,7 @@ type EngineReadinessGate struct {
 	files      RepoFileStat
 	repo       RepoStateProbe
 	skillsRepo string
+	observer   EngineObserver
 
 	mu    sync.Mutex
 	clean map[string]time.Time
@@ -88,6 +89,12 @@ func (g *EngineReadinessGate) WithRepoState(p RepoStateProbe) *EngineReadinessGa
 	return g
 }
 
+// WithObserver counts the blockers each fresh check finds, for the engine metrics.
+func (g *EngineReadinessGate) WithObserver(o EngineObserver) *EngineReadinessGate {
+	g.observer = o
+	return g
+}
+
 func (g *EngineReadinessGate) WithSkillsRepository(url string) *EngineReadinessGate {
 	if url != "" {
 		g.skillsRepo = url
@@ -104,6 +111,17 @@ func (g *EngineReadinessGate) Check(ctx context.Context, projectID string, setti
 // CheckFor is Check for a switch being turned on: with openspec=false only the knowledge hub is looked at (a project that
 // turns on solution_agent alone has no need of openspec).
 func (g *EngineReadinessGate) CheckFor(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec bool) (PreflightReport, error) {
+	report, err := g.check(ctx, projectID, settings, openspec)
+	if err == nil {
+		// A clean verdict taken from the cache has no failures, so only a fresh finding is counted.
+		for _, f := range report.Failures {
+			observerOrNoop(g.observer).PreflightFailed(f.Code)
+		}
+	}
+	return report, err
+}
+
+func (g *EngineReadinessGate) check(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec bool) (PreflightReport, error) {
 	report := PreflightReport{OK: true, CheckedAt: g.now()}
 	conn, err := g.conns.ResolveForProject(ctx, projectID)
 	if err != nil {

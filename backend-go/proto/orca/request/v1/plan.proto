@@ -4,6 +4,7 @@ package orca.request.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
+import "orca/request/v1/solution.proto";
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
 
@@ -69,6 +70,9 @@ message GetPlanProposalResponse {
   PlanBundle bundle = 8;
   repeated PlanCheck checks = 9;
   PlanKnowledge knowledge = 10;
+  // What the run's agent calls reported, and how long the run took from start to finish (0 while it runs).
+  RunStats stats = 11;
+  int64 elapsed_ms = 12;
 }
 
 // PlanBundle names the OpenSpec change a Plan was read from. Its files stay readable after the worktree is gone.

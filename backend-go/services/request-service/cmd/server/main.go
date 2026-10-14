@@ -149,6 +149,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 	defer solution.close()
+	solution.observe(rollout.Metrics)
 	approval, err := wireApproval(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, approvalRegistry, dirs, solution.handlers, execTasks.subjectArtifacts(stores.openspecChanges))
 	if err != nil {
 		return err

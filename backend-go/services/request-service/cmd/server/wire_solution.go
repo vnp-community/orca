@@ -45,6 +45,9 @@ type solutionWiring struct {
 	infra infrafleetv1.InfraFleetServiceClient
 	// gate is the readiness check shared by the openspec engine and the settings RPC; nil when the dev server stack is not configured.
 	gate *usecase.EngineReadinessGate
+	// readonly is the agent worker of the read-only kinds and of the Solution; observer receives the engine metrics.
+	readonly *usecase.RunAgentReadonlyAnalysis
+	observer usecase.EngineObserver
 	// workspace and janitor exist only when the openspec engine is configured: the janitor removes the proposal worktrees.
 	workspace *grpcclient.ProposalWorkspace
 	janitor   *usecase.ProposalJanitor
@@ -131,6 +134,7 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		Projects: projects, Writer: writer, Settings: settings, Clarifications: stores.artifact.clarifications,
 	})
 	w.writer = writer
+	w.readonly = readonly
 	w.runner = usecase.NewAnalysisRunner(stores.analysisRuns, stores.solutions, stores.tx, generation, readonly, settings, owner)
 	w.conns, w.completer, w.projects, w.settings, w.owner = conns, completer, projects, settings, owner
 	w.agent, w.caps, w.infra, w.proj, w.git = agent, caps, infraC, projectC, gitC
@@ -257,4 +261,12 @@ type unavailableAgent struct{}
 
 func (unavailableAgent) ExecPrompt(context.Context, usecase.AnalysisConnection, usecase.AgentPromptInput) (usecase.AgentPromptResult, error) {
 	return usecase.AgentPromptResult{}, usecase.ErrNoDevServer
+}
+
+// observe sends the engine metrics (runs, knowledge tool calls, preflight failures, spec violations) to o. Call it before
+// wirePlan, which hands the observer to the engine and the readiness check.
+func (w *solutionWiring) observe(o usecase.EngineObserver) {
+	w.observer = o
+	w.runner.WithObserver(o)
+	w.readonly.WithObserver(o)
 }

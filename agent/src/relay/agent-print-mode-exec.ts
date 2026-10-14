@@ -360,9 +360,15 @@ export async function handleAgentExecPrompt(
       ? { accessMode: options.accessMode, workspaceKind: options.workspaceKind }
       : undefined
 
+  // Names and counts of the tools the run called, and claude's own usage figures: evidence for a reviewer, never content.
+  const stats = capture.streamStats()
+  const toolCalls = stats && Object.keys(stats.toolCalls).length > 0 ? stats.toolCalls : undefined
+
   let finalResult: Record<string, unknown> = {
     ...result,
     stepId,
+    ...(toolCalls !== undefined ? { toolCalls } : {}),
+    ...(stats?.usage ? { usage: stats.usage } : {}),
     ...(applied !== undefined ? { applied } : {}),
     ...(changes !== undefined ? { changes } : {}),
     ...(parsed !== undefined ? { parsed } : {}),

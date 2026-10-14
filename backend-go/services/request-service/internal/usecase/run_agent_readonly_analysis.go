@@ -23,6 +23,7 @@ type RunAgentReadonlyAnalysis struct {
 	writer    *AnalysisResultWriter
 	settings  AnalysisSettings
 	answers   ClarificationRepository
+	observer  EngineObserver
 }
 
 var _ AnalysisWorker = (*RunAgentReadonlyAnalysis)(nil)
@@ -40,11 +41,19 @@ type AgentReadonlyDeps struct {
 	Settings AnalysisSettings
 	// Clarifications may be nil; the agent then does not see earlier answers to open questions.
 	Clarifications ClarificationRepository
+	// Observer may be nil; it receives the knowledge tool calls of each agent call.
+	Observer EngineObserver
 }
 
 func NewRunAgentReadonlyAnalysis(d AgentReadonlyDeps) *RunAgentReadonlyAnalysis {
 	return &RunAgentReadonlyAnalysis{requests: d.Requests, solutions: d.Solutions, conns: d.Conns, agent: d.Agent, probe: d.Probe, caps: d.Caps,
-		projects: d.Projects, writer: d.Writer, settings: d.Settings.withDefaults(), answers: d.Clarifications}
+		projects: d.Projects, writer: d.Writer, settings: d.Settings.withDefaults(), answers: d.Clarifications, observer: d.Observer}
+}
+
+// WithObserver receives the knowledge tool calls of each agent call, for the engine metrics.
+func (a *RunAgentReadonlyAnalysis) WithObserver(o EngineObserver) *RunAgentReadonlyAnalysis {
+	a.observer = o
+	return a
 }
 
 // Equal compares branch and the sorted file states; HEAD is not part of the snapshot because git-gateway does not return it.
@@ -131,6 +140,10 @@ func (a *RunAgentReadonlyAnalysis) Execute(ctx context.Context, run domain.Analy
 		if err != nil {
 			return agentCallFailure(run, err)
 		}
+		if merged := statsPtr(valueOrZero(run.Stats).Merge(res.Stats)); merged != nil {
+			run.Stats = merged
+		}
+		observerOrNoop(a.observer).KnowledgeToolCalls(res.Stats)
 		lastRaw = res.Stdout
 		if f := a.checkRun(ctx, &run, res, enforced, before, repoCheck, conn.WorktreeID); f != nil {
 			f.Raw = lastRaw

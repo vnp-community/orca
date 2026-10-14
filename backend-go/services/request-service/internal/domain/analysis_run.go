@@ -74,6 +74,8 @@ type AnalysisRun struct {
 	// Enforcement and RepoCheck are only set by agent_readonly runs.
 	Enforcement string
 	RepoCheck   string
+	// Stats is what an agent run says about its tool calls and usage; nil for a run without an agent.
+	Stats *RunStats
 }
 
 // Run enforcement and repo-check values recorded on agent_readonly runs.

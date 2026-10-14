@@ -55,6 +55,7 @@ type RunProposalGeneration struct {
 	limits         domain.PlanLimits
 	owner          string
 	now            func() time.Time
+	observer       EngineObserver
 }
 
 var _ AnalysisWorker = (*RunProposalGeneration)(nil)
@@ -78,11 +79,13 @@ type RunProposalGenerationDeps struct {
 	Tx      TxRunner
 	Limits  domain.PlanLimits
 	Owner   string
+	// Observer may be nil; it receives the structure problems found in an authored change.
+	Observer EngineObserver
 }
 
 func NewRunProposalGeneration(d RunProposalGenerationDeps) *RunProposalGeneration {
 	return &RunProposalGeneration{requests: d.Requests, solutions: d.Solutions, registry: d.Registry, projects: d.Projects, policies: d.Policies,
-		engineSettings: d.EngineSettings, timing: d.Settings.withDefaults(), checker: d.Checker, workspace: d.Workspace, changes: d.Changes, newID: uuid.NewString, runs: d.Runs, tx: d.Tx, limits: d.Limits, owner: d.Owner, now: func() time.Time { return time.Now().UTC() }}
+		engineSettings: d.EngineSettings, timing: d.Settings.withDefaults(), checker: d.Checker, workspace: d.Workspace, changes: d.Changes, newID: uuid.NewString, runs: d.Runs, tx: d.Tx, limits: d.Limits, owner: d.Owner, now: func() time.Time { return time.Now().UTC() }, observer: d.Observer}
 }
 
 func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.AnalysisRun) error {
@@ -112,6 +115,8 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 		changeID = domain.NewChangeID(req.Number, req.Title)
 	}
 	in := ProposalInput{Run: run, Request: req, ChangeID: changeID, Shape: shape, Limits: w.limits, Feedback: run.Feedback, Settings: w.projectEngineSettings(ctx, req.ProjectID)}
+	var stats domain.RunStats
+	in.Stats = &stats
 	in.OnWorkspace = func(ws Workspace) { w.recordWorkspace(ctx, req, changeID, ws, existing, hasChange) }
 	in.ProjectName, in.RepoURL = projectFacts(ctx, w.projects, req.ProjectID)
 	if sol, ok := latestApprovedAnalysis(ctx, w.solutions, req.ID); ok {
@@ -128,7 +133,11 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 	defer cancel()
 	for {
 		res, err := engine.GenerateProposal(ctx, in)
+		run.Stats = statsPtr(stats)
 		if err != nil {
+			if f, ok := asFailure(err); ok && f.Stats == nil {
+				f.Stats = run.Stats
+			}
 			return err
 		}
 		in.Workspace = &res.Workspace // the retry fixes the files in place
@@ -202,6 +211,9 @@ func (w *RunProposalGeneration) projectEngineSettings(ctx context.Context, proje
 func (w *RunProposalGeneration) assemble(ctx context.Context, req domain.Request, shape domain.PlanShape, policy domain.TypePolicy, res ProposalResult) (proposal domain.PlanProposal, problems []string, fatal error) {
 	proposal, violations := domain.ParsePlanRegion(res.TasksMD, res.Ref)
 	if len(violations) > 0 {
+		for _, v := range violations {
+			observerOrNoop(w.observer).SpecViolation(v.Code)
+		}
 		return domain.PlanProposal{}, violationLines(violations), nil
 	}
 	proposal.Title = req.Title
@@ -228,6 +240,7 @@ func (w *RunProposalGeneration) assemble(ctx context.Context, req domain.Request
 		if len(findings) > 0 {
 			out := make([]string, len(findings))
 			for i, f := range findings {
+				observerOrNoop(w.observer).SpecViolation(f.Code)
 				out[i] = f.Code + ": " + f.Message
 			}
 			return domain.PlanProposal{}, out, nil

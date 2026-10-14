@@ -94,15 +94,15 @@ func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solut
 	executor := grpcclient.NewDevServerExecutor(solution.infra)
 	gate := usecase.NewEngineReadinessGate(solution.conns, executor, os.Getenv("REQUEST_OPENSPEC_MIN_VERSION")).
 		WithCapabilities(solution.caps).WithRepoFiles(workspace).WithRepoState(grpcclient.NewRepoStateProbe(solution.git)).
-		WithSkillsRepository(os.Getenv("REQUEST_SKILLS_REPOSITORY_URL"))
+		WithSkillsRepository(os.Getenv("REQUEST_SKILLS_REPOSITORY_URL")).WithObserver(solution.observer)
 	solution.gate = gate
 	engine := usecase.NewOpenSpecEngine(usecase.OpenSpecEngineDeps{
-		Gate: gate, Workspace: workspace, Agent: solution.agent, Conns: solution.conns, Caps: solution.caps, Settings: solution.settings,
+		Gate: gate, Workspace: workspace, Agent: solution.agent, Conns: solution.conns, Caps: solution.caps, Settings: solution.settings, Observer: solution.observer,
 	})
 	registry.Register(engine)
 	solution.runner.WithProposalWorker(usecase.NewRunProposalGeneration(usecase.RunProposalGenerationDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Registry: registry, Projects: solution.projects, Policies: policies,
-		EngineSettings: stores.engineSettings, Settings: solution.settings, Workspace: workspace, Changes: stores.openspecChanges, Checker: usecase.NewOpenSpecBundleChecker(executor, solution.conns, limits), Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
+		EngineSettings: stores.engineSettings, Settings: solution.settings, Workspace: workspace, Changes: stores.openspecChanges, Checker: usecase.NewOpenSpecBundleChecker(executor, solution.conns, limits), Observer: solution.observer, Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
 	}))
 	return registry
 }

@@ -98,6 +98,9 @@ func renderSolutions(doc apiclient.Document) string {
 	}
 	for _, r := range doc.Docs("runs") {
 		fmt.Fprintf(&b, "run %s  %s  %s %s\n", r.Str("id"), r.Str("kind"), r.Str("status"), r.Str("errorCode"))
+		if line := renderRunStats(r.Doc("stats"), 0); line != "" {
+			fmt.Fprintf(&b, "    agent: %s\n", line)
+		}
 	}
 	if b.Len() == 0 {
 		return "no solutions"

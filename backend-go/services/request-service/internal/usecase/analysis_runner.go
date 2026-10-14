@@ -27,6 +27,7 @@ type AnalysisRunner struct {
 	agent     AnalysisWorker
 	plan      AnalysisWorker
 	proposal  AnalysisWorker
+	observer  EngineObserver
 	settings  AnalysisSettings
 	owner     string
 
@@ -52,6 +53,12 @@ func (r *AnalysisRunner) WithPlanWorker(w AnalysisWorker) *AnalysisRunner {
 // with a clear code instead of being written by the ai.complete plan worker, which would silently ignore the engine.
 func (r *AnalysisRunner) WithProposalWorker(w AnalysisWorker) *AnalysisRunner {
 	r.proposal = w
+	return r
+}
+
+// WithObserver reports how each run ended, for the engine metrics.
+func (r *AnalysisRunner) WithObserver(o EngineObserver) *AnalysisRunner {
+	r.observer = o
 	return r
 }
 
@@ -118,7 +125,11 @@ func (r *AnalysisRunner) execute(run domain.AnalysisRun) {
 	err := r.worker(run).Execute(ctx, run)
 	cancel()
 	<-hbDone
-	if err == nil || errors.Is(err, ErrLeaseLost) {
+	if err == nil {
+		observerOrNoop(r.observer).RunFinished(engineLabel(run), string(run.Kind), "succeeded")
+		return
+	}
+	if errors.Is(err, ErrLeaseLost) {
 		return
 	}
 	if r.stopCtx.Err() != nil {
@@ -130,6 +141,7 @@ func (r *AnalysisRunner) execute(run domain.AnalysisRun) {
 		fail = newFailure(run, domain.RunErrInternal, "internal error while running the analysis")
 	}
 	r.failRun(r.runCtx(run), run, fail)
+	observerOrNoop(r.observer).RunFinished(engineLabel(run), string(run.Kind), "failed")
 }
 
 // failRun records the failure and drops the draft in one transaction, so a failed run never leaves a draft Solution.
@@ -137,6 +149,9 @@ func (r *AnalysisRunner) failRun(ctx context.Context, run domain.AnalysisRun, f 
 	err := r.tx.InTx(ctx, func(ctx context.Context) error {
 		failed := run
 		failed.Attempt, failed.Enforcement, failed.RepoCheck = max(f.Attempt, run.Attempt), f.Enforcement, f.RepoCheck
+		if f.Stats != nil {
+			failed.Stats = f.Stats
+		}
 		failed.Fail(f.Code, f.Message, time.Now().UTC())
 		if f.Raw != "" {
 			raw := RedactRaw(f.Raw)

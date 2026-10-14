@@ -86,3 +86,21 @@ func (d Document) Strs(path ...string) []string {
 	}
 	return out
 }
+
+// Float reads a nested JSON number and says whether it was there: a missing figure is not zero.
+func (d Document) Float(path ...string) (float64, bool) {
+	v, ok := d.at(path).(float64)
+	return v, ok
+}
+
+// IntMap reads a nested object of numbers (tool name to count).
+func (d Document) IntMap(path ...string) map[string]int64 {
+	m, _ := d.at(path).(map[string]any)
+	out := make(map[string]int64, len(m))
+	for k, v := range m {
+		if n, ok := v.(float64); ok {
+			out[k] = int64(n)
+		}
+	}
+	return out
+}

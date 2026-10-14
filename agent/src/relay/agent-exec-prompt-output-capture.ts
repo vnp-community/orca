@@ -7,6 +7,7 @@ import { homedir, tmpdir } from 'node:os'
 import { BoundedOutputBuffer } from './agent-bounded-output-buffer'
 import { ClaudeStreamActivityParser } from './agent-claude-stream-activity'
 import { resolveFinalStdout } from './agent-claude-final-stdout'
+import type { StreamUsage } from './agent-claude-stream-usage'
 import { createRedactor, secretEnvValuesFrom } from './quality-output-redaction'
 
 export type ExecPromptOutputCaptureOptions = {
@@ -30,6 +31,8 @@ export type ExecPromptOutputCapture = {
   errorNote: () => string | null
   stdoutTruncated: () => boolean
   stderrTruncated: () => boolean
+  /** Tool call counts and usage of a stream-json run; null for a plain-text run. */
+  streamStats: () => { toolCalls: Record<string, number>; usage: StreamUsage | null } | null
 }
 
 // Real path too: claude reports the realpath'd cwd (e.g. /private/var on macOS) while the caller may pass the alias.
@@ -93,6 +96,10 @@ export function createExecPromptOutputCapture(
     stderrText: () => stderrBuf.toString(),
     errorNote: () => activity?.finish().errorNote ?? null,
     stdoutTruncated: () => stdoutTruncated,
-    stderrTruncated: () => stderrBuf.truncated
+    stderrTruncated: () => stderrBuf.truncated,
+    streamStats: () => {
+      const outcome = activity?.finish()
+      return outcome?.structured ? { toolCalls: outcome.toolCalls, usage: outcome.usage } : null
+    }
   }
 }

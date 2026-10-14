@@ -137,6 +137,7 @@ func toProtoSolution(s domain.Solution) *requestv1.Solution {
 func toProtoAnalysisRun(r domain.AnalysisRun) *requestv1.AnalysisRun {
 	out := &requestv1.AnalysisRun{
 		Id: r.ID, Kind: kindToProto[domain.SolutionKind(r.Kind)], Status: string(r.Status), StartedAt: timestamppb.New(r.StartedAt),
+		Engine: string(r.Mode.EngineFor()), Stats: toProtoRunStats(r.Stats),
 	}
 	if r.ErrorCode != nil {
 		out.ErrorCode = *r.ErrorCode
@@ -146,6 +147,28 @@ func toProtoAnalysisRun(r domain.AnalysisRun) *requestv1.AnalysisRun {
 	}
 	if r.FinishedAt != nil {
 		out.FinishedAt = timestamppb.New(*r.FinishedAt)
+	}
+	return out
+}
+
+// toProtoRunStats is nil for a run that reported nothing. The cost is marked present or absent, never defaulted to zero.
+func toProtoRunStats(s *domain.RunStats) *requestv1.RunStats {
+	if s == nil || s.IsZero() {
+		return nil
+	}
+	out := &requestv1.RunStats{KnowledgeToolCalls: int32(s.KnowledgeCalls())}
+	if len(s.ToolCalls) > 0 {
+		out.ToolCalls = make(map[string]int32, len(s.ToolCalls))
+		for name, n := range s.ToolCalls {
+			out.ToolCalls[name] = int32(n)
+		}
+	}
+	if u := s.Usage; u != nil {
+		out.Turns, out.DurationMs = int32(u.Turns), u.DurationMS
+		out.InputTokens, out.OutputTokens, out.CacheReadTokens, out.CacheCreationTokens = u.InputTokens, u.OutputTokens, u.CacheReadTokens, u.CacheCreationTokens
+		if u.CostUSD != nil {
+			out.HasCost, out.CostUsd = true, *u.CostUSD
+		}
 	}
 	return out
 }

@@ -647,6 +647,48 @@ describe('handleAgentExecPrompt with stream-json activity', () => {
     return res.result
   }
 
+  it('returns the tool call counts and usage of a stream-json run, and nothing the tools said', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+    const pending = handleAgentExecPrompt(
+      1,
+      { prompt: 'p', worktreePath: '/repo', stepId: 's1' },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+    await waitForSpawn()
+    for (const e of SESSION.slice(0, -1)) {
+      child.stdout.emit('data', ev(e))
+    }
+    child.stdout.emit(
+      'data',
+      ev({ ...SESSION.at(-1), total_cost_usd: 0.5, usage: { output_tokens: 42 } })
+    )
+    child.emit('close', 0)
+    const { result } = (await pending) as { result: Record<string, unknown> }
+    expect(result['toolCalls']).toEqual({ Read: 1 })
+    expect(result['usage']).toEqual({ turns: 2, durationMs: 1500, costUsd: 0.5, outputTokens: 42 })
+    expect(JSON.stringify(result['toolCalls'])).not.toContain('SECRET-FILE-BODY')
+  })
+
+  it('returns no tool calls or usage for a plain-text run', async () => {
+    probedFlags.value = PLAIN_FLAGS
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+    const pending = handleAgentExecPrompt(
+      1,
+      { prompt: 'p', worktreePath: '/repo' },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+    await waitForSpawn()
+    child.stdout.emit('data', Buffer.from('plain answer\n'))
+    child.emit('close', 0)
+    const { result } = (await pending) as { result: Record<string, unknown> }
+    expect(result).not.toHaveProperty('toolCalls')
+    expect(result).not.toHaveProperty('usage')
+  })
+
   it('adds --output-format stream-json --verbose right after the prompt', async () => {
     await run({}, (c) => c.emit('close', 0))
     expect(spawnMock).toHaveBeenCalledWith(

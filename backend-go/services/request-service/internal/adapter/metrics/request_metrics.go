@@ -34,6 +34,7 @@ type Set struct {
 	rateLimited     *prometheus.CounterVec
 	orphans         *prometheus.CounterVec
 	pendingSubjects map[string]bool
+	engine          engineSeries
 }
 
 var (
@@ -78,6 +79,7 @@ func New() *Set {
 	s.reg.MustRegister(s.created, s.transitions, s.classification, s.confidence, s.approvals, s.approvalWait, s.approvalsPend,
 		s.stuck, s.returned, s.aiGeneration, s.taskOutcome, s.rateLimited, s.orphans, s.outboxPending,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	s.engine = newEngineSeries(s.reg)
 	return s
 }
 

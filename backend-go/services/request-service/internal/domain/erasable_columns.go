@@ -130,6 +130,7 @@ var ExemptTextColumns = mergeExempt(
 		"request_checks.kind", "request_checks.source", "request_checks.status", "task_run_outcomes.cause", "task_run_outcomes.outcome",
 		"execution_reconcile_state.lease_owner"),
 	exempt("provenance has no content or credential (ParseProvenance refuses unknown members)", "solutions.provenance"),
+	exempt("tool names and counts and usage figures of an agent run; never what went into or came out of a tool", "analysis_runs.run_stats"),
 	exempt("event envelope; payloads carry ids and counts, never content (outbox payload golden tests)", "outbox_events.payload", "outbox_events.subject", "processed_events.subject"),
 	exempt("security bookkeeping: ids, names and counts, never content (MarshalAuditMetadata)",
 		"request_audit_outbox.action", "request_audit_outbox.actor_id", "request_audit_outbox.ip_address", "request_audit_outbox.metadata_json",

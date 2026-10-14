@@ -19,12 +19,14 @@ type AnalysisFailure struct {
 	Attempt     int
 	Enforcement string
 	RepoCheck   string
+	// Stats is what the agent calls of the run had reported when it failed.
+	Stats *domain.RunStats
 }
 
 func (f *AnalysisFailure) Error() string { return fmt.Sprintf("%s: %s", f.Code, f.Message) }
 
 func newFailure(run domain.AnalysisRun, code, msg string) *AnalysisFailure {
-	return &AnalysisFailure{Code: code, Message: msg, Attempt: run.Attempt, Enforcement: run.Enforcement, RepoCheck: run.RepoCheck}
+	return &AnalysisFailure{Code: code, Message: msg, Attempt: run.Attempt, Enforcement: run.Enforcement, RepoCheck: run.RepoCheck, Stats: run.Stats}
 }
 
 func asFailure(err error) (*AnalysisFailure, bool) {

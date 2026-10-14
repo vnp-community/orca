@@ -134,6 +134,8 @@ type AgentPromptResult struct {
 	// ResultBlock is the JSON object between the nonce markers; empty when none was found, with the reason in ResultBlockCode.
 	ResultBlock     []byte
 	ResultBlockCode string
+	// Stats is the tool call counts and usage the agent saw in the claude stream; zero for an older agent or a plain-text run.
+	Stats domain.RunStats
 }
 
 type AgentPromptRunner interface {

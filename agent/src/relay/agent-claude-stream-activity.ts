@@ -17,6 +17,7 @@ import {
   toPosix,
   type JsonObject
 } from './agent-claude-tool-activity-text'
+import { readStreamUsage, ToolCallCounter, type StreamUsage } from './agent-claude-stream-usage'
 
 export const ACTIVITY_GLYPH = {
   info: '·',
@@ -58,6 +59,10 @@ export type ClaudeStreamOutcome = {
   assistantText: string
   /** Reason to surface on stderr when the run ended without any answer text. */
   errorNote: string | null
+  /** Calls per tool name (names only). */
+  toolCalls: Record<string, number>
+  /** Figures of the closing result event; null when it carried none. */
+  usage: StreamUsage | null
 }
 
 export class ClaudeStreamActivityParser {
@@ -73,6 +78,8 @@ export class ClaudeStreamActivityParser {
   private resultText: string | null = null
   private isError = false
   private errorNote: string | null = null
+  private usage: StreamUsage | null = null
+  private readonly toolCalls = new ToolCallCounter()
   private readonly assistantBuf = new BoundedOutputBuffer(ASSISTANT_FALLBACK_BYTES)
   private readonly toolNames = new Map<string, string>()
   private batch: string[] = []
@@ -109,7 +116,9 @@ export class ClaudeStreamActivityParser {
       resultText: this.resultText,
       isError: this.isError,
       assistantText: this.assistantBuf.toString(),
-      errorNote: this.errorNote
+      errorNote: this.errorNote,
+      toolCalls: this.toolCalls.snapshot(),
+      usage: this.usage
     }
     return this.outcome
   }
@@ -240,6 +249,7 @@ export class ClaudeStreamActivityParser {
 
   private addToolUse(block: JsonObject): void {
     const name = block.name as string
+    this.toolCalls.add(name)
     if (typeof block.id === 'string') {
       if (this.toolNames.size >= MAX_TRACKED_TOOL_CALLS) {
         const oldest = this.toolNames.keys().next().value
@@ -278,6 +288,7 @@ export class ClaudeStreamActivityParser {
 
   private handleResult(event: JsonObject): void {
     this.isError = event.is_error === true
+    this.usage = readStreamUsage(event)
     const subtype = typeof event.subtype === 'string' ? event.subtype : ''
     this.resultText = typeof event.result === 'string' ? event.result : null
     if (this.resultText === null && (this.isError || (subtype && subtype !== 'success'))) {

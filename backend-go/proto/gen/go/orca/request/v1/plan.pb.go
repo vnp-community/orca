@@ -445,10 +445,13 @@ type GetPlanProposalResponse struct {
 	Proposal      *PlanProposal `protobuf:"bytes,5,opt,name=proposal,proto3" json:"proposal,omitempty"`
 	RawAiResponse string        `protobuf:"bytes,6,opt,name=raw_ai_response,json=rawAiResponse,proto3" json:"raw_ai_response,omitempty"`
 	// native | openspec. The fields below are set only for the openspec engine, whose Plan is read from an authored change.
-	Engine        string         `protobuf:"bytes,7,opt,name=engine,proto3" json:"engine,omitempty"`
-	Bundle        *PlanBundle    `protobuf:"bytes,8,opt,name=bundle,proto3" json:"bundle,omitempty"`
-	Checks        []*PlanCheck   `protobuf:"bytes,9,rep,name=checks,proto3" json:"checks,omitempty"`
-	Knowledge     *PlanKnowledge `protobuf:"bytes,10,opt,name=knowledge,proto3" json:"knowledge,omitempty"`
+	Engine    string         `protobuf:"bytes,7,opt,name=engine,proto3" json:"engine,omitempty"`
+	Bundle    *PlanBundle    `protobuf:"bytes,8,opt,name=bundle,proto3" json:"bundle,omitempty"`
+	Checks    []*PlanCheck   `protobuf:"bytes,9,rep,name=checks,proto3" json:"checks,omitempty"`
+	Knowledge *PlanKnowledge `protobuf:"bytes,10,opt,name=knowledge,proto3" json:"knowledge,omitempty"`
+	// What the run's agent calls reported, and how long the run took from start to finish (0 while it runs).
+	Stats         *RunStats `protobuf:"bytes,11,opt,name=stats,proto3" json:"stats,omitempty"`
+	ElapsedMs     int64     `protobuf:"varint,12,opt,name=elapsed_ms,json=elapsedMs,proto3" json:"elapsed_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -551,6 +554,20 @@ func (x *GetPlanProposalResponse) GetKnowledge() *PlanKnowledge {
 		return x.Knowledge
 	}
 	return nil
+}
+
+func (x *GetPlanProposalResponse) GetStats() *RunStats {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+func (x *GetPlanProposalResponse) GetElapsedMs() int64 {
+	if x != nil {
+		return x.ElapsedMs
+	}
+	return 0
 }
 
 // PlanBundle names the OpenSpec change a Plan was read from. Its files stay readable after the worktree is gone.
@@ -1808,7 +1825,7 @@ var File_orca_request_v1_plan_proto protoreflect.FileDescriptor
 
 const file_orca_request_v1_plan_proto_rawDesc = "" +
 	"\n" +
-	"\x1aorca/request/v1/plan.proto\x12\x0forca.request.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\xbd\x02\n" +
+	"\x1aorca/request/v1/plan.proto\x12\x0forca.request.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a\x1eorca/request/v1/solution.proto\"\xbd\x02\n" +
 	"\fTaskProposal\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1b\n" +
@@ -1840,7 +1857,7 @@ const file_orca_request_v1_plan_proto_rawDesc = "" +
 	"\x16GetPlanProposalRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x15\n" +
-	"\x06run_id\x18\x02 \x01(\tR\x05runId\"\xae\x03\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\"\xfe\x03\n" +
 	"\x17GetPlanProposalResponse\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1d\n" +
@@ -1853,7 +1870,10 @@ const file_orca_request_v1_plan_proto_rawDesc = "" +
 	"\x06bundle\x18\b \x01(\v2\x1b.orca.request.v1.PlanBundleR\x06bundle\x122\n" +
 	"\x06checks\x18\t \x03(\v2\x1a.orca.request.v1.PlanCheckR\x06checks\x12<\n" +
 	"\tknowledge\x18\n" +
-	" \x01(\v2\x1e.orca.request.v1.PlanKnowledgeR\tknowledge\"\xb8\x01\n" +
+	" \x01(\v2\x1e.orca.request.v1.PlanKnowledgeR\tknowledge\x12/\n" +
+	"\x05stats\x18\v \x01(\v2\x19.orca.request.v1.RunStatsR\x05stats\x12\x1d\n" +
+	"\n" +
+	"elapsed_ms\x18\f \x01(\x03R\telapsedMs\"\xb8\x01\n" +
 	"\n" +
 	"PlanBundle\x12\x1b\n" +
 	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x12\x16\n" +
@@ -2001,7 +2021,8 @@ var file_orca_request_v1_plan_proto_goTypes = []any{
 	(*CleanupRequestProposalRequest)(nil),  // 24: orca.request.v1.CleanupRequestProposalRequest
 	(*CleanupRequestProposalResponse)(nil), // 25: orca.request.v1.CleanupRequestProposalResponse
 	(*wrapperspb.DoubleValue)(nil),         // 26: google.protobuf.DoubleValue
-	(*timestamppb.Timestamp)(nil),          // 27: google.protobuf.Timestamp
+	(*RunStats)(nil),                       // 27: orca.request.v1.RunStats
+	(*timestamppb.Timestamp)(nil),          // 28: google.protobuf.Timestamp
 }
 var file_orca_request_v1_plan_proto_depIdxs = []int32{
 	26, // 0: orca.request.v1.TaskProposal.estimated_hours:type_name -> google.protobuf.DoubleValue
@@ -2013,17 +2034,18 @@ var file_orca_request_v1_plan_proto_depIdxs = []int32{
 	7,  // 6: orca.request.v1.GetPlanProposalResponse.bundle:type_name -> orca.request.v1.PlanBundle
 	9,  // 7: orca.request.v1.GetPlanProposalResponse.checks:type_name -> orca.request.v1.PlanCheck
 	10, // 8: orca.request.v1.GetPlanProposalResponse.knowledge:type_name -> orca.request.v1.PlanKnowledge
-	8,  // 9: orca.request.v1.PlanBundle.files:type_name -> orca.request.v1.PlanBundleFile
-	2,  // 10: orca.request.v1.CommitPlanRequest.proposal:type_name -> orca.request.v1.PlanProposal
-	27, // 11: orca.request.v1.ReportTaskOutcomeRequest.occurred_at:type_name -> google.protobuf.Timestamp
-	27, // 12: orca.request.v1.RequestCheck.created_at:type_name -> google.protobuf.Timestamp
-	19, // 13: orca.request.v1.RecordRequestCheckResponse.check:type_name -> orca.request.v1.RequestCheck
-	19, // 14: orca.request.v1.ListRequestChecksResponse.checks:type_name -> orca.request.v1.RequestCheck
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	27, // 9: orca.request.v1.GetPlanProposalResponse.stats:type_name -> orca.request.v1.RunStats
+	8,  // 10: orca.request.v1.PlanBundle.files:type_name -> orca.request.v1.PlanBundleFile
+	2,  // 11: orca.request.v1.CommitPlanRequest.proposal:type_name -> orca.request.v1.PlanProposal
+	28, // 12: orca.request.v1.ReportTaskOutcomeRequest.occurred_at:type_name -> google.protobuf.Timestamp
+	28, // 13: orca.request.v1.RequestCheck.created_at:type_name -> google.protobuf.Timestamp
+	19, // 14: orca.request.v1.RecordRequestCheckResponse.check:type_name -> orca.request.v1.RequestCheck
+	19, // 15: orca.request.v1.ListRequestChecksResponse.checks:type_name -> orca.request.v1.RequestCheck
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_orca_request_v1_plan_proto_init() }
@@ -2031,6 +2053,7 @@ func file_orca_request_v1_plan_proto_init() {
 	if File_orca_request_v1_plan_proto != nil {
 		return
 	}
+	file_orca_request_v1_solution_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

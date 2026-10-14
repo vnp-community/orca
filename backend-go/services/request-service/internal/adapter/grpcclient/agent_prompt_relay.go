@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -112,6 +113,17 @@ type agentExecPromptResult struct {
 		Value json.RawMessage `json:"value"`
 		Code  string          `json:"code"`
 	} `json:"parsed"`
+	// ToolCalls counts calls per tool name and Usage holds claude's own figures; an older agent sends neither.
+	ToolCalls map[string]int `json:"toolCalls"`
+	Usage     *struct {
+		Turns               int      `json:"turns"`
+		DurationMS          float64  `json:"durationMs"`
+		CostUSD             *float64 `json:"costUsd"`
+		InputTokens         float64  `json:"inputTokens"`
+		OutputTokens        float64  `json:"outputTokens"`
+		CacheReadTokens     float64  `json:"cacheReadTokens"`
+		CacheCreationTokens float64  `json:"cacheCreationTokens"`
+	} `json:"usage"`
 }
 
 func (r *AgentPromptRelay) ExecPrompt(ctx context.Context, conn usecase.AnalysisConnection, in usecase.AgentPromptInput) (usecase.AgentPromptResult, error) {
@@ -177,6 +189,7 @@ func parseAgentResult(resultJSON string) (usecase.AgentPromptResult, error) {
 	if r.Changes != nil {
 		out.ChangesAvailable, out.HeadMoved, out.ChangedFiles = r.Changes.Available, r.Changes.HeadMoved, len(r.Changes.ChangedFiles)
 	}
+	out.Stats = statsFromAgent(r)
 	if r.Parsed != nil {
 		if r.Parsed.OK {
 			out.ResultBlock = []byte(r.Parsed.Value)
@@ -196,4 +209,25 @@ func truncateUTF8(s string, limit int) string {
 		cut--
 	}
 	return s[:cut]
+}
+
+// statsFromAgent keeps what the agent counted. The agent already caps the number of names; the sizes are bounded here too
+// because they come over the wire.
+func statsFromAgent(r agentExecPromptResult) domain.RunStats {
+	var s domain.RunStats
+	if len(r.ToolCalls) > 0 {
+		s.ToolCalls = make(map[string]int, len(r.ToolCalls))
+		for name, n := range r.ToolCalls {
+			if n > 0 && len(s.ToolCalls) < 128 {
+				s.ToolCalls[truncateUTF8(name, 100)] += n
+			}
+		}
+	}
+	if u := r.Usage; u != nil {
+		s.Usage = &domain.RunUsage{
+			Turns: u.Turns, DurationMS: int64(u.DurationMS), CostUSD: u.CostUSD, InputTokens: int64(u.InputTokens),
+			OutputTokens: int64(u.OutputTokens), CacheReadTokens: int64(u.CacheReadTokens), CacheCreationTokens: int64(u.CacheCreationTokens),
+		}
+	}
+	return s
 }

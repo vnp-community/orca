@@ -144,6 +144,12 @@ func addPlanEngineView(out map[string]any, resp *requestv1.GetPlanProposalRespon
 	if resp.GetKnowledge() != nil {
 		out["knowledge"] = protoJSON(resp.GetKnowledge())
 	}
+	if st := runStatsView(resp.GetStats()); st != nil {
+		out["stats"] = st
+	}
+	if resp.GetElapsedMs() > 0 {
+		out["elapsedMs"] = resp.GetElapsedMs()
+	}
 }
 
 func protoJSON(m proto.Message) json.RawMessage {
