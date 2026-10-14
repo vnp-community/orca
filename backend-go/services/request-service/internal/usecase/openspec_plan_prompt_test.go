@@ -56,7 +56,7 @@ func TestBuildOpenSpecPlanPrompt_Golden(t *testing.T) {
 func TestBuildOpenSpecPlanPrompt_Contract(t *testing.T) {
 	p := BuildOpenSpecPlanPrompt(openSpecPromptInput())
 	for _, must := range []string{
-		"openspec/changes/req-142/", "request=REQ-142 schema=1", "tdd-openspec-author", "tdd-knowledge", "between 6 and 40 tasks",
+		"openspec/changes/req-142/", "request=REQ-142 schema=1", "tdd-openspec-author", "tdd-knowledge", "between 6 and 30 tasks",
 		"ORCA_RESULT_BEGIN abcdefghijklmnop0123456789", "ORCA_RESULT_END abcdefghijklmnop0123456789", "openspec validate --strict",
 		"do not commit and do not push", "<approved_decision>",
 	} {
@@ -85,11 +85,11 @@ func TestTaskRangeFor_StaysInsideTheLimits(t *testing.T) {
 		limits       domain.PlanLimits
 		wantMin, max int
 	}{
-		{domain.RequestSizeS, domain.DefaultPlanLimits, 1, 6},
-		{domain.RequestSizeM, domain.DefaultPlanLimits, 3, 15},
-		{domain.RequestSizeL, domain.DefaultPlanLimits, 6, 40},
+		{domain.RequestSizeS, domain.DefaultPlanLimits, 1, 5},
+		{domain.RequestSizeM, domain.DefaultPlanLimits, 3, 12},
+		{domain.RequestSizeL, domain.DefaultPlanLimits, 6, 30},
 		{domain.RequestSizeL, domain.PlanLimits{MaxTasksTotal: 4}, 4, 4},
-		{"", domain.DefaultPlanLimits, 3, 15},
+		{"", domain.DefaultPlanLimits, 3, 12},
 	}
 	for _, tc := range cases {
 		mn, mx := TaskRangeFor(tc.size, tc.limits)

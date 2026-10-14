@@ -58,6 +58,52 @@ func (f *fakeWorkspace) WriteFile(_ context.Context, _ Workspace, rel string, b 
 	return nil
 }
 
+// repoFiles are files of the repository at its base ref, present in every fresh worktree.
+func (f *fakeWorkspace) seedRepo(paths ...string) {
+	for _, p := range paths {
+		f.files[p] = []byte("repo file")
+	}
+}
+
+func (f *fakeWorkspace) Stat(_ context.Context, _ Workspace, rel string) (PathInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.files[rel]; ok {
+		return PathInfo{Exists: true}, nil
+	}
+	for p := range f.files {
+		if len(p) > len(rel) && p[:len(rel)] == rel && p[len(rel)] == '/' {
+			return PathInfo{Exists: true, IsDir: true}, nil
+		}
+	}
+	return PathInfo{}, nil
+}
+
+func (f *fakeWorkspace) ListDir(_ context.Context, _ Workspace, rel string) ([]DirEntry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	seen := map[string]bool{}
+	var out []DirEntry
+	for p := range f.files {
+		if len(p) <= len(rel)+1 || p[:len(rel)] != rel || p[len(rel)] != '/' {
+			continue
+		}
+		rest := p[len(rel)+1:]
+		name, isDir := rest, false
+		for i := 0; i < len(rest); i++ {
+			if rest[i] == '/' {
+				name, isDir = rest[:i], true
+				break
+			}
+		}
+		if !seen[name] {
+			seen[name] = true
+			out = append(out, DirEntry{Name: name, IsDir: isDir})
+		}
+	}
+	return out, nil
+}
+
 func (f *fakeWorkspace) ChangedPaths(context.Context, Workspace) ([]ChangedPath, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

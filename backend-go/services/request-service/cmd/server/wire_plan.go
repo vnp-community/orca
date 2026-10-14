@@ -78,14 +78,15 @@ func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solut
 		return registry
 	}
 	workspace := grpcclient.NewProposalWorkspace(solution.git, solution.proj)
-	gate := usecase.NewEngineReadinessGate(solution.conns, grpcclient.NewDevServerExecutor(solution.infra), os.Getenv("REQUEST_OPENSPEC_MIN_VERSION"))
+	executor := grpcclient.NewDevServerExecutor(solution.infra)
+	gate := usecase.NewEngineReadinessGate(solution.conns, executor, os.Getenv("REQUEST_OPENSPEC_MIN_VERSION"))
 	engine := usecase.NewOpenSpecEngine(usecase.OpenSpecEngineDeps{
 		Gate: gate, Workspace: workspace, Agent: solution.agent, Conns: solution.conns, Caps: solution.caps, Settings: solution.settings,
 	})
 	registry.Register(engine)
 	solution.runner.WithProposalWorker(usecase.NewRunProposalGeneration(usecase.RunProposalGenerationDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Registry: registry, Projects: solution.projects, Policies: policies,
-		EngineSettings: stores.engineSettings, Workspace: workspace, Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
+		EngineSettings: stores.engineSettings, Workspace: workspace, Checker: usecase.NewOpenSpecBundleChecker(executor, solution.conns, limits), Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
 	}))
 	return registry
 }

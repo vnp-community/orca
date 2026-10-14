@@ -36,11 +36,11 @@ type OpenSpecPlanPromptInput struct {
 func TaskRangeFor(size domain.RequestSize, limits domain.PlanLimits) (minTasks, maxTasks int) {
 	switch size {
 	case domain.RequestSizeS:
-		minTasks, maxTasks = 1, 6
+		minTasks, maxTasks = 1, 5
 	case domain.RequestSizeL:
-		minTasks, maxTasks = 6, 40
+		minTasks, maxTasks = 6, 30
 	default:
-		minTasks, maxTasks = 3, 15
+		minTasks, maxTasks = 3, 12
 	}
 	if maxTasks > limits.MaxTasksTotal {
 		maxTasks = limits.MaxTasksTotal

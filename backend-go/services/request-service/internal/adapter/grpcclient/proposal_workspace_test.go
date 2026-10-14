@@ -34,6 +34,10 @@ type fakeProposalGit struct {
 	removeErr   error
 	createErr   error
 	nextID      int
+	stat        *gitgatewayv1.StatFileResponse
+	statErr     error
+	dir         *gitgatewayv1.ReadDirResponse
+	dirErr      error
 }
 
 func newFakeProposalGit() *fakeProposalGit {
@@ -87,6 +91,14 @@ func (f *fakeProposalGit) WriteFile(_ context.Context, in *gitgatewayv1.WriteFil
 
 func (f *fakeProposalGit) ReadFile(_ context.Context, _ *gitgatewayv1.ReadFileRequest, _ ...grpc.CallOption) (*gitgatewayv1.ReadFileResponse, error) {
 	return f.read, f.readErr
+}
+
+func (f *fakeProposalGit) StatFile(_ context.Context, _ *gitgatewayv1.StatFileRequest, _ ...grpc.CallOption) (*gitgatewayv1.StatFileResponse, error) {
+	return f.stat, f.statErr
+}
+
+func (f *fakeProposalGit) ReadDir(_ context.Context, _ *gitgatewayv1.ReadDirRequest, _ ...grpc.CallOption) (*gitgatewayv1.ReadDirResponse, error) {
+	return f.dir, f.dirErr
 }
 
 func (f *fakeProposalGit) RemoveWorktree(_ context.Context, in *gitgatewayv1.RemoveWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.RemoveWorktreeResponse, error) {
@@ -336,5 +348,38 @@ func TestProposalWorkspace_RemoveKeepsTheBranchAndToleratesAGoneWorktree(t *test
 	g.removeErr = status.Error(codes.Internal, "busy")
 	if err := w.Remove(ctxWithIdentity(), ws1); err == nil {
 		t.Fatal("a real failure must surface")
+	}
+}
+
+func TestProposalWorkspace_StatAndListDir(t *testing.T) {
+	w, g := wsKit(oneRepo)
+	g.stat = &gitgatewayv1.StatFileResponse{Exists: true, IsDirectory: true}
+	if info, err := w.Stat(ctxWithIdentity(), ws1, "src"); err != nil || !info.Exists || !info.IsDir {
+		t.Fatalf("%+v %v", info, err)
+	}
+	g.statErr = status.Error(codes.NotFound, "gone")
+	if info, err := w.Stat(ctxWithIdentity(), ws1, "src/missing.go"); err != nil || info.Exists {
+		t.Fatalf("a missing path is not an error: %+v %v", info, err)
+	}
+	g.statErr = status.Error(codes.Internal, "boom")
+	if _, err := w.Stat(ctxWithIdentity(), ws1, "src"); err == nil {
+		t.Fatal("a real failure must surface")
+	}
+	if _, err := w.Stat(ctxWithIdentity(), ws1, "../x"); err == nil {
+		t.Fatal("an escape must be refused")
+	}
+
+	g.dir = &gitgatewayv1.ReadDirResponse{Entries: []*gitgatewayv1.DirEntry{{Name: "a", IsDirectory: true}, {Name: "b.md"}}}
+	got, err := w.ListDir(ctxWithIdentity(), ws1, "openspec/changes/x/specs")
+	if err != nil || len(got) != 2 || !got[0].IsDir || got[1].Name != "b.md" {
+		t.Fatalf("%+v %v", got, err)
+	}
+	g.dirErr = status.Error(codes.NotFound, "no dir")
+	if got, err := w.ListDir(ctxWithIdentity(), ws1, "nope"); err != nil || len(got) != 0 {
+		t.Fatalf("a missing directory lists as empty: %+v %v", got, err)
+	}
+	g.dirErr = status.Error(codes.Unavailable, "down")
+	if _, err := w.ListDir(ctxWithIdentity(), ws1, "x"); err == nil || !strings.Contains(err.Error(), "REQUEST_ENGINE_NO_CONNECTION") {
+		t.Fatalf("%v", err)
 	}
 }

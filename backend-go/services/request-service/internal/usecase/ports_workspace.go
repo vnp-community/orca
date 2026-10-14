@@ -32,6 +32,18 @@ type ChangedPath struct {
 	State   string
 }
 
+// PathInfo is what Stat knows about one path of the worktree.
+type PathInfo struct {
+	Exists bool
+	IsDir  bool
+}
+
+// DirEntry is one name inside a worktree directory.
+type DirEntry struct {
+	Name  string
+	IsDir bool
+}
+
 // ProposalWorkspace is the only door to the proposal worktree: Orca never runs git itself. The branch is local and is
 // never pushed; Remove keeps it so the proposal stays reviewable after the worktree is gone.
 type ProposalWorkspace interface {
@@ -40,6 +52,10 @@ type ProposalWorkspace interface {
 	// ReadFile refuses a file larger than maxBytes (at most MaxProposalReadBytes).
 	ReadFile(ctx context.Context, ws Workspace, relPath string, maxBytes int) ([]byte, error)
 	WriteFile(ctx context.Context, ws Workspace, relPath string, content []byte) error
+	// Stat reports a missing path as Exists=false, not as an error.
+	Stat(ctx context.Context, ws Workspace, relPath string) (PathInfo, error)
+	// ListDir lists one directory; a missing directory is an empty list, not an error.
+	ListDir(ctx context.Context, ws Workspace, relPath string) ([]DirEntry, error)
 	ChangedPaths(ctx context.Context, ws Workspace) ([]ChangedPath, error)
 	// DiscardAll restores tracked files and removes untracked ones, so a retry starts from the branch head.
 	DiscardAll(ctx context.Context, ws Workspace) error

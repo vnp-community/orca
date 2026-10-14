@@ -135,6 +135,48 @@ func (w *ProposalWorkspace) WriteFile(ctx context.Context, ws usecase.Workspace,
 	return nil
 }
 
+func (w *ProposalWorkspace) Stat(ctx context.Context, ws usecase.Workspace, relPath string) (usecase.PathInfo, error) {
+	clean, err := cleanRelPath(relPath)
+	if err != nil {
+		return usecase.PathInfo{}, err
+	}
+	tctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return usecase.PathInfo{}, err
+	}
+	resp, err := w.git.StatFile(tctx, &gitgatewayv1.StatFileRequest{WorktreeId: ws.WorktreeID, Path: clean})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return usecase.PathInfo{}, nil
+		}
+		return usecase.PathInfo{}, mapWorkspaceError("stat "+clean, err)
+	}
+	return usecase.PathInfo{Exists: resp.GetExists(), IsDir: resp.GetIsDirectory()}, nil
+}
+
+func (w *ProposalWorkspace) ListDir(ctx context.Context, ws usecase.Workspace, relPath string) ([]usecase.DirEntry, error) {
+	clean, err := cleanRelPath(relPath)
+	if err != nil {
+		return nil, err
+	}
+	tctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := w.git.ReadDir(tctx, &gitgatewayv1.ReadDirRequest{WorktreeId: ws.WorktreeID, Path: clean})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		return nil, mapWorkspaceError("list "+clean, err)
+	}
+	out := make([]usecase.DirEntry, 0, len(resp.GetEntries()))
+	for _, e := range resp.GetEntries() {
+		out = append(out, usecase.DirEntry{Name: e.GetName(), IsDir: e.GetIsDirectory()})
+	}
+	return out, nil
+}
+
 func (w *ProposalWorkspace) ChangedPaths(ctx context.Context, ws usecase.Workspace) ([]usecase.ChangedPath, error) {
 	tctx, err := withTenantMetadata(ctx)
 	if err != nil {

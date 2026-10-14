@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -115,6 +116,10 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 			return f
 		}
 		if len(problems) == 0 {
+			if !res.Report.Present {
+				// REQUEST_SPEC_REPORT_MISSING: worth knowing, never a reason to refuse a change that passed every check.
+				slog.WarnContext(ctx, "the authoring agent left no result block", slog.String("run_id", run.ID), slog.String("code", "REQUEST_SPEC_REPORT_MISSING"))
+			}
 			return w.finish(ctx, run, proposal)
 		}
 		if rerr := run.RecordAttempt(); rerr != nil {

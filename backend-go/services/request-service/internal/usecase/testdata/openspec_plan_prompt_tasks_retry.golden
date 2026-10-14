@@ -4,7 +4,7 @@ No design knowledge graph is available for this project in this run: work from t
 Write the change ONLY under openspec/changes/req-142/ in the current directory; do not modify any other file, do not commit and do not push.
 Change id: req-142. In tasks.md the region marker must read: <!-- orca:begin plan request=REQ-142 schema=1 -->
 Do not use phases: put every task under the single heading ## TASKS.
-Limits: between 6 and 40 tasks in total, at most 8 phases, at most 20 tasks per phase, titles up to 200 characters.
+Limits: between 6 and 30 tasks in total, at most 8 phases, at most 20 tasks per phase, titles up to 200 characters.
 Give every acceptance criterion of the Request at least one scenario whose name starts with its id, and let ac= name only ids the Request lists.
 Run openspec validate --strict on the change and fix every error before you finish. Run one operation per Bash command; compound commands are refused.
 
