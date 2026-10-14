@@ -1,0 +1,121 @@
+package apiclient
+
+import (
+	"context"
+	"net/url"
+)
+
+// One method per api-gateway route of the Request flow (services/api-gateway/.../request_routes*.go). The gateway
+// answers with the same views the UI reads, so the paths below are the whole contract between CLI and UI.
+
+func (c *Client) getDoc(ctx context.Context, path string, query url.Values) (Document, error) {
+	if len(query) > 0 {
+		path += "?" + query.Encode()
+	}
+	var out Document
+	err := c.do(ctx, "GET", path, nil, &out)
+	return out, err
+}
+
+func (c *Client) postDoc(ctx context.Context, path string, body any) (Document, error) {
+	if body == nil {
+		body = Document{}
+	}
+	var out Document
+	err := c.do(ctx, "POST", path, body, &out)
+	return out, err
+}
+
+func requestPath(id string, rest string) string {
+	return "/v1/requests/" + url.PathEscape(id) + rest
+}
+
+func (c *Client) CreateRequest(ctx context.Context, body Document) (Document, error) {
+	return c.postDoc(ctx, "/v1/requests/", body)
+}
+
+func (c *Client) ListRequests(ctx context.Context, q url.Values) (Document, error) {
+	return c.getDoc(ctx, "/v1/requests/", q)
+}
+
+func (c *Client) GetRequest(ctx context.Context, id string) (Document, error) {
+	return c.getDoc(ctx, requestPath(id, ""), nil)
+}
+
+func (c *Client) ClassifyRequest(ctx context.Context, id string) (Document, error) {
+	return c.postDoc(ctx, requestPath(id, "/classify"), nil)
+}
+
+func (c *Client) ConfirmRequestType(ctx context.Context, id string, body Document) (Document, error) {
+	return c.postDoc(ctx, requestPath(id, "/confirm-type"), body)
+}
+
+func (c *Client) CancelRequest(ctx context.Context, id string, body Document) (Document, error) {
+	return c.postDoc(ctx, requestPath(id, "/cancel"), body)
+}
+
+func (c *Client) ReopenRequest(ctx context.Context, id string, body Document) (Document, error) {
+	return c.postDoc(ctx, requestPath(id, "/reopen"), body)
+}
+
+func (c *Client) ListSolutions(ctx context.Context, id string, q url.Values) (Document, error) {
+	return c.getDoc(ctx, requestPath(id, "/solutions"), q)
+}
+
+func (c *Client) GenerateSolution(ctx context.Context, id string, body Document) (Document, error) {
+	return c.postDoc(ctx, requestPath(id, "/solutions"), body)
+}
+
+func (c *Client) ChooseSolutionOption(ctx context.Context, id, solutionID string, body Document) (Document, error) {
+	return c.postDoc(ctx, requestPath(id, "/solutions/"+url.PathEscape(solutionID)+"/choose"), body)
+}
+
+func (c *Client) ListRequestApprovals(ctx context.Context, id string, q url.Values) (Document, error) {
+	return c.getDoc(ctx, requestPath(id, "/approvals"), q)
+}
+
+func (c *Client) ListPendingApprovals(ctx context.Context, q url.Values) (Document, error) {
+	return c.getDoc(ctx, "/v1/approvals/pending", q)
+}
+
+func (c *Client) GetApproval(ctx context.Context, id string) (Document, error) {
+	return c.getDoc(ctx, "/v1/approvals/"+url.PathEscape(id), nil)
+}
+
+// DecideApproval approves or rejects (decision is "approve" or "reject") the gate the caller saw at version and digest.
+func (c *Client) DecideApproval(ctx context.Context, id, decision string, body Document) (Document, error) {
+	return c.postDoc(ctx, "/v1/approvals/"+url.PathEscape(id)+"/"+decision, body)
+}
+
+// GeneratePlan is the two-phase plan call: body mode "propose" starts a run, "commit" writes the proposal.
+func (c *Client) GeneratePlan(ctx context.Context, id string, body Document) (Document, error) {
+	return c.postDoc(ctx, requestPath(id, "/plan"), body)
+}
+
+func (c *Client) GetPlanProposal(ctx context.Context, id, runID string) (Document, error) {
+	q := url.Values{}
+	if runID != "" {
+		q.Set("runId", runID)
+	}
+	return c.getDoc(ctx, requestPath(id, "/plan"), q)
+}
+
+func (c *Client) StartPhase(ctx context.Context, id, phaseTaskID string) (Document, error) {
+	return c.postDoc(ctx, requestPath(id, "/phases/"+url.PathEscape(phaseTaskID)+"/start"), nil)
+}
+
+func (c *Client) GetTaskSubtree(ctx context.Context, rootTaskID string) (Document, error) {
+	return c.getDoc(ctx, "/v1/tasks/"+url.PathEscape(rootTaskID)+"/subtree", nil)
+}
+
+func (c *Client) ListClarifications(ctx context.Context, requestID string, q url.Values) (Document, error) {
+	return c.getDoc(ctx, requestPath(requestID, "/clarifications"), q)
+}
+
+func (c *Client) AnswerClarification(ctx context.Context, clarificationID string, body Document) (Document, error) {
+	return c.postDoc(ctx, "/v1/clarifications/"+url.PathEscape(clarificationID)+"/answer", body)
+}
+
+func (c *Client) GetClarification(ctx context.Context, clarificationID string) (Document, error) {
+	return c.getDoc(ctx, "/v1/clarifications/"+url.PathEscape(clarificationID), nil)
+}
