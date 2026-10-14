@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { GatewayRpcClient, RpcRow } from './gateway-rpc-client'
 import { readInventory } from './live-add-project-ledger'
+import { isUsableGitRepo } from './live-usable-git-repo'
 import { fingerprintRepo } from './live-safety-invariants'
 
 export type UserDataSnapshot = {
@@ -34,7 +35,12 @@ export async function snapshotUserData(
       repos: p.repos.map((r) => [r.id, r.url, r.displayName, r.devServerId])
     })
     for (const r of p.repos) {
-      if (r.devServerId === devServerId && existsSync(join(r.url, '.git'))) {
+      // Why: a project can outlive its folder (a throwaway repo that was half deleted); git rejecting it is not the run's doing.
+      if (
+        r.devServerId === devServerId &&
+        existsSync(join(r.url, '.git')) &&
+        isUsableGitRepo(r.url)
+      ) {
         snapshot.repoPaths.push(r.url)
       }
     }
