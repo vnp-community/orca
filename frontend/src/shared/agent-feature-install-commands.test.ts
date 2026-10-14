@@ -8,7 +8,9 @@ import {
   ORCA_LINEAR_SKILL_UPDATE_COMMAND,
   ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND,
   ORCA_CLI_SKILL_UPDATE_COMMAND,
-  ORCHESTRATION_SKILL_UPDATE_COMMAND
+  ORCHESTRATION_SKILL_UPDATE_COMMAND,
+  TDD_KNOWLEDGE_SKILLS_INSTALL_COMMAND,
+  TDD_KNOWLEDGE_SKILLS_UPDATE_COMMANDS
 } from './agent-feature-install-commands'
 
 describe('agent feature skill commands', () => {
@@ -37,5 +39,19 @@ describe('agent feature skill commands', () => {
     expect(ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND).toBe(
       buildAgentFeatureSkillInstallCommand(['orca-cli', 'orchestration'])
     )
+  })
+})
+
+describe('knowledge-hub skill commands', () => {
+  it('installs the four skills in one global command and updates them one by one', () => {
+    expect(TDD_KNOWLEDGE_SKILLS_INSTALL_COMMAND).toBe(
+      'npx skills add https://github.com/stablyai/orca --skill tdd-knowledge tdd-openspec-author tdd-knowledge-writeback tdd-orca-task --global'
+    )
+    expect(TDD_KNOWLEDGE_SKILLS_UPDATE_COMMANDS).toEqual([
+      'npx skills update tdd-knowledge --global',
+      'npx skills update tdd-openspec-author --global',
+      'npx skills update tdd-knowledge-writeback --global',
+      'npx skills update tdd-orca-task --global'
+    ])
   })
 })

@@ -26,3 +26,8 @@ var (
 	ErrOpenSpecTimeout          = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_OPENSPEC_TIMEOUT", "timeout", nil)
 	ErrOpenSpecOutOfScopeChange = apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_OPENSPEC_OUT_OF_SCOPE_CHANGE", "out of scope change", nil)
 )
+
+// ErrEngineSettingsInvalid says which setting was refused; the message is safe to show to the administrator.
+func ErrEngineSettingsInvalid(msg string) error {
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_ENGINE_SETTINGS_INVALID", msg, nil)
+}

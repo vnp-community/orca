@@ -31,6 +31,26 @@ type fakeFlowClient struct {
 	plans      []*requestv1.GetPlanProposalRequest
 	bundles    []*requestv1.GetPlanBundleFileRequest
 	bundleErr  error
+	engineGets []*requestv1.GetProjectEngineSettingsRequest
+	engineSets []*requestv1.SetProjectEngineSettingsRequest
+}
+
+func (f *fakeFlowClient) GetProjectEngineSettings(_ context.Context, in *requestv1.GetProjectEngineSettingsRequest, _ ...grpc.CallOption) (*requestv1.GetProjectEngineSettingsResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.engineGets = append(f.engineGets, in)
+	resp := &requestv1.GetProjectEngineSettingsResponse{Settings: &requestv1.ProjectEngineSettings{ProjectId: in.GetProjectId(), SolutionEngine: "openspec", SolutionAgent: true, Version: 2}}
+	if in.GetCheck() {
+		resp.Preflight = &requestv1.EnginePreflight{Ran: true, Ok: true, Gaps: []*requestv1.EnginePreflightNote{{Code: "REQUEST_KNOWLEDGE_SKILLS_MISSING", FixHint: "npx skills add"}}}
+	}
+	return resp, nil
+}
+
+func (f *fakeFlowClient) SetProjectEngineSettings(_ context.Context, in *requestv1.SetProjectEngineSettingsRequest, _ ...grpc.CallOption) (*requestv1.SetProjectEngineSettingsResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.engineSets = append(f.engineSets, in)
+	return &requestv1.SetProjectEngineSettingsResponse{Settings: &requestv1.ProjectEngineSettings{ProjectId: in.GetProjectId(), SolutionEngine: in.GetSolutionEngine(), SolutionAgent: in.GetSolutionAgent(), Version: 3}}, nil
 }
 
 func (f *fakeFlowClient) CancelRequest(_ context.Context, in *requestv1.CancelRequestRequest, _ ...grpc.CallOption) (*requestv1.CancelRequestResponse, error) {
@@ -223,5 +243,65 @@ func TestRequestFlowRoutes_PlanBundleFileInputAndErrors(t *testing.T) {
 	f.bundleErr = status.Error(codes.NotFound, "no such file")
 	if rec := doRequestRoute(r, http.MethodGet, "/v1/requests/r1/plan/bundle/file?path=x.md", "", routesIdentity); rec.Code != http.StatusNotFound {
 		t.Errorf("missing file: %d", rec.Code)
+	}
+}
+
+func TestProjectEngineRoutes_ReadWithAndWithoutTheCheck_AndOnlyAnAdminSets(t *testing.T) {
+	f := &fakeFlowClient{}
+	r := flowRouter(f)
+	rec := doRequestRoute(r, http.MethodGet, "/v1/projects/p1/request-engine", "", routesIdentity)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"solutionAgent":true`) || strings.Contains(rec.Body.String(), "preflight") {
+		t.Fatalf("plain read: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doRequestRoute(r, http.MethodGet, "/v1/projects/p1/request-engine?check=true", "", routesIdentity)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "REQUEST_KNOWLEDGE_SKILLS_MISSING") || !strings.Contains(rec.Body.String(), "npx skills add") {
+		t.Fatalf("checked read: %d %s", rec.Code, rec.Body.String())
+	}
+	if len(f.engineGets) != 2 || f.engineGets[0].GetCheck() || !f.engineGets[1].GetCheck() || f.engineGets[1].GetProjectId() != "p1" {
+		t.Fatalf("rpcs = %+v", f.engineGets)
+	}
+
+	body := `{"projectId":"OTHER","engine":"openspec","solutionAgent":true,"expectedVersion":2}`
+	if rec := doRequestRoute(r, http.MethodPut, "/v1/projects/p1/request-engine", body, routesIdentity); rec.Code != http.StatusForbidden || len(f.engineSets) != 0 {
+		t.Fatalf("member: %d rpcs=%d %s", rec.Code, len(f.engineSets), rec.Body.String())
+	}
+	admin := *routesIdentity
+	admin.Role = "admin"
+	rec = doRequestRoute(r, http.MethodPut, "/v1/projects/p1/request-engine", body, &admin)
+	if rec.Code != http.StatusOK || len(f.engineSets) != 1 {
+		t.Fatalf("admin: %d %s", rec.Code, rec.Body.String())
+	}
+	if in := f.engineSets[0]; in.GetProjectId() != "p1" || in.GetSolutionEngine() != "openspec" || !in.GetSolutionAgent() || in.GetExpectedVersion() != 2 {
+		t.Fatalf("a body must not redirect the route to another project: %+v", in)
+	}
+	if rec := doRequestRoute(r, http.MethodGet, "/v1/projects/p1/request-engine", "", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous: %d", rec.Code)
+	}
+}
+
+// The project routes own the /v1/projects prefix; the engine routes must live next to them in either mount order.
+func TestProjectEngineRoutes_CoexistWithTheProjectRoutes(t *testing.T) {
+	f := &fakeFlowClient{}
+	orders := map[string]func(chi.Router){
+		"projects first": func(r chi.Router) { mountProjectRoutes(r, nil); mountRequestRoutes(r, f, f) },
+		"requests first": func(r chi.Router) { mountRequestRoutes(r, f, f); mountProjectRoutes(r, nil) },
+	}
+	for name, mount := range orders {
+		t.Run(name, func(t *testing.T) {
+			r := chi.NewRouter()
+			mount(r)
+			for _, tc := range []struct{ method, path string }{
+				{http.MethodGet, "/v1/projects/p1/request-engine"}, {http.MethodPut, "/v1/projects/p1/request-engine"},
+				{http.MethodGet, "/v1/projects/p1/repos"}, {http.MethodGet, "/v1/projects/p1"},
+			} {
+				if !r.Match(chi.NewRouteContext(), tc.method, tc.path) {
+					t.Errorf("%s %s is not routed", tc.method, tc.path)
+				}
+			}
+			rec := doRequestRoute(r, http.MethodGet, "/v1/projects/p1/request-engine", "", routesIdentity)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("engine route shadowed: %d %s", rec.Code, rec.Body.String())
+			}
+		})
 	}
 }

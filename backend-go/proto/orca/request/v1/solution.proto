@@ -123,14 +123,20 @@ message ProjectEngineSettings {
   string solution_engine = 2;
   string openspec_min_version = 3;
   int64 version = 4;
+  // Writes the Solution with the read-only agent and the project's knowledge graph; off keeps ai.complete.
+  bool solution_agent = 5;
 }
 
 message GetProjectEngineSettingsRequest {
   string project_id = 1;
+  // Also asks the project's dev server whether the engines can run there.
+  bool check = 2;
 }
 
 message GetProjectEngineSettingsResponse {
   ProjectEngineSettings settings = 1;
+  // Set only when check was asked for.
+  EnginePreflight preflight = 2;
 }
 
 message SetProjectEngineSettingsRequest {
@@ -138,8 +144,29 @@ message SetProjectEngineSettingsRequest {
   string solution_engine = 2;
   string openspec_min_version = 3;
   int64 expected_version = 4;
+  bool solution_agent = 5;
 }
 
 message SetProjectEngineSettingsResponse {
   ProjectEngineSettings settings = 1;
+  // The result of the readiness check run for what was switched on; saving is never blocked by it.
+  EnginePreflight preflight = 2;
+}
+
+// EnginePreflight says whether a dev server can run the engines of a project. blockers stop the openspec engine; gaps only
+// mean the knowledge hub will not be used (the Solution and Plan then work as before).
+message EnginePreflight {
+  bool ran = 1;
+  bool ok = 2;
+  repeated EnginePreflightNote blockers = 3;
+  repeated EnginePreflightNote gaps = 4;
+  repeated string warnings = 5;
+  string openspec_version = 6;
+  string checked_at = 7;
+}
+
+message EnginePreflightNote {
+  string code = 1;
+  string message = 2;
+  string fix_hint = 3;
 }

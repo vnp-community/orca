@@ -10,12 +10,14 @@ const (
 	AuditAIBudgetSet         = "ai.budget.set"
 	AuditAIEgressSet         = "ai.egress.set"
 	AuditApprovalApprove     = "approval.approve"
+	// AuditEngineSettingsSet records a project switching the engine or the agent-written Solution on or off.
+	AuditEngineSettingsSet = "request.engine_settings.set"
 )
 
 // DurableAuditActions must survive an auth-service outage: they are written to the audit outbox in the
 // same transaction as the change. approval.approve is durable only for the pre_deploy gate (see IsDurableAudit).
 var DurableAuditActions = map[string]bool{
-	AuditRequestExport: true, AuditRequestErase: true, AuditAIEgressSet: true, AuditRetentionRun: true,
+	AuditRequestExport: true, AuditRequestErase: true, AuditAIEgressSet: true, AuditRetentionRun: true, AuditEngineSettingsSet: true,
 }
 
 // IsDurableAudit tells whether an action needs the outbox; subjectType matters only for approvals.

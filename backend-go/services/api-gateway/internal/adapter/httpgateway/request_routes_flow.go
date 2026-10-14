@@ -44,6 +44,12 @@ var requestFlowRoutes = []requestFlowRoute{
 	{http.MethodGet, "/{id}/clarifications", "clarification.list", byRequest},
 }
 
+// projectEngineRoutes are absolute paths: ?check=true also asks the dev server whether what is switched on can run.
+var projectEngineRoutes = []requestFlowRoute{
+	{http.MethodGet, "/v1/projects/{id}/request-engine", "request.engineSettings", map[string]string{"id": "projectId"}},
+	{http.MethodPut, "/v1/projects/{id}/request-engine", "request.engineSettingsSet", map[string]string{"id": "projectId"}},
+}
+
 // approvalFlowRoutes is relative to /v1/approvals: a decider reads the version and digest it is about to decide.
 var approvalFlowRoutes = []requestFlowRoute{
 	{http.MethodGet, "/{id}", "approval.get", byID},

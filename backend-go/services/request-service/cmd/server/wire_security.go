@@ -30,6 +30,7 @@ type securityWiring struct {
 	compliance requestgrpc.ComplianceUseCases
 	replay     *usecase.WebhookReplayGuard
 	authorize  *usecase.AuthorizeRequestAction
+	audit      *usecase.AuditRecorder
 	policy     *opaclient.RequestPolicy
 	closers    []func()
 }
@@ -103,6 +104,7 @@ func wireSecurity(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		authorize.WithOrphanObserver(projectExists, hooks.Orphans)
 	}
 	w.authorize = authorize
+	w.audit = audit
 	limits, warnings := domain.LimitsFromEnv(os.Getenv)
 	for _, msg := range warnings {
 		log.Warn("rate limit override ignored", slog.String("detail", msg))

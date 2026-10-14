@@ -26,6 +26,25 @@ func (c *Client) postDoc(ctx context.Context, path string, body any) (Document, 
 	return out, err
 }
 
+func (c *Client) putDoc(ctx context.Context, path string, body any) (Document, error) {
+	var out Document
+	err := c.do(ctx, "PUT", path, body, &out)
+	return out, err
+}
+
+// GetEngineSettings reads a project's engine switches; check also asks its dev server whether they can run.
+func (c *Client) GetEngineSettings(ctx context.Context, projectID string, check bool) (Document, error) {
+	q := url.Values{}
+	if check {
+		q.Set("check", "true")
+	}
+	return c.getDoc(ctx, "/v1/projects/"+url.PathEscape(projectID)+"/request-engine", q)
+}
+
+func (c *Client) SetEngineSettings(ctx context.Context, projectID string, body Document) (Document, error) {
+	return c.putDoc(ctx, "/v1/projects/"+url.PathEscape(projectID)+"/request-engine", body)
+}
+
 func requestPath(id string, rest string) string {
 	return "/v1/requests/" + url.PathEscape(id) + rest
 }

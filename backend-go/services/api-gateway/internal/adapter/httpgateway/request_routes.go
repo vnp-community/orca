@@ -41,6 +41,11 @@ func mountRequestRoutes(r chi.Router, req requestv1.RequestServiceClient, appr r
 		h.mountFlow(sub, approvalFlowRoutes)
 	})
 	r.Route("/v1/clarifications", func(sub chi.Router) { h.mountFlow(sub, clarificationFlowRoutes) })
+	// A project's engine switches live under the project, whose own routes (project_routes.go) own the /v1/projects prefix;
+	// registering the two paths one by one keeps both files from mounting the same prefix.
+	for _, rt := range projectEngineRoutes {
+		r.Method(rt.method, rt.pattern, h.bridge(rt))
+	}
 }
 
 type requestRoutes struct{ reg *wscompat.Registry }

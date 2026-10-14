@@ -642,6 +642,14 @@
   category: request_flow
   reason: "Reads one file of the OpenSpec change behind a Plan for the approver's view; file text is agent-written, so no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
 
+- pattern: "request.engineSettings"
+  category: request_flow
+  reason: "Administrator configuration of a project (which engine writes the Plan, whether the Solution uses the agent); no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "request.engineSettingsSet"
+  category: request_flow
+  reason: "Administrator configuration that switches agents on for a project; an MCP caller must not change it, add a ToolSpec with admin gating before exposing it."
+
 - pattern: "execution.get"
   category: request_flow
   reason: "Read channel for the task sheet's Result tab; carries agent output, so no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."

@@ -179,6 +179,30 @@ func requestChannelCases() []requestChannelCase {
 				mustEqual(t, m.GetPath(), "tasks.md")
 				mustEqual(t, res["content"], "# tasks\n")
 			}},
+		{channel: "request.engineSettings", args: `{"projectId":"p1","check":true}`, rpc: "GetProjectEngineSettings", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, in proto.Message) {
+				m := in.(*requestv1.GetProjectEngineSettingsRequest)
+				mustEqual(t, m.GetProjectId(), "p1")
+				if !m.GetCheck() {
+					t.Error("check was not passed on")
+				}
+				pre, _ := res["preflight"].(map[string]any)
+				gaps, _ := pre["gaps"].([]any)
+				if pre["ran"] != true || len(gaps) != 1 || pre["blockers"] == nil {
+					t.Errorf("preflight = %v", res["preflight"])
+				}
+			}},
+		{channel: "request.engineSettingsSet", args: `{"projectId":"p1","engine":"openspec","solutionAgent":true,"expectedVersion":2}`, rpc: "SetProjectEngineSettings", lo: short[0], hi: short[1], identity: admin,
+			check: func(t *testing.T, res map[string]any, in proto.Message) {
+				m := in.(*requestv1.SetProjectEngineSettingsRequest)
+				mustEqual(t, m.GetSolutionEngine(), "openspec")
+				mustEqual(t, m.GetExpectedVersion(), int64(2))
+				if !m.GetSolutionAgent() {
+					t.Error("solutionAgent was not passed on")
+				}
+				mustEqual(t, res["version"], float64(3))
+				mustEqual(t, res["solutionAgent"], true)
+			}},
 		{channel: "request.startPhase", args: `{"id":"r1","phaseTaskId":"ph1"}`, rpc: "StartPhase", lo: mid[0], hi: mid[1],
 			check: func(t *testing.T, res map[string]any, _ proto.Message) {
 				if res["dispatchedTaskIds"] == nil {
@@ -394,7 +418,7 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"approval.get", "approval.list", "approval.listPending", "approval.approve", "approval.reject", "approval.cancel",
 		"backlog.requests", "backlog.tasks", "backlog.execute",
 		// CONTRACT 2.5 and the plan proposal reader.
-		"request.links", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile",
+		"request.links", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet",
 		// CR-REQ-028: the channels useClarifications.ts calls.
 		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel", "clarification.request",
 	}

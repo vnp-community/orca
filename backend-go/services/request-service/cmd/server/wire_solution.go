@@ -43,8 +43,10 @@ type solutionWiring struct {
 	agent usecase.AgentPromptRunner
 	caps  usecase.DevServerCapabilityReader
 	infra infrafleetv1.InfraFleetServiceClient
-	proj  projectv1.ProjectServiceClient
-	git   gitgatewayv1.GitGatewayServiceClient
+	// gate is the readiness check shared by the openspec engine and the settings RPC; nil when the dev server stack is not configured.
+	gate *usecase.EngineReadinessGate
+	proj projectv1.ProjectServiceClient
+	git  gitgatewayv1.GitGatewayServiceClient
 }
 
 // wireSolution builds solution generation and read-only analysis (CR-REQ-007/008) and starts the lease-recovery sweeper.

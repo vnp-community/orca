@@ -20,6 +20,7 @@ type Server struct {
 	artifact       ArtifactUseCases
 	clarification  ClarificationUseCases
 	flowSettings   *usecase.FlowSettings
+	engineSettings *usecase.ManageProjectEngineSettings
 	compliance     ComplianceUseCases
 	execution      ExecutionUseCases
 	plan           PlanUseCases

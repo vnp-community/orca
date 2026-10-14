@@ -40,6 +40,15 @@ orca plan start-phase $R <phase-task-id>                    # giao task cho agen
 
 Với engine `openspec` (kế hoạch do agent viết thành một change OpenSpec trên nhánh `request/<số>-proposal`), hãy đọc gói bằng `orca plan bundle` trước khi chạy `orca approval approve <plan-gate-id>`: quyết định duyệt gắn với digest của cả gói, nên sinh lại hoặc sửa gói sau khi mở cổng làm quyết định cũ không còn hiệu lực. Engine `native` không có gói; `orca plan bundle` nói rõ điều đó.
 
+Bật engine `openspec` và Solution bằng agent cho một project (chỉ admin; mặc định tắt cả hai):
+
+```bash
+orca engine show --project <project-id> --check                       # trạng thái hai cờ + kiểm dev server (openspec, agent, skill, .tdd-agent)
+orca engine set  --project <project-id> --engine openspec --solution-agent=true
+```
+
+`engine set` chỉ đổi mục được nêu và gửi lại `version` vừa đọc; thiếu khả năng thì vẫn lưu, in lý do kèm lệnh sửa, và Request tiếp tục chạy chế độ cũ. Cài đặt trên dev server: [docs/guides/request/knowledge-hub-setup.md](../../../docs/guides/request/knowledge-hub-setup.md).
+
 Lệnh có từ trước: `worktree create`, `agent status|send|wait`, `snapshot`, `daemon status|stop`, `serve`.
 
 ## Đã biết chưa làm được

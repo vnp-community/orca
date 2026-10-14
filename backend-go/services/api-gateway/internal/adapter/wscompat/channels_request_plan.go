@@ -18,6 +18,7 @@ func (c requestChannels) registerPlan(r *Registry) {
 	c.handle(r, "request.generatePlan", requestChannelOpts{timeout: requestAIChannelTimeout, ai: true}, c.generatePlan)
 	c.handle(r, "request.planProposal", requestChannelOpts{timeout: requestRPCTimeout}, c.planProposal)
 	c.handle(r, "request.planBundleFile", requestChannelOpts{timeout: requestRPCTimeout}, c.planBundleFile)
+	c.registerEngine(r)
 	c.handle(r, "request.startPhase", requestChannelOpts{timeout: requestStartPhaseTimeout}, func(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
 		in, err := decodeRequestArgs[struct {
 			ID          string `json:"id"`

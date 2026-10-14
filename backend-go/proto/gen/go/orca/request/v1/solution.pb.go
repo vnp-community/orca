@@ -891,8 +891,10 @@ type ProjectEngineSettings struct {
 	SolutionEngine     string                 `protobuf:"bytes,2,opt,name=solution_engine,json=solutionEngine,proto3" json:"solution_engine,omitempty"`
 	OpenspecMinVersion string                 `protobuf:"bytes,3,opt,name=openspec_min_version,json=openspecMinVersion,proto3" json:"openspec_min_version,omitempty"`
 	Version            int64                  `protobuf:"varint,4,opt,name=version,proto3" json:"version,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Writes the Solution with the read-only agent and the project's knowledge graph; off keeps ai.complete.
+	SolutionAgent bool `protobuf:"varint,5,opt,name=solution_agent,json=solutionAgent,proto3" json:"solution_agent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProjectEngineSettings) Reset() {
@@ -953,9 +955,18 @@ func (x *ProjectEngineSettings) GetVersion() int64 {
 	return 0
 }
 
+func (x *ProjectEngineSettings) GetSolutionAgent() bool {
+	if x != nil {
+		return x.SolutionAgent
+	}
+	return false
+}
+
 type GetProjectEngineSettingsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	// Also asks the project's dev server whether the engines can run there.
+	Check         bool `protobuf:"varint,2,opt,name=check,proto3" json:"check,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -997,9 +1008,18 @@ func (x *GetProjectEngineSettingsRequest) GetProjectId() string {
 	return ""
 }
 
+func (x *GetProjectEngineSettingsRequest) GetCheck() bool {
+	if x != nil {
+		return x.Check
+	}
+	return false
+}
+
 type GetProjectEngineSettingsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Settings      *ProjectEngineSettings `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Settings *ProjectEngineSettings `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	// Set only when check was asked for.
+	Preflight     *EnginePreflight `protobuf:"bytes,2,opt,name=preflight,proto3" json:"preflight,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1041,12 +1061,20 @@ func (x *GetProjectEngineSettingsResponse) GetSettings() *ProjectEngineSettings 
 	return nil
 }
 
+func (x *GetProjectEngineSettingsResponse) GetPreflight() *EnginePreflight {
+	if x != nil {
+		return x.Preflight
+	}
+	return nil
+}
+
 type SetProjectEngineSettingsRequest struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	ProjectId          string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	SolutionEngine     string                 `protobuf:"bytes,2,opt,name=solution_engine,json=solutionEngine,proto3" json:"solution_engine,omitempty"`
 	OpenspecMinVersion string                 `protobuf:"bytes,3,opt,name=openspec_min_version,json=openspecMinVersion,proto3" json:"openspec_min_version,omitempty"`
 	ExpectedVersion    int64                  `protobuf:"varint,4,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	SolutionAgent      bool                   `protobuf:"varint,5,opt,name=solution_agent,json=solutionAgent,proto3" json:"solution_agent,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -1109,9 +1137,18 @@ func (x *SetProjectEngineSettingsRequest) GetExpectedVersion() int64 {
 	return 0
 }
 
+func (x *SetProjectEngineSettingsRequest) GetSolutionAgent() bool {
+	if x != nil {
+		return x.SolutionAgent
+	}
+	return false
+}
+
 type SetProjectEngineSettingsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Settings      *ProjectEngineSettings `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Settings *ProjectEngineSettings `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	// The result of the readiness check run for what was switched on; saving is never blocked by it.
+	Preflight     *EnginePreflight `protobuf:"bytes,2,opt,name=preflight,proto3" json:"preflight,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1151,6 +1188,167 @@ func (x *SetProjectEngineSettingsResponse) GetSettings() *ProjectEngineSettings 
 		return x.Settings
 	}
 	return nil
+}
+
+func (x *SetProjectEngineSettingsResponse) GetPreflight() *EnginePreflight {
+	if x != nil {
+		return x.Preflight
+	}
+	return nil
+}
+
+// EnginePreflight says whether a dev server can run the engines of a project. blockers stop the openspec engine; gaps only
+// mean the knowledge hub will not be used (the Solution and Plan then work as before).
+type EnginePreflight struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Ran             bool                   `protobuf:"varint,1,opt,name=ran,proto3" json:"ran,omitempty"`
+	Ok              bool                   `protobuf:"varint,2,opt,name=ok,proto3" json:"ok,omitempty"`
+	Blockers        []*EnginePreflightNote `protobuf:"bytes,3,rep,name=blockers,proto3" json:"blockers,omitempty"`
+	Gaps            []*EnginePreflightNote `protobuf:"bytes,4,rep,name=gaps,proto3" json:"gaps,omitempty"`
+	Warnings        []string               `protobuf:"bytes,5,rep,name=warnings,proto3" json:"warnings,omitempty"`
+	OpenspecVersion string                 `protobuf:"bytes,6,opt,name=openspec_version,json=openspecVersion,proto3" json:"openspec_version,omitempty"`
+	CheckedAt       string                 `protobuf:"bytes,7,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *EnginePreflight) Reset() {
+	*x = EnginePreflight{}
+	mi := &file_orca_request_v1_solution_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnginePreflight) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnginePreflight) ProtoMessage() {}
+
+func (x *EnginePreflight) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_solution_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnginePreflight.ProtoReflect.Descriptor instead.
+func (*EnginePreflight) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *EnginePreflight) GetRan() bool {
+	if x != nil {
+		return x.Ran
+	}
+	return false
+}
+
+func (x *EnginePreflight) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *EnginePreflight) GetBlockers() []*EnginePreflightNote {
+	if x != nil {
+		return x.Blockers
+	}
+	return nil
+}
+
+func (x *EnginePreflight) GetGaps() []*EnginePreflightNote {
+	if x != nil {
+		return x.Gaps
+	}
+	return nil
+}
+
+func (x *EnginePreflight) GetWarnings() []string {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
+}
+
+func (x *EnginePreflight) GetOpenspecVersion() string {
+	if x != nil {
+		return x.OpenspecVersion
+	}
+	return ""
+}
+
+func (x *EnginePreflight) GetCheckedAt() string {
+	if x != nil {
+		return x.CheckedAt
+	}
+	return ""
+}
+
+type EnginePreflightNote struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	FixHint       string                 `protobuf:"bytes,3,opt,name=fix_hint,json=fixHint,proto3" json:"fix_hint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnginePreflightNote) Reset() {
+	*x = EnginePreflightNote{}
+	mi := &file_orca_request_v1_solution_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnginePreflightNote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnginePreflightNote) ProtoMessage() {}
+
+func (x *EnginePreflightNote) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_solution_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnginePreflightNote.ProtoReflect.Descriptor instead.
+func (*EnginePreflightNote) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_solution_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *EnginePreflightNote) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *EnginePreflightNote) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *EnginePreflightNote) GetFixHint() string {
+	if x != nil {
+		return x.FixHint
+	}
+	return ""
 }
 
 var File_orca_request_v1_solution_proto protoreflect.FileDescriptor
@@ -1229,26 +1427,44 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\bsolution\x18\x01 \x01(\v2\x19.orca.request.v1.SolutionR\bsolution\x12'\n" +
 	"\x0fapproval_digest\x18\x02 \x01(\tR\x0eapprovalDigest\x12'\n" +
 	"\x0fdecision_status\x18\x03 \x01(\tR\x0edecisionStatus\x123\n" +
-	"\x15requires_confirmation\x18\x04 \x01(\bR\x14requiresConfirmation\"\xab\x01\n" +
+	"\x15requires_confirmation\x18\x04 \x01(\bR\x14requiresConfirmation\"\xd2\x01\n" +
 	"\x15ProjectEngineSettings\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12'\n" +
 	"\x0fsolution_engine\x18\x02 \x01(\tR\x0esolutionEngine\x120\n" +
 	"\x14openspec_min_version\x18\x03 \x01(\tR\x12openspecMinVersion\x12\x18\n" +
-	"\aversion\x18\x04 \x01(\x03R\aversion\"@\n" +
+	"\aversion\x18\x04 \x01(\x03R\aversion\x12%\n" +
+	"\x0esolution_agent\x18\x05 \x01(\bR\rsolutionAgent\"V\n" +
 	"\x1fGetProjectEngineSettingsRequest\x12\x1d\n" +
 	"\n" +
-	"project_id\x18\x01 \x01(\tR\tprojectId\"f\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x14\n" +
+	"\x05check\x18\x02 \x01(\bR\x05check\"\xa6\x01\n" +
 	" GetProjectEngineSettingsResponse\x12B\n" +
-	"\bsettings\x18\x01 \x01(\v2&.orca.request.v1.ProjectEngineSettingsR\bsettings\"\xc6\x01\n" +
+	"\bsettings\x18\x01 \x01(\v2&.orca.request.v1.ProjectEngineSettingsR\bsettings\x12>\n" +
+	"\tpreflight\x18\x02 \x01(\v2 .orca.request.v1.EnginePreflightR\tpreflight\"\xed\x01\n" +
 	"\x1fSetProjectEngineSettingsRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12'\n" +
 	"\x0fsolution_engine\x18\x02 \x01(\tR\x0esolutionEngine\x120\n" +
 	"\x14openspec_min_version\x18\x03 \x01(\tR\x12openspecMinVersion\x12)\n" +
-	"\x10expected_version\x18\x04 \x01(\x03R\x0fexpectedVersion\"f\n" +
+	"\x10expected_version\x18\x04 \x01(\x03R\x0fexpectedVersion\x12%\n" +
+	"\x0esolution_agent\x18\x05 \x01(\bR\rsolutionAgent\"\xa6\x01\n" +
 	" SetProjectEngineSettingsResponse\x12B\n" +
-	"\bsettings\x18\x01 \x01(\v2&.orca.request.v1.ProjectEngineSettingsR\bsettings*\x9c\x01\n" +
+	"\bsettings\x18\x01 \x01(\v2&.orca.request.v1.ProjectEngineSettingsR\bsettings\x12>\n" +
+	"\tpreflight\x18\x02 \x01(\v2 .orca.request.v1.EnginePreflightR\tpreflight\"\x95\x02\n" +
+	"\x0fEnginePreflight\x12\x10\n" +
+	"\x03ran\x18\x01 \x01(\bR\x03ran\x12\x0e\n" +
+	"\x02ok\x18\x02 \x01(\bR\x02ok\x12@\n" +
+	"\bblockers\x18\x03 \x03(\v2$.orca.request.v1.EnginePreflightNoteR\bblockers\x128\n" +
+	"\x04gaps\x18\x04 \x03(\v2$.orca.request.v1.EnginePreflightNoteR\x04gaps\x12\x1a\n" +
+	"\bwarnings\x18\x05 \x03(\tR\bwarnings\x12)\n" +
+	"\x10openspec_version\x18\x06 \x01(\tR\x0fopenspecVersion\x12\x1d\n" +
+	"\n" +
+	"checked_at\x18\a \x01(\tR\tcheckedAt\"^\n" +
+	"\x13EnginePreflightNote\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x19\n" +
+	"\bfix_hint\x18\x03 \x01(\tR\afixHint*\x9c\x01\n" +
 	"\fSolutionKind\x12\x1d\n" +
 	"\x19SOLUTION_KIND_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16SOLUTION_KIND_SOLUTION\x10\x01\x12\x1b\n" +
@@ -1280,7 +1496,7 @@ func file_orca_request_v1_solution_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_request_v1_solution_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_orca_request_v1_solution_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_orca_request_v1_solution_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_orca_request_v1_solution_proto_goTypes = []any{
 	(SolutionKind)(0),                        // 0: orca.request.v1.SolutionKind
 	(SolutionStatus)(0),                      // 1: orca.request.v1.SolutionStatus
@@ -1298,15 +1514,17 @@ var file_orca_request_v1_solution_proto_goTypes = []any{
 	(*GetProjectEngineSettingsResponse)(nil), // 13: orca.request.v1.GetProjectEngineSettingsResponse
 	(*SetProjectEngineSettingsRequest)(nil),  // 14: orca.request.v1.SetProjectEngineSettingsRequest
 	(*SetProjectEngineSettingsResponse)(nil), // 15: orca.request.v1.SetProjectEngineSettingsResponse
-	(*timestamppb.Timestamp)(nil),            // 16: google.protobuf.Timestamp
+	(*EnginePreflight)(nil),                  // 16: orca.request.v1.EnginePreflight
+	(*EnginePreflightNote)(nil),              // 17: orca.request.v1.EnginePreflightNote
+	(*timestamppb.Timestamp)(nil),            // 18: google.protobuf.Timestamp
 }
 var file_orca_request_v1_solution_proto_depIdxs = []int32{
 	0,  // 0: orca.request.v1.Solution.kind:type_name -> orca.request.v1.SolutionKind
 	1,  // 1: orca.request.v1.Solution.status:type_name -> orca.request.v1.SolutionStatus
-	16, // 2: orca.request.v1.Solution.created_at:type_name -> google.protobuf.Timestamp
+	18, // 2: orca.request.v1.Solution.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: orca.request.v1.AnalysisRun.kind:type_name -> orca.request.v1.SolutionKind
-	16, // 4: orca.request.v1.AnalysisRun.started_at:type_name -> google.protobuf.Timestamp
-	16, // 5: orca.request.v1.AnalysisRun.finished_at:type_name -> google.protobuf.Timestamp
+	18, // 4: orca.request.v1.AnalysisRun.started_at:type_name -> google.protobuf.Timestamp
+	18, // 5: orca.request.v1.AnalysisRun.finished_at:type_name -> google.protobuf.Timestamp
 	2,  // 6: orca.request.v1.GenerateSolutionRequest.analysis_mode:type_name -> orca.request.v1.AnalysisMode
 	0,  // 7: orca.request.v1.ListSolutionsRequest.kind:type_name -> orca.request.v1.SolutionKind
 	1,  // 8: orca.request.v1.ListSolutionsRequest.status:type_name -> orca.request.v1.SolutionStatus
@@ -1314,12 +1532,16 @@ var file_orca_request_v1_solution_proto_depIdxs = []int32{
 	4,  // 10: orca.request.v1.ListSolutionsResponse.runs:type_name -> orca.request.v1.AnalysisRun
 	3,  // 11: orca.request.v1.ChooseSolutionOptionResponse.solution:type_name -> orca.request.v1.Solution
 	11, // 12: orca.request.v1.GetProjectEngineSettingsResponse.settings:type_name -> orca.request.v1.ProjectEngineSettings
-	11, // 13: orca.request.v1.SetProjectEngineSettingsResponse.settings:type_name -> orca.request.v1.ProjectEngineSettings
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	16, // 13: orca.request.v1.GetProjectEngineSettingsResponse.preflight:type_name -> orca.request.v1.EnginePreflight
+	11, // 14: orca.request.v1.SetProjectEngineSettingsResponse.settings:type_name -> orca.request.v1.ProjectEngineSettings
+	16, // 15: orca.request.v1.SetProjectEngineSettingsResponse.preflight:type_name -> orca.request.v1.EnginePreflight
+	17, // 16: orca.request.v1.EnginePreflight.blockers:type_name -> orca.request.v1.EnginePreflightNote
+	17, // 17: orca.request.v1.EnginePreflight.gaps:type_name -> orca.request.v1.EnginePreflightNote
+	18, // [18:18] is the sub-list for method output_type
+	18, // [18:18] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_orca_request_v1_solution_proto_init() }
@@ -1333,7 +1555,7 @@ func file_orca_request_v1_solution_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_request_v1_solution_proto_rawDesc), len(file_orca_request_v1_solution_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

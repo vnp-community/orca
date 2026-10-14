@@ -80,7 +80,10 @@ func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solut
 	}
 	workspace := grpcclient.NewProposalWorkspace(solution.git, solution.proj)
 	executor := grpcclient.NewDevServerExecutor(solution.infra)
-	gate := usecase.NewEngineReadinessGate(solution.conns, executor, os.Getenv("REQUEST_OPENSPEC_MIN_VERSION"))
+	gate := usecase.NewEngineReadinessGate(solution.conns, executor, os.Getenv("REQUEST_OPENSPEC_MIN_VERSION")).
+		WithCapabilities(solution.caps).WithRepoFiles(workspace).WithRepoState(grpcclient.NewRepoStateProbe(solution.git)).
+		WithSkillsRepository(os.Getenv("REQUEST_SKILLS_REPOSITORY_URL"))
+	solution.gate = gate
 	engine := usecase.NewOpenSpecEngine(usecase.OpenSpecEngineDeps{
 		Gate: gate, Workspace: workspace, Agent: solution.agent, Conns: solution.conns, Caps: solution.caps, Settings: solution.settings,
 	})

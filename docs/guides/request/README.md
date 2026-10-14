@@ -25,7 +25,8 @@ Docker thật; "chỉ có mã" nghĩa là handler đã nối và có test đơn 
 | Thực thi: `StartPhase`, `ReportTaskOutcome`, `RecordRequestCheck`, trả kết quả task về Request | có | **chưa** (`TSK-08` tuỳ chọn, `ORCA_E2E_EXECUTE_AGENT=1`) | cần một lượt chạy tay có chủ đích |
 | Backlog (`ListBacklog`; kênh `backlog.requests`, `backlog.tasks`, `backlog.execute`) | có | `AIS-06` (chỉ kiểm kênh trả lời) | nội dung từng view chưa được e2e kiểm |
 | Quyết định (Decision), artifact, tuyên bố nguồn (provenance), kiểm tra bao phủ AC | có | gián tiếp (Solution của `AIS-02`/`PLN-08` qua kiểm tra bao phủ) | |
-| Impact, rủi ro (`AcceptRisk`, `GetRiskPolicy`), kiểm tra readiness (`CheckReadiness`, `GetReadinessReport`), nguồn ngữ cảnh (`ListContextSources`...), evidence, `GetProjectEngineSettings`, `ExportTenantRequests`, `AiBudgetAdminService` | **chưa có**: không có handler, trả `Unimplemented` | không | CR tương ứng chưa làm |
+| Impact, rủi ro (`AcceptRisk`, `GetRiskPolicy`), kiểm tra readiness (`CheckReadiness`, `GetReadinessReport`), nguồn ngữ cảnh (`ListContextSources`...), evidence, `ExportTenantRequests`, `AiBudgetAdminService` | **chưa có**: không có handler, trả `Unimplemented` | không | CR tương ứng chưa làm |
+| Cờ theo project: engine `openspec` cho Plan và Solution bằng agent có tri thức (`GetProjectEngineSettings`, `SetProjectEngineSettings`; `orca engine show|set`) | có, mặc định tắt; chỉ admin đổi; kiểm dev server (`--check`) không chặn việc lưu | **chưa** (chưa chạy qua stack Docker) | [knowledge-hub-setup.md](knowledge-hub-setup.md) |
 
 AI khi không dùng được trả mã có cấu trúc (`REQUEST_AI_NOT_CONFIGURED`, `REQUEST_AI_AGENT_UNAVAILABLE`, `REQUEST_AI_SESSION_EXPIRED`,
 `REQUEST_AI_QUOTA_EXHAUSTED`, `REQUEST_AI_BUSY`); Request đứng yên ở trạng thái hiện tại (`AIS-01`, `AIS-03`).
