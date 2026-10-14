@@ -223,6 +223,17 @@ python3 agent_push_block.py restore          # trả agent về như cũ
 
 Biện pháp này phát hiện và dừng, không ngăn mọi thao tác ghi ngoài worktree (rủi ro B4). Test: `python3 -m unittest tests/stages/e2e/orca-flows/test_pilot_guard.py`.
 
+## Luồng tri thức từ dòng lệnh, Claude thật (`run_cli_flow.py --real knowledge`)
+
+Chạy cả luồng Request `change_request` cỡ M bằng CLI `orca` trên một repo Go tạm (`knowledge_fixture/`: ba tài liệu ngắn và một dịch vụ nhỏ), đồ thị tri thức dựng bằng `tdd-agent init --no-prose` (không gọi mô hình), project tạm trên `dev-local-mac` với engine `openspec` và Solution bằng agent. Kiểm tự động từng bước: Solution trích đồ thị (`design_references`, có snapshot, có phần tử đã đọc, run báo số lần gọi tool tri thức), gói OpenSpec đạt kiểm cấu trúc (`STRUCTURE_OK`), mọi task đủ `Serves/Code/Verify/Done when`, mọi tiêu chí chấp nhận có scenario, mọi task chạy kiểm tra của nó và thoát 0, Request `completed`, gói được archive trên nhánh proposal, không có nhánh remote-tracking (không push), bàn giao được liệt kê. Cỡ M được chọn có chủ ý: chính sách duyệt mặc định cho người báo tự duyệt, nên stack một người dùng chạy được mà không đổi chính sách.
+
+```bash
+python3 tests/stages/e2e/orca-flows/run_cli_flow.py --real knowledge          # dọn sạch khi xong
+python3 tests/stages/e2e/orca-flows/run_cli_flow.py --real knowledge --keep   # giữ repo tạm, project và Request để xem
+```
+
+Điều kiện: stack local, dev server đã duyệt và đang nối, `claude` đã đăng nhập, `tdd-agent`, `openspec`, `go` trong `PATH`, bốn skill tri thức trong `~/.claude/skills/`. Tốn lượt AI thật (khoảng 15 đến 25 phút) nên không có job CI. Mã thoát: 0 đạt, 1 có kiểm tra hỏng, 2 thiếu điều kiện.
+
 ## Bốn trạng thái kết quả
 
 | Trạng thái | Nghĩa |
