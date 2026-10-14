@@ -40,6 +40,7 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 			Requests: stores.requests, Solutions: stores.solutions, Runs: stores.analysisRuns, Conns: solution.conns, Auth: auth,
 			Approvals: lifecycle.Canceller, Transition: lifecycle.Transition, Tx: stores.tx, Spawner: solution.runner,
 			Settings: solution.settings, LeaseOwner: solution.owner,
+			Pin: usecase.NewPinSolutionEngine(stores.requests, stores.engineSettings),
 		}),
 		Get: usecase.NewGetPlanProposal(stores.requests, stores.analysisRuns),
 	}

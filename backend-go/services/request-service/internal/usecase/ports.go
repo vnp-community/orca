@@ -132,6 +132,9 @@ type RequestRepository interface {
 	List(ctx context.Context, f ListFilter) (ListResult, error)
 	Update(ctx context.Context, r domain.Request, expectedVersion int64) (domain.Request, error)
 	UpdateSolutionEngine(ctx context.Context, id string, name domain.EngineName, expectedVersion int64) error
+	// PinSolutionEngineIfUnset sets the engine only while none is pinned and returns the engine in force. It does not bump the
+	// version: pinning is not a state change, and callers hold older versions of the Request inside their own transactions.
+	PinSolutionEngineIfUnset(ctx context.Context, id string, name domain.EngineName) (domain.EngineName, error)
 	// NextNumber must run inside TxRunner.InTx so a rolled-back Create never burns a number.
 	NextNumber(ctx context.Context) (int64, error)
 }

@@ -56,6 +56,7 @@ func RunSolutionContract(t *testing.T, newEnv func(t *testing.T) SolutionEnv) {
 		{"PlanRunNeedsNoDraftSolution", solPlanRunWithoutDraft},
 		{"ConcurrentStartsShareOneRun", solConcurrentStarts},
 		{"AgentGateAllowsExactlyTheMaximum", solAgentGate},
+		{"AgentGateIsSharedAcrossAgentModes", solAgentGateSharedAcrossModes},
 		{"LeaseRenewFinishAndClaim", solLease},
 		{"SolutionStoreCASSupersedeDeleteDraft", solStoreOperations},
 		{"UnicodeAndDigestSurviveTheDatabase", solUnicodeDigest},
@@ -612,6 +613,44 @@ func solAgentGate(t *testing.T, env SolutionEnv) {
 	run, draft := startInput(t, k, other, domain.AnalysisModeAgentReadonly, domain.RunKindAnswer, "")
 	if res, err := startIn(t, k, run, draft, max); err != nil || !res.Created {
 		t.Fatalf("other project: %+v %v", res, err)
+	}
+}
+
+// An agent_readonly Solution and an agent_proposal Plan occupy the same agent, so they share one per-project cap.
+func solAgentGateSharedAcrossModes(t *testing.T, env SolutionEnv) {
+	k := newSolKit(t, env)
+	project := uuid.NewString()
+	seed := func(typ domain.RequestType) domain.Request {
+		return seedRequest(t, env.IntakeEnv, k.ctx, domain.RequestStatusAnalyzing, func(r *domain.Request) {
+			r.Type, r.TypeSource, r.Size, r.ProjectID, r.ReporterID = typ, domain.TypeSourceHuman, domain.RequestSizeM, project, k.userID
+		})
+	}
+	if err := env.AnalysisRuns.EnsureProjectGate(k.ctx, project); err != nil {
+		t.Fatal(err)
+	}
+	first := seed(domain.RequestTypeQuestion)
+	run, draft := startInput(t, k, first, domain.AnalysisModeAgentReadonly, domain.RunKindAnswer, "")
+	if res, err := startIn(t, k, run, draft, 1); err != nil || !res.Created {
+		t.Fatalf("first agent run: %+v %v", res, err)
+	}
+	second := seed(domain.RequestTypeChangeRequest)
+	plan, _ := startInput(t, k, second, domain.AnalysisModeAgentProposal, domain.RunKindPlan, "")
+	plan.SolutionID = ""
+	if _, err := startIn(t, k, plan, domain.Solution{}, 1); err == nil || errCode(err) != "REQUEST_ANALYSIS_BUSY" {
+		t.Fatalf("a proposal run must count against the same cap, got %v", err)
+	}
+	if n, err := env.AnalysisRuns.CountRunning(k.ctx, project, domain.AnalysisModeAgentProposal); err != nil || n != 0 {
+		t.Fatalf("the refused proposal run left a row: %d %v", n, err)
+	}
+	// Once the cap allows it, the run is stored in mode agent_proposal and tagged with the openspec engine.
+	plan2, _ := startInput(t, k, second, domain.AnalysisModeAgentProposal, domain.RunKindPlan, "")
+	plan2.SolutionID = ""
+	res, err := startIn(t, k, plan2, domain.Solution{}, 2)
+	if err != nil || !res.Created || res.Run.Mode != domain.AnalysisModeAgentProposal {
+		t.Fatalf("proposal run: %+v %v", res, err)
+	}
+	if n, err := env.AnalysisRuns.CountRunning(k.ctx, project, domain.AnalysisModeAgentProposal); err != nil || n != 1 {
+		t.Fatalf("CountRunning(agent_proposal) = %d %v", n, err)
 	}
 }
 

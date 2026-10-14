@@ -133,6 +133,28 @@ func (r *RequestRepository) UpdateSolutionEngine(ctx context.Context, id string,
 	})
 }
 
+func (r *RequestRepository) PinSolutionEngineIfUnset(ctx context.Context, id string, name domain.EngineName) (domain.EngineName, error) {
+	var out domain.EngineName
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if _, err := db.ExecContext(ctx, `UPDATE requests SET solution_engine = ? WHERE id = ? AND tenant_id = ? AND solution_engine IS NULL`,
+			string(name), id, tenantID); err != nil {
+			return fmt.Errorf("mysql: pin solution engine: %w", err)
+		}
+		var cur sql.NullString
+		if err := db.QueryRowContext(ctx, `SELECT solution_engine FROM requests WHERE id = ? AND tenant_id = ?`, id, tenantID).Scan(&cur); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return domain.ErrRequestNotFound(id)
+			}
+			return fmt.Errorf("mysql: read pinned solution engine: %w", err)
+		}
+		if cur.Valid {
+			out = domain.EngineName(cur.String)
+		}
+		return nil
+	})
+	return out, err
+}
+
 func (r *RequestRepository) List(ctx context.Context, f usecase.ListFilter) (usecase.ListResult, error) {
 	f, err := f.Normalize()
 	if err != nil {

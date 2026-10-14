@@ -26,6 +26,7 @@ type AnalysisRunner struct {
 	complete  AnalysisWorker
 	agent     AnalysisWorker
 	plan      AnalysisWorker
+	proposal  AnalysisWorker
 	settings  AnalysisSettings
 	owner     string
 
@@ -44,6 +45,13 @@ func NewAnalysisRunner(runs AnalysisRunStore, solutions SolutionStore, tx TxRunn
 // WithPlanWorker adds the worker for kind=plan runs; they share the lease, heartbeat and recovery of the others.
 func (r *AnalysisRunner) WithPlanWorker(w AnalysisWorker) *AnalysisRunner {
 	r.plan = w
+	return r
+}
+
+// WithProposalWorker adds the worker for agent_proposal plan runs (engine "openspec"). Without it such a run fails at once
+// with a clear code instead of being written by the ai.complete plan worker, which would silently ignore the engine.
+func (r *AnalysisRunner) WithProposalWorker(w AnalysisWorker) *AnalysisRunner {
+	r.proposal = w
 	return r
 }
 
@@ -71,6 +79,12 @@ func (r *AnalysisRunner) runCtx(run domain.AnalysisRun) context.Context {
 }
 
 func (r *AnalysisRunner) worker(run domain.AnalysisRun) AnalysisWorker {
+	if run.Kind == domain.RunKindPlan && run.Mode == domain.AnalysisModeAgentProposal {
+		if r.proposal != nil {
+			return r.proposal
+		}
+		return engineUnavailableWorker{}
+	}
 	if run.Kind == domain.RunKindPlan && r.plan != nil {
 		return r.plan
 	}
@@ -148,4 +162,13 @@ func deleteDraftIfAny(ctx context.Context, store SolutionStore, run domain.Analy
 		return nil
 	}
 	return store.DeleteDraft(ctx, run.SolutionID)
+}
+
+// RunErrEngineUnavailable is the code of a run whose engine has no worker on this server.
+const RunErrEngineUnavailable = "REQUEST_ENGINE_UNAVAILABLE"
+
+type engineUnavailableWorker struct{}
+
+func (engineUnavailableWorker) Execute(_ context.Context, run domain.AnalysisRun) error {
+	return newFailure(run, RunErrEngineUnavailable, "this server has no worker for the run's engine")
 }

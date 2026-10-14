@@ -1,0 +1,73 @@
+package contracttest
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
+	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
+)
+
+// RunEngineSettingsContract is what both dialects must do for the per-project engine choice: optimistic versions, no
+// silent overwrite, and no read across tenants.
+func RunEngineSettingsContract(t *testing.T, repo usecase.EngineSettingsRepository) {
+	t.Helper()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	tenantID, project, actor := newTenant(), uuid.NewString(), uuid.NewString()
+	ctx := CtxForTenant(tenantID)
+	mk := func(engine domain.EngineName, minVersion string) domain.ProjectEngineSettings {
+		s, err := domain.NewProjectEngineSettings(tenantID, project, engine, minVersion, actor, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+
+	t.Run("a project without a row reads as not found, not as an error", func(t *testing.T) {
+		if _, found, err := repo.Get(ctx, project); err != nil || found {
+			t.Fatalf("found=%v err=%v", found, err)
+		}
+	})
+	t.Run("insert then read back", func(t *testing.T) {
+		got, err := repo.Upsert(ctx, mk(domain.EngineOpenSpec, "1.2.0"), 0)
+		if err != nil || got.Version != 1 {
+			t.Fatalf("insert: %+v %v", got, err)
+		}
+		read, found, err := repo.Get(ctx, project)
+		if err != nil || !found || read.Engine != domain.EngineOpenSpec || read.MinVersion != "1.2.0" || read.Version != 1 || read.UpdatedBy != actor {
+			t.Fatalf("read: %+v found=%v %v", read, found, err)
+		}
+	})
+	t.Run("a second insert is a version conflict", func(t *testing.T) {
+		if _, err := repo.Upsert(ctx, mk(domain.EngineNative, ""), 0); !errors.Is(err, domain.ErrEngineSettingsVersionConflict) {
+			t.Fatalf("got %v", err)
+		}
+	})
+	t.Run("update at the right version bumps it and may clear the minimum version", func(t *testing.T) {
+		got, err := repo.Upsert(ctx, mk(domain.EngineNative, ""), 1)
+		if err != nil || got.Version != 2 {
+			t.Fatalf("update: %+v %v", got, err)
+		}
+		read, _, _ := repo.Get(ctx, project)
+		if read.Engine != domain.EngineNative || read.MinVersion != "" || read.Version != 2 {
+			t.Fatalf("read: %+v", read)
+		}
+	})
+	t.Run("update at a stale version never overwrites", func(t *testing.T) {
+		if _, err := repo.Upsert(ctx, mk(domain.EngineOpenSpec, ""), 1); !errors.Is(err, domain.ErrEngineSettingsVersionConflict) {
+			t.Fatalf("got %v", err)
+		}
+		if read, _, _ := repo.Get(ctx, project); read.Engine != domain.EngineNative {
+			t.Fatalf("a stale write changed the row: %+v", read)
+		}
+	})
+	t.Run("another tenant cannot read the row", func(t *testing.T) {
+		other := tenant.WithTenantID(ctx, newTenant())
+		if _, found, err := repo.Get(other, project); err != nil || found {
+			t.Fatalf("found=%v err=%v", found, err)
+		}
+	})
+}

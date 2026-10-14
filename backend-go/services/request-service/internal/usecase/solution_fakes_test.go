@@ -164,7 +164,7 @@ func (f fakeRuns) StartRun(ctx context.Context, run domain.AnalysisRun, draft do
 			return StartRunResult{Run: r}, nil
 		}
 	}
-	if run.Mode == domain.AnalysisModeAgentReadonly && opts.MaxAgentRuns > 0 {
+	if run.Mode.IsAgent() && opts.MaxAgentRuns > 0 {
 		n, _ := f.CountRunning(ctx, run.ProjectID, domain.AnalysisModeAgentReadonly)
 		if n >= opts.MaxAgentRuns {
 			return StartRunResult{}, domain.ErrAnalysisBusy()

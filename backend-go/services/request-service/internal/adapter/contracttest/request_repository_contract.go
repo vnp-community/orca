@@ -113,6 +113,7 @@ func RunRequestRepositoryContract(t *testing.T, newEnv func(t *testing.T) Env) {
 		{"UpdateCASConflict", updateCASConflict},
 		{"UpdateNotFound", updateNotFound},
 		{"UpdateSolutionEngineCAS", updateSolutionEngineCAS},
+		{"PinSolutionEngineIfUnset", pinSolutionEngineIfUnset},
 		{"TenantIsolationRead", tenantIsolationRead},
 		{"TenantIsolationUpdate", tenantIsolationUpdate},
 		{"ListKeysetStableUnderInsert", listKeysetStableUnderInsert},
@@ -424,6 +425,29 @@ func updateSolutionEngineCAS(t *testing.T, env Env) {
 	if got.SolutionEngine == nil || *got.SolutionEngine != domain.EngineOpenSpec || got.Version != r.Version+1 {
 		t.Fatalf("engine not persisted: %+v", got)
 	}
+}
+
+// Pinning must not bump the version (callers hold the Request in an open transaction) and must keep the first answer.
+func pinSolutionEngineIfUnset(t *testing.T, env Env) {
+	ctx := CtxForTenant(newTenant())
+	r := createRequest(t, env, ctx, nil)
+	got, err := env.Requests.PinSolutionEngineIfUnset(ctx, r.ID, domain.EngineOpenSpec)
+	if err != nil || got != domain.EngineOpenSpec {
+		t.Fatalf("first pin = %q, %v", got, err)
+	}
+	got, err = env.Requests.PinSolutionEngineIfUnset(ctx, r.ID, domain.EngineNative)
+	if err != nil || got != domain.EngineOpenSpec {
+		t.Fatalf("second pin must keep the first engine, got %q, %v", got, err)
+	}
+	cur, _ := env.Requests.Get(ctx, r.ID)
+	if cur.Version != r.Version || cur.SolutionEngine == nil || *cur.SolutionEngine != domain.EngineOpenSpec {
+		t.Fatalf("version %d -> %d, engine %v", r.Version, cur.Version, cur.SolutionEngine)
+	}
+	_, err = env.Requests.PinSolutionEngineIfUnset(ctx, uuid.NewString(), domain.EngineNative)
+	requireCode(t, err, "REQUEST_NOT_FOUND")
+	other := CtxForTenant(newTenant())
+	_, err = env.Requests.PinSolutionEngineIfUnset(other, r.ID, domain.EngineNative)
+	requireCode(t, err, "REQUEST_NOT_FOUND")
 }
 
 func tenantIsolationRead(t *testing.T, env Env) {

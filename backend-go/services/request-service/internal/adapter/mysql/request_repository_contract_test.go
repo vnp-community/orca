@@ -12,3 +12,8 @@ func TestMySQL_RequestRepositoryContract(t *testing.T) {
 	f := newMigratedMySQL(t)
 	contracttest.RunRequestRepositoryContract(t, func(*testing.T) contracttest.Env { return f.contractEnv() })
 }
+
+func TestMySQL_EngineSettingsContract(t *testing.T) {
+	f := newMigratedMySQL(t)
+	contracttest.RunEngineSettingsContract(t, NewProjectEngineSettingsRepository(New(f.db)))
+}

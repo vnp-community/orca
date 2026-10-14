@@ -105,7 +105,7 @@ func (r *AnalysisRunRepository) StartRun(ctx context.Context, run domain.Analysi
 			res = usecase.StartRunResult{Run: existing}
 			return err
 		}
-		if run.Mode == domain.AnalysisModeAgentReadonly && opts.MaxAgentRuns > 0 {
+		if run.Mode.IsAgent() && opts.MaxAgentRuns > 0 {
 			// MySQL has no partial index to count on: locking the gate row serialises concurrent starts of one project.
 			var locked int
 			if err := db.QueryRowContext(ctx, `SELECT 1 FROM analysis_project_gates WHERE tenant_id = ? AND project_id = ? FOR UPDATE`, tenantID, run.ProjectID).Scan(&locked); err != nil {
@@ -114,7 +114,7 @@ func (r *AnalysisRunRepository) StartRun(ctx context.Context, run domain.Analysi
 			// FOR SHARE makes this a current read: a plain count would reuse the transaction's snapshot and miss
 			// runs another start committed while this one waited for the gate.
 			var running int
-			if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM analysis_runs WHERE tenant_id = ? AND project_id = ? AND mode = 'agent_readonly' AND status = 'running' FOR SHARE`,
+			if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM analysis_runs WHERE tenant_id = ? AND project_id = ? AND mode IN ('agent_readonly', 'agent_proposal') AND status = 'running' FOR SHARE`,
 				tenantID, run.ProjectID).Scan(&running); err != nil {
 				return fmt.Errorf("mysql: count running analyses: %w", err)
 			}
@@ -124,11 +124,11 @@ func (r *AnalysisRunRepository) StartRun(ctx context.Context, run domain.Analysi
 		}
 		// No-op update instead of INSERT IGNORE, which would also swallow CHECK and FK errors.
 		out, err := db.ExecContext(ctx, `INSERT INTO analysis_runs (id, tenant_id, request_id, kind, mode, status, idempotency_key, attempt,
-				lease_owner, lease_expires_at, started_at, solution_id, project_id, actor_id, feedback)
-			VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL ? MICROSECOND), CURRENT_TIMESTAMP(6), ?, ?, ?, ?)
+				lease_owner, lease_expires_at, started_at, solution_id, project_id, actor_id, feedback, engine)
+			VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL ? MICROSECOND), CURRENT_TIMESTAMP(6), ?, ?, ?, ?, ?)
 			ON DUPLICATE KEY UPDATE tenant_id = tenant_id`,
 			run.ID, tenantID, run.RequestID, string(run.Kind), string(run.Mode), ptrArg(run.IdempotencyKey), max(run.Attempt, 1),
-			derefStr(run.LeaseOwner), leaseMicros(opts.LeaseTTL), nullIfEmpty(run.SolutionID), nullIfEmpty(run.ProjectID), nullIfEmpty(run.ActorID), nullIfEmpty(run.Feedback))
+			derefStr(run.LeaseOwner), leaseMicros(opts.LeaseTTL), nullIfEmpty(run.SolutionID), nullIfEmpty(run.ProjectID), nullIfEmpty(run.ActorID), nullIfEmpty(run.Feedback), string(run.Mode.EngineFor()))
 		if err != nil {
 			return fmt.Errorf("mysql: insert analysis run: %w", err)
 		}

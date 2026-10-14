@@ -37,6 +37,7 @@ type GeneratePlan struct {
 	spawner    AnalysisSpawner
 	settings   AnalysisSettings
 	leaseOwner string
+	pin        EnginePinner
 	now        func() time.Time
 	newID      func() string
 }
@@ -53,11 +54,13 @@ type GeneratePlanDeps struct {
 	Spawner    AnalysisSpawner
 	Settings   AnalysisSettings
 	LeaseOwner string
+	// Pin decides the engine of the Request; nil means every Request uses the native engine.
+	Pin EnginePinner
 }
 
 func NewGeneratePlan(d GeneratePlanDeps) *GeneratePlan {
 	return &GeneratePlan{requests: d.Requests, solutions: d.Solutions, runs: d.Runs, conns: d.Conns, auth: d.Auth, approvals: d.Approvals,
-		transition: d.Transition, tx: d.Tx, spawner: d.Spawner, settings: d.Settings.withDefaults(), leaseOwner: d.LeaseOwner,
+		transition: d.Transition, tx: d.Tx, spawner: d.Spawner, settings: d.Settings.withDefaults(), leaseOwner: d.LeaseOwner, pin: d.Pin,
 		now: func() time.Time { return time.Now().UTC() }, newID: uuid.NewString}
 }
 
@@ -84,10 +87,15 @@ func (uc *GeneratePlan) Execute(ctx context.Context, in GeneratePlanInput) (Gene
 		return GeneratePlanResult{}, err
 	}
 	// Resolve the connection before any write: no dev server means no run row at all.
-	if _, err := uc.conns.ResolveForProject(ctx, req.ProjectID); err != nil {
+	conn, err := uc.conns.ResolveForProject(ctx, req.ProjectID)
+	if err != nil {
 		if errors.Is(err, ErrNoDevServer) {
 			return GeneratePlanResult{}, domain.ErrPlanAIUnavailable()
 		}
+		return GeneratePlanResult{}, err
+	}
+	mode, err := uc.modeFor(ctx, req.ID, req.ProjectID, conn)
+	if err != nil {
 		return GeneratePlanResult{}, err
 	}
 
@@ -102,10 +110,14 @@ func (uc *GeneratePlan) Execute(ctx context.Context, in GeneratePlanInput) (Gene
 		}
 		owner := uc.leaseOwner
 		run := domain.AnalysisRun{
-			ID: uc.newID(), TenantID: tenantID, RequestID: cur.ID, Kind: domain.RunKindPlan, Mode: domain.AnalysisModeComplete,
+			ID: uc.newID(), TenantID: tenantID, RequestID: cur.ID, Kind: domain.RunKindPlan, Mode: mode,
 			Status: domain.RunStatusRunning, Attempt: 1, LeaseOwner: &owner, StartedAt: uc.now(), ProjectID: cur.ProjectID, ActorID: actor, Feedback: in.Feedback,
 		}
-		res, err = uc.runs.StartRun(ctx, run, domain.Solution{}, StartRunOptions{LeaseTTL: uc.settings.LeaseTTL})
+		opts := StartRunOptions{LeaseTTL: uc.settings.LeaseTTL}
+		if mode.IsAgent() {
+			opts.MaxAgentRuns = uc.settings.MaxAgentRunsPerProject
+		}
+		res, err = uc.runs.StartRun(ctx, run, domain.Solution{}, opts)
 		if err != nil || !res.Created {
 			return err
 		}
@@ -129,6 +141,29 @@ func (uc *GeneratePlan) Execute(ctx context.Context, in GeneratePlanInput) (Gene
 		uc.spawner.Spawn(res.Run)
 	}
 	return GeneratePlanResult{RunID: res.Run.ID, Created: res.Created}, nil
+}
+
+// modeFor picks how the run executes: the pinned engine decides, and only the openspec engine needs an agent in the repo.
+// Without a pinner every Request keeps the original ai.complete path.
+func (uc *GeneratePlan) modeFor(ctx context.Context, requestID, projectID string, conn AnalysisConnection) (domain.AnalysisMode, error) {
+	if uc.pin == nil {
+		return domain.AnalysisModeComplete, nil
+	}
+	engine, err := uc.pin.Execute(ctx, requestID)
+	if err != nil {
+		return "", err
+	}
+	if engine != domain.EngineOpenSpec {
+		return domain.AnalysisModeComplete, nil
+	}
+	if conn.RepoPath == "" {
+		return "", domain.ErrAnalysisNoRepoPath()
+	}
+	// The gate row serialises the per-project cap on agent runs; it must exist before StartRun counts.
+	if err := uc.runs.EnsureProjectGate(ctx, projectID); err != nil {
+		return "", err
+	}
+	return domain.AnalysisModeAgentProposal, nil
 }
 
 // checkPlannable runs the checks that need no transaction: the type has a Plan, and an approved decision exists

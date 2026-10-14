@@ -39,7 +39,7 @@ type SolutionStore interface {
 
 type StartRunOptions struct {
 	LeaseTTL time.Duration
-	// MaxAgentRuns caps running agent_readonly runs per project; 0 disables the cap.
+	// MaxAgentRuns caps running agent runs (agent_readonly and agent_proposal together) per project; 0 disables the cap.
 	MaxAgentRuns int
 }
 

@@ -46,6 +46,13 @@ type GenerateSolution struct {
 	now        func() time.Time
 	newID      func() string
 	decisions  DecisionSuperseder
+	pin        EnginePinner
+}
+
+// WithEnginePin fixes the Request's engine at its first generation; without it the Request stays unpinned (native).
+func (uc *GenerateSolution) WithEnginePin(p EnginePinner) *GenerateSolution {
+	uc.pin = p
+	return uc
 }
 
 // WithDecisions retires the Decisions of the proposals a regenerate replaces, in the same transaction.
@@ -134,6 +141,11 @@ func (uc *GenerateSolution) start(ctx context.Context, in GenerateSolutionInput,
 	req, kind, mode, err := uc.prepare(ctx, in, system)
 	if err != nil {
 		return GenerateSolutionResult{}, domain.AnalysisRun{}, err
+	}
+	if uc.pin != nil {
+		if _, err := uc.pin.Execute(ctx, req.ID); err != nil {
+			return GenerateSolutionResult{}, domain.AnalysisRun{}, err
+		}
 	}
 	// A system start has no caller, but the dev-server lookup below needs a user (project-service
 	// rejects tenant-only calls): act as the reporter, who the run is attributed to anyway.

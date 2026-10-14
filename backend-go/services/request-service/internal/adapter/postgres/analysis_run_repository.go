@@ -84,14 +84,14 @@ func (r *AnalysisRunRepository) StartRun(ctx context.Context, run domain.Analysi
 			res = usecase.StartRunResult{Run: existing}
 			return err
 		}
-		if run.Mode == domain.AnalysisModeAgentReadonly && opts.MaxAgentRuns > 0 {
+		if run.Mode.IsAgent() && opts.MaxAgentRuns > 0 {
 			// The gate row serialises concurrent starts of one project: count-then-insert would race without it.
 			var locked int
 			if err := db.QueryRow(ctx, `SELECT 1 FROM request.analysis_project_gates WHERE tenant_id = $1 AND project_id = $2 FOR UPDATE`, tenantID, run.ProjectID).Scan(&locked); err != nil {
 				return fmt.Errorf("postgres: lock analysis gate (EnsureProjectGate must run first): %w", err)
 			}
 			var running int
-			if err := db.QueryRow(ctx, `SELECT count(*) FROM request.analysis_runs WHERE tenant_id = $1 AND project_id = $2 AND mode = 'agent_readonly' AND status = 'running'`,
+			if err := db.QueryRow(ctx, `SELECT count(*) FROM request.analysis_runs WHERE tenant_id = $1 AND project_id = $2 AND mode IN ('agent_readonly', 'agent_proposal') AND status = 'running'`,
 				tenantID, run.ProjectID).Scan(&running); err != nil {
 				return fmt.Errorf("postgres: count running analyses: %w", err)
 			}
@@ -100,11 +100,11 @@ func (r *AnalysisRunRepository) StartRun(ctx context.Context, run domain.Analysi
 			}
 		}
 		tag, err := db.Exec(ctx, `INSERT INTO request.analysis_runs (id, tenant_id, request_id, kind, mode, status, idempotency_key, attempt,
-				lease_owner, lease_expires_at, started_at, solution_id, project_id, actor_id, feedback)
-			VALUES ($1, $2, $3, $4, $5, 'running', $6, $7, $8, now() + make_interval(secs => $9), now(), $10, $11, $12, $13)
+				lease_owner, lease_expires_at, started_at, solution_id, project_id, actor_id, feedback, engine)
+			VALUES ($1, $2, $3, $4, $5, 'running', $6, $7, $8, now() + make_interval(secs => $9), now(), $10, $11, $12, $13, $14)
 			ON CONFLICT DO NOTHING`,
 			run.ID, tenantID, run.RequestID, string(run.Kind), string(run.Mode), run.IdempotencyKey, max(run.Attempt, 1),
-			derefString(run.LeaseOwner), opts.LeaseTTL.Seconds(), nullIfEmpty(run.SolutionID), nullIfEmpty(run.ProjectID), nullIfEmpty(run.ActorID), nullIfEmpty(run.Feedback))
+			derefString(run.LeaseOwner), opts.LeaseTTL.Seconds(), nullIfEmpty(run.SolutionID), nullIfEmpty(run.ProjectID), nullIfEmpty(run.ActorID), nullIfEmpty(run.Feedback), string(run.Mode.EngineFor()))
 		if err != nil {
 			return fmt.Errorf("postgres: insert analysis run: %w", err)
 		}
