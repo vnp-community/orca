@@ -161,6 +161,33 @@ func (w *syncWorld) stored() domain.OpenSpecChange {
 	return c
 }
 
+// userSeeingWorkspace records who the context says is acting when the worktree is ensured.
+type userSeeingWorkspace struct {
+	*fakeWorkspace
+	user string
+}
+
+func (w *userSeeingWorkspace) Ensure(ctx context.Context, in EnsureWorkspaceInput) (Workspace, error) {
+	w.user, _ = tenant.UserID(ctx)
+	return w.fakeWorkspace.Ensure(ctx, in)
+}
+
+// The sweep runs with no user, and project-service refuses to list a repo without one (REQUEST_REPORTER_REQUIRED in the pilot).
+func TestTasksMdSyncer_ActsForTheReporterWhenItPreparesTheWorktree(t *testing.T) {
+	w := newSyncWorld(t)
+	w.reqs.req.ReporterID = "user-reporter"
+	spy := &userSeeingWorkspace{fakeWorkspace: w.ws}
+	w.done["task-1"] = true
+	w.build()
+	w.s.Workspace = spy
+	if _, err := w.s.Flush(context.Background(), "req-1"); err != nil {
+		t.Fatal(err)
+	}
+	if spy.user != "user-reporter" {
+		t.Fatalf("the worktree was prepared as %q", spy.user)
+	}
+}
+
 func TestTasksMdSyncer_TicksOnlyDoneTasksInsideThePlanRegion(t *testing.T) {
 	w := newSyncWorld(t)
 	w.done["task-1"] = true

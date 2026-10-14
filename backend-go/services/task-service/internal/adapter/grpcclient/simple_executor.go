@@ -281,6 +281,8 @@ type agentExecPromptParams struct {
 	ResultBlock    *resultBlockParam `json:"resultBlock,omitempty"`
 	ReportChanges  bool              `json:"reportChanges,omitempty"`
 	MaxOutputBytes int               `json:"maxOutputBytes,omitempty"`
+	// TimeoutMs bounds the run on the agent (it clamps to its own ceiling); left out, the agent gives a run five minutes.
+	TimeoutMs int `json:"timeoutMs,omitempty"`
 	// KnowledgeRoot is the project's repository root, where .tdd-agent/ lives; the agent builds the MCP config itself.
 	KnowledgeRoot string `json:"knowledgeRoot,omitempty"`
 }

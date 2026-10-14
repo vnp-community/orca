@@ -17,6 +17,9 @@ import (
 )
 
 const (
+	// contractRunTimeoutMs is how long a task of a Request may run on the agent: it writes code and runs the task's own checks,
+	// which the agent's five minute default for a plain prompt cut off twice in a row and sent the whole Request back to the backlog.
+	contractRunTimeoutMs   = 25 * 60 * 1000
 	contractMaxOutputBytes = 1 << 20
 	// stdoutScanLimit bounds what the parser sees; the block is printed last so only the tail matters.
 	stdoutScanLimit = 2 << 20
@@ -44,6 +47,7 @@ func (o *contractRunOptions) apply(p *agentExecPromptParams) {
 	p.ResultBlock = &resultBlockParam{Nonce: o.nonce}
 	p.ReportChanges = true
 	p.MaxOutputBytes = contractMaxOutputBytes
+	p.TimeoutMs = contractRunTimeoutMs
 }
 
 // relayError marks failures of the relay call itself, as opposed to preparation errors, so the

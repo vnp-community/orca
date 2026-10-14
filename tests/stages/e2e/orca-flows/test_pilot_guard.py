@@ -80,6 +80,12 @@ class PilotGuardTest(unittest.TestCase):
         (self.main / ".DS_Store").write_text("noise")
         self.assertEqual(pg.compare(self.before, self.now()), ([], []))
 
+    def test_a_directory_the_agent_may_create_beside_the_repo_can_be_allowed_by_name(self) -> None:
+        (self.main.parent / "tmp").mkdir()
+        problems, _ = pg.compare(self.before, self.now())
+        self.assertTrue(any("new entries next to the repo" in p for p in problems), problems)
+        self.assertEqual(pg.compare(self.before, self.now(), allow_neighbours=frozenset({"tmp"}))[0], [])
+
     def test_a_worktree_outside_the_allowed_place_is_a_violation(self) -> None:
         elsewhere = Path(self.tmp.name) / "somewhere-else"
         sh(self.main, "worktree", "add", "-q", "-b", "stray", str(elsewhere))

@@ -178,6 +178,9 @@ func (s *TasksMdSyncer) Flush(ctx context.Context, requestID string) (FlushResul
 	if err != nil {
 		return out, err
 	}
+	// The sweep has no user, and project-service and git-gateway want one to list the repo and make the worktree: it acts for
+	// the Request's reporter, whose project this is, as the plan run that wrote the change did.
+	ctx = tenant.WithUserID(ctx, req.ReporterID)
 	if active, err := s.planRunActive(ctx, requestID); err != nil || active {
 		return out, err
 	}

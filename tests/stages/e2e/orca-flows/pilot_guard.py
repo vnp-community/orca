@@ -115,8 +115,9 @@ def allowed_worktree(path: str, before: dict) -> bool:
     return str(p.parent) in parents and any(p.name.startswith(n + "-") for n in names)
 
 
-def compare(before: dict, now: dict, strict: bool = False) -> tuple[list[str], list[str]]:
-    """(violations, growth). strict allows no growth at all: it is the check after cleanup."""
+def compare(before: dict, now: dict, strict: bool = False, allow_neighbours: frozenset[str] = frozenset()) -> tuple[list[str], list[str]]:
+    """(violations, growth). strict allows no growth at all: it is the check after cleanup.
+    allow_neighbours names directories Orca's own tools legitimately create beside the repo (the agent's `tmp/` for MCP configs, in its work dir)."""
     problems: list[str] = []
     growth: list[str] = []
     for label, was, is_ in (("the pilot worktree", before["pilot"], now["pilot"]), ("the main checkout", before["main_checkout"], now["main_checkout"])):
@@ -162,7 +163,7 @@ def compare(before: dict, now: dict, strict: bool = False) -> tuple[list[str], l
     grown_dirs = {Path(w).name for w in new_worktrees}
     for parent, was_list in before["neighbours"].items():
         now_list = now["neighbours"].get(parent, [])
-        gained = [n for n in now_list if n not in was_list and n not in grown_dirs]
+        gained = [n for n in now_list if n not in was_list and n not in grown_dirs and n not in allow_neighbours]
         lost = [n for n in was_list if n not in now_list]
         if gained:
             problems.append(f"new entries next to the repo in {parent}: {', '.join(gained[:8])}")
@@ -245,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name)
         p.add_argument("--before", required=True)
         p.add_argument("--strict", action="store_true", help="after cleanup: no growth is allowed")
+        p.add_argument("--allow-neighbour", action="append", default=[], help="a directory the agent may create next to the repo, e.g. tmp")
         if name != "orca-compare":
             p.add_argument("--repo", required=True)
         if name == "watch":
@@ -267,9 +269,9 @@ def main(argv: list[str] | None = None) -> int:
         return report(problems, [])
     before = read_json(args.before)
     if args.cmd == "compare":
-        return report(*compare(before, snapshot(args.repo), args.strict))
+        return report(*compare(before, snapshot(args.repo), args.strict, frozenset(args.allow_neighbour)))
     while True:  # watch
-        problems, growth = compare(before, snapshot(args.repo), args.strict)
+        problems, growth = compare(before, snapshot(args.repo), args.strict, frozenset(args.allow_neighbour))
         if problems:
             print(f"[{time.strftime('%H:%M:%S')}] the repo of the user changed: stop the run", file=sys.stderr)
             return report(problems, growth)

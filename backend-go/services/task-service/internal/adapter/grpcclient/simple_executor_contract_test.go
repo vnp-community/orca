@@ -75,6 +75,10 @@ func TestExecuteWithContract_SendsResultBlockAndReportChanges(t *testing.T) {
 	if sent.Prompt != "implement it" || sent.TrustPreset != "full" {
 		t.Fatalf("prompt/trust: %+v", sent)
 	}
+	// Left out, the agent cuts a run at five minutes: two such timeouts sent a whole Request back to the backlog in the pilot.
+	if sent.TimeoutMs != 25*60*1000 {
+		t.Fatalf("a contract run needs time to write code and run its checks: timeoutMs = %d", sent.TimeoutMs)
+	}
 }
 
 func TestExecuteWithContract_RequiresRequestPrefix(t *testing.T) {
