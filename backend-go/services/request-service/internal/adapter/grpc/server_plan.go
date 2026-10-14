@@ -53,7 +53,8 @@ func (s *Server) GetPlanProposal(ctx context.Context, req *requestv1.GetPlanProp
 		out.Proposal = toProtoPlanProposal(*v.Proposal)
 	}
 	if v.Bundle != nil {
-		b := &requestv1.PlanBundle{ChangeId: v.Bundle.ChangeID, Branch: v.Bundle.Branch, Commit: v.Bundle.Commit, TasksMdDigest: v.Bundle.TasksMDDigest}
+		b := &requestv1.PlanBundle{ChangeId: v.Bundle.ChangeID, Branch: v.Bundle.Branch, Commit: v.Bundle.Commit, TasksMdDigest: v.Bundle.TasksMDDigest,
+			Status: v.Bundle.Status, SyncState: v.Bundle.SyncState, SyncError: v.Bundle.SyncError, SyncAttempts: int32(v.Bundle.SyncAttempts)}
 		for _, f := range v.Bundle.Files {
 			b.Files = append(b.Files, &requestv1.PlanBundleFile{Path: f.Path, Size: f.Size, Omitted: f.Omitted})
 		}

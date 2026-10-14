@@ -82,6 +82,14 @@ message PlanBundle {
   string commit = 3;
   string tasks_md_digest = 4;
   repeated PlanBundleFile files = 5;
+  // preparing | ready | archived | abandoned. After the Request completes the archive step moves it to archived; commit is then the
+  // last commit on the proposal branch, the archive's.
+  string status = 6;
+  // in_sync | pending | failed: whether tasks.md has caught up with the Plan and the archive step is not stuck. A failed one gave up
+  // after sync_attempts tries and shows sync_error; the Request stays completed.
+  string sync_state = 7;
+  string sync_error = 8;
+  int32 sync_attempts = 9;
 }
 
 message PlanBundleFile {

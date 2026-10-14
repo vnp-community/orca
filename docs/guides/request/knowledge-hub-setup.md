@@ -67,6 +67,10 @@ Kiểm tra mồ côi: `python3 tests/stages/e2e/orca-flows/report_orphan_worktre
 
 Orca **không bao giờ** áp thay đổi vào đồ thị tri thức (quyết định T1.7): agent chỉ sửa tài liệu thiết kế trong worktree của task và gọi `changeset_propose` (chạy thử, không commit). `orca request show` cho thấy báo cáo của các agent: tài liệu đã đổi, `proposal_id`, ok hay không, số phần tử bị chạm, và (khi Request `completed`) danh sách việc còn lại cho người. Một người áp đề xuất và chạy `tdd-agent -C <repo> generate`.
 
+### Bàn giao khi Request hoàn thành
+
+`orca request show <id>` (thêm `--json` cho script, khoá `handover.items[]` với `kind`, `text`, `command`) in những việc còn lại cho người, hoặc ghi rõ không còn gì: worktree của các task (kiểm xem đã hợp nhất chưa), nhánh proposal và trạng thái archive (`archived` ⇒ gợi ý `git merge`; archive thử 5 lần vẫn lỗi ⇒ cảnh báo kèm lệnh `openspec archive <id> --yes` để chạy tay, Request vẫn `completed`), đề xuất ChangeSet và tài liệu đã đổi, xung đột Decision/Constraint mà Solution đã duyệt báo. Các lệnh chỉ là gợi ý, Orca không chạy.
+
 Đo nợ duyệt trước và sau mỗi lần áp hay `generate` (Orca không đọc KG nên số liệu do chính tdd-agent in):
 
 ```bash

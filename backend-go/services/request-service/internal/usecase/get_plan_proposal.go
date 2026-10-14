@@ -33,7 +33,11 @@ type PlanProposalView struct {
 // PlanBundleView names the authored OpenSpec change behind a Plan.
 type PlanBundleView struct {
 	ChangeID, Branch, Commit, TasksMDDigest string
-	Files                                   []PlanBundleFileView
+	// Status is the change's own (preparing, ready, archived, abandoned); SyncState, SyncError and SyncAttempts say how the
+	// tasks.md sync and the archive step are doing.
+	Status, SyncState, SyncError string
+	SyncAttempts                 int
+	Files                        []PlanBundleFileView
 }
 
 type PlanBundleFileView struct {
@@ -116,7 +120,8 @@ func (uc *GetPlanProposal) addChange(ctx context.Context, view *PlanProposalView
 	if !found {
 		return nil
 	}
-	b := &PlanBundleView{ChangeID: c.ChangeID, Branch: c.Branch, Commit: c.Commit, TasksMDDigest: c.TasksMDDigest}
+	b := &PlanBundleView{ChangeID: c.ChangeID, Branch: c.Branch, Commit: c.Commit, TasksMDDigest: c.TasksMDDigest,
+		Status: string(c.Status), SyncState: string(c.SyncState), SyncError: c.SyncError, SyncAttempts: c.SyncAttempts}
 	paths := make([]string, 0, len(c.Bundle))
 	for p := range c.Bundle {
 		paths = append(paths, p)

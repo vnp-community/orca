@@ -49,13 +49,15 @@ Khi Request `completed` và gói còn `ready`: chạy `openspec archive <id> --y
 | RPC | Kênh | REST | CLI |
 |---|---|---|---|
 | `Get/SetProjectEngineSettings` | `request.engineSettings`, `request.engineSettingsSet` (chỉ admin) | `GET/PUT /v1/projects/{id}/request-engine?check=true` | `orca engine show [--check]`, `engine set` |
-| `GetPlanProposal` (thêm `engine`, `bundle`, `checks`, `knowledge`, `stats`, `elapsed_ms`) | `request.planProposal` | `GET /v1/requests/{id}/plan[/bundle]` | `orca plan proposal`, `plan bundle [--file]` |
+| `GetPlanProposal` (thêm `engine`, `bundle` kèm `status`, `sync_state`, `sync_error`, `sync_attempts`, `checks`, `knowledge`, `stats`, `elapsed_ms`) | `request.planProposal` | `GET /v1/requests/{id}/plan[/bundle]` | `orca plan proposal`, `plan bundle [--file]` |
 | `GetPlanBundleFile` | `request.planBundleFile` | `GET /v1/requests/{id}/plan/bundle/file?path=` | `plan bundle --file` |
 | `CleanupRequestProposal` | `request.cleanupProposal` | `POST /v1/requests/{id}/proposal/cleanup` | `orca request cleanup` |
 | `ListSolutions` (run thêm `engine`, `stats`) | `solution.list` | `GET /v1/requests/{id}/solutions` | `solution list`, `request show` |
 | (task-service) kết quả lượt chạy | `execution.get` (thêm `knowledge`, `writeback`) | `GET /v1/tasks/{id}/execution` | `orca plan result <task-id>` |
 
 Kênh mới đều **ngoài** công cụ MCP (`excluded_channels.yaml`). `orca engine set` cần token có `role=admin`; token của `orca login` hiện chưa mang role, dùng phiên web (xem README orca-cli).
+
+**Bàn giao (T3.4).** `orca request show` tính ở phía CLI, chỉ khi Request `completed`, từ `GET /v1/tasks/{plan}/subtree` (worktree của task), `GetPlanProposal.bundle` (nhánh, trạng thái archive/đồng bộ), `GET /v1/tasks/{plan}/writebacks` và `design_references.conflicts` của Solution `approved`; `--json` mang `handover{items[{kind,text,command}],nothingLeft}`. Không có hành động tự động; `command` chỉ là gợi ý. Sau archive `bundle.commit` là commit cuối trên nhánh proposal (của archive), `bundle.status=archived`; file của gói vẫn đọc được từ bản lưu.
 
 ## 7. Cơ sở dữ liệu (cả Postgres và MySQL)
 
@@ -89,4 +91,4 @@ Kênh mới đều **ngoài** công cụ MCP (`excluded_channels.yaml`). `orca e
 
 ## 11. Chưa làm
 
-Giai đoạn 3 còn lại (danh sách bàn giao khi hoàn thành: T3.4 phần trạng thái archive/đồng bộ); Giai đoạn 4 (e2e ba bước trên pilot, cài skill toàn cục, bật cờ cho pilot); web UI (nhãn engine, `design_references`, thống kê run: T5.4); ghi `skill_hash` vào run của Solution bằng agent (chỉ có ở change OpenSpec); token CLI mang `role`.
+Giai đoạn 4 (e2e ba bước trên pilot, cài skill toàn cục, bật cờ cho pilot); web UI (nhãn engine, `design_references`, thống kê run: T5.4); ghi `skill_hash` vào run của Solution bằng agent (chỉ có ở change OpenSpec); token CLI mang `role`.

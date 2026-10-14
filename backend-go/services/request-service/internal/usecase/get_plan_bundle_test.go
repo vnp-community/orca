@@ -130,3 +130,17 @@ func TestGetPlanBundleFile_AnOmittedFileSaysSo(t *testing.T) {
 		t.Fatalf("%+v %v", f, err)
 	}
 }
+
+func TestGetPlanProposal_BundleSaysHowTheSyncAndTheArchiveAreDoing(t *testing.T) {
+	k, run, changes := openspecProposalKit(t, AgentReport{})
+	c, _, _ := changes.GetByRequest(k.w.ctx(), run.RequestID)
+	c.Status, c.SyncState, c.SyncError, c.SyncAttempts = domain.ChangeStatusReady, domain.SyncStateFailed, "openspec archive exited with code 1", domain.MaxSyncAttempts
+	if _, err := changes.Upsert(k.w.ctx(), c); err != nil {
+		t.Fatal(err)
+	}
+	v, err := NewGetPlanProposal(k.w, fakeRuns{k.w}).WithChanges(changes).Execute(k.w.ctx(), run.RequestID, run.ID)
+	if err != nil || v.Bundle == nil || v.Bundle.Status != "ready" || v.Bundle.SyncState != "failed" || v.Bundle.SyncAttempts != domain.MaxSyncAttempts ||
+		!strings.Contains(v.Bundle.SyncError, "exited with code 1") {
+		t.Fatalf("%+v %v", v.Bundle, err)
+	}
+}

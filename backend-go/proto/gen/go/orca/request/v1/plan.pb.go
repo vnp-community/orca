@@ -578,6 +578,14 @@ type PlanBundle struct {
 	Commit        string                 `protobuf:"bytes,3,opt,name=commit,proto3" json:"commit,omitempty"`
 	TasksMdDigest string                 `protobuf:"bytes,4,opt,name=tasks_md_digest,json=tasksMdDigest,proto3" json:"tasks_md_digest,omitempty"`
 	Files         []*PlanBundleFile      `protobuf:"bytes,5,rep,name=files,proto3" json:"files,omitempty"`
+	// preparing | ready | archived | abandoned. After the Request completes the archive step moves it to archived; commit is then the
+	// last commit on the proposal branch, the archive's.
+	Status string `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	// in_sync | pending | failed: whether tasks.md has caught up with the Plan and the archive step is not stuck. A failed one gave up
+	// after sync_attempts tries and shows sync_error; the Request stays completed.
+	SyncState     string `protobuf:"bytes,7,opt,name=sync_state,json=syncState,proto3" json:"sync_state,omitempty"`
+	SyncError     string `protobuf:"bytes,8,opt,name=sync_error,json=syncError,proto3" json:"sync_error,omitempty"`
+	SyncAttempts  int32  `protobuf:"varint,9,opt,name=sync_attempts,json=syncAttempts,proto3" json:"sync_attempts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -645,6 +653,34 @@ func (x *PlanBundle) GetFiles() []*PlanBundleFile {
 		return x.Files
 	}
 	return nil
+}
+
+func (x *PlanBundle) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *PlanBundle) GetSyncState() string {
+	if x != nil {
+		return x.SyncState
+	}
+	return ""
+}
+
+func (x *PlanBundle) GetSyncError() string {
+	if x != nil {
+		return x.SyncError
+	}
+	return ""
+}
+
+func (x *PlanBundle) GetSyncAttempts() int32 {
+	if x != nil {
+		return x.SyncAttempts
+	}
+	return 0
 }
 
 type PlanBundleFile struct {
@@ -1873,14 +1909,20 @@ const file_orca_request_v1_plan_proto_rawDesc = "" +
 	" \x01(\v2\x1e.orca.request.v1.PlanKnowledgeR\tknowledge\x12/\n" +
 	"\x05stats\x18\v \x01(\v2\x19.orca.request.v1.RunStatsR\x05stats\x12\x1d\n" +
 	"\n" +
-	"elapsed_ms\x18\f \x01(\x03R\telapsedMs\"\xb8\x01\n" +
+	"elapsed_ms\x18\f \x01(\x03R\telapsedMs\"\xb3\x02\n" +
 	"\n" +
 	"PlanBundle\x12\x1b\n" +
 	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x16\n" +
 	"\x06commit\x18\x03 \x01(\tR\x06commit\x12&\n" +
 	"\x0ftasks_md_digest\x18\x04 \x01(\tR\rtasksMdDigest\x125\n" +
-	"\x05files\x18\x05 \x03(\v2\x1f.orca.request.v1.PlanBundleFileR\x05files\"R\n" +
+	"\x05files\x18\x05 \x03(\v2\x1f.orca.request.v1.PlanBundleFileR\x05files\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"sync_state\x18\a \x01(\tR\tsyncState\x12\x1d\n" +
+	"\n" +
+	"sync_error\x18\b \x01(\tR\tsyncError\x12#\n" +
+	"\rsync_attempts\x18\t \x01(\x05R\fsyncAttempts\"R\n" +
 	"\x0ePlanBundleFile\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x18\n" +

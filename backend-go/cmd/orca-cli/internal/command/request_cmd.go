@@ -88,12 +88,18 @@ func newRequestShowCmd(e flowEnv) *cobra.Command {
 				}
 				// What the agent runs of this Request did is part of knowing where it stands; a failed read must not hide the Request.
 				if solutions, serr := cli.ListSolutions(ctx, args[0], nil); serr == nil {
-					doc["analysisRuns"] = solutions["runs"]
+					doc["analysisRuns"], doc["solutions"] = solutions["runs"], solutions["solutions"]
 				}
 				if plan := doc.Str("request", "planTaskId"); plan != "" {
 					if wb, werr := cli.GetPlanWritebacks(ctx, plan); werr == nil {
 						doc["writebacks"] = wb
 					}
+					if doc.Str("request", "status") == "completed" {
+						readHandoverFacts(ctx, cli, doc, args[0], plan)
+					}
+				}
+				if doc.Str("request", "status") == "completed" {
+					attachHandover(doc)
 				}
 				return doc, nil
 			}, renderRequestShow)
