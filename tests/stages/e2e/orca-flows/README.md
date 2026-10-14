@@ -203,6 +203,26 @@ python3 -m unittest tests/stages/e2e/orca-flows/test_agent_push_block.py        
 
 An toàn (mọi spec `deepseek-*`): checkout chính, mọi ref, worktree của người dùng và thư mục cạnh repo được lấy dấu vân tay, so mỗi 15 giây và sau dọn dẹp; `git push` bị chặn bằng `GIT_CONFIG_*` trong môi trường agent (agent khởi động lại cho run rồi khôi phục); fixture từ chối chạy nếu khối chặn chưa có. Không cài được hook `tool-guard` trong repo này (`.claude/settings.json` bị `.gitignore`), nên agent vẫn chạy `--dangerously-skip-permissions` không sandbox (B4): các biện pháp trên PHÁT HIỆN và DỪNG, không NGĂN mọi ghi ngoài worktree.
 
+## Bảo vệ repo của người dùng khi chạy thật (pilot, `pilot_guard.py`)
+
+Dùng cho mọi repo của người dùng mà agent thật làm việc trên đó (pilot vnp-qa-platform), không phụ thuộc deepseek-harness. Quy tắc lấy từ `ui-live/live-main-checkout-rules.ts`: Orca chỉ được thêm nhánh `refs/heads/*` và worktree `<repo>-*` cạnh repo; đổi HEAD, tệp, cấu hình git cục bộ, ref đã có, tag, stash, worktree của người dùng đều là vi phạm (ref `refs/remotes/*` được phép dịch chuyển vì tạo worktree có fetch).
+
+```bash
+python3 agent_push_block.py start            # khởi động lại agent với khối chặn push; in "push block ON" cho từng tiến trình agent
+python3 agent_push_block.py probe --repo <repo>   # mọi dạng git push --dry-run phải thất bại cục bộ
+python3 pilot_guard.py snapshot --repo <repo> --out before.json
+python3 pilot_guard.py orca-snapshot --out orca-before.json     # project và Request của người dùng trong Orca
+python3 pilot_guard.py watch --repo <repo> --before before.json --interval 15   # thoát 1 khi repo của người dùng đổi
+# ... chạy ...
+python3 pilot_guard.py compare --repo <repo> --before before.json              # trong lúc chạy: chỉ cho phép phần Orca được thêm
+python3 pilot_guard.py compare --repo <repo> --before before.json --strict     # sau khi dọn: phải như trước
+python3 pilot_guard.py orca-compare --before orca-before.json --allow-project <id của project pilot> --strict
+python3 report_orphan_requests.py; python3 report_orphan_worktrees.py --repo <repo>
+python3 agent_push_block.py restore          # trả agent về như cũ
+```
+
+Biện pháp này phát hiện và dừng, không ngăn mọi thao tác ghi ngoài worktree (rủi ro B4). Test: `python3 -m unittest tests/stages/e2e/orca-flows/test_pilot_guard.py`.
+
 ## Bốn trạng thái kết quả
 
 | Trạng thái | Nghĩa |

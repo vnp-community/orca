@@ -15,9 +15,9 @@
 | 1. Kiểm chứng (không sửa Orca) | 9 | 9 | **go/no-go T1.9** |
 | 2. Orca: engine, agent, kiểm cấu trúc | 15 | 15 | test xanh, cờ tắt = hành vi cũ |
 | 3. Hoàn tất và ghi ngược | 5 | 5 | đồng bộ, archive, bàn giao |
-| 4. e2e ba bước trên CR thật | 8 | 0 | nghiệm thu SOL-002 mục 5 |
+| 4. e2e ba bước trên CR thật | 8 | 1 | nghiệm thu SOL-002 mục 5 |
 | 5. Củng cố | 4 | 0 | báo cáo bảo mật, quyết định |
-| **Tổng** | **46** | **34** |
+| **Tổng** | **46** | **35** |
 
 **Phụ thuộc:** G0 → G1 → (go) → G2 → G3 → G4 → G5. Trong G1: T1.4 chặn T2.9; T1.5 chặn T2.4, T2.5; T1.7 chặn T3.1; T1.8 chặn T2.6. Trong G2: T2.1 và T2.2 trước T2.4; T2.3 trước T2.4; T2.4 trước T2.5, T2.6, T2.7.
 
@@ -82,7 +82,7 @@ Chạy bằng `claude --print` trong một **bản sao thử** của worktree pi
 
 Điều kiện vào: T1.9 đạt; Giai đoạn 2 xong và deploy lên stack local; T0.3, T0.5 xong; (Giai đoạn 3 cho mục ghi-ngược).
 
-- [ ] **T4.1** An toàn: khởi động lại agent với khối chặn push (`agent_push_block.py`); dấu vân tay thư mục chính và worktree pilot (HEAD, nhánh, file đổi/untracked theo hash, mọi ref, danh sách worktree) và ảnh chụp dữ liệu người dùng trong Orca trước/sau; watchdog giữa run. Xong khi: `git push --dry-run` trong worktree pilot thất bại cục bộ; script lặp được. Chi tiết: [TASK-TDD-002-T4-01-pilot-safety-harness.md](TASK-TDD-002-T4-01-pilot-safety-harness.md).
+- [x] **T4.1** An toàn: khởi động lại agent với khối chặn push (`agent_push_block.py`); dấu vân tay thư mục chính và worktree pilot (HEAD, nhánh, file đổi/untracked theo hash, mọi ref, danh sách worktree) và ảnh chụp dữ liệu người dùng trong Orca trước/sau; watchdog giữa run. Xong khi: `git push --dry-run` trong worktree pilot thất bại cục bộ; script lặp được. Chi tiết: [TASK-TDD-002-T4-01-pilot-safety-harness.md](TASK-TDD-002-T4-01-pilot-safety-harness.md). **Kết quả (2026-10-14):** Mới `pilot_guard.py` (`snapshot|compare [--strict]|watch|orca-snapshot|orca-compare`, dùng cho repo bất kỳ, quy tắc theo `live-main-checkout-rules.ts`) với 7 test trên repo tạm (không đổi, nhánh/worktree được phép, mọi thay đổi bị cấm, worktree ngoài chỗ cho phép, fetch, hash nội dung, dữ liệu Orca); `agent_push_block.py` thêm `start|status|restore|probe`. Chạy thật: agent `dev-local-mac` khởi động lại với khối chặn (`ps eww`: push block ON ở mọi tiến trình agent) và `probe` trên worktree pilot: cả bốn dạng push (origin, scp, ssh://, https) thất bại cục bộ. Ảnh chụp trước: worktree pilot (HEAD 18d68d01, nhánh feat/tdd-agent-bl-h01-h02, sạch) và Orca (8 project, 1232 Request). Tài liệu ở README của orca-flows. Agent giữ khối chặn đến T4.8.
 - [ ] **T4.2** **Bước 1:** vào worktree pilot, `git status` sạch, nhánh đúng. **Bước 2:** `tdd-agent -C <worktree> generate` (KG "up to date", số liệu khớp T0.1), `mcp enable --read-only`. Xong khi: ghi HEAD, snapshot, số phần tử. Chi tiết: [TASK-TDD-002-T4-02-steps-1-2-worktree-and-kg.md](TASK-TDD-002-T4-02-steps-1-2-worktree-and-kg.md).
 - [ ] **T4.3** Đăng ký vnp-qa-platform thành project Orca (repo = đường dẫn worktree pilot, dev server `dev-local-mac`), bật cờ engine `openspec` và Solution bằng agent. Xong khi: `orca request create` và `classify` chạy được; `Preflight` báo đủ. Chi tiết: [TASK-TDD-002-T4-03-register-project-and-enable-flags.md](TASK-TDD-002-T4-03-register-project-and-enable-flags.md).
 - [ ] **T4.4** **Bước 3, BL-H01:** `request create` (body từ CR) → `classify` → `confirm-type change_request --size L` → `solution generate --wait` → `choose` → duyệt → `plan generate --wait` (OpenSpec) → duyệt Plan (đọc gói) → từng Phase → `completed`. Xong khi: tiêu chí SOL-002 mục 5 (1 đến 6). Chi tiết: [TASK-TDD-002-T4-04-step-3-bl-h01-end-to-end.md](TASK-TDD-002-T4-04-step-3-bl-h01-end-to-end.md).
