@@ -79,6 +79,26 @@ func TestCreateWorktree_ThreadsLineageThroughToRecordWorktreeCreated(t *testing.
 	}
 }
 
+// BR-CLI-01: the key must be stored with the record, or FindWorktreeByIdempotencyKey can never find it and the second call
+// of the same key tries `git worktree add` again and is refused with WORKTREE_PATH_EXISTS.
+func TestCreateWorktree_StoresTheIdempotencyKeyWithTheRecord(t *testing.T) {
+	reachability := &fakeDevServerReachability{allowLocal: true}
+	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
+	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{URL: "/repo"}, recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"}}
+	uc := NewCreateWorktree(reachability, projects, local, &fakeGitExecutor{})
+
+	lineage := domain.WorktreeLineageCapture{Origin: "orchestration"}
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{
+		ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main", IdempotencyKey: "request-proposal:r1", Lineage: lineage,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if projects.gotRecordCreatedLineage.IdempotencyKey != "request-proposal:r1" || projects.gotRecordCreatedLineage.Origin != "orchestration" {
+		t.Errorf("the key and the lineage must both reach the record: %+v", projects.gotRecordCreatedLineage)
+	}
+}
+
 func TestCreateWorktree_BookkeepingFails_CompensatesByRemovingWorktree(t *testing.T) {
 	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}

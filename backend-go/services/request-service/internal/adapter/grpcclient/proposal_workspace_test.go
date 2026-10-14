@@ -164,6 +164,27 @@ func TestProposalWorkspace_EnsureRecreatesAWorktreeThatWasRemoved(t *testing.T) 
 	}
 }
 
+// A worktree created before the gateway stored the idempotency key has no record to find by key: creating it again is refused
+// because its path is taken, and the project's records say which worktree holds the branch.
+func TestProposalWorkspace_EnsureFindsTheWorktreeAnOlderRecordHolds(t *testing.T) {
+	g := newFakeProposalGit()
+	g.createErr = status.Error(codes.AlreadyExists, `WORKTREE_PATH_EXISTS: path already exists; try "request-42-proposal"`)
+	projects := &fakeProjects{repos: []*projectv1.Repo{oneRepo}, worktrees: []*projectv1.Worktree{
+		{Id: "wt-other", Path: "/srv/other", Branch: "feature/x", RepoId: "repo-1", Active: true},
+		{Id: "wt-removed", Path: "/srv/old", Branch: "request/42-proposal", RepoId: "repo-1", Active: false},
+		{Id: "wt-live", Path: "/srv/repo-request-42-proposal", Branch: "request/42-proposal", RepoId: "repo-1", Active: true},
+	}}
+	w := NewProposalWorkspace(g, projects)
+	ws, err := w.Ensure(ctxWithIdentity(), ensureIn())
+	if err != nil || ws.WorktreeID != "wt-live" || ws.Path != "/srv/repo-request-42-proposal" || ws.Branch != "request/42-proposal" {
+		t.Fatalf("%+v %v", ws, err)
+	}
+	projects.worktrees = nil
+	if _, err := w.Ensure(ctxWithIdentity(), ensureIn()); err == nil || !strings.Contains(err.Error(), "no record of this Request's branch") {
+		t.Fatalf("a taken path with no record is a failure, not a guess: %v", err)
+	}
+}
+
 func TestProposalWorkspace_EnsureRefusals(t *testing.T) {
 	w, _ := wsKit(oneRepo)
 	for name, in := range map[string]usecase.EnsureWorkspaceInput{

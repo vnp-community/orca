@@ -494,6 +494,9 @@ type WorktreeLineageCapture struct {
 	LinkedIssueRef          string
 	// LinkedIssueSite disambiguates LinkedIssueRef across Jira sites; empty = unknown.
 	LinkedIssueSite string
+	// IdempotencyKey is not lineage: it is the caller's BR-CLI-01 dedupe key, carried here so project-service stores it with the
+	// record and a second CreateWorktree with the same key finds that record. Without it the lookup never matched.
+	IdempotencyKey string
 }
 
 // ResolvedBase is PrefetchCreateBase/ResolvePrBase/ResolveMrBase's answer:

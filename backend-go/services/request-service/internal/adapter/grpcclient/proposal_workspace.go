@@ -51,6 +51,14 @@ func (w *ProposalWorkspace) Ensure(ctx context.Context, in usecase.EnsureWorkspa
 	branch := proposalBranch(in.RequestNumber)
 	key := "request-proposal:" + in.RequestID
 	ws, err := w.create(tctx, in.ProjectID, repoID, branch, base.GetRef(), key)
+	if errors.Is(err, errProposalWorktreeExists) {
+		// A worktree made before the gateway stored the key with its record has nothing to find by key; the project's own
+		// records still say which worktree holds this Request's branch.
+		var found bool
+		if ws, found, err = w.existingFor(ctx, in.ProjectID, repoID, branch, base.GetRef()); err == nil && !found {
+			err = fmt.Errorf("%w: could not create the proposal worktree: its path exists but no record of this Request's branch was found", domain.ErrOpenSpecAgentFailed)
+		}
+	}
 	if err != nil {
 		return usecase.Workspace{}, err
 	}
@@ -65,14 +73,38 @@ func (w *ProposalWorkspace) Ensure(ctx context.Context, in usecase.EnsureWorkspa
 	return ws, nil
 }
 
+// errProposalWorktreeExists says git-gateway refused to create the worktree because its path is already taken.
+var errProposalWorktreeExists = errors.New("the proposal worktree path already exists")
+
 func (w *ProposalWorkspace) create(ctx context.Context, projectID, repoID, branch, baseRef, key string) (usecase.Workspace, error) {
 	resp, err := w.git.CreateWorktree(ctx, &gitgatewayv1.CreateWorktreeRequest{
 		ProjectId: projectID, RepoId: repoID, Branch: branch, BaseRef: baseRef, IdempotencyKey: &key,
 	})
 	if err != nil {
+		if status.Code(err) == codes.AlreadyExists {
+			return usecase.Workspace{}, errProposalWorktreeExists
+		}
 		return usecase.Workspace{}, mapWorkspaceError("create the proposal worktree", err)
 	}
 	return usecase.Workspace{WorktreeID: resp.GetWorktreeId(), Path: resp.GetPath(), Branch: branch, BaseRef: baseRef}, nil
+}
+
+// existingFor finds the active worktree project-service has recorded for the Request's proposal branch on this repo.
+func (w *ProposalWorkspace) existingFor(ctx context.Context, projectID, repoID, branch, baseRef string) (usecase.Workspace, bool, error) {
+	pctx, err := withIdentityMetadata(ctx)
+	if err != nil {
+		return usecase.Workspace{}, false, err
+	}
+	resp, err := w.projects.ListWorktrees(pctx, &projectv1.ListWorktreesRequest{ProjectId: projectID})
+	if err != nil {
+		return usecase.Workspace{}, false, mapWorkspaceError("list the project's worktrees", err)
+	}
+	for _, wt := range resp.GetWorktrees() {
+		if wt.GetActive() && wt.GetBranch() == branch && (wt.GetRepoId() == repoID || wt.GetRepoId() == "") {
+			return usecase.Workspace{WorktreeID: wt.GetId(), Path: wt.GetPath(), Branch: branch, BaseRef: baseRef}, true, nil
+		}
+	}
+	return usecase.Workspace{}, false, nil
 }
 
 // repoFor takes the repo the caller named, else the project's default one (lowest position): the repo tasks execute on,

@@ -160,7 +160,9 @@ func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (
 	// in.ProjectID: no real caller ever sends project_id on this RPC (the
 	// frontend's worktree.create only ever sends repo/name/baseBranch), so
 	// trusting it left bookkeeping recorded under an empty project id.
-	worktree, err := uc.projects.RecordWorktreeCreated(ctx, repo.ProjectID, in.RepoID, result.Path, in.Branch, in.BaseRef, in.Lineage)
+	lineage := in.Lineage
+	lineage.IdempotencyKey = in.IdempotencyKey // stored with the record so the next call with the key finds it (BR-CLI-01)
+	worktree, err := uc.projects.RecordWorktreeCreated(ctx, repo.ProjectID, in.RepoID, result.Path, in.Branch, in.BaseRef, lineage)
 	if err != nil {
 		// Compensating step (05-data-architecture.md's saga pattern) — the
 		// git op already succeeded; project-service has no record of it.

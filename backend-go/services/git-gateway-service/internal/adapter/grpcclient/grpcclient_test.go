@@ -1779,6 +1779,13 @@ type fakeProjectServiceClient struct {
 
 	getRepoResp *projectv1.GetRepoResponse
 	getRepoErr  error
+
+	recordedWorktree *projectv1.RecordWorktreeCreatedRequest
+}
+
+func (f *fakeProjectServiceClient) RecordWorktreeCreated(ctx context.Context, in *projectv1.RecordWorktreeCreatedRequest, _ ...grpc.CallOption) (*projectv1.RecordWorktreeCreatedResponse, error) {
+	f.recordedWorktree = in
+	return &projectv1.RecordWorktreeCreatedResponse{Worktree: &projectv1.Worktree{Id: "wt-1", Path: in.GetPath()}}, nil
 }
 
 func (f *fakeProjectServiceClient) GetRepo(ctx context.Context, in *projectv1.GetRepoRequest, _ ...grpc.CallOption) (*projectv1.GetRepoResponse, error) {
@@ -1836,5 +1843,26 @@ func TestGitGatewayRelay_NoHiddenTargetID_UnchangedBehavior(t *testing.T) {
 	}
 	if info.HiddenTargetID != "" {
 		t.Errorf("expected empty HiddenTargetID for an ordinary repo, got %q", info.HiddenTargetID)
+	}
+}
+
+// BR-CLI-01: the caller's idempotency key must reach project-service with the record; before, it was dropped and the lookup by key
+// never matched.
+func TestProjectClient_RecordWorktreeCreatedSendsTheIdempotencyKey(t *testing.T) {
+	fake := &fakeProjectServiceClient{}
+	client := NewProjectClient(fake)
+
+	_, err := client.RecordWorktreeCreated(ctxWithTenant(t), "proj-1", "repo-1", "/repo-x", "x", "main", domain.WorktreeLineageCapture{IdempotencyKey: "request-proposal:r1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.recordedWorktree.GetIdempotencyKey() != "request-proposal:r1" {
+		t.Errorf("idempotency key = %q", fake.recordedWorktree.GetIdempotencyKey())
+	}
+	if _, err := client.RecordWorktreeCreated(ctxWithTenant(t), "proj-1", "repo-1", "/repo-y", "y", "main", domain.WorktreeLineageCapture{}); err != nil {
+		t.Fatal(err)
+	}
+	if fake.recordedWorktree.IdempotencyKey != nil {
+		t.Errorf("no key must stay unset on the wire, got %q", fake.recordedWorktree.GetIdempotencyKey())
 	}
 }

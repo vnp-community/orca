@@ -85,6 +85,7 @@ func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, re
 	req.OrchestrationRunId = nonEmptyPtr(lineage.OrchestrationRunID)
 	req.CoordinatorHandle = nonEmptyPtr(lineage.CoordinatorHandle)
 	req.CreatedByTerminalHandle = nonEmptyPtr(lineage.CreatedByTerminalHandle)
+	req.IdempotencyKey = nonEmptyPtr(lineage.IdempotencyKey)
 
 	resp, err := p.client.RecordWorktreeCreated(ctx, req)
 	if err != nil {
