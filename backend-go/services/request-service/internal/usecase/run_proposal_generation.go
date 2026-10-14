@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -264,6 +265,8 @@ func violationLines(v []domain.Violation) []string {
 // enough for a row. A file beyond the budget is kept as a marker with its size and hash, so the list and the digest stay whole.
 const (
 	maxBundleBytes     = 1 << 20
+	maxBundleDepth     = 6
+	maxBundleFiles     = 200
 	maxReportedEntries = 200
 	maxReportedRunes   = 500
 )
@@ -320,9 +323,15 @@ func (w *RunProposalGeneration) commitAndRead(ctx context.Context, req domain.Re
 	if err != nil {
 		return "", nil, err
 	}
+	// The whole change, not only the paths this run touched: a regenerated change leaves the files it did not rewrite on the
+	// branch, and a bundle without them would hide capabilities from the reader and from the digest the approval is bound to.
+	all, err := w.changeFiles(ctx, res.Workspace, prefix)
+	if err != nil {
+		return "", nil, err
+	}
 	bundle := map[string]string{}
 	budget := maxBundleBytes
-	for _, p := range paths {
+	for _, p := range all {
 		b, err := w.workspace.ReadFile(ctx, res.Workspace, p, MaxProposalReadBytes)
 		if err != nil {
 			return "", nil, fmt.Errorf("read back %s: %w", p, err)
@@ -336,6 +345,33 @@ func (w *RunProposalGeneration) commitAndRead(ctx context.Context, req domain.Re
 		bundle[rel] = string(b)
 	}
 	return sha, bundle, nil
+}
+
+// changeFiles lists every file under the change directory, directories before files and each level in name order, bounded in
+// depth and count so a runaway tree cannot grow the walk.
+func (w *RunProposalGeneration) changeFiles(ctx context.Context, ws Workspace, root string) ([]string, error) {
+	var files []string
+	queue := []string{strings.TrimSuffix(root, "/")}
+	for depth := 0; depth < maxBundleDepth && len(queue) > 0; depth++ {
+		var next []string
+		for _, dir := range queue {
+			entries, err := w.workspace.ListDir(ctx, ws, dir)
+			if err != nil {
+				return nil, fmt.Errorf("list %s: %w", dir, err)
+			}
+			sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
+			for _, e := range entries {
+				switch {
+				case e.IsDir:
+					next = append(next, dir+"/"+e.Name)
+				case len(files) < maxBundleFiles:
+					files = append(files, dir+"/"+e.Name)
+				}
+			}
+		}
+		queue = next
+	}
+	return files, nil
 }
 
 func omittedMarker(b []byte) string {

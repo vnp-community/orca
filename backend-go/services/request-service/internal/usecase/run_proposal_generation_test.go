@@ -449,6 +449,32 @@ func TestRunProposalGeneration_OversizeFilesAreKeptAsMarkers(t *testing.T) {
 	}
 }
 
+// A change that is written again leaves the files the agent did not rewrite on its branch. The bundle the approval is bound to and
+// the reader sees must be the whole change, not the paths this run touched: the pilot's second run stored two of four specs.
+func TestRunProposalGeneration_TheBundleIsTheWholeChangeEvenWhenTheRunTouchedOnlyPartOfIt(t *testing.T) {
+	eng := &scriptedEngine{answers: []ProposalResult{answer(tasksDoc(twoPhaseBody))}}
+	k, run, w := proposalKit(t, eng, nil)
+	ws := k.proposal.ws
+	eng.afterWrite = func(dir string) {
+		ws.mu.Lock()
+		defer ws.mu.Unlock()
+		ws.files[dir+"specs/ai-client/spec.md"] = []byte("### Requirement: kept from the first run\n") // on the branch, not changed now
+		ws.files[dir+"design.md"] = []byte("## Context\nkept\n")
+	}
+	if err := w.Execute(k.w.ctx(), run); err != nil {
+		t.Fatal(err)
+	}
+	change, _, _ := k.proposal.changes.GetByRequest(context.Background(), run.RequestID)
+	for _, want := range []string{"tasks.md", "proposal.md", "specs/ai/spec.md", "specs/ai-client/spec.md", "design.md"} {
+		if change.Bundle[want] == "" {
+			t.Errorf("%s is missing from the stored bundle: %v", want, change.Bundle)
+		}
+	}
+	if len(ws.committed) != 1 || len(ws.committed[0]) != 3 {
+		t.Fatalf("only what changed is committed: %v", ws.committed)
+	}
+}
+
 func TestOpenSpecChange_BundleDigestDependsOnContentNotOrder(t *testing.T) {
 	c := domain.OpenSpecChange{Bundle: map[string]string{"tasks.md": "a", "design.md": "b"}}
 	same := domain.OpenSpecChange{Bundle: map[string]string{"design.md": "b", "tasks.md": "a"}}
