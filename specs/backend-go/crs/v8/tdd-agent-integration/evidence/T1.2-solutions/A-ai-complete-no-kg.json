@@ -1,0 +1,293 @@
+{
+  "schema_version": 1,
+  "options": [
+    {
+      "id": "opt-1",
+      "title": "Adapter nhà cung cấp pluggable + middleware dùng chung cho timeout/retry/SSRF/metrics trong aiclient",
+      "summary": "Xây `shared/pkg/aiclient` với interface `Provider` và registry theo loại (openai/deepseek/zhipu), mỗi adapter dịch định dạng generic sang format riêng. Các mối quan tâm xuyên suốt (timeout, retry theo Retry-After, chặn SSRF ở tầng dial, metrics, che khoá) nằm trong một `Transport`/`RoundTripper` dùng chung. AIService ở system-setting enforce quota bằng tăng đếm nguyên tử trước khi gọi provider.",
+      "approach": "- `aiclient.Provider` interface: `Chat(ctx, ChatRequest) (ChatResponse, error)`; registry map theo `ProviderType` (openai|deepseek|zhipu), trả `ErrProviderUnsupported` cho loại chưa hỗ trợ (claude/bedrock).\n- `baseTransport` (custom `http.RoundTripper`) bọc tất cả adapter: set timeout 60s qua context, retry tối đa 2 lần tôn trọng header `Retry-After` (fallback backoff nếu thiếu), SSRF guard bằng custom `DialContext` kiểm tra IP đã resolve (chặn RFC1918, loopback, link-local, metadata 169.254.169.254) — chặn ở thời điểm dial để tránh DNS-rebinding, cho phép allowlist riêng cho `mock-ext` trong môi trường test.\n- Metric Prometheus: latency, provider, status code, số lần retry. Khoá API có type riêng override `String()`/`MarshalJSON` luôn trả `***`, áp dụng cho log field và response DTO.\n- `AIService.ResolveModel(orgID, projectID)`: tra cấu hình project trước, fallback cấu hình org; giải mã API key just-in-time bằng envelope encryption (DEK theo org, bọc bởi KEK từ secret manager hiện có).\n- Quota: tăng bộ đếm nguyên tử (SQL `UPDATE ... SET used = used + 1 WHERE used < limit RETURNING`, hoặc Redis token bucket) TRƯỚC khi gọi provider; nếu thất bại trả lỗi hạn mức rõ ràng, không gọi provider (đáp ứng AC-AI-04 chặt).\n- `AppendTurn`/`ListMessages` thao tác bảng `ai_conversation_message` (khoá theo conversation id, org, project).\n- Middleware `AI_ENABLED` chặn sớm toàn bộ route `/ai/conversation/*`, trả 503 trước khi vào handler.",
+      "pros": [
+        "Khớp đúng ranh giới module mà CR đã chỉ định (package dùng chung + AIService trong system-setting)",
+        "Dễ mở rộng thêm provider (kể cả Claude/Bedrock sau này) chỉ bằng cách thêm adapter mới, không sửa core",
+        "Chặn SSRF ở tầng dial theo IP đã resolve, chống DNS-rebinding, đáp ứng AC-AI-07 chắc chắn hơn",
+        "Tăng đếm hạn mức nguyên tử giảm rủi ro race condition khi nhiều request đồng thời (AC-AI-04)"
+      ],
+      "cons": [
+        "Nhiều công sức thiết kế ban đầu hơn (interface, registry, transport chain) so với một client đơn giản",
+        "Phải xử lý khác biệt xác thực giữa các provider (vd. ZhiPu dùng JWT ký thay vì bearer token tĩnh) trong từng adapter"
+      ],
+      "risks": [
+        {
+          "description": "Một số nhà cung cấp có cơ chế xác thực/định dạng lỗi khác biệt hơn dự kiến (vd. JWT ký của ZhiPu), có thể phát sinh việc ngoài kế hoạch cho adapter đó",
+          "severity": "medium"
+        },
+        {
+          "description": "Phụ thuộc hạ tầng KMS/secret manager sẵn có để mã hoá khoá theo kiểu envelope; nếu chưa có, phải làm thêm hạ tầng mã hoá",
+          "severity": "medium"
+        }
+      ],
+      "effort": {
+        "size": "L",
+        "hours_estimate": 140
+      },
+      "affected_areas": [
+        {
+          "kind": "module",
+          "name": "shared/pkg/aiclient"
+        },
+        {
+          "kind": "service",
+          "name": "system-setting (AIService)"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/{add,chat,update,list,delete,chat/list}"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_conversation_message"
+        },
+        {
+          "kind": "schema",
+          "name": "cấu hình mô hình theo org/project + hạn mức (bảng mới)"
+        },
+        {
+          "kind": "infra",
+          "name": "Mã hoá khoá API (envelope encryption / secret manager)"
+        },
+        {
+          "kind": "infra",
+          "name": "Metrics (Prometheus)"
+        }
+      ],
+      "breaking_change": false,
+      "rollback": "Tắt cờ AI_ENABLED để toàn bộ route trả 503 ngay lập tức (không cần deploy lại). Nếu cần rollback code, revert bản deploy system-setting; bảng ai_conversation_message mới không ảnh hưởng dữ liệu hiện có nên có thể để nguyên hoặc down-migration an toàn.",
+      "recommended": true
+    },
+    {
+      "id": "opt-2",
+      "title": "Client OpenAI-compatible dùng chung (generic), không tách adapter riêng từng nhà cung cấp",
+      "summary": "Vì cả ba nhà cung cấp đều tương thích OpenAI chat-completions, dùng một struct client duy nhất tham số hoá theo BaseURL/APIKey/Model, xử lý retry/timeout/SSRF/metrics trực tiếp trong client đó thay vì tách middleware/adapter. Kiểm tra hạn mức bằng khoá hàng (row lock) đơn giản trong AIService.",
+      "approach": "- Một `aiclient.Client` generic nhận `BaseURL`, `APIKey`, `Model` từ cấu hình; luôn build request/response theo schema OpenAI chat-completions vì DeepSeek/ZhiPu đã tương thích.\n- Retry/timeout/SSRF/metrics/che khoá viết thẳng trong các method của Client (không tách interface Provider riêng) để giảm số lớp trừu tượng.\n- SSRF: kiểm tra IP đã resolve tại thời điểm dial (tương tự opt-1) nhưng code nằm chung trong Client thay vì Transport tách biệt.\n- Quota: trong `AIService`, dùng `SELECT ... FOR UPDATE` khoá dòng hạn mức của org trước khi gọi provider, tăng sau khi gọi thành công; đơn giản hơn cơ chế tăng đếm nguyên tử của opt-1 nhưng có thể gây contention khi tải cao.\n- `AppendTurn`/`ListMessages`/route/`AI_ENABLED` giống opt-1 về hành vi bên ngoài.\n- Không có registry provider: thêm nhà cung cấp không tương thích OpenAI (Claude/Bedrock) sau này sẽ cần refactor lại thành interface, không nằm trong CR này.",
+      "pros": [
+        "Triển khai nhanh nhất, ít mã nguồn, dễ review để sớm có slice AI chạy được",
+        "Đủ dùng cho đúng 3 nhà cung cấp hiện tại vì đều tương thích OpenAI"
+      ],
+      "cons": [
+        "Kém mở rộng khi thêm provider không tương thích OpenAI sau này — khả năng phải refactor lại thành adapter pattern",
+        "Logic xử lý khác biệt nhỏ giữa các provider (header xác thực, schema lỗi) sẽ rẽ nhánh if/else trong một client, dễ rối khi số provider tăng"
+      ],
+      "risks": [
+        {
+          "description": "Khoá dòng (row lock) hạn mức có thể gây tranh chấp/độ trễ khi lượng chat đồng thời cao trong một tổ chức",
+          "severity": "medium"
+        },
+        {
+          "description": "Thiếu lớp interface khiến việc thêm Claude/Bedrock ở CR sau phải sửa lại cấu trúc core thay vì chỉ thêm adapter",
+          "severity": "low"
+        }
+      ],
+      "effort": {
+        "size": "M",
+        "hours_estimate": 85
+      },
+      "affected_areas": [
+        {
+          "kind": "module",
+          "name": "shared/pkg/aiclient"
+        },
+        {
+          "kind": "service",
+          "name": "system-setting (AIService)"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/{add,chat,update,list,delete,chat/list}"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_conversation_message"
+        },
+        {
+          "kind": "schema",
+          "name": "cấu hình mô hình theo org/project + hạn mức (bảng mới)"
+        },
+        {
+          "kind": "infra",
+          "name": "Mã hoá khoá API"
+        },
+        {
+          "kind": "infra",
+          "name": "Metrics (Prometheus)"
+        }
+      ],
+      "breaking_change": false,
+      "rollback": "Tắt AI_ENABLED để trả 503 ngay; revert deploy system-setting nếu cần, bảng mới không phá vỡ dữ liệu cũ.",
+      "recommended": false
+    },
+    {
+      "id": "opt-3",
+      "title": "Tách AI Gateway thành dịch vụ nội bộ riêng biệt (không chỉ là package dùng chung)",
+      "summary": "Dựng một service nội bộ mới 'ai-gateway' sở hữu toàn bộ việc gọi nhà cung cấp, giải mã khoá, enforce hạn mức/chi phí, chặn SSRF và metrics; system-setting chỉ còn route mỏng proxy sang ai-gateway và lưu `ai_conversation_message`. Tạo ranh giới bảo mật rõ ràng cho egress mạng ra ngoài.",
+      "approach": "- Service mới `ai-gateway` expose API nội bộ (gRPC/HTTP) nhận yêu cầu chat đã resolve model/org/project, trả response hoặc lỗi hạn mức/provider.\n- Toàn bộ logic nhạy cảm (giải mã khoá API, gọi provider, retry/Retry-After, SSRF, metrics, enforce hạn mức chi phí) tập trung trong ai-gateway; chỉ service này cần network policy cho phép egress ra Internet tới OpenAI/DeepSeek/ZhiPu.\n- `system-setting` giữ route `/ai/conversation/*`, middleware `AI_ENABLED`, và các method `ListMessages`/`AppendTurn` trên bảng `ai_conversation_message`; với `chat`, gọi sang ai-gateway qua kênh nội bộ có xác thực service-to-service.\n- Cấu hình mô hình theo org/project và khoá API được mã hoá vẫn lưu ở system-setting (hoặc chuyển vào ai-gateway tuỳ nơi quản trị), ai-gateway chỉ nhận ID cấu hình để tra cứu, không nhận khoá thô qua kênh nội bộ nếu có thể tránh.\n- Yêu cầu thêm: pipeline deploy, service discovery, auth giữa service, dashboard/alerting riêng cho ai-gateway.",
+      "pros": [
+        "Ranh giới bảo mật rõ ràng: chỉ một điểm duy nhất có egress ra nhà cung cấp AI, dễ áp network policy/firewall và audit truy cập khoá",
+        "Tập trung logic hạn mức/chi phí, dễ tái sử dụng cho CR-H02 hoặc dịch vụ khác dùng AI trong tương lai mà không nhân bản logic",
+        "Metrics/log chi tiêu AI tập trung một chỗ cho toàn nền tảng"
+      ],
+      "cons": [
+        "Đi ngược kiến trúc CR đã chỉ định rõ ('gói shared/pkg/aiclient', 'AIService ở system-setting') — cần thống nhất lại phạm vi với người viết backlog trước khi làm",
+        "Chi phí hạ tầng và vận hành lớn hơn nhiều: thêm service, pipeline CI/CD, service discovery, xác thực liên service, on-call riêng",
+        "Thêm một bước gọi mạng (service-to-service) cho mỗi lượt chat so với gọi trong tiến trình"
+      ],
+      "risks": [
+        {
+          "description": "Phạm vi công việc thực tế vượt xa ước lượng size L do phải dựng và vận hành một service mới hoàn chỉnh",
+          "severity": "high"
+        },
+        {
+          "description": "Cần hạ tầng on-call/giám sát cho ai-gateway sẵn sàng trước khi có thể xác nhận đầy đủ hành vi 503 (AC-AI-05) và chặn SSRF (AC-AI-07) trong môi trường production",
+          "severity": "medium"
+        }
+      ],
+      "effort": {
+        "size": "L",
+        "hours_estimate": 240
+      },
+      "affected_areas": [
+        {
+          "kind": "service",
+          "name": "ai-gateway (dịch vụ nội bộ mới)"
+        },
+        {
+          "kind": "service",
+          "name": "system-setting (proxy + AIService rút gọn)"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/{add,chat,update,list,delete,chat/list}"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_conversation_message"
+        },
+        {
+          "kind": "schema",
+          "name": "cấu hình mô hình theo org/project + hạn mức"
+        },
+        {
+          "kind": "infra",
+          "name": "Network policy / egress firewall cho ai-gateway"
+        },
+        {
+          "kind": "infra",
+          "name": "Xác thực service-to-service + service discovery"
+        },
+        {
+          "kind": "infra",
+          "name": "Metrics (Prometheus)"
+        }
+      ],
+      "breaking_change": false,
+      "rollback": "Tắt AI_ENABLED ở system-setting để trả 503 ngay; nếu cần, rollback/tắt deploy ai-gateway độc lập và revert proxy về trả lỗi tạm thời — phức tạp hơn vì phải đồng bộ rollback hai service cùng lúc.",
+      "recommended": false
+    }
+  ],
+  "recommendation": {
+    "option_id": "opt-1",
+    "reason": "Khớp đúng với kiến trúc mà CR đã quy định tường minh (gói shared/pkg/aiclient, AIService ở system-setting), đồng thời dùng adapter pattern để dễ mở rộng sang Claude/Bedrock sau này mà không phải viết lại core. Cân bằng tốt giữa độ chắc chắn bảo mật (SSRF chặn theo IP đã resolve, tăng hạn mức nguyên tử) và chi phí triển khai, tránh cả nợ kỹ thuật của client generic (opt-2) lẫn chi phí hạ tầng lớn của việc tách service riêng (opt-3)."
+  },
+  "assumptions": [
+    {
+      "id": "A-1",
+      "text": "'mock-ext' trong AC-AI-01 là một nhà cung cấp giả lập tương thích OpenAI sẽ được dựng/khai báo cấu hình trong phạm vi CR này để phục vụ kiểm thử, không phải hạ tầng có sẵn.",
+      "needs_confirmation": true
+    },
+    {
+      "id": "A-2",
+      "text": "Hệ thống system-setting đã có khái niệm tổ chức (org) và dự án (project) với bảng/khoá quan hệ sẵn có để gắn cấu hình mô hình AI vào.",
+      "needs_confirmation": true
+    },
+    {
+      "id": "A-3",
+      "text": "Đã tồn tại hạ tầng quản lý khoá bí mật/KMS trong hệ thống có thể tái sử dụng để mã hoá khoá API theo kiểu envelope encryption, không cần xây mới từ đầu.",
+      "needs_confirmation": true
+    },
+    {
+      "id": "A-4",
+      "text": "'LLM thật đã được duyệt' trong AC-AI-02 chỉ có nghĩa là một cấu hình nhà cung cấp thật (không phải mock) đã được bật trong hệ thống, không yêu cầu xây thêm quy trình phê duyệt/approval workflow riêng trong CR này.",
+      "needs_confirmation": true
+    },
+    {
+      "id": "A-5",
+      "text": "Hệ thống đã có hạ tầng quan sát (Prometheus/metrics) dùng chung mà aiclient có thể publish metric vào.",
+      "needs_confirmation": false
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-1",
+      "text": "Hạn mức AI theo tổ chức được tính theo đơn vị nào: số token, chi phí tiền tệ, hay số lượt request? Câu trả lời ảnh hưởng trực tiếp đến thiết kế bảng hạn mức và cách enforce trong AIService.",
+      "blocking": true
+    },
+    {
+      "id": "Q-2",
+      "text": "'ai_conversation_message' có cần một khái niệm 'conversation' (nhóm hội thoại) riêng với ID của nó để phục vụ route list/chat/list, hay mỗi message tự chứa đủ khoá nhóm (user/project/thread)?",
+      "blocking": true
+    },
+    {
+      "id": "Q-3",
+      "text": "AI_ENABLED là cờ toàn cục (env/config) hay có thể bật/tắt theo từng tổ chức/dự án? CR mô tả như một cờ duy nhất nhưng cần xác nhận phạm vi áp dụng.",
+      "blocking": false
+    },
+    {
+      "id": "Q-4",
+      "text": "Danh sách dải IP/CIDR cụ thể cần chặn cho SSRF (ngoài RFC1918, loopback, link-local, metadata endpoint mặc định) có yêu cầu riêng của hạ tầng nội bộ (VD: dải VPC cụ thể) không?",
+      "blocking": false
+    }
+  ],
+  "requirement_coverage": [
+    {
+      "ac_id": "AC-AI-01",
+      "option_ids": ["opt-1", "opt-2", "opt-3"],
+      "status": "covered",
+      "note": "Cả ba phương án đều implement route /ai/conversation/chat và chat/list; khác biệt chủ yếu ở cấu trúc nội bộ, không ảnh hưởng hành vi quan sát được."
+    },
+    {
+      "ac_id": "AC-AI-02",
+      "option_ids": ["opt-1", "opt-2", "opt-3"],
+      "status": "covered",
+      "note": "Phụ thuộc vào cấu hình nhà cung cấp thật được bật, không khác biệt theo kiến trúc."
+    },
+    {
+      "ac_id": "AC-AI-03",
+      "option_ids": ["opt-1", "opt-2", "opt-3"],
+      "status": "covered",
+      "note": "Che khoá API bắt buộc ở log/response trong cả ba; opt-3 cần đảm bảo thêm kênh nội bộ giữa system-setting và ai-gateway cũng không lộ khoá thô."
+    },
+    {
+      "ac_id": "AC-AI-04",
+      "option_ids": ["opt-1", "opt-2", "opt-3"],
+      "status": "covered",
+      "note": "opt-1 dùng tăng đếm nguyên tử (ít race condition hơn), opt-2 dùng row lock (có thể contention), opt-3 tập trung logic trong ai-gateway."
+    },
+    {
+      "ac_id": "AC-AI-05",
+      "option_ids": ["opt-1", "opt-2", "opt-3"],
+      "status": "covered",
+      "note": "Middleware AI_ENABLED chặn sớm ở tầng route trong cả ba; opt-3 cần đồng bộ trạng thái cờ với ai-gateway."
+    },
+    {
+      "ac_id": "AC-AI-06",
+      "option_ids": ["opt-1", "opt-2", "opt-3"],
+      "status": "covered",
+      "note": "Retry tôn trọng Retry-After nằm trong aiclient (opt-1/opt-2) hoặc trong ai-gateway (opt-3)."
+    },
+    {
+      "ac_id": "AC-AI-07",
+      "option_ids": ["opt-1", "opt-2", "opt-3"],
+      "status": "covered",
+      "note": "Chặn SSRF theo IP đã resolve tại thời điểm dial trong cả ba; opt-3 có thêm lớp network policy ở hạ tầng làm phòng vệ thứ hai."
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+
+Additional instruction for this run: the project has a design knowledge graph that you reach through the MCP server `tdd-agent`. Follow the skills tdd-orca-task and tdd-knowledge. Use it to name, in each option's pros/cons and in the open questions, the requirements, rules, entities, decisions and constraints (with ids) that the option affects, and add a top-level key "design_references": {"snapshot": "", "read": [], "gaps": [], "conflicts": []} to the JSON. Answer with the JSON document only.
