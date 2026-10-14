@@ -11,13 +11,15 @@ import (
 )
 
 type profileCaps struct {
-	profile domain.DevServerCapability
-	err     error
-	calls   int
+	profile    domain.DevServerCapability
+	err        error
+	calls      int
+	refreshing []bool
 }
 
-func (p *profileCaps) Get(context.Context, DevServerRef, bool) (domain.DevServerCapability, error) {
+func (p *profileCaps) Get(_ context.Context, _ DevServerRef, refresh bool) (domain.DevServerCapability, error) {
 	p.calls++
+	p.refreshing = append(p.refreshing, refresh)
 	return p.profile, p.err
 }
 
@@ -212,5 +214,23 @@ func TestSkillInstallCommand_NamesEveryKnowledgeSkill(t *testing.T) {
 	}
 	if !strings.HasSuffix(cmd, "--global") || !strings.Contains(cmd, "npx skills add "+DefaultSkillsRepositoryURL) {
 		t.Fatal(cmd)
+	}
+}
+
+func TestReadinessGate_AnExplicitCheckAsksTheAgentAgainAndIgnoresTheCleanCache(t *testing.T) {
+	caps := &profileCaps{profile: fullProfile()}
+	g, ex := readyGate(caps, &fakeFileStat{info: PathInfo{Exists: true}})
+	ctx := context.Background()
+	if rep, _ := g.Check(ctx, "p", nil); !rep.OK || len(rep.Gaps) != 0 {
+		t.Fatalf("%+v", rep)
+	}
+	if rep, _ := g.Check(ctx, "p", nil); !rep.OK || caps.calls != 1 || len(ex.seen) != 1 {
+		t.Fatalf("a run's check must reuse the clean verdict: calls=%d probes=%d", caps.calls, len(ex.seen))
+	}
+	if rep, err := g.CheckForFresh(ctx, "p", nil, true); err != nil || !rep.OK || caps.calls != 2 || len(ex.seen) != 2 {
+		t.Fatalf("an explicit check must probe again: %+v %v calls=%d probes=%d", rep, err, caps.calls, len(ex.seen))
+	}
+	if !caps.refreshing[1] || caps.refreshing[0] {
+		t.Fatalf("only the explicit check forces the agent to re-read its capabilities: %v", caps.refreshing)
 	}
 }

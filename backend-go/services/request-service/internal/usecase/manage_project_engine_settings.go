@@ -143,7 +143,7 @@ func (uc *ManageProjectEngineSettings) preflight(ctx context.Context, s domain.P
 	if uc.gate == nil {
 		return nil, []string{"preflight_not_run"}
 	}
-	rep, err := uc.gate.CheckFor(ctx, s.ProjectID, &s, openspec)
+	rep, err := uc.gate.CheckForFresh(ctx, s.ProjectID, &s, openspec)
 	if err != nil {
 		return nil, []string{"preflight_not_run"}
 	}

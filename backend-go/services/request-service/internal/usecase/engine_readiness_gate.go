@@ -111,7 +111,18 @@ func (g *EngineReadinessGate) Check(ctx context.Context, projectID string, setti
 // CheckFor is Check for a switch being turned on: with openspec=false only the knowledge hub is looked at (a project that
 // turns on solution_agent alone has no need of openspec).
 func (g *EngineReadinessGate) CheckFor(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec bool) (PreflightReport, error) {
-	report, err := g.check(ctx, projectID, settings, openspec)
+	return g.checkFor(ctx, projectID, settings, openspec, false)
+}
+
+// CheckForFresh is CheckFor for a person asking "is it ready now": it ignores the cached clean verdict and asks the dev server
+// agent for its capabilities again, which its profile cache would otherwise keep for a day (a skill installed a minute ago
+// would still show as missing).
+func (g *EngineReadinessGate) CheckForFresh(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec bool) (PreflightReport, error) {
+	return g.checkFor(ctx, projectID, settings, openspec, true)
+}
+
+func (g *EngineReadinessGate) checkFor(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec, fresh bool) (PreflightReport, error) {
+	report, err := g.check(ctx, projectID, settings, openspec, fresh)
 	if err == nil {
 		// A clean verdict taken from the cache has no failures, so only a fresh finding is counted.
 		for _, f := range report.Failures {
@@ -121,7 +132,7 @@ func (g *EngineReadinessGate) CheckFor(ctx context.Context, projectID string, se
 	return report, err
 }
 
-func (g *EngineReadinessGate) check(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec bool) (PreflightReport, error) {
+func (g *EngineReadinessGate) check(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec, fresh bool) (PreflightReport, error) {
 	report := PreflightReport{OK: true, CheckedAt: g.now()}
 	conn, err := g.conns.ResolveForProject(ctx, projectID)
 	if err != nil {
@@ -139,7 +150,7 @@ func (g *EngineReadinessGate) check(ctx context.Context, projectID string, setti
 		want = settings.MinVersion
 	}
 	key := fmt.Sprintf("%s|%s|%s|%t|%s", conn.DevServerID, conn.ConnectionID, conn.RepoPath, openspec, want)
-	if g.cachedClean(key) {
+	if !fresh && g.cachedClean(key) {
 		return report, nil
 	}
 
@@ -148,7 +159,7 @@ func (g *EngineReadinessGate) check(ctx context.Context, projectID string, setti
 			return report, err
 		}
 	}
-	g.checkAgent(ctx, conn, openspec, &report)
+	g.checkAgent(ctx, conn, openspec, fresh, &report)
 	g.checkRepoFiles(ctx, conn, &report)
 	if len(report.Failures) == 0 && len(report.Gaps) == 0 {
 		g.remember(key)
@@ -210,11 +221,11 @@ func (g *EngineReadinessGate) checkOpenSpec(ctx context.Context, conn AnalysisCo
 }
 
 // checkAgent reads the agent's own report: what the openspec engine needs is a blocker, what the knowledge hub needs is a gap.
-func (g *EngineReadinessGate) checkAgent(ctx context.Context, conn AnalysisConnection, openspec bool, report *PreflightReport) {
+func (g *EngineReadinessGate) checkAgent(ctx context.Context, conn AnalysisConnection, openspec, fresh bool, report *PreflightReport) {
 	if g.caps == nil {
 		return
 	}
-	profile, err := g.caps.Get(ctx, DevServerRef{ConnectionID: conn.ConnectionID, DevServerID: conn.DevServerID}, false)
+	profile, err := g.caps.Get(ctx, DevServerRef{ConnectionID: conn.ConnectionID, DevServerID: conn.DevServerID}, fresh)
 	if err != nil {
 		if openspec {
 			block(report, "REQUEST_ENGINE_AGENT_UNKNOWN", "the dev server agent's capabilities could not be read", "Check that the dev server is connected, then try again.")

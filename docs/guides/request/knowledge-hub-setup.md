@@ -29,7 +29,7 @@ orca engine show --project <id> --check
 orca engine set  --project <id> --engine openspec --solution-agent=true     # chỉ admin
 ```
 
-`--check` hỏi chính dev server (có cache sạch 10 phút, lỗi thì không cache nên sửa xong thấy ngay):
+`--check` (và lúc lưu cài đặt) hỏi lại chính dev server và bỏ qua cả cache kết quả sạch lẫn hồ sơ khả năng của agent (hồ sơ này hạn một ngày nên skill vừa cài sẽ không còn báo thiếu); lúc chạy một run vẫn dùng cache sạch 10 phút, lỗi thì không cache nên sửa xong thấy ngay:
 
 - **blocked** (chặn engine `openspec`): không có dev server hoặc repo path; `openspec` thiếu/cũ/không trả lời; agent không viết được change trong worktree dưới profile quyền.
 - **knowledge hub unused** (chỉ cảnh báo, engine vẫn chạy không có tri thức): agent không tải được hub; `tdd-agent` không có trong `PATH`; thiếu skill; repo không có `.tdd-agent/config.toml`.
