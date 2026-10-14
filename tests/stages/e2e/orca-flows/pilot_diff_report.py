@@ -52,6 +52,21 @@ def changed_files(repo: str | Path, base: str, branch: str) -> list[str]:
     return [p for p in git(repo, "diff", "--name-only", f"{merge_base}..{branch}").splitlines() if p]
 
 
+def working_tree_files(worktree: str | Path) -> list[str]:
+    """Files changed but not committed in the worktree. The agents of a Request's tasks leave their code uncommitted, and all the
+    tasks of one plan share one worktree, so this is where most of what they did is."""
+    out = git(worktree, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+    files, entries, skip = [], [e for e in out.split("\0") if e], False
+    for entry in entries:
+        if skip:
+            skip = False
+            continue
+        if entry[0] in "RC":
+            skip = True
+        files.append(entry[3:])
+    return files
+
+
 def protected_hits(files: list[str], protected: tuple[str, ...]) -> list[str]:
     return [f for f in files if any(f.startswith(p) for p in protected)]
 
@@ -88,16 +103,18 @@ def report(repo: str, branch_prefix: str, base: str, protected: tuple[str, ...],
     if not branches:
         lines.append("No branch under that prefix.")
     for br in branches:
-        files = changed_files(repo, base, br)
+        committed = changed_files(repo, base, br)
+        wt = worktree_of(repo, br)
+        uncommitted = working_tree_files(wt) if wt else []
+        files = sorted(set(committed) | set(uncommitted))
         stat = git(repo, "diff", "--shortstat", f"{git(repo, 'merge-base', base, br).strip()}..{br}").strip()
         hits = protected_hits(files, protected)
-        lines += [f"## {br}", "", f"{len(files)} file(s): {stat or 'no change'}", ""]
+        lines += [f"## {br}", "", f"{len(files)} file(s) in all: {len(committed)} committed ({stat or 'no change'}), {len(uncommitted)} changed but not committed", ""]
         lines += [f"- `{f}`" for f in files[:40]] + ([f"- ... {len(files) - 40} more"] if len(files) > 40 else [])
         if hits:
             bad = True
             lines += ["", f"**PROTECTED PATHS CHANGED ({len(hits)}):** " + ", ".join(f"`{h}`" for h in hits[:10])]
         if run_tests:
-            wt = worktree_of(repo, br)
             if wt is None:
                 lines += ["", "Tests not run: the branch is not checked out in a worktree."]
             else:
@@ -116,7 +133,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--repo", required=True)
     ap.add_argument("--branch-prefix", default="task/")
-    ap.add_argument("--base", default="main")
+    ap.add_argument("--base", default="main", help="the ref the task branches were made from: for the pilot, the pilot branch itself")
     ap.add_argument("--protected", action="append", default=[], help="a path prefix that must stay untouched (adds to the defaults)")
     ap.add_argument("--run-go-tests", action="store_true")
     ap.add_argument("--out")

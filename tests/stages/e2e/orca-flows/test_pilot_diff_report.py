@@ -70,6 +70,17 @@ class DiffReportTest(unittest.TestCase):
         self.assertTrue(bad)
         self.assertIn("FAIL `.:./pkg`", text)
 
+    def test_code_the_agents_left_uncommitted_in_the_worktree_is_read_too(self) -> None:
+        wt = self.branch("task/five", {"pkg/e.go": "package pkg\n"})
+        (wt / "pkg" / "f.go").write_text("package pkg\n")  # not committed
+        (wt / "openspec").mkdir()
+        (wt / "openspec" / "x.md").write_text("x")  # not committed, and protected
+        self.assertEqual(pdr.working_tree_files(wt), ["openspec/x.md", "pkg/f.go"])
+        text, bad = pdr.report(str(self.repo), "task/", "main", pdr.DEFAULT_PROTECTED, run_tests=False)
+        self.assertTrue(bad)
+        self.assertIn("pkg/f.go", text)
+        self.assertIn("2 changed but not committed", text)
+
     def test_a_deleted_go_file_has_no_package_to_test(self) -> None:
         self.assertEqual(pdr.go_packages(["pkg/gone.go", "README.md"], self.repo), [])
 
