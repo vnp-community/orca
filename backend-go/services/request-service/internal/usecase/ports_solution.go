@@ -14,6 +14,10 @@ var ErrProbeUnavailable = errors.New("repository state probe unavailable")
 // ErrAgentReadonlyUnsupported means the dev server's agent refused accessMode=readonly (it would have run in write mode).
 var ErrAgentReadonlyUnsupported = errors.New("agent does not support readonly mode")
 
+// ErrAgentKnowledgeHubUnavailable means the agent refused knowledgeRoot (claude lacks the MCP flags, or the root is not a usable
+// tdd-agent project). The run did not start, so a caller may retry without the knowledge graph.
+var ErrAgentKnowledgeHubUnavailable = errors.New("agent cannot load the knowledge hub")
+
 type SolutionListFilter struct {
 	RequestID string
 	Kind      domain.SolutionKind
@@ -103,6 +107,11 @@ type AgentPromptInput struct {
 	TimeoutMS int
 	// ReadOnlyEnforced asks the agent to enforce read-only (accessMode=readonly); only set after the capability check.
 	ReadOnlyEnforced bool
+	// KnowledgeRoot is the absolute path of the project checkout holding .tdd-agent/. The agent, not Orca, builds the MCP
+	// config from it. Only set after the capability check (agent.execPrompt.knowledgeHub).
+	KnowledgeRoot string
+	// ProposeChangesets additionally lets the agent call changeset_propose (a dry run that never commits).
+	ProposeChangesets bool
 }
 
 type AgentPromptResult struct {

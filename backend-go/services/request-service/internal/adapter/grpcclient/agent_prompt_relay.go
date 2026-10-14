@@ -52,6 +52,9 @@ type agentExecPromptParams struct {
 	WorkspaceKind  string `json:"workspaceKind,omitempty"`
 	ReportChanges  bool   `json:"reportChanges,omitempty"`
 	MaxOutputBytes int    `json:"maxOutputBytes,omitempty"`
+	// Only for agents that advertise agent.execPrompt.knowledgeHub; the agent builds the MCP config itself.
+	KnowledgeRoot     string `json:"knowledgeRoot,omitempty"`
+	ProposeChangesets bool   `json:"proposeChangesets,omitempty"`
 }
 
 // buildAgentParams fixes trust and env: the env holds two ids and never a token or credential.
@@ -59,6 +62,10 @@ func buildAgentParams(in usecase.AgentPromptInput) agentExecPromptParams {
 	p := agentExecPromptParams{
 		StepID: in.StepID, Prompt: in.Prompt, WorktreePath: in.RepoPath, TimeoutMS: in.TimeoutMS,
 		Env: map[string]string{"ORCA_REQUEST_ID": in.RequestID, "ORCA_PROJECT_ID": in.ProjectID},
+	}
+	// proposeChangesets without a root would be rejected by the agent, so it is only sent together with one.
+	if in.KnowledgeRoot != "" {
+		p.KnowledgeRoot, p.ProposeChangesets = in.KnowledgeRoot, in.ProposeChangesets
 	}
 	if in.ReadOnlyEnforced {
 		// With accessMode=readonly the agent drops any trust preset, so none is sent.
@@ -121,6 +128,9 @@ func classifyAgentRelayError(err error) error {
 	}
 	if strings.Contains(err.Error(), "READONLY_MODE_UNSUPPORTED") {
 		return usecase.ErrAgentReadonlyUnsupported
+	}
+	if strings.Contains(err.Error(), "KNOWLEDGE_HUB_UNSUPPORTED") || strings.Contains(err.Error(), "KNOWLEDGE_ROOT_") || strings.Contains(err.Error(), "KNOWLEDGE_CONFIG_MISSING") {
+		return fmt.Errorf("%w: %v", usecase.ErrAgentKnowledgeHubUnavailable, err)
 	}
 	return fmt.Errorf("grpcclient: relay agent.execPrompt: %w", err)
 }

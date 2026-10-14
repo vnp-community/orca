@@ -27,8 +27,23 @@ Options:
         tools: true,
         permissionMode: true,
         disallowedTools: true,
+        mcpConfig: false,
+        allowedTools: false,
         streamJson: false
       })
+    })
+
+    it('reports mcpConfig only when --mcp-config and --strict-mcp-config are both advertised', async () => {
+      const both =
+        '  --mcp-config <configs...>  Load MCP servers\n  --strict-mcp-config  Only use those\n  --allowedTools <t>  Allow\n'
+      const onlyConfig = '  --mcp-config <configs...>  Load MCP servers\n'
+      const hyphenated = '  --allowed-tools <tools...>  Allow\n'
+      const a = await detectClaudeFlags({ PATH: '/m1' }, async () => both)
+      const b = await detectClaudeFlags({ PATH: '/m2' }, async () => onlyConfig)
+      const c = await detectClaudeFlags({ PATH: '/m3' }, async () => hyphenated)
+      expect([a?.mcpConfig, a?.allowedTools]).toEqual([true, true])
+      expect([b?.mcpConfig, b?.allowedTools]).toEqual([false, false])
+      expect(c?.allowedTools).toBe(true)
     })
 
     it('reports streamJson only when --output-format, stream-json and --verbose are all advertised', async () => {
@@ -56,6 +71,8 @@ Options:
         tools: false,
         permissionMode: false,
         disallowedTools: false,
+        mcpConfig: false,
+        allowedTools: false,
         streamJson: false
       })
     })
@@ -137,6 +154,8 @@ Options:
           tools: false,
           permissionMode: true,
           disallowedTools: false,
+          mcpConfig: false,
+          allowedTools: false,
           streamJson: false
         })
       ).toBe('FLAG_TOOLS_MISSING')
@@ -148,6 +167,8 @@ Options:
           tools: true,
           permissionMode: false,
           disallowedTools: false,
+          mcpConfig: false,
+          allowedTools: false,
           streamJson: false
         })
       ).toBe('FLAG_PERMISSION_MODE_MISSING')
@@ -159,6 +180,8 @@ Options:
           tools: true,
           permissionMode: true,
           disallowedTools: false,
+          mcpConfig: false,
+          allowedTools: false,
           streamJson: false
         })
       ).toBeNull()

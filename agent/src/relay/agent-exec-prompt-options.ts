@@ -1,6 +1,7 @@
 // src/relay/agent-exec-prompt-options.ts
 // Parses and validates the new execPrompt options introduced in CR-REQ-033:
-// accessMode, workspaceKind, reportChanges, resultBlock, maxOutputBytes.
+// accessMode, workspaceKind, reportChanges, resultBlock, maxOutputBytes, plus the
+// knowledge-hub pair (knowledgeRoot, proposeChangesets).
 // Intentionally does NOT import from agent-rpc-dispatch.ts to avoid a
 // circular dependency (dispatcher dynamically imports this module).
 
@@ -8,9 +9,9 @@ import { AgentErrorCode } from '../shared/agent-wire-protocol'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-export const DEFAULT_MAX_OUTPUT_BYTES = 4 * 1024 * 1024   // 4 MiB
-export const MAX_OUTPUT_BYTES_CEILING = 12 * 1024 * 1024  // 12 MiB
-export const MIN_OUTPUT_BYTES = 64 * 1024                  // 64 KiB
+export const DEFAULT_MAX_OUTPUT_BYTES = 4 * 1024 * 1024 // 4 MiB
+export const MAX_OUTPUT_BYTES_CEILING = 12 * 1024 * 1024 // 12 MiB
+export const MIN_OUTPUT_BYTES = 64 * 1024 // 64 KiB
 export const RESULT_NONCE_PATTERN = /^[A-Za-z0-9]{16,64}$/
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -22,6 +23,8 @@ export type ExecPromptErrorCode =
   | 'INVALID_RESULT_BLOCK'
   | 'INVALID_RESULT_BLOCK_NONCE'
   | 'INVALID_MAX_OUTPUT_BYTES'
+  | 'INVALID_KNOWLEDGE_ROOT'
+  | 'INVALID_PROPOSE_CHANGESETS'
 
 export type ExecPromptOptions = {
   accessMode: 'write' | 'readonly'
@@ -31,12 +34,13 @@ export type ExecPromptOptions = {
   reportChanges: boolean
   resultBlockNonce: string | null
   maxOutputBytes: number
+  /** Absolute project path holding `.tdd-agent/`; null when the caller sent none. */
+  knowledgeRoot: string | null
+  proposeChangesets: boolean
 }
 
 type ParseError = { code: ExecPromptErrorCode; message: string }
-type ParseResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: ParseError }
+type ParseResult<T> = { ok: true; value: T } | { ok: false; error: ParseError }
 
 // ── Parser ─────────────────────────────────────────────────────────────────────
 
@@ -136,7 +140,7 @@ export function parseExecPromptOptions(
   if (hasMaxOutputBytes) {
     if (
       typeof rawMaxOutputBytes !== 'number' ||
-      !isFinite(rawMaxOutputBytes) ||
+      !Number.isFinite(rawMaxOutputBytes) ||
       !Number.isInteger(rawMaxOutputBytes)
     ) {
       return {
@@ -160,6 +164,46 @@ export function parseExecPromptOptions(
     maxOutputBytes = Math.min(rawMaxOutputBytes, MAX_OUTPUT_BYTES_CEILING)
   }
 
+  // knowledgeRoot / proposeChangesets: shape only here; the path itself is checked on disk
+  // by prepareKnowledgeHub, which is the only place that turns it into an MCP config.
+  const rawKnowledgeRoot = params['knowledgeRoot']
+  let knowledgeRoot: string | null = null
+  if ('knowledgeRoot' in params && rawKnowledgeRoot !== undefined) {
+    if (typeof rawKnowledgeRoot !== 'string' || rawKnowledgeRoot === '') {
+      return {
+        ok: false,
+        error: {
+          code: 'INVALID_KNOWLEDGE_ROOT',
+          message: `knowledgeRoot must be a non-empty string, got ${JSON.stringify(rawKnowledgeRoot)}`
+        }
+      }
+    }
+    knowledgeRoot = rawKnowledgeRoot
+  }
+  const rawPropose = params['proposeChangesets']
+  let proposeChangesets = false
+  if ('proposeChangesets' in params && rawPropose !== undefined) {
+    if (typeof rawPropose !== 'boolean') {
+      return {
+        ok: false,
+        error: {
+          code: 'INVALID_PROPOSE_CHANGESETS',
+          message: `proposeChangesets must be a boolean, got ${typeof rawPropose}`
+        }
+      }
+    }
+    proposeChangesets = rawPropose
+  }
+  if (proposeChangesets && knowledgeRoot === null) {
+    return {
+      ok: false,
+      error: {
+        code: 'INVALID_PROPOSE_CHANGESETS',
+        message: 'proposeChangesets requires knowledgeRoot'
+      }
+    }
+  }
+
   return {
     ok: true,
     value: {
@@ -168,7 +212,9 @@ export function parseExecPromptOptions(
       explicit: { accessMode: hasAccessMode, workspaceKind: hasWorkspaceKind },
       reportChanges,
       resultBlockNonce,
-      maxOutputBytes
+      maxOutputBytes,
+      knowledgeRoot,
+      proposeChangesets
     }
   }
 }

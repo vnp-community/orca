@@ -22,6 +22,9 @@ export type ClaudeFlagSupport = {
   tools: boolean
   permissionMode: boolean
   disallowedTools: boolean
+  /** `--mcp-config` and `--strict-mcp-config` are both advertised (knowledge hub MCP server). */
+  mcpConfig: boolean
+  allowedTools: boolean
   /** `--output-format stream-json` and `--verbose` are both advertised (activity stream for execPrompt). */
   streamJson: boolean
 }
@@ -79,6 +82,10 @@ export async function detectClaudeFlags(
         disallowedTools: /(?:^|[\s,])--(?:disallowedTools|disallowed-tools)(?=[\s<=,]|$)/m.test(
           helpText
         ),
+        mcpConfig:
+          /(?:^|[\s,])--mcp-config(?=[\s<=,]|$)/m.test(helpText) &&
+          /(?:^|[\s,])--strict-mcp-config(?=[\s<=,]|$)/m.test(helpText),
+        allowedTools: /(?:^|[\s,])--(?:allowedTools|allowed-tools)(?=[\s<=,]|$)/m.test(helpText),
         streamJson:
           /(?:^|[\s,])--output-format(?=[\s<=,]|$)/m.test(helpText) &&
           /stream-json/.test(helpText) &&

@@ -6,6 +6,7 @@ const (
 	FeatureWorkspaceKind   = "agent.execPrompt.workspaceKind"
 	FeatureChanges         = "agent.execPrompt.changes"
 	FeatureResultBlock     = "agent.execPrompt.resultBlock"
+	FeatureKnowledgeHub    = "agent.execPrompt.knowledgeHub"
 	FeatureCapabilities    = "agent.capabilities"
 	FeatureAIComplete      = "ai.complete"
 	FeatureAICompleteUsage = "ai.complete.usage"
