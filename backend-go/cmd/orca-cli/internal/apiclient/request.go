@@ -153,6 +153,12 @@ func (c *Client) ListClarifications(ctx context.Context, requestID string, q url
 	return c.getDoc(ctx, requestPath(requestID, "/clarifications"), q)
 }
 
+// AskClarification opens a Clarification of the given source about something the Request already holds (the open questions of
+// a Solution, for instance). The service decides who may ask and refuses the platform-only sources.
+func (c *Client) AskClarification(ctx context.Context, requestID string, body Document) (Document, error) {
+	return c.postDoc(ctx, requestPath(requestID, "/clarifications"), body)
+}
+
 func (c *Client) AnswerClarification(ctx context.Context, clarificationID string, body Document) (Document, error) {
 	return c.postDoc(ctx, "/v1/clarifications/"+url.PathEscape(clarificationID)+"/answer", body)
 }

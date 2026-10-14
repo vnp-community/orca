@@ -43,6 +43,7 @@ var requestFlowRoutes = []requestFlowRoute{
 	{http.MethodPost, "/{id}/proposal/cleanup", "request.cleanupProposal", byID},
 	{http.MethodPost, "/{id}/phases/{phaseTaskId}/start", "request.startPhase", phaseStart},
 	{http.MethodGet, "/{id}/clarifications", "clarification.list", byRequest},
+	{http.MethodPost, "/{id}/clarifications", "clarification.request", byRequest},
 }
 
 // projectEngineRoutes are absolute paths: ?check=true also asks the dev server whether what is switched on can run.

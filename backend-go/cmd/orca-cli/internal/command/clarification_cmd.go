@@ -13,7 +13,7 @@ import (
 
 func newClarificationCmd(e flowEnv) *cobra.Command {
 	cmd := &cobra.Command{Use: "clarification", Short: "questions the AI asked about a Request, and your answers"}
-	cmd.AddCommand(newClarificationListCmd(e), newClarificationAnswerCmd(e))
+	cmd.AddCommand(newClarificationListCmd(e), newClarificationAskCmd(e), newClarificationAnswerCmd(e))
 	return cmd
 }
 
@@ -97,5 +97,62 @@ func newClarificationAnswerCmd(e flowEnv) *cobra.Command {
 	cmd.Flags().StringArrayVar(&defaults, "accept-default", nil, "question-id whose suggested default you accept (repeatable)")
 	cmd.Flags().BoolVar(&incomplete, "partial", false, "save the answers without submitting them yet")
 	cmd.Flags().Int64Var(&version, "expected-version", 0, "the clarification version you saw (default: the current one)")
+	return cmd
+}
+
+// solutionOpenQuestionSource is the Clarification source whose answers the Solution gate looks for.
+const solutionOpenQuestionSource = "solution_open_question"
+
+// openQuestionsOf turns the open questions of one Solution into the questions of a Clarification. Only the blocking ones
+// stop the approval, so they are the default; all=true asks every question the Solution listed. The key is what the gate
+// matches an answer against, so it must stay "open_question:<id>".
+func openQuestionsOf(solutions []apiclient.Document, solutionID string, all bool) (qs []apiclient.Document, found bool) {
+	for _, s := range solutions {
+		if s.Str("id") != solutionID {
+			continue
+		}
+		found = true
+		for _, q := range s.Docs("options", "open_questions") {
+			if !all && !q.Bool("blocking") {
+				continue
+			}
+			qs = append(qs, apiclient.Document{
+				"questionKey": "open_question:" + q.Str("id"), "kind": "text", "required": true,
+				"prompt": q.Str("text"), "reason": "the Solution lists this as an open question",
+			})
+		}
+	}
+	return qs, found
+}
+
+func newClarificationAskCmd(e flowEnv) *cobra.Command {
+	var solution string
+	var all bool
+	cmd := &cobra.Command{
+		Use: "ask <request-id> --solution <solution-id>", Args: cobra.ExactArgs(1),
+		Short: "turn the blocking open questions of a Solution into a Clarification (the Solution gate needs them answered)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if solution == "" {
+				return e.usage("--solution is required: the Clarification is about one Solution's open questions")
+			}
+			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
+				listed, err := cli.ListSolutions(ctx, args[0], nil)
+				if err != nil {
+					return nil, err
+				}
+				qs, found := openQuestionsOf(listed.Docs("solutions"), solution, all)
+				switch {
+				case !found:
+					return nil, &apiclient.CLIError{StatusCode: 404, Code: "NOT_FOUND", Message: "this Request has no Solution " + solution}
+				case len(qs) == 0:
+					return nil, &apiclient.CLIError{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "the Solution has no open question that needs an answer (use --all for the non-blocking ones)"}
+				}
+				body := apiclient.Document{"source": solutionOpenQuestionSource, "sourceRef": solution, "questions": qs}
+				return cli.AskClarification(ctx, args[0], body)
+			}, nil)
+		},
+	}
+	cmd.Flags().StringVar(&solution, "solution", "", "the Solution whose open questions to ask")
+	cmd.Flags().BoolVar(&all, "all", false, "ask the non-blocking open questions too")
 	return cmd
 }
