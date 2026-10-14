@@ -62,3 +62,23 @@ Mỗi lần `plan generate` bằng engine `openspec` tạo một worktree trên 
 Worktree của một run **đang chạy** không bao giờ bị đụng, và chỉ gỡ worktree nằm đúng trên nhánh `request/<số>-proposal` của chính Request đó. Gỡ tay (chủ Request hoặc admin): `orca request cleanup <request-id>`; gói vẫn đọc được bằng `orca plan bundle`.
 
 Kiểm tra mồ côi: `python3 tests/stages/e2e/orca-flows/report_orphan_worktrees.py --repo <đường dẫn repo của project>` (thoát 1 nếu có worktree của Request đã huỷ hoặc không còn tồn tại; worktree của Request đã hoàn thành chỉ được liệt kê).
+
+## Ghi ngược tri thức và nợ duyệt của KG
+
+Orca **không bao giờ** áp thay đổi vào đồ thị tri thức (quyết định T1.7): agent chỉ sửa tài liệu thiết kế trong worktree của task và gọi `changeset_propose` (chạy thử, không commit). `orca request show` cho thấy báo cáo của các agent: tài liệu đã đổi, `proposal_id`, ok hay không, số phần tử bị chạm, và (khi Request `completed`) danh sách việc còn lại cho người. Một người áp đề xuất và chạy `tdd-agent -C <repo> generate`.
+
+Đo nợ duyệt trước và sau mỗi lần áp hay `generate` (Orca không đọc KG nên số liệu do chính tdd-agent in):
+
+```bash
+python3 specs/backend-go/crs/v8/tdd-agent-integration/evidence/review_debt.py snapshot --repo <repo> --out before.json
+# ... áp đề xuất / generate ...
+python3 specs/backend-go/crs/v8/tdd-agent-integration/evidence/review_debt.py snapshot --repo <repo> --out after.json
+python3 specs/backend-go/crs/v8/tdd-agent-integration/evidence/review_debt.py compare before.json after.json
+```
+
+Ngưỡng và cách gom lô (từ phép đo T1.6 trên KG pilot):
+
+- Đề xuất chỉ **thêm phần tử `own`** (`ChangeSpecItem`, `WorkItem`, `TestReceipt`) và cạnh giữa chúng, không cạnh tới tài liệu: nợ duyệt thêm **0** ở cỡ đến 20 thao tác; gom lô thoải mái và áp theo từng Request.
+- Đề xuất **sửa phần tử tài liệu** hoặc nối `traces_to` vào chúng: một thao tác có thể đặt lại cả thành phần liên thông (597 phần tử trên KG pilot, bất kể cỡ ChangeSet). Hoãn áp tới khi chủ KG chuẩn bị một đợt duyệt; sửa tài liệu rồi `generate` thay vì áp từng đề xuất.
+- Duyệt có chọn lọc theo lớp: `review_debt.py show` liệt kê số phần tử theo lớp và tài liệu; duyệt trước các lớp nhỏ, dễ kiểm (Decision, Constraint, Component) rồi mới đến Requirement và Attribute.
+- Quy tắc ngón tay cái: chạy `snapshot` ngay trước khi áp; nếu `compare` cho thấy hơn vài chục phần tử quay lại `needs_review` thì dừng và hỏi chủ KG.

@@ -90,21 +90,40 @@ func newRequestShowCmd(e flowEnv) *cobra.Command {
 				if solutions, serr := cli.ListSolutions(ctx, args[0], nil); serr == nil {
 					doc["analysisRuns"] = solutions["runs"]
 				}
+				if plan := doc.Str("request", "planTaskId"); plan != "" {
+					if wb, werr := cli.GetPlanWritebacks(ctx, plan); werr == nil {
+						doc["writebacks"] = wb
+					}
+				}
 				return doc, nil
 			}, renderRequestShow)
 		},
 	}
 }
 
-// renderRequestShow is renderRequest plus the latest analysis and plan runs with what their agent calls reported.
+// renderRequestShow is renderRequest plus the latest analysis and plan runs with what their agent calls reported, what the
+// agents said they wrote back to the design knowledge, and, once the Request is completed, what is left for a person.
 func renderRequestShow(doc apiclient.Document) string {
 	out := renderRequest(doc)
+	if section := renderRuns(doc); section != "" {
+		out += "\n" + section
+	}
+	if section := renderWritebacks(doc.Doc("writebacks")); section != "" {
+		out += "\n" + section
+	}
+	if doc.Str("request", "status") == "completed" {
+		out += "\n" + renderHandover(doc)
+	}
+	return out
+}
+
+func renderRuns(doc apiclient.Document) string {
 	runs := doc.Docs("analysisRuns")
 	if len(runs) == 0 {
-		return out
+		return ""
 	}
 	var b strings.Builder
-	b.WriteString(out + "\nruns:")
+	b.WriteString("runs:")
 	for i, r := range runs {
 		if i == 3 {
 			fmt.Fprintf(&b, "\n  ... %d older run(s)", len(runs)-3)

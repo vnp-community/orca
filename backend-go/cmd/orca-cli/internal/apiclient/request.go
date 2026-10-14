@@ -139,6 +139,12 @@ func (c *Client) GetTaskExecution(ctx context.Context, taskID string) (Document,
 	return c.getDoc(ctx, "/v1/tasks/"+url.PathEscape(taskID)+"/execution", nil)
 }
 
+// GetPlanWritebacks gathers what the agents of a Plan's tasks reported writing back to the design knowledge. Nothing in it
+// has been applied by anyone.
+func (c *Client) GetPlanWritebacks(ctx context.Context, planTaskID string) (Document, error) {
+	return c.getDoc(ctx, "/v1/tasks/"+url.PathEscape(planTaskID)+"/writebacks", nil)
+}
+
 func (c *Client) GetTaskSubtree(ctx context.Context, rootTaskID string) (Document, error) {
 	return c.getDoc(ctx, "/v1/tasks/"+url.PathEscape(rootTaskID)+"/subtree", nil)
 }

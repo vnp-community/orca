@@ -438,3 +438,24 @@ func TestHandleGetTaskExecution_AnswersWithTheResultViewOrAMappedError(t *testin
 		}
 	}
 }
+
+func TestHandleGetPlanWritebacks_AnswersWithTheSummaryOrAMappedError(t *testing.T) {
+	fake := &fakeTaskServiceClient{
+		getSubtreeResp: &taskv1.GetSubtreeResponse{Tasks: []*taskv1.Task{{Id: "plan", TaskType: "plan"}, {Id: "t1", TaskType: "task", Title: "Add"}}},
+		executionRecords: []*taskv1.ExecutionRecord{{
+			TaskId: "t1", Attempt: 1, ParseStatus: "ok", CreatedAt: timestamppb.Now(),
+			ResultJson: `{"writeback":{"documents":["docs/tdd/a.md"],"proposal_id":"cs-1","proposal_ok":true,"touched":["FR-1"]}}`,
+		}},
+	}
+	rec := httptest.NewRecorder()
+	taskTestRouter(fake).ServeHTTP(rec, withTestIdentity(httptest.NewRequest(http.MethodGet, "/v1/tasks/plan/writebacks", nil), usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"proposalId":"cs-1"`) || !strings.Contains(rec.Body.String(), `"proposals":1`) {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	broken := &fakeTaskServiceClient{getSubtreeErr: status.Error(codes.PermissionDenied, "no")}
+	rec = httptest.NewRecorder()
+	taskTestRouter(broken).ServeHTTP(rec, withTestIdentity(httptest.NewRequest(http.MethodGet, "/v1/tasks/plan/writebacks", nil), usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("denied: %d %s", rec.Code, rec.Body.String())
+	}
+}
