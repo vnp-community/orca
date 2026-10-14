@@ -9,6 +9,8 @@
 4. **Orca không tự gọi MCP lấy knowledge; việc đó do agent được Orca gọi làm** (bằng MCP và skill).
 5. **`plan generate`: AI kết hợp knowledge tdd và trả đầu ra là bộ tài liệu OpenSpec.**
 
+**Tiến độ (2026-10-14):** Giai đoạn 0 đến 2 xong (T0.1 đến T2.15), có code, test và hai lần chạy thật qua stack local; Giai đoạn 3 đến 5 chưa. Hợp đồng đã đổi: [CONTRACTS.md](../CONTRACTS.md). Quyết định đã chốt: ghi ngược tri thức chỉ **đề xuất**, người áp tay (T1.7); task xong khi `Verify` có kiểm tra `exit=0` (T2.11); pilot không hợp nhất (BL-J01 mở).
+
 **Checklist:** [CHECKLIST-TDD-002](../tasks/CHECKLIST-TDD-002-knowledge-hub.md)
 **Quan hệ với SOL-TDD-001:** giữ worktree pilot, KG, CR và các khảo sát; bỏ pipeline `change` (G0–G7, `receipt`, `archive`). Ý tưởng "run agent ghi OpenSpec trong worktree riêng" của SOL-001 được dùng lại, nhưng **AI tự viết OpenSpec** bằng KG và CLI `openspec`, không qua tdd-agent.
 **Trạng thái:** thiết kế và bộ skill (bản nháp, chưa thử trên agent thật); chưa có code Orca cho luồng này. Engine `openspec` của CR-REQ-026 đã có khung nhưng còn stub (2.4).

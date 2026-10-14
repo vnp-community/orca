@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/engine_readiness_gate.go`, `internal/usecase/ports.go` (sửa), `internal/adapter/grpcclient/dev_server_executor.go`, `internal/domain/semver_compare.go` và test (mới)
 **Depends on:** TASK-REQ-026-01, TASK-REQ-007-04 (`ProjectContextResolver`, adapter Relay), TASK-REQ-008-02 (adapter `agent.execPrompt`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-14), mở rộng: agent, skill, `.tdd-agent`, cache 10 phút (T2.3, T2.10)
 
 ---
 

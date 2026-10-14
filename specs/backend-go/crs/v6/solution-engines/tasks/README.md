@@ -1,6 +1,6 @@
 # Tasks backend: solution-engines (v6)
 
-> 📋 Proposed. Mỗi task 0,5 đến 2 ngày. Đường dẫn tương đối tới `backend-go/services/request-service/` (mới) trừ khi ghi khác. Tất cả `Status: [ ] TODO`, chưa chạy test nào.
+> 🔧 **Đã hiện thực một phần (2026-10-14) theo [SOL-TDD-002](../../../v8/tdd-agent-integration/solutions/SOL-TDD-002-tdd-agent-as-knowledge-hub.md)**: xem bảng "Trạng thái hiện thực" bên dưới và [CONTRACTS.md](../../../v8/tdd-agent-integration/CONTRACTS.md). Mỗi task 0,5 đến 2 ngày. Đường dẫn tương đối tới `backend-go/services/request-service/` (mới) trừ khi ghi khác. Tất cả `Status: [ ] TODO`, chưa chạy test nào.
 
 ## Bảng Solution, Task
 
@@ -14,6 +14,19 @@
 | | [TASK-REQ-026-06](./TASK-REQ-026-06-openspec-engine-generate-analysis.md) | `openspecEngine.GenerateAnalysis`, `ProposalWorkspace`, kiểm phạm vi ghi | P1 |
 | | [TASK-REQ-026-07](./TASK-REQ-026-07-openspec-plan-tasks-sync-and-archive.md) | `GeneratePlan`, `TasksMdSyncer`, archive sau `request.completed` | P1 |
 | | [TASK-REQ-026-08](./TASK-REQ-026-08-engine-settings-rpc-metrics-and-integration.md) | RPC `Get/SetProjectEngineSettings`, metric, audit, tích hợp hai dialect | P1 |
+
+## Trạng thái hiện thực (2026-10-14)
+
+| Task | Trạng thái | Ghi chú |
+|---|---|---|
+| 026-01 domain | xong | như kiểm toán 2026-10-07 |
+| 026-02 migration, repository | xong | `0007`, `0094`, `0095`, `0096`; repository Postgres + MySQL có contract test chạy thật trên cả hai |
+| 026-03 parser, renderer `tasks.md` | xong, **hợp đồng khác bản gốc** | `depends` tương đối trong container, phụ thuộc phase trước thành `DependsOnPhaseIndices`, một vùng duy nhất, bốn dòng `Serves/Code/Verify/Done when` (CONTRACTS.md mục 3) |
+| 026-04 readiness gate | xong, mở rộng | thêm agent, skill, `.tdd-agent`, cache 10 phút, tách blocker và gap tri thức |
+| 026-05 giao diện engine, ghim | xong | `engine_override` từ client chỉ nhận `native` |
+| 026-06 `openspecEngine.GenerateAnalysis` | **không làm theo hướng này** | SOL-TDD-002: Solution không dùng engine `openspec`; dùng agent chỉ đọc có KG (cờ `solution_agent`). Phần `ProposalWorkspace`, kiểm phạm vi ghi và `GenerateProposal` (Plan) đã xong |
+| 026-07 `GeneratePlan`, `TasksMdSyncer`, archive | một phần | `GeneratePlan` do agent viết change: xong. `TasksMdSyncer` và archive sau `request.completed`: chưa (T3.3) |
+| 026-08 RPC, metric, audit | xong | RPC (admin, audit bền), kênh và REST, bốn series metric, tích hợp hai dialect |
 
 ## Thứ tự phụ thuộc
 

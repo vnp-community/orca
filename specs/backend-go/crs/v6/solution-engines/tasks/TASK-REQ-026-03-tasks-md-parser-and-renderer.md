@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/tasks_md_parser.go`, `internal/domain/tasks_md_render.go`, `internal/domain/tasks_md_parser_test.go`, `internal/domain/tasks_md_render_test.go`, `testdata/openspec/tasks_*.md` (mới)
 **Depends on:** TASK-REQ-012-03 (`PlanProposal`, `PhaseProposal`, `TaskProposal`, `ValidateProposal`), TASK-REQ-027-04 (`Violation`, khối `orca-json`; nếu chưa có thì định nghĩa `Violation` tạm ở `engine_errors.go` và đổi khi 027-04 xong)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-14) với hợp đồng `tasks.md` của SOL-TDD-002 (T2.4): xem CONTRACTS.md mục 3
 
 ---
 

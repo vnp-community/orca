@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/solution_engine.go`, `internal/usecase/engine_native.go`, `internal/usecase/pin_solution_engine.go`, `internal/usecase/generate_solution.go` (sửa, của SOL-007), `internal/usecase/run_solution_generation.go` (sửa), `internal/usecase/generate_plan.go` (sửa, của SOL-012), `internal/usecase/confirm_request_type.go` (sửa, của SOL-005), `proto/orca/request/v1/request.proto` (sửa)
 **Depends on:** TASK-REQ-026-01, 026-02, 026-04, TASK-REQ-007-05 (GenerateSolution), TASK-REQ-012-05 (GeneratePlan/CommitPlan), TASK-REQ-005-05 (ConfirmRequestType)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-14): giao diện, `nativeEngine`, ghim (T2.2); `engine_override` từ client chỉ nhận `native`
 
 ---
 
