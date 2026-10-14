@@ -19,7 +19,7 @@ corrupts it, so decide the kind first.
 | Kind | Examples | How it is updated |
 |---|---|---|
 | **Document facts** (origin: URD, SRS, SAD) | a requirement's text, a business rule, an entity attribute, a decision | Edit the **document** (SRS or TDD) in the task's worktree; the KG is rebuilt from the documents by `tdd-agent generate` (done by the pipeline or the owner, not by you). The **SAD is read-only**: never edit it; if a change contradicts an ADR, report it. |
-| **KG-only facts** (origin: own) | which code symbol implements a requirement, which test verifies it, a test receipt, a work item | A **ChangeSet** proposed with `changeset_propose`. |
+| **KG-only facts** (origin: own) | which code target a change spec item names, the work item that implements it, the test receipt that verifies the work item | A **ChangeSet** proposed with `changeset_propose`. |
 
 ## 1. Find the affected zone
 
@@ -43,14 +43,18 @@ corrupts it, so decide the kind first.
 ## 3. KG-only facts: propose a ChangeSet
 
 1. Read the head with `kg_snapshots` (limit 1) and note the snapshot id.
-2. Build a ChangeSet with `ops` of kind `add`, `link`, `modify`, `unlink`
-   (`remove`, `merge` and `supersede` are for the owner), a unique `id`, and
-   `base_version` set to the version you read. Each `modify` states `path`,
-   `before` and `after` and fails if `before` does not match.
-3. Use only classes and relations the ontology registers (for example
-   `TestReceipt`, `AcceptanceReceipt`, `ChangeSpecItem`, `RepoSnapshot` and
-   relations such as `implements`, `verifies`, `has_scenario`); an unknown
-   class makes the proposal fail validation.
+2. Build a ChangeSet with `ops` of kind `add` and `link` between **own-origin**
+   elements only (`modify`, `unlink`, `remove`, `merge` and `supersede` are for the
+   owner), a unique `id`, and `base_version` set to the version you read.
+3. The own-origin chain is `ChangeSpecItem` <- `implements` <- `WorkItem` <-
+   `verifies` <- `TestReceipt`. A `ChangeSpecItem` needs `action`, `code_target`,
+   `srs_refs`, `tdd_refs`, `verification`, `cr_acceptance_refs`; a `TestReceipt` needs
+   `cs_id`, `criterion_refs`, `result`, `executed_at`; every element needs a
+   `provenance` entry. Name the requirements, rules and criteria in the `*_refs`
+   properties. **Never add an edge from an own element to a document element**
+   (`traces_to` to a requirement is accepted but marks every connected element, up to
+   65% of the graph, as needing review again). An unknown class, relation or a
+   missing property makes the proposal fail validation.
 4. Call `changeset_propose {changeset, base_snapshot}`. It **dry-runs** the
    ChangeSet, stores a proposal and returns `proposal_id`, `ok` and a `report`.
    It never commits. If `ok` is false (`SAD_READONLY`, `VERSION_CONFLICT`,
@@ -60,9 +64,9 @@ corrupts it, so decide the kind first.
 
 ## 4. Effects to report
 
-Committing a ChangeSet marks the touched elements, and elements connected to
-them, as needing review again. In a hub-shaped graph that can be most of the
-connected part. State the number of touched ids in your result so the owner can
+Committing a ChangeSet marks the touched elements, and every element connected to
+them, as needing review again; an `add` with no edge to a document element marks
+nothing else. State the number of touched ids in your result so the owner can
 judge before committing.
 
 ## Never
