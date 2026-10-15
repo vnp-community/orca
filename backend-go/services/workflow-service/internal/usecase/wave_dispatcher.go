@@ -258,6 +258,7 @@ func (d *waveDispatcher) dispatchStep(ctx context.Context, step domain.Step, se 
 
 	snapshot := execCtx.snapshot()
 	ctx = tenant.WithUserID(tenant.WithProjectID(ctx, snapshot.ProjectID), snapshot.UserID)
+	ctx = WithStepIdentity(ctx, StepIdentity{ExecutionID: se.ExecutionID, StepID: se.StepID})
 
 	interpolated, ierr := domain.Interpolate(string(step.Config), snapshot)
 	if ierr != nil {

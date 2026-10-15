@@ -2144,6 +2144,18 @@
     "kind": "unary"
   },
   {
+    "name": "workflow.stepApproval.get",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.stepApproval.list",
+    "kind": "unary"
+  },
+  {
+    "name": "workflow.stepApproval.resolve",
+    "kind": "unary"
+  },
+  {
     "name": "workflow.template.clone",
     "kind": "unary"
   },

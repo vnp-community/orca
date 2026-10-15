@@ -68,6 +68,13 @@ type Config struct {
 	// replacing the direct cfg.DatabaseDSN read main.go used to do —
 	// mirrors usage-service's (the pilot) identical field 1:1.
 	DatabaseCredentialsFile string
+	// TddAgentEnabled registers the tdd_agent.* action handlers
+	// (docs/integrate/TDD-WF-AGENT-001); off by default until the dev
+	// servers run an agent with mcp.callTool.
+	TddAgentEnabled bool
+	// StepApproverRoles are the project roles that may decide step approvals
+	// (WORKFLOW_STEP_APPROVER_ROLES, comma-separated; default owner).
+	StepApproverRoles []string
 }
 
 func Load() (Config, error) {
@@ -88,6 +95,8 @@ func Load() (Config, error) {
 		TaskServiceAddr:         commonconfig.StringEnv("TASK_SERVICE_ADDR", "task-service:9090"),
 		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
+		TddAgentEnabled:         isTrue(commonconfig.StringEnv("WORKFLOW_TDD_AGENT_ENABLED", "")),
+		StepApproverRoles:       splitCSV(commonconfig.StringEnv("WORKFLOW_STEP_APPROVER_ROLES", "owner")),
 	}, nil
 }
 
@@ -104,4 +113,12 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+func isTrue(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }

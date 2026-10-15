@@ -137,3 +137,30 @@ func (c *CleanupAuditClient) WriteCleanupReport(ctx context.Context, runID strin
 	_, err = c.client.WriteCleanupReport(ctx, &automationv1.WriteCleanupReportRequest{RunId: runID, Entries: protoEntries})
 	return err
 }
+
+// MemberRole returns userID's role in projectID ("owner", "member") or "" when
+// they are not a member — the step-approval permission check. ListMembers is
+// membership-gated, so the acting user is forwarded with the tenant.
+func (c *ProjectClient) MemberRole(ctx context.Context, projectID, userID string) (string, error) {
+	outCtx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return "", fmt.Errorf("serviceclients: project-service ListMembers: %w", err)
+	}
+	outCtx = metadata.AppendToOutgoingContext(outCtx, grpcmw.MetadataUserID, userID)
+	resp, err := c.client.ListMembers(outCtx, &projectv1.ListMembersRequest{ProjectId: projectID})
+	if err != nil {
+		return "", fmt.Errorf("serviceclients: project-service ListMembers: %w", err)
+	}
+	for _, m := range resp.GetMembers() {
+		if m.GetUserId() != userID {
+			continue
+		}
+		switch m.GetRole() {
+		case projectv1.ProjectRole_PROJECT_ROLE_OWNER:
+			return "owner", nil
+		case projectv1.ProjectRole_PROJECT_ROLE_MEMBER:
+			return "member", nil
+		}
+	}
+	return "", nil
+}

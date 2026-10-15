@@ -248,3 +248,18 @@ Quản trị viên có thể tắt các phân hệ Code Intelligence hoặc Qual
      - Các lệnh gọi trực tiếp tool CLI legacy `gitnexus` / `codegraph` qua `tools/call` vẫn chạy độc lập và không chịu ảnh hưởng bởi switch này.
      - Trong chế độ `--stdio` hoặc chạy qua SSH session, các biến môi trường được kế thừa trực tiếp từ session env.
    - *Ghi chú môi trường kiểm thử*: Đã kiểm chứng tự động qua bộ kiểm thử tự động của agent (`runtime-switches.test.ts`, `disabled-gate.test.ts`, `disabled-capabilities.test.ts`, `disabled-startup.test.ts`); chưa thử trên dev server vật lý trong môi trường local này.
+
+---
+
+## MCP bridge (`mcp.callTool`)
+
+Workflow step `action tdd_agent.*` (workflow-service) gọi tool của MCP server cài trên dev server qua RPC `mcp.callTool`
+(xem `docs/integrate/TDD-WF-AGENT-001-workflow-agent-pipeline.md` §7.1, hợp đồng ở `docs/integrate/contracts/`).
+
+- Mặc định chỉ có server `tdd-agent` (`tdd-agent -C <projectDir> mcp serve --transport stdio`) với các tool
+  `run_start, run_get, run_list, run_dispatch, run_cancel, generate_start, change_start, approval_submit, trace_get, kg_snapshots`.
+- `projectDir` phải là repo git nằm dưới `ORCA_MCP_BRIDGE_ROOTS` (mặc định `AGENT_WORK_DIR`).
+- Mỗi `(server, projectDir)` giữ một tiến trình MCP, đóng sau 10 phút rảnh và khi agent dừng. Một lời gọi tối đa 120 s.
+- Lỗi của cầu nối trả trong `result` (`ok: false`, `error.code` = `MCP_*`), lỗi của tool là `isError: true` kèm mã của tool.
+- Cài tdd-agent trên dev server và cho phép ghi/duyệt qua MCP: xem `docs/CLI_Project_Usage.md` của repo `tdd-agentic-ai`
+  (mục "Client từ xa (workflow Orca)").

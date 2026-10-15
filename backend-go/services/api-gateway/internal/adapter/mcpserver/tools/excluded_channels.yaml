@@ -725,3 +725,6 @@
 - pattern: "request.review.profile.*"
   category: request_flow
   reason: "The drawing profile is tenant and project configuration (read by anyone, written by an admin); an agent has no use for it and the write RPCs are human only."
+- pattern: "workflow.stepApproval.*"
+  category: human_gate
+  reason: "Step approvals record a person's decision on a running workflow step (docs/integrate/TDD-WF-AGENT-001 §7.5); an MCP agent must not approve or reject on a human's behalf."

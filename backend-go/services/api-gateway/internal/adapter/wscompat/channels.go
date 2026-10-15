@@ -187,6 +187,7 @@ func RegisterRealChannels(
 	registerTenantProjectChannels(r, tenantClient, projectClient)
 	registerOrcaProjectSharingChannels(r, projectClient)
 	registerWorkflowChannels(r, workflowClient)
+	registerWorkflowStepApprovalChannels(r, workflowClient)
 	registerAgentChannels(r, infraFleetClient, eventBusConsumer)
 	registerDevServerStatusSubscribeChannel(r, eventBusConsumer)
 	registerAdminUserChannels(r, authClient, tenantClient)
