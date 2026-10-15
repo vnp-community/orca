@@ -15,9 +15,9 @@
 | 1. Kiểm chứng (không sửa Orca) | 9 | 9 | **go/no-go T1.9** |
 | 2. Orca: engine, agent, kiểm cấu trúc | 15 | 15 | test xanh, cờ tắt = hành vi cũ |
 | 3. Hoàn tất và ghi ngược | 5 | 5 | đồng bộ, archive, bàn giao |
-| 4. e2e ba bước trên CR thật | 8 | 7 | nghiệm thu SOL-002 mục 5 |
+| 4. e2e ba bước trên CR thật | 8 | 8 | nghiệm thu SOL-002 mục 5 |
 | 5. Củng cố | 4 | 0 | báo cáo bảo mật, quyết định |
-| **Tổng** | **46** | **41** |
+| **Tổng** | **46** | **42** |
 
 **Phụ thuộc:** G0 → G1 → (go) → G2 → G3 → G4 → G5. Trong G1: T1.4 chặn T2.9; T1.5 chặn T2.4, T2.5; T1.7 chặn T3.1; T1.8 chặn T2.6. Trong G2: T2.1 và T2.2 trước T2.4; T2.3 trước T2.4; T2.4 trước T2.5, T2.6, T2.7.
 
@@ -89,7 +89,7 @@ Chạy bằng `claude --print` trong một **bản sao thử** của worktree pi
 - [x] **T4.5** Kiểm mã và phạm vi: test của dự án cho phần đã làm xanh trong worktree task; không đổi ngoài phạm vi (kể cả `services/infrastructure/integration-hub/`); không push; dấu vân tay thư mục chính không đổi; 0 Request mồ côi. Xong khi: báo cáo kèm diff tóm tắt. Chi tiết: [TASK-TDD-002-T4-05-verify-code-and-scope.md](TASK-TDD-002-T4-05-verify-code-and-scope.md). **Kết quả (2026-10-14):** `pilot_guard compare`: 0 vi phạm; `git push --dry-run` thất bại cả 4 dạng; 24 package Go chạy lại độc lập trong ba worktree task đều xanh, không đường dẫn được bảo vệ bị đổi; 0 Request mồ côi, 0 worktree proposal mồ côi. Báo cáo: `specs/backend-go/crs/v8/tdd-agent-integration/evidence/T4.5-diff-report.md`.
 - [x] **T4.6** BL-H02 sau khi BL-H01 `completed`, cùng quy trình. Xong khi: như T4.4 và T4.5. Chi tiết: [TASK-TDD-002-T4-06-bl-h02-end-to-end.md](TASK-TDD-002-T4-06-bl-h02-end-to-end.md). **Kết quả (2026-10-14):** BL-H02 chạy tới 23/26 task, Solution có xung đột INT-03 và ADR-12, plan 6 phase/26 task/14 scenario, AC 1 đến 6 đều có scenario. Task cuối `needs_info` đúng thiết kế (cần người), Request về `request_backlog`. Bằng chứng: `specs/backend-go/crs/v8/tdd-agent-integration/evidence/T4.6/`.
 - [x] **T4.7** Ghi số liệu (Phụ lục C) và đối chứng có/không KG, `ai.complete`/engine `openspec`. Xong khi: bảng đối chiếu SOL-002 mục 5. Chi tiết: [TASK-TDD-002-T4-07-collect-metrics-and-compare.md](TASK-TDD-002-T4-07-collect-metrics-and-compare.md). **Kết quả (2026-10-14):** Báo cáo một trang và bảng đối chiếu 7 tiêu chí mục 5: 6 đạt, tiêu chí 5 (ghi ngược `changeset_propose`) không đạt theo thiết kế vì MCP bật `--read-only`. Chi phí ước tính ~$160 (BL-H01) và ~$114 (BL-H02). Báo cáo: `specs/backend-go/crs/v8/tdd-agent-integration/evidence/T4.7-report.md`.
-- [ ] **T4.8** Dọn: huỷ/hoàn tất Request thử, gỡ worktree task và worktree proposal, khôi phục agent. Xong khi: `report_orphan_requests.py` báo 0 mồ côi. Chi tiết: [TASK-TDD-002-T4-08-cleanup-after-pilot.md](TASK-TDD-002-T4-08-cleanup-after-pilot.md).
+- [x] **T4.8** Dọn: huỷ/hoàn tất Request thử, gỡ worktree task và worktree proposal, khôi phục agent. Xong khi: `report_orphan_requests.py` báo 0 mồ côi. Chi tiết: [TASK-TDD-002-T4-08-cleanup-after-pilot.md](TASK-TDD-002-T4-08-cleanup-after-pilot.md). **Kết quả (2026-10-14):** Hai Request huỷ, project pilot và chính sách tự duyệt gỡ, 3 worktree task gỡ (code lưu thành patch ngoài repo), agent khôi phục; 0 Request mồ côi, 0 worktree mồ côi, guard 0 vi phạm. Ghi chú: `specs/backend-go/crs/v8/tdd-agent-integration/evidence/T4.8-cleanup.md`.
 
 ## Giai đoạn 5: củng cố và quyết định
 
