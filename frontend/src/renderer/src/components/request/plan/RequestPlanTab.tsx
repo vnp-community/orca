@@ -13,6 +13,7 @@ import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '../../../store'
 import { usePlanTree } from '../../../hooks/usePlanTree'
+import { usePlanRunInFlight } from '../../../hooks/usePlanRunInFlight'
 import { usePlanDecision } from '../../../hooks/usePlanDecision'
 import { REQUEST_FLOW_REGISTRY } from '../../../../../shared/request-flow-registry'
 import { buildStageTimeline } from '../request-stage-timeline-model'
@@ -57,6 +58,8 @@ export function RequestPlanTab({
     onChanged()
   }, [refetch, onChanged])
   const decision = usePlanDecision(request, onSettled)
+  // Why: a refreshed tab has lost its local busy state, but the server run goes on and a second click must not look possible.
+  const planRunning = usePlanRunInFlight(request, onSettled)
   const requestDecisions = useDecisions(request.id)
 
   const approvalMap = useMemo(
@@ -109,7 +112,7 @@ export function RequestPlanTab({
           state={state === 'ready' ? 'error' : state}
           currentStepLabel={current ? translate(current.labelKey, current.id) : undefined}
           canGenerate={canGeneratePlan(request.status)}
-          generating={decision.isBusy('generatePlan')}
+          generating={decision.isBusy('generatePlan') || planRunning}
           generateError={generateFailure ? planDecisionErrorMessage(generateFailure) : null}
           generateAiCode={firstAiSetupCode(generateFailure?.error.backendCode)}
           onGenerate={() => void decision.regeneratePlan()}
