@@ -16,8 +16,8 @@
 | 2. Orca: engine, agent, kiểm cấu trúc | 15 | 15 | test xanh, cờ tắt = hành vi cũ |
 | 3. Hoàn tất và ghi ngược | 5 | 5 | đồng bộ, archive, bàn giao |
 | 4. e2e ba bước trên CR thật | 8 | 8 | nghiệm thu SOL-002 mục 5 |
-| 5. Củng cố | 4 | 0 | báo cáo bảo mật, quyết định |
-| **Tổng** | **46** | **42** |
+| 5. Củng cố | 4 | 1 | báo cáo bảo mật, quyết định |
+| **Tổng** | **46** | **43** |
 
 **Phụ thuộc:** G0 → G1 → (go) → G2 → G3 → G4 → G5. Trong G1: T1.4 chặn T2.9; T1.5 chặn T2.4, T2.5; T1.7 chặn T3.1; T1.8 chặn T2.6. Trong G2: T2.1 và T2.2 trước T2.4; T2.3 trước T2.4; T2.4 trước T2.5, T2.6, T2.7.
 
@@ -93,7 +93,7 @@ Chạy bằng `claude --print` trong một **bản sao thử** của worktree pi
 
 ## Giai đoạn 5: củng cố và quyết định
 
-- [ ] **T5.1** Test e2e tự động cho luồng mới trên repo tạm (cách bộ e2e hiện có: stack local, Claude thật, không động vào dữ liệu người dùng). Xong khi: chạy xanh. Chi tiết: [TASK-TDD-002-T5-01-automated-e2e-for-new-flow.md](TASK-TDD-002-T5-01-automated-e2e-for-new-flow.md).
+- [x] **T5.1** Test e2e tự động cho luồng mới trên repo tạm (cách bộ e2e hiện có: stack local, Claude thật, không động vào dữ liệu người dùng). Xong khi: chạy xanh. Chi tiết: [TASK-TDD-002-T5-01-automated-e2e-for-new-flow.md](TASK-TDD-002-T5-01-automated-e2e-for-new-flow.md). **Kết quả (2026-10-14):** `run_cli_flow.py --real knowledge` chạy xanh (22 kiểm tra) trên repo tạm, size M, Claude thật: Solution trích graph, gói OpenSpec đạt kiểm cấu trúc, mọi task chạy check exit 0, Request `completed`, change được archive trên nhánh, có commit tick và archive, bàn giao có liệt kê, không push. Đây là lần đầu archive và bàn giao chạy thật. Nhật ký: `specs/backend-go/crs/v8/tdd-agent-integration/evidence/T5.1-e2e-run.log`.
 - [ ] **T5.2** Đánh giá bảo mật engine `openspec` và agent có MCP: chèn lệnh qua Request và qua nội dung KG; vùng ghi; mạng; push; quyết định B4. Xong khi: báo cáo và quyết định. Chi tiết: [TASK-TDD-002-T5-02-security-assessment.md](TASK-TDD-002-T5-02-security-assessment.md).
 - [ ] **T5.3** Quyết định mở rộng: phản biện độc lập gói OpenSpec (Q2), loại Request khác (Q3), `light` profile cho bug/security/performance, bật prose có kiểm soát để KG giàu hơn, tái xét pipeline `change`. Xong khi: ghi chú quyết định. Chi tiết: [TASK-TDD-002-T5-03-expansion-decisions.md](TASK-TDD-002-T5-03-expansion-decisions.md).
 - [ ] **T5.4** Tổng kết pilot: số liệu T4.7, những gì skill/prompt đã đổi, nợ còn lại chuyển thành task riêng. Xong khi: báo cáo ngắn và danh sách task. Chi tiết: [TASK-TDD-002-T5-04-retrospective-and-debt.md](TASK-TDD-002-T5-04-retrospective-and-debt.md).
