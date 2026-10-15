@@ -464,6 +464,10 @@ services:
       # Global switch of the request flow; each tenant is also switched on with SetRequestFlowSettings
       # (docs/guides/request/admin-enable-request-flow.md). Both must be on for the flow to run.
       REQUEST_FLOW_ENABLED: ${REQUEST_FLOW_ENABLED:-false}
+      # What a project without saved engine settings runs with (a saved setting always wins): the OpenSpec engine for Plan
+      # and the agent-written Solution that reads the knowledge graph. Both default off; see docs/guides/request/knowledge-hub-setup.md.
+      REQUEST_DEFAULT_ENGINE: ${REQUEST_DEFAULT_ENGINE:-native}
+      REQUEST_DEFAULT_SOLUTION_AGENT: ${REQUEST_DEFAULT_SOLUTION_AGENT:-false}
       # Shared secret issue-status-sync presents for LookupRequestBySource; empty refuses the call.
       SERVICE_INTERNAL_TOKEN: ${REQUEST_SERVICE_INTERNAL_TOKEN:-}
       # Gateway presents the same value as REQUEST_INTERNAL_CALLER_TOKEN; empty makes every RPC refuse.

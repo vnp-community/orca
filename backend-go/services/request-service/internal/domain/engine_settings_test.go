@@ -48,3 +48,23 @@ func TestEffectiveEngine_Table(t *testing.T) {
 		t.Errorf("expected 27 tests, ran %d", count)
 	}
 }
+
+func TestEngineDefaultsFromEnv(t *testing.T) {
+	get := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+	cases := []struct {
+		name  string
+		env   map[string]string
+		want  EngineDefaults
+		warns int
+	}{
+		{"unset keeps native and off", nil, EngineDefaults{Engine: EngineNative}, 0},
+		{"both on", map[string]string{"REQUEST_DEFAULT_ENGINE": " OpenSpec ", "REQUEST_DEFAULT_SOLUTION_AGENT": "true"}, EngineDefaults{Engine: EngineOpenSpec, SolutionAgent: true}, 0},
+		{"unreadable values keep the safe default and warn", map[string]string{"REQUEST_DEFAULT_ENGINE": "fast", "REQUEST_DEFAULT_SOLUTION_AGENT": "maybe"}, EngineDefaults{Engine: EngineNative}, 2},
+	}
+	for _, c := range cases {
+		got, warns := EngineDefaultsFromEnv(get(c.env))
+		if got != c.want || len(warns) != c.warns {
+			t.Errorf("%s: got %+v %v", c.name, got, warns)
+		}
+	}
+}

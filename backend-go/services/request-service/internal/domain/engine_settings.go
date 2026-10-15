@@ -3,6 +3,8 @@ package domain
 import (
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -49,4 +51,32 @@ func EffectiveEngine(pinned *EngineName, settings *ProjectEngineSettings, profil
 		return settings.Engine
 	}
 	return EngineNative
+}
+
+// EngineDefaults is what a project without saved settings runs with. An explicit project setting always wins.
+type EngineDefaults struct {
+	Engine        EngineName
+	SolutionAgent bool
+}
+
+// EngineDefaultsFromEnv reads REQUEST_DEFAULT_ENGINE (native|openspec) and REQUEST_DEFAULT_SOLUTION_AGENT (true|false).
+// Unset keeps native and off, so a deployment opts in on purpose; a value that cannot be read keeps the safe default and says so.
+func EngineDefaultsFromEnv(getenv func(string) string) (EngineDefaults, []string) {
+	d, warnings := EngineDefaults{Engine: EngineNative}, []string(nil)
+	switch raw := strings.ToLower(strings.TrimSpace(getenv("REQUEST_DEFAULT_ENGINE"))); raw {
+	case "":
+	case string(EngineNative), string(EngineOpenSpec):
+		d.Engine = EngineName(raw)
+	default:
+		warnings = append(warnings, "REQUEST_DEFAULT_ENGINE "+strconv.Quote(raw)+" is not native or openspec; native applies")
+	}
+	switch raw := strings.ToLower(strings.TrimSpace(getenv("REQUEST_DEFAULT_SOLUTION_AGENT"))); raw {
+	case "":
+	case "true", "1", "yes", "on":
+		d.SolutionAgent = true
+	case "false", "0", "no", "off":
+	default:
+		warnings = append(warnings, "REQUEST_DEFAULT_SOLUTION_AGENT "+strconv.Quote(raw)+" is not true or false; off applies")
+	}
+	return d, warnings
 }

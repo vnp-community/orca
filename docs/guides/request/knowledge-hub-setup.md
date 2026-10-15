@@ -23,6 +23,17 @@ Orca **không** gọi MCP hay đồ thị tri thức; agent mà Orca chạy trê
 4. **Thư mục làm việc của agent** (`AGENT_WORK_DIR`) phải chứa cả repo lẫn các worktree nằm cạnh nó: worktree proposal và worktree task là `<repo>-<nhánh>` cạnh repo, và agent từ chối ghi tệp ngoài thư mục này (`Path outside project root`), nên một repo đứng ngoài khiến run `plan generate` thất bại sau khi đã tốn chi phí. Kiểm trước khi chạy agent thật bằng `python3 tests/stages/e2e/orca-flows/workspace_probe.py --worktree-id <id> --worktree-path <thư mục>` trên worktree proposal của một Request thử: nó chạy đúng các lời gọi tệp và git mà Orca dùng (stat, đọc, ghi, commit, huỷ) và không tốn lượt AI.
 5. **Agent Orca** đủ mới (báo `agent.execPrompt.knowledgeHub`, `agent.execPrompt.permissionProfile`, ...). Agent cũ không bị hỏng: chỉ không dùng được hai cờ.
 
+## Bật mặc định cho cả triển khai
+
+Muốn mọi project **chưa có cài đặt riêng** chạy luồng mới (UI cũng vậy, không cần `engine set` từng project), đặt cho request-service:
+
+```bash
+REQUEST_DEFAULT_ENGINE=openspec          # native (mặc định) hoặc openspec
+REQUEST_DEFAULT_SOLUTION_AGENT=true      # false (mặc định) hoặc true
+```
+
+Trong `deploy/dev` hai biến này đọc từ `.env` qua `docker-compose.yml`; đổi xong phải tạo lại container (`./deploy/dev/scripts/redeploy-local.sh request-service api-gateway`). Cài đặt đã lưu của một project luôn thắng giá trị mặc định, kể cả khi nó tắt hết; project mặc định hiện `version 0`. Giá trị không đọc được thì giữ `native` và tắt, kèm một dòng cảnh báo trong log. Lưu ý: engine của một Request bị ghim ở lần sinh đầu tiên, nên Request đã sinh trước khi bật mặc định vẫn chạy engine cũ.
+
 ## Bật và kiểm tra
 
 ```bash

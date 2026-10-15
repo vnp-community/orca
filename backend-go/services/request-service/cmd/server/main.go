@@ -24,6 +24,7 @@ import (
 	eventbusadapter "github.com/stablyai/orca-go/services/request-service/internal/adapter/eventbus"
 	requestgrpc "github.com/stablyai/orca-go/services/request-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/request-service/internal/config"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 	"google.golang.org/grpc"
 	grpchealth "google.golang.org/grpc/health"
@@ -83,6 +84,11 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 	defer stores.close()
+	engineDefaults, defaultWarnings := domain.EngineDefaultsFromEnv(os.Getenv)
+	for _, w := range defaultWarnings {
+		log.Warn(w)
+	}
+	stores.engineSettings = usecase.NewDefaultedEngineSettings(stores.engineSettings, engineDefaults)
 	outboxStore := stores.outbox
 	rollout, err := wireRollout(cfg, log, stores) // wraps stores.tx and stores.outboxWriter: keep before any use case is built
 	if err != nil {
