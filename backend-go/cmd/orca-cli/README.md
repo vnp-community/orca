@@ -14,6 +14,8 @@ Token lưu ở thư mục cấu hình người dùng (`credentials.json`, mode 0
 
 ## Một Request từ đầu đến cuối
 
+Hướng dẫn từng bước cho một CR bất kỳ (trạng thái, gate, khi dừng giữa chừng, bàn giao): [docs/guides/request/cli-end-to-end.md](../../../docs/guides/request/cli-end-to-end.md). Dưới đây là bản tóm tắt lệnh.
+
 ```bash
 R=$(orca --json request create --project <project-id> --title "..." --body-file spec.md | jq -r .request.id)
 orca request classify $R                                    # AI gợi ý loại/cỡ (chạy nền)
