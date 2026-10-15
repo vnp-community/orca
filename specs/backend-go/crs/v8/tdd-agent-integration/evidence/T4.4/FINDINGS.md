@@ -19,6 +19,7 @@ at the layer that failed. Dollar figures are what the agent reported for the run
 | 9 | The tasks.md sync failed every pass with `REQUEST_REPORTER_REQUIRED` | the sweep has no user and project-service wants one | 5077a3b5a | none (found in the log in time) |
 | 10 | A Request reopened and planned again opened the gate of the new plan's third phase first | the execution tree took the first Plan task and every phase found, mixing the old and the new plan | 6a13519d5 | none |
 | 11 | The stored bundle of the second plan run held two of four specs | the bundle was built from the paths the run changed, not the whole change directory | 51e9c1626 | none |
+| 12 | BL-H01 went back to the backlog at 22/30 after an agent connection dropped for one second and both attempts of the task failed in that second | transport failures counted as agent attempts, and "connection lost" was an internal error | b9f04001d, infra-fleet mapping | ~$0 (stopped), cost of a resume |
 
 ## Product gaps found, not fixed in this change
 
@@ -33,6 +34,12 @@ at the layer that failed. Dollar figures are what the agent reported for the run
 - The agents leave their code uncommitted and all tasks of one plan share one task worktree, so a branch diff shows nothing. The
   handover lists worktrees; it cannot say what is committed. (`pilot_diff_report.py` reads the working tree.)
 - A task run reports no cost and no turns: only analysis and plan runs carry them.
+- A task whose answer is a human fact (BL-H02: "who approves the FR-SYS-07 revision?") ends `needs_info` and returns the Request to
+  the backlog. This is right, but there is no screen or CLI step to answer it and resume the task.
+- An agent created a scratch worktree under `/tmp` on the user's repo and removed it; the pilot guard now retries before it calls
+  a new directory a violation, and `--allow-neighbour` names the expected ones.
+- A decision of high risk needs a person's confirmation and had no CLI route; `orca decision list|confirm` was added (used under the
+  user's authorization for the pilot).
 - Local stack: after a service is redeployed, every service that dials it must be restarted too (see the memory note
   `orca-local-stack-gotchas`).
 
