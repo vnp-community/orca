@@ -29,6 +29,7 @@ orca approval list $R --subject solution
 orca approval approve <approval-id>                         # đọc version + digest ngay trước khi duyệt
 orca plan generate $R                                       # propose → chờ AI → commit
 orca plan proposal $R                                       # trạng thái run và kế hoạch; với engine openspec: nhánh, commit, kết quả kiểm, tham chiếu tri thức
+orca plan commit $R                                         # commit kế hoạch của run đã xong khi `plan generate` bị cắt vì token hết hạn (không sinh lại)
 orca plan bundle $R                                         # (openspec) danh sách tệp của gói OpenSpec đứng sau kế hoạch
 orca plan bundle $R --file tasks.md                         # đọc một tệp: proposal.md, design.md, specs/<capability>/spec.md, tasks.md
 orca request cleanup $R                                      # gỡ worktree của proposal (giữ nhánh và gói đã lưu); chủ Request hoặc admin

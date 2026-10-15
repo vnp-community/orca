@@ -69,3 +69,34 @@ func TestPlanProposalWait_ATokenThatRunsOutMidWaitSaysTheRunGoesOn(t *testing.T)
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestPlanCommitCmd_CommitsTheProposalOfAFinishedRunWithoutStartingAnother(t *testing.T) {
+	g := &gateway{t: t, reply: map[string]string{
+		"GET /v1/requests/r1/plan":  `{"status":"succeeded","proposal":{"phases":[]},"rawAiResponse":"raw"}`,
+		"POST /v1/requests/r1/plan": `{"planTaskId":"p1"}`,
+	}}
+	srv, factory := g.server()
+	defer srv.Close()
+	var exit int
+	cmd := newPlanCommitCmd(flowEnv{factory: factory, json: new(bool), exit: &exit})
+	cmd.SetArgs([]string{"r1"})
+	if err := cmd.ExecuteContext(context.Background()); err != nil || exit != 0 {
+		t.Fatalf("err=%v exit=%d calls=%v", err, exit, g.calls)
+	}
+	if g.bodies[1]["mode"] != "commit" || g.bodies[1]["rawAiResponse"] != "raw" || g.bodies[1]["proposal"] == nil {
+		t.Fatalf("commit body: %v", g.bodies[1])
+	}
+}
+
+func TestPlanCommitCmd_RefusesARunThatIsStillGoing(t *testing.T) {
+	g := &gateway{t: t, reply: map[string]string{"GET /v1/requests/r1/plan": `{"status":"running"}`}}
+	srv, factory := g.server()
+	defer srv.Close()
+	var exit int
+	cmd := newPlanCommitCmd(flowEnv{factory: factory, json: new(bool), exit: &exit})
+	cmd.SetArgs([]string{"r1"})
+	_ = cmd.ExecuteContext(context.Background())
+	if exit == 0 || len(g.calls) != 1 {
+		t.Fatalf("exit=%d calls=%v", exit, g.calls)
+	}
+}

@@ -11,7 +11,7 @@ import (
 
 func newPlanCmd(e flowEnv) *cobra.Command {
 	cmd := &cobra.Command{Use: "plan", Short: "the execution plan of a Request: generate it, read its tree, start a Phase"}
-	cmd.AddCommand(newPlanGenerateCmd(e), newPlanProposalCmd(e), newPlanBundleCmd(e), newPlanResultCmd(e), newPlanTreeCmd(e), newPlanStartPhaseCmd(e))
+	cmd.AddCommand(newPlanGenerateCmd(e), newPlanProposalCmd(e), newPlanCommitCmd(e), newPlanBundleCmd(e), newPlanResultCmd(e), newPlanTreeCmd(e), newPlanStartPhaseCmd(e))
 	return cmd
 }
 
@@ -44,6 +44,32 @@ func newPlanGenerateCmd(e flowEnv) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&feedback, "feedback", "", "what the plan should do differently")
 	cmd.Flags().DurationVar(&timeout, "timeout", 0, "give up on the run after this long (default 4m, 64m when an agent authors an OpenSpec change)")
+	return cmd
+}
+
+// newPlanCommitCmd commits the plan a finished run proposed. `plan generate` does this itself, but its sign-in token can run out
+// during a long wait (about ten minutes) while the run goes on, and running generate again would pay for a second run.
+func newPlanCommitCmd(e flowEnv) *cobra.Command {
+	var run string
+	cmd := &cobra.Command{
+		Use: "commit <request-id>", Short: "commit the plan a finished run proposed (when `plan generate` was cut short by an expired sign-in)", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
+				ready, err := cli.GetPlanProposal(ctx, args[0], run)
+				if err != nil {
+					return nil, err
+				}
+				if ready.Str("status") != "succeeded" || ready["proposal"] == nil {
+					return nil, &apiclient.CLIError{StatusCode: 409, Code: "REQUEST_PLAN_PROPOSAL_NOT_READY",
+						Message: "the plan run is " + ready.Str("status") + ", not succeeded: wait for it with `orca plan proposal " + args[0] + "`"}
+				}
+				commit := apiclient.Document{"mode": "commit", "proposal": ready["proposal"]}
+				withOptional(commit, "rawAiResponse", ready.Str("rawAiResponse"))
+				return cli.GeneratePlan(ctx, args[0], commit)
+			}, nil)
+		},
+	}
+	cmd.Flags().StringVar(&run, "run", "", "run id (default: the latest)")
 	return cmd
 }
 

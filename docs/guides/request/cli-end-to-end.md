@@ -131,7 +131,7 @@ orca plan generate $R                  # đề xuất, chờ AI, rồi commit k�
 orca plan generate $R --feedback "tách task migration khỏi task code"   # sinh lại theo góp ý
 ```
 
-Thời gian chờ mặc định là 4 phút với engine `native`, 64 phút khi agent viết một change OpenSpec (cỡ L có thể mất 13 đến 25 phút). Lệnh chết vì token hết hạn thì plan vẫn chạy: dùng `orca plan proposal $R`.
+Thời gian chờ mặc định là 4 phút với engine `native`, 64 phút khi agent viết một change OpenSpec (cỡ L có thể mất 13 đến 25 phút). Lệnh chết vì token hết hạn thì plan vẫn chạy: đăng nhập lại, chờ `orca plan proposal $R` báo `succeeded`, rồi `orca plan commit $R` để commit kế hoạch. Đừng chạy lại `plan generate`, vì nó bắt đầu một run mới và tốn thêm.
 
 ```bash
 orca plan proposal $R                  # trạng thái run, kế hoạch đề xuất, kết quả kiểm cấu trúc
