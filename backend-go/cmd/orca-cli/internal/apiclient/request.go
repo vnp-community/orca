@@ -159,6 +159,15 @@ func (c *Client) AskClarification(ctx context.Context, requestID string, body Do
 	return c.postDoc(ctx, requestPath(requestID, "/clarifications"), body)
 }
 
+// ListDecisions reads the decision log of a Request; ConfirmDecision is a person's act on a high risk choice.
+func (c *Client) ListDecisions(ctx context.Context, requestID string) (Document, error) {
+	return c.getDoc(ctx, requestPath(requestID, "/decisions"), nil)
+}
+
+func (c *Client) ConfirmDecision(ctx context.Context, decisionID string, body Document) (Document, error) {
+	return c.postDoc(ctx, "/v1/decisions/"+url.PathEscape(decisionID)+"/confirm", body)
+}
+
 func (c *Client) AnswerClarification(ctx context.Context, clarificationID string, body Document) (Document, error) {
 	return c.postDoc(ctx, "/v1/clarifications/"+url.PathEscape(clarificationID)+"/answer", body)
 }

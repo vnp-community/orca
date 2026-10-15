@@ -548,6 +548,14 @@
     "kind": "unary"
   },
   {
+    "name": "decision.confirm",
+    "kind": "unary"
+  },
+  {
+    "name": "decision.list",
+    "kind": "unary"
+  },
+  {
     "name": "devServer.add",
     "kind": "unary"
   },

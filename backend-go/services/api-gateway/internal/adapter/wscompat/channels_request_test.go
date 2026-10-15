@@ -427,6 +427,8 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"request.links", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal",
 		// CR-REQ-028: the channels useClarifications.ts calls.
 		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel", "clarification.request",
+		// The decision log: reading it, and a person confirming a high risk choice.
+		"decision.list", "decision.confirm",
 	}
 	got := map[string]ChannelKind{}
 	for _, ch := range r.Channels() {

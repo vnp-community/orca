@@ -44,6 +44,7 @@ var requestFlowRoutes = []requestFlowRoute{
 	{http.MethodPost, "/{id}/phases/{phaseTaskId}/start", "request.startPhase", phaseStart},
 	{http.MethodGet, "/{id}/clarifications", "clarification.list", byRequest},
 	{http.MethodPost, "/{id}/clarifications", "clarification.request", byRequest},
+	{http.MethodGet, "/{id}/decisions", "decision.list", byRequest},
 }
 
 // projectEngineRoutes are absolute paths: ?check=true also asks the dev server whether what is switched on can run.
@@ -55,6 +56,11 @@ var projectEngineRoutes = []requestFlowRoute{
 // approvalFlowRoutes is relative to /v1/approvals: a decider reads the version and digest it is about to decide.
 var approvalFlowRoutes = []requestFlowRoute{
 	{http.MethodGet, "/{id}", "approval.get", byID},
+}
+
+// decisionFlowRoutes is relative to /v1/decisions.
+var decisionFlowRoutes = []requestFlowRoute{
+	{http.MethodPost, "/{decisionId}/confirm", "decision.confirm", map[string]string{"decisionId": "decisionId"}},
 }
 
 // clarificationFlowRoutes is relative to /v1/clarifications (a Clarification is addressed by its own id).
