@@ -272,6 +272,12 @@ def main(argv: list[str] | None = None) -> int:
         return report(*compare(before, snapshot(args.repo), args.strict, frozenset(args.allow_neighbour)))
     while True:  # watch
         problems, growth = compare(before, snapshot(args.repo), args.strict, frozenset(args.allow_neighbour))
+        for _ in range(2):
+            if not problems:
+                break
+            # Orca makes a worktree directory a moment before git lists it; only a violation that is still there counts.
+            time.sleep(5)
+            problems, growth = compare(before, snapshot(args.repo), args.strict, frozenset(args.allow_neighbour))
         if problems:
             print(f"[{time.strftime('%H:%M:%S')}] the repo of the user changed: stop the run", file=sys.stderr)
             return report(problems, growth)
