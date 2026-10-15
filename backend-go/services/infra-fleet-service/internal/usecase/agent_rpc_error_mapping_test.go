@@ -175,3 +175,13 @@ func TestMapAgentExecError_AMissingPathOfAFileMethodIsNotFound(t *testing.T) {
 		}
 	}
 }
+
+func TestMapAgentExecError_ADroppedConnectionIsUnavailableSoCallersRetry(t *testing.T) {
+	for _, method := range []string{"agent.execPrompt", "fs.stat", "git.exec"} {
+		err := MapAgentExecError(method, errors.New("devserveragent: connection lost: failed to read frame header: EOF"))
+		var ae *apperrors.AppError
+		if !errors.As(err, &ae) || ae.Kind != apperrors.KindUnavailable || ae.Code != "INFRA_AGENT_CONNECTION_LOST" {
+			t.Fatalf("%s: %v", method, err)
+		}
+	}
+}

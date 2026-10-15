@@ -102,7 +102,7 @@ func (uc *ReportTaskOutcome) Execute(ctx context.Context, in ReportTaskOutcomeIn
 		}
 		inserted, err := uc.Outcomes.Insert(ctx, domain.TaskRunOutcome{
 			ID: uuid.NewString(), TenantID: tenantID, RequestID: req.ID, TaskID: in.TaskID, ContainerID: in.ParentID, Outcome: outcome,
-			Cause: in.Cause, ExecutionLinkID: in.ExecutionLinkID, ErrorMessage: in.ErrorMessage, EventID: in.EventID, OccurredAt: in.OccurredAt.UTC(),
+			Cause: domain.CauseOf(outcome, in.Cause, in.ErrorMessage), ExecutionLinkID: in.ExecutionLinkID, ErrorMessage: in.ErrorMessage, EventID: in.EventID, OccurredAt: in.OccurredAt.UTC(),
 		})
 		if err != nil || !inserted || outcome != domain.OutcomePhaseDone || !executing {
 			return err

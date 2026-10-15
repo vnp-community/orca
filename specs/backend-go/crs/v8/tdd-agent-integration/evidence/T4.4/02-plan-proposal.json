@@ -1,0 +1,439 @@
+{
+  "bundle": {
+    "branch": "request/1234-proposal",
+    "changeId": "req-1234-bl-h01-nen-ai",
+    "commit": "185cea48a0f8cdba7982a9a17e136c02a6a5115b",
+    "files": [
+      { "omitted": false, "path": "design.md", "size": "17905" },
+      { "omitted": false, "path": "proposal.md", "size": "9368" },
+      { "omitted": false, "path": "specs/ai-model-config/spec.md", "size": "4724" },
+      { "omitted": false, "path": "specs/ai-quota/spec.md", "size": "4134" },
+      { "omitted": false, "path": "tasks.md", "size": "24216" }
+    ],
+    "status": "ready",
+    "syncAttempts": 0,
+    "syncError": "",
+    "syncState": "in_sync",
+    "tasksMdDigest": "cc03c01e2aa7838518ef68e14477bfac8c19805a38aba72f025db1391bc39e5b"
+  },
+  "checks": [
+    {
+      "code": "STRUCTURE_OK",
+      "message": "the change passed the structure checks and openspec validate --strict",
+      "severity": "info",
+      "where": ""
+    },
+    {
+      "code": "KNOWLEDGE_CONFLICT",
+      "message": "ADR-09: ms-integration is the only service holding credentials and calling out; this change makes ms-system-setting a second one (read as naming Jira and Google only, Q1)",
+      "severity": "warning",
+      "where": "design.md"
+    },
+    {
+      "code": "KNOWLEDGE_CONFLICT",
+      "message": "ADR-12: its consequence column records the existing 501 exception for AI (OI-02); this change removes that exception and answers 503 when configured off",
+      "severity": "warning",
+      "where": "design.md"
+    },
+    {
+      "code": "KNOWLEDGE_CONFLICT",
+      "message": "BRL-64: forbids a 501 or fake 200 for a deferred feature; the AI chat stops being deferred, only Claude/Bedrock keep a deferred_features.yaml row (Q2)",
+      "severity": "warning",
+      "where": "design.md"
+    },
+    {
+      "code": "KNOWLEDGE_CONFLICT",
+      "message": "NFR-CO-02: same deferred-feature rule; 503 for an implemented-but-off feature is an explicit documented exception (Q2)",
+      "severity": "warning",
+      "where": "design.md"
+    },
+    {
+      "code": "KNOWLEDGE_CONFLICT",
+      "message": "NFR-CO-01: the six /ai/conversation/* paths change from 404 + X-Route-Missing: 1 to real codes, which needs a registered UI exception",
+      "severity": "warning",
+      "where": "design.md"
+    },
+    {
+      "code": "KNOWLEDGE_CONFLICT",
+      "message": "FR-SYS-07: its 501 statement and acceptance wording are replaced for the chat half",
+      "severity": "warning",
+      "where": "design.md"
+    }
+  ],
+  "elapsedMs": 543045,
+  "engine": "openspec",
+  "knowledge": {
+    "available": true,
+    "conflicts": [
+      "ADR-09: ms-integration is the only service holding credentials and calling out; this change makes ms-system-setting a second one (read as naming Jira and Google only, Q1)",
+      "ADR-12: its consequence column records the existing 501 exception for AI (OI-02); this change removes that exception and answers 503 when configured off",
+      "BRL-64: forbids a 501 or fake 200 for a deferred feature; the AI chat stops being deferred, only Claude/Bedrock keep a deferred_features.yaml row (Q2)",
+      "NFR-CO-02: same deferred-feature rule; 503 for an implemented-but-off feature is an explicit documented exception (Q2)",
+      "NFR-CO-01: the six /ai/conversation/* paths change from 404 + X-Route-Missing: 1 to real codes, which needs a registered UI exception",
+      "FR-SYS-07: its 501 statement and acceptance wording are replaced for the chat half"
+    ],
+    "gaps": [
+      "no Requirement/BusinessRule/Entity covers the AI quota, cost ceiling or usage ledger (Q3, Q4, Q5, Q6)",
+      "no element states the AI_ENABLED feature flag or its scope (Q7, Q13)",
+      "BRL-46 lists FR-SYS-01, FR-SYS-03, FR-JIR-01, FR-JIR-12, FR-NTF-04 but not FR-SYS-07, although ENT-17's app_key is such a credential (Q12)",
+      "SVC-01's responsibilities name no AI or LLM egress (Q1)",
+      "NFR-MA-01 names backend/db/ownership.yaml while the NFR-MA-04 gate reads tools/conformance/table_owners.yaml (Q10)",
+      "no approved real provider, base URL or egress-enabled environment is named for AC-2 (Q8)",
+      "FR-SYS-07 mixes chat and transform in one id, only the chat half changes here (Q9)",
+      "tdd-agent status could not be run, so source freshness is unverified (Q11)"
+    ],
+    "read": [
+      "FR-SYS-07",
+      "ENT-17",
+      "SVC-01",
+      "BRL-02",
+      "BRL-46",
+      "BRL-64",
+      "INT-14",
+      "ADR-06",
+      "ADR-09",
+      "ADR-12",
+      "ADR-15",
+      "NFR-SE-04",
+      "NFR-SE-05",
+      "NFR-CO-01",
+      "NFR-CO-02",
+      "NFR-MA-01",
+      "NFR-MA-02",
+      "NFR-MA-04",
+      "NFR-OB-02"
+    ],
+    "skillHash": "tdd-knowledge=73479f58b433845b,tdd-knowledge-writeback=e15c01cffeca2a36,tdd-openspec-author=64886850ab424106,tdd-orca-task=48e7b440903300b8",
+    "snapshot": "snap-000001"
+  },
+  "proposal": {
+    "phases": [
+      {
+        "description": "Delivers `backend/shared/pkg/aiclient` as a self-contained package with no caller yet: `Chat`/`Stream`, the single OpenAI Chat Completions implementation for `Open AI`/`DeepSeek`/`ZhiPu AI`, `ErrProviderUnsupported` for Claude and Bedrock, netguard `AdminTarget` egress, 60 s deadline, at most two `Retry-After`-aware retries, masked keys and the three AI metrics. Done when the package's unit tests pass and nothing else in the repo imports it yet.",
+        "tasks": [
+          {
+            "description": "Serves: FR-SYS-07, NFR-SE-05\nCode: create `backend/shared/pkg/aiclient/aiclient.go::Client`\nVerify: \"A configured OpenAI-compatible provider answers a chat request\" via `go test -C backend/shared/pkg ./aiclient/... -run TestChat`\nDone when: `Chat` posts to `\u003cBaseURL\u003e/chat/completions` with a Bearer key and returns the assistant content plus the provider-reported input and output token counts.",
+            "estimatedHours": 5,
+            "labels": ["spec:t1.1"],
+            "promptTemplate": "You are implementing task T1.1 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Create the aiclient package with Client, Provider, ChatRequest/ChatResponse and the OpenAI Chat Completions call"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: FR-SYS-07, NFR-CO-02, ADR-12\nCode: create `backend/shared/pkg/aiclient/provider.go::New`\nVerify: \"Claude is requested\" via `go test -C backend/shared/pkg ./aiclient/... -run TestNewUnsupportedProvider`\nDone when: `New` returns `ErrProviderUnsupported` for `Claude` and `AWS Bedrock`, opens no connection, and the three SPA provider names all resolve to the one OpenAI implementation.",
+            "estimatedHours": 1.5,
+            "labels": ["spec:t1.2"],
+            "promptTemplate": "You are implementing task T1.2 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Return ErrProviderUnsupported for Claude and AWS Bedrock without any stub path"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: NFR-SE-05, ADR-15\nCode: create `backend/shared/pkg/aiclient/transport.go::newGuardedClient`\nVerify: \"AC-7 a provider address in a disallowed internal range is blocked\" via `go test -C backend/shared/pkg ./aiclient/... -run TestGuardedTargetBlocked`\nDone when: the client is built with `netguard.NewClientFrom(netguard.FromEnv(netguard.AdminTarget), base, 60s)` wrapped by `telemetry.WrapTransport(..., WithUntrustedTarget())`, a loopback or metadata target is refused with netguard's own fixed text, and the test reaches a private target only via `netguard.AllowLoopbackForTests`.",
+            "estimatedHours": 3,
+            "labels": ["spec:t1.3"],
+            "promptTemplate": "You are implementing task T1.3 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-7; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Build the HTTP client through netguard AdminTarget and the telemetry untrusted-target transport"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: FR-SYS-07\nCode: create `backend/shared/pkg/aiclient/retry.go::doWithRetry`\nVerify: \"AC-6 two retries honouring `Retry-After` then a real error\" via `go test -C backend/shared/pkg ./aiclient/... -run TestRetryAfter`\nDone when: a provider that always answers a transient error with `Retry-After` is called exactly three times and the provider's real error is returned, a single 429 is recovered by one retry, and a cancelled context stops the wait immediately.",
+            "estimatedHours": 4,
+            "labels": ["spec:t1.4"],
+            "promptTemplate": "You are implementing task T1.4 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-6; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Retry at most twice on 429, 5xx and timeout, honouring a capped and jittered Retry-After"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: NFR-SE-04, NFR-OB-02\nCode: create `backend/shared/pkg/aiclient/metrics.go::observe`\nVerify: \"A provider error is logged\" via `go test -C backend/shared/pkg ./aiclient/... -run TestKeyMasked`\nDone when: no log line, error string, span attribute or metric label carries the key, and `ai_requests_total{provider,model,status}`, `ai_latency_seconds` and `ai_tokens_total{direction}` are exported and added to `deploy/observability/metrics-catalog.yaml`.",
+            "estimatedHours": 3,
+            "labels": ["spec:t1.5"],
+            "promptTemplate": "You are implementing task T1.5 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-3; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Mask the provider key everywhere but the Authorization header and export the three AI metrics"
+          },
+          {
+            "dependsOnIndices": [4],
+            "description": "Serves: FR-SYS-07, NFR-SE-05\nCode: create `backend/shared/pkg/aiclient/aiclient_test.go::TestAIClientSuite`\nVerify: every PH-1 scenario of `specs/ai-client/spec.md` via `go test -C backend/shared/pkg ./aiclient/... -count=1`\nDone when: the whole package suite passes with `-count=1` and the no-stub grep for a no-op AI client or an \"AI service not configured\" placeholder returns nothing.",
+            "estimatedHours": 1,
+            "labels": ["test:regression", "spec:t1.6"],
+            "promptTemplate": "You are implementing task T1.6 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-6, AC-7; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Run the aiclient unit suite for the PH-1 scenarios"
+          }
+        ],
+        "title": "Shared `aiclient`: OpenAI-compatible provider client, guarded egress, bounded retry"
+      },
+      {
+        "dependsOnPhaseIndices": [0],
+        "description": "Delivers the additive migration for conversations, messages and the per-organisation/project binding of `ai_model_source`, the repository and domain types, `ResolveModel`/`ListMessages`/`AppendTurn`, and the `AIService` gRPC contract guarded by `svcauth`. Done when the migration applies forward on a copy of the dev schema, the service operations are unit-tested, and the extended SEC-07 secret test passes for the AI key.",
+        "tasks": [
+          {
+            "description": "Serves: ENT-17, NFR-MA-02\nCode: create `backend/services/platform/system-setting/migrations/V036__ss_ai_conversation_v2.sql`\nVerify: \"A chat turn stores both messages\" via `go test -C backend/services/platform/system-setting ./migrations/... -run TestMigrationV036`\nDone when: `ai_conversation` has `title`, `scene`, `organization_id`, `model_id`, `update_time` and `idx_aiconv_user`, `ai_conversation_message` exists with its `idx_aimsg_conv`, `ai_model_source` has nullable `organization_id` and `project_id`, the legacy `content` column is untouched, and the file contains no `DROP`.",
+            "estimatedHours": 3,
+            "labels": ["spec:t2.1"],
+            "promptTemplate": "You are implementing task T2.1 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Add the additive migration for ai_conversation columns, ai_conversation_message and the org/project binding"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: NFR-MA-01, NFR-MA-04\nCode: modify `tools/conformance/table_owners.yaml`\nVerify: \"The legacy conversation route is untouched\" via `bash tools/conformance/run.sh`\nDone when: `ai_conversation_message` is owned by system-setting in both `tools/conformance/table_owners.yaml` and `backend/db/ownership.yaml`, the three `deploy/{dev,dev-remote,production}/mysql-init/10-users.sql` files grant the system-setting user on it, and the conformance table-ownership check passes.",
+            "estimatedHours": 1.5,
+            "labels": ["spec:t2.2"],
+            "promptTemplate": "You are implementing task T2.2 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Register the new table in both ownership registers and add the grants"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: ENT-17, FR-SYS-07\nCode: create `backend/services/platform/system-setting/internal/repository/mysql/ai_conversation.go::AIConversationRepo`\nVerify: \"A chat turn stores both messages\" via `go test -C backend/services/platform/system-setting ./internal/repository/... -run TestAIConversationRepo`\nDone when: `backend/services/platform/system-setting/internal/domain/ai_config.go` carries the new conversation and message fields, and the repository can upsert a conversation by client id, append a message, list a user's conversations newest-first and list a conversation's messages in ascending time order.",
+            "estimatedHours": 4,
+            "labels": ["spec:t2.3"],
+            "promptTemplate": "You are implementing task T2.3 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Extend the AI domain types and add the conversation and message repository"
+          },
+          {
+            "dependsOnIndices": [2],
+            "description": "Serves: FR-SYS-07, BRL-46, INT-14, NFR-SE-04\nCode: modify `backend/services/platform/system-setting/internal/usecase/ai/ai.go::AIConfigUsecase`\nVerify: \"The narrowest binding wins\" via `go test -C backend/services/platform/system-setting ./internal/usecase/ai/... -run TestResolveModel`\nDone when: only `status` enabled sources resolve, the order is personal then project then organisation then system, `ownerType` matches after `TrimSpace` so the SPA's `SYSTEM ` works, `adv_settings` entries with `enable=true` become the provider params, the key is opened with the existing `secret` helper and never logged, and no resolvable source yields the 422 \"chưa cấu hình mô hình AI\" error.",
+            "estimatedHours": 5,
+            "labels": ["spec:t2.4"],
+            "promptTemplate": "You are implementing task T2.4 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-3; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Implement ResolveModel with the personal to project to organisation to system order and TrimSpace owner types"
+          },
+          {
+            "dependsOnIndices": [2],
+            "description": "Serves: FR-SYS-07, ENT-17\nCode: modify `backend/services/platform/system-setting/internal/usecase/ai/ai.go::AIConfigUsecase`\nVerify: \"A chat turn stores both messages\" via `go test -C backend/services/platform/system-setting ./internal/usecase/ai/... -run TestAppendTurn`\nDone when: `ListMessages` returns a conversation's turns in ascending time order for its owner only, and `AppendTurn` writes the `user` and `assistant` rows with the token counts and model id and refreshes the conversation's title and update time.",
+            "estimatedHours": 3,
+            "labels": ["spec:t2.5"],
+            "promptTemplate": "You are implementing task T2.5 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Implement ListMessages and AppendTurn on the AI usecase"
+          },
+          {
+            "dependsOnIndices": [3, 4],
+            "description": "Serves: FR-SYS-07, NFR-SE-04, ADR-09\nCode: create `backend/shared/proto/tms/identity/v1/ai.proto::AIService`\nVerify: \"An unauthorised caller cannot resolve a model\" via `go test -C backend/services/platform/system-setting ./internal/grpcsvc/... -run TestAIServiceAuth`\nDone when: `Chat`, `ResolveModel`, `ListMessages` and `AppendTurn` are served from a new `backend/services/platform/system-setting/internal/grpcsvc/ai.go`, a `tms.identity.v1.AIService` document in `backend/shared/proto/tms/identity/v1/acl.yaml` names the allowed callers for each method (parsed by `grpcx.ParseACL`, `backend/shared/pkg/grpcx/acl.go`), `ResolveModel` returns the provider metadata with the key masked, and a caller outside the list is rejected with no key in the response.",
+            "estimatedHours": 4,
+            "labels": ["spec:t2.6"],
+            "promptTemplate": "You are implementing task T2.6 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Publish the AIService gRPC contract restricted by the identity acl.yaml caller list"
+          },
+          {
+            "dependsOnIndices": [5],
+            "description": "Serves: NFR-SE-04, INT-14, BRL-46\nCode: modify `tests/integrated/api/security/test_sec07_secrets.py`\nVerify: \"AC-3 the key is not in any API response\" and \"AC-3 the key is not in logs, spans or audit records\" via `python -m pytest tests/integrated/api/security/test_sec07_secrets.py -k ai_model_source`\nDone when: the test saves an AI model source with a known key, reads it back through the system, organisation, project and personal routes, inspects the stored row, the service logs and the operation-log rows, and fails if the clear key appears anywhere.",
+            "estimatedHours": 2,
+            "labels": ["test:regression", "spec:t2.7"],
+            "promptTemplate": "You are implementing task T2.7 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-3; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Extend the SEC-07 secret test to the AI model-source key and run it"
+          }
+        ],
+        "title": "Data model, model resolution and the internal AIService contract"
+      },
+      {
+        "dependsOnPhaseIndices": [1],
+        "description": "Delivers the routes in ms-system-setting with the flag defaulting to off, so this phase can be released while the gateway still answers the subtree as gone: internally the routes answer 503, and with the flag on they work against the local stack's mock provider. Done when the handler tests pass against `tests/local-stack/mock-ext` and the 503 gate is proven for all six paths.",
+        "tasks": [
+          {
+            "description": "Serves: FR-SYS-07, NFR-CO-01\nCode: modify `backend/services/platform/system-setting/internal/config/config.go::Config`\nVerify: \"AC-5 every conversation route answers 503 when AI is off\" via `go test -C backend/services/platform/system-setting ./internal/middleware/... -run TestAIEnabledGate`\nDone when: `AI_ENABLED` is read with default false into `Config`, a new `backend/services/platform/system-setting/internal/middleware/aienabled.go::RequireAIEnabled` returns 503 with a message for the whole `/ai/conversation` group, and no handler reaches model resolution, the quota or a provider while it is off.",
+            "estimatedHours": 3,
+            "labels": ["spec:t3.1"],
+            "promptTemplate": "You are implementing task T3.1 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Add the AI_ENABLED flag and the subtree middleware that answers 503 when it is off"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: FR-SYS-07, ENT-17\nCode: create `backend/services/platform/system-setting/internal/handler/ai/conversation.go::ConversationHandler`\nVerify: \"`add` and `chat` race on the same client id\" and \"Another user's conversation is not visible\" via `go test -C backend/services/platform/system-setting ./internal/handler/ai/... -run TestConversationCRUD`\nDone when: `add` creates the conversation with the client's `conversationId` when it matches `^[A-Za-z0-9_-]{8,64}$`, returns that same id and calls no provider; `update` caps the title at 255; `list` returns `[]` and never `null`, newest first; and an unknown or another user's id answers 404 on each of the four routes.",
+            "estimatedHours": 5,
+            "labels": ["spec:t3.2"],
+            "promptTemplate": "You are implementing task T3.2 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Implement add, update, list and delete with client-id idempotency and owner scoping"
+          },
+          {
+            "dependsOnIndices": [1],
+            "description": "Serves: FR-SYS-07, NFR-SE-04\nCode: modify `backend/services/platform/system-setting/internal/handler/ai/conversation.go::ConversationHandler`\nVerify: \"AC-1 a chat turn is answered, stored and listable\" via `go test -C backend/services/platform/system-setting ./internal/handler/ai/... -run TestConversationChat`\nDone when: the handler resolves the model, sends at most the 20 most recent turns plus the prompt through `aiclient.Chat`, stores both messages via `AppendTurn`, returns the answer as a plain string in the envelope's `data`, upserts an unknown conversation id, and maps the failures to 422 for an unsupported provider or no configured model and 502 with the provider's masked message otherwise — never 501 and never a fabricated 200.",
+            "estimatedHours": 5,
+            "labels": ["spec:t3.3"],
+            "promptTemplate": "You are implementing task T3.3 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Implement the chat turn: resolve, assemble history, call aiclient, persist, return a plain string"
+          },
+          {
+            "dependsOnIndices": [2],
+            "description": "Serves: FR-SYS-07, ENT-17\nCode: modify `backend/services/platform/system-setting/internal/handler/router.go`\nVerify: \"AC-1 the conversation appears in the conversation list\" via `go test -C backend/services/platform/system-setting ./internal/handler/... -run TestAIConversationRoutes`\nDone when: `GET /ai/conversation/chat/list/:id` returns the turns as `{id,conversationId,type,timestamp,content}` ascending, all six paths are mounted behind authentication and `RequireAIEnabled`, the legacy `/system/ai-conversation/*` routes still answer as before, and the route-shape and authz-guard tests of the service pass.",
+            "estimatedHours": 3,
+            "labels": ["spec:t3.4"],
+            "promptTemplate": "You are implementing task T3.4 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Implement chat/list and mount the six routes on the router"
+          },
+          {
+            "dependsOnIndices": [3],
+            "description": "Serves: FR-SYS-07, NFR-CO-01\nCode: create `backend/services/platform/system-setting/internal/handler/ai/conversation_test.go::TestConversationAgainstMockExt`\nVerify: every scenario of `specs/ai-conversation/spec.md` except AC-2 via `go test -C backend/services/platform/system-setting ./internal/handler/ai/... -count=1`\nDone when: the suite drives `tests/local-stack/mock-ext` `/llm/v1/chat/completions` for the happy path and its `__fail` control plane for the 429-with-`Retry-After` and 5xx paths, asserts 503 on all six routes with the flag off, and passes with `-count=1`.",
+            "estimatedHours": 4,
+            "labels": ["test:regression", "spec:t3.5"],
+            "promptTemplate": "You are implementing task T3.5 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Add the handler integration tests against the local stack mock provider and its failure control plane"
+          }
+        ],
+        "title": "The six `/ai/conversation/*` routes behind `AI_ENABLED`"
+      },
+      {
+        "dependsOnPhaseIndices": [2],
+        "description": "Delivers the quota tables, the pre-call check that refuses an exhausted organisation with 429 before any provider call, and the ledger written in the turn's transaction. Releasable on its own: with no quota rows the platform default applies and the behaviour of PH-3 is unchanged. Done when the quota unit and integration tests pass, including the proof that no provider request leaves the service.",
+        "tasks": [
+          {
+            "description": "Serves: NFR-MA-01, NFR-MA-02\nCode: create `backend/services/platform/system-setting/migrations/V037__ss_ai_quota.sql`\nVerify: \"A quota row and a default\" via `go test -C backend/services/platform/system-setting ./migrations/... -run TestMigrationV037`\nDone when: `ai_org_budget(organization_id, period, token_limit, cost_limit_micro)` and the append-only `ai_usage_ledger` exist with no `DROP`, both are owned by system-setting in `tools/conformance/table_owners.yaml` and `backend/db/ownership.yaml`, and the three `deploy/{dev,dev-remote,production}/mysql-init/10-users.sql` files grant the system-setting user on them.",
+            "estimatedHours": 3,
+            "labels": ["spec:t4.1"],
+            "promptTemplate": "You are implementing task T4.1 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Add the quota and ledger migration and register the tables and grants"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: FR-SYS-07, ENT-17\nCode: create `backend/services/platform/system-setting/internal/usecase/ai/pricing.go::PriceFor`\nVerify: \"AC-4 the cost ceiling refuses the turn as the token limit does\" via `go test -C backend/services/platform/system-setting ./internal/usecase/ai/... -run TestPricing`\nDone when: a per-provider, per-model price table in micro-units is checked in, an unknown model falls back to the most expensive known price for that provider, and the estimator bounds a turn by the prompt length plus `AI_MAX_OUTPUT_TOKENS`.",
+            "estimatedHours": 3,
+            "labels": ["spec:t4.2"],
+            "promptTemplate": "You are implementing task T4.2 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Add the static price table and the pre-call token estimator"
+          },
+          {
+            "dependsOnIndices": [1],
+            "description": "Serves: FR-SYS-07, ENT-17\nCode: create `backend/services/platform/system-setting/internal/usecase/ai/quota.go::QuotaCheck`\nVerify: \"AC-4 an exhausted organisation gets a clear message and no provider call\" via `go test -C backend/services/platform/system-setting ./internal/usecase/ai/... -run TestQuotaCheck`\nDone when: `QuotaCheck(orgID, estimate)` runs before `ResolveModel` on the chat path, reads the current calendar month's counter, returns 429 with a plain Vietnamese exhausted-quota message for a token or cost breach, decrypts no key, issues no provider request, and applies the platform default when the organisation has no quota row.",
+            "estimatedHours": 4,
+            "labels": ["spec:t4.3"],
+            "promptTemplate": "You are implementing task T4.3 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-4; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Check the quota before model resolution and refuse an exhausted organisation with 429"
+          },
+          {
+            "dependsOnIndices": [2],
+            "description": "Serves: ENT-17, FR-SYS-07\nCode: modify `backend/services/platform/system-setting/internal/usecase/ai/ai.go::AIConfigUsecase`\nVerify: \"A successful turn is stored and metered atomically\" via `go test -C backend/services/platform/system-setting ./internal/usecase/ai/... -run TestAppendTurnLedger`\nDone when: `AppendTurn` opens one `shared/pkg/uow` transaction that inserts the two message rows, inserts the ledger row with the provider-reported tokens and the derived cost and updates the period counter, the ledger has no update or delete path, and a forced ledger failure leaves no message row and no counter change.",
+            "estimatedHours": 4,
+            "labels": ["spec:t4.4"],
+            "promptTemplate": "You are implementing task T4.4 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Write the ledger row and the period counter in the same transaction as the turn"
+          },
+          {
+            "dependsOnIndices": [2],
+            "description": "Serves: BRL-02, ENT-17\nCode: modify `backend/services/platform/system-setting/internal/handler/ai/conversation.go::ConversationHandler`\nVerify: \"A non-member cannot spend an organisation's quota\" via `go test -C backend/services/platform/system-setting ./internal/handler/ai/... -run TestChatOrganisationMembership`\nDone when: the chat handler takes the organisation from the request's `organizationId`, rejects a caller who is not a member of it, and leaves that organisation's ledger and counter unchanged.",
+            "estimatedHours": 3,
+            "labels": ["spec:t4.5"],
+            "promptTemplate": "You are implementing task T4.5 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-4; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Validate the request organisation against the caller's membership before counting usage"
+          },
+          {
+            "dependsOnIndices": [4],
+            "description": "Serves: FR-SYS-07, ENT-17\nCode: create `backend/services/platform/system-setting/internal/usecase/ai/quota_test.go::TestQuotaSuite`\nVerify: every scenario of `specs/ai-quota/spec.md` via `go test -C backend/services/platform/system-setting ./internal/usecase/ai/... -count=1`\nDone when: the suite passes with `-count=1` and asserts against the mock provider's captured-request plane that an exhausted organisation produced zero provider requests.",
+            "estimatedHours": 2,
+            "labels": ["test:regression", "spec:t4.6"],
+            "promptTemplate": "You are implementing task T4.6 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-4; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Run the quota suite including the no-provider-call proof"
+          }
+        ],
+        "title": "Per-organisation quota, cost ceiling and usage ledger"
+      },
+      {
+        "dependsOnPhaseIndices": [3],
+        "description": "Opens the subtree at the gateway, moves every register the frozen route contract depends on, revises the documents the change makes false, and runs acceptance on the real local stack. This is the phase that makes the feature reachable from the SPA, and the one whose rollback is `AI_ENABLED=false`. Done when the golden route test, the decom and UI-contract gates and the acceptance suite all pass.",
+        "tasks": [
+          {
+            "description": "Serves: FR-SYS-07, NFR-CO-01\nCode: modify `backend/services/gateway/internal/routing/default_table.go`\nVerify: \"AC-1 a chat turn is answered, stored and listable\" via `go test -C backend/services/gateway ./internal/routing/... -count=1`\nDone when: the `gone(\"UF-P1a-03\", \"AI chat drawer: the service behind it is retired\", Subtree, \"/ai/conversation\")` entry at line 159 is replaced by a system-setting subtree entry, the read timeout for it is at least 90 s, and the routing table tests pass.",
+            "estimatedHours": 3,
+            "labels": ["spec:t5.1"],
+            "promptTemplate": "You are implementing task T5.1 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Route the /ai/conversation subtree to system-setting with a read timeout of at least 90 s"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: NFR-CO-01, NFR-CO-02\nCode: modify `backend/services/gateway/internal/router/testdata/route_decisions.approved.yaml`\nVerify: \"AC-5 the flag off does not hide the routes\" via `go test -C backend/services/gateway ./internal/router/... -run TestRoutesGolden`\nDone when: the `UF-P1a-03` rows for `/ai/conversation` are updated in that file and in `tools/decom/route_classes_dec.yaml`, `tools/decom/ui_route_decisions.yaml` and `tests/golden/ui-neutral/route_classes.json`, the six paths are entered as a registered exception in `backend/specs/crs/v4/UI-CONTRACT-REGISTER.md`, and `routes_golden_test.go` and the wp_f3 UI-route tests pass.",
+            "estimatedHours": 4,
+            "labels": ["spec:t5.2"],
+            "promptTemplate": "You are implementing task T5.2 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Move the five route and UI-contract registers to the new status codes"
+          },
+          {
+            "dependsOnIndices": [1],
+            "description": "Serves: ADR-12, NFR-CO-02, BRL-64\nCode: modify `tools/conformance/deferred_features.yaml`\nVerify: \"No stub path remains in the AI code\" via `bash tools/conformance/run.sh`\nDone when: one `AI-PROVIDER-CLAUDE-BEDROCK` entry exists with its retained docs and code, the entry that deferred the AI conversation path is removed, and the conformance run including the deferred-unreachable check passes.",
+            "estimatedHours": 2,
+            "labels": ["spec:t5.3"],
+            "promptTemplate": "You are implementing task T5.3 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Record only Claude and Bedrock as deferred and remove the AI chat deferral"
+          },
+          {
+            "dependsOnIndices": [2],
+            "description": "Serves: FR-SYS-07, ENT-17, ADR-12\nCode: modify `docs/features/08-ai-advanced/F24_ai-integration.md`\nVerify: \"The chat route is a real path\" via `bash tools/conformance/run.sh`\nDone when: `docs/features/08-ai-advanced/F24_ai-integration.md`, `backend/services/platform/system-setting/specs/tdd.md`, `backend/services/platform/system-setting/docs/data-model.md` and the `FR-SYS-07` row of `docs/product/v1/PRD_TMS_v1.0.md` state the real chat path, its verification against the local-stack provider, the 503-when-off behaviour and the new tables, keep `FR-SYS-07`'s transform half deferred to CR-H02, and record that `ENT-17`'s conversation side is now implemented; the SAD is not touched.",
+            "estimatedHours": 4,
+            "labels": ["spec:t5.4"],
+            "promptTemplate": "You are implementing task T5.4 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Revise the documents the change makes false, naming FR-SYS-07 and ENT-17"
+          },
+          {
+            "dependsOnIndices": [3],
+            "description": "Serves: FR-SYS-07, NFR-SE-04, NFR-SE-05\nCode: create `tests/integrated/api/wp_f3/test_ai_conversation.py::test_ai_conversation_acceptance`\nVerify: AC-1, AC-3, AC-4, AC-5, AC-6 and AC-7 via `python -m pytest tests/integrated/api/wp_f3/test_ai_conversation.py -v`\nDone when: the suite runs against the no-mock local stack with `mock-ext` as the configured provider and proves a chat turn is answered, stored and listed, the key never appears in a response or a log, an exhausted organisation gets 429 with no provider request, all six routes answer 503 with `AI_ENABLED=false`, two `Retry-After` retries then a real error, and a private provider address is blocked.",
+            "estimatedHours": 5,
+            "labels": ["test:regression", "spec:t5.5"],
+            "promptTemplate": "You are implementing task T5.5 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-3, AC-4, AC-5, AC-6, AC-7; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Add and run the end-to-end acceptance suite on the real local stack"
+          },
+          {
+            "dependsOnIndices": [4],
+            "description": "Serves: FR-SYS-07, NFR-SE-05\nCode: modify `tests/integrated/api/wp_f3/test_ai_conversation.py::test_ai_real_provider`\nVerify: \"AC-2 an approved real LLM answers\" via `python -m pytest tests/integrated/api/wp_f3/test_ai_conversation.py -k real_provider`\nDone when: a model source for the approved real provider answers a chat turn and the turn is persisted exactly as for the mock; if no approved provider or egress-enabled environment is available the task is reported blocked against open question Q8 rather than marked done.",
+            "estimatedHours": 3,
+            "labels": ["test:regression", "spec:t5.6"],
+            "promptTemplate": "You are implementing task T5.6 of the OpenSpec change req-1234-bl-h01-nen-ai (Request REQ-1234). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1234-proposal under openspec/changes/req-1234-bl-h01-nen-ai/ and is NOT checked out in this worktree. Read what you need with one `git show request/1234-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-2; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Verify a chat turn against an approved real provider in an egress-enabled environment"
+          }
+        ],
+        "title": "Gateway exposure, registers, documents and acceptance"
+      }
+    ],
+    "summary": "OpenSpec change req-1234-bl-h01-nen-ai",
+    "title": "BL-H01 nền AI"
+  },
+  "rawAiResponse": "",
+  "runId": "1a12a5bb-126a-44d0-b431-781e8a455793",
+  "stats": {
+    "cacheCreationTokens": 157237,
+    "cacheReadTokens": 9625003,
+    "costUsd": 7.379361500000002,
+    "durationMs": 538803,
+    "inputTokens": 168,
+    "knowledgeToolCalls": 27,
+    "outputTokens": 39746,
+    "toolCalls": {
+      "Bash": 37,
+      "Edit": 22,
+      "Grep": 16,
+      "Read": 14,
+      "Write": 1,
+      "mcp__tdd-agent__kg_get_element": 19,
+      "mcp__tdd-agent__kg_neighbors": 1,
+      "mcp__tdd-agent__kg_query": 2,
+      "mcp__tdd-agent__kg_search": 4,
+      "mcp__tdd-agent__kg_snapshots": 1
+    },
+    "turns": 118
+  },
+  "status": "succeeded"
+}

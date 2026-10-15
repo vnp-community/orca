@@ -81,6 +81,10 @@ func MapAgentExecError(method string, err error) error {
 	if method == "ai.complete" {
 		return mapAIExecError(err)
 	}
+	if strings.Contains(err.Error(), "connection lost") {
+		// The agent's socket dropped while the call was waiting: the peer is gone for now, not broken, so callers may retry.
+		return apperrors.New(apperrors.KindUnavailable, "INFRA_AGENT_CONNECTION_LOST", "the dev server agent connection dropped during the call", err)
+	}
 	if strings.HasPrefix(method, "fs.") {
 		var rpcErr *domain.AgentRPCError
 		if errors.As(err, &rpcErr) && rpcErr.Code == agentPathNotFoundCode {

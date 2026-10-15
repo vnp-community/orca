@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type Outcome string
 
@@ -15,6 +18,19 @@ const (
 
 // CauseDispatchError marks a failed outcome that never reached the agent; it does not use up an attempt.
 const CauseDispatchError = "dispatch_error"
+
+// TransportFailureMarker is what task-service writes into the message of a run that failed only because the agent could not be
+// reached (its failure code RELAY_UNAVAILABLE). Such a run says nothing about the task, so it is recorded like a dispatch error.
+const TransportFailureMarker = "RELAY_UNAVAILABLE"
+
+// CauseOf is the cause to record: a failed run lost to transport trouble is a dispatch error, which does not use up an attempt and is
+// bounded by the dispatch retry window instead. Without that, a connection that drops for a second burns every attempt of the task.
+func CauseOf(outcome Outcome, cause, errorMessage string) string {
+	if outcome == OutcomeFailed && strings.Contains(errorMessage, TransportFailureMarker) {
+		return CauseDispatchError
+	}
+	return cause
+}
 
 func AllOutcomes() []Outcome {
 	return []Outcome{OutcomeStarted, OutcomeSucceeded, OutcomeFailed, OutcomeCancelled, OutcomePhaseDone, OutcomePlanDone}
