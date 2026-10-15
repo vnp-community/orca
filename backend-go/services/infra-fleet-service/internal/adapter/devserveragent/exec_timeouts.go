@@ -15,12 +15,15 @@ const (
 	// its own call at 120s, so this must be longer or the Go side gives up on a call that was about to succeed.
 	aiCompleteTimeout    = 150 * time.Second
 	codeIntelReadTimeout = 90 * time.Second
+	// mcp.callTool: the agent caps one tool call at 120s; long work (a tdd-agent advance) runs in the background there.
+	mcpCallToolTimeout = 150 * time.Second
 )
 
 var execTimeoutOverrides = map[string]time.Duration{
 	"agent.execPrompt":     execPromptTimeout,
 	"ai.complete":          aiCompleteTimeout,
 	"quality.listProfiles": 45 * time.Second,
+	"mcp.callTool":         mcpCallToolTimeout,
 }
 
 // execTimeoutForMethod returns method-specific timeout overrides for Exec.

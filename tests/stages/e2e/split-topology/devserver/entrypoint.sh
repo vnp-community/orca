@@ -39,7 +39,9 @@ if command -v tdd-agent >/dev/null && [ -d "${TDD_PROJECT}" ] && [ ! -f "${TDD_P
     cd "${TDD_PROJECT}"
     tdd-agent init --no-prose --no-generate --urd docs/URD.md --srs docs/SRS.md --sad docs/SAD.md \
       --approver orca-workflow:human:BA,SA/Dev,SA,BA/owner >/dev/null
-    sed -i 's/^llm = ""  /llm = "none"/' .tdd-agent/config.toml
+    # Test specs use the same language-model source as the agent: rules only unless AI_MODE=real (then Claude Code).
+    TS_LLM=none; [ "${AI_MODE:-stub}" = "real" ] && TS_LLM=claude-cli
+    sed -i "s/^llm = \"\"  /llm = \"${TS_LLM}\"/" .tdd-agent/config.toml
     tdd-agent mcp enable --approvals --client-actor orca-workflow >/dev/null
     git add -A && git commit -q -m "tdd-agent project" || true
   )

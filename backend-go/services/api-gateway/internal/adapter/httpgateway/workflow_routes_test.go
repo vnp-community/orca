@@ -184,6 +184,18 @@ func (f *fakeWorkflowServiceClient) RateTemplate(_ context.Context, _ *workflowv
 	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
 }
 
+func (f *fakeWorkflowServiceClient) ListStepApprovals(_ context.Context, _ *workflowv1.ListStepApprovalsRequest, _ ...grpc.CallOption) (*workflowv1.ListStepApprovalsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) GetStepApproval(_ context.Context, _ *workflowv1.GetStepApprovalRequest, _ ...grpc.CallOption) (*workflowv1.GetStepApprovalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) ResolveStepApproval(_ context.Context, _ *workflowv1.ResolveStepApprovalRequest, _ ...grpc.CallOption) (*workflowv1.ResolveStepApprovalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
 func (f *fakeWorkflowServiceClient) StreamExecutionEvents(_ context.Context, _ *workflowv1.StreamExecutionEventsRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[workflowv1.ExecutionEvent], error) {
 	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
 }

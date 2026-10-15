@@ -47,6 +47,7 @@ import (
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serviceclients"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/stepexecutors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/taskclient"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/tddagentclient"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
@@ -114,8 +115,9 @@ func run() error {
 	// switch was introduced), so `repo`'s static type after the switch
 	// must satisfy all four at once.
 	var (
-		repo          workflowStore
-		approvalStore usecase.ApprovalRepository
+		repo              workflowStore
+		approvalStore     usecase.ApprovalRepository
+		stepApprovalStore usecase.StepApprovalRepository
 	)
 	switch caps.Dialect {
 	case dbcapability.DialectPostgres:
@@ -127,6 +129,7 @@ func run() error {
 		pgRepo := workflowpostgres.New(pool)
 		repo = pgRepo
 		approvalStore = workflowpostgres.NewApprovalStore(pool)
+		stepApprovalStore = workflowpostgres.NewStepApprovalStore(pool)
 		healthSrv.Register("postgres", func() error {
 			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
@@ -145,6 +148,7 @@ func run() error {
 		myRepo := workflowmysql.New(db)
 		repo = myRepo
 		approvalStore = workflowmysql.NewApprovalStore(db)
+		stepApprovalStore = workflowmysql.NewStepApprovalStore(db)
 		healthSrv.Register("mysql", func() error {
 			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
@@ -238,7 +242,16 @@ func run() error {
 	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient, resolver))
 	// CR-AUTO-003/TASK-BE-AUTO-005
 	registry.Register(domain.StepTypeCommitPush, infrafleetclient.NewGitCommitPushExecutor(infraFleetClient))
-	registry.Register(domain.StepTypeAction, stepexecutors.NewActionExecutor())
+	actionExecutor := stepexecutors.NewActionExecutor()
+	if cfg.TddAgentEnabled {
+		// tdd_agent.* actions (docs/integrate/TDD-WF-AGENT-001): tdd-agent runs on the project's dev server via mcp.callTool.
+		tddHandlers := tddagentclient.NewHandlers(tddagentclient.NewClient(infraFleetClient, resolver, projectClient), repo, stepApprovalStore)
+		tddHandlers.Register(func(name string, handler func(context.Context, string) (domain.StepResult, error)) {
+			actionExecutor.Register(name, handler)
+		})
+		logger.InfoContext(ctx, "workflow: tdd_agent actions enabled")
+	}
+	registry.Register(domain.StepTypeAction, actionExecutor)
 	// Two-phase init: ParallelExecutor needs a reference back to the SAME
 	// registry it's about to be registered into (to recursively resolve
 	// each sub-step's own executor) — see ParallelExecutor's doc comment.
@@ -303,12 +316,13 @@ func run() error {
 	}
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
-	workflowv1.RegisterWorkflowServiceServer(grpcServer, workflowgrpc.New(
+	workflowServer := workflowgrpc.New(
 		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC, hasActiveExecutionsUC,
 		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC, cloneTemplateUC, listExecutionsUC,
 		publishTemplateUC, resolveApprovalUC, listPendingApprovalsUC,
 		generateShareLinkUC, previewSharedTemplateUC, importSharedTemplateUC, rateTemplateUC,
-	))
+	).WithStepApprovals(usecase.NewStepApprovals(stepApprovalStore, cleanupProjectClient, cfg.StepApproverRoles))
+	workflowv1.RegisterWorkflowServiceServer(grpcServer, workflowServer)
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// Transactional-outbox relay (SOL-PW-04/TASK-PW-04-06, extended by
@@ -353,7 +367,7 @@ func run() error {
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
-		Handler: healthSrv.Handler(),
+		Handler: healthAndMetricsMux(healthSrv.Handler(), tddagentclient.MetricsHandler()),
 	}
 
 	errCh := make(chan error, 2)
@@ -455,4 +469,12 @@ func toMySQLDriverDSN(dsn string) (string, error) {
 		driverDSN += sep + "parseTime=true"
 	}
 	return driverDSN, nil
+}
+
+// healthAndMetricsMux keeps /healthz and /readyz as they were and adds /metrics (tdd_agent step metrics).
+func healthAndMetricsMux(health, metrics http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/", health)
+	mux.Handle("/metrics", metrics)
+	return mux
 }

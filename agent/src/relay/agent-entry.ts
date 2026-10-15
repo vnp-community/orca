@@ -142,6 +142,12 @@ async function main(): Promise<void> {
     // process behind.
     const forceExitTimer = setTimeout(() => process.exit(0), 3_000)
     forceExitTimer.unref()
+    // MCP servers started by mcp.callTool are our children; stop them with us.
+    import('./agent-rpc-dispatch-mcp')
+      .then((m) => m.closeMcpBridge())
+      .catch(() => {
+        /* best effort */
+      })
     import('./fs-agent-watch-extensions')
       .then((m) => m.cleanupAgentWatches())
       .catch(() => {
