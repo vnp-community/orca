@@ -50,15 +50,25 @@ func registerWorkflowChannels(r *Registry, client workflowv1.WorkflowServiceClie
 			ProjectID   string `json:"projectId"`
 			RootTraceID string `json:"rootTraceId"`
 			RequestID   string `json:"requestId"`
+			// Inputs feed the template's {{inputs.*}} tokens (ExecuteRequest.inputs_json).
+			Inputs map[string]any `json:"inputs"`
 		}
 		in, err := decodeArg[executeArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
+		inputsJSON := ""
+		if len(in.Inputs) > 0 {
+			raw, merr := json.Marshal(in.Inputs)
+			if merr != nil {
+				return nil, merr
+			}
+			inputsJSON = string(raw)
+		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		resp, err := client.Execute(ctx, &workflowv1.ExecuteRequest{
 			TemplateId: in.TemplateID, ProjectId: in.ProjectID,
-			RootTraceId: in.RootTraceID, RequestId: in.RequestID,
+			RootTraceId: in.RootTraceID, RequestId: in.RequestID, InputsJson: inputsJSON,
 		})
 		if err != nil {
 			return nil, err

@@ -8,6 +8,7 @@
 // agent.execPrompt.changes promises the changes report. agent.execPrompt.knowledgeHub promises
 // knowledgeRoot/proposeChangesets and the skills list of agent.capabilities.
 // agent.execPrompt.permissionProfile promises permissionProfile (a named write profile that never needs full trust).
+// mcp.callTool promises the bridge of agent-rpc-dispatch-mcp.ts (allowlisted MCP servers over stdio).
 
 export const AGENT_PROTOCOL_VERSION = 2
 
@@ -21,7 +22,8 @@ export const AGENT_FEATURES = [
   'agent.execPrompt.permissionProfile',
   'agent.capabilities',
   'ai.complete',
-  'ai.complete.usage'
+  'ai.complete.usage',
+  'mcp.callTool'
 ] as const
 
 export type AgentFeature = (typeof AGENT_FEATURES)[number]

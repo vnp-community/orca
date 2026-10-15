@@ -669,3 +669,7 @@
 - pattern: "devServer.subscribeStatus"
   category: stream
   reason: "Push-stream channels cannot answer tools/call; devServer.list reports the same state (status, busy, activeExecutions)."
+
+- pattern: "workflow.stepApproval.*"
+  category: human_gate
+  reason: "Step approvals record a person's decision on a running workflow step (docs/integrate/TDD-WF-AGENT-001 §7.5); an MCP agent must not approve or reject on a human's behalf."

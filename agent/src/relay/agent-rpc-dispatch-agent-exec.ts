@@ -20,6 +20,13 @@ export async function dispatchAgentExecRpc(
   state: WireState
 ): Promise<JsonRpcResponse | null> {
   switch (rpc.method) {
+    // ── mcp.callTool: workflow steps calling an allowlisted MCP server (agent-rpc-dispatch-mcp.ts) ──
+    // Routed from here rather than agent-rpc-dispatch.ts, which is already over its max-lines budget.
+    case 'mcp.callTool': {
+      const { dispatchMcpRpc } = await import('./agent-rpc-dispatch-mcp')
+      return dispatchMcpRpc(rpc, config, log)
+    }
+
     // ── v5.0: agent.spawn ────────────────────────────────────────────────────
     case 'agent.spawn': {
       try {

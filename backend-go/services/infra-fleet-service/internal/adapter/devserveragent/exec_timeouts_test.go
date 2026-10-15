@@ -34,6 +34,8 @@ func TestExecTimeoutForMethod_Table(t *testing.T) {
 
 		// ai.complete outlives the agent's own 120s bound
 		{"ai.complete", 150 * time.Second},
+		// mcp.callTool outlives the agent's own 120s cap per tool call
+		{"mcp.callTool", 150 * time.Second},
 
 		// Quality methods
 		{"quality.listProfiles", 45 * time.Second},

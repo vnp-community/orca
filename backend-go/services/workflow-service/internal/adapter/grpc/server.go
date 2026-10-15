@@ -43,6 +43,8 @@ type Server struct {
 	previewSharedTemplate *usecase.PreviewSharedTemplate
 	importSharedTemplate  *usecase.ImportSharedTemplate
 	rateTemplate          *usecase.RateTemplate
+
+	stepApprovals *usecase.StepApprovals // nil = the step approval RPCs answer Unimplemented
 }
 
 func New(

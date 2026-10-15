@@ -8,6 +8,8 @@ import { useWorkflowExecution } from '../../../hooks/useWorkflowExecution'
 vi.mock('../../../hooks/useWorkflowExecution', () => ({
   useWorkflowExecution: vi.fn()
 }))
+// The approval panel polls its own channel; this test is about the monitor.
+vi.mock('../StepApprovalPanel', () => ({ StepApprovalPanel: () => null }))
 
 describe('ExecutionMonitor', () => {
   const cancelExecution = vi.fn()

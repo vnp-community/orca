@@ -34,6 +34,9 @@ const (
 	WorkflowService_CloneTemplate_FullMethodName         = "/orca.workflow.v1.WorkflowService/CloneTemplate"
 	WorkflowService_StreamExecutionEvents_FullMethodName = "/orca.workflow.v1.WorkflowService/StreamExecutionEvents"
 	WorkflowService_PublishTemplate_FullMethodName       = "/orca.workflow.v1.WorkflowService/PublishTemplate"
+	WorkflowService_ListStepApprovals_FullMethodName     = "/orca.workflow.v1.WorkflowService/ListStepApprovals"
+	WorkflowService_GetStepApproval_FullMethodName       = "/orca.workflow.v1.WorkflowService/GetStepApproval"
+	WorkflowService_ResolveStepApproval_FullMethodName   = "/orca.workflow.v1.WorkflowService/ResolveStepApproval"
 	WorkflowService_ListPendingApprovals_FullMethodName  = "/orca.workflow.v1.WorkflowService/ListPendingApprovals"
 	WorkflowService_ResolveApproval_FullMethodName       = "/orca.workflow.v1.WorkflowService/ResolveApproval"
 	WorkflowService_GenerateShareLink_FullMethodName     = "/orca.workflow.v1.WorkflowService/GenerateShareLink"
@@ -103,6 +106,12 @@ type WorkflowServiceClient interface {
 	// the template in a pending Approval instead of taking effect
 	// immediately (BUG-WF-03).
 	PublishTemplate(ctx context.Context, in *PublishTemplateRequest, opts ...grpc.CallOption) (*WorkflowTemplate, error)
+	// Step approvals: decisions a running step waits for from a person, e.g. a
+	// tdd-agent gate (docs/integrate/TDD-WF-AGENT-001 §7.5). Visible to project
+	// members; deciding needs an approver project role.
+	ListStepApprovals(ctx context.Context, in *ListStepApprovalsRequest, opts ...grpc.CallOption) (*ListStepApprovalsResponse, error)
+	GetStepApproval(ctx context.Context, in *GetStepApprovalRequest, opts ...grpc.CallOption) (*GetStepApprovalResponse, error)
+	ResolveStepApproval(ctx context.Context, in *ResolveStepApprovalRequest, opts ...grpc.CallOption) (*ResolveStepApprovalResponse, error)
 	// ListPendingApprovals lists this tenant's pending publish-approval gates.
 	ListPendingApprovals(ctx context.Context, in *ListPendingApprovalsRequest, opts ...grpc.CallOption) (*ListPendingApprovalsResponse, error)
 	// ResolveApproval approves or rejects a pending approval — an admin-only
@@ -289,6 +298,36 @@ func (c *workflowServiceClient) PublishTemplate(ctx context.Context, in *Publish
 	return out, nil
 }
 
+func (c *workflowServiceClient) ListStepApprovals(ctx context.Context, in *ListStepApprovalsRequest, opts ...grpc.CallOption) (*ListStepApprovalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListStepApprovalsResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_ListStepApprovals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) GetStepApproval(ctx context.Context, in *GetStepApprovalRequest, opts ...grpc.CallOption) (*GetStepApprovalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetStepApprovalResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_GetStepApproval_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) ResolveStepApproval(ctx context.Context, in *ResolveStepApprovalRequest, opts ...grpc.CallOption) (*ResolveStepApprovalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveStepApprovalResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_ResolveStepApproval_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workflowServiceClient) ListPendingApprovals(ctx context.Context, in *ListPendingApprovalsRequest, opts ...grpc.CallOption) (*ListPendingApprovalsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListPendingApprovalsResponse)
@@ -410,6 +449,12 @@ type WorkflowServiceServer interface {
 	// the template in a pending Approval instead of taking effect
 	// immediately (BUG-WF-03).
 	PublishTemplate(context.Context, *PublishTemplateRequest) (*WorkflowTemplate, error)
+	// Step approvals: decisions a running step waits for from a person, e.g. a
+	// tdd-agent gate (docs/integrate/TDD-WF-AGENT-001 §7.5). Visible to project
+	// members; deciding needs an approver project role.
+	ListStepApprovals(context.Context, *ListStepApprovalsRequest) (*ListStepApprovalsResponse, error)
+	GetStepApproval(context.Context, *GetStepApprovalRequest) (*GetStepApprovalResponse, error)
+	ResolveStepApproval(context.Context, *ResolveStepApprovalRequest) (*ResolveStepApprovalResponse, error)
 	// ListPendingApprovals lists this tenant's pending publish-approval gates.
 	ListPendingApprovals(context.Context, *ListPendingApprovalsRequest) (*ListPendingApprovalsResponse, error)
 	// ResolveApproval approves or rejects a pending approval — an admin-only
@@ -481,6 +526,15 @@ func (UnimplementedWorkflowServiceServer) StreamExecutionEvents(*StreamExecution
 }
 func (UnimplementedWorkflowServiceServer) PublishTemplate(context.Context, *PublishTemplateRequest) (*WorkflowTemplate, error) {
 	return nil, status.Error(codes.Unimplemented, "method PublishTemplate not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ListStepApprovals(context.Context, *ListStepApprovalsRequest) (*ListStepApprovalsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListStepApprovals not implemented")
+}
+func (UnimplementedWorkflowServiceServer) GetStepApproval(context.Context, *GetStepApprovalRequest) (*GetStepApprovalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetStepApproval not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ResolveStepApproval(context.Context, *ResolveStepApprovalRequest) (*ResolveStepApprovalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveStepApproval not implemented")
 }
 func (UnimplementedWorkflowServiceServer) ListPendingApprovals(context.Context, *ListPendingApprovalsRequest) (*ListPendingApprovalsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListPendingApprovals not implemented")
@@ -784,6 +838,60 @@ func _WorkflowService_PublishTemplate_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkflowService_ListStepApprovals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListStepApprovalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ListStepApprovals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ListStepApprovals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ListStepApprovals(ctx, req.(*ListStepApprovalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_GetStepApproval_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStepApprovalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).GetStepApproval(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_GetStepApproval_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).GetStepApproval(ctx, req.(*GetStepApprovalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_ResolveStepApproval_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveStepApprovalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ResolveStepApproval(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ResolveStepApproval_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ResolveStepApproval(ctx, req.(*ResolveStepApprovalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _WorkflowService_ListPendingApprovals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListPendingApprovalsRequest)
 	if err := dec(in); err != nil {
@@ -954,6 +1062,18 @@ var WorkflowService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PublishTemplate",
 			Handler:    _WorkflowService_PublishTemplate_Handler,
+		},
+		{
+			MethodName: "ListStepApprovals",
+			Handler:    _WorkflowService_ListStepApprovals_Handler,
+		},
+		{
+			MethodName: "GetStepApproval",
+			Handler:    _WorkflowService_GetStepApproval_Handler,
+		},
+		{
+			MethodName: "ResolveStepApproval",
+			Handler:    _WorkflowService_ResolveStepApproval_Handler,
 		},
 		{
 			MethodName: "ListPendingApprovals",

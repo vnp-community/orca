@@ -1,5 +1,6 @@
 import { useWorkflowExecution } from '../../hooks/useWorkflowExecution'
 import { StepStatusBadge } from './StepStatusBadge'
+import { StepApprovalPanel } from './StepApprovalPanel'
 import { Button } from '../ui/button'
 import type { WorkflowStep, StepStatus } from '@shared/workflow-types'
 
@@ -59,6 +60,8 @@ export function ExecutionMonitor({ executionId }: { executionId: string }) {
           )}
         </div>
       </div>
+
+      <StepApprovalPanel executionId={executionId} active={execution.status === 'running'} />
 
       {/* Waves */}
       {waves.map(({ waveIdx, steps }) => (
