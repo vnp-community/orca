@@ -127,7 +127,7 @@ def build_repo(root: Path) -> Path:
     git(repo, "init", "-q", "-b", "main")
     git(repo, "remote", "add", "origin", "git@github.com:example/notes.git")  # a real-looking remote, so the push block is what stops a push
     done = subprocess.run(["tdd-agent", "-C", str(repo), "init", "--no-prose", "--name", "Notes", "--tdd-id", "TDD-NOTES",
-                           "--urd", "docs/URD.md", "--srs", "docs/SRS.md", "--sad", "docs/SAD.md"], capture_output=True, text=True, timeout=300)
+                           "--urd", str(repo / "docs/URD.md"), "--srs", str(repo / "docs/SRS.md"), "--sad", str(repo / "docs/SAD.md")], capture_output=True, text=True, timeout=300)
     if done.returncode != 0:
         raise Failure("tdd-agent init failed: " + (done.stderr or done.stdout)[-300:])
     done = subprocess.run(["tdd-agent", "-C", str(repo), "mcp", "enable", "--read-only"], capture_output=True, text=True, timeout=60)
@@ -203,7 +203,7 @@ def run(args: argparse.Namespace) -> int:
     project_id = request_id = ""
     try:
         repo = build_repo(root)
-        rep.check("the temp repo has a knowledge graph", "knowledge graph" in subprocess.run(["tdd-agent", "-C", str(repo), "status"], capture_output=True, text=True).stdout)
+        rep.check("the temp repo has a knowledge graph", json.loads(subprocess.run(["tdd-agent", "-C", str(repo), "status"], capture_output=True, text=True).stdout).get("knowledge", {}).get("elements", 0) > 0)
         agent.start()
         state = agent_block_state()
         rep.check("the agent runs with the push block", bool(state) and all(state.values()), state)
