@@ -17,6 +17,7 @@ const (
 // Second layer next to RLS: application filters keep working if a role ever bypasses the policies.
 func TestTenantScope(t *testing.T) {
 	contracttest.CheckTenantScope(t, ".", map[string]string{
+		"request_activity.go:ListActivity":               "tenant_id is bound in every branch of the activityUnion constant, which the outer filter wraps",
 		"approval_policy_repository.go:List":             dynamicWhere,
 		"approval_repository.go:List":                    dynamicWhere,
 		"backlog_requests.go:ListByStatus":               "WHERE is assembled in a variable and always starts with tenant_id = ?/$1",

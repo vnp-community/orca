@@ -133,3 +133,29 @@ func (r *TaskRunOutcomeRepository) LatestDispatchError(ctx context.Context, task
 	})
 	return o, found, err
 }
+
+func (r *TaskRunOutcomeRepository) ListByRequest(ctx context.Context, requestID string) ([]domain.TaskRunOutcome, error) {
+	var out []domain.TaskRunOutcome
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(requestID) {
+			return nil
+		}
+		rows, err := db.Query(ctx, `SELECT id::text, request_id::text, task_id::text, COALESCE(container_id::text, ''), outcome, cause, error_message, occurred_at
+			FROM request.task_run_outcomes WHERE tenant_id = $1 AND request_id = $2::uuid ORDER BY occurred_at, id`, tenantID, requestID)
+		if err != nil {
+			return fmt.Errorf("postgres: list task run outcomes: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			o := domain.TaskRunOutcome{TenantID: tenantID}
+			var outcome string
+			if err := rows.Scan(&o.ID, &o.RequestID, &o.TaskID, &o.ContainerID, &outcome, &o.Cause, &o.ErrorMessage, &o.OccurredAt); err != nil {
+				return err
+			}
+			o.Outcome, o.OccurredAt = domain.Outcome(outcome), o.OccurredAt.UTC()
+			out = append(out, o)
+		}
+		return rows.Err()
+	})
+	return out, err
+}

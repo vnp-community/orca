@@ -28,12 +28,14 @@ type EnginePreflightView struct {
 }
 
 type EngineSettingsView struct {
-	ProjectID          string               `json:"projectId"`
-	Engine             string               `json:"engine"`
-	OpenSpecMinVersion string               `json:"openspecMinVersion"`
-	SolutionAgent      bool                 `json:"solutionAgent"`
-	Version            int64                `json:"version"`
-	Preflight          *EnginePreflightView `json:"preflight,omitempty"`
+	ProjectID          string `json:"projectId"`
+	Engine             string `json:"engine"`
+	OpenSpecMinVersion string `json:"openspecMinVersion"`
+	SolutionAgent      bool   `json:"solutionAgent"`
+	// ExecutionMode is step_by_step or continuous (CR-REQ-038).
+	ExecutionMode string               `json:"executionMode"`
+	Version       int64                `json:"version"`
+	Preflight     *EnginePreflightView `json:"preflight,omitempty"`
 }
 
 // looseBool reads true/false or "true"/"false": a REST query string carries every value as text.
@@ -88,6 +90,7 @@ func (c requestChannels) registerEngine(r *Registry) {
 			Engine          string `json:"engine"`
 			MinVersion      string `json:"openspecMinVersion"`
 			SolutionAgent   bool   `json:"solutionAgent"`
+			ExecutionMode   string `json:"executionMode"`
 			ExpectedVersion int64  `json:"expectedVersion"`
 		}](args)
 		if err != nil {
@@ -98,7 +101,7 @@ func (c requestChannels) registerEngine(r *Registry) {
 		}
 		resp, err := c.req.SetProjectEngineSettings(ctx, &requestv1.SetProjectEngineSettingsRequest{
 			ProjectId: in.ProjectID, SolutionEngine: in.Engine, OpenspecMinVersion: in.MinVersion,
-			SolutionAgent: in.SolutionAgent, ExpectedVersion: in.ExpectedVersion,
+			SolutionAgent: in.SolutionAgent, ExecutionMode: in.ExecutionMode, ExpectedVersion: in.ExpectedVersion,
 		})
 		if err != nil {
 			return nil, err
@@ -110,7 +113,7 @@ func (c requestChannels) registerEngine(r *Registry) {
 func engineSettingsView(s *requestv1.ProjectEngineSettings, p *requestv1.EnginePreflight) EngineSettingsView {
 	v := EngineSettingsView{
 		ProjectID: s.GetProjectId(), Engine: s.GetSolutionEngine(), OpenSpecMinVersion: s.GetOpenspecMinVersion(),
-		SolutionAgent: s.GetSolutionAgent(), Version: s.GetVersion(),
+		SolutionAgent: s.GetSolutionAgent(), ExecutionMode: s.GetExecutionMode(), Version: s.GetVersion(),
 	}
 	if p != nil {
 		v.Preflight = &EnginePreflightView{

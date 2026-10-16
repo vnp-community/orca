@@ -126,7 +126,7 @@ func ResolveTaskGate(in TaskGateInput) GateResolution {
 		}
 		statuses = append(statuses, gateStatusOf(in.Approvals.GetLatest(SubjectPreDeploy, in.Task.ID)))
 	case in.Container.Type == TaskTypePhase:
-		if flow.HasExecutionGate(GatePhase) {
+		if flow.HasExecutionGateFor(GatePhase, in.Request.ExecutionMode) {
 			statuses = append(statuses, gateStatusOf(in.Approvals.GetLatest(SubjectPhase, in.Container.ID)))
 		}
 		planGate(in.Plan)

@@ -8,21 +8,25 @@ import (
 )
 
 type Request struct {
-	ID                     string
-	TenantID               string
-	ProjectID              string
-	Number                 int64
-	Title                  string
-	Body                   string
-	SourceProvider         SourceProvider
-	SourceRef              string
-	SourceURL              string
-	SourceSite             string
-	Type                   RequestType // empty means not set
-	TypeSource             TypeSource
-	Size                   RequestSize // empty means not set
-	Urgency                Urgency
-	SolutionEngine         *EngineName
+	ID             string
+	TenantID       string
+	ProjectID      string
+	Number         int64
+	Title          string
+	Body           string
+	SourceProvider SourceProvider
+	SourceRef      string
+	SourceURL      string
+	SourceSite     string
+	Type           RequestType // empty means not set
+	TypeSource     TypeSource
+	Size           RequestSize // empty means not set
+	Urgency        Urgency
+	SolutionEngine *EngineName
+	// Engine is what a read derives (RequestEngineResolver): never stored, empty when it could not be worked out.
+	Engine EngineName
+	// ExecutionMode is pinned when the Request enters executing; empty before that (and for rows older than the column).
+	ExecutionMode          ExecutionMode
 	Confidence             *float64
 	ClassificationReason   string
 	Stage                  string

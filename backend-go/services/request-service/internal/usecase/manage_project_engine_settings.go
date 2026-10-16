@@ -12,10 +12,12 @@ import (
 )
 
 type SetProjectEngineSettingsInput struct {
-	ProjectID       string
-	Engine          string
-	MinVersion      string
-	SolutionAgent   bool
+	ProjectID     string
+	Engine        string
+	MinVersion    string
+	SolutionAgent bool
+	// ExecutionMode is step_by_step or continuous; empty keeps the mode the project already has.
+	ExecutionMode   string
 	ExpectedVersion int64
 }
 
@@ -67,7 +69,7 @@ func (uc *ManageProjectEngineSettings) GetProjectEngineSettings(ctx context.Cont
 		return EngineSettingsView{}, err
 	}
 	if !ok {
-		settings = domain.ProjectEngineSettings{ProjectID: projectID, Engine: domain.EngineNative}
+		settings = domain.ProjectEngineSettings{ProjectID: projectID, Engine: domain.EngineNative, ExecutionMode: domain.ExecutionStepByStep}
 	}
 	view := EngineSettingsView{Settings: settings}
 	if check {
@@ -105,6 +107,20 @@ func (uc *ManageProjectEngineSettings) SetProjectEngineSettings(ctx context.Cont
 		return EngineSettingsView{}, domain.ErrEngineSettingsInvalid(err.Error())
 	}
 	s.SolutionAgent = in.SolutionAgent
+	if in.ExecutionMode == "" {
+		// An older client that does not know the field must not flip a project back to step_by_step.
+		if cur, found, err := uc.repo.Get(ctx, in.ProjectID); err != nil {
+			return EngineSettingsView{}, err
+		} else if found {
+			s.ExecutionMode = cur.ExecutionMode.OrDefault()
+		}
+	} else {
+		mode, err := domain.ParseExecutionMode(in.ExecutionMode)
+		if err != nil {
+			return EngineSettingsView{}, err
+		}
+		s.ExecutionMode = mode
+	}
 
 	write := func(ctx context.Context) error {
 		saved, err := uc.repo.Upsert(ctx, s, in.ExpectedVersion)
@@ -117,7 +133,7 @@ func (uc *ManageProjectEngineSettings) SetProjectEngineSettings(ctx context.Cont
 		}
 		return uc.audit.Record(ctx, AuditEvent{
 			Action: domain.AuditEngineSettingsSet, TargetType: "project", TargetID: s.ProjectID, Outcome: "allowed",
-			Metadata: map[string]any{"solution_engine": string(s.Engine), "solution_agent": s.SolutionAgent, "version": s.Version},
+			Metadata: map[string]any{"solution_engine": string(s.Engine), "solution_agent": s.SolutionAgent, "execution_mode": string(s.ExecutionMode.OrDefault()), "version": s.Version},
 		})
 	}
 	if uc.tx != nil {

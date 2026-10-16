@@ -31,7 +31,7 @@ group_roles := {
 agent_rpcs := {
 	"read": {
 		"GetRequest", "ListRequests", "ListBacklog", "ListRequestTypeHistory", "ListRequestLinks",
-		"ListSolutions", "GetApproval", "ListApprovals",
+		"ListSolutions", "GetApproval", "ListApprovals", "ListRequestActivity", "GetExecutionSummary",
 	},
 	"create": {"CreateRequest", "SpawnChildRequest"},
 	"triage": {"ClassifyRequest", "ChangeRequestType"},

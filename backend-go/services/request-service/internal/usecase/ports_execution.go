@@ -104,6 +104,8 @@ type TaskRunOutcomeRepository interface {
 	DispatchRetrySince(ctx context.Context, taskID string) (since time.Time, ok bool, err error)
 	// LatestDispatchError is the newest dispatch_error outcome of the task, for the backlog reason.
 	LatestDispatchError(ctx context.Context, taskID string) (domain.TaskRunOutcome, bool, error)
+	// ListByRequest returns every outcome of the Request, oldest first, for the execution summary.
+	ListByRequest(ctx context.Context, requestID string) ([]domain.TaskRunOutcome, error)
 }
 
 // RequestCheckRepository is append-only: there is no update or delete path.

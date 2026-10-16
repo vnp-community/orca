@@ -162,6 +162,33 @@ func (r *RequestRepository) PinSolutionEngineIfUnset(ctx context.Context, id str
 	return out, err
 }
 
+// PinExecutionModeIfUnset records the execution mode a Request runs with, once: a later call returns the stored mode and
+// changes nothing, so a project setting changed mid-run never changes the rules of a Request that already started.
+func (r *RequestRepository) PinExecutionModeIfUnset(ctx context.Context, id string, mode domain.ExecutionMode) (domain.ExecutionMode, error) {
+	var out domain.ExecutionMode
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return domain.ErrRequestNotFound(id)
+		}
+		if _, err := db.Exec(ctx, `UPDATE request.requests SET execution_mode = $3 WHERE id = $1 AND tenant_id = $2 AND execution_mode IS NULL`,
+			id, tenantID, string(mode)); err != nil {
+			return fmt.Errorf("postgres: pin execution mode: %w", err)
+		}
+		var cur *string
+		if err := db.QueryRow(ctx, `SELECT execution_mode FROM request.requests WHERE id = $1 AND tenant_id = $2`, id, tenantID).Scan(&cur); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return domain.ErrRequestNotFound(id)
+			}
+			return fmt.Errorf("postgres: read pinned execution mode: %w", err)
+		}
+		if cur != nil {
+			out = domain.ExecutionMode(*cur)
+		}
+		return nil
+	})
+	return out, err
+}
+
 func (r *RequestRepository) List(ctx context.Context, f usecase.ListFilter) (usecase.ListResult, error) {
 	f, err := f.Normalize()
 	if err != nil {

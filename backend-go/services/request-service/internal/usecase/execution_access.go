@@ -84,6 +84,32 @@ func (a *ExecutionAccess) ensureOnRoot(ctx context.Context, root domain.TaskView
 	return nil
 }
 
+// CheckReady is Ensure without the grant: it says whether Ensure could succeed for actor, and writes nothing. A plan approval
+// uses it before the decision is recorded, when granting access to someone who may still be refused would be wrong.
+// The part it cannot know is whether the owner is still allowed to write the grant; that failure surfaces later, as before.
+func (a *ExecutionAccess) CheckReady(ctx context.Context, req domain.Request, actor string) error {
+	if actor == "" {
+		return nil
+	}
+	tasks, err := a.Tasks.ListTasks(ctx, ListTasksQuery{RequestIDs: []string{req.ID}, TaskTypes: executionTaskTypes})
+	if err != nil {
+		return err
+	}
+	for _, root := range tasks {
+		if root.ParentID != "" || root.Status == domain.TaskStatusCancelled {
+			continue
+		}
+		ok, err := a.Tasks.CanExecute(ctx, root.ID, actor)
+		if err != nil {
+			return err
+		}
+		if !ok && (root.OwnerID == "" || root.OwnerID == actor) {
+			return domain.ErrExecuteForbidden()
+		}
+	}
+	return nil
+}
+
 func (a *ExecutionAccess) now() time.Time {
 	if a.Now != nil {
 		return a.Now()

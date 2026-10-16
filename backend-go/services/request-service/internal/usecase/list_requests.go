@@ -8,7 +8,14 @@ import (
 )
 
 type ListRequests struct {
-	repo RequestRepository
+	repo   RequestRepository
+	engine *RequestEngineResolver
+}
+
+// WithEngine makes every Request of the page carry the engine it runs on.
+func (uc *ListRequests) WithEngine(r *RequestEngineResolver) *ListRequests {
+	uc.engine = r
+	return uc
 }
 
 func NewListRequests(repo RequestRepository) *ListRequests {
@@ -37,5 +44,10 @@ func (uc *ListRequests) Execute(ctx context.Context, f ListFilter) (ListResult, 
 		}
 		f.ProjectIDs = scope
 	}
-	return uc.repo.List(ctx, f)
+	res, err := uc.repo.List(ctx, f)
+	if err != nil {
+		return ListResult{}, err
+	}
+	uc.engine.Annotate(ctx, res.Requests)
+	return res, nil
 }

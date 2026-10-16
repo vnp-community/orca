@@ -32,6 +32,8 @@ var requestServiceRPCChannels = map[string]rpcDisposition{
 	"CancelRequest":            viaChannel("request.cancel"),
 	"SpawnChildRequest":        viaChannel("request.spawnChild"),
 	"ListRequestLinks":         viaChannel("request.links"),
+	"ListRequestActivity":      viaChannel("request.activity"),
+	"GetExecutionSummary":      viaChannel("request.executionSummary"),
 	"GetRequestFlow":           viaChannel("request.flow"),
 	"LookupRequestBySource":    internalRPC("source dedupe runs inside CreateRequest"),
 	"GetRequestFlowSettings":   viaChannel("request.flowStatus"),

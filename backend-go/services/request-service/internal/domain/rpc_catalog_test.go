@@ -99,7 +99,7 @@ func TestCatalogAgentMatrix(t *testing.T) {
 		"GetRequest", "ListRequests", "ListBacklog", "ListRequestTypeHistory", "ListRequestLinks", "ListSolutions",
 		"GetApproval", "ListApprovals", "ListPendingForUser", "GetRequestFlow", "GetRequestFlowSettings",
 		"CreateRequest", "SpawnChildRequest", "ClassifyRequest", "ChangeRequestType", "GenerateSolution",
-		"ReturnToBacklog", "ReopenRequest",
+		"ReturnToBacklog", "ReopenRequest", "ListRequestActivity", "GetExecutionSummary",
 	}
 	denied := []string{
 		"Approve", "Reject", "Cancel", "ExtendApproval", "StartPhase", "GeneratePlan", "CommitPlan", "CancelRequest",

@@ -8,6 +8,7 @@
 | [CR-REQ-012](./CR-REQ-012-plan-phase-task-generation-from-solution.md) | Chưa có use case sinh Plan, Phase, Task từ Solution; `AIApply` không biết Plan, nhãn, `request_id` | 🔴 P0 | Large | 📝 Đề xuất, chưa triển khai |
 | [CR-REQ-013](./CR-REQ-013-phase-execution-and-feedback-loop.md) | `task-service` không phát sự kiện khi task chạy, lỗi, xong; chưa có `StartPhase` và vòng phản hồi | 🔴 P0 | Large | 📝 Đề xuất, chưa triển khai |
 | [CR-REQ-014](./CR-REQ-014-type-specific-execution-policies.md) | `hotfix`, `security`, `performance`, `ops_request`, `refactor` cần cổng và kiểm tra riêng | 🟠 P1 | Large | 📝 Đề xuất, chưa triển khai |
+| [CR-REQ-038](./CR-REQ-038-continuous-execution-activity-feed-and-execution-summary.md) | Mọi luồng có Phase đều chờ người bấm `StartPhase`, `change_request` còn duyệt từng Phase; không có API nhật ký hoạt động và tóm tắt thực thi; `Request` không có `engine`, `execution_mode` | 🟠 P1 | Large | 📝 Đề xuất, chưa triển khai |
 
 ## Thứ tự thực thi
 

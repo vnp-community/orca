@@ -88,7 +88,8 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 		}
 	}
 	flow, _ := domain.FlowFor(req.Type)
-	if flow.HasExecutionGate(domain.GatePhase) && (latest == nil || latest.Status != domain.ApprovalStatusApproved) {
+	// A continuous run has no Phase gate: the approval of the plan already covers every Phase.
+	if flow.HasExecutionGateFor(domain.GatePhase, req.ExecutionMode) && (latest == nil || latest.Status != domain.ApprovalStatusApproved) {
 		return StartPhaseResult{}, domain.ErrPhaseNotApproved(phase.ID)
 	}
 	if err := uc.ensureAccess(ctx, tasks, actor); err != nil {
@@ -98,7 +99,11 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 		return StartPhaseResult{}, err
 	}
 
-	inserted, err := uc.claim(ctx, req, phase.ID, actor)
+	trigger := domain.PhaseStartManual
+	if in.Internal {
+		trigger = domain.PhaseStartAuto
+	}
+	inserted, err := claimPhase(ctx, uc.Tx, uc.PhaseStarts, uc.Outbox, req, phase.ID, actor, trigger)
 	if err != nil {
 		return StartPhaseResult{}, err
 	}
@@ -157,12 +162,15 @@ func (uc *StartPhase) checkPredecessors(ctx context.Context, tree domain.Executi
 	return nil
 }
 
-func (uc *StartPhase) claim(ctx context.Context, req domain.Request, phaseID, actor string) (bool, error) {
+// claimPhase records "this Phase was released" and emits phase.started in the same transaction. The phase_starts row is the
+// claim, so releasing twice (a double click, a repeated event) dispatches once. trigger tells a person's click from Orca
+// starting the Phase itself.
+func claimPhase(ctx context.Context, tx TxRunner, starts PhaseStartRepository, outbox OutboxWriter, req domain.Request, phaseID, actor string, trigger domain.PhaseStartTrigger) (bool, error) {
 	tenantID, _ := tenant.TenantID(ctx)
 	var inserted bool
-	err := uc.Tx.InTx(ctx, func(ctx context.Context) error {
+	err := tx.InTx(ctx, func(ctx context.Context) error {
 		var err error
-		inserted, err = uc.PhaseStarts.TryStart(ctx, domain.PhaseStart{TenantID: tenantID, PhaseTaskID: phaseID, RequestID: req.ID, StartedBy: actor})
+		inserted, err = starts.TryStart(ctx, domain.PhaseStart{TenantID: tenantID, PhaseTaskID: phaseID, RequestID: req.ID, StartedBy: actor, Trigger: trigger})
 		if err != nil || !inserted {
 			return err
 		}
@@ -170,7 +178,7 @@ func (uc *StartPhase) claim(ctx context.Context, req domain.Request, phaseID, ac
 		if err != nil {
 			return err
 		}
-		return uc.Outbox.InsertOutboxEvent(ctx, ev)
+		return outbox.InsertOutboxEvent(ctx, ev)
 	})
 	return inserted, err
 }

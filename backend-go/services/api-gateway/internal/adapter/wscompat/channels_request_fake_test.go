@@ -312,6 +312,37 @@ func (f *fakeRequestClient) ListRequestLinks(ctx context.Context, in *requestv1.
 	return &requestv1.ListRequestLinksResponse{Children: []*requestv1.RequestLink{{ParentRequestId: "r1", ChildRequestId: "c1", Reason: "escalation"}}}, nil
 }
 
+func (f *fakeRequestClient) ListRequestActivity(ctx context.Context, in *requestv1.ListRequestActivityRequest, _ ...grpc.CallOption) (*requestv1.ListRequestActivityResponse, error) {
+	f.rec(ctx, "ListRequestActivity", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.empty {
+		return &requestv1.ListRequestActivityResponse{}, nil
+	}
+	return &requestv1.ListRequestActivityResponse{
+		NextPageToken: "tok2",
+		Entries: []*requestv1.ActivityEntry{{
+			Id: "o1", Kind: "task.failed", OccurredAt: timestamppb.New(time.Date(2026, 10, 15, 10, 56, 29, 0, time.UTC)), ActorKind: "agent",
+			SubjectType: "task", SubjectId: "t1", Summary: "Run the e2e acceptance failed (timed_out)", Attempt: 2, Severity: "error",
+			DetailsJson: `{"cause":"timed_out","attempt":2}`,
+		}, {Id: "o2", Kind: "request.created", OccurredAt: timestamppb.New(time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)), ActorKind: "user", Severity: "info", DetailsJson: "not json"}},
+	}, nil
+}
+
+func (f *fakeRequestClient) GetExecutionSummary(ctx context.Context, in *requestv1.GetExecutionSummaryRequest, _ ...grpc.CallOption) (*requestv1.GetExecutionSummaryResponse, error) {
+	f.rec(ctx, "GetExecutionSummary", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetExecutionSummaryResponse{Summary: &requestv1.ExecutionSummary{
+		RequestId: in.GetRequestId(), Status: "request_backlog", Engine: "openspec", ExecutionMode: "continuous", MaxAttempts: 2,
+		Progress: &requestv1.ExecutionProgress{PhasesTotal: 7, PhasesDone: 6, TasksTotal: 28, TasksDone: 27, TasksFailed: 1},
+		Failed: []*requestv1.ExecutionFailedTask{{TaskId: "t1", Title: "Run the e2e acceptance", Attempts: 2, MaxAttempts: 2, LastCause: "timed_out"}},
+		NeedsYou: []*requestv1.ExecutionNeedsYou{{Kind: "failed_task", RefId: "t1", Title: "Run the e2e acceptance", Since: timestamppb.New(time.Date(2026, 10, 15, 10, 56, 29, 0, time.UTC))}},
+	}}, nil
+}
+
 func (f *fakeRequestClient) GetRequestFlow(ctx context.Context, in *requestv1.GetRequestFlowRequest, _ ...grpc.CallOption) (*requestv1.GetRequestFlowResponse, error) {
 	f.rec(ctx, "GetRequestFlow", in)
 	if f.err != nil {

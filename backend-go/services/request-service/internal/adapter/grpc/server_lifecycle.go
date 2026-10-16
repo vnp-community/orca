@@ -23,7 +23,7 @@ func (s *Server) GetRequestFlow(ctx context.Context, req *requestv1.GetRequestFl
 	out := &requestv1.GetRequestFlowResponse{
 		Type: string(v.Flow.Type), HumanConfirmRequired: v.Flow.HumanConfirmRequired, AnalysisKind: string(v.Flow.AnalysisKind),
 		AnalysisGate: string(v.Flow.AnalysisGate), PlanKind: string(v.Flow.PlanKind), HasPhases: v.HasPhases, StartGate: string(v.Flow.StartGate),
-		CompletesAfterAnalysis: v.Flow.CompletesAfterAnalysis,
+		CompletesAfterAnalysis: v.Flow.CompletesAfterAnalysis, OpenSpecProfile: string(v.Flow.OpenSpecProfile),
 	}
 	for _, g := range v.Flow.ExecutionGates {
 		out.ExecutionGates = append(out.ExecutionGates, string(g))

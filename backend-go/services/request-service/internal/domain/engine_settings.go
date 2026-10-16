@@ -15,6 +15,8 @@ type ProjectEngineSettings struct {
 	MinVersion string
 	// SolutionAgent makes the Solution of a Request run through the read-only agent with the project's knowledge graph.
 	SolutionAgent bool
+	// ExecutionMode is how Requests of this project run after their plan is approved. Empty reads as step_by_step.
+	ExecutionMode ExecutionMode
 	UpdatedBy     string
 	UpdatedAt     time.Time
 	Version       int64
@@ -30,13 +32,14 @@ func NewProjectEngineSettings(tenantID, projectID string, engine EngineName, min
 		return ProjectEngineSettings{}, fmt.Errorf("invalid minVersion format")
 	}
 	return ProjectEngineSettings{
-		TenantID:   tenantID,
-		ProjectID:  projectID,
-		Engine:     engine,
-		MinVersion: minVersion,
-		UpdatedBy:  actor,
-		UpdatedAt:  now,
-		Version:    1,
+		TenantID:      tenantID,
+		ProjectID:     projectID,
+		Engine:        engine,
+		MinVersion:    minVersion,
+		ExecutionMode: ExecutionStepByStep,
+		UpdatedBy:     actor,
+		UpdatedAt:     now,
+		Version:       1,
 	}, nil
 }
 
@@ -57,12 +60,14 @@ func EffectiveEngine(pinned *EngineName, settings *ProjectEngineSettings, profil
 type EngineDefaults struct {
 	Engine        EngineName
 	SolutionAgent bool
+	ExecutionMode ExecutionMode
 }
 
-// EngineDefaultsFromEnv reads REQUEST_DEFAULT_ENGINE (native|openspec) and REQUEST_DEFAULT_SOLUTION_AGENT (true|false).
+// EngineDefaultsFromEnv reads REQUEST_DEFAULT_ENGINE (native|openspec), REQUEST_DEFAULT_SOLUTION_AGENT (true|false) and
+// REQUEST_DEFAULT_EXECUTION_MODE (step_by_step|continuous).
 // Unset keeps native and off, so a deployment opts in on purpose; a value that cannot be read keeps the safe default and says so.
 func EngineDefaultsFromEnv(getenv func(string) string) (EngineDefaults, []string) {
-	d, warnings := EngineDefaults{Engine: EngineNative}, []string(nil)
+	d, warnings := EngineDefaults{Engine: EngineNative, ExecutionMode: ExecutionStepByStep}, []string(nil)
 	switch raw := strings.ToLower(strings.TrimSpace(getenv("REQUEST_DEFAULT_ENGINE"))); raw {
 	case "":
 	case string(EngineNative), string(EngineOpenSpec):
@@ -77,6 +82,13 @@ func EngineDefaultsFromEnv(getenv func(string) string) (EngineDefaults, []string
 	case "false", "0", "no", "off":
 	default:
 		warnings = append(warnings, "REQUEST_DEFAULT_SOLUTION_AGENT "+strconv.Quote(raw)+" is not true or false; off applies")
+	}
+	switch raw := strings.ToLower(strings.TrimSpace(getenv("REQUEST_DEFAULT_EXECUTION_MODE"))); raw {
+	case "":
+	case string(ExecutionStepByStep), string(ExecutionContinuous):
+		d.ExecutionMode = ExecutionMode(raw)
+	default:
+		warnings = append(warnings, "REQUEST_DEFAULT_EXECUTION_MODE "+strconv.Quote(raw)+" is not step_by_step or continuous; step_by_step applies")
 	}
 	return d, warnings
 }

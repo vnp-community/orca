@@ -1640,6 +1640,10 @@
     "kind": "unary"
   },
   {
+    "name": "request.activity",
+    "kind": "unary"
+  },
+  {
     "name": "request.cancel",
     "kind": "unary"
   },
@@ -1673,6 +1677,10 @@
   },
   {
     "name": "request.engineSettingsSet",
+    "kind": "unary"
+  },
+  {
+    "name": "request.executionSummary",
     "kind": "unary"
   },
   {

@@ -57,9 +57,10 @@ func TestEngineDefaultsFromEnv(t *testing.T) {
 		want  EngineDefaults
 		warns int
 	}{
-		{"unset keeps native and off", nil, EngineDefaults{Engine: EngineNative}, 0},
-		{"both on", map[string]string{"REQUEST_DEFAULT_ENGINE": " OpenSpec ", "REQUEST_DEFAULT_SOLUTION_AGENT": "true"}, EngineDefaults{Engine: EngineOpenSpec, SolutionAgent: true}, 0},
-		{"unreadable values keep the safe default and warn", map[string]string{"REQUEST_DEFAULT_ENGINE": "fast", "REQUEST_DEFAULT_SOLUTION_AGENT": "maybe"}, EngineDefaults{Engine: EngineNative}, 2},
+		{"unset keeps native and off", nil, EngineDefaults{Engine: EngineNative, ExecutionMode: ExecutionStepByStep}, 0},
+		{"both on", map[string]string{"REQUEST_DEFAULT_ENGINE": " OpenSpec ", "REQUEST_DEFAULT_SOLUTION_AGENT": "true"}, EngineDefaults{Engine: EngineOpenSpec, SolutionAgent: true, ExecutionMode: ExecutionStepByStep}, 0},
+		{"continuous mode", map[string]string{"REQUEST_DEFAULT_EXECUTION_MODE": " Continuous "}, EngineDefaults{Engine: EngineNative, ExecutionMode: ExecutionContinuous}, 0},
+		{"unreadable values keep the safe default and warn", map[string]string{"REQUEST_DEFAULT_ENGINE": "fast", "REQUEST_DEFAULT_SOLUTION_AGENT": "maybe", "REQUEST_DEFAULT_EXECUTION_MODE": "turbo"}, EngineDefaults{Engine: EngineNative, ExecutionMode: ExecutionStepByStep}, 3},
 	}
 	for _, c := range cases {
 		got, warns := EngineDefaultsFromEnv(get(c.env))

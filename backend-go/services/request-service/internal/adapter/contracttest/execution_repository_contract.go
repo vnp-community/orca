@@ -30,6 +30,9 @@ type ExecutionEnv struct {
 	Processed        usecase.ProcessedEventRepository
 	InsertRawOutcome func(tenantID string, overrides map[string]any) error
 	InsertRawCheck   func(tenantID string, overrides map[string]any) error
+	// Activity reads the feed of a Request (CR-REQ-038) and InsertRaw writes a row of a table that has no repository in this package.
+	Activity  usecase.RequestActivityReader
+	InsertRaw func(table string, row map[string]any) error
 }
 
 // RunExecutionRepositoryContract runs the repository scenarios of phase_starts, task_run_outcomes, request_checks,
@@ -64,6 +67,12 @@ func RunExecutionRepositoryContract(t *testing.T, newEnv func(t *testing.T) Exec
 		{"Backlog_TenantIsolation", backlogTenantIsolation},
 		{"Backlog_ParentRequestIDs_And_LatestReturnsUseHistory", backlogParentsAndReturns},
 		{"GateApprovals_IncludeDecider_AndSubjects", gateApprovalsDecider},
+		{"PhaseStarts_TriggerRoundTrips", phaseStartTrigger},
+		{"TaskRunOutcomes_ListByRequest_OldestFirst", outcomesListByRequest},
+		{"Requests_PinExecutionMode_OnceAndPerTenant", pinExecutionMode},
+		{"Activity_EverySource_NewestFirst_AttemptNumbers", activityAllSources},
+		{"Activity_Filters_And_KeysetPaging", activityFiltersAndKeyset},
+		{"Activity_TenantIsolation", activityTenantIsolation},
 	}
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) { s.fn(t, env) })

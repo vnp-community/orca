@@ -89,6 +89,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		log.Warn(w)
 	}
 	stores.engineSettings = usecase.NewDefaultedEngineSettings(stores.engineSettings, engineDefaults)
+	stores.engineDefaults = engineDefaults
 	outboxStore := stores.outbox
 	rollout, err := wireRollout(cfg, log, stores) // wraps stores.tx and stores.outboxWriter: keep before any use case is built
 	if err != nil {
@@ -213,8 +214,8 @@ func run(ctx context.Context, cfg config.Config) error {
 	// ChainUnary (recovery, tenant extraction, logging) stays first; the security chain (with the flow gate and RPC audit hooks) runs after it.
 	grpcServer := grpc.NewServer(append(append([]grpc.ServerOption{grpcmw.ChainUnary(log), grpcmw.StatsHandler()}, security.options...), rollout.ServerOptions()...)...)
 	requestv1.RegisterRequestServiceServer(grpcServer, artifact.attach(rollout.WithRPCs(requestgrpc.NewServer(
-		usecase.NewGetRequest(stores.requests),
-		usecase.NewListRequests(stores.requests),
+		usecase.NewGetRequest(stores.requests).WithEngine(&usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}),
+		usecase.NewListRequests(stores.requests).WithEngine(&usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}),
 	).WithExecution(execution.Server))).WithIntake(requestgrpc.IntakeUseCases{Create: intake.createRequest, Lookup: intake.lookup}).
 		WithClassification(requestgrpc.ClassificationUseCases{Runner: classification.runner, Confirm: classification.confirm, Change: classification.change, History: classification.history}).
 		WithLifecycle(requestgrpc.LifecycleUseCases{Flow: lifecycle.GetFlow, Return: lifecycle.Return, Reopen: lifecycle.Reopen, Cancel: lifecycle.Cancel, SpawnChild: lifecycle.SpawnChild, Links: lifecycle.ListLinks}).

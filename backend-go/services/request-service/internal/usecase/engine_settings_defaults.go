@@ -15,7 +15,7 @@ type DefaultedEngineSettings struct {
 }
 
 func NewDefaultedEngineSettings(inner EngineSettingsRepository, defaults domain.EngineDefaults) EngineSettingsRepository {
-	if defaults.Engine == domain.EngineNative && !defaults.SolutionAgent {
+	if defaults.Engine == domain.EngineNative && !defaults.SolutionAgent && defaults.ExecutionMode.OrDefault() == domain.ExecutionStepByStep {
 		return inner
 	}
 	return &DefaultedEngineSettings{EngineSettingsRepository: inner, defaults: defaults}
@@ -26,5 +26,5 @@ func (d *DefaultedEngineSettings) Get(ctx context.Context, projectID string) (do
 	if err != nil || found {
 		return s, found, err
 	}
-	return domain.ProjectEngineSettings{ProjectID: projectID, Engine: d.defaults.Engine, SolutionAgent: d.defaults.SolutionAgent}, true, nil
+	return domain.ProjectEngineSettings{ProjectID: projectID, Engine: d.defaults.Engine, SolutionAgent: d.defaults.SolutionAgent, ExecutionMode: d.defaults.ExecutionMode.OrDefault()}, true, nil
 }

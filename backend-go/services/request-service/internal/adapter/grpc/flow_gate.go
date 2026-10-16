@@ -46,6 +46,8 @@ var flowMethodClass = map[string]flowClass{
 	requestSvc + "ListBacklog":                      classRead,
 	requestSvc + "ListRequestTypeHistory":           classRead,
 	requestSvc + "ListRequestLinks":                 classRead,
+	requestSvc + "ListRequestActivity":              classRead,
+	requestSvc + "GetExecutionSummary":              classRead,
 	requestSvc + "GetRequestFlow":                   classRead,
 	requestSvc + "GetRequestFlowSettings":           classRead,
 	requestSvc + "ListSolutions":                    classRead,

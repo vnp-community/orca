@@ -302,6 +302,18 @@ func (f *exOutcomes) LatestFailed(_ context.Context, ids []string) (map[string]d
 	return out, nil
 }
 
+func (f *exOutcomes) ListByRequest(_ context.Context, requestID string) ([]domain.TaskRunOutcome, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []domain.TaskRunOutcome
+	for _, r := range f.rows {
+		if r.RequestID == requestID {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
 func (f *exOutcomes) LastEventAt(context.Context, string) (time.Time, error) { return time.Time{}, nil }
 
 func (f *exOutcomes) Exists(_ context.Context, taskID string, outcome domain.Outcome) (bool, error) {

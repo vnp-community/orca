@@ -90,6 +90,9 @@ func (e *EvaluateExecution) Run(ctx context.Context, req domain.Request) error {
 		return err
 	}
 	if err := e.completePhases(ctx, req, tree, started, flow); err != nil {
+		if returned, rerr := e.returnWhenActorForbidden(ctx, req, err); returned || rerr != nil {
+			return rerr
+		}
 		return err
 	}
 	if tree.ScopeFinished() {
@@ -253,7 +256,10 @@ func (e *EvaluateExecution) completePhases(ctx context.Context, req domain.Reque
 			return err
 		}
 	}
-	if e.Open == nil || !flow.HasExecutionGate(domain.GatePhase) {
+	if flow.StartsPhasesItself(req.ExecutionMode, req.Size) {
+		return e.startNextPhase(ctx, req, tree, started)
+	}
+	if e.Open == nil || !flow.HasExecutionGateFor(domain.GatePhase, req.ExecutionMode) {
 		return nil
 	}
 	for _, p := range tree.Phases {

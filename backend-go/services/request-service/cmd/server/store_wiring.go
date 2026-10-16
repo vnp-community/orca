@@ -11,6 +11,7 @@ import (
 	"github.com/stablyai/orca-go/common/outbox"
 	mysqladapter "github.com/stablyai/orca-go/services/request-service/internal/adapter/mysql"
 	postgresadapter "github.com/stablyai/orca-go/services/request-service/internal/adapter/postgres"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -30,9 +31,13 @@ type requestStores struct {
 	locker       usecase.RequestLocker
 	returns      usecase.ReturnHistoryRepository
 	requests     usecase.RequestRepository
-	history      usecase.RequestTypeHistoryRepository
-	solutions    usecase.SolutionStore
-	analysisRuns usecase.AnalysisRunStore
+	// executionModes pins the execution mode of a Request when it enters executing (CR-REQ-038); the same repository as requests.
+	executionModes usecase.ExecutionModePinner
+	// engineDefaults are the deployment defaults (engine, agent-written Solution, execution mode); set by main after the stores open.
+	engineDefaults domain.EngineDefaults
+	history        usecase.RequestTypeHistoryRepository
+	solutions      usecase.SolutionStore
+	analysisRuns   usecase.AnalysisRunStore
 	// engineSettings holds the per-project engine choice; the Request pins its engine from it at the first generation.
 	engineSettings usecase.EngineSettingsRepository
 	// openspecChanges is the authored OpenSpec change of a Request: its files, branch, commit and what it was built from.
@@ -76,6 +81,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			locker:          postgresadapter.NewRequestLocker(base),
 			returns:         postgresadapter.NewReturnHistoryRepository(base),
 			requests:        postgresadapter.NewRequestRepository(base),
+			executionModes:  postgresadapter.NewRequestRepository(base),
 			history:         postgresadapter.NewRequestTypeHistoryRepository(base),
 			solutions:       postgresadapter.NewSolutionRecordRepository(base),
 			analysisRuns:    postgresadapter.NewAnalysisRunRepository(base),
@@ -122,6 +128,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			locker:          mysqladapter.NewRequestLocker(base),
 			returns:         mysqladapter.NewReturnHistoryRepository(base),
 			requests:        mysqladapter.NewRequestRepository(base),
+			executionModes:  mysqladapter.NewRequestRepository(base),
 			history:         mysqladapter.NewRequestTypeHistoryRepository(base),
 			solutions:       mysqladapter.NewSolutionRecordRepository(base),
 			analysisRuns:    mysqladapter.NewAnalysisRunRepository(base),

@@ -29,6 +29,7 @@ type executionStores struct {
 	leases        usecase.ReconcileLeases
 	gateApprovals usecase.ApprovalGateReader
 	backlog       usecase.BacklogRequestReader
+	activity      usecase.RequestActivityReader
 }
 
 func postgresExecutionStores(base *postgresadapter.Repository) executionStores {
@@ -37,6 +38,7 @@ func postgresExecutionStores(base *postgresadapter.Repository) executionStores {
 		phaseStarts: postgresadapter.NewPhaseStartRepository(base), outcomes: postgresadapter.NewTaskRunOutcomeRepository(base),
 		checks: postgresadapter.NewRequestCheckRepository(base), scanner: executing, leases: executing,
 		gateApprovals: postgresadapter.NewApprovalGateReader(base), backlog: postgresadapter.NewBacklogRequestReader(base),
+		activity: postgresadapter.NewRequestActivityRepository(base),
 	}
 }
 
@@ -46,6 +48,7 @@ func mysqlExecutionStores(base *mysqladapter.Repository) executionStores {
 		phaseStarts: mysqladapter.NewPhaseStartRepository(base), outcomes: mysqladapter.NewTaskRunOutcomeRepository(base),
 		checks: mysqladapter.NewRequestCheckRepository(base), scanner: executing, leases: executing,
 		gateApprovals: mysqladapter.NewApprovalGateReader(base), backlog: mysqladapter.NewBacklogRequestReader(base),
+		activity: mysqladapter.NewRequestActivityRepository(base),
 	}
 }
 
@@ -140,6 +143,13 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	visibility := &usecase.MemberRequestVisibility{Members: members}
 
 	access := &usecase.ExecutionAccess{Tasks: tasks.client, Log: log}
+	if approval.Enabled && approval.Server.Decide != nil {
+		// A continuous run is driven by whoever approves the plan; refuse an approver task-service would not let run it.
+		approval.Server.Decide.StartPrecheck = &usecase.ExecutionStartPrecheck{
+			Requests: stores.requests, Access: access, Authorizer: authorizer,
+			Modes: &usecase.ExecutionModeResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults},
+		}
+	}
 	actors := &usecase.ApprovalExecutionActors{Approvals: ex.gateApprovals, PhaseStarts: ex.phaseStarts, Access: access}
 	advance := &usecase.AdvanceExecution{
 		Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Policies: policies,
@@ -154,7 +164,10 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 		Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, Processed: stores.processed, Evaluate: evaluate,
 		Tx: stores.tx, Outbox: stores.outboxWriter, Settings: settings, TaskSync: w.taskSync, Log: log,
 	}
-	startExecution := &usecase.StartExecution{Requests: stores.requests, Evaluate: evaluate}
+	startExecution := &usecase.StartExecution{
+		Requests: stores.requests, Evaluate: evaluate, Pinner: stores.executionModes,
+		Modes: &usecase.ExecutionModeResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults},
+	}
 	resume := &usecase.ResumeAfterGate{Requests: stores.requests, Evaluate: evaluate}
 	host, _ := os.Hostname()
 	reconcile := &usecase.ReconcileExecutingRequests{
@@ -171,6 +184,14 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 			Requests: stores.requests, Checks: ex.checks, Authorizer: &usecase.ParticipantWriteAuthorizer{Approvals: ex.gateApprovals},
 		},
 		ListChecks: &usecase.ListRequestChecks{Requests: stores.requests, Checks: ex.checks, Visibility: visibility},
+		Activity: &usecase.ListRequestActivity{
+			Requests: stores.requests, Activity: ex.activity, Tasks: tasks.client, MaxAttempts: settings.MaxTaskAttempts, Log: log,
+		},
+		Summary: &usecase.GetExecutionSummary{
+			Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Approvals: ex.gateApprovals,
+			Authorizer: authorizer, Clarifications: stores.artifact.clarifications, Changes: stores.openspecChanges,
+			Engine: &usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}, MaxAttempts: settings.MaxTaskAttempts, Log: log,
+		},
 		Backlog: &usecase.ListBacklog{
 			Requests: &usecase.ListBacklogRequests{Reader: ex.backlog, Visibility: visibility},
 			Tasks: &usecase.ListBacklogTasks{
@@ -185,6 +206,7 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 		"AdvanceExecution": advance, "EvaluateExecution": evaluate, "ReportTaskOutcome": report, "StartExecution": startExecution,
 		"ResumeAfterGate": resume, "ReconcileExecutingRequests": reconcile, "StartPhase": w.Server.StartPhase,
 		"RecordRequestCheck": w.Server.RecordCheck, "ListRequestChecks": w.Server.ListChecks,
+		"ListRequestActivity": w.Server.Activity, "GetExecutionSummary": w.Server.Summary,
 		"ListBacklogRequests": w.Server.Backlog.Requests, "ListBacklogTasks": w.Server.Backlog.Tasks,
 	} {
 		if err := requireWired(name, v, optional...); err != nil {

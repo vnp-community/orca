@@ -311,6 +311,35 @@ func requestChannelCases() []requestChannelCase {
 				mustEqual(t, len(res["parents"].([]any)), 0)
 				mustEqual(t, res["children"].([]any)[0].(map[string]any)["childRequestId"], "c1")
 			}},
+		{channel: "request.activity", args: `{"id":"r1","pageSize":20,"kinds":["task.failed"],"minSeverity":"attention","since":"2026-10-15T00:00:00Z"}`, rpc: "ListRequestActivity", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, in proto.Message) {
+				m := in.(*requestv1.ListRequestActivityRequest)
+				mustEqual(t, m.GetRequestId(), "r1")
+				mustEqual(t, m.GetPageSize(), int32(20))
+				mustEqual(t, m.GetMinSeverity(), "attention")
+				mustEqual(t, m.GetKinds()[0], "task.failed")
+				mustEqual(t, m.GetSince().AsTime().Format("2006-01-02"), "2026-10-15")
+				mustEqual(t, res["nextPageToken"], "tok2")
+				entries := res["entries"].([]any)
+				first := entries[0].(map[string]any)
+				mustEqual(t, first["kind"], "task.failed")
+				mustEqual(t, first["severity"], "error")
+				mustEqual(t, first["details"].(map[string]any)["cause"], "timed_out")
+				mustEqual(t, first["occurredAt"], "2026-10-15T10:56:29Z")
+				// Details that are not JSON never reach the screen as a broken value.
+				mustEqual(t, len(entries[1].(map[string]any)["details"].(map[string]any)), 0)
+			}},
+		{channel: "request.executionSummary", args: `{"id":"r1"}`, rpc: "GetExecutionSummary", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, _ proto.Message) {
+				s := res["summary"].(map[string]any)
+				mustEqual(t, s["engine"], "openspec")
+				mustEqual(t, s["executionMode"], "continuous")
+				mustEqual(t, s["progress"].(map[string]any)["tasksDone"], float64(27))
+				mustEqual(t, s["failed"].([]any)[0].(map[string]any)["lastCause"], "timed_out")
+				mustEqual(t, s["needsYou"].([]any)[0].(map[string]any)["kind"], "failed_task")
+				mustEqual(t, s["handover"].(map[string]any)["state"], "none")
+				mustEqual(t, len(s["running"].([]any)), 0)
+			}},
 		{channel: "request.flow", args: `{"type":"bug","size":"S"}`, rpc: "GetRequestFlow", lo: short[0], hi: short[1],
 			check: func(t *testing.T, res map[string]any, _ proto.Message) {
 				mustEqual(t, res["hasPhases"], true)
@@ -424,7 +453,7 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"approval.get", "approval.list", "approval.listPending", "approval.approve", "approval.reject", "approval.cancel",
 		"backlog.requests", "backlog.tasks", "backlog.execute",
 		// CONTRACT 2.5 and the plan proposal reader.
-		"request.links", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal",
+		"request.links", "request.activity", "request.executionSummary", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal",
 		// CR-REQ-028: the channels useClarifications.ts calls.
 		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel", "clarification.request",
 		// The decision log: reading it, and a person confirming a high risk choice.

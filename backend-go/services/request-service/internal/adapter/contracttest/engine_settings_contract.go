@@ -72,6 +72,25 @@ func RunEngineSettingsContract(t *testing.T, repo usecase.EngineSettingsReposito
 			t.Fatalf("read: %+v", read)
 		}
 	})
+	t.Run("the execution mode defaults to step_by_step and is stored, read back and changed", func(t *testing.T) {
+		if read, _, _ := repo.Get(ctx, project); read.ExecutionMode != domain.ExecutionStepByStep {
+			t.Fatalf("a row written without a mode reads as step_by_step: %q", read.ExecutionMode)
+		}
+		continuous := mk(domain.EngineNative, "")
+		continuous.ExecutionMode = domain.ExecutionContinuous
+		if got, err := repo.Upsert(ctx, continuous, 4); err != nil || got.Version != 5 {
+			t.Fatalf("set continuous: %+v %v", got, err)
+		}
+		if read, _, _ := repo.Get(ctx, project); read.ExecutionMode != domain.ExecutionContinuous || read.Version != 5 {
+			t.Fatalf("read: %+v", read)
+		}
+		if _, err := repo.Upsert(ctx, mk(domain.EngineNative, ""), 5); err != nil {
+			t.Fatal(err)
+		}
+		if read, _, _ := repo.Get(ctx, project); read.ExecutionMode != domain.ExecutionStepByStep || read.Version != 6 {
+			t.Fatalf("back to step_by_step: %+v", read)
+		}
+	})
 	t.Run("update at a stale version never overwrites", func(t *testing.T) {
 		if _, err := repo.Upsert(ctx, mk(domain.EngineOpenSpec, ""), 1); !errors.Is(err, domain.ErrEngineSettingsVersionConflict) {
 			t.Fatalf("got %v", err)

@@ -144,6 +144,8 @@ message ProjectEngineSettings {
   int64 version = 4;
   // Writes the Solution with the read-only agent and the project's knowledge graph; off keeps ai.complete.
   bool solution_agent = 5;
+  // step_by_step (default) or continuous: how Requests of this project run after their plan is approved (CR-REQ-038).
+  string execution_mode = 6;
 }
 
 message GetProjectEngineSettingsRequest {
@@ -164,6 +166,8 @@ message SetProjectEngineSettingsRequest {
   string openspec_min_version = 3;
   int64 expected_version = 4;
   bool solution_agent = 5;
+  // Empty keeps the stored mode; otherwise step_by_step or continuous.
+  string execution_mode = 6;
 }
 
 message SetProjectEngineSettingsResponse {

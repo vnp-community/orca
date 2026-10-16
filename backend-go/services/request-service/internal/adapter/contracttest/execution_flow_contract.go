@@ -218,6 +218,8 @@ func RunExecutionFlowContract(t *testing.T, newEnv func(t *testing.T) ExecutionE
 		fn   func(t *testing.T, env ExecutionEnv)
 	}{
 		{"ExecutionFlow_ChangeRequest_ToCompleted", flowChangeRequestToCompleted},
+		{"ExecutionFlow_Continuous_OneApprovalRunsEveryPhase", flowContinuousChangeRequest},
+		{"ExecutionFlow_Continuous_FailureStopsTheRun", flowContinuousFailureStops},
 		{"ExecutionFlow_TaskFailsTwice_ToBacklog", flowTaskFailsTwice},
 		{"ExecutionFlow_LostEvents_ReconcileFixes", flowLostEvents},
 		{"ExecutionFlow_ReleasedTask_ReconcileRedispatches", flowReleasedTask},
@@ -564,5 +566,114 @@ func flowApproverIsNotTheCommitter(t *testing.T, env ExecutionEnv) {
 	// Nobody else gains access: an unrelated user is still refused by task-service.
 	if ok, err := r.tasks.Client.CanExecute(r.ctx, plan, outsider); err != nil || ok {
 		t.Errorf("an outsider must not be able to execute: %v %v", ok, err)
+	}
+}
+
+
+// pinContinuous gives the Request the mode StartExecution would pin for a project on continuous.
+func (r *flowRig) pinContinuous(req domain.Request) {
+	r.t.Helper()
+	pinner, ok := r.env.Requests.(usecase.ExecutionModePinner)
+	if !ok {
+		r.t.Fatal("the request repository must pin execution modes")
+	}
+	if got, err := pinner.PinExecutionModeIfUnset(r.ctx, req.ID, domain.ExecutionContinuous); err != nil || got != domain.ExecutionContinuous {
+		r.t.Fatalf("pin: %q %v", got, err)
+	}
+}
+
+// flowContinuousChangeRequest is the case of request #1242 in miniature: one approval of the plan, no Phase approval and no
+// Start button, and every Phase still runs after the one before it.
+func flowContinuousChangeRequest(t *testing.T, env ExecutionEnv) {
+	r := newFlowRig(t, env)
+	req := r.request(domain.RequestTypeChangeRequest, domain.RequestSizeM)
+	plan := r.tasks.Add(req.ID, "plan", "plan", "", "open")
+	p1 := r.tasks.Add(req.ID, "phase", "phase 1", plan, "open")
+	p2 := r.tasks.Add(req.ID, "phase", "phase 2", plan, "open")
+	p3 := r.tasks.Add(req.ID, "phase", "phase 3", plan, "open")
+	t1 := r.tasks.Add(req.ID, "task", "t1", p1, "open")
+	t2 := r.tasks.Add(req.ID, "task", "t2", p2, "open")
+	t3 := r.tasks.Add(req.ID, "task", "t3", p3, "open")
+	r.tasks.DependsOn(p3, p2)
+	planApprover := uuid.NewString()
+	r.tasks.AllowTreeReaders(planApprover)
+	r.approve(req, domain.SubjectPlan, plan, planApprover)
+	r.pinContinuous(req)
+
+	started, err := r.startExec.Execute(r.ctx, req.ID)
+	if err != nil || !started {
+		t.Fatalf("StartExecution: started=%v %v", started, err)
+	}
+	r.settle()
+	if r.tasks.Task(t1).Status != "in_progress" || r.tasks.Task(t2).Status != "open" || r.tasks.Task(t3).Status != "open" {
+		t.Fatalf("only phase 1 runs: %s %s %s", r.tasks.Task(t1).Status, r.tasks.Task(t2).Status, r.tasks.Task(t3).Status)
+	}
+	for _, p := range []string{p1, p2, p3} {
+		if got := r.approvals(req, domain.SubjectPhase, p); len(got) != 0 {
+			t.Fatalf("no Phase approval is opened in continuous mode: %+v", got)
+		}
+	}
+	r.tasks.RunSucceeded(t1)
+	r.settle()
+	if r.tasks.Task(t2).Status != "in_progress" || r.tasks.Task(t3).Status != "open" {
+		t.Fatalf("finishing phase 1 starts phase 2 alone: %s %s", r.tasks.Task(t2).Status, r.tasks.Task(t3).Status)
+	}
+	r.tasks.RunSucceeded(t2)
+	r.settle()
+	if r.tasks.Task(t3).Status != "in_progress" {
+		t.Fatalf("finishing phase 2 starts phase 3: %s", r.tasks.Task(t3).Status)
+	}
+	r.tasks.RunSucceeded(t3)
+	r.settle()
+
+	if got := r.reload(req); got.Status != domain.RequestStatusCompleted || got.ExecutionMode != domain.ExecutionContinuous {
+		t.Fatalf("status=%s mode=%q, want completed / continuous", got.Status, got.ExecutionMode)
+	}
+	starts, err := env.PhaseStarts.ListByRequest(r.ctx, req.ID)
+	if err != nil || len(starts) != 3 {
+		t.Fatalf("three starts: %d %v", len(starts), err)
+	}
+	for _, s := range starts {
+		if s.Trigger != domain.PhaseStartAuto || s.StartedBy != planApprover {
+			t.Fatalf("each Phase starts by itself as the plan approver: %+v", s)
+		}
+	}
+	if got := r.tasks.ExecutedBy(); len(got) != 3 || got[0] != planApprover || got[1] != planApprover || got[2] != planApprover {
+		t.Fatalf("task-service sees the plan approver for every task: %v", got)
+	}
+	if r.outboxCount(domain.SubjectPhaseStarted) != 3 || r.outboxCount(domain.SubjectPhaseCompleted) != 3 || r.outboxCount(domain.SubjectRequestCompleted) != 1 {
+		t.Fatalf("events: started=%d completed=%d request.completed=%d", r.outboxCount(domain.SubjectPhaseStarted), r.outboxCount(domain.SubjectPhaseCompleted), r.outboxCount(domain.SubjectRequestCompleted))
+	}
+}
+
+func flowContinuousFailureStops(t *testing.T, env ExecutionEnv) {
+	r := newFlowRig(t, env)
+	req := r.request(domain.RequestTypeChangeRequest, domain.RequestSizeM)
+	plan := r.tasks.Add(req.ID, "plan", "plan", "", "open")
+	p1 := r.tasks.Add(req.ID, "phase", "phase 1", plan, "open")
+	p2 := r.tasks.Add(req.ID, "phase", "phase 2", plan, "open")
+	t1 := r.tasks.Add(req.ID, "task", "t1", p1, "open")
+	t2 := r.tasks.Add(req.ID, "task", "t2", p2, "open")
+	planApprover := uuid.NewString()
+	r.tasks.AllowTreeReaders(planApprover)
+	r.approve(req, domain.SubjectPlan, plan, planApprover)
+	r.pinContinuous(req)
+	if _, err := r.startExec.Execute(r.ctx, req.ID); err != nil {
+		t.Fatal(err)
+	}
+	r.settle()
+	for i := 0; i < r.settings.MaxTaskAttempts; i++ {
+		r.tasks.RunFailed(t1, "execution failed: retryable TIMED_OUT")
+		r.settle()
+	}
+	got := r.reload(req)
+	if got.Status != domain.RequestStatusRequestBacklog || got.ReturnedCategory != domain.ReturnCategoryOther {
+		t.Fatalf("status=%s category=%s, want request_backlog after the task ran out of attempts", got.Status, got.ReturnedCategory)
+	}
+	if r.tasks.Task(t2).Status != "open" {
+		t.Fatalf("phase 2 must not start after the run stopped: %s", r.tasks.Task(t2).Status)
+	}
+	if starts, _ := env.PhaseStarts.ListByRequest(r.ctx, req.ID); len(starts) != 1 {
+		t.Fatalf("only phase 1 was ever started: %d", len(starts))
 	}
 }

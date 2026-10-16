@@ -31,8 +31,8 @@ func TestRequestFlowPack_CountsAndDeclared(t *testing.T) {
 			live++
 		}
 	}
-	if live != 17 || len(declared) != 3 || !declared["request_classify"] || !declared["request_generatePlan"] || !declared["request_startPhase"] {
-		t.Fatalf("live=%d declared=%v, want 17 live and the 3 declared tools", live, declared)
+	if live != 19 || len(declared) != 3 || !declared["request_classify"] || !declared["request_generatePlan"] || !declared["request_startPhase"] {
+		t.Fatalf("live=%d declared=%v, want 19 live and the 3 declared tools", live, declared)
 	}
 }
 
@@ -56,11 +56,11 @@ func TestRequestFlowPack_ListedWhenPacks1And2(t *testing.T) {
 		}
 	}
 	sort.Strings(got)
-	if len(got) != 17 {
+	if len(got) != 19 {
 		t.Fatalf("listed %d request-flow tools: %v", len(got), got)
 	}
 	for _, reads := range []string{"request_list", "request_get", "request_typeHistory", "solution_list", "approval_get", "approval_list",
-		"approval_listPending", "backlog_requests", "backlog_tasks", "backlog_execute", "request_flowStatus"} {
+		"approval_listPending", "backlog_requests", "backlog_tasks", "backlog_execute", "request_flowStatus", "request_activity", "request_executionSummary"} {
 		if !readOnly[reads] {
 			t.Errorf("%s must be listed read-only", reads)
 		}
@@ -101,8 +101,8 @@ func TestRequestFlowPack_DefaultPackListsOnlyReads(t *testing.T) {
 			}
 		}
 	}
-	if n != 11 {
-		t.Errorf("default config lists %d request-flow tools, want the 11 reads", n)
+	if n != 13 {
+		t.Errorf("default config lists %d request-flow tools, want the 13 reads", n)
 	}
 }
 

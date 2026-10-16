@@ -287,6 +287,26 @@ interface ExecutionResultView {          // camelCase; parseExecutionResult củ
 
 `devServer.subscribeStatus` (kênh push, không có tham số) đẩy `devServer.statusChanged` với `{devServerId, connected, activeExecutions, busy}` khi dev server nối, rớt, hoặc bắt đầu/kết thúc một lượt chạy. Là ảnh chụp trạng thái (không phải thay đổi) và tạm thời: client nên gọi `devServer.list` một lần khi mở, rồi để sự kiện ghi đè.
 
+### 2.10 Nhật ký hoạt động, tóm tắt thực thi, engine và chế độ thực thi (CR-REQ-038)
+
+Tên tham số của kênh là `id` (không phải `requestId`), giống các kênh `request.*` khác. Cả hai kênh đọc, `GroupRead`, agent được phép gọi (OPA `agent_rpcs`), có tương đương MCP (`request_activity`, `request_executionSummary`).
+
+| Kênh | Tham số | Kết quả | RPC |
+|---|---|---|---|
+| `request.activity` | `{id, pageSize?, pageToken?, kinds?: string[], minSeverity?: info\|attention\|error, actorKind?: user\|ai\|agent\|system, subjectId?, since?}` | `{entries: ActivityEntryView[], nextPageToken?}`; mới nhất trước, khoá phân trang `(occurred_at, id)` | `ListRequestActivity` |
+| `request.executionSummary` | `{id}` | `{summary: ExecutionSummaryView}` | `GetExecutionSummary` |
+
+`ActivityEntryView = {id, kind, occurredAt, actorKind, actorId?, subjectType?, subjectId?, summary, attempt?, severity, details}`. `kind` là chuỗi mở (`request.created`, `request.type_changed`, `analysis.generated`, `clarification.asked|answered`, `approval.requested|decided`, `phase.started`, `task.started|succeeded|failed|accepted|cancelled`, `request.returned|reopened|cancelled`…); frontend phải chịu được `kind` lạ. `attempt` là số lần chạy của task (cửa sổ `SUM` trên `task_run_outcomes`).
+
+`ExecutionSummaryView = {requestId, status, engine?, executionMode?, progress{phasesTotal, phasesDone, tasksTotal, tasksDone, tasksFailed, tasksRunning}, currentPhaseId?, nextPhaseId?, running[{taskId, phaseId?, title, attempt, maxAttempts, startedAt?}], failed[{taskId, phaseId?, title, attempts, maxAttempts, lastCause, lastError?, lastAt?}], needsYou[{kind: approval|clarification|failed_task|pre_deploy|drift, refId, subjectType?, title?, phaseId?, since?, dueAt?}], handover{state: none|archiving|ready|failed, archiveAttempts, summaryRef?}, maxAttempts, startedAt?}`. `needsYou` chỉ liệt kê việc người gọi có quyền làm. `lastCause` ∈ `timed_out|model_error|verify_failed|env_defect|spec_defect|agent_error|needs_info|cancelled|unknown`.
+
+Trường thêm vào kênh có sẵn (cộng, không đổi nghĩa):
+
+- `request.get`/`request.list`: `engine` (`native|openspec`, rỗng khi không xác định được) và `executionMode` (`step_by_step|continuous`: giá trị đã ghim khi vào `executing`, trước đó là chế độ sẽ áp dụng theo cài đặt dự án).
+- `request.flow`: `openSpecProfile` (`full|light|none`).
+- `request.engineSettingsGet|Set`: `executionMode` (rỗng khi `Set` giữ giá trị đã lưu). Biến môi trường mặc định của triển khai: `REQUEST_DEFAULT_EXECUTION_MODE`.
+- Lỗi mới: `REQUEST_EXECUTION_ACTOR_NOT_ALLOWED` (duyệt Plan bị từ chối vì người duyệt không có quyền chạy thực thi).
+
 ## 3. Sự kiện thời gian thực: `request.subscribe`
 
 - Mở: `request.subscribe {id?}`. Có `id`: chỉ sự kiện của Request đó; không `id`: mọi sự kiện Request trong tenant của người dùng, lọc thêm theo quyền đọc. Gateway gọi `GetRequest` một lần để kiểm quyền khi có `id`.

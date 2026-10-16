@@ -12,6 +12,7 @@ Nguồn: [docs/crs/v6/plan-phase-task](../../../../../../docs/crs/v6/plan-phase-
 | CR-REQ-012 sinh Plan/Phase/Task, `CreatePlanTree` | 🚧 2/7 [BE-REQ-SOL-012](./BE-REQ-SOL-012-plan-phase-task-generation-from-solution.md) | `task-service`, `request-service` | TASK-REQ-012-01 đến 07 |
 | CR-REQ-013 `StartPhase`, sự kiện task, `ReportTaskOutcome`, đối soát | 🚧 2/7 [BE-REQ-SOL-013](./BE-REQ-SOL-013-phase-execution-and-feedback-loop.md) | `task-service`, `request-service` | TASK-REQ-013-01 đến 07 |
 | CR-REQ-014 chính sách theo loại | [BE-REQ-SOL-014](./BE-REQ-SOL-014-type-specific-execution-policies.md) | `request-service` | TASK-REQ-014-01 đến 07 |
+| CR-REQ-038 thực thi liên tục, nhật ký hoạt động, tóm tắt thực thi, `engine` và `execution_mode` trên Request | ✅ [BE-REQ-SOL-038](./BE-REQ-SOL-038-continuous-execution-activity-feed-and-execution-summary.md) (8/8, 2026-10-16) | `request-service`, `api-gateway`, `mcp-service` (parity) | TASK-REQ-038-01 đến 08 |
 
 ## Thứ tự phụ thuộc
 

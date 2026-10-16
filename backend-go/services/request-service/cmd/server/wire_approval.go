@@ -177,7 +177,7 @@ func wireApproval(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		"ListApprovals": w.Server.List, "ListPendingApprovalsForUser": w.Server.Pending, "ExtendApproval": w.Server.Extend,
 		"ManageApprovalPolicies": w.Admin, "RequestTypeApprovalHandler": w.typeHandler,
 	} {
-		if err := requireWired(name, v, "Log", "Confirm"); err != nil { // Confirm is bound later by BindConfirm
+		if err := requireWired(name, v, "Log", "Confirm", "StartPrecheck"); err != nil { // Confirm and StartPrecheck are bound later (BindConfirm, wireExecution)
 			return nil, err
 		}
 	}

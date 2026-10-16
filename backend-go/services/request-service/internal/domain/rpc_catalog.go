@@ -92,6 +92,8 @@ var Catalog = map[string]Entry{
 	reqSvc + "CancelRequest":                    onRequest(GroupLifecycle, "request_id", RateWrite, false),
 	reqSvc + "SpawnChildRequest":                onRequest(GroupCreate, "parent_request_id", RateWrite, true),
 	reqSvc + "ListRequestLinks":                 onRequest(GroupRead, "request_id", RateRead, true),
+	reqSvc + "ListRequestActivity":              onRequest(GroupRead, "request_id", RateRead, true),
+	reqSvc + "GetExecutionSummary":              onRequest(GroupRead, "request_id", RateRead, true),
 	reqSvc + "GetRequestFlow":                   unlocated(GroupAuthenticated, RateRead, true),
 	reqSvc + "LookupRequestBySource":            unlocated(GroupInternal, RateNone, false),
 	reqSvc + "GetRequestFlowSettings":           unlocated(GroupAuthenticated, RateRead, true),

@@ -24,7 +24,7 @@ specs/backend-go/crs/v6/<feature>/{solutions,tasks}/
 | [`request-lifecycle`](./request-lifecycle/solutions/README.md) | 003 đến 006 | 4 | 28 | Máy trạng thái, tiếp nhận, phân loại AI, trả backlog, Request con |
 | [`solution-analysis`](./solution-analysis/solutions/README.md) | 007, 008 | 2 | 11 | Sinh Solution, Chẩn đoán, Findings, Answer |
 | [`approval`](./approval/solutions/README.md) | 009, 010 | 2 | 13 | Approval tổng quát, chính sách, thông báo, hết hạn |
-| [`plan-phase-task`](./plan-phase-task/solutions/README.md) | 011 đến 014 | 4 | 28 | Plan/Phase là Task, sinh Plan, thực thi theo Phase, chính sách theo loại |
+| [`plan-phase-task`](./plan-phase-task/solutions/README.md) | 011 đến 014, 038 | 5 | 36 | Plan/Phase là Task, sinh Plan, thực thi theo Phase, chính sách theo loại; 038 (✅ 8/8, 2026-10-16): thực thi liên tục, nhật ký hoạt động, tóm tắt thực thi, `engine`/`execution_mode` trên Request |
 | [`backlog-views`](./backlog-views/solutions/README.md) | 015 | 1 | 6 | Ba view backlog |
 | [`gateway-and-mcp`](./gateway-and-mcp/solutions/README.md) | 016, 017 | 2 | 13 | Kênh WS, route HTTP, tool MCP. Có [`CONTRACT-request-ui-api.md`](./gateway-and-mcp/CONTRACT-request-ui-api.md) |
 | [`request-quality-rollout`](./request-quality-rollout/solutions/README.md) | 024, 025 | 2 | 16 | Đồng bộ Jira, audit, quan sát, e2e, cờ tính năng, rollout |
@@ -36,7 +36,7 @@ specs/backend-go/crs/v6/<feature>/{solutions,tasks}/
 | [`agent-capabilities`](./agent-capabilities/solutions/README.md) | 033 (backend) | 1 | 6 | Hồ sơ năng lực dev server, client `agent.execPrompt` mới |
 | [`ai-governance`](./ai-governance/solutions/README.md) | 034 | 1 | 8 | Ngân sách AI, phiên bản prompt, eval |
 | [`security-compliance`](./security-compliance/solutions/README.md) | 035 | 1 | 9 | Quyền mức Request, RLS thật, secretscan, audit, lưu giữ (🚧 035-01 xong, 035-02 một phần) |
-| **Tổng** | 33 CR | **28** | **199** | |
+| **Tổng** | 34 CR | **29** | **207** | |
 
 CR-REQ-018 đến 023, 032, 036 chỉ có ở frontend; CR-REQ-033 có thêm phần ở [agent](../../../agent/crs/v6/agent-capabilities/solutions/README.md).
 
