@@ -1010,3 +1010,51 @@ func TestTerminalCreateChannel_EndToEndPushInterleavesWithConcurrentSend(t *test
 		t.Fatalf("unexpected terminal.exited payload: %+v", exited.Args)
 	}
 }
+
+// BUG-QA-01: the web UI sends a worktree selector and (before its own fix) no cwd; a terminal must still start in the worktree.
+func TestTerminalCwd(t *testing.T) {
+	cases := []struct {
+		name, cwd, worktree, want string
+	}{
+		{"explicit cwd wins", "/explicit", "id:repo::/from/selector", "/explicit"},
+		{"path from the selector", "", "id:repo::/Users/me/repo-wt", "/Users/me/repo-wt"},
+		{"selector without a path", "", "id:0a03c74e-0000", ""},
+		{"empty selector", "", "", ""},
+		{"blank cwd is no cwd", "  ", "id:repo::/p", "/p"},
+		{"selector with an empty path", "", "id:repo::", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := terminalCwd(c.cwd, c.worktree); got != c.want {
+				t.Fatalf("terminalCwd(%q, %q) = %q, want %q", c.cwd, c.worktree, got, c.want)
+			}
+		})
+	}
+}
+
+func TestTerminalCreateChannel_StartsInTheWorktreeOfTheSelectorAndReportsAFallback(t *testing.T) {
+	var gotCwd string
+	fake := &fakeTerminalInfraFleetClient{
+		spawnFunc: func(in *infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
+			gotCwd = in.GetCwd()
+			return &infrafleetv1.SpawnTerminalSessionResponse{
+				Session: &infrafleetv1.TerminalSession{PtyId: "pty-1", ConnectionId: "conn-1", Cwd: "/Users/me", CwdFellBack: true, CwdRequested: in.GetCwd()},
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+
+	ack, _, _, err := r.DispatchStreamChannel(newTerminalTestCtx(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "terminal.create",
+		argsJSON(t, terminalCreateArgs{ConnectionID: "conn-1", Worktree: "id:repo::/gone/worktree"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotCwd != "/gone/worktree" {
+		t.Errorf("the worktree selector's path was not used as cwd: %q", gotCwd)
+	}
+	view := ack.(terminalCreateResultView)
+	if !view.Terminal.CwdFellBack || view.Terminal.CwdRequested != "/gone/worktree" {
+		t.Errorf("the fallback to the home directory was not reported: %+v", view.Terminal)
+	}
+}

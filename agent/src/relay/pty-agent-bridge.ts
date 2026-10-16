@@ -36,9 +36,13 @@
 
 import type { AgentLogger } from './agent-logger'
 import { Tracers } from '../shared/trace/tracers'
-import { getForegroundProcessName } from './pty-shell-utils'
 import { buildStartupCommandSubmission } from '../shared/startup-command-submission'
 import { buildGhEnv, buildGlabEnv } from './external-api-connector'
+import { AGENT_PTY_MAP, resumeFrom, type AgentPtyEntry } from './pty-agent-state'
+import { safeCwd, usableCwd } from './pty-agent-cwd'
+
+export { usableCwd }
+export { handlePtySendSignal, handlePtyListProcesses } from './pty-agent-signals'
 
 // Why: matches pty-handler.ts's STARTUP_COMMAND_WRITE_DELAY_MS (the SSH
 // relay's non-shell-ready-gated default) — a short pause for node-pty to
@@ -51,59 +55,10 @@ import { buildGhEnv, buildGlabEnv } from './external-api-connector'
 // Part A doesn't use at all today).
 const STARTUP_COMMAND_WRITE_DELAY_MS = 50
 
-// ─── Trace propagation helper ───────────────────────────────────────────────
-// Agent WS JSON-RPC 2.0: traceId nested at params._trace.id (CR-TRACE-000 §3.3).
-// No caller today sends _trace for pty.* — this helper is forward-compatible:
-// it resumes correctly the moment an Orca-side caller starts sending it.
-function resumeFrom(params: Record<string, unknown>): { id: string } | undefined {
-  const t = params['_trace']
-  if (t && typeof t === 'object' && typeof (t as { id?: unknown }).id === 'string') {
-    return { id: (t as { id: string }).id }
-  }
-  return undefined
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type NotifyFn = (method: string, params: Record<string, unknown>) => void
-
-type AgentPtyEntry = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- node-pty IPty
-  pty:    any
-  cwd:    string
-  cols:   number
-  rows:   number
-  shell:  string
-  buf:    string   // scrollback buffer (last SCROLLBACK_LINES lines), doubles as the replay buffer
-  /** Attach-only identity metadata, mirrors pty-handler.ts's PtyIdentity check —
-   *  rejects a reattach whose caller-supplied identity disagrees with the PTY's
-   *  own, so a stale lease can't wire a tab to the wrong shell after this
-   *  agent process restarts and its pty-id counter resets. */
-  paneKey?: string
-  tabId?: string
-  /** Set while a grace period is running (WS disconnected, not yet reattached
-   *  or expired). Cleared on reattach or on real cleanup. */
-  graceTimer?: ReturnType<typeof setTimeout> | null
-  /** Why this is mutable: term.onData/onExit are registered ONCE at spawn
-   *  time and must keep pushing live output for the PTY's entire lifetime,
-   *  but the WebSocket they push over does not — every reconnect hands
-   *  handlePtyAttach a brand-new notify bound to the new connection. Without
-   *  rebinding this field on each successful attach, onData/onExit keep
-   *  calling the notify from the connection that existed at create time;
-   *  once that socket closes, every push after a reconnect silently no-ops
-   *  (the notifier's own readyState guard drops it) even though pty.create/
-   *  pty.attach themselves keep reporting success — the terminal looks
-   *  merely frozen, with no error surfaced anywhere.
-   */
-  notify: NotifyFn
-}
-
 // ─── Module state ─────────────────────────────────────────────────────────────
 
-const AGENT_PTY_MAP = new Map<string, AgentPtyEntry>()
 let nextAgentPtyId = 1
 
-const ALLOWED_SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGTSTP'])
 const SCROLLBACK_LINES = 500
 /** How long a PTY survives after its WebSocket disconnects, waiting for a
  *  reattach, before being killed for real. Fixed (not user-configurable) —
@@ -127,19 +82,6 @@ function attachIdentityMismatches(
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function safeCwd(raw: string): string {
-  if (!raw) {return require('node:os').homedir() as string}
-  if (raw.includes('\0')) {return require('node:os').homedir() as string}
-  const resolved = require('node:path').resolve(raw) as string
-  try {
-    const stat = require('node:fs').statSync(resolved) as import('node:fs').Stats
-    if (!stat.isDirectory()) {return require('node:os').homedir() as string}
-    return resolved
-  } catch {
-    return require('node:os').homedir() as string
-  }
-}
-
 function appendScrollback(entry: AgentPtyEntry, data: string): void {
   entry.buf += data
   // Trim to last N lines
@@ -160,33 +102,37 @@ function appendScrollback(entry: AgentPtyEntry, data: string): void {
  * `pty.scrollback` fallback older Orca clients rely on.
  */
 export async function handlePtyCreate(
-  id:     string | number | null,
+  id: string | number | null,
   params: Record<string, unknown>,
-  log:    AgentLogger,
-  notify: (method: string, params: Record<string, unknown>) => void,
+  log: AgentLogger,
+  notify: (method: string, params: Record<string, unknown>) => void
 ): Promise<object> {
-  const cols       = typeof params.cols === 'number' ? params.cols : 80
-  const rows       = typeof params.rows === 'number' ? params.rows : 24
-  const rawCwd     = typeof params.cwd  === 'string' ? params.cwd  : ''
+  const cols = typeof params.cols === 'number' ? params.cols : 80
+  const rows = typeof params.rows === 'number' ? params.rows : 24
+  const rawCwd = typeof params.cwd === 'string' ? params.cwd : ''
   const span = Tracers.terminalCreate.start({ origin: 'agent-pty', cols, rows }, resumeFrom(params))
 
   const nodePty = await import('node-pty').catch(() => null)
   if (!nodePty) {
     span.fail('node-pty not available on this host')
     return {
-      jsonrpc: '2.0', id,
-      error: { code: -32603, message: 'node-pty is not available on this host' },
+      jsonrpc: '2.0',
+      id,
+      error: { code: -32603, message: 'node-pty is not available on this host' }
     }
   }
 
-  const cwd        = safeCwd(rawCwd)
-  const envOverride = (params.env && typeof params.env === 'object' && !Array.isArray(params.env))
-    ? params.env as Record<string, string>
-    : {}
+  const cwd = safeCwd(rawCwd)
+  // Why: a caller that asked for a directory must be told when it was unusable and $HOME was opened instead (BUG-QA-01).
+  const cwdFellBack = rawCwd !== '' && usableCwd(rawCwd) === null
+  const envOverride =
+    params.env && typeof params.env === 'object' && !Array.isArray(params.env)
+      ? (params.env as Record<string, string>)
+      : {}
 
   // Resolve shell: params.shellOverride → env.SHELL → system default
   const shellOverride = typeof params.shellOverride === 'string' ? params.shellOverride.trim() : ''
-  const envShell      = typeof envOverride.SHELL     === 'string' ? envOverride.SHELL.trim()   : ''
+  const envShell = typeof envOverride.SHELL === 'string' ? envOverride.SHELL.trim() : ''
   const shell = shellOverride || envShell || (process.env.SHELL ?? '/bin/sh')
 
   // Why Date.now() prefix, not just the counter: this module runs inside
@@ -200,7 +146,7 @@ export async function handlePtyCreate(
   // counter alone is only unique within one daemon process's lifetime.
   const ptyId = `agent-pty-${Date.now().toString(36)}-${nextAgentPtyId++}`
   const paneKey = typeof params.paneKey === 'string' ? params.paneKey : undefined
-  const tabId   = typeof params.tabId   === 'string' ? params.tabId   : undefined
+  const tabId = typeof params.tabId === 'string' ? params.tabId : undefined
   // Why: 'provider' means the caller has no renderer terminal pane to type
   // the command into (e.g. a headless gh/glab auth-login PTY) — the agent
   // must submit it itself. See specs/agent/api/gaps-and-findings.md #5.
@@ -214,9 +160,11 @@ export async function handlePtyCreate(
   // `gh auth login` on this Dev Server shares one default config. Prefix
   // match (not exact) since `command` carries the full shell command line.
   const providerEnv =
-    userId && command?.startsWith('gh ') ? buildGhEnv(userId, {}) :
-    userId && command?.startsWith('glab ') ? buildGlabEnv(userId, {}) :
-    undefined
+    userId && command?.startsWith('gh ')
+      ? buildGhEnv(userId, {})
+      : userId && command?.startsWith('glab ')
+        ? buildGlabEnv(userId, {})
+        : undefined
 
   try {
     span.step('node-pty-spawn', { shell, cwd })
@@ -233,10 +181,20 @@ export async function handlePtyCreate(
         // Why last: per-user isolation must win over a caller-supplied env
         // override, the same precedence pty-handler.ts uses.
         ...(providerEnv as Record<string, string> | undefined)
-      } as NodeJS.ProcessEnv,
+      } as NodeJS.ProcessEnv
     })
 
-    const entry: AgentPtyEntry = { pty: term, cwd, cols, rows, shell, buf: '', paneKey, tabId, notify }
+    const entry: AgentPtyEntry = {
+      pty: term,
+      cwd,
+      cols,
+      rows,
+      shell,
+      buf: '',
+      paneKey,
+      tabId,
+      notify
+    }
     AGENT_PTY_MAP.set(ptyId, entry)
 
     // Capture scrollback (backup for pty.scrollback polling) and stream live.
@@ -247,7 +205,9 @@ export async function handlePtyCreate(
       entry.notify('pty.data', { id: ptyId, data })
     })
     term.onExit(({ exitCode, signal }: { exitCode: number; signal?: number }) => {
-      if (entry.graceTimer) {clearTimeout(entry.graceTimer)}
+      if (entry.graceTimer) {
+        clearTimeout(entry.graceTimer)
+      }
       AGENT_PTY_MAP.delete(ptyId)
       entry.notify('pty.exit', { id: ptyId, exitCode, signal: signal ?? null })
     })
@@ -257,19 +217,29 @@ export async function handlePtyCreate(
         // Why: re-check liveness — the PTY may have already exited (or been
         // destroyed) in the short window since spawn; writing to a dead
         // node-pty instance throws.
-        if (!AGENT_PTY_MAP.has(ptyId)) {return}
+        if (!AGENT_PTY_MAP.has(ptyId)) {
+          return
+        }
         const submit = process.platform === 'win32' ? '\r' : '\n'
         try {
-          term.write(buildStartupCommandSubmission(command as string, { submit, bracketedPasteSafe: false }))
+          term.write(
+            buildStartupCommandSubmission(command as string, { submit, bracketedPasteSafe: false })
+          )
         } catch (err: unknown) {
-          log.warn(`pty.create (agent): startup command delivery failed: id=${ptyId} err=${err instanceof Error ? err.message : String(err)}`)
+          log.warn(
+            `pty.create (agent): startup command delivery failed: id=${ptyId} err=${err instanceof Error ? err.message : String(err)}`
+          )
         }
       }, STARTUP_COMMAND_WRITE_DELAY_MS)
     }
 
     log.info(`pty.create (agent): id=${ptyId} cwd=${cwd} shell=${shell}`)
     span.ok({ ptyId, shell, cwd })
-    return { jsonrpc: '2.0', id, result: { id: ptyId, cols, rows, cwd, shell } }
+    return {
+      jsonrpc: '2.0',
+      id,
+      result: { id: ptyId, cols, rows, cwd, shell, ...(cwdFellBack ? { cwdFellBack: true } : {}) }
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     log.error(`pty.create (agent): failed: ${msg}`)
@@ -286,10 +256,10 @@ export async function handlePtyCreate(
  * pushed via a `pty.replay` notification instead).
  */
 export async function handlePtyAttach(
-  id:     string | number | null,
+  id: string | number | null,
   params: Record<string, unknown>,
-  log:    AgentLogger,
-  notify: (method: string, params: Record<string, unknown>) => void,
+  log: AgentLogger,
+  notify: (method: string, params: Record<string, unknown>) => void
 ): Promise<object> {
   const ptyId = typeof params.id === 'string' ? params.id : ''
   const span = Tracers.terminalReattach.start({ origin: 'agent-pty', ptyId }, resumeFrom(params))
@@ -305,11 +275,16 @@ export async function handlePtyAttach(
     return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY "${ptyId}" not found` } }
   }
 
-  const expectedPaneKey = typeof params.expectedPaneKey === 'string' ? params.expectedPaneKey : undefined
-  const expectedTabId   = typeof params.expectedTabId   === 'string' ? params.expectedTabId   : undefined
+  const expectedPaneKey =
+    typeof params.expectedPaneKey === 'string' ? params.expectedPaneKey : undefined
+  const expectedTabId = typeof params.expectedTabId === 'string' ? params.expectedTabId : undefined
   if (attachIdentityMismatches({ paneKey: expectedPaneKey, tabId: expectedTabId }, entry)) {
     span.fail('identity mismatch', { ptyId })
-    return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY "${ptyId}" not found (identity mismatch)` } }
+    return {
+      jsonrpc: '2.0',
+      id,
+      error: { code: -32603, message: `PTY "${ptyId}" not found (identity mismatch)` }
+    }
   }
 
   // Why here, unconditionally: this is the only signal the agent gets that a
@@ -333,7 +308,9 @@ export async function handlePtyAttach(
       entry.pty.resize(cols, rows)
       entry.cols = cols
       entry.rows = rows
-    } catch { /* best effort — attach still succeeds without a resize */ }
+    } catch {
+      /* best effort — attach still succeeds without a resize */
+    }
   }
 
   log.info(`pty.attach (agent): id=${ptyId}`)
@@ -353,21 +330,32 @@ export async function handlePtyAttach(
  * PTY; a reattach within PTY_GRACE_PERIOD_MS cancels it (see handlePtyAttach).
  * If no reattach arrives in time, the PTY is killed for real.
  */
-export function scheduleGracePeriodCleanup(log: AgentLogger, graceTimeMs = PTY_GRACE_PERIOD_MS): void {
+export function scheduleGracePeriodCleanup(
+  log: AgentLogger,
+  graceTimeMs = PTY_GRACE_PERIOD_MS
+): void {
   for (const [ptyId, entry] of AGENT_PTY_MAP.entries()) {
-    if (entry.graceTimer) {continue} // already counting down from an earlier disconnect
+    if (entry.graceTimer) {
+      continue
+    } // already counting down from an earlier disconnect
     entry.graceTimer = setTimeout(() => {
       const current = AGENT_PTY_MAP.get(ptyId)
-      if (!current || current.graceTimer !== entry.graceTimer) {return} // reattached or already gone
+      if (!current || current.graceTimer !== entry.graceTimer) {
+        return
+      } // reattached or already gone
       try {
         current.pty.kill('SIGTERM')
         log.info(`scheduleGracePeriodCleanup: grace period expired, killed ${ptyId}`)
-      } catch { /* best effort */ }
+      } catch {
+        /* best effort */
+      }
       AGENT_PTY_MAP.delete(ptyId)
     }, graceTimeMs)
   }
   if (AGENT_PTY_MAP.size > 0) {
-    log.info(`scheduleGracePeriodCleanup: armed grace timers for ${AGENT_PTY_MAP.size} PTY(s) (${graceTimeMs}ms)`)
+    log.info(
+      `scheduleGracePeriodCleanup: armed grace timers for ${AGENT_PTY_MAP.size} PTY(s) (${graceTimeMs}ms)`
+    )
   }
 }
 
@@ -376,16 +364,20 @@ export function scheduleGracePeriodCleanup(log: AgentLogger, graceTimeMs = PTY_G
  * Params: { id, data }
  */
 export async function handlePtyWrite(
-  id:     string | number | null,
+  id: string | number | null,
   params: Record<string, unknown>,
-  _log:   AgentLogger,
+  _log: AgentLogger
 ): Promise<object> {
-  const ptyId = typeof params.id   === 'string' ? params.id   : ''
-  const data  = typeof params.data === 'string' ? params.data : ''
-  if (!ptyId) {return { jsonrpc: '2.0', id, error: { code: -32602, message: 'pty.write: missing id' } }}
+  const ptyId = typeof params.id === 'string' ? params.id : ''
+  const data = typeof params.data === 'string' ? params.data : ''
+  if (!ptyId) {
+    return { jsonrpc: '2.0', id, error: { code: -32602, message: 'pty.write: missing id' } }
+  }
 
   const entry = AGENT_PTY_MAP.get(ptyId)
-  if (!entry) {return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY not found: ${ptyId}` } }}
+  if (!entry) {
+    return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY not found: ${ptyId}` } }
+  }
 
   try {
     entry.pty.write(data)
@@ -401,14 +393,17 @@ export async function handlePtyWrite(
  * Params: { id, cols, rows }
  */
 export async function handlePtyResize(
-  id:     string | number | null,
+  id: string | number | null,
   params: Record<string, unknown>,
-  _log:   AgentLogger,
+  _log: AgentLogger
 ): Promise<object> {
-  const ptyId = typeof params.id   === 'string' ? params.id   : ''
-  const cols  = typeof params.cols === 'number' ? params.cols : 80
-  const rows  = typeof params.rows === 'number' ? params.rows : 24
-  const span = Tracers.terminalResize.start({ origin: 'agent-pty', ptyId, cols, rows }, resumeFrom(params))
+  const ptyId = typeof params.id === 'string' ? params.id : ''
+  const cols = typeof params.cols === 'number' ? params.cols : 80
+  const rows = typeof params.rows === 'number' ? params.rows : 24
+  const span = Tracers.terminalResize.start(
+    { origin: 'agent-pty', ptyId, cols, rows },
+    resumeFrom(params)
+  )
 
   if (!ptyId) {
     span.fail('missing id')
@@ -439,13 +434,16 @@ export async function handlePtyResize(
  * Params: { id, graceful? }
  */
 export async function handlePtyDestroy(
-  id:     string | number | null,
+  id: string | number | null,
   params: Record<string, unknown>,
-  log:    AgentLogger,
+  log: AgentLogger
 ): Promise<object> {
-  const ptyId   = typeof params.id === 'string' ? params.id : ''
-  const graceful = params.graceful !== false  // default: graceful=true
-  const span = Tracers.terminalDestroy.start({ origin: 'agent-pty', ptyId, graceful }, resumeFrom(params))
+  const ptyId = typeof params.id === 'string' ? params.id : ''
+  const graceful = params.graceful !== false // default: graceful=true
+  const span = Tracers.terminalDestroy.start(
+    { origin: 'agent-pty', ptyId, graceful },
+    resumeFrom(params)
+  )
 
   if (!ptyId) {
     span.fail('missing id')
@@ -459,9 +457,14 @@ export async function handlePtyDestroy(
   }
 
   try {
-    if (entry.graceTimer) {clearTimeout(entry.graceTimer)}
-    if (process.platform === 'win32') { entry.pty.kill() }
-    else { entry.pty.kill(graceful ? 'SIGTERM' : 'SIGKILL') }
+    if (entry.graceTimer) {
+      clearTimeout(entry.graceTimer)
+    }
+    if (process.platform === 'win32') {
+      entry.pty.kill()
+    } else {
+      entry.pty.kill(graceful ? 'SIGTERM' : 'SIGKILL')
+    }
     AGENT_PTY_MAP.delete(ptyId)
     log.info(`pty.destroy (agent): id=${ptyId}`)
     span.ok({ ptyId, graceful })
@@ -478,98 +481,24 @@ export async function handlePtyDestroy(
  * Params: { id, lines? }
  */
 export async function handlePtyScrollback(
-  id:     string | number | null,
+  id: string | number | null,
   params: Record<string, unknown>,
-  _log:   AgentLogger,
+  _log: AgentLogger
 ): Promise<object> {
-  const ptyId = typeof params.id    === 'string' ? params.id    : ''
+  const ptyId = typeof params.id === 'string' ? params.id : ''
   const lines = typeof params.lines === 'number' ? params.lines : 100
-  if (!ptyId) {return { jsonrpc: '2.0', id, error: { code: -32602, message: 'pty.scrollback: missing id' } }}
-
-  const entry = AGENT_PTY_MAP.get(ptyId)
-  if (!entry) {return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY not found: ${ptyId}` } }}
-
-  const allLines = entry.buf.split('\n')
-  const data = allLines.slice(Math.max(0, allLines.length - lines)).join('\n')
-  return { jsonrpc: '2.0', id, result: { data } }
-}
-
-/**
- * handlePtySendSignal — Send a POSIX signal to PTY process.
- * Params: { id, signal }
- */
-export async function handlePtySendSignal(
-  id:     string | number | null,
-  params: Record<string, unknown>,
-  log:    AgentLogger,
-): Promise<object> {
-  const ptyId  = typeof params.id     === 'string' ? params.id     : ''
-  const signal = typeof params.signal === 'string' ? params.signal : 'SIGTERM'
-  // Only SIGKILL/SIGTERM end the process — those are the ones worth tracing
-  // as a terminal:destroy event; SIGINT/SIGHUP/SIGTSTP are routine in-session
-  // signals (Ctrl+C, etc.) and would be pure per-keystroke noise (CR-TRACE-000 §5).
-  const isTerminating = signal === 'SIGKILL' || signal === 'SIGTERM'
-  const span = isTerminating
-    ? Tracers.terminalDestroy.start({ origin: 'agent-pty', ptyId, signal, via: 'pty.sendSignal' }, resumeFrom(params))
-    : undefined
-
   if (!ptyId) {
-    span?.fail('missing id')
-    return { jsonrpc: '2.0', id, error: { code: -32602, message: 'pty.sendSignal: missing id' } }
-  }
-  if (!ALLOWED_SIGNALS.has(signal)) {
-    span?.fail(`signal not allowed: ${signal}`)
-    return { jsonrpc: '2.0', id, error: { code: -32602, message: `Signal not allowed: ${signal}` } }
+    return { jsonrpc: '2.0', id, error: { code: -32602, message: 'pty.scrollback: missing id' } }
   }
 
   const entry = AGENT_PTY_MAP.get(ptyId)
   if (!entry) {
-    span?.fail('pty not found', { ptyId })
     return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY not found: ${ptyId}` } }
   }
 
-  try {
-    if (process.platform !== 'win32') { entry.pty.kill(signal) }
-    else { entry.pty.kill() }
-    log.info(`pty.sendSignal (agent): id=${ptyId} signal=${signal}`)
-    span?.ok({ ptyId, signal })
-    return { jsonrpc: '2.0', id, result: { ok: true } }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err)
-    span?.fail(err, { ptyId })
-    return { jsonrpc: '2.0', id, error: { code: -32603, message: `pty.sendSignal failed: ${msg}` } }
-  }
-}
-
-/**
- * handlePtyListProcesses — Enumerate every PTY this daemon currently tracks.
- *
- * Why this exists: DevServerPtyProvider.listProcesses() (backend) used to
- * always return [] with a "no agent-wide PTY enumeration RPC exists yet"
- * comment — mirrors SshPtyProvider.listProcesses(), which has always called
- * this same-named RPC against the SSH relay daemon (pty-handler.ts). Without
- * it, the backend's liveness sweep (refreshPtyWorktreeRecordsFromController)
- * could never learn a Dev-Server-hosted PTY died on its own: a dead ptyId
- * stayed marked "ready" in session-tabs bookkeeping until the tab/leaf was
- * closed outright, so every reattach attempt — fresh spawn included, since
- * mirrored web tabs always ask "what handle is ready for this tab" — kept
- * being handed back the same dead id (BUG-FE-PTY-001).
- */
-export async function handlePtyListProcesses(
-  id:     string | number | null,
-  _params: Record<string, unknown>,
-  _log:   AgentLogger,
-): Promise<object> {
-  const results: { id: string; cwd: string; title: string; pid: number }[] = []
-  for (const [ptyId, entry] of AGENT_PTY_MAP) {
-    const title =
-      (await getForegroundProcessName(entry.pty.pid, entry.pty.process || null)) || 'shell'
-    // pid is the PTY's own (shell) process id, not the foreground child's —
-    // added so backend-go's InspectProcess can report a real pid instead of
-    // always 0 (see infra-fleet-service's devserveragent/methods.go).
-    results.push({ id: ptyId, cwd: entry.cwd, title, pid: entry.pty.pid })
-  }
-  return { jsonrpc: '2.0', id, result: results }
+  const allLines = entry.buf.split('\n')
+  const data = allLines.slice(Math.max(0, allLines.length - lines)).join('\n')
+  return { jsonrpc: '2.0', id, result: { data } }
 }
 
 /** Number of PTYs currently tracked — used by pty-daemon-server.ts to decide
@@ -585,10 +514,14 @@ export function activePtyCount(): number {
 export function cleanupAgentPtys(log: AgentLogger): void {
   for (const [ptyId, entry] of AGENT_PTY_MAP.entries()) {
     try {
-      if (entry.graceTimer) {clearTimeout(entry.graceTimer)}
+      if (entry.graceTimer) {
+        clearTimeout(entry.graceTimer)
+      }
       entry.pty.kill('SIGTERM')
       log.info(`cleanupAgentPtys: killed ${ptyId}`)
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
   }
   AGENT_PTY_MAP.clear()
 }

@@ -2723,7 +2723,8 @@
             "removedBody": "此工作区的 SSH 主机已被移除，无法再连接。请移除工作区以清理 — 远程文件不会受影响。",
             "removeWorkspaceButton": "移除工作区"
           }
-        }
+        },
+        "cwdFellBack": "此主机上找不到目录 {{path}}，已改为打开你的主目录。"
       },
       "tab": {
         "group": {
@@ -12752,10 +12753,10 @@
             "7b3967c12f": "Atlassian API token",
             "3d81bf3ab3": "API 令牌",
             "e91b9a4073": "you@example.com",
-            "2849ddb295": "Atlassian 邮箱",
+            "2849ddb295": "邮箱（可选：Jira Cloud 配合 API 令牌使用；Server/Data Center 的个人访问令牌有无邮箱均可）",
             "70fcd360c4": "https://example.atlassian.net",
             "e176f9d0c5": "Jira Cloud 站点 URL",
-            "d785c42b8b": "使用 Jira Cloud 站点 URL、Atlassian 邮箱和 API token 来浏览议题。",
+            "d785c42b8b": "使用 Jira 站点 URL（Cloud 或 Server/Data Center）以及 API 令牌或个人访问令牌来浏览问题。",
             "8388bdea2b": "连接 Jira 站点"
           }
         }

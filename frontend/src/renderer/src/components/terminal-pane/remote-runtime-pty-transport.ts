@@ -35,6 +35,7 @@ import {
   createRemoteRuntimeViewportBatcher
 } from './remote-runtime-pty-batching'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import { translate } from '@/i18n/i18n'
 import { setFitOverride } from '@/lib/pane-manager/mobile-fit-overrides'
 import { setDriverForPty } from '@/lib/pane-manager/mobile-driver-state'
 import { isWebTerminalSurfaceTabId, toHostSessionTabId } from '@/runtime/web-terminal-surface-id'
@@ -148,6 +149,7 @@ export function createRemoteRuntimePtyTransport(
 ): PtyTransport {
   const {
     command,
+    cwd,
     startupCommandDelivery,
     env,
     launchConfig,
@@ -896,6 +898,8 @@ export function createRemoteRuntimePtyTransport(
             // Every dev-server-bound terminal on web rides this transport, so
             // connectionId must travel with it.
             ...(connectionId ? { connectionId } : {}),
+            // Why: the gateway/agent open the home directory when no cwd arrives, so a worktree terminal must say where it lives.
+            ...(cwd ? { cwd } : {}),
             ...(commandToSend !== undefined ? { command: commandToSend } : {}),
             ...(startupCommandDeliveryToSend !== undefined
               ? { startupCommandDelivery: startupCommandDeliveryToSend }
@@ -939,6 +943,16 @@ export function createRemoteRuntimePtyTransport(
         await subscribeToHandle()
         if (destroyed || !connected || !remotePtyId) {
           return
+        }
+        if (created.terminal.cwdFellBack) {
+          // Why: the directory asked for is not usable on that host; opening $HOME silently looks like a working terminal.
+          storedCallbacks.onData?.(
+            `\r\n\x1b[33m${translate(
+              'auto.components.terminal.cwdFellBack',
+              'Directory {{path}} was not found on this host; opened your home directory instead.',
+              { path: created.terminal.cwdRequested ?? cwd ?? '' }
+            )}\x1b[0m\r\n`
+          )
         }
 
         return {

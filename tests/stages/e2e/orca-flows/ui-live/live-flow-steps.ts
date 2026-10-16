@@ -175,7 +175,7 @@ export async function rejectPlanApprovalAndCancel(f: LiveFlow, r: RequestUnderTe
         `a pending plan/task_list approval (got ${pending.map((a) => a.subjectType).join(',') || 'none'})`
       ).toBe(true)
       await page.getByRole('tab', { name: /Approvals/ }).click()
-      const row = approvalRowFor(page, r.title, /\bPlan\b/)
+      const row = approvalRowFor(page, r.title, /\b(Plan|Task list)\b/)
       await expect(row).toBeVisible({ timeout: 30_000 })
       await shots.take('plan-approval-in-inbox')
       if (f.cfg.executeAgent) {

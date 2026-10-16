@@ -1656,6 +1656,8 @@ func (s *Server) toProtoTerminalSession(session domain.TerminalSession) *infrafl
 		LastActiveAtUnixMs: session.LastActiveAt.UnixMilli(),
 		LastOutputPreview:  usecase.LastOutputPreview(s.liveStates, session.PtyID),
 		Origin:             originToProto(session.Origin),
+		CwdFellBack:        session.CwdFellBack,
+		CwdRequested:       session.CwdRequested,
 	}
 }
 

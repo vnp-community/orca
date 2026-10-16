@@ -1,10 +1,10 @@
 package domain
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -64,7 +64,20 @@ func TestFlowFixtureMatchesFlowFor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the frontend fixture: %v (regenerate with UPDATE_FLOW_FIXTURE=1)", err)
 	}
-	if !bytes.Equal(got, want) {
+	// Why: the frontend formatter rewrites the file's whitespace; only its content has to match FlowFor.
+	if !sameJSON(t, got, want) {
 		t.Fatalf("%s is out of date with FlowFor; regenerate it with UPDATE_FLOW_FIXTURE=1 and update frontend/src/shared/request-flow-registry.ts", flowFixturePath)
 	}
+}
+
+func sameJSON(t *testing.T, a, b []byte) bool {
+	t.Helper()
+	var x, y any
+	if err := json.Unmarshal(a, &x); err != nil {
+		t.Fatalf("the fixture is not valid JSON: %v", err)
+	}
+	if err := json.Unmarshal(b, &y); err != nil {
+		t.Fatal(err)
+	}
+	return reflect.DeepEqual(x, y)
 }

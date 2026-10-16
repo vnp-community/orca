@@ -2,7 +2,15 @@
 // The agent writes one activity line per event, led by a glyph (agent/src/relay/agent-claude-stream-activity.ts):
 //   ·  session info   »  assistant text   ▸  tool call   ↳  tool result   ■  final status
 
-export type AgentActivityKind = 'info' | 'text' | 'tool' | 'result' | 'end' | 'stderr' | 'raw'
+export type AgentActivityKind =
+  | 'info'
+  | 'text'
+  | 'tool'
+  | 'result'
+  | 'end'
+  | 'diagnostic'
+  | 'stderr'
+  | 'raw'
 export type AgentActivityTone = 'ok' | 'error'
 
 export type AgentActivityLine = {
@@ -74,6 +82,31 @@ function splitLines(text: string): string[] {
     .filter((l) => l.trim().length > 0)
 }
 
+// Why: the Claude Code CLI writes `[claude-code:<code>] {…}` notices on stderr (for example `unrecognized_model` when it does
+// not know a model id yet) while the run itself goes on. They are not errors unless the run ends badly or the code is a blocker.
+const CLI_DIAGNOSTIC = /^\[claude-code:([a-z0-9_-]+)\]/i
+const BLOCKING_DIAGNOSTIC_CODES = new Set([
+  'auth_failed',
+  'authentication_failed',
+  'rate_limit',
+  'rate_limited',
+  'overloaded'
+])
+
+function stderrLine(id: number, masked: string, runFailed: boolean): AgentActivityLine {
+  const text = masked.length > MAX_LINE_CHARS ? `${masked.slice(0, MAX_LINE_CHARS - 1)}…` : masked
+  const code = CLI_DIAGNOSTIC.exec(masked)?.[1]?.toLowerCase()
+  if (!code) {
+    return { id, kind: 'stderr', text }
+  }
+  return {
+    id,
+    kind: 'diagnostic',
+    text,
+    ...(runFailed || BLOCKING_DIAGNOSTIC_CODES.has(code) ? { tone: 'error' as const } : {})
+  }
+}
+
 export function parseAgentOutput(stdout: string, stderr: string): ParsedAgentOutput {
   const cutHead = stdout.length > MAX_STDOUT_CHARS
   const tail = cutHead ? stdout.slice(stdout.length - MAX_STDOUT_CHARS) : stdout
@@ -84,13 +117,9 @@ export function parseAgentOutput(stdout: string, stderr: string): ParsedAgentOut
   const lines = complete.slice(droppedLines).map((l, i) => classify(l, droppedLines + i))
   const errLines = splitLines(stderr).slice(-MAX_STDERR_LINES)
   const base = droppedLines + lines.length
+  const runFailed = lines.some((l) => l.kind === 'end' && l.tone === 'error')
   errLines.forEach((l, i) => {
-    const masked = maskSecretShapes(l)
-    lines.push({
-      id: base + i,
-      kind: 'stderr',
-      text: masked.length > MAX_LINE_CHARS ? `${masked.slice(0, MAX_LINE_CHARS - 1)}…` : masked
-    })
+    lines.push(stderrLine(base + i, maskSecretShapes(l), runFailed))
   })
   return { lines, olderHidden: cutHead || droppedLines > 0 }
 }

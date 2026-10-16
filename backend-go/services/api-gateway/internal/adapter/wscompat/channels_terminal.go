@@ -31,6 +31,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -157,6 +158,10 @@ type terminalSessionView struct {
 	Cwd          string `json:"cwd"`
 	CreatedAt    int64  `json:"createdAt"`
 	LastActiveAt int64  `json:"lastActiveAt"`
+	// CwdFellBack is present only on terminal.create's answer: the requested directory was unusable on the host and the home
+	// directory was opened instead (CwdRequested is what was asked for).
+	CwdFellBack  bool   `json:"cwdFellBack,omitempty"`
+	CwdRequested string `json:"cwdRequested,omitempty"`
 	// Origin is present only for sessions an MCP client created (CONTRACT §5).
 	Origin *sessionOriginView `json:"origin,omitempty"`
 }
@@ -168,6 +173,8 @@ func toTerminalSessionView(s *infrafleetv1.TerminalSession) terminalSessionView 
 		Cwd:          s.GetCwd(),
 		CreatedAt:    s.GetCreatedAtUnixMs(),
 		LastActiveAt: s.GetLastActiveAtUnixMs(),
+		CwdFellBack:  s.GetCwdFellBack(),
+		CwdRequested: s.GetCwdRequested(),
 		Origin:       originViewFromProto(s.GetOrigin()),
 	}
 }
@@ -219,9 +226,24 @@ func attachContext(id Identity) (context.Context, context.CancelFunc) {
 
 // ── terminal.create ─────────────────────────────────────────────────────
 
+// terminalCwd is the directory a new terminal starts in: the client's own cwd when it sent one, else the path carried by a
+// worktree selector of the form `id:<repoId>::<path>`. A selector without a path (`id:<worktreeId>`) yields "" and the agent's
+// default applies; the gateway does not guess.
+func terminalCwd(cwd, worktreeSelector string) string {
+	if strings.TrimSpace(cwd) != "" {
+		return cwd
+	}
+	if _, path, ok := strings.Cut(worktreeSelector, "::"); ok && strings.TrimSpace(path) != "" {
+		return path
+	}
+	return ""
+}
+
 type terminalCreateArgs struct {
-	ConnectionID     string `json:"connectionId"`
-	Cwd              string `json:"cwd"`
+	ConnectionID string `json:"connectionId"`
+	Cwd          string `json:"cwd"`
+	// Worktree is the selector the web UI sends (`id:<repoId>::<path>`); it only supplies a cwd when the client sent none.
+	Worktree         string `json:"worktree"`
 	Shell            string `json:"shell"`
 	Cols             int32  `json:"cols"`
 	Rows             int32  `json:"rows"`
@@ -242,7 +264,7 @@ func registerTerminalCreateChannel(r *Registry, client infrafleetv1.InfraFleetSe
 		invokeCtx := gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		spawnResp, err := client.SpawnTerminalSession(invokeCtx, &infrafleetv1.SpawnTerminalSessionRequest{
 			ConnectionId:     in.ConnectionID,
-			Cwd:              in.Cwd,
+			Cwd:              terminalCwd(in.Cwd, in.Worktree),
 			Shell:            in.Shell,
 			Cols:             in.Cols,
 			Rows:             in.Rows,

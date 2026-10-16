@@ -65,6 +65,8 @@ func (c *Client) SpawnPty(ctx context.Context, devServer domain.DevServer, in us
 		Rows  int32  `json:"rows"`
 		Cwd   string `json:"cwd"`
 		Shell string `json:"shell"`
+		// Set by agents that report a cwd they could not use (absent on older ones, which read as false).
+		CwdFellBack bool `json:"cwdFellBack"`
 	}
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &out); err != nil {
@@ -77,7 +79,7 @@ func (c *Client) SpawnPty(ctx context.Context, devServer domain.DevServer, in us
 		// instead, at the one place that knows the response was malformed.
 		return usecase.SpawnPtyResult{}, fmt.Errorf("devserveragent: pty.create response missing id")
 	}
-	return usecase.SpawnPtyResult{PtyID: out.ID, Cols: out.Cols, Rows: out.Rows, Cwd: out.Cwd, Shell: out.Shell}, nil
+	return usecase.SpawnPtyResult{PtyID: out.ID, Cols: out.Cols, Rows: out.Rows, Cwd: out.Cwd, Shell: out.Shell, CwdFellBack: out.CwdFellBack}, nil
 }
 
 // WritePty calls pty.write. Params confirmed via agent-rpc-dispatch.ts's

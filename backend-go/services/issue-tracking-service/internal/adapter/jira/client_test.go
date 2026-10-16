@@ -293,6 +293,15 @@ func TestListProjects_CloudSite_StillUsesPaginatedSearchEndpoint(t *testing.T) {
 func TestListIssueTypes_RealHTTPCall(t *testing.T) {
 	var gotMethod, gotPath, gotAuth string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/rest/api/2/serverInfo" {
+			// A Cloud site: Basic email:token is accepted, a Bearer token is not.
+			if !strings.HasPrefix(r.Header.Get("Authorization"), "Basic ") {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"deploymentType": "Cloud"})
+			return
+		}
 		gotMethod = r.Method
 		gotPath = r.URL.Path
 		gotAuth = r.Header.Get("Authorization")
@@ -464,6 +473,11 @@ func TestWhoami_CloudSite_StillUsesV3AndBasicAuth(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/rest/api/2/serverInfo":
+			// A Cloud site rejects a Bearer token: only Basic email:token is accepted.
+			if !strings.HasPrefix(r.Header.Get("Authorization"), "Basic ") {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{"deploymentType": "Cloud"})
 		case "/rest/api/3/myself":
@@ -490,5 +504,95 @@ func TestWhoami_CloudSite_StillUsesV3AndBasicAuth(t *testing.T) {
 	}
 	if gotMyselfAuth != "Basic "+basicAuth("a@example.com", "tok") {
 		t.Errorf("expected Basic email:token auth unchanged for Cloud, got %q", gotMyselfAuth)
+	}
+}
+
+// BUG-QA-04: a Jira Server/Data Center site accepts a Personal Access Token only as Bearer, also when the user typed an email.
+func newServerDCSite(t *testing.T, pat string) (*httptest.Server, *[]string) {
+	t.Helper()
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.Path+" "+strings.SplitN(r.Header.Get("Authorization")+" ", " ", 2)[0])
+		if strings.HasPrefix(r.URL.Path, "/rest/api/3/") {
+			w.WriteHeader(http.StatusNotFound) // Cloud-only API version
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer "+pat {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/rest/api/2/serverInfo":
+			_ = json.NewEncoder(w).Encode(map[string]any{"deploymentType": "Server"})
+		case "/rest/api/2/myself":
+			_ = json.NewEncoder(w).Encode(map[string]any{"name": "qa", "key": "JIRAUSER1", "displayName": "QA", "emailAddress": "qa@example.com"})
+		case "/rest/api/2/search":
+			_ = json.NewEncoder(w).Encode(map[string]any{"issues": []map[string]any{{"key": "QA-1", "fields": map[string]any{"summary": "s"}}}})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	return srv, &seen
+}
+
+func TestWhoami_ServerSiteWithEmailAndPAT_UsesBearerAndV2(t *testing.T) {
+	srv, seen := newServerDCSite(t, "pat-1")
+	defer srv.Close()
+	client := New(srv.Client())
+	cred := usecase.Credential{BaseURL: srv.URL, Email: "qa@example.com", Token: "pat-1"}
+
+	viewer, err := client.Whoami(context.Background(), cred)
+	if err != nil {
+		t.Fatalf("an email next to a PAT must not turn the auth into Basic: %v", err)
+	}
+	if viewer.ID != "JIRAUSER1" || viewer.DisplayName != "QA" {
+		t.Errorf("a Server/Data Center viewer is identified by key/name: %+v", viewer)
+	}
+	issues, err := client.SearchIssues(context.Background(), cred, "", 5)
+	if err != nil || len(issues) != 1 || issues[0].Key != "QA-1" {
+		t.Fatalf("issues over /rest/api/2/search: %v %+v", err, issues)
+	}
+	for _, line := range *seen {
+		if strings.HasPrefix(line, "/rest/api/3/") {
+			t.Errorf("a Server/Data Center site was asked for the Cloud-only v3 API: %s", line)
+		}
+	}
+}
+
+func TestWhoami_RejectedCredentialSaysWhatTheSiteAnswered(t *testing.T) {
+	srv, _ := newServerDCSite(t, "right-pat")
+	defer srv.Close()
+	client := New(srv.Client())
+
+	_, err := client.Whoami(context.Background(), usecase.Credential{BaseURL: srv.URL, Email: "qa@example.com", Token: "wrong-pat"})
+	if err == nil {
+		t.Fatal("a rejected token must fail")
+	}
+	for _, want := range []string{"HTTP 401", "Bearer", "Basic"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error should say what the site answered (%q): %v", want, err)
+		}
+	}
+	if strings.Contains(err.Error(), "wrong-pat") {
+		t.Errorf("the token must never appear in an error: %v", err)
+	}
+}
+
+func TestResolveSiteAuth_AFailureIsNotRememberedForLong(t *testing.T) {
+	srv, _ := newServerDCSite(t, "pat-ok")
+	defer srv.Close()
+	client := New(srv.Client())
+	cred := usecase.Credential{BaseURL: srv.URL, Token: "pat-ok"}
+	siteAuthCache.Delete(credentialCacheKey(cred))
+
+	if got := client.resolveSiteAuth(context.Background(), cred); got.err != nil || got.version != "2" || got.header != "Bearer pat-ok" {
+		t.Fatalf("server site with a PAT: %+v", got)
+	}
+	// A different token on the same site is a different cache entry.
+	other := usecase.Credential{BaseURL: srv.URL, Token: "other"}
+	siteAuthCache.Delete(credentialCacheKey(other))
+	if got := client.resolveSiteAuth(context.Background(), other); got.err == nil {
+		t.Fatalf("another token must not inherit the first token's success: %+v", got)
 	}
 }

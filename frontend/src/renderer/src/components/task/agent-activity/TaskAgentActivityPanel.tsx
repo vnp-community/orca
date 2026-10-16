@@ -22,6 +22,7 @@ const FOLLOW_THRESHOLD_PX = 24
 
 const GLYPH: Record<AgentActivityKind, string> = {
   info: '·',
+  diagnostic: 'ⓘ',
   text: '»',
   tool: '▸',
   result: '↳',

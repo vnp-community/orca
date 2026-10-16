@@ -41,7 +41,10 @@ export function PlanApprovalBar({
       ? decision.failure
       : null
   const regenerating = decision.isBusy('generatePlan')
-  const isTaskList = (approval?.subjectType as string | undefined) === 'task_list'
+  // Why: the wire parser folds task_list into plan; the original kind survives in rawSubjectType.
+  const isTaskList =
+    approval?.rawSubjectType === 'task_list' ||
+    (approval?.subjectType as string | undefined) === 'task_list'
   const risk = useApprovalRiskGate(approval, failure?.error ?? null)
 
   // Approved plans are read-only: changing one means regenerating, which needs a new approval.

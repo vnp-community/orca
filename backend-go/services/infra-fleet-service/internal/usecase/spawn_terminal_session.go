@@ -177,5 +177,9 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 	if err != nil {
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindInternal, "INFRA_CREATE_TERMINAL_SESSION_FAILED", "failed to persist terminal session", err)
 	}
+	// Why: opening the home directory in place of the one asked for must be visible to the caller, not look like success.
+	if result.CwdFellBack {
+		session.CwdFellBack, session.CwdRequested = true, in.Cwd
+	}
 	return session, nil
 }

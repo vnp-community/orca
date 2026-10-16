@@ -81,6 +81,25 @@ describe('PlanApprovalCard', () => {
     )
   })
 
+  it('a task-list approval says "task list" (BUG-QA-06: subjectType is folded to plan, rawSubjectType keeps the kind)', () => {
+    function TaskListHarness(): React.JSX.Element {
+      const d = usePlanDecision({ id: 'r1' }, settled)
+      return (
+        <PlanApprovalCard
+          approval={planApproval('ap2', { rawSubjectType: 'task_list' })}
+          decision={d}
+          flow={fallbackRequestFlow('docs', 'M')}
+          stepCount={0}
+          taskCount={3}
+        />
+      )
+    }
+    render(<TaskListHarness />)
+    expect(screen.getByTestId('plan-approval-card')).toHaveTextContent(
+      'Approve once and the agent runs all 3 tasks'
+    )
+  })
+
   it('Request changes needs a reason of at least 10 characters', () => {
     render(<Harness type="change_request" steps={7} tasks={28} />)
     fireEvent.click(screen.getByRole('button', { name: 'Request changes' }))

@@ -20,6 +20,10 @@ type ProjectEngineSettings struct {
 	UpdatedBy     string
 	UpdatedAt     time.Time
 	Version       int64
+	// FromDeploymentDefault marks settings that were not saved for this project but filled in from the deployment's defaults
+	// (never stored). The default engine moves only the types that run OpenSpec by default; a type that merely may run it
+	// (OpenSpecProfileLight) needs a project that chose it.
+	FromDeploymentDefault bool
 }
 
 var versionRegex = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
@@ -51,6 +55,9 @@ func EffectiveEngine(pinned *EngineName, settings *ProjectEngineSettings, profil
 		return *pinned
 	}
 	if settings != nil && settings.Engine != "" {
+		if profile == OpenSpecProfileLight && settings.FromDeploymentDefault {
+			return EngineNative
+		}
 		return settings.Engine
 	}
 	return EngineNative

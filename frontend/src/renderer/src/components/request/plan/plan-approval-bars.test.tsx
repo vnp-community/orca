@@ -63,6 +63,16 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('PlanApprovalBar', () => {
+  it('names a task-list approval "Approve task list" (BUG-QA-06)', () => {
+    render(<PlanHarness approval={planApproval('ap-tl', { rawSubjectType: 'task_list' })} />)
+    expect(screen.getByTestId('plan-approve')).toHaveTextContent('Approve task list')
+  })
+
+  it('names a plan approval "Approve plan"', () => {
+    render(<PlanHarness approval={planApproval('ap-pl')} />)
+    expect(screen.getByTestId('plan-approve')).toHaveTextContent('Approve plan')
+  })
+
   it('approve sends id, expectedVersion and expectedDigest', async () => {
     render(<PlanHarness approval={planApproval('ap1')} />)
     fireEvent.click(screen.getByTestId('plan-approve'))

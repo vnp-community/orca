@@ -25,6 +25,7 @@ import suite_ai_stub_login
 import suite_dev_server_agent
 import suite_not_found_contract
 import suite_platform_health
+import suite_qa_regressions
 import suite_request_ai_stages
 import suite_request_exits
 import suite_request_lifecycle
@@ -53,10 +54,11 @@ SUITES = [
     ("analysis", "Read-only analyses: diagnosis, findings, answer", suite_request_readonly_analysis),
     ("task", "Task CRUD, agent execution, MCP", suite_task_and_mcp),
     ("notfound", "Unknown ids are NotFound on every service", suite_not_found_contract),
+    ("qa", "QA regressions 2026-10-16 (terminal cwd, engine of bug/task, GitHub and Jira sources)", suite_qa_regressions),
     ("aistub", "Fake claude wiring and the logged-out path (--ai-stub only)", suite_ai_stub_login),
 ]
 STUB_ONLY = {"aistub"}
-AI_USING = {"request", "matrix", "exits", "ai", "plan", "analysis"}  # suites whose requests go through classification
+AI_USING = {"request", "matrix", "exits", "ai", "plan", "analysis", "qa"}  # suites whose requests go through classification
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
 
 

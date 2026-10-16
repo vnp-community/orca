@@ -36,7 +36,10 @@ export function PlanApprovalCard({
 }: Props): React.JSX.Element {
   const hasPreDeploy =
     flow?.startGate === 'pre_deploy' || flow?.executionGates.includes('pre_deploy')
-  const isTaskList = (approval.subjectType as string) === 'task_list'
+  // Why: the wire parser folds task_list into plan; the original kind survives in rawSubjectType.
+  const isTaskList =
+    approval.rawSubjectType === 'task_list' ||
+    (approval.subjectType as string | undefined) === 'task_list'
   const unit =
     stepCount > 0
       ? translate(`${T}steps`, '{{count}} steps', { count: stepCount })

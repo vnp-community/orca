@@ -934,6 +934,8 @@ type SpawnPtyResult struct {
 	Rows  int32
 	Cwd   string
 	Shell string
+	// CwdFellBack is true when the agent could not use the requested cwd and opened the home directory instead.
+	CwdFellBack bool
 }
 
 // PtyEvent is one event pushed by the Dev Server Agent's pty-daemon over a

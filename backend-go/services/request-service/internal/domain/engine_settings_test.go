@@ -69,3 +69,34 @@ func TestEngineDefaultsFromEnv(t *testing.T) {
 		}
 	}
 }
+
+// BUG-QA-02: the deployment default (REQUEST_DEFAULT_ENGINE=openspec) moves change_request and refactor, not bug, security or
+// performance, which run OpenSpec only when their project chose it.
+func TestEffectiveEngine_DeploymentDefaultOnlyMovesFullProfileTypes(t *testing.T) {
+	fromDefault := &ProjectEngineSettings{Engine: EngineOpenSpec, FromDeploymentDefault: true}
+	chosen := &ProjectEngineSettings{Engine: EngineOpenSpec}
+	cases := []struct {
+		name     string
+		settings *ProjectEngineSettings
+		profile  OpenSpecProfile
+		want     EngineName
+	}{
+		{"default, full profile (change_request)", fromDefault, OpenSpecProfileFull, EngineOpenSpec},
+		{"default, light profile (bug)", fromDefault, OpenSpecProfileLight, EngineNative},
+		{"default, no profile (task)", fromDefault, OpenSpecProfileNone, EngineNative},
+		{"project chose openspec, light profile (bug)", chosen, OpenSpecProfileLight, EngineOpenSpec},
+		{"project chose openspec, full profile", chosen, OpenSpecProfileFull, EngineOpenSpec},
+		{"project chose openspec, no profile (task)", chosen, OpenSpecProfileNone, EngineNative},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := EffectiveEngine(nil, c.settings, c.profile); got != c.want {
+				t.Fatalf("EffectiveEngine = %s, want %s", got, c.want)
+			}
+		})
+	}
+	pinned := EngineOpenSpec
+	if got := EffectiveEngine(&pinned, fromDefault, OpenSpecProfileLight); got != EngineOpenSpec {
+		t.Fatalf("a Request pinned to openspec keeps it, got %s", got)
+	}
+}

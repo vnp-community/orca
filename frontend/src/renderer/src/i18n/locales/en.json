@@ -2723,7 +2723,8 @@
             "removedBody": "The SSH host for this workspace was removed, so it can no longer connect. Remove the workspace to clear it — remote files are left untouched.",
             "removeWorkspaceButton": "Remove workspace"
           }
-        }
+        },
+        "cwdFellBack": "Directory {{path}} was not found on this host; opened your home directory instead."
       },
       "tab": {
         "group": {
@@ -12752,10 +12753,10 @@
             "7b3967c12f": "Atlassian API token",
             "3d81bf3ab3": "API token",
             "e91b9a4073": "you@example.com",
-            "2849ddb295": "Atlassian email",
+            "2849ddb295": "Email (optional — Jira Cloud uses it with an API token; a Server/Data Center Personal Access Token works with or without it)",
             "70fcd360c4": "https://example.atlassian.net",
             "e176f9d0c5": "Jira Cloud site URL",
-            "d785c42b8b": "Use a Jira Cloud site URL, Atlassian email, and API token to browse issues.",
+            "d785c42b8b": "Use your Jira site URL (Cloud or Server/Data Center) and an API token or Personal Access Token to browse issues.",
             "8388bdea2b": "Connect Jira site"
           }
         }

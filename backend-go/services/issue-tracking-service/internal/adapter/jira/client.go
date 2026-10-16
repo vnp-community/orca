@@ -14,7 +14,9 @@ package jira
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,76 +61,120 @@ var _ usecase.IssueTrackerProvider = (*Client)(nil)
 
 // ── API version resolution (CR-JIRA-001) ────────────────────────────────
 
-type apiVersionCacheEntry struct {
-	version   string
-	expiresAt time.Time
+// siteAuth is what one credential turned out to be on one site: how it authenticates and which REST version the site speaks.
+// A Jira Server/Data Center site takes a Personal Access Token only as `Authorization: Bearer <PAT>`, even when the user also
+// has an email; Cloud takes `email:api-token` as Basic. Which one a site wants cannot be told from the credential alone
+// (BUG-QA-04: sending Basic because an email was present got every PAT of a Server/DC site rejected), so it is probed once.
+type siteAuth struct {
+	header  string // full Authorization header value
+	version string // "2" (Server/Data Center) or "3" (Cloud)
+	err     error  // set when no scheme was accepted
+	expires time.Time
 }
 
-// apiVersionCache avoids re-probing serverInfo on every single API call —
-// keyed by baseURL, since deployment type never changes for a given site.
-var apiVersionCache sync.Map // map[string]apiVersionCacheEntry
+// siteAuthCache avoids re-probing on every call: keyed by site and credential, since two users of one site (or one user with a
+// replaced token) can differ. Failures are kept only briefly so a corrected token is tried at once.
+var siteAuthCache sync.Map // map[string]siteAuth
 
-const apiVersionCacheTTL = 10 * time.Minute
+const (
+	siteAuthCacheTTL    = 10 * time.Minute
+	siteAuthFailureTTL  = 30 * time.Second
+	serverInfoPathAPIv2 = "/rest/api/2/serverInfo"
+)
 
-// resolveAPIVersion detects whether cred.BaseURL is Jira Cloud (API v3
-// available) or Server/Data Center (v3 doesn't exist — Cloud-only — must
-// use v2) by calling the v2 serverInfo endpoint, which exists on BOTH
-// deployment types, and reading its deploymentType field. Falls back to "3"
-// (the pre-CR-JIRA-001 Cloud-only default) on any probe failure — an
-// unreachable/unusual site degrades to the previous behavior rather than a
-// new failure mode, and a real Cloud site's own requests are unaffected
-// either way (this cache never returns an error itself, only a version
-// string every call site can use unconditionally).
-func (c *Client) resolveAPIVersion(ctx context.Context, cred usecase.Credential) string {
-	if cached, ok := apiVersionCache.Load(cred.BaseURL); ok {
-		if entry, ok := cached.(apiVersionCacheEntry); ok && time.Now().Before(entry.expiresAt) {
-			return entry.version
+func credentialCacheKey(cred usecase.Credential) string {
+	sum := sha256.Sum256([]byte(cred.Email + "\x00" + cred.Token))
+	return cred.BaseURL + "|" + hex.EncodeToString(sum[:8])
+}
+
+func bearerHeader(cred usecase.Credential) string { return "Bearer " + cred.Token }
+
+func basicHeader(cred usecase.Credential) string { return "Basic " + basicAuth(cred.Email, cred.Token) }
+
+// resolveSiteAuth returns the accepted scheme and API version of cred's site. Server/Data Center (Bearer) is tried first, then
+// Cloud (Basic, only when there is an email). When neither is accepted the error says which statuses came back.
+func (c *Client) resolveSiteAuth(ctx context.Context, cred usecase.Credential) siteAuth {
+	key := credentialCacheKey(cred)
+	if cached, ok := siteAuthCache.Load(key); ok {
+		if entry, ok := cached.(siteAuth); ok && time.Now().Before(entry.expires) {
+			return entry
 		}
 	}
-	version := c.probeAPIVersion(ctx, cred)
-	apiVersionCache.Store(cred.BaseURL, apiVersionCacheEntry{version: version, expiresAt: time.Now().Add(apiVersionCacheTTL)})
-	return version
+	candidates := []struct{ name, header string }{{"Bearer (personal access token)", bearerHeader(cred)}}
+	if cred.Email != "" {
+		candidates = append(candidates, struct{ name, header string }{"Basic (email and API token)", basicHeader(cred)})
+	}
+	var tried []string
+	for _, cand := range candidates {
+		status, deployment := c.probeServerInfo(ctx, cred.BaseURL, cand.header)
+		if status == http.StatusOK {
+			version := "3"
+			if deployment == "Server" || deployment == "Data Center" {
+				version = "2"
+			}
+			entry := siteAuth{header: cand.header, version: version, expires: time.Now().Add(siteAuthCacheTTL)}
+			siteAuthCache.Store(key, entry)
+			return entry
+		}
+		tried = append(tried, fmt.Sprintf("%s: HTTP %d", cand.name, status))
+	}
+	entry := siteAuth{
+		// Keep the legacy choice so a site that hides serverInfo behind other rules still gets its request and its own error.
+		header:  legacyAuthHeader(cred),
+		version: "3",
+		err:     fmt.Errorf("jira: the site rejected the credential (%s)", strings.Join(tried, "; ")),
+		expires: time.Now().Add(siteAuthFailureTTL),
+	}
+	siteAuthCache.Store(key, entry)
+	return entry
 }
 
-func (c *Client) probeAPIVersion(ctx context.Context, cred usecase.Credential) string {
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/2/serverInfo"
+// probeServerInfo reads GET /rest/api/2/serverInfo, which both deployment types serve. Status 0 means the site was unreachable.
+func (c *Client) probeServerInfo(ctx context.Context, baseURL, authorization string) (int, string) {
+	u := strings.TrimRight(baseURL, "/") + serverInfoPathAPIv2
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return "3"
+		return 0, ""
 	}
-	req.Header.Set("Authorization", authHeaderValue(cred))
+	req.Header.Set("Authorization", authorization)
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "3"
+		return 0, ""
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return "3"
+		return resp.StatusCode, ""
 	}
 	var parsed struct {
 		DeploymentType string `json:"deploymentType"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return "3"
-	}
-	if parsed.DeploymentType == "Server" || parsed.DeploymentType == "Data Center" {
-		return "2"
-	}
-	return "3" // "Cloud", or empty/unrecognized — same safe default as before this CR.
+	_ = json.NewDecoder(resp.Body).Decode(&parsed)
+	return resp.StatusCode, parsed.DeploymentType
 }
 
-// authHeaderValue picks Basic (Cloud's email:api-token convention) when an
-// email is present, else Bearer (Server/Data Center's Personal Access Token
-// convention — CR-JIRA-001) — a caller with only a token and no email is
-// assumed to be authenticating with a PAT against a self-hosted instance.
-// Does not change behavior for any existing Cloud caller (all of which
-// already send both email and token).
-func authHeaderValue(cred usecase.Credential) string {
+// resolveAPIVersion detects whether cred.BaseURL is Jira Cloud (API v3) or Server/Data Center (v2, v3 does not exist there) and
+// remembers how the credential authenticates, so authHeaderValue used by every call afterwards matches the site.
+func (c *Client) resolveAPIVersion(ctx context.Context, cred usecase.Credential) string {
+	return c.resolveSiteAuth(ctx, cred).version
+}
+
+func legacyAuthHeader(cred usecase.Credential) string {
 	if cred.Email == "" {
-		return "Bearer " + cred.Token
+		return bearerHeader(cred)
 	}
-	return "Basic " + basicAuth(cred.Email, cred.Token)
+	return basicHeader(cred)
+}
+
+// authHeaderValue is the Authorization header for cred on its site. Callers resolve the API version first (every method does),
+// which fills the cache; a credential never resolved falls back to the legacy rule.
+func authHeaderValue(cred usecase.Credential) string {
+	if cached, ok := siteAuthCache.Load(credentialCacheKey(cred)); ok {
+		if entry, ok := cached.(siteAuth); ok && time.Now().Before(entry.expires) {
+			return entry.header
+		}
+	}
+	return legacyAuthHeader(cred)
 }
 
 func apiURL(baseURL, apiVersion, path string) string {
@@ -143,6 +189,9 @@ type jiraMyselfResponse struct {
 	AccountID    string `json:"accountId"`
 	DisplayName  string `json:"displayName"`
 	EmailAddress string `json:"emailAddress"`
+	// Server/Data Center identify the user by key/name; they carry no accountId.
+	Key  string `json:"key"`
+	Name string `json:"name"`
 }
 
 // Whoami calls Jira's .../myself to verify cred and identify the
@@ -152,7 +201,11 @@ func (c *Client) Whoami(ctx context.Context, cred usecase.Credential) (domain.Vi
 	if cred.BaseURL == "" {
 		return domain.Viewer{}, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	apiVersion := c.resolveAPIVersion(ctx, cred)
+	site := c.resolveSiteAuth(ctx, cred)
+	if site.err != nil {
+		return domain.Viewer{}, site.err
+	}
+	apiVersion := site.version
 	u := apiURL(cred.BaseURL, apiVersion, "/myself")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -173,7 +226,14 @@ func (c *Client) Whoami(ctx context.Context, cred usecase.Credential) (domain.Vi
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
 		return domain.Viewer{}, fmt.Errorf("jira: decoding whoami response: %w", err)
 	}
-	return domain.Viewer{ID: parsed.AccountID, DisplayName: parsed.DisplayName, Email: parsed.EmailAddress}, nil
+	id := parsed.AccountID
+	if id == "" {
+		id = parsed.Key
+	}
+	if id == "" {
+		id = parsed.Name
+	}
+	return domain.Viewer{ID: id, DisplayName: parsed.DisplayName, Email: parsed.EmailAddress}, nil
 }
 
 // ── SearchIssues / ListIssues / GetIssue ────────────────────────────────

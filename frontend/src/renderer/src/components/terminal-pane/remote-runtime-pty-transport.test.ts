@@ -1201,6 +1201,59 @@ describe('createRemoteRuntimePtyTransport', () => {
     expect(transport.getConnectionId?.()).toBeNull()
   })
 
+  it('sends the worktree directory as cwd in terminal.create (BUG-QA-01: the host opened $HOME without it)', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('env-1', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1',
+      cwd: '/Users/me/work/repo-feature',
+      connectionId: 'dev-server-1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+
+    const call = runtimeCall.mock.calls.find((c) => c[0].method === 'terminal.create')
+    expect(call?.[0].params).toMatchObject({ cwd: '/Users/me/work/repo-feature' })
+  })
+
+  it('omits cwd when the pane has none (the host default applies)', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('env-1', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+
+    const call = runtimeCall.mock.calls.find((c) => c[0].method === 'terminal.create')
+    expect(call?.[0].params).not.toHaveProperty('cwd')
+  })
+
+  it('tells the user when the host opened the home directory instead of the requested one', async () => {
+    runtimeCall.mockResolvedValue({
+      ok: true,
+      result: {
+        terminal: { handle: 'terminal-1', cwdFellBack: true, cwdRequested: '/gone/worktree' }
+      }
+    })
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('env-1', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1',
+      cwd: '/gone/worktree'
+    })
+    const onData = vi.fn()
+
+    await transport.connect({ url: '', callbacks: { onData } })
+
+    const written = onData.mock.calls.map((c) => String(c[0])).join('')
+    expect(written).toContain('/gone/worktree')
+    expect(written).toContain('home directory')
+  })
+
   it('passes startup command delivery when creating the remote runtime terminal', async () => {
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
     const transport = createRemoteRuntimePtyTransport('env-1', {

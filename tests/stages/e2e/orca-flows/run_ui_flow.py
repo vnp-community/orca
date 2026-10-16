@@ -6,6 +6,7 @@
   python3 run_ui_flow.py --ai-stub -- --headed   # anything after `--` goes to `playwright test`
   python3 run_ui_flow.py --real readonly # REAL Claude Code, read-only analysis on a throwaway repo (question, bug)
   python3 run_ui_flow.py --real execute  # REAL Claude Code approves and EXECUTES a tiny Plan on a throwaway repo
+  python3 run_ui_flow.py --real native-execute # REAL Claude Code executes a native `bug` and a native `task` (QA 2026-10-16: engine, tabs, agent log shows no CLI diagnostic as an error)
   python3 run_ui_flow.py --real continuous # REAL Claude Code runs a two-step Plan that is approved ONCE (project execution mode `continuous`); the Execution tab follows it (CR-REQ-038 / FE-REQ-037)
   python3 run_ui_flow.py --real monitor  # REAL Claude Code executes a one-task Plan while the spec watches the agent through the UI (TASK-FE-E2E-011)
   python3 run_ui_flow.py --real addproject # REAL Claude Code, read-only: Add Project makes its own project per repo, a duplicate folder is refused, a Request in that project is answered from the right repo (TASK-FE-E2E-027)
@@ -38,6 +39,7 @@ REAL_SPECS = {
     "readonly": ["/readonly-real"],
     "execute": ["/execute-real"],
     "continuous": ["continuous-execute-real"],
+    "native-execute": ["qa-native-execute-real"],
     "monitor": ["agent-session-monitoring-real"],
     "addproject": ["add-project-own-project-request-real"],
     "all": ["/readonly-real", "/execute-real", "agent-session-monitoring-real", "add-project-own-project-request-real"],
@@ -53,7 +55,7 @@ REAL_SPECS = {
 REPRO_SPECS = {"add-project-worktree": ["add-project-worktree-repro"]}
 # Why: these approve a Plan, which runs a real agent that WRITES to the throwaway repo; read-only analysis does not need the flag
 # (addproject only reads: it never approves the analysis).
-EXECUTING = ("execute", "continuous", "monitor", "all", "deepseek-execute", "deepseek-task", "deepseek")
+EXECUTING = ("execute", "continuous", "native-execute", "monitor", "all", "deepseek-execute", "deepseek-task", "deepseek")
 
 
 def run_playwright(env: dict[str, str], extra: list[str]) -> int:
