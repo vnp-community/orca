@@ -40,7 +40,7 @@ const (
 )
 
 // DefaultSkillsRepositoryURL is where `npx skills add` finds the knowledge-hub skills (the repository's skills/ folder).
-const DefaultSkillsRepositoryURL = "https://github.com/stablyai/orca"
+const DefaultSkillsRepositoryURL = "https://github.com/vnp-community/orca"
 
 // RepoFileStat says whether a path exists in a worktree; the file system answers, the knowledge graph is never asked.
 type RepoFileStat interface {

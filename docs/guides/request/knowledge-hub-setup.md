@@ -16,8 +16,10 @@ Orca **không** gọi MCP hay đồ thị tri thức; agent mà Orca chạy trê
 3. **Skill** (một lần cho mỗi dev server):
 
    ```bash
-   npx skills add https://github.com/stablyai/orca --skill tdd-knowledge tdd-openspec-author tdd-knowledge-writeback tdd-orca-task --global
+   npx skills add https://github.com/vnp-community/orca --skill tdd-knowledge tdd-openspec-author tdd-knowledge-writeback tdd-orca-task --global
    ```
+
+   Nguồn là repo `vnp-community/orca` (thư mục `skills/`), không phải repo gốc `stablyai/orca` vì repo gốc không có bốn skill này. `npx skills add` đọc nhánh mặc định của repo, nên skill phải đã nằm trên nhánh đó; máy chủ cần quyền đọc repo nếu repo riêng tư. Muốn thử một nhánh chưa hợp nhất, chép tay `skills/tdd-*` vào `~/.claude/skills/`.
 
    Cập nhật từng skill: `npx skills update <tên> --global`. Máy chủ có thể trỏ nguồn khác bằng `REQUEST_SKILLS_REPOSITORY_URL` (hiện trong gợi ý sửa lỗi).
 4. **Thư mục làm việc của agent** (`AGENT_WORK_DIR`) phải chứa cả repo lẫn các worktree nằm cạnh nó: worktree proposal và worktree task là `<repo>-<nhánh>` cạnh repo, và agent từ chối ghi tệp ngoài thư mục này (`Path outside project root`), nên một repo đứng ngoài khiến run `plan generate` thất bại sau khi đã tốn chi phí. Kiểm trước khi chạy agent thật bằng `python3 tests/stages/e2e/orca-flows/workspace_probe.py --worktree-id <id> --worktree-path <thư mục>` trên worktree proposal của một Request thử: nó chạy đúng các lời gọi tệp và git mà Orca dùng (stat, đọc, ghi, commit, huỷ) và không tốn lượt AI.
