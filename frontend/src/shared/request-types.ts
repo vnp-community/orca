@@ -44,6 +44,11 @@ export type RequestStatus =
 
 export type RequestSize = 'S' | 'M' | 'L'
 
+export type RequestEngine = 'native' | 'openspec'
+
+/** How a request runs once its plan is approved: a person releases every Phase, or one approval runs them all. */
+export type ExecutionMode = 'step_by_step' | 'continuous'
+
 export type RequestUrgency = 'normal' | 'urgent' | 'unknown'
 
 /** How the request type was last set */
@@ -121,6 +126,10 @@ export type OrcaRequest = {
   version?: number
   /** Task id in the plan that this request is attached to */
   planTaskId?: string
+  /** The engine the request runs on (CR-REQ-038); absent when the backend could not tell. */
+  engine?: RequestEngine
+  /** step_by_step or continuous, pinned when the request entered executing; absent before that. */
+  executionMode?: ExecutionMode
   createdAt: string
   updatedAt: string
 }

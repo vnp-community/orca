@@ -30,32 +30,40 @@ export function SidebarRequestNavButton(): React.JSX.Element | null {
 
   const isActive = activeView === 'requests'
   const label = translate('auto.components.request.SidebarRequestNavButton.label', 'Requests')
+  const badgeLabel = translate(
+    'auto.components.request.SidebarRequestNavButton.badge',
+    '{{count}} pending approvals',
+    // Why: the catalog string carries the count; without it screen readers lost the number.
+    { count: pendingApprovalCount }
+  )
+  const accessibleName = pendingApprovalCount > 0 ? `${label}, ${badgeLabel}` : label
 
   return (
     <button
       type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={isActive}
+      title={accessibleName}
+      aria-label={accessibleName}
+      aria-current={isActive ? 'page' : undefined}
       data-testid="sidebar-requests"
       onClick={() => setActiveView('requests')}
+      // Why: same row anatomy as Automations/Agents so the entry reads as a labelled nav item.
       className={cn(
-        'relative flex items-center justify-center size-8 rounded transition-colors',
+        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] font-medium tracking-tight transition-colors',
         isActive
-          ? 'bg-accent text-accent-foreground'
-          : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+          ? 'bg-worktree-sidebar-accent text-worktree-sidebar-accent-foreground'
+          : 'text-worktree-sidebar-foreground/60 hover:bg-worktree-sidebar-foreground/8'
       )}
     >
-      <Inbox className="size-4" aria-hidden />
+      <Inbox
+        className={cn('size-4 shrink-0', !isActive && 'text-worktree-sidebar-foreground/30')}
+        strokeWidth={isActive ? 2.25 : 1.75}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
       {pendingApprovalCount > 0 && (
         <span
-          aria-label={translate(
-            'auto.components.request.SidebarRequestNavButton.badge',
-            '{{count}} pending approvals',
-            // Why: the catalog string carries the count; without it screen readers lost the number.
-            { count: pendingApprovalCount }
-          )}
-          className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 px-0.5 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold leading-none"
+          data-testid="sidebar-requests-badge"
+          className="shrink-0 rounded-full bg-primary px-1.5 py-px text-[10px] font-semibold text-primary-foreground"
         >
           {formatBadgeCount(pendingApprovalCount)}
         </span>

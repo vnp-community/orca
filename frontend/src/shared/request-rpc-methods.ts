@@ -11,6 +11,8 @@
 export const REQUEST_RPC_METHODS = {
   // Flow management
   FLOW_STATUS: 'request.flowStatus',
+  /** The flow of one request type and size (analysis, plan, gates), straight from the backend registry. */
+  FLOW: 'request.flow',
 
   // Request CRUD
   CREATE: 'request.create',
@@ -81,7 +83,11 @@ export const REQUEST_RPC_METHODS = {
   READINESS_CHECK: 'readiness.check',
   READINESS_GET: 'readiness.get',
   READINESS_LIST: 'readiness.list',
-  EXECUTION_GET: 'execution.get'
+  EXECUTION_GET: 'execution.get',
+
+  // Request detail read models (CR-REQ-038)
+  ACTIVITY: 'request.activity',
+  EXECUTION_SUMMARY: 'request.executionSummary'
 } as const
 
 export type RequestRpcMethod = (typeof REQUEST_RPC_METHODS)[keyof typeof REQUEST_RPC_METHODS]

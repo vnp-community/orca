@@ -9,20 +9,39 @@
  */
 
 import { CHILD_REQUEST_RULES } from './request-stage-timeline-model'
-import { REQUEST_FLOW_REGISTRY } from '../../../../shared/request-flow-registry'
-import type { OrcaRequest, RequestStatus, ReturnedFromStage } from '../../../../shared/request-types'
+import type { RequestFlowView } from '../../../../shared/request-execution-types'
+import type {
+  OrcaRequest,
+  RequestStatus,
+  ReturnedFromStage
+} from '../../../../shared/request-types'
 
 const RETURNABLE_STATUSES: RequestStatus[] = [
-  'analyzing', 'awaiting_analysis_approval', 'planning', 'awaiting_plan_approval', 'executing'
+  'analyzing',
+  'awaiting_analysis_approval',
+  'planning',
+  'awaiting_plan_approval',
+  'executing'
 ]
 
-const PRE_CONFIRMATION_STATUSES: RequestStatus[] = ['submitted', 'classifying', 'awaiting_type_confirmation', 'unknown']
+const PRE_CONFIRMATION_STATUSES: RequestStatus[] = [
+  'submitted',
+  'classifying',
+  'awaiting_type_confirmation',
+  'unknown'
+]
 
 export const RETURN_STAGES: Exclude<ReturnedFromStage, 'unknown'>[] = [
-  'classification', 'analysis', 'plan', 'phase', 'task'
+  'classification',
+  'analysis',
+  'plan',
+  'phase',
+  'task'
 ]
 
-const STATUS_TO_RETURN_STAGE: Partial<Record<RequestStatus, Exclude<ReturnedFromStage, 'unknown'>>> = {
+const STATUS_TO_RETURN_STAGE: Partial<
+  Record<RequestStatus, Exclude<ReturnedFromStage, 'unknown'>>
+> = {
   analyzing: 'analysis',
   awaiting_analysis_approval: 'analysis',
   planning: 'plan',
@@ -42,7 +61,9 @@ export type RequestActionAvailability = {
   canSpawnChild: boolean
 }
 
-export function getRequestActionAvailability(request: Pick<OrcaRequest, 'status' | 'type'>): RequestActionAvailability {
+export function getRequestActionAvailability(
+  request: Pick<OrcaRequest, 'status' | 'type'>
+): RequestActionAvailability {
   const { status, type } = request
   const terminal = status === 'completed' || status === 'cancelled'
   const childRule = type === 'unknown' ? undefined : CHILD_REQUEST_RULES[type]
@@ -65,9 +86,21 @@ export function getRequestActionAvailability(request: Pick<OrcaRequest, 'status'
   }
 }
 
-/** Detail tabs the registry says exist for this type; unknown type shows neither. */
-export function getVisibleDetailTabs(type: OrcaRequest['type']): { analysis: boolean; plan: boolean } {
-  if (type === 'unknown') {return { analysis: false, plan: false }}
-  const entry = REQUEST_FLOW_REGISTRY[type]
-  return { analysis: entry.analysisKind !== null, plan: entry.plan !== 'none' }
+/**
+ * Detail tabs the flow says exist. The Plan tab holds a Plan or a task list (a single-task hotfix has none), the Execution tab
+ * exists whenever something is executed, and an unknown flow shows none of them.
+ */
+export function getVisibleDetailTabs(flow: RequestFlowView | null): {
+  analysis: boolean
+  plan: boolean
+  execution: boolean
+} {
+  if (!flow) {
+    return { analysis: false, plan: false, execution: false }
+  }
+  return {
+    analysis: flow.analysisKind !== null,
+    plan: flow.planKind === 'plan' || flow.planKind === 'task_list',
+    execution: flow.planKind !== 'none'
+  }
 }

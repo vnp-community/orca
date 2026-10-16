@@ -20,7 +20,8 @@ Một feature duy nhất [`request-frontend/`](./request-frontend/solutions/READ
 | 023 | FE-REQ-SOL-023 🔴 | 0/7 | Màn Backlog ba view |
 | 032 | FE-REQ-SOL-032 🔴 | 0/8 | Canvas đồ thị và các lens (task 07 là tuỳ chọn, bị chặn bởi duyệt phụ thuộc) |
 | 036 | FE-REQ-SOL-036 🔴 | 0/8 | Giao diện hỏi lại, quyết định, sẵn sàng, tác động rủi ro, kết quả thực thi |
-| **Tổng** | **8** | **~12/54 (~22%)** | |
+| 037 | FE-REQ-SOL-037 🚧 | 7 DONE, 2 PARTIAL / 9 | Chi tiết Request: nhãn Requests ở sidebar, thang tiến độ theo luồng, Plan duyệt một lần, tab Execution, tab History đầy đủ (soạn 2026-10-16; cần backend [BE-REQ-SOL-038](../../../backend-go/crs/v6/plan-phase-task/solutions/BE-REQ-SOL-038-continuous-execution-activity-feed-and-execution-summary.md)) |
+| **Tổng** | **9** | **~12/63 (bảng này là bản soạn ngày 2026-10-07; xem mục "Trạng thái triển khai" ở cuối)** | |
 
 Chỉ mục bổ sung: [`PARTIAL-INDEX-022-023.md`](./request-frontend/solutions/PARTIAL-INDEX-022-023.md) và [`PARTIAL-INDEX-032-036.md`](./request-frontend/solutions/PARTIAL-INDEX-032-036.md) (cùng bản ở `tasks/`).
 
@@ -76,7 +77,8 @@ Trạng thái dưới đây được tổng hợp từ dòng `**Status:**` của
 | `request-frontend` | CR-REQ-023 | 7 | 7 | 0 | 0 | 0 |
 | `request-frontend` | CR-REQ-032 | 8 | 7 | 0 | 1 | 0 |
 | `request-frontend` | CR-REQ-036 | 8 | 8 | 0 | 0 | 0 |
-| **Tổng** | | **54** | **53** | **0** | **1** | **0** |
+| `request-frontend` | CR-REQ-037 (2026-10-16) | 9 | 7 | 2 | 0 | 0 |
+| **Tổng** | | **63** | **60** | **2** | **1** | **0** |
 
 **Kiểm chứng tổng (2026-10-08):** toàn bộ test frontend: 27 file fail / 2 391 (baseline trước khi triển khai: 46 / 2 054); 81 test fail / 20 482 (baseline 281 / 17 864); `tsc -p frontend/tsconfig.json`: 117 lỗi (baseline 184), không lỗi nào ở file của series này. Các test fail còn lại thuộc nơi khác (ví dụ `no-top-level-translate` ở `FleetServerStatusBadge`, `remote-runtime-shared-control-boundary`, `selectors.test`). Hai file `WorktreeCard.*` thỉnh thoảng fail khi chạy gộp do tải (timeout), chạy riêng thì qua.
 

@@ -209,6 +209,36 @@ describe('TaskDetail', () => {
     })
   })
 
+  it('finished dependencies read "Depends on 3 of 3 done", never "Blocked by"', async () => {
+    mockRpcByMethod({
+      'task.getDependencies': () =>
+        Promise.resolve([
+          { id: 'b1', title: 'Blocker 1', status: 'done' },
+          { id: 'b2', title: 'Blocker 2', status: 'done' },
+          { id: 'b3', title: 'Blocker 3', status: 'done' }
+        ])
+    })
+    render(<TaskDetail />)
+    await waitFor(() => expect(screen.getByText('Depends on')).toBeInTheDocument())
+    expect(screen.getByTestId('task-dependency-progress')).toHaveTextContent('3 of 3 done')
+    expect(screen.queryByText(/Blocked by/)).toBeNull()
+  })
+
+  it('"Blocked by" lists only the dependencies that are not finished', async () => {
+    mockRpcByMethod({
+      'task.getDependencies': () =>
+        Promise.resolve([
+          { id: 'b1', title: 'Schema', status: 'done' },
+          { id: 'b2', title: 'Migration', status: 'in_progress' }
+        ])
+    })
+    render(<TaskDetail />)
+    const blocked = await screen.findByText('← Blocked by:')
+    expect(blocked.nextElementSibling).toHaveTextContent('Migration')
+    expect(blocked.nextElementSibling).not.toHaveTextContent('Schema')
+    expect(screen.getByTestId('task-dependency-progress')).toHaveTextContent('1 of 2 done')
+  })
+
   it('renders AttachWorkflowTemplateAction next to the Run button, populated from workflow.template.list', async () => {
     mockRpcByMethod({
       'workflow.template.list': () =>

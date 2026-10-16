@@ -178,6 +178,25 @@ describe('TaskDetail + readiness', () => {
     expect(screen.queryByRole('tab', { name: 'Result' })).toBeNull()
   })
 
+  it('a Request task whose run printed no result block shows its output neutrally', async () => {
+    h.rpc = {
+      'execution.get': {
+        taskId: 't1',
+        attempt: 1,
+        parseStatus: 'missing',
+        filesChanged: [],
+        checksRun: [],
+        stdoutTail: 'Done. Added the index.',
+        source: 'execution_record'
+      }
+    }
+    render(<TaskDetail />)
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Result' }))
+    expect(await screen.findByTestId('execution-agent-output')).toHaveTextContent('Added the index')
+    expect(screen.queryByTestId('execution-malformed')).toBeNull()
+    expect(screen.queryByText('The result is not in the expected format')).toBeNull()
+  })
+
   it('an idle agent panel points to the Result tab only when that tab has saved output', async () => {
     h.rpc = {
       'execution.get': {

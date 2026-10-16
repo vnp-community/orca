@@ -12885,7 +12885,13 @@
             "unknown": "El worktree de esta tarea ya no existe",
             "notOnHost": "El worktree de esta tarea ya no está en este host. Puede que se haya limpiado.",
             "failed": "No se pudo abrir el worktree: {{message}}"
-          }
+          },
+          "dependencies": "Dependencias",
+          "blockedBy": "Bloqueada por:",
+          "dependsOn": "Depende de",
+          "dependsOnProgress": "{{done}} de {{total}} hechas",
+          "noDependencies": "Sin dependencias",
+          "dependenciesFailed": "No se pudieron cargar las dependencias"
         },
         "TaskDAGView": {
           "status": {
@@ -13463,7 +13469,9 @@
             "analysis": "Análisis",
             "plan": "Plan",
             "history": "Historial",
-            "related": "Relacionadas"
+            "related": "Relacionadas",
+            "needsAttention": "Requiere atención",
+            "execution": "Ejecución"
           }
         },
         "RequestOverviewTab": {
@@ -13483,16 +13491,30 @@
             "analysis": "Análisis",
             "plan": "Plan",
             "phase": "Fases",
-            "execution": "Ejecución"
+            "execution": "Ejecución",
+            "handover": "Entrega",
+            "taskList": "Lista de tareas"
           },
           "state": {
             "done": "hecho",
             "current": "actual",
             "pending": "pendiente",
-            "skipped": "detenido"
+            "skipped": "detenido",
+            "running": "en curso",
+            "waiting": "esperando por ti",
+            "stopped": "detenido"
           },
           "note": {
             "hotfix": "Hotfix: diagnóstico rápido, sin aprobación antes del plan."
+          },
+          "caption": {
+            "progressPhases": "paso {{phase}}/{{phases}} · {{done}}/{{total}} tareas",
+            "progress": "{{done}}/{{total}} tareas",
+            "stoppedProgress": "{{done}}/{{total}} tareas · detenido",
+            "waitingApproval": "esperando aprobación",
+            "waitingYou": "esperando por ti",
+            "archiving": "archivando",
+            "handoverFailed": "falló el archivado"
           }
         },
         "RequestsTab": {
@@ -13634,7 +13656,8 @@
             "notApprover": "No tienes permiso para aprobar esto.",
             "conflict": "Esto cambió mientras lo revisabas. Se cargó la última versión; revísala de nuevo.",
             "alreadyDecided": "Esto ya fue decidido.",
-            "expired": "Esta aprobación caducó. Se cargó la última versión."
+            "expired": "Esta aprobación caducó. Se cargó la última versión.",
+            "executionNotAllowed": "Solo puedes aprobar planes si tienes permiso para ejecutarlos. Pide a alguien que lo tenga o solicita acceso."
           },
           "PlanGateChips": {
             "plan": "Plan",
@@ -13672,10 +13695,32 @@
           },
           "RequestPlanTab": {
             "reload": "Recargar",
-            "truncated": "La lista de tareas se truncó; pueden faltar algunas tareas."
+            "truncated": "La lista de tareas se truncó; pueden faltar algunas tareas.",
+            "approvedStrip": "Plan aprobado {{when}}. El agente lo ejecuta por sí solo.",
+            "followInExecution": "Seguir en Ejecución"
           },
           "PlanUnconfirmedAssumptionsNotice": {
             "ids": "Aún sin confirmar: {{ids}}"
+          },
+          "PlanApprovalCard": {
+            "steps": "{{count}} pasos",
+            "tasks": "{{count}} tareas",
+            "titleTaskList": "Aprueba una vez y el agente ejecuta los {{unit}}",
+            "title": "Aprueba una vez y el agente ejecuta los {{unit}}",
+            "stopsWhen": "Se detiene y te consulta solo cuando:",
+            "needsInfo": "necesita información que solo tú tienes",
+            "failsTwice": "una tarea sigue fallando; la solicitud vuelve entonces al backlog",
+            "drift": "el cambio se desvía de este plan y necesita revisión",
+            "preDeploy": "llega a la aprobación previa al despliegue",
+            "riskWhole": "El riesgo se evalúa para el plan completo, incluidos todos los pasos. Revísalo abajo antes de aprobar.",
+            "approve": "Aprobar e iniciar la ejecución",
+            "requestChanges": "Solicitar cambios"
+          },
+          "PlanOutline": {
+            "hours": "~{{hours}} h estimadas",
+            "done": "Hecho",
+            "step": "{{index}}. {{title}}",
+            "taskCount": "{{count}} tareas"
           }
         },
         "approval": {
@@ -14082,6 +14127,93 @@
             "note": "Esta ejecución no informó un resultado estructurado. Se muestra el final de lo que imprimió el agente.",
             "cut": "Solo se muestra la última parte.",
             "redacted": "Se ocultaron los secretos."
+          },
+          "ExecutionFailureCard": {
+            "title": "Detenido: «{{task}}» falló {{attempts}}/{{max}} veces",
+            "cause": "Causa: {{cause}}",
+            "kept": "Todo lo anterior está hecho y se conserva ({{done}}/{{total}} tareas).",
+            "reopen": "Reabrir y volver a ejecutar",
+            "log": "Ver el último registro",
+            "cancel": "Cancelar solicitud"
+          },
+          "ExecutionNeedsYou": {
+            "due": "Vence {{when}}",
+            "preDeploy": "Aprobar antes del despliegue{{what}}",
+            "phase": "Aprobar paso{{what}}",
+            "approve": "Aprobar",
+            "reject": "Rechazar",
+            "rejectTitle": "Rechazar esta aprobación",
+            "heading": "Te necesita",
+            "clarification": "El agente tiene una pregunta para ti",
+            "answer": "Responder",
+            "drift": "El cambio se desvió del plan{{what}}",
+            "driftHint": "Usa «Revisar» en el banner de arriba para aceptarlo o devolverlo.",
+            "failedTask": "«{{task}}» agotó sus intentos",
+            "viewLog": "Ver el último registro"
+          },
+          "ExecutionStepList": {
+            "stepTitle": "Paso {{index}}/{{total}} · {{title}}",
+            "tasksDone": "{{done}}/{{total}} tareas hechas",
+            "empty": "Este plan aún no tiene tareas.",
+            "later": "{{count}} pasos más · {{tasks}} tareas pendientes"
+          },
+          "ExecutionSummaryStrip": {
+            "running": "En curso",
+            "needsYou": "Te necesita",
+            "stopped": "Detenido",
+            "done": "Hecho",
+            "progressSteps": "{{done}}/{{total}} tareas · paso {{step}}/{{steps}}",
+            "progress": "{{done}}/{{total}} tareas",
+            "elapsed": "en ejecución desde hace {{time}}",
+            "stop": "Detener ejecución",
+            "progressLabel": "Progreso de la ejecución"
+          },
+          "ExecutionTab": {
+            "notStarted": "Sin iniciar. Esperando la aprobación del plan.",
+            "openPlan": "Abrir plan"
+          },
+          "ExecutionTaskRow": {
+            "done": "Hecho",
+            "runningAttempt": "En curso · intento {{attempt}} de {{max}}",
+            "running": "En curso",
+            "failedAttempts": "Falló {{attempt}} de {{max}}",
+            "failed": "Falló",
+            "blocked": "Bloqueada",
+            "waiting": "Esperando «{{title}}»",
+            "queued": "En cola",
+            "log": "Registro",
+            "details": "Detalles",
+            "noCause": "Sin causa registrada"
+          },
+          "ExecutionTaskSheet": {
+            "title": "Tarea",
+            "description": "Detalles de la tarea"
+          },
+          "HandoverRow": {
+            "nativeDone": "Termina cuando la última tarea esté hecha.",
+            "archiving": "Archivando el cambio y preparando la entrega",
+            "ready": "Cambio archivado y listo para la entrega",
+            "failed": "El archivado falló tras {{count}} intentos",
+            "pending": "Tras la última tarea, el cambio se archiva y se entrega"
+          },
+          "cause": {
+            "timedOut": "Tiempo agotado",
+            "modelError": "Error del modelo",
+            "verifyFailed": "Falló la verificación",
+            "envDefect": "Problema del entorno",
+            "specDefect": "Problema en la especificación de la tarea",
+            "agentError": "Error del agente",
+            "needsInfo": "Necesita información",
+            "cancelled": "Cancelado",
+            "unknown": "Causa desconocida",
+            "adviceTimedOut": "El agente se quedó sin tiempo. Reejecutar suele ayudar; si se repite, divide la tarea.",
+            "adviceModelError": "No se pudo usar el modelo. Revisa la configuración del agente y del modelo y vuelve a ejecutar.",
+            "adviceVerifyFailed": "El trabajo no pasó sus comprobaciones. Lee el registro y vuelve a ejecutar.",
+            "adviceEnvDefect": "El espacio de trabajo o las herramientas fallan. Arregla el entorno y vuelve a ejecutar.",
+            "adviceSpecDefect": "La especificación de la tarea es incorrecta o está incompleta. Cambia el plan antes de volver a ejecutar.",
+            "adviceAgentError": "El agente se detuvo sin un resultado utilizable. Lee el registro y vuelve a ejecutar.",
+            "adviceNeedsInfo": "El agente necesita una respuesta tuya para continuar.",
+            "adviceUnknown": "Lee el registro para ver qué pasó y vuelve a ejecutar."
           }
         },
         "aiSetup": {
@@ -14131,6 +14263,119 @@
           "runsOnWithHost": "La solicitud se ejecuta en el repositorio {{repo}} ({{path}}) de {{host}}.",
           "runsOn": "La solicitud se ejecuta en el repositorio {{repo}} ({{path}}).",
           "firstOfMany": "Es el primero de los {{count}} repositorios de este proyecto."
+        },
+        "activity": {
+          "filter": {
+            "approvals": "Aprobaciones",
+            "tasks": "Tareas",
+            "clarifications": "Aclaraciones",
+            "changes": "Cambios de tipo y plan",
+            "all": "Todo",
+            "actor": {
+              "user": "Usuario",
+              "ai": "IA",
+              "agent": "Agente",
+              "system": "Sistema",
+              "any": "Cualquiera"
+            },
+            "groupLabel": "Filtrar por tipo",
+            "needsAttention": "Solo lo que requiere atención",
+            "actorLabel": "Filtrar por autor"
+          },
+          "day": {
+            "today": "Hoy",
+            "yesterday": "Ayer",
+            "unknown": "Fecha desconocida"
+          },
+          "empty": "Aún no hay actividad",
+          "emptyFiltered": "Ninguna actividad coincide con estos filtros.",
+          "loadingMore": "Cargando…",
+          "loadMore": "Cargar más",
+          "type": {
+            "unknown": "sin clasificar"
+          },
+          "task": {
+            "unnamed": "Una tarea"
+          },
+          "actor": {
+            "user": "Usuario",
+            "ai": "IA",
+            "agent": "Agente",
+            "system": "Sistema"
+          },
+          "severity": {
+            "error": "Detenido",
+            "attention": "Requiere atención"
+          },
+          "cause": {
+            "timedOut": "Tiempo agotado",
+            "modelError": "Error del modelo",
+            "verifyFailed": "Falló la verificación",
+            "envDefect": "Problema del entorno",
+            "specDefect": "Problema en la especificación de la tarea",
+            "agentError": "Error del agente",
+            "needsInfo": "Necesitaba más información",
+            "cancelled": "Cancelado",
+            "unknown": "Causa desconocida"
+          },
+          "title": {
+            "requestCreated": "Solicitud creada",
+            "requestClassified": "Clasificada como {{type}}",
+            "typeChanged": "Tipo cambiado de {{from}} a {{to}}",
+            "analysisGeneratedVersion": "{{kind}} versión {{version}} generada",
+            "analysisGenerated": "{{kind}} generado",
+            "clarificationAsked": "Aclaración solicitada",
+            "clarificationAnswered": "Aclaración respondida",
+            "approvalRequested": "Aprobación solicitada para {{subject}}",
+            "approvalApproved": "Se aprobó {{subject}}",
+            "approvalRejected": "Se rechazó {{subject}}",
+            "approvalDecided": "Decisión sobre {{subject}}",
+            "phaseStartedAuto": "Fase iniciada automáticamente",
+            "phaseStarted": "Fase iniciada",
+            "phaseDone": "Fase terminada",
+            "planDone": "Todas las tareas terminadas",
+            "taskStarted": "{{task}} iniciada",
+            "taskSucceeded": "{{task}} terminada",
+            "taskAccepted": "{{task}} marcada como hecha",
+            "taskFailed": "{{task}} falló",
+            "taskCancelled": "{{task}} cancelada",
+            "requestReturned": "Devuelta al backlog",
+            "requestReopened": "Reabierta",
+            "requestCancelled": "Cancelado"
+          },
+          "analysis": {
+            "generic": "Análisis"
+          },
+          "approval": {
+            "subjectFallback": "elemento"
+          },
+          "attemptOf": "Intento {{attempt}} de {{max}}",
+          "attempt": "Intento {{attempt}}",
+          "detail": {
+            "failure": "{{cause}}: {{error}}"
+          },
+          "openTab": "Abrir {{tab}}"
+        },
+        "NextAction": {
+          "failed": "«{{task}}» falló {{attempts}}/{{max}} veces",
+          "failedDetail": "La solicitud volvió al backlog. Todo lo anterior se conserva.",
+          "reopen": "Reabrir y volver a ejecutar",
+          "question": "Hay una pregunta esperando tu respuesta",
+          "answer": "Responder",
+          "preDeploy": "La aprobación previa al despliegue te está esperando",
+          "drift": "Un cambio se desvió del plan y necesita tu revisión",
+          "approval": "Una aprobación te está esperando",
+          "review": "Revisar",
+          "confirmType": "Confirma el tipo de esta solicitud",
+          "running": "El agente está trabajando en «{{task}}»",
+          "runningDetail": "Intento {{attempt}} de {{max}}. Nada requiere tu atención ahora.",
+          "nextTask": "Esperando que empiece la siguiente tarea",
+          "classifying": "Orca está clasificando esta solicitud",
+          "analyzing": "Orca está analizando esta solicitud",
+          "planning": "Orca está redactando el plan",
+          "waitingApproval": "Esperando que alguien apruebe",
+          "waitingInfo": "Esperando que alguien responda una pregunta",
+          "done": "Esta solicitud está terminada"
         }
       },
       "reviewMap": {

@@ -176,6 +176,8 @@ Thuộc tính phụ: `size` ∈ {`S`,`M`,`L`}; `urgency` ∈ {`normal`,`urgent`}
 | [`ai-governance`](./ai-governance/README.md) | CR-REQ-034 | Ngân sách AI, chọn model, phiên bản prompt, eval | 🟠 P1 | Large |
 | [`security-compliance`](./security-compliance/README.md) | CR-REQ-035 | Quyền mức Request, RLS thật, secretscan, audit, lưu giữ | 🔴 P0 | Large |
 | [`request-frontend`](./request-frontend/README.md) | CR-REQ-036 | Giao diện hỏi lại, quyết định, sẵn sàng, tác động | 🟠 P1 | Large |
+| [`request-frontend`](./request-frontend/README.md) | CR-REQ-037 | Chi tiết Request: nhãn Requests ở sidebar, thang tiến độ theo luồng, Plan duyệt một lần, tab Execution, tab History đầy đủ | 🟠 P1 | Large |
+| [`plan-phase-task`](./plan-phase-task/README.md) | CR-REQ-038 | Chế độ thực thi `continuous` (duyệt Plan một lần), API nhật ký hoạt động, API tóm tắt thực thi, `engine` và `execution_mode` trên Request | 🟠 P1 | Large |
 
 ## 5. Thứ tự thực thi
 
@@ -196,6 +198,7 @@ CR-001 ─▶ CR-002 ─▶ CR-003 ─┬─▶ CR-004 ─▶ CR-005 ─▶ CR-0
 CR-016 (sau 003..009) ─▶ CR-017
 CR-018 ─▶ CR-019 ─▶ CR-020 ─▶ CR-021 ─▶ CR-022, CR-023     (frontend theo sau khi RPC chạy, nguyên tắc "UI sau cùng")
 CR-024, CR-025: sau khi lõi (001–016) ổn định
+CR-013 ─▶ CR-038 (backend: thực thi liên tục, nhật ký, tóm tắt) ─▶ CR-037 (frontend: chi tiết Request, tab Execution, History)
 ```
 
 Đợt gợi ý:
@@ -261,8 +264,8 @@ Mỗi CR có solution và task ở từng khu vực mà nó chạm tới, theo t
 
 | Khu vực | Vị trí | Solution | Task |
 |---|---|---|---|
-| Backend | [`specs/backend-go/crs/v6/`](../../../specs/backend-go/crs/v6/README.md) | 28 | 199 |
-| Frontend | [`specs/frontend/crs/v6/`](../../../specs/frontend/crs/v6/README.md) | 8 | 54 |
+| Backend | [`specs/backend-go/crs/v6/`](../../../specs/backend-go/crs/v6/README.md) | 29 | 207 |
+| Frontend | [`specs/frontend/crs/v6/`](../../../specs/frontend/crs/v6/README.md) | 9 | 63 |
 | Agent | [`specs/agent/crs/v6/`](../../../specs/agent/crs/v6/README.md) | 3 | 13 |
 
 Mỗi README ở các nơi trên có danh sách "điểm cần chốt" riêng. Các điểm chéo khu vực quan trọng nhất: số migration của `request-service` chồng nhau, timeout WebSocket 25 giây so với lời gọi AI đồng bộ, RLS thật ở `request-service`, token màu rủi ro ở frontend, và chế độ chỉ đọc của agent chưa kiểm chứng với `claude` thật.

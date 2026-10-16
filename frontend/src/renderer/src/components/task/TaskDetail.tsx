@@ -17,6 +17,7 @@ import { ExecutionEngineBadge } from './ExecutionEngineBadge'
 import { TaskSourceBadge } from './TaskSourceBadge'
 import { AttachWorkflowTemplateAction } from './AttachWorkflowTemplateAction'
 import { TaskGrantModal } from './TaskGrantModal'
+import { TaskDependenciesSection } from './TaskDependenciesSection'
 import { Button } from '../ui/button'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { useTaskPermission } from '../../hooks/useTaskPermission'
@@ -381,26 +382,7 @@ export function TaskDetail() {
               </Select>
             </div>
 
-            {/* Dependencies */}
-            <div className="pt-2 text-xs">
-              <p className="font-semibold mb-1">Dependencies</p>
-              {blockedBy.length > 0 ? (
-                <div className="text-muted-foreground flex gap-1">
-                  <span>← Blocked by:</span>
-                  <span>{blockedBy.map((d) => d.title).join(', ')}</span>
-                </div>
-              ) : null}
-              <div className="text-muted-foreground flex gap-1 mt-1">
-                <span>→ Blocks:</span>
-                <span>Not supported on the Details tab — see the DAG tab</span>
-              </div>
-              {blockedBy.length === 0 && (
-                <div className="text-muted-foreground">No dependencies</div>
-              )}
-              {depsError && (
-                <div className="text-destructive mt-1">Failed to load dependencies</div>
-              )}
-            </div>
+            <TaskDependenciesSection dependencies={blockedBy} loadFailed={depsError} />
           </div>
         </TabsContent>
         <TabsContent value="subtasks">

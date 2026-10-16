@@ -14,6 +14,7 @@
 | CR-REQ-023 | [FE-REQ-SOL-023](./FE-REQ-SOL-023-backlog-screens.md) | Màn Backlog ba view | ✅ Done (7/7 tasks, verified 2026-10-07) |
 | CR-REQ-032 | [FE-REQ-SOL-032](./FE-REQ-SOL-032-graph-canvas-and-lenses.md) | Canvas đồ thị và các lens | 🚧 In Progress (7/8 DONE, 032-07 BLOCKED chờ duyệt `elkjs`) |
 | CR-REQ-036 | [FE-REQ-SOL-036](./FE-REQ-SOL-036-clarification-decision-readiness-impact-ui.md) | Giao diện hỏi lại, quyết định, sẵn sàng, tác động | ✅ Done (8/8 DONE, 2026-10-08) |
+| CR-REQ-037 | [FE-REQ-SOL-037](./FE-REQ-SOL-037-request-detail-redesign-execution-tab-and-activity.md) | Chi tiết Request: nhãn Requests ở sidebar, thang tiến độ theo luồng, Plan duyệt một lần, tab Execution, tab History đầy đủ | 🚧 Đã triển khai (7 DONE, 2 PARTIAL trên 9, 2026-10-16; backend BE-REQ-SOL-038 xong) |
 
 Các solution 018 đến 021 để chỗ cắm cho 022 và 023 (`ApprovalInboxTab`, `BacklogTab` trong `RequestPage`, `RejectReasonDialog`, `useApprovals`, `useBacklog` với `backlog.requests|tasks|execute`).
 

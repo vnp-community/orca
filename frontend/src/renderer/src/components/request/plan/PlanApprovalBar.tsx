@@ -23,12 +23,17 @@ type Props = {
   decision: PlanDecision
   /** Why Approve is locked (no effective Decision yet); null/undefined = not blocked. */
   approveBlockedReason?: string | null
+  /** The continuous plan card words the decision as starting the run. */
+  approveLabel?: string
+  rejectLabel?: string
 }
 
 export function PlanApprovalBar({
   approval,
   decision,
-  approveBlockedReason = null
+  approveBlockedReason = null,
+  approveLabel,
+  rejectLabel
 }: Props): React.JSX.Element | null {
   const failure =
     decision.failure &&
@@ -94,11 +99,12 @@ export function PlanApprovalBar({
             approveExtras={risk.gate.approveExtras}
             hideApprove={risk.approverNotAllowed}
             approveLabel={
-              isTaskList
+              approveLabel ??
+              (isTaskList
                 ? translate(`${P}approveTaskList`, 'Approve task list')
-                : translate(`${P}approve`, 'Approve plan')
+                : translate(`${P}approve`, 'Approve plan'))
             }
-            rejectLabel={translate(`${P}reject`, 'Reject')}
+            rejectLabel={rejectLabel ?? translate(`${P}reject`, 'Reject')}
             rejectTitle={translate(`${P}rejectTitle`, 'Reject plan')}
             offerRegenerate
           />

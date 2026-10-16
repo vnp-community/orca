@@ -12885,7 +12885,13 @@
             "unknown": "此任务的 worktree 已不存在",
             "notOnHost": "此任务的 worktree 已不在此主机上，可能已被清理。",
             "failed": "无法打开 worktree：{{message}}"
-          }
+          },
+          "dependencies": "依赖",
+          "blockedBy": "被以下阻塞：",
+          "dependsOn": "依赖于",
+          "dependsOnProgress": "{{total}} 个中已完成 {{done}} 个",
+          "noDependencies": "无依赖",
+          "dependenciesFailed": "无法加载依赖"
         },
         "TaskDAGView": {
           "status": {
@@ -13463,7 +13469,9 @@
             "analysis": "分析",
             "plan": "计划",
             "history": "历史",
-            "related": "相关"
+            "related": "相关",
+            "needsAttention": "需要关注",
+            "execution": "执行"
           }
         },
         "RequestOverviewTab": {
@@ -13483,16 +13491,30 @@
             "analysis": "分析",
             "plan": "计划",
             "phase": "阶段",
-            "execution": "执行"
+            "execution": "执行",
+            "handover": "交接",
+            "taskList": "任务列表"
           },
           "state": {
             "done": "已完成",
             "current": "当前",
             "pending": "待处理",
-            "skipped": "已中止"
+            "skipped": "已中止",
+            "running": "进行中",
+            "waiting": "等待你处理",
+            "stopped": "已停止"
           },
           "note": {
             "hotfix": "热修复:快速诊断,计划前无需审批。"
+          },
+          "caption": {
+            "progressPhases": "第 {{phase}}/{{phases}} 步 · {{done}}/{{total}} 个任务",
+            "progress": "{{done}}/{{total}} 个任务",
+            "stoppedProgress": "{{done}}/{{total}} 个任务 · 已停止",
+            "waitingApproval": "等待批准",
+            "waitingYou": "等待你处理",
+            "archiving": "归档中",
+            "handoverFailed": "归档失败"
           }
         },
         "RequestsTab": {
@@ -13634,7 +13656,8 @@
             "notApprover": "您无权批准此项。",
             "conflict": "您审阅期间内容已变更。已加载最新版本,请重新审阅。",
             "alreadyDecided": "此项已有决定。",
-            "expired": "此审批已过期。已加载最新版本。"
+            "expired": "此审批已过期。已加载最新版本。",
+            "executionNotAllowed": "只有具备执行权限的人才能批准计划。请联系有权限的人，或申请访问权限。"
           },
           "PlanGateChips": {
             "plan": "计划",
@@ -13672,10 +13695,32 @@
           },
           "RequestPlanTab": {
             "reload": "重新加载",
-            "truncated": "任务列表已被截断,部分任务可能缺失。"
+            "truncated": "任务列表已被截断,部分任务可能缺失。",
+            "approvedStrip": "计划已于 {{when}} 批准，智能体将自动执行。",
+            "followInExecution": "在“执行”中查看"
           },
           "PlanUnconfirmedAssumptionsNotice": {
             "ids": "尚未确认：{{ids}}"
+          },
+          "PlanApprovalCard": {
+            "steps": "{{count}} 个步骤",
+            "tasks": "{{count}} 个任务",
+            "titleTaskList": "批准一次，智能体将执行全部 {{unit}}",
+            "title": "批准一次，智能体将执行全部 {{unit}}",
+            "stopsWhen": "仅在以下情况下才会停下来询问你：",
+            "needsInfo": "需要只有你掌握的信息",
+            "failsTwice": "某个任务持续失败——请求随后退回待办",
+            "drift": "变更偏离此计划，需要审阅",
+            "preDeploy": "到达部署前审批",
+            "riskWhole": "风险按整个计划（含每个步骤）评估。批准前请在下方查看。",
+            "approve": "批准并开始执行",
+            "requestChanges": "请求修改"
+          },
+          "PlanOutline": {
+            "hours": "预计约 {{hours}} 小时",
+            "done": "已完成",
+            "step": "{{index}}. {{title}}",
+            "taskCount": "{{count}} 个任务"
           }
         },
         "approval": {
@@ -14082,6 +14127,93 @@
             "note": "本次运行没有报告结构化结果。这里显示的是智能体输出内容的末尾。",
             "cut": "仅显示最后一部分。",
             "redacted": "已隐藏敏感信息。"
+          },
+          "ExecutionFailureCard": {
+            "title": "已停止：“{{task}}”失败 {{attempts}}/{{max}} 次",
+            "cause": "原因：{{cause}}",
+            "kept": "此前的内容均已完成并保留（{{done}}/{{total}} 个任务）。",
+            "reopen": "重新打开并重试",
+            "log": "查看最近日志",
+            "cancel": "取消请求"
+          },
+          "ExecutionNeedsYou": {
+            "due": "截止 {{when}}",
+            "preDeploy": "部署前审批{{what}}",
+            "phase": "批准步骤{{what}}",
+            "approve": "批准",
+            "reject": "拒绝",
+            "rejectTitle": "拒绝此审批",
+            "heading": "需要你处理",
+            "clarification": "智能体有问题要问你",
+            "answer": "回答",
+            "drift": "变更偏离了计划{{what}}",
+            "driftHint": "请使用上方横幅中的“审阅”来接受或退回。",
+            "failedTask": "“{{task}}”已用完尝试次数",
+            "viewLog": "查看最近日志"
+          },
+          "ExecutionStepList": {
+            "stepTitle": "第 {{index}}/{{total}} 步 · {{title}}",
+            "tasksDone": "已完成 {{done}}/{{total}} 个任务",
+            "empty": "此计划还没有任务。",
+            "later": "还有 {{count}} 个步骤 · {{tasks}} 个任务"
+          },
+          "ExecutionSummaryStrip": {
+            "running": "运行中",
+            "needsYou": "需要你处理",
+            "stopped": "已停止",
+            "done": "已完成",
+            "progressSteps": "{{done}}/{{total}} 个任务 · 第 {{step}}/{{steps}} 步",
+            "progress": "{{done}}/{{total}} 个任务",
+            "elapsed": "已运行 {{time}}",
+            "stop": "停止运行",
+            "progressLabel": "运行进度"
+          },
+          "ExecutionTab": {
+            "notStarted": "尚未开始，等待计划批准。",
+            "openPlan": "打开计划"
+          },
+          "ExecutionTaskRow": {
+            "done": "已完成",
+            "runningAttempt": "运行中 · 第 {{attempt}}/{{max}} 次",
+            "running": "运行中",
+            "failedAttempts": "失败 {{attempt}}/{{max}} 次",
+            "failed": "失败",
+            "blocked": "已阻塞",
+            "waiting": "等待“{{title}}”",
+            "queued": "排队中",
+            "log": "日志",
+            "details": "详情",
+            "noCause": "未记录原因"
+          },
+          "ExecutionTaskSheet": {
+            "title": "任务",
+            "description": "任务详情"
+          },
+          "HandoverRow": {
+            "nativeDone": "最后一个任务完成即结束。",
+            "archiving": "正在归档变更并准备交接",
+            "ready": "变更已归档，可以交接",
+            "failed": "尝试 {{count}} 次后归档失败",
+            "pending": "最后一个任务之后，变更将被归档并交接"
+          },
+          "cause": {
+            "timedOut": "超时",
+            "modelError": "模型错误",
+            "verifyFailed": "验证失败",
+            "envDefect": "环境问题",
+            "specDefect": "任务规格有问题",
+            "agentError": "智能体错误",
+            "needsInfo": "需要信息",
+            "cancelled": "已取消",
+            "unknown": "原因未知",
+            "adviceTimedOut": "智能体超时。通常重试即可；如果重复出现，请拆分任务。",
+            "adviceModelError": "无法使用该模型。请检查智能体和模型设置后重试。",
+            "adviceVerifyFailed": "工作未通过检查。请查看日志后重试。",
+            "adviceEnvDefect": "工作区或工具出现故障。请修复环境后重试。",
+            "adviceSpecDefect": "任务规格有误或不完整。请先修改计划再重试。",
+            "adviceAgentError": "智能体在没有可用结果的情况下停止。请查看日志后重试。",
+            "adviceNeedsInfo": "智能体需要你的回答才能继续。",
+            "adviceUnknown": "请查看日志了解情况后重试。"
           }
         },
         "aiSetup": {
@@ -14131,6 +14263,119 @@
           "runsOnWithHost": "请求将在 {{host}} 上的仓库 {{repo}}（{{path}}）中运行。",
           "runsOn": "请求将在仓库 {{repo}}（{{path}}）中运行。",
           "firstOfMany": "这是该项目 {{count}} 个仓库中的第一个。"
+        },
+        "activity": {
+          "filter": {
+            "approvals": "审批",
+            "tasks": "任务",
+            "clarifications": "澄清",
+            "changes": "类型与计划变更",
+            "all": "全部",
+            "actor": {
+              "user": "用户",
+              "ai": "AI",
+              "agent": "智能体",
+              "system": "系统",
+              "any": "任何人"
+            },
+            "groupLabel": "按类型筛选",
+            "needsAttention": "仅显示需要关注的",
+            "actorLabel": "按操作者筛选"
+          },
+          "day": {
+            "today": "今天",
+            "yesterday": "昨天",
+            "unknown": "日期未知"
+          },
+          "empty": "暂无活动",
+          "emptyFiltered": "没有符合这些筛选条件的活动。",
+          "loadingMore": "加载中…",
+          "loadMore": "加载更多",
+          "type": {
+            "unknown": "未分类"
+          },
+          "task": {
+            "unnamed": "一个任务"
+          },
+          "actor": {
+            "user": "用户",
+            "ai": "AI",
+            "agent": "智能体",
+            "system": "系统"
+          },
+          "severity": {
+            "error": "已停止",
+            "attention": "需要关注"
+          },
+          "cause": {
+            "timedOut": "超时",
+            "modelError": "模型错误",
+            "verifyFailed": "验证失败",
+            "envDefect": "环境问题",
+            "specDefect": "任务规格有问题",
+            "agentError": "智能体错误",
+            "needsInfo": "需要更多信息",
+            "cancelled": "已取消",
+            "unknown": "原因未知"
+          },
+          "title": {
+            "requestCreated": "请求已创建",
+            "requestClassified": "已分类为 {{type}}",
+            "typeChanged": "类型已从 {{from}} 改为 {{to}}",
+            "analysisGeneratedVersion": "已生成 {{kind}} 版本 {{version}}",
+            "analysisGenerated": "已生成 {{kind}}",
+            "clarificationAsked": "已提出澄清问题",
+            "clarificationAnswered": "澄清已回答",
+            "approvalRequested": "已请求批准 {{subject}}",
+            "approvalApproved": "{{subject}} 已批准",
+            "approvalRejected": "{{subject}} 已拒绝",
+            "approvalDecided": "对 {{subject}} 的决定",
+            "phaseStartedAuto": "阶段已自动开始",
+            "phaseStarted": "阶段已开始",
+            "phaseDone": "阶段已完成",
+            "planDone": "所有任务已完成",
+            "taskStarted": "{{task}} 已开始",
+            "taskSucceeded": "{{task}} 已完成",
+            "taskAccepted": "{{task}} 已标记为完成",
+            "taskFailed": "{{task}} 失败",
+            "taskCancelled": "{{task}} 已取消",
+            "requestReturned": "已退回待办",
+            "requestReopened": "已重新打开",
+            "requestCancelled": "已取消"
+          },
+          "analysis": {
+            "generic": "分析"
+          },
+          "approval": {
+            "subjectFallback": "项目"
+          },
+          "attemptOf": "第 {{attempt}}/{{max}} 次尝试",
+          "attempt": "第 {{attempt}} 次尝试",
+          "detail": {
+            "failure": "{{cause}}：{{error}}"
+          },
+          "openTab": "打开{{tab}}"
+        },
+        "NextAction": {
+          "failed": "“{{task}}”失败 {{attempts}}/{{max}} 次",
+          "failedDetail": "请求已退回待办。此前的内容均已保留。",
+          "reopen": "重新打开并重试",
+          "question": "有一个问题在等你回答",
+          "answer": "回答",
+          "preDeploy": "部署前审批在等你处理",
+          "drift": "有变更偏离了计划，需要你审阅",
+          "approval": "有审批在等你处理",
+          "review": "审阅",
+          "confirmType": "请确认此请求的类型",
+          "running": "智能体正在处理“{{task}}”",
+          "runningDetail": "第 {{attempt}}/{{max}} 次尝试。目前无需你处理。",
+          "nextTask": "等待下一个任务开始",
+          "classifying": "Orca 正在对此请求分类",
+          "analyzing": "Orca 正在分析此请求",
+          "planning": "Orca 正在编写计划",
+          "waitingApproval": "等待有人批准",
+          "waitingInfo": "等待有人回答问题",
+          "done": "此请求已完成"
         }
       },
       "reviewMap": {

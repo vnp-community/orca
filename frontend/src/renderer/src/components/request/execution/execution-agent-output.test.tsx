@@ -101,6 +101,45 @@ describe('ExecutionResultPanel with the output of the last run', () => {
   })
 })
 
+describe('ExecutionResultPanel with a contract run that printed no result block', () => {
+  it('shows the free-form output neutrally: "missing" is not "wrong format"', () => {
+    render(
+      <ExecutionResultPanel
+        taskId="t1"
+        execution={{
+          result: tailResult({
+            source: 'execution_record',
+            parseStatus: 'missing',
+            stdoutTail: 'Implemented the change, all done'
+          }),
+          status: 'ready'
+        }}
+      />
+    )
+    expect(screen.getByTestId('execution-agent-output-text')).toHaveTextContent(
+      'Implemented the change, all done'
+    )
+    expect(screen.queryByTestId('execution-malformed')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(
+      screen.getByTestId('execution-agent-output').querySelector('.text-destructive')
+    ).toBeNull()
+  })
+
+  it('still warns in red when a block was found but failed the schema', () => {
+    render(
+      <ExecutionResultPanel
+        taskId="t1"
+        execution={{
+          result: tailResult({ source: 'execution_record', parseStatus: 'invalid' }),
+          status: 'ready'
+        }}
+      />
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('The result is not in the expected format')
+  })
+})
+
 describe('prepareAgentOutputTail', () => {
   it('keeps the last lines, drops trailing blanks and normalises CRLF', () => {
     const text = `${Array.from({ length: AGENT_OUTPUT_MAX_LINES + 20 }, (_, i) => `l${i}`).join('\r\n')}\r\n\r\n`

@@ -12885,7 +12885,13 @@
             "unknown": "이 작업의 worktree가 더 이상 존재하지 않습니다",
             "notOnHost": "이 작업의 worktree가 이 호스트에 더 이상 없습니다. 정리되었을 수 있습니다.",
             "failed": "worktree를 열지 못했습니다: {{message}}"
-          }
+          },
+          "dependencies": "의존성",
+          "blockedBy": "차단 원인:",
+          "dependsOn": "의존 대상",
+          "dependsOnProgress": "{{total}}개 중 {{done}}개 완료",
+          "noDependencies": "의존성 없음",
+          "dependenciesFailed": "의존성을 불러오지 못했습니다"
         },
         "TaskDAGView": {
           "status": {
@@ -13463,7 +13469,9 @@
             "analysis": "분석",
             "plan": "계획",
             "history": "기록",
-            "related": "관련"
+            "related": "관련",
+            "needsAttention": "확인 필요",
+            "execution": "실행"
           }
         },
         "RequestOverviewTab": {
@@ -13483,16 +13491,30 @@
             "analysis": "분석",
             "plan": "계획",
             "phase": "단계",
-            "execution": "실행"
+            "execution": "실행",
+            "handover": "인계",
+            "taskList": "작업 목록"
           },
           "state": {
             "done": "완료",
             "current": "현재",
             "pending": "대기",
-            "skipped": "중단됨"
+            "skipped": "중단됨",
+            "running": "실행 중",
+            "waiting": "내 응답 대기",
+            "stopped": "중단됨"
           },
           "note": {
             "hotfix": "핫픽스: 빠른 진단, 계획 전 승인 없음."
+          },
+          "caption": {
+            "progressPhases": "단계 {{phase}}/{{phases}} · 작업 {{done}}/{{total}}",
+            "progress": "작업 {{done}}/{{total}}",
+            "stoppedProgress": "작업 {{done}}/{{total}} · 중단됨",
+            "waitingApproval": "승인 대기 중",
+            "waitingYou": "내 응답 대기",
+            "archiving": "보관 중",
+            "handoverFailed": "보관 실패"
           }
         },
         "RequestsTab": {
@@ -13634,7 +13656,8 @@
             "notApprover": "이 항목을 승인할 권한이 없습니다.",
             "conflict": "검토하는 동안 내용이 변경되었습니다. 최신 버전을 불러왔으니 다시 검토하세요.",
             "alreadyDecided": "이미 결정되었습니다.",
-            "expired": "이 승인이 만료되었습니다. 최신 버전을 불러왔습니다."
+            "expired": "이 승인이 만료되었습니다. 최신 버전을 불러왔습니다.",
+            "executionNotAllowed": "계획의 실행 권한이 있는 사람만 승인할 수 있습니다. 권한이 있는 사람에게 요청하거나 접근 권한을 신청하세요."
           },
           "PlanGateChips": {
             "plan": "계획",
@@ -13672,10 +13695,32 @@
           },
           "RequestPlanTab": {
             "reload": "새로고침",
-            "truncated": "작업 목록이 잘렸습니다. 일부 작업이 누락되었을 수 있습니다."
+            "truncated": "작업 목록이 잘렸습니다. 일부 작업이 누락되었을 수 있습니다.",
+            "approvedStrip": "계획이 {{when}} 승인되었습니다. 에이전트가 자동으로 실행합니다.",
+            "followInExecution": "실행 탭에서 보기"
           },
           "PlanUnconfirmedAssumptionsNotice": {
             "ids": "아직 확인되지 않음: {{ids}}"
+          },
+          "PlanApprovalCard": {
+            "steps": "{{count}}개 단계",
+            "tasks": "작업 {{count}}개",
+            "titleTaskList": "한 번 승인하면 에이전트가 {{unit}}을(를) 모두 실행합니다",
+            "title": "한 번 승인하면 에이전트가 {{unit}}을(를) 모두 실행합니다",
+            "stopsWhen": "다음 경우에만 멈추고 물어봅니다:",
+            "needsInfo": "당신만 가진 정보가 필요할 때",
+            "failsTwice": "작업이 계속 실패할 때 — 요청은 백로그로 돌아갑니다",
+            "drift": "변경이 이 계획에서 벗어나 검토가 필요할 때",
+            "preDeploy": "배포 전 승인에 도달할 때",
+            "riskWhole": "위험은 모든 단계를 포함한 계획 전체에 대해 평가됩니다. 승인하기 전에 아래에서 검토하세요.",
+            "approve": "승인하고 실행 시작",
+            "requestChanges": "변경 요청"
+          },
+          "PlanOutline": {
+            "hours": "약 {{hours}}시간 (예상)",
+            "done": "완료",
+            "step": "{{index}}. {{title}}",
+            "taskCount": "작업 {{count}}개"
           }
         },
         "approval": {
@@ -14082,6 +14127,93 @@
             "note": "이 실행은 구조화된 결과를 보고하지 않았습니다. 에이전트가 출력한 내용의 끝부분을 표시합니다.",
             "cut": "마지막 부분만 표시됩니다.",
             "redacted": "비밀 정보는 숨겨졌습니다."
+          },
+          "ExecutionFailureCard": {
+            "title": "중단됨: “{{task}}”이(가) {{attempts}}/{{max}}회 실패했습니다",
+            "cause": "원인: {{cause}}",
+            "kept": "그 이전 작업은 모두 완료되어 보존됩니다 (작업 {{done}}/{{total}}).",
+            "reopen": "다시 열고 재실행",
+            "log": "마지막 로그 보기",
+            "cancel": "요청 취소"
+          },
+          "ExecutionNeedsYou": {
+            "due": "기한 {{when}}",
+            "preDeploy": "배포 전 승인{{what}}",
+            "phase": "단계 승인{{what}}",
+            "approve": "승인",
+            "reject": "거부",
+            "rejectTitle": "이 승인 거부",
+            "heading": "내 확인 필요",
+            "clarification": "에이전트가 질문이 있습니다",
+            "answer": "답변",
+            "drift": "변경이 계획에서 벗어났습니다{{what}}",
+            "driftHint": "위 배너의 “검토”에서 수락하거나 되돌리세요.",
+            "failedTask": "“{{task}}”이(가) 시도 횟수를 모두 소진했습니다",
+            "viewLog": "마지막 로그 보기"
+          },
+          "ExecutionStepList": {
+            "stepTitle": "단계 {{index}}/{{total}} · {{title}}",
+            "tasksDone": "작업 {{done}}/{{total}} 완료",
+            "empty": "이 계획에는 아직 작업이 없습니다.",
+            "later": "남은 단계 {{count}}개 · 작업 {{tasks}}개"
+          },
+          "ExecutionSummaryStrip": {
+            "running": "실행 중",
+            "needsYou": "내 확인 필요",
+            "stopped": "중단됨",
+            "done": "완료",
+            "progressSteps": "작업 {{done}}/{{total}} · 단계 {{step}}/{{steps}}",
+            "progress": "작업 {{done}}/{{total}}",
+            "elapsed": "{{time}} 동안 실행 중",
+            "stop": "실행 중지",
+            "progressLabel": "실행 진행률"
+          },
+          "ExecutionTab": {
+            "notStarted": "시작되지 않았습니다. 계획 승인을 기다리는 중입니다.",
+            "openPlan": "계획 열기"
+          },
+          "ExecutionTaskRow": {
+            "done": "완료",
+            "runningAttempt": "실행 중 · {{max}}회 중 {{attempt}}회째",
+            "running": "실행 중",
+            "failedAttempts": "{{max}}회 중 {{attempt}}회 실패",
+            "failed": "실패",
+            "blocked": "차단됨",
+            "waiting": "“{{title}}” 대기 중",
+            "queued": "대기열",
+            "log": "로그",
+            "details": "상세",
+            "noCause": "기록된 원인 없음"
+          },
+          "ExecutionTaskSheet": {
+            "title": "작업",
+            "description": "작업 상세"
+          },
+          "HandoverRow": {
+            "nativeDone": "마지막 작업이 끝나면 완료됩니다.",
+            "archiving": "변경 사항을 보관하고 인계를 준비하는 중",
+            "ready": "변경 사항이 보관되어 인계 준비가 끝났습니다",
+            "failed": "{{count}}회 시도 후 보관 실패",
+            "pending": "마지막 작업 후 변경 사항이 보관되고 인계됩니다"
+          },
+          "cause": {
+            "timedOut": "시간 초과",
+            "modelError": "모델 오류",
+            "verifyFailed": "검증 실패",
+            "envDefect": "환경 문제",
+            "specDefect": "작업 명세 문제",
+            "agentError": "에이전트 오류",
+            "needsInfo": "정보 필요",
+            "cancelled": "취소됨",
+            "unknown": "원인 알 수 없음",
+            "adviceTimedOut": "에이전트의 시간이 초과되었습니다. 재실행하면 대개 해결되며, 반복되면 작업을 나누세요.",
+            "adviceModelError": "모델을 사용할 수 없었습니다. 에이전트와 모델 설정을 확인한 뒤 재실행하세요.",
+            "adviceVerifyFailed": "작업이 검사를 통과하지 못했습니다. 로그를 확인한 뒤 재실행하세요.",
+            "adviceEnvDefect": "작업 공간이나 도구에 문제가 있습니다. 환경을 고친 뒤 재실행하세요.",
+            "adviceSpecDefect": "작업 명세가 잘못되었거나 불완전합니다. 재실행 전에 계획을 수정하세요.",
+            "adviceAgentError": "에이전트가 사용할 수 있는 결과 없이 멈췄습니다. 로그를 확인한 뒤 재실행하세요.",
+            "adviceNeedsInfo": "계속하려면 에이전트가 당신의 답변을 필요로 합니다.",
+            "adviceUnknown": "로그에서 무슨 일이 있었는지 확인한 뒤 재실행하세요."
           }
         },
         "aiSetup": {
@@ -14131,6 +14263,119 @@
           "runsOnWithHost": "요청은 {{host}}의 저장소 {{repo}}({{path}})에서 실행됩니다.",
           "runsOn": "요청은 저장소 {{repo}}({{path}})에서 실행됩니다.",
           "firstOfMany": "이 프로젝트의 저장소 {{count}}개 중 첫 번째입니다."
+        },
+        "activity": {
+          "filter": {
+            "approvals": "승인",
+            "tasks": "작업",
+            "clarifications": "확인 요청",
+            "changes": "유형 및 계획 변경",
+            "all": "전체",
+            "actor": {
+              "user": "사용자",
+              "ai": "AI",
+              "agent": "에이전트",
+              "system": "시스템",
+              "any": "모두"
+            },
+            "groupLabel": "종류별 필터",
+            "needsAttention": "확인 필요 항목만",
+            "actorLabel": "수행자별 필터"
+          },
+          "day": {
+            "today": "오늘",
+            "yesterday": "어제",
+            "unknown": "날짜 알 수 없음"
+          },
+          "empty": "아직 활동이 없습니다",
+          "emptyFiltered": "이 필터와 일치하는 활동이 없습니다.",
+          "loadingMore": "불러오는 중…",
+          "loadMore": "더 보기",
+          "type": {
+            "unknown": "미분류"
+          },
+          "task": {
+            "unnamed": "작업"
+          },
+          "actor": {
+            "user": "사용자",
+            "ai": "AI",
+            "agent": "에이전트",
+            "system": "시스템"
+          },
+          "severity": {
+            "error": "중단됨",
+            "attention": "확인 필요"
+          },
+          "cause": {
+            "timedOut": "시간 초과",
+            "modelError": "모델 오류",
+            "verifyFailed": "검증 실패",
+            "envDefect": "환경 문제",
+            "specDefect": "작업 명세 문제",
+            "agentError": "에이전트 오류",
+            "needsInfo": "추가 정보가 필요했음",
+            "cancelled": "취소됨",
+            "unknown": "원인 알 수 없음"
+          },
+          "title": {
+            "requestCreated": "요청이 생성됨",
+            "requestClassified": "{{type}}(으)로 분류됨",
+            "typeChanged": "유형이 {{from}}에서 {{to}}(으)로 변경됨",
+            "analysisGeneratedVersion": "{{kind}} 버전 {{version}} 생성됨",
+            "analysisGenerated": "{{kind}} 생성됨",
+            "clarificationAsked": "확인 요청이 접수됨",
+            "clarificationAnswered": "확인 요청에 답변함",
+            "approvalRequested": "{{subject}} 승인을 요청함",
+            "approvalApproved": "{{subject}}이(가) 승인됨",
+            "approvalRejected": "{{subject}}이(가) 거부됨",
+            "approvalDecided": "{{subject}}에 대한 결정",
+            "phaseStartedAuto": "단계가 자동으로 시작됨",
+            "phaseStarted": "단계 시작됨",
+            "phaseDone": "단계 완료됨",
+            "planDone": "모든 작업 완료",
+            "taskStarted": "{{task}} 시작됨",
+            "taskSucceeded": "{{task}} 완료됨",
+            "taskAccepted": "{{task}} 완료 처리됨",
+            "taskFailed": "{{task}} 실패",
+            "taskCancelled": "{{task}} 취소됨",
+            "requestReturned": "백로그로 반환됨",
+            "requestReopened": "다시 열림",
+            "requestCancelled": "취소됨"
+          },
+          "analysis": {
+            "generic": "분석"
+          },
+          "approval": {
+            "subjectFallback": "항목"
+          },
+          "attemptOf": "{{max}}회 중 {{attempt}}회째 시도",
+          "attempt": "{{attempt}}회째 시도",
+          "detail": {
+            "failure": "{{cause}}: {{error}}"
+          },
+          "openTab": "{{tab}} 열기"
+        },
+        "NextAction": {
+          "failed": "“{{task}}”이(가) {{attempts}}/{{max}}회 실패했습니다",
+          "failedDetail": "요청이 백로그로 돌아갔습니다. 그 이전 작업은 보존됩니다.",
+          "reopen": "다시 열고 재실행",
+          "question": "답변을 기다리는 질문이 있습니다",
+          "answer": "답변",
+          "preDeploy": "배포 전 승인이 대기 중입니다",
+          "drift": "변경이 계획에서 벗어나 검토가 필요합니다",
+          "approval": "승인이 대기 중입니다",
+          "review": "검토",
+          "confirmType": "이 요청의 유형을 확인하세요",
+          "running": "에이전트가 “{{task}}” 작업 중입니다",
+          "runningDetail": "{{max}}회 중 {{attempt}}회째 시도입니다. 지금은 확인할 것이 없습니다.",
+          "nextTask": "다음 작업이 시작되기를 기다리는 중",
+          "classifying": "Orca가 이 요청을 분류하는 중입니다",
+          "analyzing": "Orca가 이 요청을 분석하는 중입니다",
+          "planning": "Orca가 계획을 작성하는 중입니다",
+          "waitingApproval": "누군가의 승인을 기다리는 중",
+          "waitingInfo": "누군가 질문에 답하기를 기다리는 중",
+          "done": "이 요청은 완료되었습니다"
         }
       },
       "reviewMap": {

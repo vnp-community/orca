@@ -12885,7 +12885,13 @@
             "unknown": "This task's worktree no longer exists",
             "notOnHost": "This task's worktree is no longer on this host. It may have been cleaned up.",
             "failed": "Failed to open worktree: {{message}}"
-          }
+          },
+          "dependencies": "Dependencies",
+          "blockedBy": "Blocked by:",
+          "dependsOn": "Depends on",
+          "dependsOnProgress": "{{done}} of {{total}} done",
+          "noDependencies": "No dependencies",
+          "dependenciesFailed": "Failed to load dependencies"
         },
         "TaskDAGView": {
           "status": {
@@ -13463,7 +13469,9 @@
             "analysis": "Analysis",
             "plan": "Plan",
             "history": "History",
-            "related": "Related"
+            "related": "Related",
+            "needsAttention": "Needs attention",
+            "execution": "Execution"
           }
         },
         "RequestOverviewTab": {
@@ -13483,16 +13491,30 @@
             "analysis": "Analysis",
             "plan": "Plan",
             "phase": "Phases",
-            "execution": "Execution"
+            "execution": "Execution",
+            "handover": "Handover",
+            "taskList": "Task list"
           },
           "state": {
             "done": "done",
             "current": "current",
             "pending": "pending",
-            "skipped": "stopped"
+            "skipped": "stopped",
+            "running": "running",
+            "waiting": "waiting for you",
+            "stopped": "stopped"
           },
           "note": {
             "hotfix": "Hotfix: fast diagnosis, no approval before the plan."
+          },
+          "caption": {
+            "progressPhases": "step {{phase}}/{{phases}} · {{done}}/{{total}} tasks",
+            "progress": "{{done}}/{{total}} tasks",
+            "stoppedProgress": "{{done}}/{{total}} tasks · stopped",
+            "waitingApproval": "waiting for approval",
+            "waitingYou": "waiting for you",
+            "archiving": "archiving",
+            "handoverFailed": "archive failed"
           }
         },
         "RequestsTab": {
@@ -13634,7 +13656,8 @@
             "notApprover": "You are not allowed to approve this.",
             "conflict": "This changed while you were reviewing it. The latest version was loaded; review it again.",
             "alreadyDecided": "This was already decided.",
-            "expired": "This approval expired. The latest version was loaded."
+            "expired": "This approval expired. The latest version was loaded.",
+            "executionNotAllowed": "You can approve plans only if you are allowed to run their execution. Ask someone who is, or request access."
           },
           "PlanGateChips": {
             "plan": "Plan",
@@ -13672,10 +13695,32 @@
           },
           "RequestPlanTab": {
             "reload": "Reload",
-            "truncated": "The task list was cut off; some tasks may be missing."
+            "truncated": "The task list was cut off; some tasks may be missing.",
+            "approvedStrip": "Plan approved {{when}}. The agent runs it on its own.",
+            "followInExecution": "Follow in Execution"
           },
           "PlanUnconfirmedAssumptionsNotice": {
             "ids": "Still unconfirmed: {{ids}}"
+          },
+          "PlanApprovalCard": {
+            "steps": "{{count}} steps",
+            "tasks": "{{count}} tasks",
+            "titleTaskList": "Approve once and the agent runs all {{unit}}",
+            "title": "Approve once and the agent runs all {{unit}}",
+            "stopsWhen": "It stops and asks you only when:",
+            "needsInfo": "it needs information only you have",
+            "failsTwice": "a task keeps failing — the request then goes back to the backlog",
+            "drift": "the change drifts from this plan and needs a review",
+            "preDeploy": "it reaches the pre-deploy approval",
+            "riskWhole": "Risk is assessed for the plan as a whole, including every step. Review it below before approving.",
+            "approve": "Approve and start execution",
+            "requestChanges": "Request changes"
+          },
+          "PlanOutline": {
+            "hours": "~{{hours}}h estimated",
+            "done": "Done",
+            "step": "{{index}}. {{title}}",
+            "taskCount": "{{count}} tasks"
           }
         },
         "approval": {
@@ -14082,6 +14127,93 @@
             "note": "This run did not report a structured result. The end of what the agent printed is shown.",
             "cut": "Only the last part is shown.",
             "redacted": "Secrets were hidden."
+          },
+          "ExecutionFailureCard": {
+            "title": "Stopped: “{{task}}” failed {{attempts}}/{{max}} times",
+            "cause": "Cause: {{cause}}",
+            "kept": "Everything before it is done and kept ({{done}}/{{total}} tasks).",
+            "reopen": "Reopen and rerun",
+            "log": "View last log",
+            "cancel": "Cancel request"
+          },
+          "ExecutionNeedsYou": {
+            "due": "Due {{when}}",
+            "preDeploy": "Approve before deploy{{what}}",
+            "phase": "Approve step{{what}}",
+            "approve": "Approve",
+            "reject": "Reject",
+            "rejectTitle": "Reject this approval",
+            "heading": "Needs you",
+            "clarification": "The agent has a question for you",
+            "answer": "Answer",
+            "drift": "The change drifted from the plan{{what}}",
+            "driftHint": "Use “Review” in the banner above to accept or return it.",
+            "failedTask": "“{{task}}” ran out of attempts",
+            "viewLog": "View last log"
+          },
+          "ExecutionStepList": {
+            "stepTitle": "Step {{index}}/{{total}} · {{title}}",
+            "tasksDone": "{{done}}/{{total}} tasks done",
+            "empty": "This plan has no tasks yet.",
+            "later": "{{count}} more steps · {{tasks}} tasks to go"
+          },
+          "ExecutionSummaryStrip": {
+            "running": "Running",
+            "needsYou": "Needs you",
+            "stopped": "Stopped",
+            "done": "Done",
+            "progressSteps": "{{done}}/{{total}} tasks · step {{step}}/{{steps}}",
+            "progress": "{{done}}/{{total}} tasks",
+            "elapsed": "running for {{time}}",
+            "stop": "Stop run",
+            "progressLabel": "Run progress"
+          },
+          "ExecutionTab": {
+            "notStarted": "Not started. Waiting for plan approval.",
+            "openPlan": "Open Plan"
+          },
+          "ExecutionTaskRow": {
+            "done": "Done",
+            "runningAttempt": "Running · attempt {{attempt}} of {{max}}",
+            "running": "Running",
+            "failedAttempts": "Failed {{attempt}} of {{max}}",
+            "failed": "Failed",
+            "blocked": "Blocked",
+            "waiting": "Waiting for “{{title}}”",
+            "queued": "Queued",
+            "log": "Log",
+            "details": "Details",
+            "noCause": "No cause recorded"
+          },
+          "ExecutionTaskSheet": {
+            "title": "Task",
+            "description": "Task details"
+          },
+          "HandoverRow": {
+            "nativeDone": "Done when the last task is done.",
+            "archiving": "Archiving the change and preparing the handover",
+            "ready": "Change archived and ready for handover",
+            "failed": "Archiving failed after {{count}} attempts",
+            "pending": "After the last task the change is archived and handed over"
+          },
+          "cause": {
+            "timedOut": "Timed out",
+            "modelError": "Model error",
+            "verifyFailed": "Verification failed",
+            "envDefect": "Environment problem",
+            "specDefect": "Problem in the task spec",
+            "agentError": "Agent error",
+            "needsInfo": "Needs information",
+            "cancelled": "Cancelled",
+            "unknown": "Unknown cause",
+            "adviceTimedOut": "The agent ran out of time. Rerunning usually helps; if it repeats, split the task.",
+            "adviceModelError": "The model could not be used. Check the agent and model settings, then rerun.",
+            "adviceVerifyFailed": "The work did not pass its checks. Read the log, then rerun.",
+            "adviceEnvDefect": "The workspace or tools are broken. Fix the environment, then rerun.",
+            "adviceSpecDefect": "The task spec is wrong or incomplete. Change the plan before rerunning.",
+            "adviceAgentError": "The agent stopped without a usable result. Read the log, then rerun.",
+            "adviceNeedsInfo": "The agent needs an answer from you before it can continue.",
+            "adviceUnknown": "Read the log to see what happened, then rerun."
           }
         },
         "aiSetup": {
@@ -14131,6 +14263,119 @@
           "runsOnWithHost": "The request runs on repo {{repo}} ({{path}}) on {{host}}.",
           "runsOn": "The request runs on repo {{repo}} ({{path}}).",
           "firstOfMany": "It is the first of this project's {{count}} repos."
+        },
+        "activity": {
+          "filter": {
+            "approvals": "Approvals",
+            "tasks": "Tasks",
+            "clarifications": "Clarifications",
+            "changes": "Type & plan changes",
+            "all": "All",
+            "actor": {
+              "user": "User",
+              "ai": "AI",
+              "agent": "Agent",
+              "system": "System",
+              "any": "Anyone"
+            },
+            "groupLabel": "Filter by kind",
+            "needsAttention": "Needs attention only",
+            "actorLabel": "Filter by who did it"
+          },
+          "day": {
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "unknown": "Unknown date"
+          },
+          "empty": "No activity yet",
+          "emptyFiltered": "No activity matches these filters.",
+          "loadingMore": "Loading…",
+          "loadMore": "Load more",
+          "type": {
+            "unknown": "unclassified"
+          },
+          "task": {
+            "unnamed": "A task"
+          },
+          "actor": {
+            "user": "User",
+            "ai": "AI",
+            "agent": "Agent",
+            "system": "System"
+          },
+          "severity": {
+            "error": "Stopped",
+            "attention": "Needs attention"
+          },
+          "cause": {
+            "timedOut": "Timed out",
+            "modelError": "Model error",
+            "verifyFailed": "Verification failed",
+            "envDefect": "Environment problem",
+            "specDefect": "Problem in the task spec",
+            "agentError": "Agent error",
+            "needsInfo": "Needed more information",
+            "cancelled": "Cancelled",
+            "unknown": "Unknown cause"
+          },
+          "title": {
+            "requestCreated": "Request created",
+            "requestClassified": "Classified as {{type}}",
+            "typeChanged": "Type changed from {{from}} to {{to}}",
+            "analysisGeneratedVersion": "{{kind}} version {{version}} generated",
+            "analysisGenerated": "{{kind}} generated",
+            "clarificationAsked": "Clarification asked",
+            "clarificationAnswered": "Clarification answered",
+            "approvalRequested": "Approval requested for the {{subject}}",
+            "approvalApproved": "The {{subject}} was approved",
+            "approvalRejected": "The {{subject}} was rejected",
+            "approvalDecided": "Decision on the {{subject}}",
+            "phaseStartedAuto": "Phase started automatically",
+            "phaseStarted": "Phase started",
+            "phaseDone": "Phase finished",
+            "planDone": "All tasks finished",
+            "taskStarted": "{{task}} started",
+            "taskSucceeded": "{{task}} finished",
+            "taskAccepted": "{{task}} marked done",
+            "taskFailed": "{{task}} failed",
+            "taskCancelled": "{{task}} cancelled",
+            "requestReturned": "Returned to backlog",
+            "requestReopened": "Reopened",
+            "requestCancelled": "Cancelled"
+          },
+          "analysis": {
+            "generic": "Analysis"
+          },
+          "approval": {
+            "subjectFallback": "item"
+          },
+          "attemptOf": "Attempt {{attempt}} of {{max}}",
+          "attempt": "Attempt {{attempt}}",
+          "detail": {
+            "failure": "{{cause}}: {{error}}"
+          },
+          "openTab": "Open {{tab}}"
+        },
+        "NextAction": {
+          "failed": "“{{task}}” failed {{attempts}}/{{max}} times",
+          "failedDetail": "The request is back in the backlog. Everything before it is kept.",
+          "reopen": "Reopen and rerun",
+          "question": "A question is waiting for your answer",
+          "answer": "Answer",
+          "preDeploy": "Pre-deploy approval is waiting for you",
+          "drift": "A change drifted from the plan and needs your review",
+          "approval": "An approval is waiting for you",
+          "review": "Review",
+          "confirmType": "Confirm the type of this request",
+          "running": "The agent is working on “{{task}}”",
+          "runningDetail": "Attempt {{attempt}} of {{max}}. Nothing needs you right now.",
+          "nextTask": "Waiting for the next task to start",
+          "classifying": "Orca is classifying this request",
+          "analyzing": "Orca is analysing this request",
+          "planning": "Orca is writing the plan",
+          "waitingApproval": "Waiting for someone to approve",
+          "waitingInfo": "Waiting for someone to answer a question",
+          "done": "This request is done"
         }
       },
       "reviewMap": {

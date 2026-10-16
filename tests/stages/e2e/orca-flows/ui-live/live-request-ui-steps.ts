@@ -58,7 +58,7 @@ export async function reloadAndReopen(page: Page, title: string): Promise<void> 
 
 export async function openDetailTab(
   page: Page,
-  name: 'Overview' | 'Analysis' | 'Plan' | 'History' | 'Related'
+  name: 'Overview' | 'Analysis' | 'Plan' | 'Execution' | 'History' | 'Related'
 ): Promise<void> {
   await detailPane(page).getByRole('tab', { name }).click()
 }

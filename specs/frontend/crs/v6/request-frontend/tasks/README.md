@@ -33,6 +33,22 @@
 
 CR-REQ-022, 023, 032, 036: xem [PARTIAL-INDEX-022-023.md](./PARTIAL-INDEX-022-023.md) và [PARTIAL-INDEX-032-036.md](./PARTIAL-INDEX-032-036.md) (bảng Solution → Task và thứ tự phụ thuộc).
 
+### CR-REQ-037 (7 DONE, 2 PARTIAL, 2026-10-16)
+
+| Task | Mô tả | Priority | Phụ thuộc | Status |
+|---|---|---|---|---|
+| [FE-REQ-TASK-037-01](./FE-REQ-TASK-037-01-sidebar-requests-nav-row.md) | Nút Requests thành hàng có nhãn, pill `primary` | P1 | không | [x] DONE |
+| [FE-REQ-TASK-037-02](./FE-REQ-TASK-037-02-flow-types-parsers-hooks-and-registry-fixture.md) | Kiểu, parser, hằng kênh, hook `request.flow`/`executionSummary`/`activity`, sửa bảng dự phòng và fixture | P1 | 018-01..03; backend 038-04..07 | [x] DONE |
+| [FE-REQ-TASK-037-03](./FE-REQ-TASK-037-03-stage-timeline-and-visible-tabs.md) | Thang tiến độ theo luồng, tab theo luồng | P1 | 037-02 | [x] DONE |
+| [FE-REQ-TASK-037-04](./FE-REQ-TASK-037-04-plan-tab-single-approval-and-readonly-outline.md) | Tab Plan: một khối duyệt, đề cương chỉ đọc, giữ `step_by_step` | P1 | 037-02, 037-03, 021-03..05, 036-06 | [x] DONE |
+| [FE-REQ-TASK-037-05](./FE-REQ-TASK-037-05-execution-tab.md) | Tab Execution: tóm tắt, Needs you, bước/task, thẻ lỗi, Handover | P1 | 037-02, 037-03, 021-02, 036-03, 036-07; backend 038-06 | [~] PARTIAL |
+| [FE-REQ-TASK-037-06](./FE-REQ-TASK-037-06-next-action-bar.md) | Dải "việc cần làm tiếp theo" | P1 | 037-03, 037-05 | [x] DONE |
+| [FE-REQ-TASK-037-07](./FE-REQ-TASK-037-07-history-activity-tab.md) | Tab History thành nhật ký hoạt động | P1 | 037-02; backend 038-05, 07 | [x] DONE |
+| [FE-REQ-TASK-037-08](./FE-REQ-TASK-037-08-task-detail-label-and-result-fixes.md) | Nhãn "Depends on", tab Result không cảnh báo sai (có bước điều tra) | P1 | không | [x] DONE |
+| [FE-REQ-TASK-037-09](./FE-REQ-TASK-037-09-i18n-coverage-and-e2e.md) | i18n năm locale, truy cập, e2e, cập nhật tài liệu | P1 | 037-01..08 | [~] PARTIAL |
+
+Thứ tự: 037-01 và 037-08 làm được ngay; 037-02 song song; 037-03 sau 037-02; 037-04, 037-05, 037-07 sau 037-03 (037-07 chỉ cần 037-02); 037-06 sau 037-05; 037-09 cuối.
+
 ## Thứ tự phụ thuộc
 
 ```

@@ -27,10 +27,31 @@ describe('SidebarRequestNavButton', () => {
     useAppStore.setState({ pendingApprovalCount: 7 })
     rerender(<SidebarRequestNavButton />)
     expect(screen.getByText('7')).toBeInTheDocument()
-    expect(screen.getByLabelText('7 pending approvals')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toHaveAccessibleName('Requests, 7 pending approvals')
     useAppStore.setState({ pendingApprovalCount: 250 })
     rerender(<SidebarRequestNavButton />)
     expect(screen.getByText('99+')).toBeInTheDocument()
+  })
+
+  it('renders a labelled row with the primary-tone pill and no aria-pressed', () => {
+    useAppStore.setState({ pendingApprovalCount: 3 })
+    render(<SidebarRequestNavButton />)
+    const button = screen.getByTestId('sidebar-requests')
+    expect(button).toHaveTextContent('Requests')
+    expect(button).toHaveAttribute('title', 'Requests, 3 pending approvals')
+    expect(button).not.toHaveAttribute('aria-pressed')
+    expect(screen.getByTestId('sidebar-requests-badge')).toHaveClass('bg-primary')
+    expect(button).not.toHaveAttribute('aria-current')
+    expect(button).toHaveClass('text-worktree-sidebar-foreground/60')
+  })
+
+  it('marks the row as the current page when the requests view is active', () => {
+    useAppStore.setState({ activeView: 'requests' })
+    render(<SidebarRequestNavButton />)
+    const button = screen.getByTestId('sidebar-requests')
+    expect(button).toHaveAttribute('aria-current', 'page')
+    expect(button).toHaveClass('bg-worktree-sidebar-accent')
+    expect(button).toHaveAccessibleName('Requests')
   })
 
   it('opens the requests view on click', () => {

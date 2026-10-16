@@ -19,6 +19,13 @@ export function planDecisionErrorMessage(failure: PlanDecisionFailure): string {
   if (code === 'REQUEST_TRANSITION_NOT_ALLOWED' || code.startsWith('REQUEST_PHASE_')) {
     return splitErrorCode(failure.error.message ?? '').rest || requestErrorMessage('invalid_state')
   }
+  // Why: approving a plan starts the run as the approver, so someone who cannot execute is refused up front.
+  if (code === 'REQUEST_EXECUTION_ACTOR_NOT_ALLOWED') {
+    return translate(
+      `${P}PlanApprovalBar.executionNotAllowed`,
+      'You can approve plans only if you are allowed to run their execution. Ask someone who is, or request access.'
+    )
+  }
   if (failure.errorClass === 'notApprover' || failure.errorClass === 'forbidden') {
     return translate(`${P}PlanApprovalBar.notApprover`, 'You are not allowed to approve this.')
   }

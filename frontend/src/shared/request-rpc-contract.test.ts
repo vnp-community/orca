@@ -35,8 +35,6 @@ const PENDING_GATEWAY_CHANNELS: Readonly<Record<string, string>> = {
   'impact.accept': 'CR-REQ-030 impact channels are not registered at the gateway yet',
   'risk.override': 'CR-REQ-030 risk override is not registered at the gateway yet',
   'request.readiness': 'CR-REQ-028 request readiness is not registered at the gateway yet',
-  'decision.list': 'CR-REQ-029 decision channels are not registered at the gateway yet',
-  'decision.confirm': 'CR-REQ-029 decision channels are not registered at the gateway yet',
   'readiness.check': 'CR-REQ-029 task readiness channels are not registered at the gateway yet',
   'readiness.get': 'CR-REQ-029 task readiness channels are not registered at the gateway yet',
   'readiness.list': 'CR-REQ-029 task readiness channels are not registered at the gateway yet'

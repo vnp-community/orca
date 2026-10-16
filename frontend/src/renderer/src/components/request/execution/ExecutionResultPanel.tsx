@@ -132,7 +132,9 @@ export function ExecutionResultPanel({
       </div>
     )
   }
-  if (result.source === 'last_execution_output') {
+  // A contract run that printed no result block at all ("missing") has nothing malformed to report:
+  // only a block that was found but failed the schema ("invalid") is the red "wrong format" case.
+  if (result.source === 'last_execution_output' || result.parseStatus === 'missing') {
     return <AgentOutputView result={result} />
   }
   if (result.parseStatus !== 'ok') {
