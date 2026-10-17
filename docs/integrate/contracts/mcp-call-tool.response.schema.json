@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "orca:agent/mcp.callTool/response",
+  "title": "mcp.callTool result (always a JSON-RPC result; relay/transport failures surface as gRPC errors instead)",
+  "oneOf": [
+    {
+      "description": "The tool ran. isError=true means the tool itself refused or failed; its error object is in error.",
+      "type": "object",
+      "required": ["ok", "isError", "durationMs"],
+      "properties": {
+        "ok": { "const": true },
+        "isError": { "type": "boolean" },
+        "result": { "description": "Parsed JSON of the tool's text content (null when isError)" },
+        "error": { "$ref": "#/$defs/error" },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    {
+      "description": "The bridge refused or could not run the call.",
+      "type": "object",
+      "required": ["ok", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "error": { "$ref": "#/$defs/error" },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      }
+    }
+  ],
+  "$defs": {
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Bridge codes: MCP_INVALID_PARAMS, MCP_SERVER_NOT_ALLOWED, MCP_TOOL_NOT_ALLOWED, MCP_PROJECT_DIR_OUTSIDE_WORKSPACE, MCP_PROJECT_DIR_INVALID, MCP_SERVER_NOT_INSTALLED, MCP_SERVER_FAILED, MCP_TIMEOUT. Tool codes are passed through (e.g. RUN_NOT_FOUND, DECISION_HASH_MISMATCH)."
+        },
+        "message": { "type": "string" },
+        "details": {}
+      }
+    }
+  }
+}

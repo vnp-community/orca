@@ -1,0 +1,65 @@
+# The dev-server side: its own compose project (another "host"), joined to the control plane only through the
+# orca-e2e-wan network that control-plane.override.yml creates. Started by split-up.sh, which issues the agent tokens.
+name: orca-e2e-devservers
+
+x-devserver: &devserver
+  image: orca-e2e-devserver:dev
+  build:
+    context: ./devserver
+    args:
+      INSTALL_CLAUDE_CLI: ${INSTALL_CLAUDE_CLI:-0}
+  restart: "no" # a crashed agent must show up as a failed test, not be hidden by a restart loop
+  init: true
+  networks: [orca-wan]
+  mem_limit: 1g
+
+x-devserver-env: &devserver-env
+  ORCA_URL: ws://orca-gateway:8081/agent
+  AI_MODE: ${AI_MODE:-stub}
+  FAKE_CLAUDE_LOGGED_IN: ${FAKE_CLAUDE_LOGGED_IN:-1}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  devserver-a:
+    <<: *devserver
+    container_name: orca-e2e-devserver-a
+    hostname: devserver-a
+    environment:
+      <<: *devserver-env
+      DEV_SERVER_ID: ${DEVSERVER_A_ID:-e2e-devserver-a}
+      AGENT_TOKEN: ${DEVSERVER_A_TOKEN:?issued by split-up.sh}
+    volumes:
+      - ../../../../agent/out/agent.js:/opt/orca-agent/agent.js:ro
+      - ../orca-flows/fake_claude_cli/claude:/opt/fake-claude/claude:ro
+      - ../orca-flows/ui-live/fixture-repo/template:/fixtures/fixture-repo:ro
+      - ./fixtures/tdd-project:/fixtures/tdd-project:ro
+      - devserver-a-projects:/srv/projects
+      - ${CLAUDE_HOME_A:-devserver-a-claude}:/home/node/.claude
+
+  # Second machine: proves a step lands on the dev server of ITS project, not on whichever agent is connected.
+  devserver-b:
+    <<: *devserver
+    profiles: [multi]
+    container_name: orca-e2e-devserver-b
+    hostname: devserver-b
+    environment:
+      <<: *devserver-env
+      DEV_SERVER_ID: ${DEVSERVER_B_ID:-e2e-devserver-b}
+      AGENT_TOKEN: ${DEVSERVER_B_TOKEN:-}
+    volumes:
+      - ../../../../agent/out/agent.js:/opt/orca-agent/agent.js:ro
+      - ../orca-flows/fake_claude_cli/claude:/opt/fake-claude/claude:ro
+      - ../orca-flows/ui-live/fixture-repo/template:/fixtures/fixture-repo:ro
+      - devserver-b-projects:/srv/projects
+      - devserver-b-claude:/home/node/.claude
+
+networks:
+  orca-wan:
+    external: true
+    name: orca-e2e-wan
+
+volumes:
+  devserver-a-projects:
+  devserver-a-claude:
+  devserver-b-projects:
+  devserver-b-claude:

@@ -1,0 +1,35 @@
+{
+  "name": "tdd-agent: TDD generation",
+  "description": "Build the knowledge graph and write the TDD from the project's URD/SRS/SAD (tdd-agent generate) on the project's dev server.",
+  "inputs": {
+    "projectDir": "optional: tdd-agent project directory inside the project's repo (default: the repo)"
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.start",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "mode": "generate"
+        }
+      }
+    },
+    {
+      "id": "generate",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.advance",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "stopAt": ["completed"],
+          "allowNoRun": true,
+          "deadlineMin": 120
+        }
+      },
+      "dependsOn": ["start"]
+    }
+  ]
+}

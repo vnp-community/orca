@@ -1,0 +1,190 @@
+{
+  "name": "tdd-agent: change request -> TDD -> test specs",
+  "description": "tdd-agent change-request flow G0..G7 with approvals in Orca; the test specs child run (GT -> TS1) runs alongside the G5 approval.",
+  "inputs": {
+    "projectDir": "optional",
+    "changeName": "lowercase-words, e.g. keep-evidence",
+    "crPath": "CR markdown file relative to the project",
+    "srsAfterPath": "optional: SRS already edited by hand"
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.start",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "mode": "change",
+          "changeName": "{{changeName}}",
+          "crPath": "{{crPath}}",
+          "srsAfterPath": "{{srsAfterPath}}"
+        }
+      }
+    },
+    {
+      "id": "to_g1",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.advance",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "expectGate": "G1"
+        }
+      },
+      "dependsOn": ["start"]
+    },
+    {
+      "id": "approve_g1",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.approval",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "gate": "G1",
+          "role": "BA"
+        }
+      },
+      "dependsOn": ["to_g1"]
+    },
+    {
+      "id": "to_g2",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.advance",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "expectGate": "G2"
+        }
+      },
+      "dependsOn": ["approve_g1"]
+    },
+    {
+      "id": "approve_g2",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.approval",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "gate": "G2",
+          "role": "SA/Dev"
+        }
+      },
+      "dependsOn": ["to_g2"]
+    },
+    {
+      "id": "to_g5",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.advance",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "expectGate": "G5",
+          "deadlineMin": 120
+        }
+      },
+      "dependsOn": ["approve_g2"]
+    },
+    {
+      "id": "testspecs",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.wait_child",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "childFlow": "testspec",
+          "deadlineMin": 60
+        }
+      },
+      "dependsOn": ["to_g5"]
+    },
+    {
+      "id": "approve_g5",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.approval",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "gate": "G5",
+          "role": "SA"
+        }
+      },
+      "dependsOn": ["to_g5"]
+    },
+    {
+      "id": "to_g6",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.advance",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "stopAt": ["awaiting_evidence", "awaiting_approval"]
+        }
+      },
+      "dependsOn": ["approve_g5"]
+    },
+    {
+      "id": "evidence",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.wait_evidence",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "gate": "G6",
+          "pollIntervalSec": 60,
+          "deadlineMin": 10080
+        }
+      },
+      "dependsOn": ["to_g6"]
+    },
+    {
+      "id": "to_g7",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.advance",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "expectGate": "G7"
+        }
+      },
+      "dependsOn": ["evidence"]
+    },
+    {
+      "id": "approve_g7",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.approval",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "gate": "G7",
+          "role": "BA/owner"
+        }
+      },
+      "dependsOn": ["to_g7"]
+    },
+    {
+      "id": "finish",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.advance",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "stopAt": ["completed"]
+        }
+      },
+      "dependsOn": ["approve_g7", "testspecs"]
+    }
+  ]
+}
