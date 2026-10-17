@@ -30,8 +30,8 @@ Orca **không** gọi MCP hay đồ thị tri thức; agent mà Orca chạy trê
 Muốn mọi project **chưa có cài đặt riêng** chạy luồng mới (UI cũng vậy, không cần `engine set` từng project), đặt cho request-service:
 
 ```bash
-REQUEST_DEFAULT_ENGINE=openspec          # native (mặc định) hoặc openspec
-REQUEST_DEFAULT_SOLUTION_AGENT=true      # false (mặc định) hoặc true
+REQUEST_DEFAULT_ENGINE=openspec          # openspec (mặc định của deploy/dev) hoặc native
+REQUEST_DEFAULT_SOLUTION_AGENT=true      # true (mặc định của deploy/dev) hoặc false
 ```
 
 Trong `deploy/dev` hai biến này đọc từ `.env` qua `docker-compose.yml`; đổi xong phải tạo lại container (`./deploy/dev/scripts/redeploy-local.sh request-service api-gateway`). Cài đặt đã lưu của một project luôn thắng giá trị mặc định, kể cả khi nó tắt hết; project mặc định hiện `version 0`. Giá trị không đọc được thì giữ `native` và tắt, kèm một dòng cảnh báo trong log. Lưu ý: engine của một Request bị ghim ở lần sinh đầu tiên, nên Request đã sinh trước khi bật mặc định vẫn chạy engine cũ.

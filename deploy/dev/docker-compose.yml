@@ -465,9 +465,10 @@ services:
       # (docs/guides/request/admin-enable-request-flow.md). Both must be on for the flow to run.
       REQUEST_FLOW_ENABLED: ${REQUEST_FLOW_ENABLED:-false}
       # What a project without saved engine settings runs with (a saved setting always wins): the OpenSpec engine for Plan
-      # and the agent-written Solution that reads the knowledge graph. Both default off; see docs/guides/request/knowledge-hub-setup.md.
-      REQUEST_DEFAULT_ENGINE: ${REQUEST_DEFAULT_ENGINE:-native}
-      REQUEST_DEFAULT_SOLUTION_AGENT: ${REQUEST_DEFAULT_SOLUTION_AGENT:-false}
+      # and the agent-written Solution that reads the knowledge graph. Both default on here (the binary's own default without this file is off);
+      # a repo without .tdd-agent/config.toml needs its project set to native; see docs/guides/request/knowledge-hub-setup.md.
+      REQUEST_DEFAULT_ENGINE: ${REQUEST_DEFAULT_ENGINE:-openspec}
+      REQUEST_DEFAULT_SOLUTION_AGENT: ${REQUEST_DEFAULT_SOLUTION_AGENT:-true}
       # step_by_step (a person releases every Phase) or continuous (one approval of the plan runs every Phase); a project setting wins.
       REQUEST_DEFAULT_EXECUTION_MODE: ${REQUEST_DEFAULT_EXECUTION_MODE:-step_by_step}
       # Shared secret issue-status-sync presents for LookupRequestBySource; empty refuses the call.
