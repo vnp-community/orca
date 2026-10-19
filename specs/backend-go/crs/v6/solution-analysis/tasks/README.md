@@ -17,6 +17,10 @@
 | | [TASK-REQ-008-03](./TASK-REQ-008-03-run-agent-readonly-analysis-usecase.md) | `RunAgentReadonlyAnalysis`, giới hạn đồng thời, prompt | P1 | ✅ DONE |
 | | [TASK-REQ-008-04](./TASK-REQ-008-04-findings-answer-approval-handlers.md) | Handler `findings`, `answer`, hoàn tất sau phân tích | P1 | ✅ DONE |
 | | [TASK-REQ-008-05](./TASK-REQ-008-05-readonly-analysis-integration-and-agent-interface.md) | Test tích hợp, README giới hạn, giao diện agent | P1 | ✅ DONE |
+| | [TASK-REQ-041-04](./TASK-REQ-041-04-failure-paths-gateway-contract-and-e2e.md) | Đường lỗi, gateway, CONTRACT, e2e | P1 | [ ] TODO |
+| | [TASK-REQ-041-03](./TASK-REQ-041-03-activity-kind-analysis-revision-requested.md) | Activity kind `analysis.revision_requested` | P2 | [ ] TODO |
+| | [TASK-REQ-041-02](./TASK-REQ-041-02-revision-feedback-field-and-prior-artifacts.md) | `revision_feedback` và phản hồi cũ trong prompt | P1 | [ ] TODO |
+| | [TASK-REQ-041-01](./TASK-REQ-041-01-authorize-revise-and-prepare.md) | `AuthorizeRevise`: approver của cổng Analysis được chỉnh | P1 | [ ] TODO |
 
 ## Thứ tự phụ thuộc
 

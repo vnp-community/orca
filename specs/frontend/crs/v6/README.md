@@ -21,6 +21,8 @@ Một feature duy nhất [`request-frontend/`](./request-frontend/solutions/READ
 | 032 | FE-REQ-SOL-032 🔴 | 0/8 | Canvas đồ thị và các lens (task 07 là tuỳ chọn, bị chặn bởi duyệt phụ thuộc) |
 | 036 | FE-REQ-SOL-036 🔴 | 0/8 | Giao diện hỏi lại, quyết định, sẵn sàng, tác động rủi ro, kết quả thực thi |
 | 037 | FE-REQ-SOL-037 🚧 | 7 DONE, 2 PARTIAL / 9 | Chi tiết Request: nhãn Requests ở sidebar, thang tiến độ theo luồng, Plan duyệt một lần, tab Execution, tab History đầy đủ (soạn 2026-10-16; cần backend [BE-REQ-SOL-038](../../../backend-go/crs/v6/plan-phase-task/solutions/BE-REQ-SOL-038-continuous-execution-activity-feed-and-execution-summary.md)) |
+| 040 | FE-REQ-SOL-040 📝 | 0/5 | Chọn nhánh gốc của worktree khi tạo và xem Request |
+| 041 | FE-REQ-SOL-041 📝 | 0/4 | Chỉnh phân tích bằng prompt tại cổng duyệt Analysis, danh sách phiên bản |
 | **Tổng** | **9** | **~12/63 (bảng này là bản soạn ngày 2026-10-07; xem mục "Trạng thái triển khai" ở cuối)** | |
 
 Chỉ mục bổ sung: [`PARTIAL-INDEX-022-023.md`](./request-frontend/solutions/PARTIAL-INDEX-022-023.md) và [`PARTIAL-INDEX-032-036.md`](./request-frontend/solutions/PARTIAL-INDEX-032-036.md) (cùng bản ở `tasks/`).

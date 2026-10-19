@@ -103,3 +103,12 @@ Làm được ngay, không cần backend: 018-01, 018-04, 018-06, 019-01, 020-01
 | [FE-REQ-TASK-036-06-risk-acceptance-and-approval-gating](./FE-REQ-TASK-036-06-risk-acceptance-and-approval-gating.md) | [x] DONE (2026-10-08) |
 | [FE-REQ-TASK-036-07-readiness-badge-report-plan-drift](./FE-REQ-TASK-036-07-readiness-badge-report-plan-drift.md) | [x] DONE (2026-10-08) |
 | [FE-REQ-TASK-036-08-execution-result-panel-i18n-e2e](./FE-REQ-TASK-036-08-execution-result-panel-i18n-e2e.md) | [x] DONE (2026-10-08) |
+| [FE-REQ-TASK-040-01-types-parsers-rpc-and-capability](./FE-REQ-TASK-040-01-types-parsers-rpc-and-capability.md) | [ ] TODO |
+| [FE-REQ-TASK-040-02-repo-ref-picker-extraction](./FE-REQ-TASK-040-02-repo-ref-picker-extraction.md) | [ ] TODO |
+| [FE-REQ-TASK-040-03-create-request-start-from-field](./FE-REQ-TASK-040-03-create-request-start-from-field.md) | [ ] TODO |
+| [FE-REQ-TASK-040-04-overview-row-edit-lock-and-errors](./FE-REQ-TASK-040-04-overview-row-edit-lock-and-errors.md) | [ ] TODO |
+| [FE-REQ-TASK-040-05-i18n-and-live-e2e](./FE-REQ-TASK-040-05-i18n-and-live-e2e.md) | [ ] TODO |
+| [FE-REQ-TASK-041-01-types-parsers-and-revision-hook](./FE-REQ-TASK-041-01-types-parsers-and-revision-hook.md) | [ ] TODO |
+| [FE-REQ-TASK-041-02-revision-panel-in-solution-panel](./FE-REQ-TASK-041-02-revision-panel-in-solution-panel.md) | [ ] TODO |
+| [FE-REQ-TASK-041-03-version-list-and-readonly-old-versions](./FE-REQ-TASK-041-03-version-list-and-readonly-old-versions.md) | [ ] TODO |
+| [FE-REQ-TASK-041-04-activity-i18n-and-live-e2e](./FE-REQ-TASK-041-04-activity-i18n-and-live-e2e.md) | [ ] TODO |

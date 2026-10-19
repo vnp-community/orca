@@ -181,6 +181,7 @@ Thuộc tính phụ: `size` ∈ {`S`,`M`,`L`}; `urgency` ∈ {`normal`,`urgent`}
 | [`plan-phase-task`](./plan-phase-task/README.md) | CR-REQ-039 | Chỉ định nhánh gốc để tạo worktree cho Request (`base_ref`), mặc định là nhánh mặc định của repo | 🟠 P1 | Medium |
 | [`request-frontend`](./request-frontend/README.md) | CR-REQ-040 | Chọn nhánh gốc của worktree khi tạo và xem Request (giao diện) | 🟠 P1 | Small đến Medium |
 | [`solution-analysis`](./solution-analysis/README.md) | CR-REQ-041 | Chỉnh phương án phân tích bằng prompt tại cổng duyệt Analysis, danh sách phiên bản | 🟠 P1 | Medium |
+| [`ai-governance`](./ai-governance/README.md) | CR-REQ-042 | Gom prompt về `backend-go/prompts/<luồng>/`, một relay dùng chung tới dev server, `execPrompt` qua stdin | 🟡 P2 | Large |
 
 ## 5. Thứ tự thực thi
 

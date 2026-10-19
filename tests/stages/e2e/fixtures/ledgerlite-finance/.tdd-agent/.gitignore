@@ -1,0 +1,8 @@
+# local state of tdd-agent: the knowledge graph and run records are rebuilt from the sources by `tdd-agent generate`
+*.db
+*.db-shm
+*.db-wal
+logs/
+runs/
+staging/
+last-generate.json

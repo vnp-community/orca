@@ -27,7 +27,7 @@
 - Cả Solution lẫn chẩn đoán/Findings/Answer dùng chung bộ dựng prompt đó: `RunAgentReadonlyAnalysis` gọi `BuildSolutionPrompt` với `Feedback` và `PriorArtifacts`. Nên đường chỉnh bằng phản hồi có sẵn cho mọi loại phân tích có cổng duyệt.
 - Ai được sinh lại hiện nay: `AuthorizeGenerate` = người báo cáo Request, hoặc vai trò `admin`/`lead`/`owner`. Người có quyền duyệt (approver) mà không thuộc nhóm đó không sinh lại được, dù `AuthorizeChoose` đã cho họ chọn phương án (`ApproverAwareAuthorizer`). CR này sửa điểm lệch đó (mục 2.8).
 
-### 1.2 Giao diện chỉ đi đường vòng
+### 1.2 Giao diện chỉ đi đường vòng (đã có nút Regenerate không phản hồi và `SolutionVersionSwitcher` liệt kê phiên bản, đánh dấu "Older version" cho bản `superseded`)
 
 `useSolutionDecision.reject(comment, regenerate)` thực hiện hai lời gọi liên tiếp: từ chối Approval kèm lý do, rồi (nếu bật) gọi sinh lại với `feedback` là lý do đó. Người dùng muốn "chỉnh một chút" lại phải đi qua hành động từ chối; không có nơi xem các phiên bản cũ; lỗi giữa hai lời gọi để lại Request ở trạng thái lưng chừng. Tôi chưa kiểm chứng từ chối có đưa Request về backlog hay không.
 
@@ -67,7 +67,7 @@ Nếu agent cần hỏi thêm trong lúc chỉnh, Request đi sang `awaiting_inf
 
 ### 2.3 Danh sách phiên bản
 
-- Khối "Versions" liệt kê mọi tài liệu cùng loại của Request, mới nhất trước: `Version n`, ghi chú rút gọn từ yêu cầu chỉnh (80 ký tự), thời điểm, trạng thái (Current, Superseded, Rejected, Approved).
+- Mở rộng `SolutionVersionSwitcher` hiện có (không tạo danh sách thứ hai): liệt kê mọi tài liệu cùng loại của Request, mới nhất trước: `Version n`, ghi chú rút gọn từ yêu cầu chỉnh (80 ký tự), thời điểm, trạng thái (Current, Superseded, Rejected, Approved).
 - Bấm một phiên bản cũ thì xem được nội dung ở chế độ chỉ đọc, nhãn "Superseded", không có Approve hay Choose. Chọn so sánh hai phiên bản hiện cạnh nhau ở mức phương án (tên phương án, tóm tắt); so sánh từng dòng nằm ngoài CR này.
 - Số phiên bản dùng `Solution.seq` (đã có, trường 12; cấp theo Request ở `MintSolutionID` khi tài liệu được lập chỉ mục). Lượt chạy thất bại trước khi lập chỉ mục có thể không có `seq`; giao diện không đếm các bản đó thành phiên bản.
 
@@ -98,7 +98,7 @@ Ngân sách AI theo tenant (CR-REQ-034) hiện chưa có (`AiBudgetAdminService`
 Thư mục `frontend/src/renderer/src/components/request/solution/`:
 
 - `AnalysisRevisionPanel.tsx`: textarea, bộ đếm, chip gợi ý, nút Revise analysis; trạng thái đang chạy; lỗi.
-- `AnalysisVersionList.tsx`: danh sách phiên bản, chế độ xem phiên bản cũ.
+- `SolutionVersionSwitcher.tsx` (sửa): trạng thái, ghi chú, số bản; `SolutionPanel.tsx` (sửa): chế độ chỉ đọc cho bản cũ.
 - `useAnalysisRevision.ts`: gọi `generate` trực tiếp (dùng lại `actions.generate` của `useSolutionDecision`), thay vì đi qua `reject`. `useSolutionDecision.reject` giữ nguyên cho luồng từ chối.
 - Chip gợi ý theo loại tài liệu (nhãn tiếng Anh; 5 locale): Solution "Make it smaller", "Keep the public API", "Avoid a migration", "Compare with another option"; chẩn đoán "Look deeper at the root cause", "Check the logs path too"; Findings/Answer "Cover X as well", "Shorten the answer".
 - Mỗi file dưới 300 dòng mã; không thêm `max-lines` disable. Dùng token của `main.css` và primitive shadcn (`guides/STYLEGUIDE.md`).
@@ -208,4 +208,4 @@ Người có quyền duyệt cổng Analysis đang chờ được chỉnh, cùng
 - `backend-go/services/request-service/internal/domain/request_flow_registry.go` (`AnalysisGate`)
 - `frontend/src/renderer/src/components/request/solution/useSolutionDecision.ts` (`reject`, `regenerate`), `RejectReasonDialog.tsx`, `solution-view-model.ts` (`clampFeedback`, 2000)
 - [CR-REQ-007](./CR-REQ-007-solution-generation-options-and-selection.md), [CR-REQ-008](./CR-REQ-008-diagnosis-findings-answer-analysis.md), [CR-REQ-037](../request-frontend/CR-REQ-037-request-detail-redesign-execution-tab-and-activity.md)
-- Mới: `components/request/solution/{AnalysisRevisionPanel,AnalysisVersionList}.tsx`, `useAnalysisRevision.ts`, trường proto `Solution.revision_feedback`
+- Mới: `components/request/solution/AnalysisRevisionPanel.tsx`, `useAnalysisRevision.ts`, trường proto `Solution.revision_feedback`

@@ -14,6 +14,14 @@
 | | [TASK-REQ-034-06](./TASK-REQ-034-06-grounding-checker.md) | `GroundingChecker` | P1 | 034-04, BE-REQ-SOL-031 task 03, 04 |
 | | [TASK-REQ-034-07](./TASK-REQ-034-07-human-gate-policy-shadow-mode.md) | `HumanGatePolicy` chạy bóng | P2 | 034-01, BE-REQ-SOL-009 |
 | | [TASK-REQ-034-08](./TASK-REQ-034-08-eval-harness-and-ci.md) | Eval harness và cổng CI | P1 | 034-03, 034-06 |
+| | [TASK-REQ-042-08](./TASK-REQ-042-08-ci-guards-docs-and-regression.md) | Kiểm soát CI, tài liệu, hồi quy cuối | P2 | 042-02, 03, 04, 06, 07 |
+| | [TASK-REQ-042-07](./TASK-REQ-042-07-prompts-task-and-git-flows.md) | Module `prompts/`: thực thi task, tách task, git | P2 | 042-05, 042-06 |
+| | [TASK-REQ-042-06](./TASK-REQ-042-06-prompts-module-analysis-plan-classify.md) | Module `prompts/`: classify, analysis, plan, OpenSpec; xoá `PromptRegistry` chết | P1 | 042-05 |
+| | [TASK-REQ-042-05](./TASK-REQ-042-05-golden-capture-of-current-prompts.md) | Chụp golden mọi prompt hiện tại | P1 | TASK-REQ-041-02 |
+| | [TASK-REQ-042-04](./TASK-REQ-042-04-agent-prompt-via-stdin.md) | Agent: prompt `execPrompt` qua stdin, công tắc quay lui | P1 | Không |
+| | [TASK-REQ-042-03](./TASK-REQ-042-03-migrate-task-workflow-orchestration-git-relays.md) | Chuyển relay task, workflow, orchestration, git-gateway | P1 | 042-01 |
+| | [TASK-REQ-042-02](./TASK-REQ-042-02-migrate-request-service-relays.md) | Chuyển relay của request-service | P1 | 042-01 |
+| | [TASK-REQ-042-01](./TASK-REQ-042-01-agentrelay-package.md) | Gói `common/agentrelay`: `ExecPrompt`, `Complete` | P1 | Không |
 
 ## Thứ tự phụ thuộc
 

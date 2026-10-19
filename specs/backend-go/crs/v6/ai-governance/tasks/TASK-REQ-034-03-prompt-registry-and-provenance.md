@@ -1,5 +1,8 @@
 # TASK-REQ-034-03: `PromptRegistry`, phiên bản prompt bất biến và `provenance`
 
+> **Điều chỉnh 2026-10-19 (CR-REQ-042):** vị trí prompt đổi từ `request-service/internal/prompts/` sang module `backend-go/prompts/<luồng>/`, và `AIGateway` bọc `common/agentrelay` thay vì hai relay riêng. Làm CR-REQ-042 (task 05 đến 07) **trước** task này; các tham chiếu `internal/prompts/` bên dưới đọc là `backend-go/prompts/`.
+
+
 **From Solution:** BE-REQ-SOL-034 (mục E `PromptRegistry`, CR 2.3)
 **Priority:** P1
 **Service:** `request-service`, `backend-go/ci`

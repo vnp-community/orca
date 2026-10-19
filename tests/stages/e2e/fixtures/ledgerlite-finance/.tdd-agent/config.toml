@@ -1,0 +1,28 @@
+# tdd-agent project configuration for the LedgerLite e2e fixture.
+# Relative paths are relative to the project folder (the parent of .tdd-agent/).
+
+[project]
+name = "LedgerLite"
+tdd_id = "TDD-LEDGERLITE"
+docs_dir = "docs/tdd"
+# prose = false: read only the structured tables of the documents, so generation
+# makes no model call, needs no credentials and gives the same graph every time.
+prose = false
+
+[project.sources]
+urd = "docs/URD.md"
+srs = "docs/SRS.md"
+sad = "docs/SAD.md"
+
+[llm]
+default = "claude_code"
+
+[render]
+language = "en"
+
+# Read-only MCP: ORCA agents query the graph but never write to it.
+
+[mcp]
+write = false
+approvals = false
+client_actor = ""

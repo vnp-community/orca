@@ -32,6 +32,7 @@ Giao diện chọn nhánh đã có sẵn ở nơi khác: `components/settings/Ba
 - Trạng thái mặc định: chip **"Default branch (`main`)"**, trong đó `main` là kết quả `getRuntimeRepoBaseRefDefault` của repo đầu tiên; nếu chưa phân giải được thì chỉ ghi "Default branch", không bịa tên (cùng nguyên tắc với `BaseRefPicker`: không hiển thị `origin/main` giả).
 - Bấm chip mở picker tìm kiếm nhánh/tag của repo đó (debounce, giới hạn độ dài truy vấn theo `runtime-repo-search-bounds`). Chọn một ref thì chip hiện tên ref kèm nút "Use default branch" để quay lại mặc định.
 - Gửi `baseRef` trong `request.create` **chỉ khi** người dùng chọn khác mặc định; không gửi gì nghĩa là dùng nhánh mặc định, khớp quy tắc backend (rỗng = mặc định).
+- Runtime hỗ trợ được nhận biết bằng `request.flowStatus.features` có `request.baseRef` (gateway cũ bỏ qua tham số lạ, nên không thể chỉ dựa vào lỗi); sau khi tạo, so `baseRef` trả về với giá trị đã gửi và cảnh báo nếu lệch.
 - Đổi dự án trong hộp thoại thì xoá lựa chọn nhánh (repo khác có tập nhánh khác) và trả về mặc định.
 - Dev server của repo offline: picker không tìm được; hiện dòng "Branches can't be listed while the host is offline. The default branch will be used." và cho nhập tay tên ref có kiểm tra cú pháp (backend sẽ kiểm lại, CR-REQ-039 mục 2.4).
 

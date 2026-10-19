@@ -5,6 +5,7 @@
 | CR | Vấn đề | Priority | Effort | Trạng thái |
 |----|--------|----------|--------|------------|
 | [CR-REQ-034](./CR-REQ-034-ai-governance-budgets-evals-prompt-versioning.md) | Không ai đo chi phí AI (`usage-service` theo CLI/người dùng, `RecordTokenUsage` không ai gọi); model do agent chọn cứng; prompt không có phiên bản; không có bộ đo chất lượng; không có công tắc cấm dữ liệu ra ngoài | 🟠 P1 (ngân sách và `egress` là P0 trước khi bật cờ) | Large | 📝 Đề xuất, chưa triển khai |
+| [CR-REQ-042](./CR-REQ-042-prompt-catalog-shared-agent-relay-and-stdin.md) | Prompt rải rác trong mã vận chuyển, bốn bản sao relay `agent.execPrompt`, `PromptRegistry` là mã chết, `execPrompt` truyền prompt qua argv | 🟡 P2 | Large | 📝 Đề xuất |
 
 ## Thứ tự thực thi
 
