@@ -193,6 +193,25 @@ Khi triển khai phiên bản 2.2.0 hỗ trợ `agent.capabilities`, `agent.exec
 
 ---
 
+## Prompt của `agent.execPrompt` đi qua stdin (CR-REQ-042)
+
+Từ bản này agent chạy `claude --print` và ghi prompt (`initFile` + `\n` + `prompt`) vào **stdin** của tiến trình con; đối số chỉ còn các cờ (`--print`, `--output-format stream-json --verbose`, `--permission-mode`, `--tools`, `--allowedTools`, `--mcp-config`, ...).
+
+- Không còn trần đối số của hệ điều hành (Linux ~128 KB mỗi đối số, Windows 32 KB cả dòng lệnh); prompt vài trăm KB chạy được.
+- Prompt không hiện trong danh sách tiến trình (`ps`, Task Manager); prompt bắt đầu bằng `-` không bị hiểu thành cờ.
+- Giao thức dây và backend không đổi; không thêm tên vào `AGENT_FEATURES`.
+- Chỉ áp dụng cho `agent.execPrompt`. `agent.execPromptStream` (không có caller backend) vẫn truyền prompt qua đối số.
+
+### Công tắc quay lui
+
+| Biến | Giá trị | Ý nghĩa |
+|---|---|---|
+| `ORCA_AGENT_PROMPT_VIA_ARGV` | `1` (hoặc `true`) | Quay về hành vi cũ: `claude --print <prompt>` và stdin đóng. Mỗi lần chạy ghi một dòng log `ORCA_AGENT_PROMPT_VIA_ARGV is set` (không ghi nội dung prompt). Mặc định (không đặt) là stdin. |
+
+Biến được đọc từ môi trường của chính tiến trình agent, **không** đọc từ `env` do request gửi lên. Đặt trong `.env` của agent rồi `sudo systemctl restart orca-agent` (khởi động lại làm gián đoạn lượt chạy đang có). Ở chế độ argv, prompt lớn hơn trần của hệ điều hành sẽ làm tiến trình con không khởi động được (`E2BIG`/lỗi tạo tiến trình), đúng như trước đây; công tắc dự kiến bị gỡ sau một bản phát hành.
+
+---
+
 ## Kill Switch / Tắt Tính Năng Tại Máy (CR-073)
 
 Quản trị viên có thể tắt các phân hệ Code Intelligence hoặc Quality Gate tại Dev Server khi cần giảm tải hoặc xử lý sự cố.

@@ -14,7 +14,6 @@ import { spawn } from 'node:child_process'
 import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 import { resolveAgentSpec, buildAgentEnv } from './agent-spawner'
-import { YOLO_TUI_AGENT_ARGS } from '../shared/tui-agent-permissions'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import { Tracers } from '../shared/trace/tracers'
 import { parseExecPromptOptions, toExecPromptErrorResponse } from './agent-exec-prompt-options'
@@ -30,8 +29,10 @@ import { parseResultBlock } from './agent-result-block-parser'
 import { captureSnapshot, diffSnapshots } from './agent-worktree-change-snapshot'
 import { createExecPromptOutputCapture } from './agent-exec-prompt-output-capture'
 import { resolveKnowledgeHub } from './agent-exec-prompt-knowledge-hub'
-import { profileAllowedTools, profileArgs } from './agent-permission-profiles'
+import { profileAllowedTools } from './agent-permission-profiles'
 import { DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS, MIN_TIMEOUT_MS } from './agent-exec-prompt-timeouts'
+import { resolvePromptDelivery, writePromptToStdin } from './agent-claude-prompt-input'
+import { buildPrintModeArgs } from './agent-print-mode-args'
 
 type PrintModeExecResult = {
   stdout: string
@@ -193,32 +194,20 @@ export async function handleAgentExecPrompt(
     }
     readonlyArgs = buildReadonlyArgs()
   }
-  // Why: stream-json is what exposes tool calls to the web UI; an older claude, or a failed
-  // probe, keeps the previous plain-text invocation so execution never breaks.
   const streamJson = flags?.streamJson === true
 
-  const args = ['--print', initFile ? `${initFile}\n${prompt}` : prompt]
-  if (streamJson) {
-    args.push('--output-format', 'stream-json', '--verbose')
-  }
-  if (options.permissionProfile) {
-    args.push(...profileArgs(options.permissionProfile))
-    // A named profile is the whole permission story of the run; full trust would void it.
-    if (trustPresetFull) {
-      warnings.push('TRUST_PRESET_IGNORED_PROFILE')
-    }
-  } else if (options.accessMode === 'write' && trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
-    args.push(YOLO_TUI_AGENT_ARGS.claude)
-  } else if (options.accessMode === 'readonly') {
-    args.push(...readonlyArgs)
-    // YOLO flags override tool restrictions — discard them to keep readonly enforced
-    if (trustPresetFull) {
-      log.warn(
-        'agent.execPrompt: trustPreset=full ignored in readonly mode (TRUST_PRESET_IGNORED_READONLY)'
-      )
-      warnings.push('TRUST_PRESET_IGNORED_READONLY')
-    }
-  }
+  // Why: stdin is the default so the prompt has no argv size ceiling and is not visible in `ps`.
+  const { promptInput, viaArgv } = resolvePromptDelivery({ initFile, prompt, stepId, log })
+  const { args, warnings: argWarnings } = buildPrintModeArgs({
+    promptInput,
+    viaArgv,
+    streamJson,
+    options,
+    trustPresetFull,
+    readonlyArgs,
+    log
+  })
+  warnings.push(...argWarnings)
 
   // Snapshot before spawn (task 08)
   const snapshotMode = options.workspaceKind === 'scratch' ? 'directory' : 'git'
@@ -270,8 +259,11 @@ export async function handleAgentExecPrompt(
     const child = spawn(spec.binary, args, {
       cwd: spawnCwd,
       env: { ...process.env, ...env },
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: [viaArgv ? 'ignore' : 'pipe', 'pipe', 'pipe']
     })
+    if (!viaArgv && child.stdin) {
+      writePromptToStdin(child.stdin, promptInput)
+    }
 
     const finish = (r: PrintModeExecResult): void => {
       if (settled) {

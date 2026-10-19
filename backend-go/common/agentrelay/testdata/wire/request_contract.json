@@ -1,0 +1,14 @@
+{
+  "env": {
+    "ORCA_PROJECT_ID": "proj-1",
+    "ORCA_REQUEST_ID": "req-1"
+  },
+  "prompt": "Analyse the repo",
+  "resultBlock": {
+    "nonce": "AbCdEfGh01234567"
+  },
+  "stepId": "step-1",
+  "timeoutMs": 600000,
+  "trustPreset": "default",
+  "worktreePath": "/srv/repo"
+}

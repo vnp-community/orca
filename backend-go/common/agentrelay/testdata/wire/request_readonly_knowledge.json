@@ -1,0 +1,16 @@
+{
+  "accessMode": "readonly",
+  "env": {
+    "ORCA_PROJECT_ID": "proj-1",
+    "ORCA_REQUEST_ID": "req-1"
+  },
+  "knowledgeRoot": "/srv/repo",
+  "maxOutputBytes": 327680,
+  "prompt": "Analyse the repo",
+  "proposeChangesets": true,
+  "reportChanges": true,
+  "stepId": "step-1",
+  "timeoutMs": 600000,
+  "workspaceKind": "repo_root",
+  "worktreePath": "/srv/repo"
+}

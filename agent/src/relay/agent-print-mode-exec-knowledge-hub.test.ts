@@ -122,7 +122,8 @@ describe('handleAgentExecPrompt with a knowledge root', () => {
       )
     })
     const args = spawnMock.mock.calls[0]?.[1] as string[]
-    expect(args.slice(0, 2)).toEqual(['--print', 'p'])
+    expect(args.slice(0, 2)).toEqual(['--print', '--permission-mode'])
+    expect(args).not.toContain('p')
     expect(args.indexOf('--tools')).toBeLessThan(args.indexOf('--mcp-config'))
     expect(args).toContain('--strict-mcp-config')
     expect(args[args.indexOf('--allowedTools') + 1]).not.toContain('changeset_propose')

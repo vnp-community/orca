@@ -1,0 +1,17 @@
+{
+  "accessMode": "write",
+  "env": {
+    "ORCA_PROJECT_ID": "proj-1",
+    "ORCA_REQUEST_ID": "req-1"
+  },
+  "knowledgeRoot": "/srv/repo",
+  "maxOutputBytes": 327680,
+  "permissionProfile": "spec-author",
+  "prompt": "Analyse the repo",
+  "reportChanges": true,
+  "stepId": "step-1",
+  "timeoutMs": 600000,
+  "trustPreset": "default",
+  "workspaceKind": "worktree",
+  "worktreePath": "/srv/wt/req-1"
+}

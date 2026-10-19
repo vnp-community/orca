@@ -1,0 +1,7 @@
+{
+  "accountId": "acc-1",
+  "model": "claude-opus",
+  "prompt": "Review",
+  "trustPreset": "default",
+  "worktreePath": "/srv/wt"
+}

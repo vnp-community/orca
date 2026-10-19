@@ -1,0 +1,14 @@
+{
+  "env": {
+    "ORCA_PROJECT_ID": "p-1",
+    "ORCA_TASK_ID": "t-1",
+    "ORCA_USER_ID": "u-1",
+    "PATH": "/opt/bin"
+  },
+  "initFile": "# Project\nname: demo",
+  "model": "claude-sonnet",
+  "prompt": "Do task",
+  "stepId": "req:1",
+  "trustPreset": "full",
+  "worktreePath": "/srv/wt"
+}

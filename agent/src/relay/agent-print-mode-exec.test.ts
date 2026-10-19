@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { EventEmitter } from 'node:events'
+import { Writable } from 'node:stream'
 import { spawn } from 'node:child_process'
 import type * as ChildProcess from 'node:child_process'
 import type * as ReadonlyToolPolicy from './agent-readonly-tool-policy'
@@ -41,12 +42,24 @@ const spawnMock = vi.mocked(spawn)
 type FakeChild = EventEmitter & {
   stdout: EventEmitter
   stderr: EventEmitter
+  stdin: Writable
   kill: ReturnType<typeof vi.fn>
+  /** Everything the agent wrote to the fake child's stdin so far. */
+  stdinText: () => string
 }
 function createFakeChild(): FakeChild {
+  const chunks: Buffer[] = []
+  const stdin = new Writable({
+    write(chunk: Buffer, _enc, cb) {
+      chunks.push(chunk)
+      cb()
+    }
+  })
   return Object.assign(new EventEmitter(), {
     stdout: new EventEmitter(),
     stderr: new EventEmitter(),
+    stdin,
+    stdinText: () => Buffer.concat(chunks).toString('utf8'),
     kill: vi.fn()
   })
 }
@@ -132,7 +145,7 @@ describe('handleAgentExecPrompt', () => {
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
-  it('invokes claude in --print mode with the prompt as an argv element', async () => {
+  it('invokes claude in --print mode with the prompt on stdin, not in argv', async () => {
     const child = createFakeChild()
     spawnMock.mockReturnValue(child as never)
 
@@ -150,9 +163,11 @@ describe('handleAgentExecPrompt', () => {
     expect(result.result).toMatchObject({ stdout: 'done', exitCode: 0, timedOut: false })
     expect(spawnMock).toHaveBeenCalledWith(
       'claude',
-      ['--print', 'fix the bug'],
-      expect.objectContaining({ cwd: '/repo', stdio: ['ignore', 'pipe', 'pipe'] })
+      ['--print'],
+      expect.objectContaining({ cwd: '/repo', stdio: ['pipe', 'pipe', 'pipe'] })
     )
+    expect(child.stdinText()).toBe('fix the bug')
+    expect(child.stdin.writableEnded).toBe(true)
   })
 
   it('prepends initFile to the prompt when the caller sends a project-context preamble', async () => {
@@ -173,10 +188,9 @@ describe('handleAgentExecPrompt', () => {
     child.emit('close', 0)
     await pending
 
-    expect(spawnMock).toHaveBeenCalledWith(
-      'claude',
-      ['--print', '# Orca Project Context\nProject: demo\nTeam: platform\n\nfix the bug'],
-      expect.anything()
+    expect(spawnMock).toHaveBeenCalledWith('claude', ['--print'], expect.anything())
+    expect(child.stdinText()).toBe(
+      '# Orca Project Context\nProject: demo\nTeam: platform\n\nfix the bug'
     )
   })
 
@@ -194,7 +208,8 @@ describe('handleAgentExecPrompt', () => {
     child.emit('close', 0)
     await pending
 
-    expect(spawnMock).toHaveBeenCalledWith('claude', ['--print', 'fix the bug'], expect.anything())
+    expect(spawnMock).toHaveBeenCalledWith('claude', ['--print'], expect.anything())
+    expect(child.stdinText()).toBe('fix the bug')
   })
 
   it("appends YOLO_TUI_AGENT_ARGS.claude when trustPreset is 'full'", async () => {
@@ -213,7 +228,7 @@ describe('handleAgentExecPrompt', () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       'claude',
-      ['--print', 'fix the bug', '--dangerously-skip-permissions'],
+      ['--print', '--dangerously-skip-permissions'],
       expect.anything()
     )
   })
@@ -232,7 +247,8 @@ describe('handleAgentExecPrompt', () => {
     child.emit('close', 0)
     await pending
 
-    expect(spawnMock).toHaveBeenCalledWith('claude', ['--print', 'fix the bug'], expect.anything())
+    expect(spawnMock).toHaveBeenCalledWith('claude', ['--print'], expect.anything())
+    expect(child.stdinText()).toBe('fix the bug')
   })
 
   it('merges caller-provided env on top of the base env', async () => {
@@ -689,11 +705,11 @@ describe('handleAgentExecPrompt with stream-json activity', () => {
     expect(result).not.toHaveProperty('usage')
   })
 
-  it('adds --output-format stream-json --verbose right after the prompt', async () => {
+  it('adds --output-format stream-json --verbose right after --print', async () => {
     await run({}, (c) => c.emit('close', 0))
     expect(spawnMock).toHaveBeenCalledWith(
       'claude',
-      ['--print', 'p', '--output-format', 'stream-json', '--verbose'],
+      ['--print', '--output-format', 'stream-json', '--verbose'],
       expect.anything()
     )
   })
@@ -702,7 +718,6 @@ describe('handleAgentExecPrompt with stream-json activity', () => {
     await run({ accessMode: 'readonly', trustPreset: 'full' }, (c) => c.emit('close', 0))
     expect(spawnMock.mock.calls[0]?.[1]).toEqual([
       '--print',
-      'p',
       '--output-format',
       'stream-json',
       '--verbose',
@@ -717,7 +732,6 @@ describe('handleAgentExecPrompt with stream-json activity', () => {
     await run({ trustPreset: 'full' }, (c) => c.emit('close', 0))
     expect(spawnMock.mock.calls[0]?.[1]).toEqual([
       '--print',
-      'p',
       '--output-format',
       'stream-json',
       '--verbose',
@@ -786,12 +800,12 @@ describe('handleAgentExecPrompt with stream-json activity', () => {
   it('uses the plain text invocation when the flag probe fails or does not advertise stream-json', async () => {
     probedFlags.value = null
     await run({}, (c) => c.emit('close', 0))
-    expect(spawnMock.mock.calls[0]?.[1]).toEqual(['--print', 'p'])
+    expect(spawnMock.mock.calls[0]?.[1]).toEqual(['--print'])
 
     spawnMock.mockReset()
     probedFlags.value = PLAIN_FLAGS
     await run({}, (c) => c.emit('close', 0))
-    expect(spawnMock.mock.calls[0]?.[1]).toEqual(['--print', 'p'])
+    expect(spawnMock.mock.calls[0]?.[1]).toEqual(['--print'])
   })
 
   it('returns the error text of a failed run as stdout, with the exit code', async () => {

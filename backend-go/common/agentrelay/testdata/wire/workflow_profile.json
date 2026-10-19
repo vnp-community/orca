@@ -1,0 +1,12 @@
+{
+  "accountId": "acc-1",
+  "env": {
+    "ORCA_PROJECT_NAME": "demo",
+    "ORCA_USER_ID": "u-1"
+  },
+  "initFile": "# Project",
+  "model": "claude-opus",
+  "prompt": "Review",
+  "trustPreset": "default",
+  "worktreePath": "/srv/wt"
+}

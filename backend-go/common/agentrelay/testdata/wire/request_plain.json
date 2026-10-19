@@ -1,0 +1,10 @@
+{
+  "env": {
+    "ORCA_PROJECT_ID": "proj-1",
+    "ORCA_REQUEST_ID": "req-1"
+  },
+  "prompt": "Analyse the repo",
+  "stepId": "step-1",
+  "trustPreset": "default",
+  "worktreePath": "/srv/repo"
+}
