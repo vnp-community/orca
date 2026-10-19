@@ -58,6 +58,7 @@ import type { CodeIntelSlice } from './slices/code-intel'
 import type { CodeIntelQualitySlice } from './slices/code-intel-quality-state'
 import type { ReviewUiSlice } from './slices/review-ui'
 import type { ReviewProgressSlice } from './slices/review-progress'
+import type { TaskEnrichmentSlice } from './slices/task-enrichment'
 
 // ── Re-exports for cross-slice consumers (import from '@/store/types') ────────
 export type {
@@ -128,4 +129,5 @@ export type AppState = RepoSlice &
   CodeIntelSlice &
   CodeIntelQualitySlice &
   ReviewUiSlice &
-  ReviewProgressSlice
+  ReviewProgressSlice &
+  TaskEnrichmentSlice

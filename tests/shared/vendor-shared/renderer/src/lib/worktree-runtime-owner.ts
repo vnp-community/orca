@@ -48,7 +48,10 @@ function getGlobalActiveRuntimeEnvironmentId(state: WorktreeRuntimeOwnerState): 
   if (envId) {
     return envId
   }
-  if (typeof window !== 'undefined' && (window as any)?.__orca_platform === 'web') {
+  if (
+    typeof window !== 'undefined' &&
+    (window as Record<string, unknown>)?.__orca_platform === 'web'
+  ) {
     return 'session-auth'
   }
   return null

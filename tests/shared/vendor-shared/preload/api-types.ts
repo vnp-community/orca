@@ -390,6 +390,15 @@ import type {
   PortForwardEntry,
   EnrichedDetectedPort
 } from '../shared/ssh-types'
+import type {
+  AgentTokenInfo,
+  ConnectionTestResult,
+  DevServer,
+  DevServerInput,
+  DevServerStatus,
+  RemotePreflightStatus,
+  WindowsTerminalCapabilities
+} from '../shared/dev-server-types'
 import type { FleetImportStatus } from '../renderer/src/store/slices/ssh'
 import type { ProvisioningProgressEvent } from '../renderer/src/store/slices/provisioning-events'
 import type { BootstrapProgressEvent } from '../renderer/src/store/slices/bootstrap-events'
@@ -2215,12 +2224,8 @@ export type PreloadApi = {
     getPreflightStatus: (params: {
       devServerId: string
       force?: boolean
-    }) => Promise<import('../shared/dev-server-types').RemotePreflightStatus>
-    setGitIdentity: (params: {
-      devServerId: string
-      name: string
-      email: string
-    }) => Promise<void>
+    }) => Promise<RemotePreflightStatus>
+    setGitIdentity: (params: { devServerId: string; name: string; email: string }) => Promise<void>
     openGhAuthTerminal: (params: {
       devServerId: string
     }) => Promise<{ ptyId: string; devServerId: string }>
@@ -2229,7 +2234,7 @@ export type PreloadApi = {
     }) => Promise<{ configPath: string | null; themeDir: string | null }>
     detectWindowsCapabilities: (params: {
       devServerId: string
-    }) => Promise<import('../shared/dev-server-types').WindowsTerminalCapabilities>
+    }) => Promise<WindowsTerminalCapabilities>
     markChecklistItem: (params: {
       item: string
       devServerId?: string
@@ -2238,26 +2243,22 @@ export type PreloadApi = {
   }
   devServer: {
     /** Return all persisted dev servers (with their runtime status populated) */
-    list: () => Promise<import('../shared/dev-server-types').DevServer[]>
+    list: () => Promise<DevServer[]>
     /** Add a new dev server entry (does not connect automatically) */
-    add: (
-      input: import('../shared/dev-server-types').DevServerInput
-    ) => Promise<import('../shared/dev-server-types').DevServer>
+    add: (input: DevServerInput) => Promise<DevServer>
     /** Remove a dev server and disconnect if connected */
     remove: (id: string) => Promise<void>
     /** Run a connectivity test without persisting the server */
-    testConnection: (
-      input: import('../shared/dev-server-types').DevServerInput
-    ) => Promise<import('../shared/dev-server-types').ConnectionTestResult>
+    testConnection: (input: DevServerInput) => Promise<ConnectionTestResult>
     /** Open the relay connection for a persisted server */
-    connect: (id: string) => Promise<import('../shared/dev-server-types').DevServer>
+    connect: (id: string) => Promise<DevServer>
     /** Close the relay connection for a persisted server */
     disconnect: (id: string) => Promise<void>
     /** Subscribe to push events when a server's connection status changes */
     onStatusChanged: (
       handler: (event: {
         id: string
-        status: import('../shared/dev-server-types').DevServerStatus
+        status: DevServerStatus
         platform?: NodeJS.Platform
         error?: string
       }) => void
@@ -2266,7 +2267,7 @@ export type PreloadApi = {
      * List SSH targets from the Orca server DB (server-mode only).
      * Bypasses the desktop-only ssh.listTargets ipc guard.
      */
-    listSshTargets: () => Promise<import('../shared/ssh-types').SshTarget[]>
+    listSshTargets: () => Promise<SshTarget[]>
     /**
      * Create a new SSH target in the Orca server DB.
      * Used by AddDevServerDialog inline host form (no Settings → SSH Hosts needed).
@@ -2276,29 +2277,22 @@ export type PreloadApi = {
       host: string
       port?: number
       username?: string
-    }) => Promise<import('../shared/ssh-types').SshTarget>
+    }) => Promise<SshTarget>
     /**
      * Subscribe to push events when a direct-websocket agent token is generated.
      * The handler is called once per Connect attempt with the one-time token
      * and Orca URL the agent should use.
      */
-    onAgentToken: (
-      handler: (info: import('../shared/dev-server-types').AgentTokenInfo) => void
-    ) => void | (() => void)
+    onAgentToken: (handler: (info: AgentTokenInfo) => void) => void | (() => void)
     /** Unsubscribe a previously registered onAgentToken handler */
-    offAgentToken: (
-      handler: (info: import('../shared/dev-server-types').AgentTokenInfo) => void
-    ) => void
+    offAgentToken: (handler: (info: AgentTokenInfo) => void) => void
     /**
      * Browse a directory on a connected dev server via the agent relay.
      * Returns the resolved absolute path and a list of directory entries.
      * Used by the web-mode folder picker (RemoteFileBrowser) when the
      * selected host is a Dev Server rather than an Orca runtime environment.
      */
-    browseDir?: (args: {
-      id: string
-      path: string
-    }) => Promise<{
+    browseDir?: (args: { id: string; path: string }) => Promise<{
       resolvedPath: string
       entries: { name: string; isDirectory: boolean; isSymlink: boolean }[]
     }>
@@ -3214,23 +3208,16 @@ export type PreloadApi = {
     }>
     /** Subscribe to streaming progress events during fleet config import.
      *  Returns an unsubscribe function. */
-    onFleetImportProgress: (
-      callback: (status: FleetImportStatus) => void
-    ) => () => void
+    onFleetImportProgress: (callback: (status: FleetImportStatus) => void) => () => void
     // ── Bulk Provisioning Methods (CR-003) ────────────────────────────────────
     /** Trigger bulk relay deployment to the given server IDs.
      *  Progress events are emitted via onProvisioningProgress. */
-    provisionFleetServers: (args: {
-      serverIds: string[]
-      concurrency?: number
-    }) => Promise<void>
+    provisionFleetServers: (args: { serverIds: string[]; concurrency?: number }) => Promise<void>
     /** Cancel the currently running provisioning session. */
     cancelProvisioning: () => Promise<void>
     /** Subscribe to per-server provisioning progress events.
      *  Returns an unsubscribe function. */
-    onProvisioningProgress: (
-      callback: (event: ProvisioningProgressEvent) => void
-    ) => () => void
+    onProvisioningProgress: (callback: (event: ProvisioningProgressEvent) => void) => () => void
     // ── Fleet Health Monitoring (CR-005) ─────────────────────────────────────
     /** Fetch current health snapshot for all connected SSH targets. */
     getFleetHealth: () => Promise<{
@@ -3261,9 +3248,7 @@ export type PreloadApi = {
     cancelBootstrap: (serverId: string) => Promise<void>
     /** Subscribe to streaming bootstrap progress events.
      *  Returns an unsubscribe function. */
-    onBootstrapProgress: (
-      callback: (event: BootstrapProgressEvent) => void
-    ) => () => void
+    onBootstrapProgress: (callback: (event: BootstrapProgressEvent) => void) => () => void
   }
   /** Auth namespace — SSO and user identity (CR-006, Phase 2). */
   auth?: {
