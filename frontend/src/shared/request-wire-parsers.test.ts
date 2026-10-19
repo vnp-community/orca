@@ -37,7 +37,16 @@ describe('parseRequest', () => {
   })
 
   it('maps unknown enum values to "unknown"', () => {
-    const raw = { id: 'x', projectId: 'p', number: 1, title: 't', type: 'alien_type', status: 'flying', createdAt: '', updatedAt: '' }
+    const raw = {
+      id: 'x',
+      projectId: 'p',
+      number: 1,
+      title: 't',
+      type: 'alien_type',
+      status: 'flying',
+      createdAt: '',
+      updatedAt: ''
+    }
     const result = parseRequest(raw)
     expect(result.type).toBe('unknown')
     expect(result.status).toBe('unknown')
@@ -57,8 +66,14 @@ describe('parseRequest', () => {
 
   it('sets links array when present', () => {
     const raw = {
-      id: 'r1', projectId: 'p', number: 1, title: 't',
-      type: 'bug', status: 'submitted', createdAt: '', updatedAt: '',
+      id: 'r1',
+      projectId: 'p',
+      number: 1,
+      title: 't',
+      type: 'bug',
+      status: 'submitted',
+      createdAt: '',
+      updatedAt: '',
       links: [{ id: 'l1', requestId: 'r1', relatedRequestId: 'r2', reason: 'child', createdAt: '' }]
     }
     const result = parseRequest(raw)
@@ -67,12 +82,31 @@ describe('parseRequest', () => {
   })
 
   it('leaves links undefined when absent', () => {
-    const result = parseRequest({ id: 'r', projectId: 'p', number: 1, title: 't', type: 'bug', status: 'submitted', createdAt: '', updatedAt: '' })
+    const result = parseRequest({
+      id: 'r',
+      projectId: 'p',
+      number: 1,
+      title: 't',
+      type: 'bug',
+      status: 'submitted',
+      createdAt: '',
+      updatedAt: ''
+    })
     expect(result.links).toBeUndefined()
   })
 
   it('maps null slice in links to empty array item gracefully', () => {
-    const raw = { id: 'r', projectId: 'p', number: 1, title: 't', type: 'bug', status: 'submitted', createdAt: '', updatedAt: '', links: [null] }
+    const raw = {
+      id: 'r',
+      projectId: 'p',
+      number: 1,
+      title: 't',
+      type: 'bug',
+      status: 'submitted',
+      createdAt: '',
+      updatedAt: '',
+      links: [null]
+    }
     expect(() => parseRequest(raw)).not.toThrow()
   })
 })
@@ -80,7 +114,10 @@ describe('parseRequest', () => {
 describe('parseSolution', () => {
   it('parses a solution with options', () => {
     const raw = {
-      id: 's1', requestId: 'r1', kind: 'solution', status: 'ready',
+      id: 's1',
+      requestId: 'r1',
+      kind: 'solution',
+      status: 'ready',
       options: [
         { id: 'opt-1', title: 'Option A', pros: ['fast'], cons: ['risky'] },
         { title: 'Option B' } // missing id → String(1)
@@ -94,7 +131,12 @@ describe('parseSolution', () => {
   })
 
   it('handles missing options gracefully', () => {
-    const result = parseSolution({ id: 's1', requestId: 'r', kind: 'diagnosis', status: 'generating' })
+    const result = parseSolution({
+      id: 's1',
+      requestId: 'r',
+      kind: 'diagnosis',
+      status: 'generating'
+    })
     expect(result.options).toBeUndefined()
   })
 
@@ -106,7 +148,10 @@ describe('parseSolution', () => {
 
   it('keeps raw remainder on SolutionOption', () => {
     const raw = {
-      id: 's1', requestId: 'r', kind: 'solution', status: 'ready',
+      id: 's1',
+      requestId: 'r',
+      kind: 'solution',
+      status: 'ready',
       options: [{ id: 'o1', title: 'T', futureField: 'preserve_me' }]
     }
     const result = parseSolution(raw)
@@ -122,8 +167,14 @@ describe('parseSolution', () => {
 describe('parseApproval', () => {
   it('parses a valid approval', () => {
     const raw = {
-      id: 'a1', requestId: 'r1', subjectType: 'plan', subjectId: 'p1',
-      status: 'pending', version: 3, createdAt: '', updatedAt: ''
+      id: 'a1',
+      requestId: 'r1',
+      subjectType: 'plan',
+      subjectId: 'p1',
+      status: 'pending',
+      version: 3,
+      createdAt: '',
+      updatedAt: ''
     }
     const result = parseApproval(raw)
     expect(result.subjectType).toBe('plan')
@@ -132,7 +183,15 @@ describe('parseApproval', () => {
   })
 
   it('maps unknown enum values', () => {
-    const result = parseApproval({ id: 'x', requestId: 'r', subjectType: 'alien', subjectId: 's', status: 'flying', createdAt: '', updatedAt: '' })
+    const result = parseApproval({
+      id: 'x',
+      requestId: 'r',
+      subjectType: 'alien',
+      subjectId: 's',
+      status: 'flying',
+      createdAt: '',
+      updatedAt: ''
+    })
     expect(result.subjectType).toBe('unknown')
     expect(result.status).toBe('unknown')
   })
@@ -145,7 +204,16 @@ describe('parseApproval', () => {
 describe('parseBacklogItem', () => {
   it('parses requests view', () => {
     const raw = {
-      request: { id: 'r1', projectId: 'p', number: 5, title: 'My request', type: 'bug', status: 'planning', createdAt: '', updatedAt: '' }
+      request: {
+        id: 'r1',
+        projectId: 'p',
+        number: 5,
+        title: 'My request',
+        type: 'bug',
+        status: 'planning',
+        createdAt: '',
+        updatedAt: ''
+      }
     }
     const result = parseBacklogItem('requests', raw)
     expect(result.kind).toBe('request')
@@ -155,13 +223,25 @@ describe('parseBacklogItem', () => {
   })
 
   it('parses tasks view', () => {
-    const raw = { taskId: 't1', taskTitle: 'Do X', requestId: 'r1', requestNumber: 3, requestTitle: 'Fix Y' }
+    const raw = {
+      taskId: 't1',
+      taskTitle: 'Do X',
+      requestId: 'r1',
+      requestNumber: 3,
+      requestTitle: 'Fix Y'
+    }
     const result = parseBacklogItem('tasks', raw)
     expect(result.kind).toBe('task')
   })
 
   it('parses execute view', () => {
-    const raw = { taskId: 't2', taskTitle: 'Run Z', requestId: 'r2', requestNumber: 7, requestTitle: 'Deploy' }
+    const raw = {
+      taskId: 't2',
+      taskTitle: 'Run Z',
+      requestId: 'r2',
+      requestNumber: 7,
+      requestTitle: 'Deploy'
+    }
     const result = parseBacklogItem('execute', raw)
     expect(result.kind).toBe('execute')
   })
@@ -174,7 +254,12 @@ describe('parseBacklogItem', () => {
 
 describe('parseRequestEvent', () => {
   it('parses a valid event', () => {
-    const raw = { requestId: 'r1', eventType: 'request.status_changed', status: 'planning', occurredAt: '2024-01-01T00:00:00Z' }
+    const raw = {
+      requestId: 'r1',
+      eventType: 'request.status_changed',
+      status: 'planning',
+      occurredAt: '2024-01-01T00:00:00Z'
+    }
     const result = parseRequestEvent(raw)
     expect(result.requestId).toBe('r1')
     expect(result.eventType).toBe('request.status_changed')
@@ -195,8 +280,12 @@ describe('parseRequestEvent', () => {
 describe('parseRequestTypeHistoryEntry', () => {
   it('parses a valid entry', () => {
     const raw = {
-      id: 'h1', requestId: 'r1', fromType: 'bug', toType: 'task',
-      actorKind: 'human', occurredAt: '2024-01-01T00:00:00Z'
+      id: 'h1',
+      requestId: 'r1',
+      fromType: 'bug',
+      toType: 'task',
+      actorKind: 'human',
+      occurredAt: '2024-01-01T00:00:00Z'
     }
     const result = parseRequestTypeHistoryEntry(raw)
     expect(result.fromType).toBe('bug')
@@ -205,7 +294,13 @@ describe('parseRequestTypeHistoryEntry', () => {
   })
 
   it('maps unknown types to "unknown"', () => {
-    const result = parseRequestTypeHistoryEntry({ id: 'x', requestId: 'r', fromType: 'alien', toType: 'unknown_type', occurredAt: '' })
+    const result = parseRequestTypeHistoryEntry({
+      id: 'x',
+      requestId: 'r',
+      fromType: 'alien',
+      toType: 'unknown_type',
+      occurredAt: ''
+    })
     expect(result.fromType).toBe('unknown')
     expect(result.toType).toBe('unknown')
   })
@@ -214,27 +309,118 @@ describe('parseRequestTypeHistoryEntry', () => {
 describe('CONTRACT-request-ui-api shapes (CR-REQ-018 reconciliation)', () => {
   it("maps status 'new' to submitted and reads flat source fields", () => {
     const r = parseRequest({
-      id: 'r1', status: 'new', type: null, sourceProvider: 'jira', sourceRef: 'ABC-1',
-      sourceUrl: 'https://x.example/ABC-1', returnedBy: 'u1'
+      id: 'r1',
+      status: 'new',
+      type: null,
+      sourceProvider: 'jira',
+      sourceRef: 'ABC-1',
+      sourceUrl: 'https://x.example/ABC-1',
+      returnedBy: 'u1'
     })
     expect(r.status).toBe('submitted')
     expect(r.type).toBe('unknown')
-    expect(r.source).toEqual({ provider: 'jira', ref: 'ABC-1', url: 'https://x.example/ABC-1', site: undefined })
+    expect(r.source).toEqual({
+      provider: 'jira',
+      ref: 'ABC-1',
+      url: 'https://x.example/ABC-1',
+      site: undefined
+    })
     expect(r.returnedById).toBe('u1')
   })
 
   it('reads typeHistory entries that use `at`', () => {
-    const e = parseRequestTypeHistoryEntry({ fromType: null, toType: 'bug', actorKind: 'user', at: '2026-01-01T00:00:00Z' })
+    const e = parseRequestTypeHistoryEntry({
+      fromType: null,
+      toType: 'bug',
+      actorKind: 'user',
+      at: '2026-01-01T00:00:00Z'
+    })
     expect(e.occurredAt).toBe('2026-01-01T00:00:00Z')
     expect(e.fromType).toBe('unknown')
     expect(e.id).not.toBe('')
   })
 
   it('reads approvals with decidedBy / dueAt and aliased subject types', () => {
-    const a = parseApproval({ id: 'a', subjectType: 'task_list', status: 'approved', decidedBy: 'u', decidedAt: 'd', dueAt: 'due', createdAt: 'c' })
+    const a = parseApproval({
+      id: 'a',
+      subjectType: 'task_list',
+      status: 'approved',
+      decidedBy: 'u',
+      decidedAt: 'd',
+      dueAt: 'due',
+      createdAt: 'c'
+    })
     expect(a.subjectType).toBe('plan')
     expect(a.approverId).toBe('u')
     expect(a.expiresAt).toBe('due')
     expect(a.updatedAt).toBe('d')
+  })
+})
+
+describe('parseRequest base ref fields (CR-REQ-039)', () => {
+  const base = { id: 'r1', projectId: 'p', number: 1, title: 't', type: 'bug', status: 'submitted' }
+
+  it('keeps every base ref field undefined when an older gateway omits them', () => {
+    const r = parseRequest(base)
+    expect(r.baseRef).toBeUndefined()
+    expect(r.baseRefLocked).toBeUndefined()
+    expect(r.baseRefLockReason).toBeUndefined()
+    expect(r.baseRefUnverified).toBeUndefined()
+  })
+
+  it('keeps an empty baseRef as the repository default, distinct from a missing one', () => {
+    const r = parseRequest({ ...base, baseRef: '', baseRefLocked: false, baseRefLockReason: '' })
+    expect(r.baseRef).toBe('')
+    expect(r.baseRefLocked).toBe(false)
+    expect(r.baseRefLockReason).toBe('')
+  })
+
+  it('reads a full set of fields', () => {
+    const r = parseRequest({
+      ...base,
+      baseRef: 'release/1.4',
+      baseRefLocked: true,
+      baseRefLockReason: 'execution',
+      baseRefUnverified: true
+    })
+    expect(r.baseRef).toBe('release/1.4')
+    expect(r.baseRefLocked).toBe(true)
+    expect(r.baseRefLockReason).toBe('execution')
+    expect(r.baseRefUnverified).toBe(true)
+  })
+
+  it.each(['proposal', 'task', 'execution', 'terminal'])('accepts the lock reason %s', (reason) => {
+    expect(parseRequest({ ...base, baseRefLockReason: reason }).baseRefLockReason).toBe(reason)
+  })
+
+  it('keeps a lock reason this client does not know as unknown (still locked), not as unlocked', () => {
+    expect(parseRequest({ ...base, baseRefLockReason: 'archived' }).baseRefLockReason).toBe(
+      'unknown'
+    )
+  })
+
+  it.each([
+    ['numbers', 7],
+    ['objects', {}],
+    ['arrays', ['main']],
+    ['null', null],
+    ['booleans', true]
+  ])('treats a %s baseRef / lock reason as absent', (_name, value) => {
+    const r = parseRequest({ ...base, baseRef: value, baseRefLockReason: value })
+    expect(r.baseRef).toBeUndefined()
+    expect(r.baseRefLockReason).toBeUndefined()
+  })
+
+  it.each(['true', 1, null, 'yes'])('treats a non-boolean flag (%s) as absent', (value) => {
+    const r = parseRequest({ ...base, baseRefLocked: value, baseRefUnverified: value })
+    expect(r.baseRefLocked).toBeUndefined()
+    expect(r.baseRefUnverified).toBeUndefined()
+  })
+
+  it('never throws, whatever the input', () => {
+    for (const junk of [undefined, null, 0, 'x', [], [1], () => 1, { baseRef: { a: 1 } }]) {
+      expect(() => parseRequest(junk)).not.toThrow()
+      expect(parseRequest(junk).baseRef).toBeUndefined()
+    }
   })
 })

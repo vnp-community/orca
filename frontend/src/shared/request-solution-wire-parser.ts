@@ -44,6 +44,12 @@ function recommendedOptionId(rec: unknown): string | undefined {
   return [r.optionId, r.option_id, r.id].find((v): v is string => typeof v === 'string' && v !== '')
 }
 
+// 0 is what the backend shows for a dry run; a version number has to be a whole number from 1.
+function parseSolutionSeq(value: unknown): number | undefined {
+  const seq = safeOptNum(value)
+  return seq !== undefined && Number.isInteger(seq) && seq >= 1 ? seq : undefined
+}
+
 export function parseSolution(raw: unknown): Solution {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   // CONTRACT: options is an object { options[], recommendation, ... } for kind=solution
@@ -86,6 +92,8 @@ export function parseSolution(raw: unknown): Solution {
     generatedAt: safeOptStr(r.generatedAt) ?? safeOptStr(r.createdAt),
     reviewedAt: safeOptStr(r.reviewedAt),
     reviewedById: safeOptStr(r.reviewedById),
-    version: safeOptNum(r.version)
+    version: safeOptNum(r.version),
+    revisionFeedback: safeOptStr(r.revisionFeedback),
+    seq: parseSolutionSeq(r.seq)
   }
 }

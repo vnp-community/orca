@@ -11,7 +11,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useApprovals } from '../../../hooks/useApprovals'
 import { useRequestCooldown } from '../../../hooks/useRequestCooldown'
 import { useRequestActions } from '../../../hooks/useRequestActions'
@@ -26,38 +25,27 @@ import { requestErrorMessage, requestErrorMessageForError } from '../request-err
 import { SolutionBody } from './SolutionBody'
 import { SolutionDecisionBar } from './SolutionDecisionBar'
 import { SolutionAskBackDialog } from './SolutionAskBackDialog'
+import { SolutionEmptyState } from './SolutionEmptyState'
 import { SolutionGenerationState } from './SolutionGenerationState'
+import { SolutionPanelError, SolutionPanelLoading } from './SolutionPanelLoadStates'
 import { SolutionOpenQuestions } from './SolutionOpenQuestions'
 import { SolutionRunFailure } from './SolutionRunFailure'
+import { SolutionRevisionFeedback } from './SolutionRevisionFeedback'
 import { focusClarificationPanelWhenReady } from '../clarification/clarification-panel-focus'
-import { SolutionStartPrompt } from './SolutionStartPrompt'
 import { SolutionStatusBanner } from './SolutionStatusBanner'
 import { SolutionVersionSwitcher } from './SolutionVersionSwitcher'
+import { OlderVersionBanner } from './OlderVersionBanner'
+import { AnalysisRevisionPanel } from './AnalysisRevisionPanel'
+import { currentSolutionOf, orderSolutionsNewestFirst } from './solution-version-history'
 import { getSolutionPresentation, pickPendingApproval } from './solution-view-model'
+import { useAnalysisRevision } from './useAnalysisRevision'
+import { useSolutionPanelSync } from './useSolutionPanelSync'
 import { useSolutionDecision } from './useSolutionDecision'
 import { useSolutionStart } from './useSolutionStart'
 
 const REFETCH_EVENT_RE = /(?:^|\.)(?:solution\.[a-z_]+|approval\.[a-z_]+|request\.status_changed)$/
 // Why: a throttled regenerate must not be hammered; this floor keeps the old 5s guard when the server gave no wait.
 const MIN_REGENERATE_LOCK_MS = 5000
-// Why: a failed run raises no event, so a request that is still analysing must be re-read.
-const RUN_POLL_INTERVAL_MS = 5000
-// Why: the approval row is written after the Solution; a missed event must not leave the bar missing until reload.
-const APPROVAL_POLL_INTERVAL_MS = 3000
-const APPROVAL_POLL_MAX_TRIES = 20
-// Why: after an answered Clarification the new Solution is written by the backend, with no guaranteed event.
-const FRESH_SOLUTION_POLL_INTERVAL_MS = 3000
-const FRESH_SOLUTION_POLL_MAX_TRIES = 40
-
-function orderNewestFirst(solutions: Solution[]): Solution[] {
-  return [...solutions].sort((a, b) => {
-    const byVersion = (b.version ?? 0) - (a.version ?? 0)
-    if (byVersion !== 0) {
-      return byVersion
-    }
-    return (b.generatedAt ?? '').localeCompare(a.generatedAt ?? '')
-  })
-}
 
 export type SolutionPanelProps = {
   request: OrcaRequest
@@ -76,7 +64,6 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [askBackOpen, setAskBackOpen] = useState(false)
   const aiCooldown = useRequestCooldown('ai')
-  const readCooldown = useRequestCooldown('read')
   const cooldown = aiCooldown.coolingDown
   // Why: later polls also set isLoading; only the very first read should replace the panel with a skeleton.
   const loadedOnce = useRef(false)
@@ -100,8 +87,11 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
     }
   })
 
-  const ordered = useMemo(() => orderNewestFirst(solutionsApi.solutions), [solutionsApi.solutions])
-  const latest = ordered.find((s) => s.status !== 'superseded') ?? ordered[0]
+  const ordered = useMemo(
+    () => orderSolutionsNewestFirst(solutionsApi.solutions),
+    [solutionsApi.solutions]
+  )
+  const latest = currentSolutionOf(ordered)
   const solution = ordered.find((s) => s.id === viewId) ?? latest
 
   const approval = useMemo(
@@ -134,47 +124,24 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
     onSettled: refetchAll
   })
 
-  // Why: a Request that moved on (Clarification answered, regenerated) has a newer Solution; events can be missed,
-  // so the Request's own state is the trigger. Approvals are not part of either payload, so they are re-read too.
-  const requestKey = `${request.status}|${request.updatedAt ?? ''}|${request.version ?? ''}`
-  const syncKey = `${requestKey}|${solution?.id ?? ''}|${solution?.status ?? ''}`
-  const lastSyncKey = useRef(syncKey)
-  const lastRequestKey = useRef(requestKey)
-  useEffect(() => {
-    if (lastSyncKey.current === syncKey) {
-      return
-    }
-    lastSyncKey.current = syncKey
-    if (lastRequestKey.current !== requestKey) {
-      lastRequestKey.current = requestKey
-      refetchSolutions()
-    }
-    refetchApprovals()
-  }, [syncKey, requestKey, refetchApprovals, refetchSolutions])
+  const { failedRun, runPending, awaitingNewer } = useSolutionPanelSync({
+    request,
+    solution,
+    latest,
+    approval,
+    expiredApproval,
+    latestRun: solutionsApi.latestRun ?? null,
+    refetchSolutions,
+    refetchApprovals,
+    onChanged
+  })
 
-  const awaitingApprovalRow =
-    request.status === 'awaiting_analysis_approval' &&
-    !!solution &&
-    solution.status === 'ready' &&
-    solution.id === latest?.id &&
-    !approval &&
-    !expiredApproval &&
-    !readCooldown.coolingDown
-  useEffect(() => {
-    if (!awaitingApprovalRow) {
-      return undefined
-    }
-    let tries = 0
-    const t = setInterval(() => {
-      tries += 1
-      if (tries > APPROVAL_POLL_MAX_TRIES) {
-        clearInterval(t)
-        return
-      }
-      refetchApprovals()
-    }, APPROVAL_POLL_INTERVAL_MS)
-    return () => clearInterval(t)
-  }, [awaitingApprovalRow, solution?.id, refetchApprovals])
+  const revision = useAnalysisRevision({
+    request,
+    solution,
+    actions: { generate: solutionsApi.generate },
+    onSettled: refetchAll
+  })
 
   // Keep the local selection across refetches only while that option still exists.
   const optionIds = (solution?.options ?? []).map((o) => o.id).join('|')
@@ -198,58 +165,6 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
     }
   }, [failure])
 
-  const latestRun = solutionsApi.latestRun ?? null
-  const failedRun = latestRun?.status === 'failed' ? latestRun : null
-  const runPending = latestRun?.status === 'running'
-  const { refetch: reloadSolutions } = solutionsApi
-  const polling =
-    (runPending || (request.status === 'analyzing' && !latest && !failedRun)) &&
-    !readCooldown.coolingDown
-  useEffect(() => {
-    if (!polling) {
-      return undefined
-    }
-    const t = setInterval(reloadSolutions, RUN_POLL_INTERVAL_MS)
-    return () => clearInterval(t)
-  }, [polling, reloadSolutions])
-
-  // Only superseded/rejected versions are on screen while the backend is producing the next one.
-  const awaitingNewer =
-    !!latest &&
-    !runPending &&
-    !failedRun &&
-    ((latest.status === 'superseded' &&
-      (request.status === 'analyzing' || request.status === 'awaiting_analysis_approval')) ||
-      (latest.status === 'rejected' && request.status === 'analyzing'))
-  useEffect(() => {
-    if (!awaitingNewer || readCooldown.coolingDown) {
-      return undefined
-    }
-    let tries = 0
-    const t = setInterval(() => {
-      tries += 1
-      if (tries > FRESH_SOLUTION_POLL_MAX_TRIES) {
-        clearInterval(t)
-        return
-      }
-      reloadSolutions()
-      refetchApprovals()
-      // Why: the Request itself stays `analyzing` on screen until it is re-read.
-      if (request.status === 'analyzing') {
-        onChanged()
-      }
-    }, FRESH_SOLUTION_POLL_INTERVAL_MS)
-    return () => clearInterval(t)
-  }, [
-    awaitingNewer,
-    readCooldown.coolingDown,
-    request.status,
-    latest?.id,
-    reloadSolutions,
-    refetchApprovals,
-    onChanged
-  ])
-
   const flow = request.type === 'unknown' ? undefined : REQUEST_FLOW_REGISTRY[request.type]
   const canGeneratePlan = !!flow && flow.plan !== 'none' && !request.planTaskId
   const generatePlan = (): void => {
@@ -264,67 +179,21 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
 
   // ---- load / empty / error states ----
   if (solutionsApi.isLoading && !loadedOnce.current && solutionsApi.solutions.length === 0) {
-    return (
-      <div data-testid="solution-panel-loading" aria-busy="true" className="space-y-3 p-4">
-        <Skeleton className="h-8 w-1/3" />
-        <Skeleton className="h-24 w-full" />
-      </div>
-    )
+    return <SolutionPanelLoading />
   }
   if (solutionsApi.error) {
-    return (
-      <div role="alert" data-testid="solution-panel-error" className="space-y-2 p-4">
-        <p className="text-sm text-destructive">
-          {solutionsApi.error === 'forbidden'
-            ? translate(
-                'auto.components.request.SolutionPanel.forbidden',
-                'You do not have permission to view the analysis.'
-              )
-            : requestErrorMessage(solutionsApi.error)}
-        </p>
-        {solutionsApi.error !== 'forbidden' && (
-          <Button size="sm" variant="outline" onClick={refetchSolutions}>
-            {translate('auto.components.request.SolutionPanel.retry', 'Retry')}
-          </Button>
-        )}
-      </div>
-    )
+    return <SolutionPanelError error={solutionsApi.error} onRetry={refetchSolutions} />
   }
   if (!solution) {
     return (
-      <div data-testid="solution-panel-empty" className="p-4">
-        {failure || failedRun ? (
-          <SolutionRunFailure
-            code={failure ? failure.error.backendCode : failedRun?.errorCode}
-            errorKind={failure?.error.kind}
-            errorText={failure ? requestErrorMessageForError(failure.error) : null}
-            onRegenerate={() => void decision.regenerate()}
-            regenerateDisabled={decision.submitting || cooldown}
-          />
-        ) : start.failure ? (
-          <SolutionRunFailure
-            code={start.failure.backendCode}
-            errorKind={start.failure.kind}
-            errorText={requestErrorMessageForError(start.failure)}
-            onRegenerate={() => void start.start()}
-            regenerateDisabled={start.submitting || cooldown}
-          />
-        ) : request.status === 'analyzing' ? (
-          runPending || start.started ? (
-            <SolutionGenerationState variant="analyzing" />
-          ) : (
-            <SolutionStartPrompt
-              onStart={() => void start.start()}
-              disabled={start.submitting || cooldown}
-              submitting={start.submitting}
-            />
-          )
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {translate('auto.components.request.SolutionPanel.empty', 'No analysis yet.')}
-          </p>
-        )}
-      </div>
+      <SolutionEmptyState
+        requestStatus={request.status}
+        runPending={runPending}
+        failedRun={failedRun}
+        decision={decision}
+        start={start}
+        cooldown={cooldown}
+      />
     )
   }
 
@@ -346,6 +215,9 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
   // Why: only a refused approval proves which questions the server still counts as unanswered.
   // Why: a superseded Solution's questions were already asked back; only the current version's still gate approval.
   const showQuestions = isCurrent && solution.status !== 'superseded'
+  const barShown = isCurrent && !presentation.readOnly && presentation.actions.length > 0
+  // Why: once the revision runs the Request leaves the gate, yet its progress must stay visible until the new version lands.
+  const showRevision = isCurrent && (revision.busy || (revision.canShow && barShown))
   const refusedIds =
     showQuestions && failure?.errorClass === 'blockingQuestions'
       ? parseBlockingQuestionIds(failure.error.message)
@@ -358,10 +230,18 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
           <SolutionRunFailure
             code={failedRun.errorCode}
             onRegenerate={() => void decision.regenerate()}
-            regenerateDisabled={decision.submitting || cooldown}
+            regenerateDisabled={decision.submitting || cooldown || revision.busy}
           />
         )}
-        <SolutionVersionSwitcher solutions={ordered} currentId={solution.id} onSelect={setViewId} />
+        <SolutionVersionSwitcher
+          solutions={ordered}
+          currentId={solution.id}
+          latestId={latest?.id}
+          // Why: selecting the current version means "follow the newest", so a revision that lands is shown.
+          onSelect={(id) => setViewId(id === latest?.id ? null : id)}
+        />
+        {!isCurrent && <OlderVersionBanner onBack={() => setViewId(null)} />}
+        <SolutionRevisionFeedback feedback={solution.revisionFeedback} />
         <SolutionStatusBanner
           solution={solution}
           presentation={presentation}
@@ -381,7 +261,7 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
             onSelect={setSelectedId}
             readOnly={readOnly}
             onRegenerate={() => void decision.regenerate()}
-            regenerateDisabled={decision.submitting || cooldown}
+            regenerateDisabled={decision.submitting || cooldown || revision.busy}
           />
         )}
         {awaitingNewer && request.status === 'analyzing' && (
@@ -409,6 +289,7 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
               : undefined
           }
         />
+        {showRevision && <AnalysisRevisionPanel revision={revision} kind={solution.kind} />}
       </div>
       {canAskBack && (
         <SolutionAskBackDialog
@@ -435,6 +316,7 @@ export function SolutionPanel({ request, onChanged }: SolutionPanelProps): React
           decision={decision}
           onGeneratePlan={canGeneratePlan ? generatePlan : undefined}
           regenerateCooldown={cooldown}
+          locked={revision.busy}
         />
       )}
     </div>

@@ -110,3 +110,46 @@ describe('parseSolution open questions', () => {
     expect(JSON.parse(d.content!).root_cause).toBe('x')
   })
 })
+
+describe('parseSolution revision fields (CR-REQ-041)', () => {
+  const base = { id: 's1', requestId: 'r', kind: 'solution', status: 'proposed' }
+
+  it('leaves both undefined when an older gateway omits them', () => {
+    const s = parseSolution(base)
+    expect(s.revisionFeedback).toBeUndefined()
+    expect(s.seq).toBeUndefined()
+  })
+
+  it('reads the feedback and the version number', () => {
+    const s = parseSolution({ ...base, revisionFeedback: 'Cover the rollback path', seq: 3 })
+    expect(s.revisionFeedback).toBe('Cover the rollback path')
+    expect(s.seq).toBe(3)
+  })
+
+  it('keeps an empty feedback string (the first proposal) as written', () => {
+    expect(parseSolution({ ...base, revisionFeedback: '', seq: 1 }).revisionFeedback).toBe('')
+  })
+
+  it.each([
+    ['a string', '2'],
+    ['zero (a dry run)', 0],
+    ['negative', -1],
+    ['fractional', 1.5],
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['null', null],
+    ['an object', { n: 1 }]
+  ])('treats seq %s as absent', (_name, value) => {
+    expect(parseSolution({ ...base, seq: value }).seq).toBeUndefined()
+  })
+
+  it.each([5, null, ['x'], { a: 1 }])('treats a non-string feedback (%j) as absent', (value) => {
+    expect(parseSolution({ ...base, revisionFeedback: value }).revisionFeedback).toBeUndefined()
+  })
+
+  it('does not throw on junk', () => {
+    for (const junk of [undefined, null, 5, 'x', []]) {
+      expect(() => parseSolution(junk)).not.toThrow()
+    }
+  })
+})

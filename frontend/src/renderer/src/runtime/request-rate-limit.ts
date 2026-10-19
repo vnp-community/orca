@@ -35,6 +35,7 @@ const WRITE_METHODS: ReadonlySet<string> = new Set([
   REQUEST_RPC_METHODS.RETURN_TO_BACKLOG,
   REQUEST_RPC_METHODS.CONFIRM_TYPE,
   REQUEST_RPC_METHODS.CHANGE_TYPE,
+  REQUEST_RPC_METHODS.SET_BASE_REF,
   REQUEST_RPC_METHODS.SPAWN_CHILD,
   REQUEST_RPC_METHODS.START_PHASE,
   REQUEST_RPC_METHODS.SOLUTION_CHOOSE,
@@ -60,7 +61,9 @@ const IDEMPOTENT_WRITES: ReadonlySet<string> = new Set([
   // Server returns the same Clarification for the same source, sourceRef and question keys.
   REQUEST_RPC_METHODS.CLARIFICATION_REQUEST,
   REQUEST_RPC_METHODS.APPROVAL_APPROVE,
-  REQUEST_RPC_METHODS.APPROVAL_REJECT
+  REQUEST_RPC_METHODS.APPROVAL_REJECT,
+  // Carries expectedVersion: a repeat after a throttled call that did run fails with REQUEST_VERSION_CONFLICT.
+  REQUEST_RPC_METHODS.SET_BASE_REF
 ])
 
 export function rateLimitClassOf(method: RequestRpcMethod): RateLimitClass {

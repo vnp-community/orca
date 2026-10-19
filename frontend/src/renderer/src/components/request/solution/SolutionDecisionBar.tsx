@@ -45,6 +45,8 @@ export type SolutionDecisionBarProps = {
   onGeneratePlan?: () => void
   /** Briefly true after REQUEST_RATE_LIMITED so regenerate cannot be hammered. */
   regenerateCooldown?: boolean
+  /** True while an analysis revision is being written: every decision waits for the new version. */
+  locked?: boolean
 }
 
 export function SolutionDecisionBar({
@@ -56,7 +58,8 @@ export function SolutionDecisionBar({
   selectedId,
   decision,
   onGeneratePlan,
-  regenerateCooldown = false
+  regenerateCooldown = false,
+  locked = false
 }: SolutionDecisionBarProps): React.JSX.Element | null {
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rationale, setRationale] = useState('')
@@ -105,7 +108,7 @@ export function SolutionDecisionBar({
     chosenOptionId: selectedId ?? solution.chosenOptionId
   })
   const busy = decision.submitting
-  const writeBusy = busy || writeCooling
+  const writeBusy = busy || writeCooling || locked
   const approveLabel =
     solution.kind === 'answer'
       ? translate('auto.components.request.SolutionDecisionBar.accept', 'Accept')
@@ -351,7 +354,7 @@ export function SolutionDecisionBar({
         {actions.includes('regenerate') && (
           <Button
             variant="outline"
-            disabled={busy || regenerateCooldown || aiCooling}
+            disabled={busy || locked || regenerateCooldown || aiCooling}
             onClick={() => void decision.regenerate()}
           >
             <RefreshCw className="size-4" aria-hidden />
@@ -360,7 +363,7 @@ export function SolutionDecisionBar({
         )}
         {actions.includes('generatePlan') && onGeneratePlan && (
           <Button
-            disabled={busy || aiCooling}
+            disabled={busy || locked || aiCooling}
             onClick={onGeneratePlan}
             data-testid="solution-generate-plan"
           >

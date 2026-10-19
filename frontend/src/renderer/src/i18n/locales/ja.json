@@ -5124,16 +5124,7 @@
           "0691753cf2": "未保存の変更"
         },
         "BaseRefPicker": {
-          "1b8e54151f": "一致するブランチが見つかりませんでした。",
-          "d166ff883d": "現在",
-          "a4a9372eb2": "ブランチを検索中...",
-          "7db7fb87e5": "ブランチを名前で検索...",
           "773a5687a3": "プライマリを使用",
-          "ade9a5bb03": ") 結果の範囲を指定します。",
-          "b468f46726": "上流/メイン",
-          "80f7c82303": ") または完全な参照 (例:",
-          "915ad97875": "上流",
-          "a5c16712c1": "複数のリモコンが検出されました。リモート名を入力します (例:",
           "9a14ec7400": "以下のベースブランチを選択",
           "086ce7f369": "次のプライマリ ブランチ ({{value0}})",
           "2f3cda96f5": "この repo に固定されています",
@@ -10808,6 +10799,27 @@
           }
         }
       },
+      "gitRefPicker": {
+        "RepoRefPicker": {
+          "remotesHintPrefix": "複数のリモコンが検出されました。リモート名を入力します (例:",
+          "remoteExample": "upstream",
+          "remotesHintMiddle": ") または完全な参照 (例:",
+          "refExample": "upstream/main",
+          "remotesHintSuffix": ") 結果の範囲を指定します。",
+          "searching": "ブランチを検索中...",
+          "noMatches": "一致するブランチが見つかりませんでした。",
+          "current": "現在",
+          "placeholder": "ブランチを名前で検索...",
+          "resultCount": "一致するブランチ: {{number}}件",
+          "offline": "ブランチを検索するためにホストへ接続できません。接続を確認してもう一度お試しください。",
+          "searchFailed": "ブランチの検索に失敗しました。もう一度お試しください。",
+          "retry": "再試行",
+          "searchLabel": "ブランチを検索",
+          "listLabel": "一致するブランチ",
+          "defaultNamed": "デフォルトブランチ ({{value0}})",
+          "defaultUnnamed": "デフォルトブランチ"
+        }
+      },
       "floating": {
         "terminal": {
           "FloatingTerminalIconContextMenu": {
@@ -13416,8 +13428,19 @@
         },
         "SolutionVersionSwitcher": {
           "label": "バージョン",
-          "old": "旧バージョン",
-          "version": "v{{n}}"
+          "badgeCurrent": "現在",
+          "badgeSuperseded": "置き換え済み",
+          "badgeRejected": "却下",
+          "badgeApproved": "承認済み",
+          "versionN": "バージョン {{n}}",
+          "firstProposal": "最初の提案",
+          "pages": "バージョンのページ",
+          "newer": "新しい",
+          "range": "{{total}} 件中 {{from}}–{{to}}",
+          "older": "古い",
+          "askedFor": "このバージョンで依頼した内容",
+          "viewingOlder": "古いバージョンを表示しています。",
+          "backToCurrent": "現在のバージョンに戻る"
         },
         "RequestReasonDialog": {
           "cancel": "キャンセル"
@@ -13625,7 +13648,8 @@
           "submit": "作成",
           "duplicate": "このイシューにはすでにリクエストがあります",
           "open": "開く",
-          "pendingLimit": "分類待ちのリクエストが多すぎます。後でもう一度お試しください。"
+          "pendingLimit": "分類待ちのリクエストが多すぎます。後でもう一度お試しください。",
+          "baseRefNotAppliedDetail": "リクエストは作成されましたが、そのワークツリーは {{ref}} から開始されません。"
         },
         "CreateRequestIssueButton": {
           "label": "リクエストを作成",
@@ -14135,7 +14159,8 @@
             "kept": "それ以前の作業は完了しており、保持されています ({{done}}/{{total}} タスク)。",
             "reopen": "再開して再実行",
             "log": "最新のログを見る",
-            "cancel": "リクエストをキャンセル"
+            "cancel": "リクエストをキャンセル",
+            "changeBranch": "開始ブランチを変更"
           },
           "ExecutionNeedsYou": {
             "due": "期限 {{when}}",
@@ -14214,7 +14239,9 @@
             "adviceSpecDefect": "タスク仕様が誤っているか不完全です。再実行の前にプランを変更してください。",
             "adviceAgentError": "エージェントは利用可能な結果なしに停止しました。ログを確認して再実行してください。",
             "adviceNeedsInfo": "続行するにはあなたの回答が必要です。",
-            "adviceUnknown": "ログで状況を確認してから再実行してください。"
+            "adviceUnknown": "ログで状況を確認してから再実行してください。",
+            "baseRefNotFound": "開始ブランチが見つかりません",
+            "adviceBaseRefNotFound": "このリクエストの開始元ブランチはリポジトリに存在しなくなりました。別の開始ブランチを選んで再実行してください。"
           }
         },
         "aiSetup": {
@@ -14377,6 +14404,108 @@
           "waitingApproval": "誰かの承認を待っています",
           "waitingInfo": "誰かが質問に答えるのを待っています",
           "done": "このリクエストは完了しました"
+        },
+        "AnalysisRevision": {
+          "errorEmpty": "送信する前に、何を変更すべきか記述してください。",
+          "errorTooLong": "依頼は{{max}}文字以内にしてください。",
+          "errorForbidden": "この分析の変更を依頼できるのは承認者のみです。入力した内容は保持されます。",
+          "errorWrongState": "他の人がすでにこの分析を修正中か、決定済みです。内容を更新しました。入力した内容は保持されます。",
+          "errorNoConnection": "開発サーバーが接続されていないため、今は分析を修正できません。現在のバージョンは変更されず、入力した内容は保持されます。",
+          "suggestion": {
+            "solution": {
+              "lowerRisk": "リスクの低い代替案を追加してください。",
+              "compareCost": "各案をコストと工数で比較してください。",
+              "tradeOffs": "推奨案のトレードオフを説明してください。",
+              "rollback": "ロールバック計画を含めてください。"
+            },
+            "diagnosis": {
+              "evidence": "根本原因の根拠を示してください。",
+              "otherCauses": "他に考えられる原因も検討してください。",
+              "reproduce": "再現手順を説明してください。",
+              "prevent": "再発防止策を提案してください。"
+            },
+            "findings": {
+              "moreAreas": "私が挙げていないファイルやモジュールも対象にしてください。",
+              "rankByRisk": "所見をリスク順に並べてください。",
+              "evidence": "各所見に根拠を追加してください。",
+              "dropIrrelevant": "関連のない所見は除いてください。"
+            },
+            "answer": {
+              "concise": "もっと簡潔にしてください。",
+              "examples": "具体例を追加してください。",
+              "cite": "コードのどの部分に基づくか示してください。",
+              "uncertainty": "確信が持てない点を明記してください。"
+            }
+          },
+          "title": "この分析の変更を依頼",
+          "hint": "変更したい点を書いてください。AI が新しいバージョンを作成し、このバージョンは履歴に残ります。",
+          "fieldLabel": "何を変更しますか?",
+          "placeholder": "例: 選択肢をコストで比較し、ロールバック計画を追加する。",
+          "suggestions": "候補",
+          "counter": "{{count}} / {{max}}",
+          "submit": "分析を修正",
+          "shortcutHint": "または {{shortcut}} を押す",
+          "busy": "バージョン {{n}} を分析中…",
+          "busyNext": "次のバージョンを分析中…"
+        },
+        "StartFromField": {
+          "defaultNamed": "デフォルトブランチ ({{name}})",
+          "defaultUnnamed": "デフォルトブランチ",
+          "label": "開始元",
+          "triggerLabel": "開始ブランチ: {{branch}}",
+          "useDefault": "デフォルトブランチを使う",
+          "hint": "このリクエストのワークツリーは {{repo}} のこのブランチから開始されます。",
+          "manualLabel": "ブランチまたはタグの名前",
+          "manualPlaceholder": "例: release/1.2",
+          "manualUse": "このブランチを使う",
+          "offline": "ブランチを一覧表示するためにホストへ接続できません。ブランチ名を入力してください。ワークツリーの作成時に確認されます。",
+          "typeInstead": "ブランチ名を直接入力する"
+        },
+        "RequestBaseRefRow": {
+          "suggestions": "もしかして:",
+          "notApplied": "このサーバーは開始ブランチを適用しませんでした。",
+          "unverified": "ホストに接続できず、このブランチを確認できませんでした。ワークツリーの作成時に確認されます。",
+          "label": "開始ブランチ",
+          "startsFromDefault": "ワークツリーはデフォルトブランチから開始されます",
+          "startsFrom": "ワークツリーは {{ref}} から開始されます",
+          "lockedLabel": "ロック中: {{reason}}",
+          "locked": "ロック中",
+          "edit": "開始ブランチを変更",
+          "saving": "保存中...",
+          "defaultBranch": "デフォルトブランチ",
+          "conflict": "他のユーザーが先にこのリクエストを変更しました。現在の開始元は {{current}} です。あなたの変更は {{mine}} でした。",
+          "applyMine": "自分の変更を適用",
+          "keepCurrent": "現在のものを維持",
+          "saved": "開始ブランチを更新しました"
+        },
+        "BaseRefViolation": {
+          "blank": "ブランチまたはタグの名前を入力してください。",
+          "tooLong": "この名前は長すぎます。255 バイト以内にしてください。",
+          "invalidUtf8": "この名前には保存できない文字が含まれています。",
+          "leadingDash": "ブランチ名をハイフンで始めることはできません。",
+          "bareAt": "ブランチ名を {{token}} だけにすることはできません。",
+          "nulByte": "ブランチ名に null 文字を含めることはできません。",
+          "controlCharacter": "ブランチ名に制御文字を含めることはできません。",
+          "whitespace": "ブランチ名に空白を含めることはできません。",
+          "forbiddenCharacter": "ブランチ名に {{token}} を含めることはできません。",
+          "doubleDot": "ブランチ名に {{token}} を含めることはできません。",
+          "reflogSyntax": "ブランチ名に {{token}} を含めることはできません。",
+          "doubleSlash": "ブランチ名に {{token}} を含めることはできません。",
+          "leadingSlash": "ブランチ名を {{token}} で始めることはできません。",
+          "trailingSlash": "ブランチ名を {{token}} で終えることはできません。",
+          "trailingDot": "ブランチ名を {{token}} で終えることはできません。",
+          "dotComponent": "ブランチ名のどの部分もドットで始めることはできません。",
+          "lockComponent": "ブランチ名のどの部分も {{token}} で終えることはできません。"
+        },
+        "BaseRefError": {
+          "lockProposal": "分析がすでにこのブランチからワークツリーを作成したため、変更できません。",
+          "lockTask": "このリクエストにはすでにタスクのワークツリーがあるため、ブランチを変更できません。",
+          "lockExecution": "実行がすでに開始されているため、ブランチを変更できません。",
+          "lockTerminal": "このリクエストは完了しているため、ブランチを変更できません。",
+          "lockGeneric": "このリクエストにはすでにワークツリーがあるため、ブランチを変更できません。",
+          "invalid": "有効なブランチ名またはタグ名ではありません。確認してもう一度お試しください。",
+          "notFound": "このブランチまたはタグはリポジトリに見つかりませんでした。別のものを選択してください。",
+          "checkNotConfigured": "このサーバーはまだブランチを確認できないため、ブランチは保存されませんでした。管理者に問い合わせてください。"
         }
       },
       "reviewMap": {

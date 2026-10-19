@@ -94,6 +94,18 @@ export type RequestLinkReason =
   | 'child'
   | 'unknown'
 
+/**
+ * Why a Request's base ref can no longer change. `unknown` is a reason a newer backend invented: the ref is still locked.
+ * The empty string is the wire value of "not locked".
+ */
+export type RequestBaseRefLockReason =
+  | 'proposal'
+  | 'task'
+  | 'execution'
+  | 'terminal'
+  | 'unknown'
+  | ''
+
 export type OrcaRequest = {
   id: string
   projectId: string
@@ -130,6 +142,16 @@ export type OrcaRequest = {
   engine?: RequestEngine
   /** step_by_step or continuous, pinned when the request entered executing; absent before that. */
   executionMode?: ExecutionMode
+  /**
+   * CR-REQ-039: branch or tag the worktrees start from. `''` means the repository default; `undefined` means the gateway
+   * did not send the field at all (a gateway older than CR-REQ-039), which the UI must not read as "default".
+   */
+  baseRef?: string
+  /** True once a worktree exists or the request is finished; `undefined` on an older gateway. */
+  baseRefLocked?: boolean
+  baseRefLockReason?: RequestBaseRefLockReason
+  /** The ref was stored but the host could not confirm it exists (create/set results only). */
+  baseRefUnverified?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -193,6 +215,10 @@ export type Solution = {
   reviewedAt?: string
   reviewedById?: string
   version?: number
+  /** CR-REQ-041: what the reviewer asked for when this version was generated; absent on the first proposal. */
+  revisionFeedback?: string
+  /** 1-based position of this version among the Request's analyses of one kind; absent on an older gateway. */
+  seq?: number
 }
 
 /** One background AI run behind a Solution (`solution.list` → `runs`). */

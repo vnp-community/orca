@@ -5124,16 +5124,7 @@
           "0691753cf2": "저장되지 않은 변경사항"
         },
         "BaseRefPicker": {
-          "1b8e54151f": "일치하는 브랜치를 찾을 수 없습니다.",
-          "d166ff883d": "현재",
-          "a4a9372eb2": "브랜치 검색 중...",
-          "7db7fb87e5": "이름으로 브랜치 검색...",
           "773a5687a3": "기본 사용",
-          "ade9a5bb03": ") 결과 범위를 지정합니다.",
-          "b468f46726": "upstream/main",
-          "80f7c82303": ") 또는 전체 참조(예:",
-          "915ad97875": "upstream",
-          "a5c16712c1": "여러 개의 원격이 감지되었습니다. 원격 이름을 입력하세요(예:",
           "9a14ec7400": "아래에서 기본 브랜치를 선택하세요.",
           "086ce7f369": "다음 기본 브랜치({{value0}})",
           "2f3cda96f5": "이 repo에 고정됨",
@@ -10808,6 +10799,27 @@
           }
         }
       },
+      "gitRefPicker": {
+        "RepoRefPicker": {
+          "remotesHintPrefix": "여러 개의 원격이 감지되었습니다. 원격 이름을 입력하세요(예:",
+          "remoteExample": "upstream",
+          "remotesHintMiddle": ") 또는 전체 참조(예:",
+          "refExample": "upstream/main",
+          "remotesHintSuffix": ") 결과 범위를 지정합니다.",
+          "searching": "브랜치 검색 중...",
+          "noMatches": "일치하는 브랜치를 찾을 수 없습니다.",
+          "current": "현재",
+          "placeholder": "이름으로 브랜치 검색...",
+          "resultCount": "일치하는 브랜치 {{number}}개",
+          "offline": "브랜치를 검색할 호스트에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
+          "searchFailed": "브랜치 검색에 실패했습니다. 다시 시도하세요.",
+          "retry": "다시 시도",
+          "searchLabel": "브랜치 검색",
+          "listLabel": "일치하는 브랜치",
+          "defaultNamed": "기본 브랜치 ({{value0}})",
+          "defaultUnnamed": "기본 브랜치"
+        }
+      },
       "floating": {
         "terminal": {
           "FloatingTerminalIconContextMenu": {
@@ -13416,8 +13428,19 @@
         },
         "SolutionVersionSwitcher": {
           "label": "버전",
-          "old": "이전 버전",
-          "version": "v{{n}}"
+          "badgeCurrent": "현재",
+          "badgeSuperseded": "대체됨",
+          "badgeRejected": "반려됨",
+          "badgeApproved": "승인됨",
+          "versionN": "버전 {{n}}",
+          "firstProposal": "첫 제안",
+          "pages": "버전 페이지",
+          "newer": "최신",
+          "range": "총 {{total}}개 중 {{from}}–{{to}}",
+          "older": "이전",
+          "askedFor": "이 버전에 요청한 내용",
+          "viewingOlder": "이전 버전을 보고 있습니다.",
+          "backToCurrent": "현재 버전으로 돌아가기"
         },
         "RequestReasonDialog": {
           "cancel": "취소"
@@ -13625,7 +13648,8 @@
           "submit": "만들기",
           "duplicate": "이 이슈에는 이미 요청이 있습니다",
           "open": "열기",
-          "pendingLimit": "분류 대기 중인 요청이 너무 많습니다. 나중에 다시 시도하세요."
+          "pendingLimit": "분류 대기 중인 요청이 너무 많습니다. 나중에 다시 시도하세요.",
+          "baseRefNotAppliedDetail": "요청은 만들어졌지만 워크트리가 {{ref}}에서 시작되지 않습니다."
         },
         "CreateRequestIssueButton": {
           "label": "요청 만들기",
@@ -14135,7 +14159,8 @@
             "kept": "그 이전 작업은 모두 완료되어 보존됩니다 (작업 {{done}}/{{total}}).",
             "reopen": "다시 열고 재실행",
             "log": "마지막 로그 보기",
-            "cancel": "요청 취소"
+            "cancel": "요청 취소",
+            "changeBranch": "시작 브랜치 변경"
           },
           "ExecutionNeedsYou": {
             "due": "기한 {{when}}",
@@ -14214,7 +14239,9 @@
             "adviceSpecDefect": "작업 명세가 잘못되었거나 불완전합니다. 재실행 전에 계획을 수정하세요.",
             "adviceAgentError": "에이전트가 사용할 수 있는 결과 없이 멈췄습니다. 로그를 확인한 뒤 재실행하세요.",
             "adviceNeedsInfo": "계속하려면 에이전트가 당신의 답변을 필요로 합니다.",
-            "adviceUnknown": "로그에서 무슨 일이 있었는지 확인한 뒤 재실행하세요."
+            "adviceUnknown": "로그에서 무슨 일이 있었는지 확인한 뒤 재실행하세요.",
+            "baseRefNotFound": "시작 브랜치를 찾을 수 없음",
+            "adviceBaseRefNotFound": "이 요청이 시작하는 브랜치가 저장소에 더 이상 없습니다. 다른 시작 브랜치를 선택한 뒤 재실행하세요."
           }
         },
         "aiSetup": {
@@ -14377,6 +14404,108 @@
           "waitingApproval": "누군가의 승인을 기다리는 중",
           "waitingInfo": "누군가 질문에 답하기를 기다리는 중",
           "done": "이 요청은 완료되었습니다"
+        },
+        "AnalysisRevision": {
+          "errorEmpty": "보내기 전에 무엇을 바꿔야 하는지 적어 주세요.",
+          "errorTooLong": "요청은 {{max}}자 이하로 작성해 주세요.",
+          "errorForbidden": "이 분석의 변경은 승인자만 요청할 수 있습니다. 입력한 내용은 그대로 유지됩니다.",
+          "errorWrongState": "다른 사람이 이미 이 분석을 수정 중이거나 결정을 내렸습니다. 화면을 새로 고쳤으며 입력한 내용은 유지됩니다.",
+          "errorNoConnection": "연결된 개발 서버가 없어 지금은 분석을 수정할 수 없습니다. 현재 버전은 그대로이며 입력한 내용도 유지됩니다.",
+          "suggestion": {
+            "solution": {
+              "lowerRisk": "위험이 더 낮은 대안을 추가해 주세요.",
+              "compareCost": "비용과 노력 기준으로 옵션을 비교해 주세요.",
+              "tradeOffs": "추천 옵션의 장단점(트레이드오프)을 설명해 주세요.",
+              "rollback": "롤백 계획을 포함해 주세요."
+            },
+            "diagnosis": {
+              "evidence": "근본 원인의 근거를 보여 주세요.",
+              "otherCauses": "다른 가능한 원인도 검토해 주세요.",
+              "reproduce": "재현 방법을 설명해 주세요.",
+              "prevent": "재발 방지 방안을 제안해 주세요."
+            },
+            "findings": {
+              "moreAreas": "제가 언급하지 않은 파일과 모듈도 다뤄 주세요.",
+              "rankByRisk": "발견 사항을 위험도 순으로 정렬해 주세요.",
+              "evidence": "각 발견 사항에 근거를 추가해 주세요.",
+              "dropIrrelevant": "관련 없는 발견 사항은 제외해 주세요."
+            },
+            "answer": {
+              "concise": "더 간결하게 써 주세요.",
+              "examples": "구체적인 예시를 추가해 주세요.",
+              "cite": "코드의 어느 부분에서 나온 내용인지 밝혀 주세요.",
+              "uncertainty": "확실하지 않은 부분을 밝혀 주세요."
+            }
+          },
+          "title": "이 분석에 변경 요청",
+          "hint": "바꿀 내용을 적어 주세요. AI가 새 버전을 작성하며 이 버전은 기록에 남습니다.",
+          "fieldLabel": "무엇을 바꿔야 하나요?",
+          "placeholder": "예: 옵션을 비용 기준으로 비교하고 롤백 계획을 추가하세요.",
+          "suggestions": "추천 문구",
+          "counter": "{{count}} / {{max}}",
+          "submit": "분석 수정",
+          "shortcutHint": "또는 {{shortcut}} 누르기",
+          "busy": "버전 {{n}} 분석 중…",
+          "busyNext": "다음 버전 분석 중…"
+        },
+        "StartFromField": {
+          "defaultNamed": "기본 브랜치 ({{name}})",
+          "defaultUnnamed": "기본 브랜치",
+          "label": "시작 브랜치",
+          "triggerLabel": "시작 브랜치: {{branch}}",
+          "useDefault": "기본 브랜치 사용",
+          "hint": "이 요청의 워크트리는 {{repo}}의 이 브랜치에서 시작됩니다.",
+          "manualLabel": "브랜치 또는 태그 이름",
+          "manualPlaceholder": "예: release/1.2",
+          "manualUse": "이 브랜치 사용",
+          "offline": "브랜치를 나열할 호스트에 연결할 수 없습니다. 브랜치 이름을 입력하세요. 워크트리를 만들 때 확인됩니다.",
+          "typeInstead": "브랜치 이름 직접 입력"
+        },
+        "RequestBaseRefRow": {
+          "suggestions": "혹시 다음인가요:",
+          "notApplied": "이 서버는 시작 브랜치를 적용하지 않았습니다.",
+          "unverified": "호스트에 연결할 수 없어 이 브랜치를 확인하지 못했습니다. 워크트리를 만들 때 확인됩니다.",
+          "label": "시작 브랜치",
+          "startsFromDefault": "워크트리는 기본 브랜치에서 시작됩니다",
+          "startsFrom": "워크트리는 {{ref}}에서 시작됩니다",
+          "lockedLabel": "잠김: {{reason}}",
+          "locked": "잠김",
+          "edit": "시작 브랜치 변경",
+          "saving": "저장 중...",
+          "defaultBranch": "기본 브랜치",
+          "conflict": "다른 사람이 먼저 이 요청을 변경했습니다. 지금은 {{current}}에서 시작합니다. 내 변경은 {{mine}}이었습니다.",
+          "applyMine": "내 변경 적용",
+          "keepCurrent": "현재 값 유지",
+          "saved": "시작 브랜치를 업데이트했습니다"
+        },
+        "BaseRefViolation": {
+          "blank": "브랜치 또는 태그 이름을 입력하세요.",
+          "tooLong": "이름이 너무 깁니다. 255바이트 이하로 입력하세요.",
+          "invalidUtf8": "이름에 저장할 수 없는 문자가 포함되어 있습니다.",
+          "leadingDash": "브랜치 이름은 하이픈으로 시작할 수 없습니다.",
+          "bareAt": "브랜치 이름을 {{token}}만으로 지정할 수 없습니다.",
+          "nulByte": "브랜치 이름에 널 문자를 포함할 수 없습니다.",
+          "controlCharacter": "브랜치 이름에 제어 문자를 포함할 수 없습니다.",
+          "whitespace": "브랜치 이름에 공백을 포함할 수 없습니다.",
+          "forbiddenCharacter": "브랜치 이름에 {{token}}을(를) 포함할 수 없습니다.",
+          "doubleDot": "브랜치 이름에 {{token}}을(를) 포함할 수 없습니다.",
+          "reflogSyntax": "브랜치 이름에 {{token}}을(를) 포함할 수 없습니다.",
+          "doubleSlash": "브랜치 이름에 {{token}}을(를) 포함할 수 없습니다.",
+          "leadingSlash": "브랜치 이름은 {{token}}(으)로 시작할 수 없습니다.",
+          "trailingSlash": "브랜치 이름은 {{token}}(으)로 끝날 수 없습니다.",
+          "trailingDot": "브랜치 이름은 {{token}}(으)로 끝날 수 없습니다.",
+          "dotComponent": "브랜치 이름의 어느 구간도 점으로 시작할 수 없습니다.",
+          "lockComponent": "브랜치 이름의 어느 구간도 {{token}}(으)로 끝날 수 없습니다."
+        },
+        "BaseRefError": {
+          "lockProposal": "분석에서 이미 이 브랜치로 워크트리를 만들었으므로 더 이상 변경할 수 없습니다.",
+          "lockTask": "이 요청에는 이미 작업 워크트리가 있으므로 브랜치를 더 이상 변경할 수 없습니다.",
+          "lockExecution": "실행이 이미 시작되었으므로 브랜치를 더 이상 변경할 수 없습니다.",
+          "lockTerminal": "이 요청은 종료되었으므로 브랜치를 더 이상 변경할 수 없습니다.",
+          "lockGeneric": "이 요청에는 이미 워크트리가 있으므로 브랜치를 더 이상 변경할 수 없습니다.",
+          "invalid": "올바른 브랜치 또는 태그 이름이 아닙니다. 확인한 뒤 다시 시도하세요.",
+          "notFound": "저장소에서 이 브랜치 또는 태그를 찾을 수 없습니다. 다른 것을 선택하세요.",
+          "checkNotConfigured": "이 서버는 아직 브랜치를 확인할 수 없어 브랜치가 저장되지 않았습니다. 관리자에게 문의하세요."
         }
       },
       "reviewMap": {

@@ -41,6 +41,8 @@ export type FailureCause =
   | 'agent_error'
   | 'needs_info'
   | 'cancelled'
+  /** CR-REQ-039: the Request's starting branch no longer exists, so no worktree could be created from it. */
+  | 'base_ref_not_found'
   | 'unknown'
 
 export type ExecutionProgress = {

@@ -5139,16 +5139,7 @@
           "0691753cf2": "Cambios sin guardar"
         },
         "BaseRefPicker": {
-          "1b8e54151f": "No se encontraron ramas coincidentes.",
-          "d166ff883d": "Actual",
-          "a4a9372eb2": "Buscando ramas...",
-          "7db7fb87e5": "Buscar ramas por nombre...",
           "773a5687a3": "Usar rama principal",
-          "ade9a5bb03": ") para acotar los resultados.",
-          "b468f46726": "upstream/main",
-          "80f7c82303": ") o una ref completa (p. ej.",
-          "915ad97875": "upstream",
-          "a5c16712c1": "Se detectaron varios remotes. Escribe el nombre de un remote (p. ej.",
           "9a14ec7400": "Elige una rama base abajo",
           "086ce7f369": "Siguiendo la rama principal ({{value0}})",
           "2f3cda96f5": "Fijada para este repositorio",
@@ -10808,6 +10799,27 @@
           }
         }
       },
+      "gitRefPicker": {
+        "RepoRefPicker": {
+          "remotesHintPrefix": "Se detectaron varios remotes. Escribe el nombre de un remote (p. ej.",
+          "remoteExample": "upstream",
+          "remotesHintMiddle": ") o una ref completa (p. ej.",
+          "refExample": "upstream/main",
+          "remotesHintSuffix": ") para acotar los resultados.",
+          "searching": "Buscando ramas...",
+          "noMatches": "No se encontraron ramas coincidentes.",
+          "current": "Actual",
+          "placeholder": "Buscar ramas por nombre...",
+          "resultCount": "{{number}} ramas coincidentes",
+          "offline": "No se puede conectar con el host para buscar ramas. Compruebe la conexión e inténtelo de nuevo.",
+          "searchFailed": "Falló la búsqueda de ramas. Inténtelo de nuevo.",
+          "retry": "Reintentar",
+          "searchLabel": "Buscar ramas",
+          "listLabel": "Ramas coincidentes",
+          "defaultNamed": "Rama predeterminada ({{value0}})",
+          "defaultUnnamed": "Rama predeterminada"
+        }
+      },
       "floating": {
         "terminal": {
           "FloatingTerminalIconContextMenu": {
@@ -13416,8 +13428,19 @@
         },
         "SolutionVersionSwitcher": {
           "label": "Versiones",
-          "old": "Versión anterior",
-          "version": "v{{n}}"
+          "badgeCurrent": "Actual",
+          "badgeSuperseded": "Reemplazada",
+          "badgeRejected": "Rechazada",
+          "badgeApproved": "Aprobada",
+          "versionN": "Versión {{n}}",
+          "firstProposal": "Primera propuesta",
+          "pages": "Páginas de versiones",
+          "newer": "Más recientes",
+          "range": "{{from}}–{{to}} de {{total}}",
+          "older": "Más antiguas",
+          "askedFor": "Qué se pidió para esta versión",
+          "viewingOlder": "Estás viendo una versión anterior.",
+          "backToCurrent": "Volver a la actual"
         },
         "RequestReasonDialog": {
           "cancel": "Cancelar"
@@ -13625,7 +13648,8 @@
           "submit": "Crear",
           "duplicate": "Esta incidencia ya tiene una solicitud",
           "open": "Abrir",
-          "pendingLimit": "Hay demasiadas solicitudes pendientes de clasificar. Inténtalo más tarde."
+          "pendingLimit": "Hay demasiadas solicitudes pendientes de clasificar. Inténtalo más tarde.",
+          "baseRefNotAppliedDetail": "La solicitud se creó, pero sus worktrees no partirán de {{ref}}."
         },
         "CreateRequestIssueButton": {
           "label": "Crear solicitud",
@@ -14135,7 +14159,8 @@
             "kept": "Todo lo anterior está hecho y se conserva ({{done}}/{{total}} tareas).",
             "reopen": "Reabrir y volver a ejecutar",
             "log": "Ver el último registro",
-            "cancel": "Cancelar solicitud"
+            "cancel": "Cancelar solicitud",
+            "changeBranch": "Cambiar la rama de inicio"
           },
           "ExecutionNeedsYou": {
             "due": "Vence {{when}}",
@@ -14214,7 +14239,9 @@
             "adviceSpecDefect": "La especificación de la tarea es incorrecta o está incompleta. Cambia el plan antes de volver a ejecutar.",
             "adviceAgentError": "El agente se detuvo sin un resultado utilizable. Lee el registro y vuelve a ejecutar.",
             "adviceNeedsInfo": "El agente necesita una respuesta tuya para continuar.",
-            "adviceUnknown": "Lee el registro para ver qué pasó y vuelve a ejecutar."
+            "adviceUnknown": "Lee el registro para ver qué pasó y vuelve a ejecutar.",
+            "baseRefNotFound": "Rama de inicio no encontrada",
+            "adviceBaseRefNotFound": "La rama de la que parte esta solicitud ya no existe en el repositorio. Elige otra rama de inicio y vuelve a ejecutar."
           }
         },
         "aiSetup": {
@@ -14377,6 +14404,108 @@
           "waitingApproval": "Esperando que alguien apruebe",
           "waitingInfo": "Esperando que alguien responda una pregunta",
           "done": "Esta solicitud está terminada"
+        },
+        "AnalysisRevision": {
+          "errorEmpty": "Describa qué debe cambiar antes de enviarlo.",
+          "errorTooLong": "Limite la petición a {{max}} caracteres o menos.",
+          "errorForbidden": "Solo los aprobadores de este análisis pueden pedir cambios. Se conserva su texto.",
+          "errorWrongState": "Otra persona ya está revisando este análisis o ya ha decidido. Se actualizó; se conserva su texto.",
+          "errorNoConnection": "No hay ningún servidor de desarrollo conectado, así que el análisis no se puede revisar ahora. La versión actual no ha cambiado y se conserva su texto.",
+          "suggestion": {
+            "solution": {
+              "lowerRisk": "Añade una alternativa de menor riesgo.",
+              "compareCost": "Compara las opciones en coste y esfuerzo.",
+              "tradeOffs": "Explica las contrapartidas de la opción recomendada.",
+              "rollback": "Incluye el plan de reversión."
+            },
+            "diagnosis": {
+              "evidence": "Muestra las pruebas de la causa raíz.",
+              "otherCauses": "Considera otras causas posibles.",
+              "reproduce": "Explica cómo reproducirlo.",
+              "prevent": "Sugiere cómo evitar que vuelva a ocurrir."
+            },
+            "findings": {
+              "moreAreas": "Cubre los archivos y módulos que no mencioné.",
+              "rankByRisk": "Ordena los hallazgos por riesgo.",
+              "evidence": "Añade pruebas para cada hallazgo.",
+              "dropIrrelevant": "Elimina los hallazgos que no sean relevantes."
+            },
+            "answer": {
+              "concise": "Sé más conciso.",
+              "examples": "Añade ejemplos concretos.",
+              "cite": "Indica en qué parte del código se basa.",
+              "uncertainty": "Indica de qué no estás seguro."
+            }
+          },
+          "title": "Pedir cambios en este análisis",
+          "hint": "Describe qué debe cambiar. La IA escribe una versión nueva y esta se conserva en el historial.",
+          "fieldLabel": "¿Qué debe cambiar?",
+          "placeholder": "Por ejemplo: compara las opciones por costo y añade un plan de reversión.",
+          "suggestions": "Sugerencias",
+          "counter": "{{count}} / {{max}}",
+          "submit": "Revisar análisis",
+          "shortcutHint": "o pulsa {{shortcut}}",
+          "busy": "Analizando la versión {{n}}…",
+          "busyNext": "Analizando la siguiente versión…"
+        },
+        "StartFromField": {
+          "defaultNamed": "Rama predeterminada ({{name}})",
+          "defaultUnnamed": "Rama predeterminada",
+          "label": "Empezar desde",
+          "triggerLabel": "Rama de inicio: {{branch}}",
+          "useDefault": "Usar la rama predeterminada",
+          "hint": "Los worktrees de esta solicitud parten de esta rama de {{repo}}.",
+          "manualLabel": "Nombre de la rama o etiqueta",
+          "manualPlaceholder": "p. ej. release/1.2",
+          "manualUse": "Usar esta rama",
+          "offline": "No se puede conectar con el host para listar las ramas. Escribe el nombre de la rama; se comprobará al crear el worktree.",
+          "typeInstead": "Escribir el nombre de una rama"
+        },
+        "RequestBaseRefRow": {
+          "suggestions": "¿Quisiste decir:",
+          "notApplied": "Este servidor no aplicó la rama de inicio.",
+          "unverified": "No pudimos conectar con el host para comprobar esta rama. Se comprobará al crear el worktree.",
+          "label": "Rama de inicio",
+          "startsFromDefault": "Los worktrees parten de la rama predeterminada",
+          "startsFrom": "Los worktrees parten de {{ref}}",
+          "lockedLabel": "Bloqueado: {{reason}}",
+          "locked": "Bloqueado",
+          "edit": "Cambiar la rama de inicio",
+          "saving": "Guardando...",
+          "defaultBranch": "la rama predeterminada",
+          "conflict": "Otra persona cambió esta solicitud antes. Ahora parte de {{current}}. Tu cambio era a {{mine}}.",
+          "applyMine": "Aplicar mi cambio",
+          "keepCurrent": "Mantener la actual",
+          "saved": "Rama de inicio actualizada"
+        },
+        "BaseRefViolation": {
+          "blank": "Escribe el nombre de una rama o etiqueta.",
+          "tooLong": "Este nombre es demasiado largo. Usa 255 bytes o menos.",
+          "invalidUtf8": "Este nombre contiene caracteres que no se pueden guardar.",
+          "leadingDash": "El nombre de una rama no puede empezar por un guion.",
+          "bareAt": "El nombre de una rama no puede ser solo {{token}}.",
+          "nulByte": "El nombre de una rama no puede contener un carácter nulo.",
+          "controlCharacter": "El nombre de una rama no puede contener caracteres de control.",
+          "whitespace": "El nombre de una rama no puede contener espacios.",
+          "forbiddenCharacter": "El nombre de una rama no puede contener {{token}}.",
+          "doubleDot": "El nombre de una rama no puede contener {{token}}.",
+          "reflogSyntax": "El nombre de una rama no puede contener {{token}}.",
+          "doubleSlash": "El nombre de una rama no puede contener {{token}}.",
+          "leadingSlash": "El nombre de una rama no puede empezar por {{token}}.",
+          "trailingSlash": "El nombre de una rama no puede terminar en {{token}}.",
+          "trailingDot": "El nombre de una rama no puede terminar en {{token}}.",
+          "dotComponent": "Ninguna parte del nombre de una rama puede empezar por un punto.",
+          "lockComponent": "Ninguna parte del nombre de una rama puede terminar en {{token}}."
+        },
+        "BaseRefError": {
+          "lockProposal": "El análisis ya creó un worktree desde esta rama, así que ya no se puede cambiar.",
+          "lockTask": "Ya existe un worktree de tarea para esta solicitud, así que la rama ya no se puede cambiar.",
+          "lockExecution": "La ejecución ya ha empezado, así que la rama ya no se puede cambiar.",
+          "lockTerminal": "Esta solicitud ha terminado, así que la rama ya no se puede cambiar.",
+          "lockGeneric": "Ya existen worktrees para esta solicitud, así que la rama ya no se puede cambiar.",
+          "invalid": "No es un nombre de rama o etiqueta válido. Revísalo e inténtalo de nuevo.",
+          "notFound": "No se encontró esta rama o etiqueta en el repositorio. Elige otra.",
+          "checkNotConfigured": "Este servidor aún no puede comprobar ramas, así que la rama no se guardó. Consulta con un administrador."
         }
       },
       "reviewMap": {

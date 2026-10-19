@@ -5139,16 +5139,7 @@
           "0691753cf2": "Unsaved changes"
         },
         "BaseRefPicker": {
-          "1b8e54151f": "No matching branches found.",
-          "d166ff883d": "Current",
-          "a4a9372eb2": "Searching branches...",
-          "7db7fb87e5": "Search branches by name...",
           "773a5687a3": "Use Primary",
-          "ade9a5bb03": ") to scope results.",
-          "b468f46726": "upstream/main",
-          "80f7c82303": ") or a full ref (e.g.",
-          "915ad97875": "upstream",
-          "a5c16712c1": "Multiple remotes detected. Type a remote name (e.g.",
           "9a14ec7400": "Pick a base branch below",
           "086ce7f369": "Following primary branch ({{value0}})",
           "2f3cda96f5": "Pinned for this repo",
@@ -10808,6 +10799,27 @@
           }
         }
       },
+      "gitRefPicker": {
+        "RepoRefPicker": {
+          "remotesHintPrefix": "Multiple remotes detected. Type a remote name (e.g.",
+          "remoteExample": "upstream",
+          "remotesHintMiddle": ") or a full ref (e.g.",
+          "refExample": "upstream/main",
+          "remotesHintSuffix": ") to scope results.",
+          "searching": "Searching branches...",
+          "noMatches": "No matching branches found.",
+          "current": "Current",
+          "placeholder": "Search branches by name...",
+          "resultCount": "{{number}} matching branches",
+          "offline": "Cannot reach the host to search branches. Check the connection and try again.",
+          "searchFailed": "Branch search failed. Try again.",
+          "retry": "Retry",
+          "searchLabel": "Search branches",
+          "listLabel": "Matching branches",
+          "defaultNamed": "Default branch ({{value0}})",
+          "defaultUnnamed": "Default branch"
+        }
+      },
       "floating": {
         "terminal": {
           "FloatingTerminalIconContextMenu": {
@@ -13416,8 +13428,19 @@
         },
         "SolutionVersionSwitcher": {
           "label": "Versions",
-          "old": "Older version",
-          "version": "v{{n}}"
+          "badgeCurrent": "Current",
+          "badgeSuperseded": "Superseded",
+          "badgeRejected": "Rejected",
+          "badgeApproved": "Approved",
+          "versionN": "Version {{n}}",
+          "firstProposal": "First proposal",
+          "pages": "Version pages",
+          "newer": "Newer",
+          "range": "{{from}}–{{to}} of {{total}}",
+          "older": "Older",
+          "askedFor": "What was asked for this version",
+          "viewingOlder": "You're viewing an older version.",
+          "backToCurrent": "Back to current"
         },
         "RequestReasonDialog": {
           "cancel": "Cancel"
@@ -13625,7 +13648,8 @@
           "submit": "Create",
           "duplicate": "This issue already has a request",
           "open": "Open",
-          "pendingLimit": "Too many requests are waiting for classification. Try again later."
+          "pendingLimit": "Too many requests are waiting for classification. Try again later.",
+          "baseRefNotAppliedDetail": "The request was created, but its worktrees will not start from {{ref}}."
         },
         "CreateRequestIssueButton": {
           "label": "Create request",
@@ -14135,7 +14159,8 @@
             "kept": "Everything before it is done and kept ({{done}}/{{total}} tasks).",
             "reopen": "Reopen and rerun",
             "log": "View last log",
-            "cancel": "Cancel request"
+            "cancel": "Cancel request",
+            "changeBranch": "Change starting branch"
           },
           "ExecutionNeedsYou": {
             "due": "Due {{when}}",
@@ -14214,7 +14239,9 @@
             "adviceSpecDefect": "The task spec is wrong or incomplete. Change the plan before rerunning.",
             "adviceAgentError": "The agent stopped without a usable result. Read the log, then rerun.",
             "adviceNeedsInfo": "The agent needs an answer from you before it can continue.",
-            "adviceUnknown": "Read the log to see what happened, then rerun."
+            "adviceUnknown": "Read the log to see what happened, then rerun.",
+            "baseRefNotFound": "Starting branch not found",
+            "adviceBaseRefNotFound": "The branch this request starts from no longer exists in the repository. Choose another starting branch, then rerun."
           }
         },
         "aiSetup": {
@@ -14377,6 +14404,108 @@
           "waitingApproval": "Waiting for someone to approve",
           "waitingInfo": "Waiting for someone to answer a question",
           "done": "This request is done"
+        },
+        "AnalysisRevision": {
+          "errorEmpty": "Describe what should change before you send it.",
+          "errorTooLong": "Keep the request to {{max}} characters or fewer.",
+          "errorForbidden": "Only the approvers of this analysis can request changes. Your text is kept.",
+          "errorWrongState": "Someone else is already revising this analysis or has decided. It was refreshed; your text is kept.",
+          "errorNoConnection": "No dev server is connected, so the analysis cannot be revised right now. The current version is unchanged and your text is kept.",
+          "suggestion": {
+            "solution": {
+              "lowerRisk": "Add a lower-risk alternative.",
+              "compareCost": "Compare the options on cost and effort.",
+              "tradeOffs": "Explain the trade-offs of the recommended option.",
+              "rollback": "Cover the rollback plan."
+            },
+            "diagnosis": {
+              "evidence": "Show the evidence for the root cause.",
+              "otherCauses": "Consider other possible causes.",
+              "reproduce": "Explain how to reproduce it.",
+              "prevent": "Suggest how to prevent it."
+            },
+            "findings": {
+              "moreAreas": "Cover the files and modules I did not mention.",
+              "rankByRisk": "Rank the findings by risk.",
+              "evidence": "Add evidence for each finding.",
+              "dropIrrelevant": "Drop findings that are not relevant."
+            },
+            "answer": {
+              "concise": "Be more concise.",
+              "examples": "Add concrete examples.",
+              "cite": "Cite where in the code this comes from.",
+              "uncertainty": "State what you are unsure about."
+            }
+          },
+          "title": "Request changes to this analysis",
+          "hint": "Describe what should change. The AI writes a new version and this one stays in the history.",
+          "fieldLabel": "What should change?",
+          "placeholder": "For example: compare the options on cost and add a rollback plan.",
+          "suggestions": "Suggestions",
+          "counter": "{{count}} / {{max}}",
+          "submit": "Revise analysis",
+          "shortcutHint": "or press {{shortcut}}",
+          "busy": "Analyzing version {{n}}…",
+          "busyNext": "Analyzing the next version…"
+        },
+        "StartFromField": {
+          "defaultNamed": "Default branch ({{name}})",
+          "defaultUnnamed": "Default branch",
+          "label": "Start from",
+          "triggerLabel": "Starting branch: {{branch}}",
+          "useDefault": "Use default branch",
+          "hint": "Worktrees for this request start from this branch of {{repo}}.",
+          "manualLabel": "Branch or tag name",
+          "manualPlaceholder": "e.g. release/1.2",
+          "manualUse": "Use this branch",
+          "offline": "Cannot reach the host to list branches. Type the branch name; it is checked when the worktree is created.",
+          "typeInstead": "Type a branch name instead"
+        },
+        "RequestBaseRefRow": {
+          "suggestions": "Did you mean:",
+          "notApplied": "This server didn't apply the starting branch.",
+          "unverified": "We couldn't reach the host to check this branch. It will be checked when the worktree is created.",
+          "label": "Starting branch",
+          "startsFromDefault": "Worktrees start from the default branch",
+          "startsFrom": "Worktrees start from {{ref}}",
+          "lockedLabel": "Locked: {{reason}}",
+          "locked": "Locked",
+          "edit": "Change starting branch",
+          "saving": "Saving...",
+          "defaultBranch": "the default branch",
+          "conflict": "Someone else changed this request first. It now starts from {{current}}. Your change was to {{mine}}.",
+          "applyMine": "Apply my change",
+          "keepCurrent": "Keep the current one",
+          "saved": "Starting branch updated"
+        },
+        "BaseRefViolation": {
+          "blank": "Enter a branch or tag name.",
+          "tooLong": "This name is too long. Use 255 bytes or fewer.",
+          "invalidUtf8": "This name contains characters that cannot be stored.",
+          "leadingDash": "A branch name cannot start with a dash.",
+          "bareAt": "A branch name cannot be only {{token}}.",
+          "nulByte": "A branch name cannot contain a null character.",
+          "controlCharacter": "A branch name cannot contain control characters.",
+          "whitespace": "A branch name cannot contain spaces.",
+          "forbiddenCharacter": "A branch name cannot contain {{token}}.",
+          "doubleDot": "A branch name cannot contain {{token}}.",
+          "reflogSyntax": "A branch name cannot contain {{token}}.",
+          "doubleSlash": "A branch name cannot contain {{token}}.",
+          "leadingSlash": "A branch name cannot start with {{token}}.",
+          "trailingSlash": "A branch name cannot end with {{token}}.",
+          "trailingDot": "A branch name cannot end with {{token}}.",
+          "dotComponent": "No part of a branch name can start with a dot.",
+          "lockComponent": "No part of a branch name can end with {{token}}."
+        },
+        "BaseRefError": {
+          "lockProposal": "The analysis already created a worktree from this branch, so it can no longer be changed.",
+          "lockTask": "A task worktree already exists for this request, so the branch can no longer be changed.",
+          "lockExecution": "Execution has started, so the branch can no longer be changed.",
+          "lockTerminal": "This request is finished, so the branch can no longer be changed.",
+          "lockGeneric": "Worktrees already exist for this request, so the branch can no longer be changed.",
+          "invalid": "This is not a valid branch or tag name. Check it and try again.",
+          "notFound": "This branch or tag was not found in the repository. Pick another one.",
+          "checkNotConfigured": "This server cannot check branches yet, so the branch was not saved. Ask an administrator."
         }
       },
       "reviewMap": {

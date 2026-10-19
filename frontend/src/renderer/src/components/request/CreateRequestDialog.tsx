@@ -8,8 +8,7 @@
  * @module components/request/CreateRequestDialog
  */
 
-import React, { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
+import React, { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -31,13 +30,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { translate } from '@/i18n/i18n'
 import { getScreenSubmitShortcutLabel, isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import { useAppStore } from '@/store'
+import { supportsBaseRef } from '@/store/slices/request'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
-import { callRequestRpc } from '../../runtime/request-rpc-client'
 import { useRequestCooldown } from '../../hooks/useRequestCooldown'
-import { parseRequest } from '../../../../shared/request-wire-parsers'
-import { REQUEST_RPC_METHODS } from '../../../../shared/request-rpc-methods'
-import { requestErrorMessageForError } from './request-error-message'
+import { classifyBaseRefWriteError } from './base-ref-write-error'
 import { CreateRequestProjectRepoNote } from './CreateRequestProjectRepoNote'
+import { createRequest, finishCreate } from './create-request-submit'
+import { StartFromField, type StartFromFieldError } from './StartFromField'
+import { baseRefToSend, initialStartFrom, startFromReducer } from './start-from-state'
+import type { StartFromAction } from './start-from-state'
 import { FILTERABLE_TYPES } from './request-list-filters'
 import { REQUEST_BODY_MAX, REQUEST_TITLE_MAX } from './create-request-from-issue'
 import type { CreateRequestParams } from './create-request-from-issue'
@@ -72,6 +73,16 @@ export function CreateRequestDialog({
   const [typeHint, setTypeHint] = useState<string>(LET_AI_CLASSIFY)
   const [submitting, setSubmitting] = useState(false)
   const [errorText, setErrorText] = useState<string | null>(null)
+  const baseRefSupported = useAppStore(supportsBaseRef)
+  const [startFrom, dispatchStartFrom] = useReducer(startFromReducer, undefined, initialStartFrom)
+  const [startFromError, setStartFromError] = useState<StartFromFieldError | null>(null)
+  // Why: a refused branch stays on screen until the user changes it; the typed fields are never cleared by an error.
+  const changeStartFrom = useCallback((action: StartFromAction) => {
+    if (action.type !== 'hostOffline') {
+      setStartFromError(null)
+    }
+    dispatchStartFrom(action)
+  }, [])
   // Why: one key per open so retries and double clicks stay idempotent.
   const clientRequestId = useRef(crypto.randomUUID())
 
@@ -108,53 +119,41 @@ export function CreateRequestDialog({
     }
     setSubmitting(true)
     setErrorText(null)
-    const result = await callRequestRpc<{ request?: unknown; created?: boolean }>(
-      REQUEST_RPC_METHODS.CREATE,
-      {
-        projectId,
-        title: title.trim(),
-        ...(body.trim() ? { body: body.trim() } : {}),
-        ...(initial?.source ? { source: initial.source } : {}),
-        hints: {
-          priority: urgency === 'urgent' ? 'high' : undefined,
-          ...(typeHint !== LET_AI_CLASSIFY ? { issueType: typeHint } : {})
-        },
-        clientRequestId: clientRequestId.current
-        // Why: the same clientRequestId makes a repeat answer `created: false`, so a throttled create may be retried once.
-      },
-      { idempotent: true }
-    )
+    setStartFromError(null)
+    // Why: no field, no `baseRef`: a gateway without the feature would drop it silently.
+    const baseRef = baseRefSupported ? baseRefToSend(startFrom) : undefined
+    const result = await createRequest({
+      projectId,
+      title,
+      body,
+      source: initial?.source,
+      urgency,
+      typeHint: typeHint === LET_AI_CLASSIFY ? undefined : typeHint,
+      clientRequestId: clientRequestId.current,
+      baseRef
+    })
     setSubmitting(false)
     if (!result.ok) {
+      const failure = classifyBaseRefWriteError(result.error)
+      // Why only when sent: the field shows these, and it is hidden when no branch was asked for.
+      if (baseRef !== undefined && (failure.kind === 'invalid' || failure.kind === 'notFound')) {
+        setStartFromError({
+          message: failure.message,
+          suggestions: failure.kind === 'notFound' ? failure.suggestions : []
+        })
+        return
+      }
       setErrorText(
         (result.error.backendCode ?? result.error.code) === 'REQUEST_PENDING_LIMIT'
           ? translate(
               `${T}pendingLimit`,
               'Too many requests are waiting for classification. Try again later.'
             )
-          : requestErrorMessageForError(result.error)
+          : failure.message
       )
       return
     }
-    const request = parseRequest(result.value.request)
-    const store = useAppStore.getState()
-    store.upsertRequests([request])
-    onOpenChange(false)
-    if (result.value.created === false) {
-      toast(translate(`${T}duplicate`, 'This issue already has a request'), {
-        action: {
-          label: translate(`${T}open`, 'Open'),
-          onClick: () => {
-            const s = useAppStore.getState()
-            s.setRequestPageData({ section: 'requests', requestId: request.id })
-            s.setActiveView('requests')
-          }
-        }
-      })
-      return
-    }
-    store.setRequestPageData({ section: 'requests', requestId: request.id })
-    store.setActiveView('requests')
+    finishCreate(result.value, baseRef, () => onOpenChange(false))
   }
 
   return (
@@ -192,7 +191,13 @@ export function CreateRequestDialog({
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>{translate(`${T}project`, 'Project')}</Label>
-            <Select value={projectId} onValueChange={setProjectId}>
+            <Select
+              value={projectId}
+              onValueChange={(id) => {
+                setProjectId(id)
+                changeStartFrom({ type: 'projectChanged' })
+              }}
+            >
               <SelectTrigger
                 aria-label={translate(`${T}project`, 'Project')}
                 aria-invalid={projectId === ''}
@@ -216,6 +221,13 @@ export function CreateRequestDialog({
             )}
             <CreateRequestProjectRepoNote projectId={projectId} />
           </div>
+          <StartFromField
+            projectId={projectId}
+            state={startFrom}
+            dispatch={changeStartFrom}
+            error={startFromError}
+            disabled={submitting}
+          />
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-1.5">
               <Label>{translate(`${T}urgency`, 'Urgency')}</Label>

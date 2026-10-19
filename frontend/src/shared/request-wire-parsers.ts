@@ -7,6 +7,7 @@
  *  - Missing strings → ''
  *  - Missing arrays → []
  *  - Missing numbers → undefined
+ *  - Request.baseRef* keep undefined when absent (CR-REQ-039): an old gateway must not look like "default branch"
  *  - SolutionOption.raw keeps the raw payload remainder (forward compat)
  *  - SolutionOption.id falls back to String(index) if missing
  *  - Never throws; always returns a valid typed value
@@ -25,6 +26,7 @@ import type {
   ReturnedFromStage,
   RequestLink,
   RequestLinkReason,
+  RequestBaseRefLockReason,
   RequestTypeHistoryEntry,
   Approval,
   ApprovalSubjectType,
@@ -105,6 +107,13 @@ const APPROVAL_SUBJECT_TYPES = new Set<ApprovalSubjectType>([
   'phase',
   'pre_deploy'
 ])
+const BASE_REF_LOCK_REASONS = new Set<RequestBaseRefLockReason>([
+  '',
+  'proposal',
+  'task',
+  'execution',
+  'terminal'
+])
 const APPROVAL_STATUSES = new Set<ApprovalStatus>(['pending', 'approved', 'rejected', 'expired'])
 
 // Why: CONTRACT-request-ui-api.md names the first status 'new' and flattens source fields;
@@ -137,6 +146,16 @@ function parseRequestLink(raw: unknown): RequestLink {
 // ---------------------------------------------------------------------------
 // OrcaRequest
 // ---------------------------------------------------------------------------
+
+// A non-string is treated as absent; a string this client does not know stays locked-with-unknown-reason.
+function parseBaseRefLockReason(value: unknown): RequestBaseRefLockReason | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+  return BASE_REF_LOCK_REASONS.has(value as RequestBaseRefLockReason)
+    ? (value as RequestBaseRefLockReason)
+    : 'unknown'
+}
 
 export function parseRequest(raw: unknown): OrcaRequest {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
@@ -197,6 +216,10 @@ export function parseRequest(raw: unknown): OrcaRequest {
       r.executionMode === 'step_by_step' || r.executionMode === 'continuous'
         ? r.executionMode
         : undefined,
+    baseRef: safeOptStr(r.baseRef),
+    baseRefLocked: typeof r.baseRefLocked === 'boolean' ? r.baseRefLocked : undefined,
+    baseRefLockReason: parseBaseRefLockReason(r.baseRefLockReason),
+    baseRefUnverified: typeof r.baseRefUnverified === 'boolean' ? r.baseRefUnverified : undefined,
     createdAt: safeStr(r.createdAt),
     updatedAt: safeStr(r.updatedAt)
   }

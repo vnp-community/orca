@@ -12,7 +12,13 @@
 
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
-import type { OrcaRequest, BacklogView, RequestStatus, RequestType } from '../../../../shared/request-types'
+import type {
+  OrcaRequest,
+  BacklogView,
+  RequestStatus,
+  RequestType
+} from '../../../../shared/request-types'
+import { REQUEST_BASE_REF_FEATURE } from '../../../../shared/request-base-ref'
 
 // ---------------------------------------------------------------------------
 // Slice state types
@@ -46,11 +52,14 @@ export type RequestSlice = {
   /** Tasks that must not be run yet; written by the Request Plan tab, read by TaskDetail. */
   executionGateByTaskId: Record<string, TaskExecutionGate>
   requestFlowSupport: RequestFlowSupport
+  /** Feature flags of `request.flowStatus`; empty for a gateway that predates them, so an absent flag always reads as unsupported. */
+  requestFlowFeatures: ReadonlySet<string>
   requestsById: Record<string, OrcaRequest>
   pendingApprovalCount: number
   requestPage: RequestPageData
 
   setRequestFlowSupport(support: RequestFlowSupport): void
+  setRequestFlowFeatures(features: Iterable<string>): void
   upsertRequests(requests: OrcaRequest[]): void
   removeRequest(id: string): void
   setPendingApprovalCount(count: number): void
@@ -65,9 +74,15 @@ export type RequestSlice = {
 // Slice creator
 // ---------------------------------------------------------------------------
 
+/** True when the connected gateway stores and enforces `Request.baseRef`; false means hide the picker, never send the field. */
+export function supportsBaseRef(state: Pick<RequestSlice, 'requestFlowFeatures'>): boolean {
+  return state.requestFlowFeatures.has(REQUEST_BASE_REF_FEATURE)
+}
+
 export const createRequestSlice: StateCreator<AppState, [], [], RequestSlice> = (set) => ({
   executionGateByTaskId: {},
   requestFlowSupport: 'unknown',
+  requestFlowFeatures: new Set<string>(),
   requestsById: {},
   pendingApprovalCount: 0,
   requestPage: {
@@ -77,8 +92,9 @@ export const createRequestSlice: StateCreator<AppState, [], [], RequestSlice> = 
     listFilters: {}
   },
 
-  setRequestFlowSupport: (support) =>
-    set(() => ({ requestFlowSupport: support })),
+  setRequestFlowSupport: (support) => set(() => ({ requestFlowSupport: support })),
+
+  setRequestFlowFeatures: (features) => set(() => ({ requestFlowFeatures: new Set(features) })),
 
   upsertRequests: (requests) =>
     set((s) => {

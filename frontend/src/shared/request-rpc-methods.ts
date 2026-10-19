@@ -16,6 +16,8 @@ export const REQUEST_RPC_METHODS = {
 
   // Request CRUD
   CREATE: 'request.create',
+  /** CR-REQ-039: change the branch a Request's worktrees start from, while no worktree exists. */
+  SET_BASE_REF: 'request.setBaseRef',
   GET: 'request.get',
   LIST: 'request.list',
   CANCEL: 'request.cancel',

@@ -10,6 +10,7 @@
 
 import type { JiraIssue } from '../../../../shared/jira-types'
 import type { GitHubWorkItem } from '../../../../shared/types'
+import type { RequestCreateBaseRefParams } from '../../../../shared/request-base-ref'
 import type { RequestSourceProvider } from '../../../../shared/request-types'
 
 export const REQUEST_TITLE_MAX = 500
@@ -22,7 +23,8 @@ export type CreateRequestSource = {
   site?: string
 }
 
-export type CreateRequestParams = {
+// Why baseRef is here: it is part of the `request.create` params; the dialog fills it from its Start from field, not from `initial`.
+export type CreateRequestParams = RequestCreateBaseRefParams & {
   projectId: string
   title: string
   body?: string
@@ -42,7 +44,12 @@ export function jiraIssueToCreateParams(issue: JiraIssue, projectId: string): Cr
     projectId,
     title: clamp(issue.title, REQUEST_TITLE_MAX),
     ...(description ? { body: clamp(description, REQUEST_BODY_MAX) } : {}),
-    source: { provider: 'jira', ref: issue.key, url: issue.url, ...(issue.siteId ? { site: issue.siteId } : {}) }
+    source: {
+      provider: 'jira',
+      ref: issue.key,
+      url: issue.url,
+      ...(issue.siteId ? { site: issue.siteId } : {})
+    }
   }
 }
 
@@ -54,12 +61,18 @@ export function githubItemToCreateParams(
   repoIdentity: GitHubRepoIdentity,
   projectId: string
 ): CreateRequestParams | null {
-  if (item.type === 'pr') {return null}
+  if (item.type === 'pr') {
+    return null
+  }
   const body = item.body?.trim()
   return {
     projectId,
     title: clamp(item.title, REQUEST_TITLE_MAX),
     ...(body ? { body: clamp(body, REQUEST_BODY_MAX) } : {}),
-    source: { provider: 'github', ref: `${repoIdentity.owner}/${repoIdentity.repo}#${item.number}`, url: item.url }
+    source: {
+      provider: 'github',
+      ref: `${repoIdentity.owner}/${repoIdentity.repo}#${item.number}`,
+      url: item.url
+    }
   }
 }

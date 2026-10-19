@@ -9,6 +9,7 @@
 
 import React from 'react'
 import { translate } from '@/i18n/i18n'
+import { RequestBaseRefRow } from './RequestBaseRefRow'
 import { RequestSourceBadge } from './RequestSourceBadge'
 import type { OrcaRequest } from '../../../../shared/request-types'
 
@@ -59,6 +60,7 @@ export function RequestOverviewTab({ request }: { request: OrcaRequest }): React
           </Field>
         )}
       </dl>
+      <RequestBaseRefRow key={request.id} request={request} />
     </div>
   )
 }

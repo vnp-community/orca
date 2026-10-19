@@ -72,6 +72,14 @@ describe('parseExecutionSummary', () => {
     expect(s.running).toEqual([])
   })
 
+  it('keeps the missing-starting-branch cause (CR-REQ-039) instead of calling it unknown', () => {
+    const s = parseExecutionSummary({
+      requestId: 'r',
+      failed: [{ taskId: 't', lastCause: 'base_ref_not_found' }]
+    })!
+    expect(s.failed[0].lastCause).toBe('base_ref_not_found')
+  })
+
   it('returns null for something that is not a summary', () => {
     expect(parseExecutionSummary(null)).toBeNull()
     expect(parseExecutionSummary({})).toBeNull()

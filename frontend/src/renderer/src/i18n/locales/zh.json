@@ -5124,16 +5124,7 @@
           "0691753cf2": "未保存的更改"
         },
         "BaseRefPicker": {
-          "1b8e54151f": "未找到匹配的分支。",
-          "d166ff883d": "当前",
-          "a4a9372eb2": "搜索分支...",
-          "7db7fb87e5": "按名称搜索分支...",
           "773a5687a3": "跟随主分支",
-          "ade9a5bb03": ") 来确定结果范围。",
-          "b468f46726": "upstream/main",
-          "80f7c82303": "）或完整的参考（例如",
-          "915ad97875": "上游",
-          "a5c16712c1": "已检测多个遥控器。输入远程名称（例如",
           "9a14ec7400": "选择下面的一个基础分支",
           "086ce7f369": "跟随主分支 ({{value0}})",
           "2f3cda96f5": "固定此仓库",
@@ -10808,6 +10799,27 @@
           }
         }
       },
+      "gitRefPicker": {
+        "RepoRefPicker": {
+          "remotesHintPrefix": "已检测多个遥控器。输入远程名称（例如",
+          "remoteExample": "upstream",
+          "remotesHintMiddle": "）或完整的参考（例如",
+          "refExample": "upstream/main",
+          "remotesHintSuffix": ") 来确定结果范围。",
+          "searching": "搜索分支...",
+          "noMatches": "未找到匹配的分支。",
+          "current": "当前",
+          "placeholder": "按名称搜索分支...",
+          "resultCount": "{{number}} 个匹配的分支",
+          "offline": "无法连接到主机以搜索分支。请检查连接后重试。",
+          "searchFailed": "分支搜索失败。请重试。",
+          "retry": "重试",
+          "searchLabel": "搜索分支",
+          "listLabel": "匹配的分支",
+          "defaultNamed": "默认分支（{{value0}}）",
+          "defaultUnnamed": "默认分支"
+        }
+      },
       "floating": {
         "terminal": {
           "FloatingTerminalIconContextMenu": {
@@ -13416,8 +13428,19 @@
         },
         "SolutionVersionSwitcher": {
           "label": "版本",
-          "old": "旧版本",
-          "version": "v{{n}}"
+          "badgeCurrent": "当前",
+          "badgeSuperseded": "已被取代",
+          "badgeRejected": "已拒绝",
+          "badgeApproved": "已批准",
+          "versionN": "版本 {{n}}",
+          "firstProposal": "首个方案",
+          "pages": "版本分页",
+          "newer": "较新",
+          "range": "第 {{from}}–{{to}} 个,共 {{total}} 个",
+          "older": "较旧",
+          "askedFor": "此版本的修改要求",
+          "viewingOlder": "您正在查看旧版本。",
+          "backToCurrent": "返回当前版本"
         },
         "RequestReasonDialog": {
           "cancel": "取消"
@@ -13625,7 +13648,8 @@
           "submit": "创建",
           "duplicate": "此问题已有对应请求",
           "open": "打开",
-          "pendingLimit": "等待分类的请求过多,请稍后再试。"
+          "pendingLimit": "等待分类的请求过多,请稍后再试。",
+          "baseRefNotAppliedDetail": "请求已创建，但其工作树不会从 {{ref}} 开始。"
         },
         "CreateRequestIssueButton": {
           "label": "创建请求",
@@ -14135,7 +14159,8 @@
             "kept": "此前的内容均已完成并保留（{{done}}/{{total}} 个任务）。",
             "reopen": "重新打开并重试",
             "log": "查看最近日志",
-            "cancel": "取消请求"
+            "cancel": "取消请求",
+            "changeBranch": "更改起始分支"
           },
           "ExecutionNeedsYou": {
             "due": "截止 {{when}}",
@@ -14214,7 +14239,9 @@
             "adviceSpecDefect": "任务规格有误或不完整。请先修改计划再重试。",
             "adviceAgentError": "智能体在没有可用结果的情况下停止。请查看日志后重试。",
             "adviceNeedsInfo": "智能体需要你的回答才能继续。",
-            "adviceUnknown": "请查看日志了解情况后重试。"
+            "adviceUnknown": "请查看日志了解情况后重试。",
+            "baseRefNotFound": "找不到起始分支",
+            "adviceBaseRefNotFound": "此请求所基于的分支在仓库中已不存在。请选择其他起始分支后重试。"
           }
         },
         "aiSetup": {
@@ -14377,6 +14404,108 @@
           "waitingApproval": "等待有人批准",
           "waitingInfo": "等待有人回答问题",
           "done": "此请求已完成"
+        },
+        "AnalysisRevision": {
+          "errorEmpty": "发送前请描述需要修改的内容。",
+          "errorTooLong": "请将内容控制在 {{max}} 个字符以内。",
+          "errorForbidden": "只有此分析的审批人可以请求修改。您输入的内容已保留。",
+          "errorWrongState": "其他人已在修改此分析，或已做出决定。页面已刷新；您输入的内容已保留。",
+          "errorNoConnection": "没有已连接的开发服务器，因此目前无法修改分析。当前版本保持不变，您输入的内容已保留。",
+          "suggestion": {
+            "solution": {
+              "lowerRisk": "增加一个风险更低的备选方案。",
+              "compareCost": "从成本和工作量角度比较各方案。",
+              "tradeOffs": "说明推荐方案的取舍。",
+              "rollback": "补充回滚方案。"
+            },
+            "diagnosis": {
+              "evidence": "给出根本原因的依据。",
+              "otherCauses": "考虑其他可能的原因。",
+              "reproduce": "说明如何复现。",
+              "prevent": "建议如何防止再次发生。"
+            },
+            "findings": {
+              "moreAreas": "涵盖我没有提到的文件和模块。",
+              "rankByRisk": "按风险对发现项排序。",
+              "evidence": "为每条发现项补充依据。",
+              "dropIrrelevant": "去掉不相关的发现项。"
+            },
+            "answer": {
+              "concise": "请更简洁。",
+              "examples": "增加具体示例。",
+              "cite": "注明依据的是代码中的哪一部分。",
+              "uncertainty": "说明哪些地方不确定。"
+            }
+          },
+          "title": "请求修改此分析",
+          "hint": "说明需要修改的内容。AI 会生成新版本,此版本会保留在历史记录中。",
+          "fieldLabel": "需要修改什么?",
+          "placeholder": "例如:按成本比较各方案,并补充回滚计划。",
+          "suggestions": "建议",
+          "counter": "{{count}} / {{max}}",
+          "submit": "修订分析",
+          "shortcutHint": "或按 {{shortcut}}",
+          "busy": "正在分析版本 {{n}}…",
+          "busyNext": "正在分析下一个版本…"
+        },
+        "StartFromField": {
+          "defaultNamed": "默认分支（{{name}}）",
+          "defaultUnnamed": "默认分支",
+          "label": "起始分支",
+          "triggerLabel": "起始分支：{{branch}}",
+          "useDefault": "使用默认分支",
+          "hint": "此请求的工作树将从 {{repo}} 的该分支开始。",
+          "manualLabel": "分支或标签名称",
+          "manualPlaceholder": "例如 release/1.2",
+          "manualUse": "使用此分支",
+          "offline": "无法连接到主机以列出分支。请输入分支名称，创建工作树时会进行检查。",
+          "typeInstead": "改为输入分支名称"
+        },
+        "RequestBaseRefRow": {
+          "suggestions": "你是不是想选：",
+          "notApplied": "此服务器未应用起始分支。",
+          "unverified": "无法连接到主机，未能检查此分支。创建工作树时会进行检查。",
+          "label": "起始分支",
+          "startsFromDefault": "工作树从默认分支开始",
+          "startsFrom": "工作树从 {{ref}} 开始",
+          "lockedLabel": "已锁定：{{reason}}",
+          "locked": "已锁定",
+          "edit": "更改起始分支",
+          "saving": "正在保存...",
+          "defaultBranch": "默认分支",
+          "conflict": "其他人先更改了此请求，现在从 {{current}} 开始。你的更改是 {{mine}}。",
+          "applyMine": "应用我的更改",
+          "keepCurrent": "保留当前分支",
+          "saved": "起始分支已更新"
+        },
+        "BaseRefViolation": {
+          "blank": "请输入分支或标签名称。",
+          "tooLong": "名称太长，请控制在 255 字节以内。",
+          "invalidUtf8": "名称包含无法保存的字符。",
+          "leadingDash": "分支名称不能以连字符开头。",
+          "bareAt": "分支名称不能只有 {{token}}。",
+          "nulByte": "分支名称不能包含空字符。",
+          "controlCharacter": "分支名称不能包含控制字符。",
+          "whitespace": "分支名称不能包含空格。",
+          "forbiddenCharacter": "分支名称不能包含 {{token}}。",
+          "doubleDot": "分支名称不能包含 {{token}}。",
+          "reflogSyntax": "分支名称不能包含 {{token}}。",
+          "doubleSlash": "分支名称不能包含 {{token}}。",
+          "leadingSlash": "分支名称不能以 {{token}} 开头。",
+          "trailingSlash": "分支名称不能以 {{token}} 结尾。",
+          "trailingDot": "分支名称不能以 {{token}} 结尾。",
+          "dotComponent": "分支名称的任何部分都不能以点开头。",
+          "lockComponent": "分支名称的任何部分都不能以 {{token}} 结尾。"
+        },
+        "BaseRefError": {
+          "lockProposal": "分析已从该分支创建了工作树，因此无法再更改。",
+          "lockTask": "此请求已有任务工作树，因此无法再更改分支。",
+          "lockExecution": "执行已经开始，因此无法再更改分支。",
+          "lockTerminal": "此请求已结束，因此无法再更改分支。",
+          "lockGeneric": "此请求已有工作树，因此无法再更改分支。",
+          "invalid": "这不是有效的分支或标签名称。请检查后重试。",
+          "notFound": "在仓库中找不到此分支或标签。请选择其他分支。",
+          "checkNotConfigured": "此服务器暂时无法检查分支，因此未保存该分支。请联系管理员。"
         }
       },
       "reviewMap": {

@@ -2,9 +2,9 @@
  * Tests for request store slice (CR-REQ-018-04)
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { createStore } from 'zustand'
-import { createRequestSlice } from './request'
+import { createRequestSlice, supportsBaseRef } from './request'
 import type { RequestSlice } from './request'
 import type { OrcaRequest } from '../../../../shared/request-types'
 
@@ -110,6 +110,20 @@ describe('RequestSlice — defaults', () => {
   it('starts with unknown flow support', () => {
     const store = makeStore()
     expect(store.getState().requestFlowSupport).toBe('unknown')
+  })
+
+  it('starts with no flow features, so supportsBaseRef is false', () => {
+    const store = makeStore()
+    expect(store.getState().requestFlowFeatures.size).toBe(0)
+    expect(supportsBaseRef(store.getState())).toBe(false)
+  })
+
+  it('replaces the flow features wholesale', () => {
+    const store = makeStore()
+    store.getState().setRequestFlowFeatures(['request.baseRef'])
+    expect(supportsBaseRef(store.getState())).toBe(true)
+    store.getState().setRequestFlowFeatures([])
+    expect(supportsBaseRef(store.getState())).toBe(false)
   })
 
   it('starts with empty requestsById', () => {

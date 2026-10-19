@@ -171,14 +171,14 @@ describe('RequestAnalysisTab / SolutionPanel', () => {
     expect(screen.getByTestId('solution-generation-pending')).toBeInTheDocument()
   })
 
-  it('collapses superseded versions with an "Older version" label and is read-only', () => {
+  it('collapses superseded versions with a "Superseded" badge and is read-only', () => {
     state.solutions.solutions = [
       sol({ id: 's0', status: 'superseded', version: 1 }),
       sol({ id: 's1', version: 2 })
     ]
     mount()
-    expect(screen.getByRole('button', { name: /Older version/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Older version/ }))
+    expect(screen.getByRole('button', { name: /Superseded/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Superseded/ }))
     expect(screen.getByTestId('solution-status-banner')).toHaveAttribute(
       'data-status',
       'superseded'
@@ -664,7 +664,7 @@ describe('approval bar after the Solution is listed (TASK-FE-E2E-009)', () => {
         sol({ id: 's1', version: 2, openQuestions: [] })
       ]
       mount()
-      fireEvent.click(screen.getByRole('button', { name: /Older version/ }))
+      fireEvent.click(screen.getByRole('button', { name: /Superseded/ }))
       expect(screen.queryByTestId('solution-ask-back')).toBeNull()
     })
 

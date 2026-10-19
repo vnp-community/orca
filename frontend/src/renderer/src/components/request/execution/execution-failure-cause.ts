@@ -30,6 +30,8 @@ export function failureCauseLabel(cause: FailureCause): string {
       return translate(`${C}needsInfo`, 'Needs information')
     case 'cancelled':
       return translate(`${C}cancelled`, 'Cancelled')
+    case 'base_ref_not_found':
+      return translate(`${C}baseRefNotFound`, 'Starting branch not found')
     default:
       return translate(`${C}unknown`, 'Unknown cause')
   }
@@ -72,6 +74,11 @@ export function failureCauseAdvice(cause: FailureCause): string {
       return translate(
         `${C}adviceNeedsInfo`,
         'The agent needs an answer from you before it can continue.'
+      )
+    case 'base_ref_not_found':
+      return translate(
+        `${C}adviceBaseRefNotFound`,
+        'The branch this request starts from no longer exists in the repository. Choose another starting branch, then rerun.'
       )
     default:
       return translate(`${C}adviceUnknown`, 'Read the log to see what happened, then rerun.')

@@ -33,6 +33,7 @@ const FAILURE_CAUSES = new Set<FailureCause>([
   'agent_error',
   'needs_info',
   'cancelled',
+  'base_ref_not_found',
   'unknown'
 ])
 const NEEDS_YOU_KINDS = new Set<NeedsYouKind>([
