@@ -106,6 +106,7 @@ var flowMethodClass = map[string]flowClass{
 	requestSvc + "ClassifyRequest":         classAdvance,
 	requestSvc + "ConfirmRequestType":      classAdvance,
 	requestSvc + "ChangeRequestType":       classAdvance,
+	requestSvc + "SetRequestBaseRef":       classAdvance,
 	requestSvc + "ReopenRequest":           classAdvance,
 	requestSvc + "SpawnChildRequest":       classAdvance,
 	requestSvc + "GenerateSolution":        classAdvance,

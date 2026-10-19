@@ -39,12 +39,12 @@ func (s *Server) CreateRequest(ctx context.Context, req *requestv1.CreateRequest
 		ProjectID: req.GetProjectId(), Title: req.GetTitle(), Body: req.GetBody(),
 		Source:          domain.SourceRef{Provider: domain.SourceProvider(req.GetSource().GetProvider()), Ref: req.GetSource().GetRef(), URL: req.GetSource().GetUrl(), Site: req.GetSource().GetSite()},
 		Hints:           domain.SourceHints{IssueType: h.GetIssueType(), Labels: h.GetLabels(), Priority: h.GetPriority()}, // type_hint is for SpawnChildRequest only
-		ClientRequestID: req.GetClientRequestId(),
+		ClientRequestID: req.GetClientRequestId(), BaseRef: req.GetBaseRef(),
 	})
 	if err != nil {
-		return nil, apperrors.ToGRPCStatus(err)
+		return nil, baseRefStatus(err)
 	}
-	return &requestv1.CreateRequestResponse{Request: toProtoRequest(res.Request), Created: res.Created}, nil
+	return &requestv1.CreateRequestResponse{Request: toProtoRequest(res.Request), Created: res.Created, BaseRefUnverified: res.BaseRefUnverified}, nil
 }
 
 func (s *Server) LookupRequestBySource(ctx context.Context, req *requestv1.LookupRequestBySourceRequest) (*requestv1.LookupRequestBySourceResponse, error) {

@@ -6,8 +6,10 @@ const (
 	SubjectRequestClassified    = "orca.request.request.classified"
 	SubjectRequestTypeConfirmed = "orca.request.request.type_confirmed"
 	SubjectRequestTypeChanged   = "orca.request.request.type_changed"
-	SubjectRequestReturned      = "orca.request.request.returned"
-	SubjectRequestCompleted     = "orca.request.request.completed"
+	// SubjectRequestBaseRefChanged carries ids and the old and new ref names, never the Request title or body (CR-REQ-039).
+	SubjectRequestBaseRefChanged = "orca.request.request.base_ref_changed"
+	SubjectRequestReturned       = "orca.request.request.returned"
+	SubjectRequestCompleted      = "orca.request.request.completed"
 )
 
 // CR-REQ-027 / CR-REQ-028 subjects. Payloads never carry Request content, questions or answers.

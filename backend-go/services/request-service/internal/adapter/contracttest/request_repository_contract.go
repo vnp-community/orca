@@ -126,6 +126,9 @@ func RunRequestRepositoryContract(t *testing.T, newEnv func(t *testing.T) Env) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) { s.fn(t, env) })
 	}
+	for _, s := range baseRefScenarios() {
+		t.Run(s.name, func(t *testing.T) { s.fn(t, env) })
+	}
 }
 
 func createGetRoundTrip(t *testing.T, env Env) {

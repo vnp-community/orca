@@ -62,6 +62,10 @@ func RunArtifactNotFoundContract(t *testing.T, newEnv func(t *testing.T) Artifac
 		add("Requests.UpdateSolutionEngine "+id, false, env.Requests.UpdateSolutionEngine(ctx, id, domain.EngineName("native"), 1))
 		_, err = env.Requests.PinSolutionEngineIfUnset(ctx, id, domain.EngineName("native"))
 		add("Requests.PinSolutionEngineIfUnset "+id, false, err)
+		if w, ok := env.Requests.(usecase.RequestBaseRefWriter); ok {
+			_, err = w.SetBaseRef(ctx, id, "main", 1)
+			add("Requests.SetBaseRef "+id, false, err)
+		}
 		_, err = env.Content.UpdateContent(ctx, ghost, 1)
 		add("Content.UpdateContent "+id, false, err)
 

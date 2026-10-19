@@ -26,7 +26,12 @@ type Request struct {
 	// Engine is what a read derives (RequestEngineResolver): never stored, empty when it could not be worked out.
 	Engine EngineName
 	// ExecutionMode is pinned when the Request enters executing; empty before that (and for rows older than the column).
-	ExecutionMode          ExecutionMode
+	ExecutionMode ExecutionMode
+	// BaseRef is the branch or tag every worktree of the Request starts from; empty means the repository default (CR-REQ-039).
+	BaseRef string
+	// BaseRefLocked and BaseRefLockReason are derived on read (WorktreePresence), never stored.
+	BaseRefLocked          bool
+	BaseRefLockReason      BaseRefLockReason
 	Confidence             *float64
 	ClassificationReason   string
 	Stage                  string

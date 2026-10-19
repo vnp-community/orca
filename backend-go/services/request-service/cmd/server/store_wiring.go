@@ -33,6 +33,9 @@ type requestStores struct {
 	requests     usecase.RequestRepository
 	// executionModes pins the execution mode of a Request when it enters executing (CR-REQ-038); the same repository as requests.
 	executionModes usecase.ExecutionModePinner
+	// baseRefs stores the base ref (CR-REQ-039); worktreeRecords tells which Requests already have a worktree request-service knows of.
+	baseRefs        usecase.RequestBaseRefWriter
+	worktreeRecords usecase.WorktreePresence
 	// engineDefaults are the deployment defaults (engine, agent-written Solution, execution mode); set by main after the stores open.
 	engineDefaults domain.EngineDefaults
 	history        usecase.RequestTypeHistoryRepository
@@ -82,6 +85,8 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			returns:         postgresadapter.NewReturnHistoryRepository(base),
 			requests:        postgresadapter.NewRequestRepository(base),
 			executionModes:  postgresadapter.NewRequestRepository(base),
+			baseRefs:        postgresadapter.NewRequestRepository(base),
+			worktreeRecords: postgresadapter.NewWorktreePresence(base),
 			history:         postgresadapter.NewRequestTypeHistoryRepository(base),
 			solutions:       postgresadapter.NewSolutionRecordRepository(base),
 			analysisRuns:    postgresadapter.NewAnalysisRunRepository(base),
@@ -129,6 +134,8 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			returns:         mysqladapter.NewReturnHistoryRepository(base),
 			requests:        mysqladapter.NewRequestRepository(base),
 			executionModes:  mysqladapter.NewRequestRepository(base),
+			baseRefs:        mysqladapter.NewRequestRepository(base),
+			worktreeRecords: mysqladapter.NewWorktreePresence(base),
 			history:         mysqladapter.NewRequestTypeHistoryRepository(base),
 			solutions:       mysqladapter.NewSolutionRecordRepository(base),
 			analysisRuns:    mysqladapter.NewAnalysisRunRepository(base),

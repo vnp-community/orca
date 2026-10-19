@@ -26,6 +26,7 @@ const (
 	RequestService_ClassifyRequest_FullMethodName                  = "/orca.request.v1.RequestService/ClassifyRequest"
 	RequestService_ConfirmRequestType_FullMethodName               = "/orca.request.v1.RequestService/ConfirmRequestType"
 	RequestService_ChangeRequestType_FullMethodName                = "/orca.request.v1.RequestService/ChangeRequestType"
+	RequestService_SetRequestBaseRef_FullMethodName                = "/orca.request.v1.RequestService/SetRequestBaseRef"
 	RequestService_ListRequestTypeHistory_FullMethodName           = "/orca.request.v1.RequestService/ListRequestTypeHistory"
 	RequestService_ReturnToBacklog_FullMethodName                  = "/orca.request.v1.RequestService/ReturnToBacklog"
 	RequestService_ReopenRequest_FullMethodName                    = "/orca.request.v1.RequestService/ReopenRequest"
@@ -112,6 +113,7 @@ type RequestServiceClient interface {
 	ClassifyRequest(ctx context.Context, in *ClassifyRequestRequest, opts ...grpc.CallOption) (*ClassifyRequestResponse, error)
 	ConfirmRequestType(ctx context.Context, in *ConfirmRequestTypeRequest, opts ...grpc.CallOption) (*ConfirmRequestTypeResponse, error)
 	ChangeRequestType(ctx context.Context, in *ChangeRequestTypeRequest, opts ...grpc.CallOption) (*ChangeRequestTypeResponse, error)
+	SetRequestBaseRef(ctx context.Context, in *SetRequestBaseRefRequest, opts ...grpc.CallOption) (*SetRequestBaseRefResponse, error)
 	ListRequestTypeHistory(ctx context.Context, in *ListRequestTypeHistoryRequest, opts ...grpc.CallOption) (*ListRequestTypeHistoryResponse, error)
 	ReturnToBacklog(ctx context.Context, in *ReturnToBacklogRequest, opts ...grpc.CallOption) (*ReturnToBacklogResponse, error)
 	ReopenRequest(ctx context.Context, in *ReopenRequestRequest, opts ...grpc.CallOption) (*ReopenRequestResponse, error)
@@ -264,6 +266,16 @@ func (c *requestServiceClient) ChangeRequestType(ctx context.Context, in *Change
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ChangeRequestTypeResponse)
 	err := c.cc.Invoke(ctx, RequestService_ChangeRequestType_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) SetRequestBaseRef(ctx context.Context, in *SetRequestBaseRefRequest, opts ...grpc.CallOption) (*SetRequestBaseRefResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetRequestBaseRefResponse)
+	err := c.cc.Invoke(ctx, RequestService_SetRequestBaseRef_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -975,6 +987,7 @@ type RequestServiceServer interface {
 	ClassifyRequest(context.Context, *ClassifyRequestRequest) (*ClassifyRequestResponse, error)
 	ConfirmRequestType(context.Context, *ConfirmRequestTypeRequest) (*ConfirmRequestTypeResponse, error)
 	ChangeRequestType(context.Context, *ChangeRequestTypeRequest) (*ChangeRequestTypeResponse, error)
+	SetRequestBaseRef(context.Context, *SetRequestBaseRefRequest) (*SetRequestBaseRefResponse, error)
 	ListRequestTypeHistory(context.Context, *ListRequestTypeHistoryRequest) (*ListRequestTypeHistoryResponse, error)
 	ReturnToBacklog(context.Context, *ReturnToBacklogRequest) (*ReturnToBacklogResponse, error)
 	ReopenRequest(context.Context, *ReopenRequestRequest) (*ReopenRequestResponse, error)
@@ -1083,6 +1096,9 @@ func (UnimplementedRequestServiceServer) ConfirmRequestType(context.Context, *Co
 }
 func (UnimplementedRequestServiceServer) ChangeRequestType(context.Context, *ChangeRequestTypeRequest) (*ChangeRequestTypeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ChangeRequestType not implemented")
+}
+func (UnimplementedRequestServiceServer) SetRequestBaseRef(context.Context, *SetRequestBaseRefRequest) (*SetRequestBaseRefResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetRequestBaseRef not implemented")
 }
 func (UnimplementedRequestServiceServer) ListRequestTypeHistory(context.Context, *ListRequestTypeHistoryRequest) (*ListRequestTypeHistoryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListRequestTypeHistory not implemented")
@@ -1431,6 +1447,24 @@ func _RequestService_ChangeRequestType_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RequestServiceServer).ChangeRequestType(ctx, req.(*ChangeRequestTypeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_SetRequestBaseRef_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetRequestBaseRefRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).SetRequestBaseRef(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_SetRequestBaseRef_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).SetRequestBaseRef(ctx, req.(*SetRequestBaseRefRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2686,6 +2720,10 @@ var RequestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ChangeRequestType",
 			Handler:    _RequestService_ChangeRequestType_Handler,
+		},
+		{
+			MethodName: "SetRequestBaseRef",
+			Handler:    _RequestService_SetRequestBaseRef_Handler,
 		},
 		{
 			MethodName: "ListRequestTypeHistory",

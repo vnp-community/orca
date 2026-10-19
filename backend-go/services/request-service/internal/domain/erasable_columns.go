@@ -125,7 +125,7 @@ var ExemptTextColumns = mergeExempt(
 		"clarifications.created_by", "clarifications.source_ref", "decision_history.actor_id", "decision_history.option_id",
 		"decisions.chooser_id", "decisions.chosen_option_id", "decisions.confirmed_by", "decisions.recommended_option_id",
 		"decisions.subject_digest", "decisions.subject_id", "request_coverage.ac_id", "request_coverage.check_id",
-		"request_revisions.actor_id", "request_revisions.digest", "requests.content_digest", "solutions.content_digest",
+		"request_revisions.actor_id", "request_revisions.digest", "requests.base_ref", "requests.content_digest", "solutions.content_digest",
 		"solutions.content_ref", "tenant_settings.updated_by"),
 	exempt("enum, reason code or lease owner of the execution loop; no customer content",
 		"request_checks.kind", "request_checks.source", "request_checks.status", "task_run_outcomes.cause", "task_run_outcomes.outcome",

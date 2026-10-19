@@ -54,6 +54,12 @@ message Request {
   // executing (step_by_step or continuous; empty before that).
   string engine = 32;
   string execution_mode = 33;
+  // 34 to 36: CR-REQ-039. The branch or tag every worktree of the Request starts from (empty = the repository default). The
+  // lock is derived on read, never stored: once a worktree exists the value can no longer change.
+  string base_ref = 34;
+  bool base_ref_locked = 35;
+  // "proposal" (an OpenSpec change worktree exists), "task" (a task has a worktree), "terminal" (completed or cancelled), or "".
+  string base_ref_lock_reason = 36;
 }
 
 message RequestSource {
@@ -106,11 +112,15 @@ message CreateRequestRequest {
   // 7 to 8: CR-REQ-027 optional content.
   string acceptance_criteria_json = 7;
   string type_fields_json = 8;
+  // 9: CR-REQ-039. Optional branch or tag for the Request's worktrees; empty keeps the repository default.
+  string base_ref = 9;
 }
 
 message CreateRequestResponse {
   Request request = 1;
   bool created = 2;
+  // True when the ref was stored but git could not confirm it exists (the dev server was unreachable).
+  bool base_ref_unverified = 3;
 }
 
 // Asynchronous (IMPLEMENTATION-PLAN D3): returns at once with the Request in classifying and a run_id.
@@ -148,6 +158,18 @@ message ChangeRequestTypeRequest {
 
 message ChangeRequestTypeResponse {
   Request request = 1;
+}
+
+// CR-REQ-039. Allowed only while the Request has no worktree; expected_version 0 skips the version check.
+message SetRequestBaseRefRequest {
+  string request_id = 1;
+  string base_ref = 2;
+  int64 expected_version = 3;
+}
+
+message SetRequestBaseRefResponse {
+  Request request = 1;
+  bool base_ref_unverified = 2;
 }
 
 message RequestTypeChange {
@@ -309,6 +331,7 @@ service RequestService {
   rpc ClassifyRequest(ClassifyRequestRequest) returns (ClassifyRequestResponse);
   rpc ConfirmRequestType(ConfirmRequestTypeRequest) returns (ConfirmRequestTypeResponse);
   rpc ChangeRequestType(ChangeRequestTypeRequest) returns (ChangeRequestTypeResponse);
+  rpc SetRequestBaseRef(SetRequestBaseRefRequest) returns (SetRequestBaseRefResponse);
   rpc ListRequestTypeHistory(ListRequestTypeHistoryRequest) returns (ListRequestTypeHistoryResponse);
   rpc ReturnToBacklog(ReturnToBacklogRequest) returns (ReturnToBacklogResponse);
   rpc ReopenRequest(ReopenRequestRequest) returns (ReopenRequestResponse);

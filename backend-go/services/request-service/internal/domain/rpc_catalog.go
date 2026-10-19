@@ -86,6 +86,7 @@ var Catalog = map[string]Entry{
 	reqSvc + "ClassifyRequest":                  onRequest(GroupTriage, "request_id", RateAI, true),
 	reqSvc + "ConfirmRequestType":               onRequest(GroupTriage, "request_id", RateWrite, false),
 	reqSvc + "ChangeRequestType":                onRequest(GroupTriage, "request_id", RateWrite, true),
+	reqSvc + "SetRequestBaseRef":                onRequest(GroupTriage, "request_id", RateWrite, false),
 	reqSvc + "ListRequestTypeHistory":           onRequest(GroupRead, "request_id", RateRead, true),
 	reqSvc + "ReturnToBacklog":                  onRequest(GroupLifecycle, "request_id", RateWrite, true),
 	reqSvc + "ReopenRequest":                    onRequest(GroupLifecycle, "request_id", RateWrite, true),

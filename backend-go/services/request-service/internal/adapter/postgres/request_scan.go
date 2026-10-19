@@ -11,7 +11,7 @@ import (
 const requestColumns = `id, tenant_id, project_id, number, title, body, source_provider, source_ref, source_url, source_site,
 	type, type_source, size, urgency, confidence, classification_reason, status, returned_from_stage, return_reason,
 	plan_task_id, reporter_id, created_at, updated_at, version, solution_engine, returned_category, source_hints, classification_attempts,
-	content_schema_version, acceptance_criteria, type_fields, content_revision, content_digest, execution_mode`
+	content_schema_version, acceptance_criteria, type_fields, content_revision, content_digest, execution_mode, base_ref`
 
 func nullIfEmpty(s string) any {
 	if s == "" {
@@ -38,7 +38,7 @@ func scanRequest(row pgx.Row) (domain.Request, error) {
 	err := row.Scan(&r.ID, &r.TenantID, &project, &r.Number, &r.Title, &r.Body, &provider, &r.SourceRef, &r.SourceURL, &r.SourceSite,
 		&typ, &typeSource, &size, &urgency, &r.Confidence, &r.ClassificationReason, &status, &returned, &r.ReturnReason,
 		&plan, &r.ReporterID, &created, &updated, &r.Version, &se, &category, &hints, &r.ClassificationAttempts,
-		&r.ContentSchemaVersion, &r.AcceptanceCriteriaJSON, &r.TypeFieldsJSON, &r.ContentRevision, &r.ContentDigest, &mode)
+		&r.ContentSchemaVersion, &r.AcceptanceCriteriaJSON, &r.TypeFieldsJSON, &r.ContentRevision, &r.ContentDigest, &mode, &r.BaseRef)
 	if err != nil {
 		return domain.Request{}, err
 	}

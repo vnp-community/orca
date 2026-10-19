@@ -28,6 +28,14 @@ type LifecycleUseCases struct {
 	Links      *usecase.ListRequestLinks
 }
 
+// BaseRefUseCases is the CR-REQ-039 write path; without it SetRequestBaseRef answers Unimplemented.
+type BaseRefUseCases struct {
+	Set *usecase.SetRequestBaseRef
+}
+
+// WithBaseRef attaches SetRequestBaseRef.
+func (s *Server) WithBaseRef(u BaseRefUseCases) *Server { s.baseRef = u; return s }
+
 // WithIntake attaches the intake handlers; without it those RPCs stay Unimplemented.
 func (s *Server) WithIntake(u IntakeUseCases) *Server { s.intake = u; return s }
 

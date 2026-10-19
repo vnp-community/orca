@@ -81,6 +81,12 @@ func (t *AuditTap) event(ctx context.Context, ev domain.OutboxEvent, f auditFiel
 			actor = f.ActorID
 		}
 		return req(domain.ActionRequestTypeChange, actor, kind, map[string]string{"from": f.From, "to": f.To})
+	case domain.SubjectRequestBaseRefChanged:
+		actor, kind := ctxActor(ctx)
+		if f.ActorID != "" {
+			actor = f.ActorID
+		}
+		return req(domain.ActionRequestBaseRefChange, actor, kind, map[string]string{"from": f.From, "to": f.To})
 	case domain.SubjectRequestReturned:
 		actor, kind := ctxActor(ctx)
 		if f.ActorID != "" {

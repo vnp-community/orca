@@ -27,11 +27,15 @@ type CreateRequestInput struct {
 	// AcceptanceCriteria and TypeFields are optional initial content (CR-REQ-027); Jira and GitHub requests arrive without them.
 	AcceptanceCriteria []domain.ACInput
 	TypeFields         map[string]any
+	// BaseRef is the optional branch or tag the Request's worktrees start from; empty keeps the repository default (CR-REQ-039).
+	BaseRef string
 }
 
 type CreateRequestResult struct {
 	Request domain.Request
 	Created bool
+	// BaseRefUnverified is true when git could not confirm the ref (dev server unreachable); it is stored all the same.
+	BaseRefUnverified bool
 }
 
 type CreateRequest struct {
@@ -44,6 +48,14 @@ type CreateRequest struct {
 	recorder   RequestCreationRecorder
 	flags      SecurityFlagStore
 	projects   ProjectExistence
+	refs       BaseRefChecker
+}
+
+// WithBaseRefChecker enables the existence check of CreateRequestInput.BaseRef. Without it a non-empty ref is refused
+// (REQUEST_BASE_REF_CHECK_NOT_CONFIGURED) instead of being accepted unchecked.
+func (uc *CreateRequest) WithBaseRefChecker(c BaseRefChecker) *CreateRequest {
+	uc.refs = c
+	return uc
 }
 
 // ProjectExistence tells whether a project is real. Admins skip the membership check, so without this a Request could
@@ -108,6 +120,11 @@ func (uc *CreateRequest) Execute(ctx context.Context, in CreateRequestInput) (Cr
 	if err != nil {
 		return CreateRequestResult{}, err
 	}
+	baseRef, err := domain.ParseWorktreeBaseRef(in.BaseRef)
+	if err != nil {
+		return CreateRequestResult{}, err
+	}
+	in.BaseRef = string(baseRef)
 	key, keyed, err := domain.BuildIdempotencyKey(src, reporter, in.ClientRequestID)
 	if err != nil {
 		return CreateRequestResult{}, err
@@ -131,6 +148,11 @@ func (uc *CreateRequest) Execute(ctx context.Context, in CreateRequestInput) (Cr
 		return CreateRequestResult{}, err
 	}
 	in.Title, in.Body = title, body
+	// The check is a network call, so it runs before the transaction that holds the request_counters row lock.
+	unverified, err := verifyBaseRef(ctx, uc.refs, "", in.ProjectID, baseRef)
+	if err != nil {
+		return CreateRequestResult{}, err
+	}
 
 	var created domain.Request
 	err = uc.tx.InTx(ctx, func(txCtx context.Context) error {
@@ -149,7 +171,7 @@ func (uc *CreateRequest) Execute(ctx context.Context, in CreateRequestInput) (Cr
 	if err != nil {
 		return CreateRequestResult{}, err
 	}
-	return CreateRequestResult{Request: created, Created: true}, nil
+	return CreateRequestResult{Request: created, Created: true, BaseRefUnverified: unverified}, nil
 }
 
 func (uc *CreateRequest) existing(ctx context.Context, key domain.IdempotencyKey) (CreateRequestResult, bool, error) {
@@ -220,6 +242,12 @@ func (uc *CreateRequest) CreateWithinTx(ctx context.Context, in CreateRequestInp
 	if err != nil {
 		return domain.Request{}, err
 	}
+	// Other callers (child requests, webhooks) reach this point without Execute, so the ref is validated here too.
+	baseRef, err := domain.ParseWorktreeBaseRef(in.BaseRef)
+	if err != nil {
+		return domain.Request{}, err
+	}
+	r.BaseRef = string(baseRef)
 	if len(in.AcceptanceCriteria) > 0 || len(in.TypeFields) > 0 {
 		c, err := domain.InitialContent(r.Title, r.Body, in.AcceptanceCriteria, in.TypeFields)
 		if err != nil {

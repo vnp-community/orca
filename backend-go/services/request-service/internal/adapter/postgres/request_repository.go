@@ -33,15 +33,19 @@ func (r *RequestRepository) Create(ctx context.Context, req domain.Request) erro
 		if req.Number <= 0 {
 			return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_NUMBER_REQUIRED", "request number must come from NextNumber", nil)
 		}
+		if err := checkStorableBaseRef(req.BaseRef); err != nil {
+			return err
+		}
 		args := append([]any{req.ID, req.TenantID, req.Number}, requestArgs(req)...)
 		args = append(args, req.CreatedAt, req.UpdatedAt, req.Version)
 		args = append(args, contentArgs(req)...)
+		args = append(args, req.BaseRef)
 		_, err := db.Exec(ctx, `
 			INSERT INTO request.requests (id, tenant_id, number, project_id, title, body, source_provider, source_ref, source_url,
 				source_site, type, type_source, size, urgency, confidence, classification_reason, status, returned_from_stage,
 				return_reason, plan_task_id, reporter_id, solution_engine, returned_category, source_hints, classification_attempts, created_at, updated_at, version,
-				content_schema_version, acceptance_criteria, type_fields, content_revision, content_digest)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24::jsonb,$25,$26,$27,$28,$29,$30::jsonb,$31::jsonb,$32,$33)`, args...)
+				content_schema_version, acceptance_criteria, type_fields, content_revision, content_digest, base_ref)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24::jsonb,$25,$26,$27,$28,$29,$30::jsonb,$31::jsonb,$32,$33,$34)`, args...)
 		if err != nil {
 			return fmt.Errorf("postgres: create request: %w", err)
 		}

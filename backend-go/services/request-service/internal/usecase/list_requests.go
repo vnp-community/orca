@@ -10,11 +10,18 @@ import (
 type ListRequests struct {
 	repo   RequestRepository
 	engine *RequestEngineResolver
+	locks  *BaseRefLockAnnotator
 }
 
 // WithEngine makes every Request of the page carry the engine it runs on.
 func (uc *ListRequests) WithEngine(r *RequestEngineResolver) *ListRequests {
 	uc.engine = r
+	return uc
+}
+
+// WithBaseRefLock makes the answer say whether the base ref can still change.
+func (uc *ListRequests) WithBaseRefLock(a *BaseRefLockAnnotator) *ListRequests {
+	uc.locks = a
 	return uc
 }
 
@@ -49,5 +56,6 @@ func (uc *ListRequests) Execute(ctx context.Context, f ListFilter) (ListResult, 
 		return ListResult{}, err
 	}
 	uc.engine.Annotate(ctx, res.Requests)
+	uc.locks.Annotate(ctx, res.Requests)
 	return res, nil
 }

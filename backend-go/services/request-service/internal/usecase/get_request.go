@@ -11,11 +11,18 @@ import (
 type GetRequest struct {
 	repo   RequestRepository
 	engine *RequestEngineResolver
+	locks  *BaseRefLockAnnotator
 }
 
 // WithEngine makes the answer carry the engine the Request runs on.
 func (uc *GetRequest) WithEngine(r *RequestEngineResolver) *GetRequest {
 	uc.engine = r
+	return uc
+}
+
+// WithBaseRefLock makes the answer say whether the base ref can still change.
+func (uc *GetRequest) WithBaseRefLock(a *BaseRefLockAnnotator) *GetRequest {
+	uc.locks = a
 	return uc
 }
 
@@ -37,5 +44,6 @@ func (uc *GetRequest) Execute(ctx context.Context, id string) (domain.Request, e
 	}
 	one := []domain.Request{req}
 	uc.engine.Annotate(ctx, one)
+	uc.locks.Annotate(ctx, one)
 	return one[0], nil
 }

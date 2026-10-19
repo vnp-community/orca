@@ -23,6 +23,7 @@ import (
 	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 	eventbusadapter "github.com/stablyai/orca-go/services/request-service/internal/adapter/eventbus"
 	requestgrpc "github.com/stablyai/orca-go/services/request-service/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/request-service/internal/adapter/grpcclient"
 	"github.com/stablyai/orca-go/services/request-service/internal/config"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
@@ -168,6 +169,13 @@ func run(ctx context.Context, cfg config.Config) error {
 	}
 	defer intake.close()
 	intake.attachIntake(lifecycle, stores)
+	// No git-gateway based ref checker is connected yet, so base refs are stored flagged as unverified (never silently accepted).
+	baseRef, err := wireBaseRef(log, stores, execTasks.client, grpcclient.UnavailableBaseRefChecker{})
+	if err != nil {
+		return err
+	}
+	log.Warn("base ref existence check is not connected: a requested base ref is stored as unverified")
+	intake.createRequest.WithBaseRefChecker(baseRef.Checker)
 	rollout.AttachLookup(intake)
 	classification, err := wireClassification(lifecycleCtx, &lifecycleWG, cfg, log, stores, transitioner, approval.Recorder, busConsumer)
 	if err != nil {
@@ -214,9 +222,9 @@ func run(ctx context.Context, cfg config.Config) error {
 	// ChainUnary (recovery, tenant extraction, logging) stays first; the security chain (with the flow gate and RPC audit hooks) runs after it.
 	grpcServer := grpc.NewServer(append(append([]grpc.ServerOption{grpcmw.ChainUnary(log), grpcmw.StatsHandler()}, security.options...), rollout.ServerOptions()...)...)
 	requestv1.RegisterRequestServiceServer(grpcServer, artifact.attach(rollout.WithRPCs(requestgrpc.NewServer(
-		usecase.NewGetRequest(stores.requests).WithEngine(&usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}),
-		usecase.NewListRequests(stores.requests).WithEngine(&usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}),
-	).WithExecution(execution.Server))).WithIntake(requestgrpc.IntakeUseCases{Create: intake.createRequest, Lookup: intake.lookup}).
+		usecase.NewGetRequest(stores.requests).WithEngine(&usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}).WithBaseRefLock(baseRef.Locks),
+		usecase.NewListRequests(stores.requests).WithEngine(&usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}).WithBaseRefLock(baseRef.Locks),
+	).WithExecution(execution.Server))).WithBaseRef(requestgrpc.BaseRefUseCases{Set: baseRef.Set}).WithIntake(requestgrpc.IntakeUseCases{Create: intake.createRequest, Lookup: intake.lookup}).
 		WithClassification(requestgrpc.ClassificationUseCases{Runner: classification.runner, Confirm: classification.confirm, Change: classification.change, History: classification.history}).
 		WithLifecycle(requestgrpc.LifecycleUseCases{Flow: lifecycle.GetFlow, Return: lifecycle.Return, Reopen: lifecycle.Reopen, Cancel: lifecycle.Cancel, SpawnChild: lifecycle.SpawnChild, Links: lifecycle.ListLinks}).
 		WithSolution(solution.useCases()).

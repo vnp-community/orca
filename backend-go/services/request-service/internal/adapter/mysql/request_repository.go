@@ -33,15 +33,19 @@ func (r *RequestRepository) Create(ctx context.Context, req domain.Request) erro
 		if req.Number <= 0 {
 			return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_NUMBER_REQUIRED", "request number must come from NextNumber", nil)
 		}
+		if err := checkStorableBaseRef(req.BaseRef); err != nil {
+			return err
+		}
 		args := append([]any{req.ID, req.TenantID, req.Number}, requestArgs(req)...)
 		args = append(args, req.CreatedAt, req.UpdatedAt, req.Version)
 		args = append(args, contentArgs(req)...)
+		args = append(args, req.BaseRef)
 		_, err := db.ExecContext(ctx, `
 			INSERT INTO requests (id, tenant_id, number, project_id, title, body, source_provider, source_ref, source_url,
 				source_site, type, type_source, size, urgency, confidence, classification_reason, status, returned_from_stage,
 				return_reason, plan_task_id, reporter_id, solution_engine, returned_category, source_hints, classification_attempts, created_at, updated_at, version,
-				content_schema_version, acceptance_criteria, type_fields, content_revision, content_digest)
-			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...)
+				content_schema_version, acceptance_criteria, type_fields, content_revision, content_digest, base_ref)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...)
 		if err != nil {
 			return fmt.Errorf("mysql: create request: %w", err)
 		}

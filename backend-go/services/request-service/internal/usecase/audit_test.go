@@ -66,6 +66,8 @@ func TestAudit_EveryEventDerivedActionWritesExactlyOneEntry(t *testing.T) {
 			domain.ActionRequestTypeChange, domain.AuditActorUser, "request", "r1", map[string]string{"from": "bug", "to": "change_request"}},
 		{"change type by agent", auditCtx("u1", "agent"), domain.SubjectRequestTypeChanged, map[string]any{"request_id": "r1", "from": "bug", "to": "task", "actor_id": "u1"},
 			domain.ActionRequestTypeChange, domain.AuditActorAgent, "request", "r1", map[string]string{"from": "bug", "to": "task"}},
+		{"change base ref", auditCtx("u1", ""), domain.SubjectRequestBaseRefChanged, map[string]any{"request_id": "r1", "from": "", "to": "release/1.4", "actor_id": "u1", "version": 7, "title": "secret title"},
+			domain.ActionRequestBaseRefChange, domain.AuditActorUser, "request", "r1", map[string]string{"from": "", "to": "release/1.4"}},
 		{"return by user", auditCtx("u1", ""), domain.SubjectRequestReturned, map[string]any{"request_id": "r1", "stage": "plan", "actor_id": "u1", "reason": "free text"},
 			domain.ActionRequestReturn, domain.AuditActorUser, "request", "r1", map[string]string{"returned_from_stage": "plan"}},
 		{"return by the system", auditCtx("", ""), domain.SubjectRequestReturned, map[string]any{"request_id": "r1", "stage": "task", "actor_id": ""},
