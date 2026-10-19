@@ -216,7 +216,7 @@ func (s *TasksMdSyncer) planRunActive(ctx context.Context, requestID string) (bo
 
 func (s *TasksMdSyncer) workspace(ctx context.Context, change domain.OpenSpecChange, req domain.Request) (Workspace, error) {
 	return s.Workspace.Ensure(ctx, EnsureWorkspaceInput{
-		TenantID: req.TenantID, ProjectID: req.ProjectID, RequestID: req.ID, RequestNumber: req.Number, ChangeID: change.ChangeID,
+		TenantID: req.TenantID, ProjectID: req.ProjectID, RequestID: req.ID, RequestNumber: req.Number, ChangeID: change.ChangeID, BaseRef: req.BaseRef,
 	})
 }
 

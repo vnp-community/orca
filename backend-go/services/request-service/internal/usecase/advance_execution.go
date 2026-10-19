@@ -174,15 +174,17 @@ func (uc *AdvanceExecution) run(ctx context.Context, req domain.Request, tree do
 }
 
 // dispatch starts one task: on the contract path when the plan and the task client allow it, otherwise the plain run.
+// req is the Request loaded under the lock for this pass, so a base ref set after an earlier pass is honoured (CR-REQ-039).
 func (uc *AdvanceExecution) dispatch(ctx context.Context, req domain.Request, task domain.TaskView, execRef string) error {
 	if uc.Contract != nil {
 		if client, ok := uc.Tasks.(ContractTaskClient); ok {
 			if run, planned := uc.Contract.Plan(ctx, req, task); planned {
+				run.BaseRef = req.BaseRef
 				return client.ExecuteContract(ctx, task.ID, execRef, run)
 			}
 		}
 	}
-	return uc.Tasks.Execute(ctx, task.ID, execRef)
+	return uc.Tasks.Execute(ctx, task.ID, execRef, ExecuteOptions{BaseRef: req.BaseRef})
 }
 
 func (uc *AdvanceExecution) openGate(ctx context.Context, req domain.Request, gate domain.GateRequirement, actorID string) error {

@@ -835,14 +835,41 @@ func (r *RelayExecutor) RemoveWorktree(ctx context.Context, worktreePath string,
 	}, nil)
 }
 
+// FetchAndResolveRef fetches ref from origin and resolves it, with git.exec's allowed fetch and rev-parse: the agent has no
+// git.fetchRef method. A failed fetch still answers when the ref resolves in the local clone, which is what worktree creation
+// resolves; the fetch error is returned only when neither works.
 func (r *RelayExecutor) FetchAndResolveRef(ctx context.Context, repoPath, ref string) (string, error) {
-	var result struct {
-		SHA string `json:"sha"`
+	if strings.HasPrefix(ref, "-") {
+		return "", fmt.Errorf("git fetch: ref %q looks like an option", ref)
 	}
-	err := r.relay(ctx, repoPath, "git.fetchRef", map[string]any{
-		"repoPath": repoPath, "ref": ref,
-	}, &result)
-	return result.SHA, err
+	fetchErr := r.gitExecOK(ctx, repoPath, "fetch", "origin", ref)
+	if fetchErr == nil {
+		return r.resolveCommit(ctx, repoPath, "FETCH_HEAD^{commit}")
+	}
+	if sha, err := r.resolveCommit(ctx, repoPath, ref+"^{commit}"); err == nil {
+		return sha, nil
+	}
+	return "", fetchErr
+}
+
+// gitExecOK runs one git command through git.exec and fails on a non-zero exit, which the agent answers as a success.
+func (r *RelayExecutor) gitExecOK(ctx context.Context, repoPath string, args ...string) error {
+	var res gitExecResult
+	if err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": args, "cwd": repoPath}, &res); err != nil {
+		return err
+	}
+	return res.failed("git " + args[0])
+}
+
+func (r *RelayExecutor) resolveCommit(ctx context.Context, repoPath, rev string) (string, error) {
+	var res gitExecResult
+	if err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": []string{"rev-parse", "--verify", "--quiet", rev}, "cwd": repoPath}, &res); err != nil {
+		return "", err
+	}
+	if err := res.failed("git rev-parse " + rev); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(res.Stdout), nil
 }
 
 // ListWorktreePaths: the previously-documented "agent has no git.worktreeList

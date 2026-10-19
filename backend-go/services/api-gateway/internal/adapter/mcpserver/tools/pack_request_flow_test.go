@@ -108,7 +108,7 @@ func TestRequestFlowPack_DefaultPackListsOnlyReads(t *testing.T) {
 
 func TestRequestFlowPack_HumanGatesAreNotTools(t *testing.T) {
 	ex := newRequestFlowExec(t, &fakeRequestService{}, DefaultConfig())
-	for _, name := range []string{"approval_approve", "approval_reject", "approval_cancel", "solution_choose", "request_confirmType", "request_cancel", "request_flowSet", "request_subscribe"} {
+	for _, name := range []string{"approval_approve", "approval_reject", "approval_cancel", "solution_choose", "request_confirmType", "request_cancel", "request_flowSet", "request_subscribe", "request_setBaseRef"} {
 		_, err := ex.CallTool(context.Background(), alice, name, json.RawMessage(`{}`))
 		if err != mcpserver.ErrUnknownTool {
 			t.Errorf("%s: got %v, want unknown tool", name, err)

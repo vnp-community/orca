@@ -28,6 +28,25 @@ type fakeGitGatewayCreateWorktreeClient struct {
 	createWorktreeErr    error
 	gotCreateWorktree    *gitgatewayv1.CreateWorktreeRequest
 	createWorktreeCalled bool
+
+	// baseRefDefaultResp is what BaseRefDefault answers; unset it answers "main", so tests that do not care still get a default.
+	baseRefDefaultResp   *gitgatewayv1.BaseRefDefaultResponse
+	baseRefDefaultErr    error
+	gotBaseRefDefault    *gitgatewayv1.BaseRefDefaultRequest
+	gotBaseRefDefaultCtx context.Context
+	baseRefDefaultCalls  int
+}
+
+func (f *fakeGitGatewayCreateWorktreeClient) BaseRefDefault(ctx context.Context, in *gitgatewayv1.BaseRefDefaultRequest, _ ...grpc.CallOption) (*gitgatewayv1.BaseRefDefaultResponse, error) {
+	f.baseRefDefaultCalls++
+	f.gotBaseRefDefault, f.gotBaseRefDefaultCtx = in, ctx
+	if f.baseRefDefaultErr != nil {
+		return nil, f.baseRefDefaultErr
+	}
+	if f.baseRefDefaultResp != nil {
+		return f.baseRefDefaultResp, nil
+	}
+	return &gitgatewayv1.BaseRefDefaultResponse{Ref: "main"}, nil
 }
 
 func (f *fakeGitGatewayCreateWorktreeClient) CreateWorktree(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateWorktreeResponse, error) {
@@ -94,7 +113,7 @@ func TestWorktreeProvisioner_ReusesExistingWorktree(t *testing.T) {
 	projects := &fakeProjectServiceClient{getWorktreeResp: &projectv1.Worktree{Id: "wt-existing", Path: "/opt/repos/proj-1-task-task-1"}}
 	p := NewWorktreeProvisioner(git, projects)
 
-	worktreeID, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-existing"})
+	worktreeID, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-existing"}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -124,7 +143,7 @@ func TestWorktreeProvisioner_ReuseExistingWorktree_GetWorktreeError_FailsClosed(
 	projects := &fakeProjectServiceClient{getWorktreeErr: errors.New("project-service unavailable")}
 	p := NewWorktreeProvisioner(git, projects)
 
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-existing"}); err == nil {
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-existing"}, ""); err == nil {
 		t.Fatal("expected an error when GetWorktree fails, not a silently guessed path")
 	}
 	if git.createWorktreeCalled {
@@ -144,7 +163,7 @@ func TestWorktreeProvisioner_CreatesWorktreeForTaskWithNoExistingOne(t *testing.
 	}}}
 	p := NewWorktreeProvisioner(git, projects)
 
-	worktreeID, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
+	worktreeID, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -183,7 +202,7 @@ func TestWorktreeProvisioner_ResolveRepoIDForwardsUserIDToListRepos(t *testing.T
 	p := NewWorktreeProvisioner(git, projects)
 
 	ctx := tenant.WithUserID(ctxWithTenant(t), "user-1")
-	if _, _, err := p.EnsureWorktree(ctx, "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+	if _, _, err := p.EnsureWorktree(ctx, "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -204,7 +223,7 @@ func TestWorktreeProvisioner_NoReposForProject_ReturnsError(t *testing.T) {
 	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{}}
 	p := NewWorktreeProvisioner(git, projects)
 
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err == nil {
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err == nil {
 		t.Fatal("expected an error when the project has no repos")
 	}
 	if git.createWorktreeCalled {
@@ -217,7 +236,7 @@ func TestWorktreeProvisioner_ListReposError_Propagates(t *testing.T) {
 	projects := &fakeProjectServiceClient{listReposErr: errors.New("project-service unavailable")}
 	p := NewWorktreeProvisioner(git, projects)
 
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err == nil {
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err == nil {
 		t.Fatal("expected an error when ListRepos fails")
 	}
 }
@@ -227,7 +246,7 @@ func TestWorktreeProvisioner_CreateWorktreeError_Propagates(t *testing.T) {
 	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "repo-1", ProjectId: "proj-1"}}}}
 	p := NewWorktreeProvisioner(git, projects)
 
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err == nil {
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err == nil {
 		t.Fatal("expected an error when CreateWorktree fails")
 	}
 }

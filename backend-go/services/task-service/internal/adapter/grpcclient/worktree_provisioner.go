@@ -59,7 +59,9 @@ func NewWorktreeProvisioner(git gitgatewayv1.GitGatewayServiceClient, projects p
 	return &WorktreeProvisioner{git: git, projects: projects}
 }
 
-func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (worktreeID, path string, err error) {
+// EnsureWorktree reuses the task's worktree or creates one from baseRef. An empty baseRef is the repository's default
+// branch, looked up through git-gateway; it is never the main checkout's current HEAD. Reused worktrees ignore baseRef.
+func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task, baseRef string) (worktreeID, path string, err error) {
 	if task.WorktreeID != "" {
 		// reuse — spec's "IF task.worktreeId exists: use existing
 		// worktree". BUG-028: this used to return an empty path, relying
@@ -106,10 +108,17 @@ func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID strin
 	if userID, ok := tenant.UserID(origCtx); ok && userID != "" {
 		ctx = metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataUserID, userID)
 	}
+	if baseRef == "" {
+		// A lookup failure stops the run: falling back to HEAD would start the task from whatever branch the main checkout is on.
+		if baseRef, err = p.defaultBaseRef(ctx, repoID); err != nil {
+			return "", "", err
+		}
+	}
 	req := &gitgatewayv1.CreateWorktreeRequest{
 		ProjectId: task.ProjectID,
 		RepoId:    repoID,
 		Branch:    fmt.Sprintf("task/%s", task.ID),
+		BaseRef:   baseRef,
 		TaskId:    &task.ID,
 	}
 	// Record the issue on the worktree this task creates, so issue-status-sync
@@ -128,6 +137,18 @@ func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID strin
 		return "", "", fmt.Errorf("worktree_provisioner: create worktree: %w", err)
 	}
 	return resp.GetWorktreeId(), resp.GetPath(), nil
+}
+
+// defaultBaseRef asks git-gateway for the repository's default branch. ctx already carries tenant and acting user.
+func (p *WorktreeProvisioner) defaultBaseRef(ctx context.Context, repoID string) (string, error) {
+	resp, err := p.git.BaseRefDefault(ctx, &gitgatewayv1.BaseRefDefaultRequest{RepoId: repoID})
+	if err != nil {
+		return "", fmt.Errorf("worktree_provisioner: resolve default branch of repo %q: %w", repoID, err)
+	}
+	if resp.GetRef() == "" {
+		return "", fmt.Errorf("worktree_provisioner: repo %q reported an empty default branch", repoID)
+	}
+	return resp.GetRef(), nil
 }
 
 // resolveRepoID picks the project's default repo — see this type's doc

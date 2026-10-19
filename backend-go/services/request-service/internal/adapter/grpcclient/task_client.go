@@ -129,8 +129,8 @@ func (c *TaskClient) GetSubtree(ctx context.Context, rootID string) (usecase.Sub
 }
 
 // Execute maps task-service's dispatch failures onto the domain errors AdvanceExecution branches on.
-func (c *TaskClient) Execute(ctx context.Context, taskID, executionRequestID string) error {
-	return c.execute(ctx, &taskv1.TaskServiceExecuteRequest{TaskId: taskID, RequestId: executionRequestID})
+func (c *TaskClient) Execute(ctx context.Context, taskID, executionRequestID string, opts usecase.ExecuteOptions) error {
+	return c.execute(ctx, &taskv1.TaskServiceExecuteRequest{TaskId: taskID, RequestId: executionRequestID, BaseRef: opts.BaseRef})
 }
 
 var _ usecase.ContractTaskClient = (*TaskClient)(nil)
@@ -139,7 +139,7 @@ var _ usecase.ContractTaskClient = (*TaskClient)(nil)
 func (c *TaskClient) ExecuteContract(ctx context.Context, taskID, executionRequestID string, run usecase.ContractRun) error {
 	return c.execute(ctx, &taskv1.TaskServiceExecuteRequest{
 		TaskId: taskID, RequestId: executionRequestID, ResultNonce: run.ResultNonce,
-		UseKnowledgeHub: run.UseKnowledgeHub, RequirePassingCheck: run.RequirePassingCheck,
+		UseKnowledgeHub: run.UseKnowledgeHub, RequirePassingCheck: run.RequirePassingCheck, BaseRef: run.BaseRef,
 	})
 }
 
@@ -285,7 +285,9 @@ func (UnavailableTaskClient) ListTasks(context.Context, usecase.ListTasksQuery) 
 func (UnavailableTaskClient) GetSubtree(context.Context, string) (usecase.SubtreeView, error) {
 	return usecase.SubtreeView{}, errNoTaskService
 }
-func (UnavailableTaskClient) Execute(context.Context, string, string) error { return errNoTaskService }
+func (UnavailableTaskClient) Execute(context.Context, string, string, usecase.ExecuteOptions) error {
+	return errNoTaskService
+}
 func (UnavailableTaskClient) SetWorktree(context.Context, string, string) error {
 	return errNoTaskService
 }

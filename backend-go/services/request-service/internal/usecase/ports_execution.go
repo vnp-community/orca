@@ -39,7 +39,7 @@ type TaskClient interface {
 	ListTasks(ctx context.Context, q ListTasksQuery) ([]domain.TaskView, error)
 	GetSubtree(ctx context.Context, rootID string) (SubtreeView, error)
 	// Execute dispatches one working task; executionRequestID is "req:<request>:<task>:<attempt>".
-	Execute(ctx context.Context, taskID, executionRequestID string) error
+	Execute(ctx context.Context, taskID, executionRequestID string, opts ExecuteOptions) error
 	SetWorktree(ctx context.Context, taskID, worktreeID string) error
 	SetStatus(ctx context.Context, taskID, status string) error
 	// ListExecutionStates batches its ids itself (at most 500 per call).
@@ -153,9 +153,17 @@ type ExecutionActors interface {
 	ActorFor(ctx context.Context, req domain.Request, phaseID string) (string, error)
 }
 
+// ExecuteOptions are per-dispatch inputs of the plain run. BaseRef is the Request's base ref read at dispatch time; only the
+// creation of the Plan's first worktree uses it, later tasks reuse that worktree (CR-REQ-039).
+type ExecuteOptions struct {
+	BaseRef string
+}
+
 // ContractRun asks task-service for a run that must end in a nonce-fenced result block. The zero value is not a contract run.
 type ContractRun struct {
 	ResultNonce string
+	// BaseRef: see ExecuteOptions.BaseRef.
+	BaseRef string
 	// UseKnowledgeHub gives the agent the project's knowledge graph; RequirePassingCheck makes a "done" without a passing
 	// check count as a failed attempt.
 	UseKnowledgeHub, RequirePassingCheck bool

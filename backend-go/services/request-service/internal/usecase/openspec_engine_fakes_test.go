@@ -22,19 +22,22 @@ type fakeWorkspace struct {
 	committed [][]string
 	removed   int
 	ensureErr error
-	discErr   error
-	changeErr error
-	readErr   error
+	// lastEnsure is the input of the latest Ensure, so tests can see which base ref a caller asked for.
+	lastEnsure EnsureWorkspaceInput
+	discErr    error
+	changeErr  error
+	readErr    error
 }
 
 func newFakeWorkspace() *fakeWorkspace {
 	return &fakeWorkspace{ws: Workspace{WorktreeID: "wt-1", Path: "/srv/wt-1", Branch: "request/42-proposal", BaseRef: "main"}, files: map[string][]byte{}}
 }
 
-func (f *fakeWorkspace) Ensure(context.Context, EnsureWorkspaceInput) (Workspace, error) {
+func (f *fakeWorkspace) Ensure(_ context.Context, in EnsureWorkspaceInput) (Workspace, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ensured++
+	f.lastEnsure = in
 	return f.ws, f.ensureErr
 }
 

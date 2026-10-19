@@ -980,10 +980,12 @@ type fakeWorktreeProvisioner struct {
 	err        error
 	called     bool
 	gotTask    domain.Task
+	gotBaseRef string
 }
 
-func (f *fakeWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (string, string, error) {
+func (f *fakeWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task, baseRef string) (string, string, error) {
 	f.called = true
+	f.gotBaseRef = baseRef
 	f.gotTask = task
 	if f.err != nil {
 		return "", "", f.err

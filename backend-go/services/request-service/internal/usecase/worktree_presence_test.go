@@ -38,6 +38,19 @@ func TestWorktreePresence_Has(t *testing.T) {
 			t.Fatalf("%v %q %v calls=%d", present, reason, err, len(tasks.calls))
 		}
 	})
+	t.Run("an executing Request is already locked by the stored part, without asking task-service", func(t *testing.T) {
+		stored, tasks := newFakePresence(), &taskLister{err: errors.New("must not be called")}
+		stored.set(req, domain.BaseRefLockedExecution)
+		p := &TaskAwareWorktreePresence{Stored: stored, Tasks: tasks}
+		present, reason, err := p.Has(tctx(), req)
+		if err != nil || !present || reason != domain.BaseRefLockedExecution || len(tasks.calls) != 0 {
+			t.Fatalf("%v %q %v calls=%d", present, reason, err, len(tasks.calls))
+		}
+		many, err := p.HasMany(tctx(), []string{req})
+		if err != nil || many[req] != domain.BaseRefLockedExecution || len(tasks.calls) != 0 {
+			t.Fatalf("%v %v calls=%d", many, err, len(tasks.calls))
+		}
+	})
 	t.Run("a task with a worktree locks", func(t *testing.T) {
 		tasks := &taskLister{tasks: []domain.TaskView{{ID: "t1", RequestID: req}, {ID: "t2", RequestID: req, WorktreeID: "wt-1"}}}
 		p := &TaskAwareWorktreePresence{Stored: newFakePresence(), Tasks: tasks}

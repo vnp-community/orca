@@ -2,8 +2,10 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
@@ -44,6 +46,10 @@ func verifyBaseRef(ctx context.Context, checker BaseRefChecker, requestID, proje
 		return false, ctx.Err()
 	}
 	if cerr != nil {
+		var ae *apperrors.AppError
+		if errors.As(cerr, &ae) && ae.Code == "REQUEST_BASE_REF_CHECK_NOT_CONFIGURED" {
+			return false, cerr // a deployment defect, not an unreachable dev server: say so instead of storing the ref unchecked
+		}
 		slog.WarnContext(ctx, "base ref could not be checked; stored unverified", slog.String("request_id", requestID), slog.Any("error", cerr))
 		return true, nil
 	}

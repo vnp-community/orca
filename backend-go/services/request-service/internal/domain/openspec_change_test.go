@@ -70,3 +70,16 @@ func TestNewChangeID_Cases(t *testing.T) {
 		}
 	}
 }
+
+func TestOpenSpecChange_Reopen_OnlyFromAbandoned(t *testing.T) {
+	c := OpenSpecChange{Status: ChangeStatusAbandoned}
+	if err := c.Reopen(); err != nil || c.Status != ChangeStatusPreparing {
+		t.Fatalf("abandoned -> preparing: %v %s", err, c.Status)
+	}
+	for _, st := range []ChangeStatus{ChangeStatusPreparing, ChangeStatusReady, ChangeStatusArchived} {
+		c := OpenSpecChange{Status: st}
+		if err := c.Reopen(); err == nil || c.Status != st {
+			t.Errorf("%s must not be reopened: %v %s", st, err, c.Status)
+		}
+	}
+}

@@ -67,9 +67,11 @@ func packRequestFlow() []*ToolSpec {
 		read("request.executionSummary", "How a Request's run is going: progress, the tasks running now, the tasks that failed and why, what waits for a person, and the OpenSpec handover.", id).untrusted(),
 
 		// Pack 2: reversible writes.
-		write("request.create", "Create a Request in the intake queue. Always send a stable client_request_id per piece of work so a retry does not create a duplicate. At most a few Requests per hour per client.",
+		write("request.create", "Create a Request in the intake queue. Always send a stable client_request_id per piece of work so a retry does not create a duplicate. At most a few Requests per hour per client. "+
+			"base_ref (optional) is the branch or tag the Request's worktrees start from; leave it out for the repository's default branch. It is fixed once the Request has a worktree and only a person can change it later.",
 			Str("project_id", "projectId", "Project id", Req), Str("title", "title", "Short title", Req, Len(500)),
-			Str("body", "body", "Description", Len(100000)), Str("client_request_id", "clientRequestId", "Stable id for this piece of work", Len(128))),
+			Str("body", "body", "Description", Len(100000)), Str("client_request_id", "clientRequestId", "Stable id for this piece of work", Len(128)),
+			Str("base_ref", "baseRef", "Branch or tag the Request's worktrees start from; empty means the repository default", Len(255))),
 		write("request.changeType", "Propose a different type for a Request; a person confirms it again.",
 			id, Str("to_type", "toType", "New type", Req, OneOf(requestFlowTypes...)), Str("reason", "reason", "Why the type should change", Req, Len(2000))),
 		write("request.returnToBacklog", "Return a Request to the backlog when it cannot be carried out. Undo with request_reopen.",

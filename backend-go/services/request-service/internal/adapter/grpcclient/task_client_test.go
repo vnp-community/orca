@@ -212,7 +212,7 @@ func TestTaskClient_Execute_ErrorMapping(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := &fakeTaskServer{executeErr: tc.err}
-			err := startTaskServer(t, f).Execute(ctxWith("approver-1"), "task-1", "req:r:task-1:1")
+			err := startTaskServer(t, f).Execute(ctxWith("approver-1"), "task-1", "req:r:task-1:1", usecase.ExecuteOptions{})
 			if !errors.Is(err, tc.is) {
 				t.Fatalf("got %v, want %v", err, tc.is)
 			}
@@ -224,7 +224,7 @@ func TestTaskClient_Execute_ErrorMapping(t *testing.T) {
 	}
 	t.Run("other failure surfaces", func(t *testing.T) {
 		f := &fakeTaskServer{executeErr: status.Error(codes.FailedPrecondition, "TASK_EXECUTE_PROMPT_UNSUPPORTED: x")}
-		err := startTaskServer(t, f).Execute(ctxWith("u"), "t", "ref")
+		err := startTaskServer(t, f).Execute(ctxWith("u"), "t", "ref", usecase.ExecuteOptions{})
 		if err == nil || errors.Is(err, domain.ErrTaskDispatchTransient) || errors.Is(err, domain.ErrTaskAlreadyRunning) {
 			t.Fatalf("an unknown failure is not transient: %v", err)
 		}
@@ -234,13 +234,13 @@ func TestTaskClient_Execute_ErrorMapping(t *testing.T) {
 func TestTaskClient_Execute_CarriesTheActingUser(t *testing.T) {
 	f := &fakeTaskServer{}
 	c := startTaskServer(t, f)
-	if err := c.Execute(ctxWith("approver-1"), "task-1", "req:r:task-1:1"); err != nil {
+	if err := c.Execute(ctxWith("approver-1"), "task-1", "req:r:task-1:1", usecase.ExecuteOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.md[0].Get(grpcmw.MetadataUserID); len(got) != 1 || got[0] != "approver-1" {
 		t.Fatalf("task-service checks this user's permission: %v", f.md[0])
 	}
-	if err := c.Execute(ctxWith(""), "task-1", "ref"); err == nil {
+	if err := c.Execute(ctxWith(""), "task-1", "ref", usecase.ExecuteOptions{}); err == nil {
 		t.Fatal("writes need an acting user")
 	}
 }
@@ -319,7 +319,7 @@ func TestUnavailableTaskClient(t *testing.T) {
 	if _, err := c.ListTasks(ctxWith("u"), usecase.ListTasksQuery{}); !errors.Is(err, domain.ErrTaskServiceDown) {
 		t.Fatalf("got %v", err)
 	}
-	if err := c.Execute(ctxWith("u"), "t", "r"); !errors.Is(err, domain.ErrTaskServiceDown) {
+	if err := c.Execute(ctxWith("u"), "t", "r", usecase.ExecuteOptions{}); !errors.Is(err, domain.ErrTaskServiceDown) {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -337,11 +337,11 @@ func TestChunkStrings(t *testing.T) {
 func TestTaskClient_ExecuteContract_SendsTheNonceAndTheTwoFlags_AndPlainExecuteSendsNone(t *testing.T) {
 	f := &fakeTaskServer{}
 	c := startTaskServer(t, f)
-	run := usecase.ContractRun{ResultNonce: "n0nce-n0nce-n0nce-n0nce", UseKnowledgeHub: true, RequirePassingCheck: true}
+	run := usecase.ContractRun{ResultNonce: "n0nce-n0nce-n0nce-n0nce", UseKnowledgeHub: true, RequirePassingCheck: true, BaseRef: "release/x"}
 	if err := c.ExecuteContract(ctxWith("approver-1"), "task-1", "req:r:task-1:2", run); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.Execute(ctxWith("approver-1"), "task-2", "req:r:task-2:1"); err != nil {
+	if err := c.Execute(ctxWith("approver-1"), "task-2", "req:r:task-2:1", usecase.ExecuteOptions{BaseRef: "v2.0"}); err != nil {
 		t.Fatal(err)
 	}
 	got, plain := f.executes[0], f.executes[1]
@@ -350,6 +350,9 @@ func TestTaskClient_ExecuteContract_SendsTheNonceAndTheTwoFlags_AndPlainExecuteS
 	}
 	if plain.GetResultNonce() != "" || plain.GetUseKnowledgeHub() || plain.GetRequirePassingCheck() {
 		t.Fatalf("a plain run must not select the contract path: %v", plain)
+	}
+	if got.GetBaseRef() != "release/x" || plain.GetBaseRef() != "v2.0" {
+		t.Fatalf("both paths carry their base ref: contract %q plain %q", got.GetBaseRef(), plain.GetBaseRef())
 	}
 	// Both go through the same error mapping.
 	f.executeErr = status.Error(codes.FailedPrecondition, "TASK_EXECUTE_ALREADY_IN_PROGRESS: x")

@@ -79,6 +79,12 @@ proto/orca/request/v1/request.proto, proto/orca/task/v1/task.proto              
 
 `BaseRefChecker.Check(ctx, projectID, baseRef) (CheckResult, error)` cài bằng `git-gateway.PrefetchCreateBase{repo_id, base_ref}`; repo là repo đầu của dự án (`ListRepos`, giống `repoFor`). Timeout 10 giây. Phân loại: `Found`, `NotFound` (kèm tối đa 5 gợi ý từ `available`), `Unreachable` (lỗi mạng, dev server offline, `DeadlineExceeded`).
 
+**Điều chỉnh khi triển khai TASK-039-03 (2026-10-19).**
+- `PrefetchCreateBase` của git-gateway nay phân loại: ref không có (cả trên remote lẫn trong clone cục bộ) là `NotFound` mã `WORKTREE_BASE_REF_NOT_FOUND` kèm `available: ...` như `CreateWorktree`; remote/dev server không với tới là `Unavailable` hoặc `DeadlineExceeded`. Executor relay không còn gọi `git.fetchRef` (agent không có) mà dùng `git.exec fetch` + `rev-parse`.
+- Lý do khoá có thêm `execution`: Request ở trạng thái `executing` luôn coi là đã có worktree (worktree task được tạo ở task-service ngay khi giao việc, chỉ khi Request đang thực thi). Các giá trị: `proposal`, `task`, `execution`, `terminal`.
+- Khe giữa các dịch vụ được đóng bằng `ReservingProposalWorkspace`: mọi `Ensure` giữ `LockRequest`, đọc `base_ref` mới từ DB, ghi dấu `preparing` rồi mới tạo worktree ngoài khoá. Dấu bị `abandoned` khi git nói ref không tồn tại (chắc chắn chưa tạo gì), giữ nguyên với mọi lỗi khác.
+- Ref do người dùng chọn không bao giờ được gửi trần cho `git worktree add`: nếu ref chỉ có dạng `origin/<tên>`, git (2.54) tạo nhánh cục bộ trùng tên ref và checkout nó thay cho nhánh đề xuất. Gửi dạng đầy đủ `refs/heads/`, `refs/remotes/origin/`, `refs/tags/` theo thứ tự đó. Task 04 phải làm tương tự cho worktree của task.
+
 ### 2.5 Truyền xuống
 
 1. `ProposalWorkspace.Ensure`: nhận `EnsureWorkspaceInput.BaseRef`; `base := in.BaseRef`; nếu rỗng thì `BaseRefDefault`; truyền vào `create` và `existingFor` như hiện nay.

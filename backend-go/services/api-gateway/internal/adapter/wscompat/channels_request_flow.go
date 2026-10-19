@@ -18,8 +18,9 @@ func (c requestChannels) registerFlow(r *Registry) {
 			return nil, err
 		}
 		return struct {
-			Enabled bool `json:"enabled"`
-		}{resp.GetEnabled()}, nil
+			Enabled  bool     `json:"enabled"`
+			Features []string `json:"features"`
+		}{resp.GetEnabled(), requestFeatures()}, nil
 	})
 	c.handle(r, "request.flowSet", opts, func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		// Fail early with a clear code; request-service checks the role again.

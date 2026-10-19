@@ -54,6 +54,32 @@ func TestRequestCreate_SourceComesFromMCPSessionNotInput(t *testing.T) {
 	}
 }
 
+func TestRequestCreate_BaseRefIsPassedOnAndBounded(t *testing.T) {
+	fake := &fakeRequestService{}
+	ex := newRequestFlowExec(t, fake, DefaultConfig())
+	if _, err := ex.CallTool(context.Background(), alice, "request_create",
+		json.RawMessage(`{"project_id":"p1","title":"x","base_ref":"release/2.1"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got := fake.creates[0].GetBaseRef(); got != "release/2.1" {
+		t.Errorf("base_ref reached the service as %q", got)
+	}
+	if _, err := ex.CallTool(context.Background(), alice, "request_create", json.RawMessage(`{"project_id":"p1","title":"y"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got := fake.creates[1].GetBaseRef(); got != "" {
+		t.Errorf("an omitted base_ref must stay empty, got %q", got)
+	}
+	long := strings.Repeat("a", 256)
+	_, err := ex.CallTool(context.Background(), alice, "request_create", json.RawMessage(`{"project_id":"p1","title":"z","base_ref":"`+long+`"}`))
+	if err == nil || !strings.HasPrefix(errText(err), "INVALID_ARGUMENTS") {
+		t.Errorf("a 256 byte base_ref must be rejected before the service, got %v", err)
+	}
+	if len(fake.creates) != 2 {
+		t.Errorf("the rejected call reached the service: creates = %d", len(fake.creates))
+	}
+}
+
 func TestRequestCreate_UnknownClientNameFallsBack(t *testing.T) {
 	fake := &fakeRequestService{}
 	ex := newRequestFlowExec(t, fake, DefaultConfig())

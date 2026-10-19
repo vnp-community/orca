@@ -404,7 +404,10 @@ type WorktreeProvisioner interface {
 	// the shared repo root instead of its own isolated directory) — see
 	// internal/adapter/grpcclient.WorktreeProvisioner.EnsureWorktree's doc
 	// comment for the reuse branch's real resolution path.
-	EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (worktreeID, path string, err error)
+	//
+	// baseRef is the branch or tag a NEW worktree starts from (CR-REQ-039); empty means the repository's default branch.
+	// An existing worktree is reused as it is and baseRef is ignored.
+	EnsureWorktree(ctx context.Context, tenantID string, task domain.Task, baseRef string) (worktreeID, path string, err error)
 }
 
 // ProjectInfoResolver resolves a project's name/repo URL via

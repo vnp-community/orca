@@ -40,7 +40,7 @@ func baseRefStores() *requestStores {
 }
 
 func TestWireBaseRef_BuildsWhenEveryPortIsThere(t *testing.T) {
-	w, err := wireBaseRef(slog.New(slog.NewTextHandler(io.Discard, nil)), baseRefStores(), grpcclient.UnavailableTaskClient{}, grpcclient.UnavailableBaseRefChecker{})
+	w, err := wireBaseRef(slog.New(slog.NewTextHandler(io.Discard, nil)), baseRefStores(), grpcclient.UnavailableTaskClient{}, grpcclient.NewGitBaseRefChecker(nil, nil))
 	if err != nil || w.Set == nil || w.Locks == nil || w.Checker == nil {
 		t.Fatalf("%+v %v", w, err)
 	}
@@ -53,11 +53,11 @@ func TestWireBaseRef_AMissingPortStopsStartup(t *testing.T) {
 		checker usecase.BaseRefChecker
 		want    string
 	}{
-		"base ref writer":   {mutate: func(s *requestStores) { s.baseRefs = nil }, tasks: grpcclient.UnavailableTaskClient{}, checker: grpcclient.UnavailableBaseRefChecker{}, want: "base ref writer"},
-		"presence store":    {mutate: func(s *requestStores) { s.worktreeRecords = nil }, tasks: grpcclient.UnavailableTaskClient{}, checker: grpcclient.UnavailableBaseRefChecker{}, want: "worktree presence"},
-		"task client":       {mutate: func(*requestStores) {}, tasks: nil, checker: grpcclient.UnavailableBaseRefChecker{}, want: "task client"},
+		"base ref writer":   {mutate: func(s *requestStores) { s.baseRefs = nil }, tasks: grpcclient.UnavailableTaskClient{}, checker: grpcclient.NewGitBaseRefChecker(nil, nil), want: "base ref writer"},
+		"presence store":    {mutate: func(s *requestStores) { s.worktreeRecords = nil }, tasks: grpcclient.UnavailableTaskClient{}, checker: grpcclient.NewGitBaseRefChecker(nil, nil), want: "worktree presence"},
+		"task client":       {mutate: func(*requestStores) {}, tasks: nil, checker: grpcclient.NewGitBaseRefChecker(nil, nil), want: "task client"},
 		"checker":           {mutate: func(*requestStores) {}, tasks: grpcclient.UnavailableTaskClient{}, checker: nil, want: "checker"},
-		"locker (use case)": {mutate: func(s *requestStores) { s.locker = nil }, tasks: grpcclient.UnavailableTaskClient{}, checker: grpcclient.UnavailableBaseRefChecker{}, want: "locker"},
+		"locker (use case)": {mutate: func(s *requestStores) { s.locker = nil }, tasks: grpcclient.UnavailableTaskClient{}, checker: grpcclient.NewGitBaseRefChecker(nil, nil), want: "locker"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -118,7 +118,7 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 	in := ProposalInput{Run: run, Request: req, ChangeID: changeID, Shape: shape, Limits: w.limits, Feedback: run.Feedback, Settings: w.projectEngineSettings(ctx, req.ProjectID)}
 	var stats domain.RunStats
 	in.Stats = &stats
-	in.OnWorkspace = func(ws Workspace) { w.recordWorkspace(ctx, req, changeID, ws, existing, hasChange) }
+	in.OnWorkspace = func(ws Workspace) { w.recordWorkspace(ctx, req, changeID, ws) }
 	in.ProjectName, in.RepoURL = projectFacts(ctx, w.projects, req.ProjectID)
 	if sol, ok := latestApprovedAnalysis(ctx, w.solutions, req.ID); ok {
 		in.Analysis = approvedAnalysisText(sol)
@@ -166,9 +166,14 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 
 // recordWorkspace notes the worktree on the change row the moment it exists. A run that fails later leaves that row as
 // "preparing", which is how the cleanup finds a worktree no successful run ever recorded. Best effort: it never fails the run.
-func (w *RunProposalGeneration) recordWorkspace(ctx context.Context, req domain.Request, changeID string, ws Workspace, prev domain.OpenSpecChange, hasPrev bool) {
-	c := prev
-	if !hasPrev {
+// The row is read again rather than taken from the run's start: the reservation made before the worktree was created is newer.
+func (w *RunProposalGeneration) recordWorkspace(ctx context.Context, req domain.Request, changeID string, ws Workspace) {
+	c, found, err := w.changes.GetByRequest(ctx, req.ID)
+	if err != nil {
+		slog.WarnContext(ctx, "could not record the proposal worktree", slog.String("request_id", req.ID), slog.Any("error", err))
+		return
+	}
+	if !found {
 		c = domain.OpenSpecChange{ID: w.newID(), RequestID: req.ID, ChangeID: changeID, Branch: ws.Branch, Status: domain.ChangeStatusPreparing, SyncState: domain.SyncStateInSync}
 	}
 	if c.WorkspaceID == ws.WorktreeID {

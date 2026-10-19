@@ -25,7 +25,9 @@ func (f *fakeTasks) ListTasks(context.Context, usecase.ListTasksQuery) ([]domain
 func (f *fakeTasks) GetSubtree(context.Context, string) (usecase.SubtreeView, error) {
 	return usecase.SubtreeView{}, f.err
 }
-func (f *fakeTasks) Execute(context.Context, string, string) error              { return f.err }
+func (f *fakeTasks) Execute(context.Context, string, string, usecase.ExecuteOptions) error {
+	return f.err
+}
 func (f *fakeTasks) SetWorktree(context.Context, string, string) error          { return f.err }
 func (f *fakeTasks) SetStatus(context.Context, string, string) error            { return f.err }
 func (f *fakeTasks) CanExecute(context.Context, string, string) (bool, error)   { return true, f.err }

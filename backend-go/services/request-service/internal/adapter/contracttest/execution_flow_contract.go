@@ -59,6 +59,7 @@ type flowRig struct {
 	startPh   *usecase.StartPhase
 	startExec *usecase.StartExecution
 	evaluate  *usecase.EvaluateExecution
+	advance   *usecase.AdvanceExecution
 	reconcile func(owner string) *usecase.ReconcileExecutingRequests
 
 	deliver atomic.Bool
@@ -91,6 +92,7 @@ func newFlowRig(t *testing.T, env ExecutionEnv) *flowRig {
 	advance := &usecase.AdvanceExecution{
 		Requests: env.Requests, Tasks: client, Outcomes: env.Outcomes, PhaseStarts: env.PhaseStarts, Policies: policies, Approvals: opener, Settings: r.settings,
 	}
+	r.advance = advance
 	r.evaluate = &usecase.EvaluateExecution{
 		Tasks: client, Outcomes: env.Outcomes, PhaseStarts: env.PhaseStarts, Checks: env.Checks, Approvals: env.GateApprovals, Open: opener, Advance: advance,
 		Actors: &usecase.ApprovalExecutionActors{Approvals: env.GateApprovals, PhaseStarts: env.PhaseStarts, Access: access}, Policies: policies, Transition: transition,
@@ -227,6 +229,7 @@ func RunExecutionFlowContract(t *testing.T, newEnv func(t *testing.T) ExecutionE
 		{"ExecutionFlow_DuplicateEventsAreHarmless", flowDuplicateEvents},
 		{"ExecutionFlow_DispatchOutageThenRecovery", flowDispatchOutage},
 		{"ExecutionFlow_ApproverAndStarterAreNotTheCommitter", flowApproverIsNotTheCommitter},
+		{"ExecutionFlow_BaseRef_ReachesTaskServiceOnBothDispatchPaths", flowBaseRefOnBothPaths},
 	}
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) { s.fn(t, env) })
@@ -568,7 +571,6 @@ func flowApproverIsNotTheCommitter(t *testing.T, env ExecutionEnv) {
 		t.Errorf("an outsider must not be able to execute: %v %v", ok, err)
 	}
 }
-
 
 // pinContinuous gives the Request the mode StartExecution would pin for a project on continuous.
 func (r *flowRig) pinContinuous(req domain.Request) {

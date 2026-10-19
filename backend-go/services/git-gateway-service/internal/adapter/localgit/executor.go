@@ -610,12 +610,21 @@ func (e *Executor) RemoveWorktree(ctx context.Context, worktreePath string, forc
 }
 
 // FetchAndResolveRef runs `git fetch origin <ref>` then resolves its local
-// SHA via `git rev-parse FETCH_HEAD`.
+// SHA via `git rev-parse FETCH_HEAD^{commit}`. When the fetch fails but the
+// ref resolves in the local clone (a branch never pushed, or no network),
+// that local commit is the answer: it is exactly what `git worktree add`
+// resolves later. The fetch error is returned only when neither works.
 func (e *Executor) FetchAndResolveRef(ctx context.Context, repoPath, ref string) (string, error) {
-	if _, err := e.run(ctx, repoPath, "fetch", "origin", ref); err != nil {
-		return "", err
+	if strings.HasPrefix(ref, "-") {
+		return "", fmt.Errorf("git fetch: ref %q looks like an option", ref)
 	}
-	sha, err := e.run(ctx, repoPath, "rev-parse", "FETCH_HEAD")
+	if _, fetchErr := e.run(ctx, repoPath, "fetch", "origin", ref); fetchErr != nil {
+		if sha, err := e.run(ctx, repoPath, "rev-parse", "--verify", "--quiet", ref+"^{commit}"); err == nil {
+			return strings.TrimSpace(sha), nil
+		}
+		return "", fetchErr
+	}
+	sha, err := e.run(ctx, repoPath, "rev-parse", "FETCH_HEAD^{commit}")
 	if err != nil {
 		return "", err
 	}

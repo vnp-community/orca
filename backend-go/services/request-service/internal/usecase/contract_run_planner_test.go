@@ -124,5 +124,5 @@ type contractTasks struct {
 
 func (c *contractTasks) ExecuteContract(ctx context.Context, taskID, ref string, run ContractRun) error {
 	c.runs = append(c.runs, run)
-	return c.exTasks.Execute(ctx, taskID, ref)
+	return c.exTasks.Execute(ctx, taskID, ref, ExecuteOptions{BaseRef: run.BaseRef})
 }

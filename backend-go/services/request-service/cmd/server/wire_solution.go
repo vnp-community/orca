@@ -52,7 +52,7 @@ type solutionWiring struct {
 	executor  usecase.DevServerExecutor
 	tasksSync *usecase.TasksMdSyncer
 	// workspace and janitor exist only when the openspec engine is configured: the janitor removes the proposal worktrees.
-	workspace *grpcclient.ProposalWorkspace
+	workspace usecase.ProposalWorkspace
 	janitor   *usecase.ProposalJanitor
 	proj      projectv1.ProjectServiceClient
 	git       gitgatewayv1.GitGatewayServiceClient

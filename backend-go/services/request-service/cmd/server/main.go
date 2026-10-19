@@ -169,12 +169,11 @@ func run(ctx context.Context, cfg config.Config) error {
 	}
 	defer intake.close()
 	intake.attachIntake(lifecycle, stores)
-	// No git-gateway based ref checker is connected yet, so base refs are stored flagged as unverified (never silently accepted).
-	baseRef, err := wireBaseRef(log, stores, execTasks.client, grpcclient.UnavailableBaseRefChecker{})
+	// Without git-gateway or project-service the checker refuses a requested ref (REQUEST_BASE_REF_CHECK_NOT_CONFIGURED) rather than storing it unchecked.
+	baseRef, err := wireBaseRef(log, stores, execTasks.client, grpcclient.NewGitBaseRefChecker(solution.git, solution.proj))
 	if err != nil {
 		return err
 	}
-	log.Warn("base ref existence check is not connected: a requested base ref is stored as unverified")
 	intake.createRequest.WithBaseRefChecker(baseRef.Checker)
 	rollout.AttachLookup(intake)
 	classification, err := wireClassification(lifecycleCtx, &lifecycleWG, cfg, log, stores, transitioner, approval.Recorder, busConsumer)

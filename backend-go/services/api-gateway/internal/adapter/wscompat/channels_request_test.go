@@ -125,6 +125,13 @@ func requestChannelCases() []requestChannelCase {
 				mustEqual(t, m.GetNewType(), "hotfix")
 				mustEqual(t, m.GetExpectedVersion(), int64(4))
 			}},
+		{channel: "request.setBaseRef", args: `{"id":"r1","baseRef":"release/2.1","expectedVersion":4}`, rpc: "SetRequestBaseRef", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, in proto.Message) {
+				m := in.(*requestv1.SetRequestBaseRefRequest)
+				mustEqual(t, m.GetBaseRef(), "release/2.1")
+				mustEqual(t, m.GetExpectedVersion(), int64(4))
+				mustEqual(t, res["request"].(map[string]any)["baseRef"], "release/2.1")
+			}},
 		{channel: "request.returnToBacklog", args: `{"id":"r1","stage":"plan","category":"c","reason":"r","expectedVersion":5}`, rpc: "ReturnToBacklog", lo: short[0], hi: short[1],
 			check: func(t *testing.T, _ map[string]any, in proto.Message) {
 				m := in.(*requestv1.ReturnToBacklogRequest)
@@ -447,7 +454,7 @@ func TestRequestChannels_Inventory(t *testing.T) {
 	want := []string{
 		// 28 channels of CONTRACT section 2.1 to 2.4 (request.subscribe is the stream).
 		"request.flowStatus", "request.flowSet", "request.create", "request.get", "request.list", "request.typeHistory", "request.classify",
-		"request.confirmType", "request.changeType", "request.returnToBacklog", "request.reopen", "request.cancel", "request.spawnChild",
+		"request.confirmType", "request.changeType", "request.setBaseRef", "request.returnToBacklog", "request.reopen", "request.cancel", "request.spawnChild",
 		"request.generatePlan", "request.startPhase", "request.subscribe",
 		"solution.list", "solution.generate", "solution.choose",
 		"approval.get", "approval.list", "approval.listPending", "approval.approve", "approval.reject", "approval.cancel",

@@ -288,7 +288,7 @@ func (s *Server) Execute(ctx context.Context, req *taskv1.TaskServiceExecuteRequ
 		RequestID:       req.GetRequestId(),
 		Prompt:          req.GetPrompt(),
 		ResultNonce:     req.GetResultNonce(),
-		UseKnowledgeHub: req.GetUseKnowledgeHub(), RequirePassingCheck: req.GetRequirePassingCheck(),
+		UseKnowledgeHub: req.GetUseKnowledgeHub(), RequirePassingCheck: req.GetRequirePassingCheck(), BaseRef: req.GetBaseRef(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

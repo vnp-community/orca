@@ -54,6 +54,10 @@ interface RequestView {
   reporterId: string
   createdAt: string; updatedAt: string
   version: number                      // gửi lại ở expectedVersion
+  baseRef: string                      // CR-REQ-039: nhánh hoặc tag gốc của worktree; '' = nhánh mặc định. LUÔN có mặt (mục 2.11)
+  baseRefLocked?: boolean              // chỉ có ở request.get, list, create, setBaseRef (mục 2.11)
+  baseRefLockReason?: '' | 'proposal' | 'task' | 'execution' | 'terminal'
+  baseRefUnverified?: boolean          // chỉ có ở request.create, setBaseRef
 }
 
 interface TypeHistoryEntryView {       // request.typeHistory
@@ -77,6 +81,8 @@ interface SolutionView {
   generationRunId?: string
   createdAt: string
   version: number
+  seq?: number                          // số phiên bản trong một Request (1, 2, ...); vắng với bản nháp chưa được lập chỉ mục (CR-REQ-041)
+  revisionFeedback?: string            // người dùng đã yêu cầu gì để sinh ra phiên bản này; ai đọc được Request thì đọc được; vắng với bản đầu (CR-REQ-041)
 }
 
 interface AnalysisRunView {
@@ -140,15 +146,16 @@ Cột "Quyền" là mức tối thiểu `request-service` thi hành. "Timeout" l
 
 | Kênh | Tham số (`args[0]`) | Kết quả | Quyền | Timeout | RPC |
 |---|---|---|---|---|---|
-| `request.flowStatus` | `{}` | `{enabled: boolean}` | thành viên tenant | 8s | `GetRequestFlowSettings` |
+| `request.flowStatus` | `{}` | `{enabled: boolean, features: string[]}` (mục 2.11) | thành viên tenant | 8s | `GetRequestFlowSettings` |
 | `request.flowSet` | `{enabled}` | `{enabled}` | `Identity.Role=admin` | 8s | `SetRequestFlowSettings` |
-| `request.create` | `{projectId, title (1..500), body? (≤100000), source?: {provider, ref, url, site}, hints?: {issueType, labels[], priority}, clientRequestId? (≤128)}` | `{request: RequestView, created: boolean}` | ghi trên project | 8s | `CreateRequest` |
+| `request.create` | `{projectId, title (1..500), body? (≤100000), source?: {provider, ref, url, site}, hints?: {issueType, labels[], priority}, clientRequestId? (≤128), baseRef? (≤255, mục 2.11)}` | `{request: RequestView, created: boolean}` | ghi trên project | 8s | `CreateRequest` |
 | `request.get` | `{id}` | `{request: RequestView}` (có `body`) | đọc | 8s | `GetRequest` |
 | `request.list` | `{projectId?, status?: RequestStatus[], type?: RequestType[], sourceProvider?, sourceSite?, sourceRef?, pageSize?, pageToken?}` | `{requests: RequestView[], nextPageToken}` | đọc trên project | 8s | `ListRequests` |
 | `request.typeHistory` | `{id}` | `{changes: TypeHistoryEntryView[]}` | đọc | 8s | `ListRequestTypeHistory` |
 | `request.classify` | `{id}` | `{request: RequestView}` | ghi | 24s (xem ghi chú) | `ClassifyRequest` |
 | `request.confirmType` | `{id, type, size?, urgency?, reason?, expectedVersion}` | `{request: RequestView}` | người duyệt `request_type` | 8s | `ConfirmRequestType` |
 | `request.changeType` | `{id, toType, size?, urgency?, reason, expectedVersion}` | `{request: RequestView}` | ghi | 8s | `ChangeRequestType` (`new_type`) |
+| `request.setBaseRef` | `{id, baseRef, expectedVersion?}` (mục 2.11) | `{request: RequestView}` | chủ Request hoặc người báo (nhóm triage), không phải agent | 8s | `SetRequestBaseRef` |
 | `request.returnToBacklog` | `{id, stage: ReturnStage, category?, reason, expectedVersion?}` | `{request: RequestView}` | ghi | 8s | `ReturnToBacklog` |
 | `request.reopen` | `{id, note?, expectedVersion?}` | `{request: RequestView}` | ghi | 8s | `ReopenRequest` |
 | `request.cancel` | `{id, reason, expectedVersion?}` | `{request: RequestView}` | ghi, chủ Request hoặc admin project | 8s | `CancelRequest` |
@@ -296,7 +303,9 @@ Tên tham số của kênh là `id` (không phải `requestId`), giống các k�
 | `request.activity` | `{id, pageSize?, pageToken?, kinds?: string[], minSeverity?: info\|attention\|error, actorKind?: user\|ai\|agent\|system, subjectId?, since?}` | `{entries: ActivityEntryView[], nextPageToken?}`; mới nhất trước, khoá phân trang `(occurred_at, id)` | `ListRequestActivity` |
 | `request.executionSummary` | `{id}` | `{summary: ExecutionSummaryView}` | `GetExecutionSummary` |
 
-`ActivityEntryView = {id, kind, occurredAt, actorKind, actorId?, subjectType?, subjectId?, summary, attempt?, severity, details}`. `kind` là chuỗi mở (`request.created`, `request.type_changed`, `analysis.generated`, `clarification.asked|answered`, `approval.requested|decided`, `phase.started`, `task.started|succeeded|failed|accepted|cancelled`, `request.returned|reopened|cancelled`…); frontend phải chịu được `kind` lạ. `attempt` là số lần chạy của task (cửa sổ `SUM` trên `task_run_outcomes`).
+`ActivityEntryView = {id, kind, occurredAt, actorKind, actorId?, subjectType?, subjectId?, summary, attempt?, severity, details}`. `kind` là chuỗi mở (`request.created`, `request.type_changed`, `analysis.generated`, `analysis.revision_requested`, `clarification.asked|answered`, `approval.requested|decided`, `phase.started`, `task.started|succeeded|failed|accepted|cancelled`, `request.returned|reopened|cancelled`…); frontend phải chịu được `kind` lạ. `attempt` là số lần chạy của task (cửa sổ `SUM` trên `task_run_outcomes`).
+
+`analysis.revision_requested` (CR-REQ-041): mỗi lượt phân tích có phản hồi của người duyệt để lại đúng một dòng, `id = <runId>:revision`, `occurredAt = started_at` của lượt, `actorKind = user`, `actorId` là người chỉnh (rỗng nếu lượt chưa ghi), `subjectType = solution`, `subjectId` là Solution của lượt (rỗng nếu chưa có), `severity = info`, `summary = "Requested changes to the analysis"`, `details = {solutionId}`. Dòng **không bao giờ chứa nội dung phản hồi** (C9): lấy nội dung qua `solution.list` (`revisionFeedback`), không qua activity. `kinds` nhận giá trị mới như các kind khác; hai dialect cho cùng kết quả.
 
 `ExecutionSummaryView = {requestId, status, engine?, executionMode?, progress{phasesTotal, phasesDone, tasksTotal, tasksDone, tasksFailed, tasksRunning}, currentPhaseId?, nextPhaseId?, running[{taskId, phaseId?, title, attempt, maxAttempts, startedAt?}], failed[{taskId, phaseId?, title, attempts, maxAttempts, lastCause, lastError?, lastAt?}], needsYou[{kind: approval|clarification|failed_task|pre_deploy|drift, refId, subjectType?, title?, phaseId?, since?, dueAt?}], handover{state: none|archiving|ready|failed, archiveAttempts, summaryRef?}, maxAttempts, startedAt?}`. `needsYou` chỉ liệt kê việc người gọi có quyền làm. `lastCause` ∈ `timed_out|model_error|verify_failed|env_defect|spec_defect|agent_error|needs_info|cancelled|unknown`.
 
@@ -306,6 +315,37 @@ Trường thêm vào kênh có sẵn (cộng, không đổi nghĩa):
 - `request.flow`: `openSpecProfile` (`full|light|none`).
 - `request.engineSettingsGet|Set`: `executionMode` (rỗng khi `Set` giữ giá trị đã lưu). Biến môi trường mặc định của triển khai: `REQUEST_DEFAULT_EXECUTION_MODE`.
 - Lỗi mới: `REQUEST_EXECUTION_ACTOR_NOT_ALLOWED` (duyệt Plan bị từ chối vì người duyệt không có quyền chạy thực thi).
+
+### 2.11 Nhánh gốc của worktree (CR-REQ-039)
+
+Một Request có thể chọn nhánh hoặc tag mà mọi worktree của nó (worktree đề xuất OpenSpec và worktree của Task) bắt đầu từ đó. Rỗng nghĩa là nhánh mặc định của repo. Tên tham số của kênh là `id`.
+
+**Kênh mới `request.setBaseRef {id, baseRef, expectedVersion?}`** (RPC `SetRequestBaseRef`, nhóm `triage`, tức chủ Request hoặc người báo; `expectedVersion` 0 hoặc bỏ qua thì không kiểm phiên bản). Trả `{request: RequestView}` với `baseRef` mới, `baseRefLocked`, `baseRefLockReason`, `baseRefUnverified`.
+- `baseRef` là **bắt buộc có khoá**: thiếu khoá, `null` hay không phải chuỗi thì gateway trả `INVALID_ARGUMENT` mà không gọi service (gõ nhầm tên khoá không được lặng lẽ đặt lại về mặc định). Gửi `""` để quay về nhánh mặc định.
+- Chỉ được đổi khi Request chưa có worktree. Sau đó trả `REQUEST_BASE_REF_LOCKED`.
+- **Không có tool MCP.** Agent không đổi được nền của worktree mình sẽ chạy: RPC có `AgentAllowed=false` và không nằm trong `agent_rpcs` của `request.rego`, kênh nằm trong `excluded_channels.yaml` (`human_gate`). Agent chỉ đặt được `base_ref` một lần, ở `request_create`.
+
+**`request.create`** nhận thêm `baseRef?` (≤255 byte; rỗng hoặc bỏ qua giữ hành vi cũ, nên frontend cũ chạy như trước) và trả `request.baseRef`, `baseRefLocked` (luôn `false`), `baseRefLockReason` (`""`), `baseRefUnverified`.
+
+**Trường trên `RequestView`** (cộng, không đổi nghĩa):
+- `baseRef: string` có mặt ở **mọi** `RequestView`, kể cả `""` (không `omitempty`): frontend phân biệt gateway cũ (thiếu khoá) với gateway mới (khoá có, giá trị rỗng) bằng sự có mặt của khoá.
+- `baseRefLocked: boolean` và `baseRefLockReason: "" | "proposal" | "task" | "execution" | "terminal"` có mặt ở `request.get`, `request.list`, `request.create` và `request.setBaseRef` (luôn có, `false` và `""` khi chưa khoá). Các kênh khác (`changeType`, `cancel`, `classify`…) **bỏ hai khoá này**, vì chúng không tra cứu worktree: `false` ở đó có thể sai. Frontend giữ giá trị lần đọc trước hoặc gọi `request.get`.
+- `baseRefUnverified: boolean` chỉ có ở `request.create` và `request.setBaseRef`.
+- Lý do khoá: `proposal` (có worktree đề xuất OpenSpec, kể cả đang `preparing`), `task` (một Task của Request có worktree), `execution` (một lần thực thi đã bắt đầu dùng ref; mã do request-service thêm cùng đợt, gateway chuyển nguyên), `terminal` (Request `completed` hoặc `cancelled`). Gateway không kiểm tập giá trị này: frontend phải chịu được lý do lạ (coi là đã khoá).
+
+**Mã lỗi** (đều do `request-service` cấp, gateway chuyển nguyên; thông báo là câu cho người đọc). Với hai mã sau, gateway thêm đuôi JSON sau thông báo, cùng dạng `{"retryAfterMs":N}` của `REQUEST_RATE_LIMITED`:
+
+| Mã | gRPC | Khi nào | Đuôi JSON (`details`) |
+|---|---|---|---|
+| `REQUEST_BASE_REF_INVALID` | InvalidArgument | tên sai cú pháp git (khoảng trắng, ký tự cấm, `..`, `@{`, kết thúc `.lock`, quá 255 byte, chuỗi chỉ gồm khoảng trắng…); thông báo nêu quy tắc, không lặp lại giá trị | không có |
+| `REQUEST_BASE_REF_NOT_FOUND` | NotFound | git trả lời rằng ref không tồn tại trong repo | `{"suggestions":["main",…]}`, tối đa 5, có thể vắng; gateway không lặp lại `ref` vì client đã gửi |
+| `REQUEST_BASE_REF_LOCKED` | FailedPrecondition | Request đã có worktree hoặc đã ở trạng thái cuối | `{"reason":"proposal\|task\|execution\|terminal"}` |
+
+Lỗi chung của `setBaseRef`: `REQUEST_VERSION_CONFLICT` (phiên bản cũ, tải lại), `REQUEST_NOT_FOUND`, `REQUEST_FORBIDDEN` (không thuộc nhóm triage) hoặc `REQUEST_ACTOR_NOT_ALLOWED` (agent), `REQUEST_BASE_REF_CHECK_NOT_CONFIGURED` (triển khai thiếu bộ kiểm ref; đây là lỗi cấu hình, ref không được nhận mà chưa kiểm), `INVALID_ARGUMENT` (do gateway).
+
+**Kiểm ref fail-open.** Khi `baseRef` không rỗng, `request-service` hỏi git trên dev server xem ref có tồn tại không. Chỉ câu trả lời "không có" mới bị từ chối (`REQUEST_BASE_REF_NOT_FOUND`). Nếu dev server không với tới được hoặc git báo lỗi chung thì ref **vẫn được lưu** và kết quả mang `baseRefUnverified: true`: tạo Request không bị chặn chỉ vì agent offline. Worktree sẽ được tạo từ ref đó sau; nếu khi đó ref vẫn không có thì lỗi xuất hiện lúc tạo worktree. UI nên hiện cảnh báo nhẹ khi `baseRefUnverified`. Không có kiểm tra thì `baseRefUnverified` là `false` (ref rỗng).
+
+**Cờ tính năng `request.flowStatus.features`.** `request.flowStatus` trả thêm `features: string[]`, do **gateway** công bố (không phải `request-service`), hiện là `["request.baseRef"]`. Frontend chỉ hiện ô nhánh gốc khi mảng có `request.baseRef`; gateway cũ không trả `features` (và `RequestView` thiếu khoá `baseRef`) nên ô ẩn. Tên chỉ được thêm, không bỏ. `features` có mặt kể cả khi `enabled=false`.
 
 ## 3. Sự kiện thời gian thực: `request.subscribe`
 
@@ -375,6 +415,7 @@ Tiền tố `REQUEST_` cho **mọi** mã (README v6 mục 8 dòng 5; CR-REQ-007 
 | `REQUEST_APPROVAL_ALREADY_DECIDED`, `REQUEST_APPROVAL_EXPIRED`, `REQUEST_APPROVAL_DIGEST_MISMATCH`, `REQUEST_APPROVAL_STAGE_MISMATCH` | FailedPrecondition | duyệt lặp, quá hạn, nội dung đã đổi | tải lại cổng |
 | `REQUEST_APPROVAL_NOT_APPROVER`, `REQUEST_APPROVAL_SELF_APPROVAL_FORBIDDEN`, `REQUEST_APPROVAL_AGENT_FORBIDDEN`, `REQUEST_APPROVAL_FORBIDDEN`, `REQUEST_APPROVAL_NO_ELIGIBLE_APPROVER` | PermissionDenied, FailedPrecondition | quyền duyệt (CR-REQ-010) | toast, ẩn nút, tải lại |
 | `REQUEST_BACKLOG_INVALID_VIEW`, `REQUEST_BACKLOG_BAD_PAGE_TOKEN`, `REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE` | InvalidArgument, Unavailable | `backlog.*` | thử lại |
+| `REQUEST_BASE_REF_INVALID`, `REQUEST_BASE_REF_NOT_FOUND`, `REQUEST_BASE_REF_LOCKED` | InvalidArgument, NotFound, FailedPrecondition | `request.create` và `request.setBaseRef` (CR-REQ-039, mục 2.11) | lỗi cạnh ô nhánh gốc; `NOT_FOUND` gợi ý nhánh gần đúng; `LOCKED` khoá ô |
 | `REQUEST_FLOW_DISABLED` | FailedPrecondition | cờ tắt | ẩn màn hình Request |
 | `REQUEST_RATE_LIMITED`, `REQUEST_PENDING_LIMIT` | ResourceExhausted | chống spam (chủ yếu nguồn MCP), giới hạn theo lớp đọc/ghi/AI/webhook (`REQUEST_RATE_<LỚP>_PER_SECOND`, `_BURST`) | chờ đúng `retryAfterMs` rồi thử lại; thông báo có đuôi JSON `{"retryAfterMs":N}` khi service gửi `RetryInfo` |
 | `REQUEST_CLARIFICATION_NOT_FOUND` | NotFound | id Clarification sai hoặc khác tenant | làm mới danh sách |

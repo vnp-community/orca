@@ -64,7 +64,7 @@ func TestWorktreeProvisioner_AdoptsWorktreeLinkedToTaskIssue(t *testing.T) {
 		{Id: "wt-eng1", Path: "/p/eng1", LinkedIssueProvider: strp("jira"), LinkedIssueRef: strp("ENG-1"), Status: "active"},
 	}, nil)
 
-	id, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
+	id, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestWorktreeProvisioner_IssueReuse_SkipsOwnedByOtherTaskAndInactive(t *test
 		{Id: "wt-done", Path: "/p/done", LinkedIssueProvider: strp("jira"), LinkedIssueRef: strp("ENG-1"), Status: "completed"},
 	}, nil)
 
-	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
+	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestWorktreeProvisioner_IssueReuse_SkipsOwnedByOtherTaskAndInactive(t *test
 
 func TestWorktreeProvisioner_IssueReuse_LookupFailureFallsBackToCreate(t *testing.T) {
 	p, git, _ := newIssueReuseProvisioner(jiraSource("ENG-1"), nil, errors.New("project-service down"))
-	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
+	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, "")
 	if err != nil || id != "wt-new" || !git.createWorktreeCalled {
 		t.Fatalf("want fall back to create, got id=%q err=%v created=%v", id, err, git.createWorktreeCalled)
 	}
@@ -101,7 +101,7 @@ func TestWorktreeProvisioner_IssueReuse_LookupFailureFallsBackToCreate(t *testin
 
 func TestWorktreeProvisioner_NoSource_DoesNotListWorktrees(t *testing.T) {
 	p, git, projects := newIssueReuseProvisioner(fakeTaskSourceReader{}, nil, nil)
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if projects.called || !git.createWorktreeCalled {
@@ -114,7 +114,7 @@ func TestWorktreeProvisioner_ExistingTaskWorktreeWinsOverIssueLookup(t *testing.
 	projects := &projectWithWorktrees{fakeProjectServiceClient: &fakeProjectServiceClient{getWorktreeResp: &projectv1.Worktree{Id: "wt-own", Path: "/p/own"}}}
 	p := NewWorktreeProvisioner(git, projects).WithTaskSources(jiraSource("ENG-1"))
 
-	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-own"})
+	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-own"}, "")
 	if err != nil || id != "wt-own" || projects.called {
 		t.Fatalf("task.WorktreeID must win: id=%q err=%v listed=%v", id, err, projects.called)
 	}
@@ -122,7 +122,7 @@ func TestWorktreeProvisioner_ExistingTaskWorktreeWinsOverIssueLookup(t *testing.
 
 func TestWorktreeProvisioner_CreateCarriesIssueLinkAndTaskID(t *testing.T) {
 	p, git, _ := newIssueReuseProvisioner(jiraSource("ENG-1"), nil, nil)
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	req := git.gotCreateWorktree
@@ -136,7 +136,7 @@ func TestWorktreeProvisioner_CreateCarriesIssueLinkAndTaskID(t *testing.T) {
 
 func TestWorktreeProvisioner_CreateWithoutSourceSendsNoIssueLink(t *testing.T) {
 	p, git, _ := newIssueReuseProvisioner(fakeTaskSourceReader{}, nil, nil)
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if git.gotCreateWorktree.LinkedIssueProvider != nil || git.gotCreateWorktree.LinkedIssueRef != nil {
@@ -146,7 +146,7 @@ func TestWorktreeProvisioner_CreateWithoutSourceSendsNoIssueLink(t *testing.T) {
 
 func TestWorktreeProvisioner_SourceLookupErrorStillCreatesWorktree(t *testing.T) {
 	p, git, _ := newIssueReuseProvisioner(fakeTaskSourceReader{err: errors.New("table missing")}, nil, nil)
-	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
+	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, "")
 	if err != nil || id != "wt-new" || git.gotCreateWorktree.LinkedIssueProvider != nil {
 		t.Fatalf("lookup failure must degrade to a plain create: id=%q err=%v", id, err)
 	}
@@ -160,7 +160,7 @@ func TestWorktreeProvisioner_RemovedWorktree_IsRecreatedNotFatal(t *testing.T) {
 	}}
 	p := NewWorktreeProvisioner(git, projects)
 
-	id, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-gone"})
+	id, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-gone"}, "")
 	if err != nil {
 		t.Fatalf("a task whose worktree was cleaned up must get a new one, got %v", err)
 	}
@@ -182,7 +182,7 @@ func TestWorktreeProvisioner_OtherLookupErrors_StillFailClosed(t *testing.T) {
 			projects := &projectWithWorktrees{fakeProjectServiceClient: &fakeProjectServiceClient{getWorktreeErr: lookupErr}}
 			p := NewWorktreeProvisioner(git, projects)
 
-			if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-1"}); err == nil {
+			if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-1"}, ""); err == nil {
 				t.Fatal("expected an error")
 			}
 			if git.createWorktreeCalled {
@@ -210,7 +210,7 @@ func TestWorktreeProvisioner_CreateForwardsTheActingUser(t *testing.T) {
 	p := NewWorktreeProvisioner(git, projects)
 
 	ctx := tenant.WithUserID(ctxWithTenant(t), "user-7")
-	if _, _, err := p.EnsureWorktree(ctx, "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+	if _, _, err := p.EnsureWorktree(ctx, "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	md, _ := metadata.FromOutgoingContext(git.gotCtx)
@@ -228,7 +228,7 @@ func TestWorktreeProvisioner_CreateWithoutUserSendsNoUserHeader(t *testing.T) {
 	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "repo-1", ProjectId: "proj-1"}}}}
 	p := NewWorktreeProvisioner(git, projects)
 
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	md, _ := metadata.FromOutgoingContext(git.gotCtx)
@@ -248,32 +248,32 @@ func TestWorktreeProvisioner_IssueReuse_MatchesOnSiteWithEmptyAsWildcard(t *test
 	}
 	// Site a must skip the site-b worktree and fall to the legacy (site-less) one.
 	p, _, _ := newIssueReuseProvisioner(jiraSiteSource("ENG-1", "https://a.atlassian.net"), wts, nil)
-	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
+	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, "")
 	if err != nil || id != "wt-legacy" {
 		t.Fatalf("want legacy worktree, got id=%q err=%v", id, err)
 	}
 	// A site-less source matches any worktree: first in list wins.
 	p, _, _ = newIssueReuseProvisioner(jiraSiteSource("ENG-1", ""), wts, nil)
-	if id, _, _ = p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); id != "wt-b" {
+	if id, _, _ = p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); id != "wt-b" {
 		t.Errorf("site-less source must wildcard-match, got %q", id)
 	}
 	// Different site and no legacy candidate: create a new worktree.
 	p, git, _ := newIssueReuseProvisioner(jiraSiteSource("ENG-1", "https://a.atlassian.net"), wts[:1], nil)
-	if id, _, _ = p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); id != "wt-new" || !git.createWorktreeCalled {
+	if id, _, _ = p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); id != "wt-new" || !git.createWorktreeCalled {
 		t.Errorf("other-site worktree must not be adopted, got %q", id)
 	}
 }
 
 func TestWorktreeProvisioner_CreateCarriesIssueSite(t *testing.T) {
 	p, git, _ := newIssueReuseProvisioner(jiraSiteSource("ENG-1", "https://a.atlassian.net"), nil, nil)
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got := git.gotCreateWorktree.GetLinkedIssueSite(); got != "https://a.atlassian.net" {
 		t.Errorf("linked_issue_site = %q", got)
 	}
 	p, git, _ = newIssueReuseProvisioner(jiraSource("ENG-1"), nil, nil)
-	_, _, _ = p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
+	_, _, _ = p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}, "")
 	if git.gotCreateWorktree.LinkedIssueSite != nil {
 		t.Error("empty site must not be sent")
 	}

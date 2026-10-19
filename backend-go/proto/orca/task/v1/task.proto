@@ -359,6 +359,9 @@ message TaskServiceExecuteRequest {
   // require_passing_check: a "done" result must list at least one check with exit 0 in checks_run; without one the run
   // counts as a failed attempt. Set for tasks whose spec names a Verify step.
   bool require_passing_check = 6;
+  // base_ref: branch or tag a worktree created for this run starts from (CR-REQ-039). Empty = the repository's default
+  // branch, never the main checkout's current HEAD. Ignored when the task reuses an existing worktree.
+  string base_ref = 7;
 }
 
 message TaskServiceExecuteResponse {

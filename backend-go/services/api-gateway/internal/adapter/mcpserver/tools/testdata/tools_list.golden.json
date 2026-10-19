@@ -1668,7 +1668,7 @@
     "risk": "write_reversible",
     "scope": "orca:write",
     "required": ["project_id", "title"],
-    "props": ["body", "client_request_id", "project_id", "title"]
+    "props": ["base_ref", "body", "client_request_id", "project_id", "title"]
   },
   {
     "name": "request_executionSummary",

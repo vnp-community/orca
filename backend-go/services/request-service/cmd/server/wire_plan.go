@@ -33,7 +33,10 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 		Policies: execution.Policies, Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Settings: solution.settings, Owner: solution.owner,
 	})
 	solution.runner.WithPlanWorker(worker)
-	registry := wireOpenSpecEngine(log, stores, solution, execution.Policies, limits)
+	registry, err := wireOpenSpecEngine(log, stores, solution, execution.Policies, limits)
+	if err != nil {
+		return requestgrpc.PlanUseCases{}, err
+	}
 
 	bindHotfixFixTask(log, solution, approval, execution, tasks, limits)
 
@@ -94,18 +97,23 @@ func bindHotfixFixTask(log *slog.Logger, solution *solutionWiring, approval *app
 // wireOpenSpecEngine registers the openspec engine and its plan worker when the services it drives are configured: the
 // dev server relay (agent and exec), project-service and git-gateway. Without them the registry stays empty, and
 // GeneratePlan refuses a Request pinned to openspec instead of starting a run nothing can execute.
-func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solutionWiring, policies usecase.PlanPolicies, limits domain.PlanLimits) usecase.EngineRegistry {
+func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solutionWiring, policies usecase.PlanPolicies, limits domain.PlanLimits) (usecase.EngineRegistry, error) {
 	registry := usecase.NewDefaultEngineRegistry()
 	if solution.infra == nil || solution.proj == nil || solution.git == nil || solution.caps == nil {
 		log.Warn("openspec engine is off: INFRA_FLEET_SERVICE_ADDR, PROJECT_SERVICE_ADDR and GIT_GATEWAY_SERVICE_ADDR must all be set")
-		return registry
+		return registry, nil
 	}
-	workspace := grpcclient.NewProposalWorkspace(solution.git, solution.proj)
+	raw := grpcclient.NewProposalWorkspace(solution.git, solution.proj)
+	// Every Ensure reserves the worktree under the Request lock first, so a base ref change cannot slip in while git works.
+	workspace, err := usecase.NewReservingProposalWorkspace(raw, stores.locker, stores.openspecChanges, stores.tx)
+	if err != nil {
+		return nil, fmt.Errorf("openspec engine wiring: %w", err)
+	}
 	solution.workspace = workspace
 	executor := grpcclient.NewDevServerExecutor(solution.infra)
 	solution.executor = executor
 	gate := usecase.NewEngineReadinessGate(solution.conns, executor, os.Getenv("REQUEST_OPENSPEC_MIN_VERSION")).
-		WithCapabilities(solution.caps).WithRepoFiles(workspace).WithRepoState(grpcclient.NewRepoStateProbe(solution.git)).
+		WithCapabilities(solution.caps).WithRepoFiles(raw).WithRepoState(grpcclient.NewRepoStateProbe(solution.git)).
 		WithSkillsRepository(os.Getenv("REQUEST_SKILLS_REPOSITORY_URL")).WithObserver(solution.observer)
 	solution.gate = gate
 	engine := usecase.NewOpenSpecEngine(usecase.OpenSpecEngineDeps{
@@ -116,5 +124,5 @@ func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solut
 		Requests: stores.requests, Solutions: stores.solutions, Registry: registry, Projects: solution.projects, Policies: policies,
 		EngineSettings: stores.engineSettings, Settings: solution.settings, Workspace: workspace, Changes: stores.openspecChanges, Checker: usecase.NewOpenSpecBundleChecker(executor, solution.conns, limits), Observer: solution.observer, Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
 	}))
-	return registry
+	return registry, nil
 }

@@ -25,6 +25,8 @@ type ExecuteTaskInput struct {
 	// UseKnowledgeHub gives the contract run's agent the project's knowledge graph; RequirePassingCheck makes a "done"
 	// without a passing check a failed attempt. Both apply to the contract path only.
 	UseKnowledgeHub, RequirePassingCheck bool
+	// BaseRef is the ref a worktree created for this run starts from; empty = the repository's default branch.
+	BaseRef string
 }
 
 // ExecuteResult replaces the bare execution-ref string Execute used to
@@ -275,7 +277,7 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 
 	// Worktree reuse-or-create (SOL-TG-04's "IF task.worktreeId exists: use
 	// existing worktree ELSE: create one").
-	worktreeID, worktreePath, err := uc.worktrees.EnsureWorktree(ctx, tenantID, task)
+	worktreeID, worktreePath, err := uc.worktrees.EnsureWorktree(ctx, tenantID, task, in.BaseRef)
 	if err != nil {
 		// BUG-026-style diagnostic: same reasoning as the connection-check
 		// log above — apperrors.ToGRPCStatus never forwards this wrapped

@@ -23,6 +23,7 @@ type exTasks struct {
 	calls       []string
 	executed    []string // execution refs
 	executedBy  []string // acting user per Execute
+	baseRefs    []string // opts.BaseRef per Execute, in call order
 	executeErrs map[string][]error
 	listErr     error
 	listCalls   int
@@ -112,9 +113,10 @@ func (f *exTasks) GetSubtree(ctx context.Context, rootID string) (SubtreeView, e
 	return out, nil
 }
 
-func (f *exTasks) Execute(ctx context.Context, taskID, ref string) error {
+func (f *exTasks) Execute(ctx context.Context, taskID, ref string, opts ExecuteOptions) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.baseRefs = append(f.baseRefs, opts.BaseRef)
 	f.calls = append(f.calls, "execute:"+taskID)
 	user, _ := tenant.UserID(ctx)
 	f.executedBy = append(f.executedBy, user)

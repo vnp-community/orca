@@ -116,6 +116,16 @@ func (c *OpenSpecChange) Abandon() error {
 	return nil
 }
 
+// Reopen puts an abandoned change back to preparing when its Request needs a worktree again (a creation that failed released
+// the marker, and the next run reserves it anew). A change in any other state is already in use.
+func (c *OpenSpecChange) Reopen() error {
+	if c.Status != ChangeStatusAbandoned {
+		return ErrOpenSpecChangeStateInvalid
+	}
+	c.Status = ChangeStatusPreparing
+	return nil
+}
+
 func removeMn() transform.Transformer {
 	return runes.Remove(runes.In(unicode.Mn))
 }

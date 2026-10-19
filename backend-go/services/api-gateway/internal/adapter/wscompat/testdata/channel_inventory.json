@@ -1728,6 +1728,10 @@
     "kind": "unary"
   },
   {
+    "name": "request.setBaseRef",
+    "kind": "unary"
+  },
+  {
     "name": "request.spawnChild",
     "kind": "unary"
   },

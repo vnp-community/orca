@@ -525,6 +525,10 @@ func (f fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context, 
 }
 
 func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server {
+	return newTestServerWithWorktrees(tasks, edges, stubWorktreeProvisioner{})
+}
+
+func newTestServerWithWorktrees(tasks *fakeTaskRepository, edges *fakeEdgeRepository, worktrees usecase.WorktreeProvisioner) *Server {
 	createTaskUC := usecase.NewCreateTask(tasks, tasks)
 	txRunner := fakeTxRunner{tasks: tasks, edges: edges}
 	// resolvePermissionUC is shared: Grant now requires it internally
@@ -539,7 +543,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		txRunner,
 		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}),
 		resolvePermissionUC,
-		usecase.NewExecuteTask(tasks, edges, stubSimpleExecutor{}, stubExecutor{}, stubWorkflowExecutor{}, resolvePermissionUC, stubWorktreeProvisioner{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, stubClock{}, stubExecutionLinkRepository{}),
+		usecase.NewExecuteTask(tasks, edges, stubSimpleExecutor{}, stubExecutor{}, stubWorkflowExecutor{}, resolvePermissionUC, worktrees, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, stubClock{}, stubExecutionLinkRepository{}),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks),
 		usecase.NewUpdateTask(tasks, edges),
@@ -664,7 +668,7 @@ func (stubWorkflowExecutor) Execute(ctx context.Context, tenantID, taskID, reque
 // these are fixed, always-succeeding stand-ins.
 type stubWorktreeProvisioner struct{}
 
-func (stubWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (string, string, error) {
+func (stubWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task, baseRef string) (string, string, error) {
 	return "wt-1", "/srv/worktrees/wt-1", nil
 }
 

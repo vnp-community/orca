@@ -19,11 +19,16 @@ type scriptedEngine struct {
 	inputs     []ProposalInput
 	// announce is the worktree the engine reports through OnWorkspace before it can fail, as the real one does.
 	announce *Workspace
+	// reserve runs just before the worktree is announced, as ReservingProposalWorkspace.Ensure does in production.
+	reserve func(in ProposalInput)
 }
 
 func (e *scriptedEngine) GenerateProposal(_ context.Context, in ProposalInput) (ProposalResult, error) {
 	n := len(e.inputs)
 	e.inputs = append(e.inputs, in)
+	if e.reserve != nil {
+		e.reserve(in)
+	}
 	if e.announce != nil && in.OnWorkspace != nil {
 		in.OnWorkspace(*e.announce)
 	}

@@ -203,7 +203,7 @@ func (e *openspecEngine) prepare(ctx context.Context, run domain.AnalysisRun, re
 		}
 	}
 	ws, err := e.ws.Ensure(ctx, EnsureWorkspaceInput{
-		TenantID: run.TenantID, ProjectID: req.ProjectID, RequestID: req.ID, RequestNumber: req.Number, ChangeID: in.ChangeID,
+		TenantID: run.TenantID, ProjectID: req.ProjectID, RequestID: req.ID, RequestNumber: req.Number, ChangeID: in.ChangeID, BaseRef: req.BaseRef,
 	})
 	if err != nil {
 		return Workspace{}, workspaceFailure(run, err)
@@ -315,6 +315,9 @@ func specAgentFailure(run domain.AnalysisRun, err error) *AnalysisFailure {
 
 // workspaceFailure keeps the code of a workspace error that already carries one, so the run row says why.
 func workspaceFailure(run domain.AnalysisRun, err error) *AnalysisFailure {
+	if domain.IsBaseRefNotFound(err) {
+		return newFailure(run, domain.RunErrBaseRefNotFound, baseRefGoneMessage(err))
+	}
 	if code := errorCode(err); strings.HasPrefix(code, "REQUEST_ENGINE_") || strings.HasPrefix(code, "REQUEST_OPENSPEC_") {
 		return newFailure(run, code, "the proposal workspace failed")
 	}
@@ -332,4 +335,15 @@ func parseAgentReport(block []byte) AgentReport {
 	}
 	r.Present = true
 	return r
+}
+
+// baseRefGoneMessage says which ref is gone and what exists instead, so the activity feed tells the person what to change.
+// The ref is a branch name, not Request content.
+func baseRefGoneMessage(err error) string {
+	details, _ := domain.BaseRefDetails(err)
+	msg := fmt.Sprintf("the base branch %q does not exist in the repository any more; choose another base ref and generate the Plan again", details["ref"])
+	if s := details["suggestions"]; s != "" {
+		msg += " (available: " + strings.ReplaceAll(s, ",", ", ") + ")"
+	}
+	return msg
 }

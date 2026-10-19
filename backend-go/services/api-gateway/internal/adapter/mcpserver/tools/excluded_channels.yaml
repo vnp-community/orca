@@ -614,6 +614,10 @@
   category: human_gate
   reason: "Clarification questions are answered by the people who own the requirement; an agent must not answer or cancel them for a person."
 
+- pattern: "request.setBaseRef"
+  category: human_gate
+  reason: "Moving the base branch of a Request's worktrees changes what an agent will build on; a person sets it (an agent may only pass base_ref once, in request_create). The RPC is AgentAllowed=false and absent from agent_rpcs in request.rego."
+
 - pattern: "request.flowSet"
   category: human_gate
   reason: "Turning the Request flow on or off is tenant administration done in the UI by an admin."

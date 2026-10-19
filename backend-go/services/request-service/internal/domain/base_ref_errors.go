@@ -15,7 +15,10 @@ const (
 	BaseRefUnlocked       BaseRefLockReason = ""
 	BaseRefLockedProposal BaseRefLockReason = "proposal" // an OpenSpec change worktree exists
 	BaseRefLockedTask     BaseRefLockReason = "task"     // a task of the Request has a worktree
-	BaseRefLockedTerminal BaseRefLockReason = "terminal" // the Request is completed or cancelled
+	// BaseRefLockedExecution: task worktrees are created in task-service the moment a task is dispatched, which only happens
+	// while the Request is executing; locking for the whole stage closes the gap before task-service has recorded one.
+	BaseRefLockedExecution BaseRefLockReason = "execution"
+	BaseRefLockedTerminal  BaseRefLockReason = "terminal" // the Request is completed or cancelled
 )
 
 // BaseRefError is an AppError that also carries machine-readable details (suggestions, lock reason) for the gRPC layer.
@@ -69,4 +72,24 @@ func ErrRequestBaseRefLocked(reason BaseRefLockReason) error {
 // Failing is deliberate; accepting the ref unchecked would turn a missing wiring into silent behaviour.
 func ErrRequestBaseRefCheckNotConfigured() error {
 	return apperrors.New(apperrors.KindInternal, "REQUEST_BASE_REF_CHECK_NOT_CONFIGURED", "this server cannot check base refs", nil)
+}
+
+// StoredBaseRefLock is the lock reason request-service can decide from its own tables: the Request status and whether a
+// proposal worktree is recorded. A finished Request outranks everything; both dialects call this so they cannot differ.
+func StoredBaseRefLock(status RequestStatus, proposalWorktree bool) BaseRefLockReason {
+	switch {
+	case status.IsTerminal():
+		return BaseRefLockedTerminal
+	case proposalWorktree:
+		return BaseRefLockedProposal
+	case status == RequestStatusExecuting:
+		return BaseRefLockedExecution
+	}
+	return BaseRefUnlocked
+}
+
+// IsBaseRefNotFound reports whether err says git does not know the base ref: nothing was created from it.
+func IsBaseRefNotFound(err error) bool {
+	var ae *apperrors.AppError
+	return errors.As(err, &ae) && ae.Code == "REQUEST_BASE_REF_NOT_FOUND"
 }

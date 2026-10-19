@@ -86,6 +86,7 @@ test_agent_unlisted_rpc_denied_even_for_admin if {
 		{"action": "admin", "rpc": "EraseRequest"},
 		{"action": "admin", "rpc": "ExportRequest"},
 		{"action": "triage", "rpc": "ConfirmRequestType"},
+		{"action": "triage", "rpc": "SetRequestBaseRef"},
 	] {
 		not request.allow with input as object.union(callers.admin, {"action": case.action, "rpc": case.rpc, "actor_type": "agent"})
 		not request.allow with input as object.union(callers.owner, {"action": case.action, "rpc": case.rpc, "actor_type": "agent"})

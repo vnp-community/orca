@@ -23,6 +23,9 @@ type EnsureWorkspaceInput struct {
 	RequestID     string
 	RequestNumber int64
 	ChangeID      string
+	// BaseRef is the branch or tag the proposal branch starts from; "" means the repository default. Callers pass the Request's
+	// value as read, but ReservingProposalWorkspace replaces it with the one stored under the Request lock.
+	BaseRef string
 }
 
 // ChangedPath is one path git reports as differing from the branch head, including new (untracked), renamed and deleted ones.
@@ -47,7 +50,8 @@ type DirEntry struct {
 // ProposalWorkspace is the only door to the proposal worktree: Orca never runs git itself. The branch is local and is
 // never pushed; Remove keeps it so the proposal stays reviewable after the worktree is gone.
 type ProposalWorkspace interface {
-	// Ensure is idempotent per Request: a second call returns the same worktree.
+	// Ensure is idempotent per Request: a second call returns the same worktree. An existing worktree keeps the base it was cut
+	// from (the Request's base ref is frozen once one exists). A base ref that no longer exists fails with REQUEST_BASE_REF_NOT_FOUND.
 	Ensure(ctx context.Context, in EnsureWorkspaceInput) (Workspace, error)
 	// ReadFile refuses a file larger than maxBytes (at most MaxProposalReadBytes).
 	ReadFile(ctx context.Context, ws Workspace, relPath string, maxBytes int) ([]byte, error)

@@ -73,6 +73,8 @@ func RunExecutionRepositoryContract(t *testing.T, newEnv func(t *testing.T) Exec
 		{"Activity_EverySource_NewestFirst_AttemptNumbers", activityAllSources},
 		{"Activity_Filters_And_KeysetPaging", activityFiltersAndKeyset},
 		{"Activity_TenantIsolation", activityTenantIsolation},
+		{"Activity_RevisionRequested_OneLinePerRound_NoFeedback", activityRevisionRequested},
+		{"Activity_RevisionRequested_NullSolutionAndActor", activityRevisionWithoutSolutionOrActor},
 	}
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) { s.fn(t, env) })

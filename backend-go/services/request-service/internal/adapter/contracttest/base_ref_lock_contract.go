@@ -59,6 +59,7 @@ func RunBaseRefLockContract(t *testing.T, d BaseRefLockDeps) {
 	t.Run("WorktreePresence", func(t *testing.T) { worktreePresenceScenarios(t, d) })
 	t.Run("SetRequestBaseRefEndToEnd", func(t *testing.T) { setBaseRefEndToEnd(t, d) })
 	t.Run("ConcurrentWithWorktreeCreationNoLostLock", func(t *testing.T) { setBaseRefRacesWorktree(t, d) })
+	t.Run("ProposalReservation", func(t *testing.T) { RunProposalReservationContract(t, d) })
 }
 
 func worktreePresenceScenarios(t *testing.T, d BaseRefLockDeps) {
@@ -74,6 +75,9 @@ func worktreePresenceScenarios(t *testing.T, d BaseRefLockDeps) {
 	backlog := mk(func(r *domain.Request) {
 		r.Status, r.ReturnedFromStage, r.ReturnedCategory = domain.RequestStatusRequestBacklog, domain.ReturnStageTask, domain.ReturnCategoryOther
 	})
+	executing := mk(func(r *domain.Request) { r.Status = domain.RequestStatusExecuting })
+	executingWithChange := mk(func(r *domain.Request) { r.Status = domain.RequestStatusExecuting })
+	d.recordChange(t, ctx, executingWithChange.ID, domain.ChangeStatusReady)
 	d.recordChange(t, ctx, proposalPreparing.ID, domain.ChangeStatusPreparing)
 	d.recordChange(t, ctx, proposalReady.ID, domain.ChangeStatusReady)
 	d.recordChange(t, ctx, proposalArchived.ID, domain.ChangeStatusArchived)
@@ -85,6 +89,8 @@ func worktreePresenceScenarios(t *testing.T, d BaseRefLockDeps) {
 		proposalArchived.ID: domain.BaseRefLockedProposal, proposalAbandoned.ID: domain.BaseRefUnlocked,
 		completed.ID: domain.BaseRefLockedTerminal, cancelled.ID: domain.BaseRefLockedTerminal,
 		completedWithChange.ID: domain.BaseRefLockedTerminal, backlog.ID: domain.BaseRefUnlocked,
+		// Task worktrees appear only while executing, so the whole stage is locked before task-service has recorded any.
+		executing.ID: domain.BaseRefLockedExecution, executingWithChange.ID: domain.BaseRefLockedProposal,
 	}
 	for id, reason := range want {
 		present, got, err := d.Presence.Has(ctx, id)
@@ -210,6 +216,16 @@ func setBaseRefEndToEnd(t *testing.T, d BaseRefLockDeps) {
 		d.recordChange(t, ctx, r.ID, domain.ChangeStatusAbandoned)
 		if _, err := uc.Execute(ctx, in(r, "main")); err != nil {
 			t.Fatal(err)
+		}
+	})
+
+	t.Run("an executing Request is locked, whatever task-service has recorded so far", func(t *testing.T) {
+		r := createRequest(t, d.Env, ctx, func(r *domain.Request) { r.Status = domain.RequestStatusExecuting })
+		_, err := uc.Execute(ctx, in(r, "main"))
+		requireLocked(t, err, "execution")
+		got, _ := d.Requests.Get(ctx, r.ID)
+		if got.BaseRef != "" || got.Version != r.Version {
+			t.Fatalf("a refused write must change nothing: %+v", got)
 		}
 	})
 

@@ -20,6 +20,7 @@ func registerRequestChannels(r *Registry, req requestv1.RequestServiceClient, ap
 	c.registerApproval(r)
 	c.registerBacklog(r)
 	c.registerExtras(r)
+	c.registerBaseRef(r)
 	c.registerActivity(r)
 	c.registerClarification(r)
 	c.registerClarificationAsk(r)
@@ -49,7 +50,7 @@ func (c requestChannels) registerLifecycle(r *Registry) {
 		if err != nil {
 			return nil, err
 		}
-		return requestEnvelope{Request: RequestViewOf(resp.GetRequest(), true)}, nil
+		return requestEnvelope{Request: RequestViewOf(resp.GetRequest(), true).withBaseRefState(resp.GetRequest(), nil)}, nil
 	})
 	c.handle(r, "request.list", read, c.list)
 	c.handle(r, "request.typeHistory", read, func(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
@@ -129,6 +130,7 @@ func (c requestChannels) create(ctx context.Context, _ Identity, args []json.Raw
 		Source          *RequestSourceInput `json:"source"`
 		Hints           *requestHintsArgs   `json:"hints"`
 		ClientRequestID string              `json:"clientRequestId"`
+		BaseRef         string              `json:"baseRef"`
 	}](args)
 	if err != nil {
 		return nil, err
@@ -143,7 +145,7 @@ func (c requestChannels) create(ctx context.Context, _ Identity, args []json.Raw
 		return nil, err
 	}
 	rpc := &requestv1.CreateRequestRequest{
-		ProjectId: in.ProjectID, Title: in.Title, Body: in.Body, Source: source, ClientRequestId: in.ClientRequestID,
+		ProjectId: in.ProjectID, Title: in.Title, Body: in.Body, Source: source, ClientRequestId: in.ClientRequestID, BaseRef: in.BaseRef,
 	}
 	if in.Hints != nil {
 		rpc.Hints = &requestv1.SourceHints{IssueType: in.Hints.IssueType, Labels: in.Hints.Labels, Priority: in.Hints.Priority}
@@ -152,10 +154,11 @@ func (c requestChannels) create(ctx context.Context, _ Identity, args []json.Raw
 	if err != nil {
 		return nil, err
 	}
+	unverified := resp.GetBaseRefUnverified()
 	return struct {
 		Request RequestView `json:"request"`
 		Created bool        `json:"created"`
-	}{RequestViewOf(resp.GetRequest(), false), resp.GetCreated()}, nil
+	}{RequestViewOf(resp.GetRequest(), false).withBaseRefState(resp.GetRequest(), &unverified), resp.GetCreated()}, nil
 }
 
 func (c requestChannels) list(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {

@@ -26,6 +26,7 @@ var requestServiceRPCChannels = map[string]rpcDisposition{
 	"ClassifyRequest":          viaChannel("request.classify"),
 	"ConfirmRequestType":       viaChannel("request.confirmType"),
 	"ChangeRequestType":        viaChannel("request.changeType"),
+	"SetRequestBaseRef":        viaChannel("request.setBaseRef"),
 	"ListRequestTypeHistory":   viaChannel("request.typeHistory"),
 	"ReturnToBacklog":          viaChannel("request.returnToBacklog"),
 	"ReopenRequest":            viaChannel("request.reopen"),

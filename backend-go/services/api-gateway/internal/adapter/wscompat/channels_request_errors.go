@@ -65,7 +65,7 @@ func requestErrorWith(err error, forbiddenCode string) error {
 		if len(msg) > maxRequestErrorMessage {
 			msg = msg[:maxRequestErrorMessage]
 		}
-		return errors.New(msg + retryAfterSuffix(err))
+		return errors.New(msg + retryAfterSuffix(err) + baseRefErrorSuffix(err, msg))
 	}
 	code := status.Code(err)
 	switch {

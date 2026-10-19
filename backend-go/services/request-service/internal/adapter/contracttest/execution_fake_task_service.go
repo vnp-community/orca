@@ -45,6 +45,7 @@ type FakeTaskService struct {
 	worktrees   int
 	executedBy  []string
 	executed    []string
+	calls       []ExecuteCall
 	forbidden   map[string]bool
 	executeErrs map[string][]error
 	links       map[string]string
@@ -156,6 +157,20 @@ func clone(t *taskv1.Task) *taskv1.Task {
 		return nil
 	}
 	return proto.Clone(t).(*taskv1.Task)
+}
+
+// ExecuteCall is what one accepted Execute RPC carried that the scenarios assert on.
+type ExecuteCall struct {
+	TaskID, BaseRef string
+	// Contract is true when the dispatch asked for a result block (a non-empty nonce), i.e. came through ExecuteContract.
+	Contract bool
+}
+
+// ExecuteCalls lists the accepted dispatches in call order.
+func (f *FakeTaskService) ExecuteCalls() []ExecuteCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.calls)
 }
 
 // Executed lists the execution references in call order; ExecutedBy the acting users.
@@ -328,6 +343,7 @@ func (f *FakeTaskService) Execute(ctx context.Context, req *taskv1.TaskServiceEx
 	link := uuid.NewString()
 	f.links[id] = link
 	f.executed = append(f.executed, req.GetRequestId())
+	f.calls = append(f.calls, ExecuteCall{TaskID: id, BaseRef: req.GetBaseRef(), Contract: req.GetResultNonce() != ""})
 	change := StatusChange{TaskID: id, TaskType: t.TaskType, ParentID: t.ParentId, RequestID: t.RequestId, Previous: prev, New: "in_progress", Cause: "execute_claim", LinkID: link}
 	f.mu.Unlock()
 	f.emit(change)

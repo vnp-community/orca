@@ -10,7 +10,8 @@ import (
 )
 
 // WorktreePresence answers the part of "does this Request have a worktree?" that request-service stores itself: a finished
-// Request and an OpenSpec proposal worktree. Task worktrees live in task-service (usecase.TaskAwareWorktreePresence adds them).
+// Request, an OpenSpec proposal worktree (or the marker reserved before it is created) and an executing Request. Task worktrees
+// live in task-service (usecase.TaskAwareWorktreePresence adds them for the stages after execution).
 type WorktreePresence struct {
 	*Repository
 }
@@ -76,22 +77,11 @@ func (p *WorktreePresence) lookup(ctx context.Context, ids []string) (map[string
 				return fmt.Errorf("postgres: scan worktree presence: %w", err)
 			}
 			found[id] = true
-			if reason := lockReason(domain.RequestStatus(status), proposal); reason != domain.BaseRefUnlocked {
+			if reason := domain.StoredBaseRefLock(domain.RequestStatus(status), proposal); reason != domain.BaseRefUnlocked {
 				locks[id] = reason
 			}
 		}
 		return rows.Err()
 	})
 	return locks, found, err
-}
-
-// lockReason ranks a finished Request above a proposal worktree: it cannot change whatever else exists.
-func lockReason(status domain.RequestStatus, proposal bool) domain.BaseRefLockReason {
-	switch {
-	case status.IsTerminal():
-		return domain.BaseRefLockedTerminal
-	case proposal:
-		return domain.BaseRefLockedProposal
-	}
-	return domain.BaseRefUnlocked
 }

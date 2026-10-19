@@ -4,7 +4,6 @@
 #
 # method                      called from
 fs.scanNestedRepos            project-service  usecase/scan_nested.go          (import nested repositories)
-git.fetchRef                  git-gateway-service  grpcclient/relay_executor.go
 git.forceDeleteBranch         git-gateway-service  grpcclient/relay_executor.go
 git.merge                     git-gateway-service  grpcclient/relay_executor.go
 git.remoteCommitUrl           git-gateway-service  grpcclient/relay_executor.go
