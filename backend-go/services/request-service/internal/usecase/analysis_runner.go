@@ -28,6 +28,7 @@ type AnalysisRunner struct {
 	plan      AnalysisWorker
 	proposal  AnalysisWorker
 	observer  EngineObserver
+	requests  AnalysisRequestGetter
 	settings  AnalysisSettings
 	owner     string
 
@@ -54,6 +55,31 @@ func (r *AnalysisRunner) WithPlanWorker(w AnalysisWorker) *AnalysisRunner {
 func (r *AnalysisRunner) WithProposalWorker(w AnalysisWorker) *AnalysisRunner {
 	r.proposal = w
 	return r
+}
+
+// AnalysisRequestGetter is the part of the Request store the runner reads: who reported it.
+type AnalysisRequestGetter interface {
+	Get(ctx context.Context, id string) (domain.Request, error)
+}
+
+// WithRequests lets analysis runs started by someone other than the reporter find the dev server, which is bound to the reporter.
+func (r *AnalysisRunner) WithRequests(q AnalysisRequestGetter) *AnalysisRunner {
+	r.requests = q
+	return r
+}
+
+// reporterIdentity makes an analysis run started by an approver or admin look up its dev server as the reporter; the run stays
+// attributed to the caller. Plan runs keep the caller's identity. A failed lookup keeps the caller's identity, so the run then
+// fails with the same no-connection error it would have had.
+func (r *AnalysisRunner) reporterIdentity(ctx context.Context, run domain.AnalysisRun) context.Context {
+	if r.requests == nil || run.Kind == domain.RunKindPlan || run.ActorID == "" {
+		return ctx
+	}
+	req, err := r.requests.Get(ctx, run.RequestID)
+	if err != nil || req.ReporterID == "" || req.ReporterID == run.ActorID {
+		return ctx
+	}
+	return tenant.WithUserID(ctx, req.ReporterID)
 }
 
 // WithObserver reports how each run ended, for the engine metrics.
@@ -104,6 +130,7 @@ func (r *AnalysisRunner) worker(run domain.AnalysisRun) AnalysisWorker {
 func (r *AnalysisRunner) execute(run domain.AnalysisRun) {
 	ctx, cancel := context.WithCancel(r.runCtx(run))
 	defer cancel()
+	ctx = r.reporterIdentity(ctx, run)
 	hbDone := make(chan struct{})
 	go func() {
 		defer close(hbDone)

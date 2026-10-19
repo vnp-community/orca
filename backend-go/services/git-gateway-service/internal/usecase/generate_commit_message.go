@@ -50,7 +50,10 @@ func (uc *GenerateCommitMessage) Execute(ctx context.Context, in GenerateCommitM
 		// BR-CR-15 — no per-file GetDiff calls at all above the threshold:
 		// avoids the N extra dispatch round trips gatherFullDiffFromStatus
 		// would otherwise make for content that gets discarded anyway.
-		diffOrStats = statsOnlySummary(status.Files)
+		diffOrStats, err = renderStatsOnlySummary(status.Files)
+		if err != nil {
+			return "", apperrors.New(apperrors.KindInternal, "GITGATEWAY_PROMPT_BUILD_FAILED", "failed to build the commit message prompt", err)
+		}
 	} else {
 		diffOrStats, err = gatherFullDiffFromStatus(ctx, uc.getDiff, in.WorktreeID, status, true)
 		if err != nil {
@@ -68,7 +71,10 @@ func (uc *GenerateCommitMessage) Execute(ctx context.Context, in GenerateCommitM
 	}
 
 	issueRef := extractIssueRef(status.Branch)
-	prompt := buildCommitMessagePrompt(status.Branch, recent.Commits, diffOrStats, issueRef)
+	prompt, err := renderCommitMessagePrompt(status.Branch, recent.Commits, diffOrStats, issueRef)
+	if err != nil {
+		return "", apperrors.New(apperrors.KindInternal, "GITGATEWAY_PROMPT_BUILD_FAILED", "failed to build the commit message prompt", err)
+	}
 
 	message, err := uc.completer.Complete(ctx, conn.ConnectionID, prompt)
 	if err != nil {

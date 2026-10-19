@@ -51,7 +51,10 @@ func (c *RelayClassifier) Classify(ctx context.Context, in usecase.Classificatio
 		return domain.ClassificationProposal{}, err
 	}
 	accountID := c.accountID(ctx, in.ProjectID)
-	prompt := BuildClassificationPrompt(in)
+	prompt, err := RenderClassificationPrompt(in)
+	if err != nil {
+		return domain.ClassificationProposal{}, err
+	}
 
 	text, err := c.complete(ctx, conn, accountID, prompt)
 	if err != nil {

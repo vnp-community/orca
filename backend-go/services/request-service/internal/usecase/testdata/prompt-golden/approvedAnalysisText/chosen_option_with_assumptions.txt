@@ -1,0 +1,7 @@
+chosen option: App cache
+summary: In process
+approach:
+Cache in the app.
+Invalidate on publish.
+assumption: Traffic is read heavy
+assumption: Pages are public

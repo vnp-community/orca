@@ -1,0 +1,10 @@
+You are implementing task T3.1 of the OpenSpec change req-142-cache-landing-page (Request REQ-142). The task's own contract is under "Description" below: where to change code, how it is verified and when it is done.
+
+The whole change is on the local branch orca/req-142-cache-landing-page under openspec/changes/req-142-cache-landing-page/ and is NOT checked out in this worktree. Read what you need with one `git show orca/req-142-cache-landing-page:<path>` per command (tasks.md, design.md, specs/<capability>/spec.md) and never copy it into this worktree.
+
+Rules:
+- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.
+- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.
+- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.
+- Run the Verify command and report its real output. A task is done only when that command succeeds.
+- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `proto/orca/request/v1/solution.proto` (sửa) + mã sinh, `internal/domain/solution.go`, `internal/usecase/{list_solutions,run_solution_generation,solution_prompt}.go` (sửa), `internal/adapter/{postgres,mysql}/solution_repository.go` (sửa), `internal/adapter/grpc/{server_solution,solution_mapper}.go` (sửa)
 **Depends on:** TASK-REQ-041-01
-**Status:** [ ] PARTIAL — request-service side done and verified; the api-gateway JSON mapping (`revisionFeedback` in `wscompat/channels_request_views.go`) was outside this agent's files and is still to do
+**Status:** [x] DONE (2026-10-20) — gateway đã ánh xạ `revisionFeedback` và `seq`; kiểm trên stack bằng ARV-01..05 và spec UI `analysis-revision` 5/5
 
 ---
 
@@ -34,7 +34,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `solution.list` trả `revisionFeedback` đúng cho từng phiên bản. (Đã kiểm chứng ở RPC `ListSolutions` của request-service trên Postgres và MySQL; JSON của gateway chưa làm, xem ghi chú.)
+- [x] `solution.list` trả `revisionFeedback` đúng cho từng phiên bản (RPC trên Postgres/MySQL, JSON gateway, và ARV-01 trên stack). Chạy thật phát hiện 2 lỗi đã sửa: nhãn hệ thống `clarification:<id>` bị trả như lời yêu cầu của người duyệt (nay lọc bằng `domain.ReviewerRevisionFeedback`), và `seq` chưa được ánh xạ sang proto nên màn hình không biết số phiên bản kế tiếp.
 - [x] Prompt của lượt chỉnh chứa chuỗi phản hồi, trong khối bọc, trong giới hạn kích thước.
 - [x] Không N+1; không lộ nội dung vào log.
 

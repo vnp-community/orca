@@ -138,7 +138,7 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	})
 	w.writer = writer
 	w.readonly = readonly
-	w.runner = usecase.NewAnalysisRunner(stores.analysisRuns, stores.solutions, stores.tx, generation, readonly, settings, owner)
+	w.runner = usecase.NewAnalysisRunner(stores.analysisRuns, stores.solutions, stores.tx, generation, readonly, settings, owner).WithRequests(stores.requests)
 	w.conns, w.completer, w.projects, w.settings, w.owner = conns, completer, projects, settings, owner
 	w.agent, w.caps, w.infra, w.proj, w.git = agent, caps, infraC, projectC, gitC
 

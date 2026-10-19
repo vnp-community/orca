@@ -124,6 +124,20 @@ func (p *ProjectClient) FindWorktreeByIdempotencyKey(ctx context.Context, projec
 	return domain.WorktreeRecord{ID: wt.GetId(), Path: wt.GetPath(), Branch: wt.GetBranch()}, true, nil
 }
 
+// GetProjectDefaultBranch reads project-service's configured default_branch
+// via GetProject; BaseRefDefault uses it as a hint, never as a requirement.
+func (p *ProjectClient) GetProjectDefaultBranch(ctx context.Context, projectID string) (string, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return "", err
+	}
+	resp, err := p.client.GetProject(ctx, &projectv1.GetProjectRequest{Id: projectID})
+	if err != nil {
+		return "", err
+	}
+	return resp.GetProject().GetDefaultBranch(), nil
+}
+
 // IsIssueStatusSyncEnabled reads project-service's per-project
 // issue_status_sync_enabled flag (BR-PI-06/TASK-PI-02-06) via GetProject.
 func (p *ProjectClient) IsIssueStatusSyncEnabled(ctx context.Context, projectID string) (bool, error) {

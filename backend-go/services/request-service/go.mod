@@ -11,6 +11,7 @@ require (
 	github.com/prometheus/client_golang v1.24.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stablyai/orca-go/common v0.0.0
+	github.com/stablyai/orca-go/prompts v0.0.0
 	github.com/stablyai/orca-go/proto v0.0.0
 	github.com/testcontainers/testcontainers-go v0.44.0
 	go.opentelemetry.io/otel v1.45.0
@@ -131,5 +132,7 @@ require (
 )
 
 replace github.com/stablyai/orca-go/common => ../../common
+
+replace github.com/stablyai/orca-go/prompts => ../../prompts
 
 replace github.com/stablyai/orca-go/proto => ../../proto

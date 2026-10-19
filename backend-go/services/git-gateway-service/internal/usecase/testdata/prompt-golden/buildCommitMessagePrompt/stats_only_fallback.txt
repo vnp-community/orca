@@ -1,0 +1,12 @@
+Write a concise, conventional-commits-style commit message for the following staged diff. Reply with only the commit message text.
+
+
+Recent commits on this project, for style/convention matching:
+0123456 feat(cache): add the landing page cache
+
+Current branch: feature/cache
+
+Staged changes are large (3 files) — showing file stats only:
+added cache.go
+modified main.go
+deleted old.go

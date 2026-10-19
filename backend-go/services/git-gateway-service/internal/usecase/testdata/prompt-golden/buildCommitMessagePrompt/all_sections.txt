@@ -1,0 +1,16 @@
+Write a concise, conventional-commits-style commit message for the following staged diff. Reply with only the commit message text.
+
+
+Recent commits on this project, for style/convention matching:
+0123456 feat(cache): add the landing page cache
+abc1234 fix(login): keep the query string
+short chore: bump deps
+
+Current branch: feature/ORCA-123-cache
+Issue/ticket reference to include (as a trailing "Refs: ORCA-123" line): ORCA-123
+
+diff --git a/cache.go b/cache.go
+--- a/cache.go
++++ b/cache.go
+@@ -1 +1,2 @@
++package cache

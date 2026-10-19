@@ -177,10 +177,16 @@ Ghi chú:
 | Kênh | Tham số | Kết quả | Quyền | Timeout | RPC |
 |---|---|---|---|---|---|
 | `solution.list` | `{requestId, kind?, status?, pageSize?, pageToken?}` | `{solutions: SolutionView[], runs: AnalysisRunView[], nextPageToken}` | đọc | 8s | `ListSolutions` |
-| `solution.generate` | `{requestId, idempotencyKey?, feedback? (≤2000), analysisMode?: 'complete'\|'agent_readonly'}` | `{solutionId, runId}` | ghi | 8s | `GenerateSolution` |
+| `solution.generate` | `{requestId, idempotencyKey?, feedback? (≤2000), analysisMode?: 'complete'\|'agent_readonly'}` | `{solutionId, runId}` | ghi; chỉnh bằng `feedback`: xem dưới | 8s | `GenerateSolution` |
 | `solution.choose` | `{requestId, solutionId, optionId, comment?}` | `{solution: SolutionView, approvalDigest}` | người duyệt `solution` | 8s | `ChooseSolutionOption` |
 
 `solution.generate` **bất đồng bộ** (CR-REQ-007 mục 2.5): trả ngay `runId`; hoàn tất qua sự kiện `solution.proposed`, hoặc lỗi nằm ở `runs[].errorCode` (`REQUEST_SOLUTION_INVALID_OUTPUT`, `REQUEST_SOLUTION_RUN_INTERRUPTED`). Frontend không giữ yêu cầu chờ 25 giây. `solution.choose` trả `approvalDigest` mới; gửi lại ở `approval.approve.expectedDigest`.
+
+**Chỉnh phân tích bằng phản hồi (CR-REQ-041).** `solution.generate` với `feedback` khác rỗng trên Request đang `awaiting_analysis_approval` yêu cầu một phiên bản mới của Solution, Diagnosis, Findings hoặc Answer (cổng `solution`, `findings`, `answer` tuỳ loại Request). Quyền do request-service quyết định, gateway và MCP không lọc thêm: người báo cáo, `admin|lead|owner`, và người duyệt của Approval `solution|findings|answer` đang chờ (theo user, team hoặc vai trò) đều gọi được; người khác nhận `PERMISSION_DENIED` (`REQUEST_SOLUTION_FORBIDDEN`). Người duyệt chỉ được chỉnh, không được khởi động phân tích đầu. Hệ quả cho client:
+- Phiên bản đang chờ chuyển `superseded` và Approval của nó bị huỷ ngay khi lượt mới bắt đầu, nên nếu lượt mới thất bại thì Request ở `analyzing` và không còn đề xuất để duyệt. Lỗi nằm ở `runs[0].errorCode`. `solution.generate` không kèm `feedback` chạy lại lượt đó và **mang theo phản hồi của lượt vừa thất bại** (phản hồi không mất); gửi `feedback` mới thì phản hồi mới thay phản hồi cũ. Phiên bản `superseded` luôn nằm trong ngữ cảnh của lượt kế.
+- Hai người chỉnh cùng lúc: người đến sau nhận `REQUEST_SOLUTION_WRONG_STATE` (lượt chỉnh khác đang chạy), không có lượt thứ hai; UI tải lại `solution.list`. Cùng `idempotencyKey` (bấm đúp, thử lại mạng) trả lại đúng `runId` đầu và không sinh lượt mới.
+- `hotfix` không có cổng duyệt Analysis: Request không dừng ở `awaiting_analysis_approval` (Diagnosis tự duyệt), nên sau khi phân tích xong, `feedback` bị từ chối `REQUEST_SOLUTION_WRONG_STATE`.
+- `revisionFeedback` và `seq` của `SolutionView` do `solution.list` trả; MCP `solution_list` trả cùng trường (`solution_generate` nhận `feedback` và `idempotency_key`). Nội dung phản hồi không có trong activity, log, span hay sự kiện (C9).
 
 ### 2.3 `approval.*`
 
@@ -367,6 +373,7 @@ Lỗi chung của `setBaseRef`: `REQUEST_VERSION_CONFLICT` (phiên bản cũ, t�
 | `request.status_changed` | `orca.request.request.status_changed` | làm mới Request; kèm `trigger` (`reopen`, `cancel`... thay cho sự kiện `reopened`, `cancelled` không tồn tại) |
 | `request.returned` | suy từ `status_changed` với `to=request_backlog`, hoặc subject riêng nếu CR-006 phát | làm mới Request và backlog |
 | `request.completed` | `orca.request.request.completed` | làm mới |
+| `request.base_ref_changed` | `orca.request.request.base_ref_changed` | làm mới Request (nhánh bắt đầu, khóa); khung không kèm tên nhánh (CR-REQ-039) |
 | `solution.proposed` | `orca.request.solution.proposed` | tải `solution.list`; dừng trạng thái "đang sinh" |
 | `solution.approved` | `orca.request.solution.approved` | làm mới |
 | `approval.requested` | `orca.request.approval.requested` | tăng chấm số hộp duyệt; tải `approval.list` |

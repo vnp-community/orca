@@ -266,7 +266,8 @@ func (f *fakeRequestClient) ListSolutions(ctx context.Context, in *requestv1.Lis
 	}
 	return &requestv1.ListSolutionsResponse{
 		Solutions: []*requestv1.Solution{{Id: "s1", RequestId: "r1", Kind: requestv1.SolutionKind_SOLUTION_KIND_SOLUTION,
-			Status: requestv1.SolutionStatus_SOLUTION_STATUS_PROPOSED, OptionsJson: `{"options":[{"id":"opt-0"},{"id":"opt-1","risk_level":"low"}]}`, ChosenOption: 1, CreatedAt: fakeStamp, Version: 1}},
+			Status: requestv1.SolutionStatus_SOLUTION_STATUS_PROPOSED, OptionsJson: `{"options":[{"id":"opt-0"},{"id":"opt-1","risk_level":"low"}]}`, ChosenOption: 1, CreatedAt: fakeStamp, Version: 1,
+			Seq: 2, RevisionFeedback: "keep the public API"}},
 		Runs: []*requestv1.AnalysisRun{{Id: "run1", Kind: requestv1.SolutionKind_SOLUTION_KIND_SOLUTION, Status: "failed", ErrorCode: "REQUEST_SOLUTION_INVALID_OUTPUT", StartedAt: fakeStamp}},
 	}, nil
 }

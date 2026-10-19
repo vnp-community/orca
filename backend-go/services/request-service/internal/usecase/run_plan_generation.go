@@ -77,7 +77,11 @@ func (w *RunPlanGeneration) Execute(ctx context.Context, run domain.AnalysisRun)
 
 	var lastRaw string
 	for {
-		text, err := w.complete(ctx, req.ProjectID, BuildPlanPrompt(in))
+		prompt, perr := RenderPlanPrompt(in)
+		if perr != nil {
+			return promptBuildFailure(run, perr)
+		}
+		text, err := w.complete(ctx, req.ProjectID, prompt)
 		if err != nil {
 			f := planCompletionFailure(run, err)
 			f.Raw = lastRaw

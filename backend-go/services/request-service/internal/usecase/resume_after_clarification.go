@@ -106,9 +106,9 @@ func (uc *ResumeAfterClarification) Handle(ctx context.Context, ev ResumeEvent) 
 				id = ev.ID // information came without a clarification (a waiver): the event itself keys the run
 			}
 			if d, ok := uc.analysis.(DeferredAnalysisStarter); ok {
-				after, act = d.StartSolutionDeferred(txCtx, ev.RequestID, "clarification:"+id, "clr-"+id)
+				after, act = d.StartSolutionDeferred(txCtx, ev.RequestID, domain.ClarificationFeedbackPrefix+id, "clr-"+id)
 			} else {
-				act = uc.analysis.StartSolution(txCtx, ev.RequestID, "clarification:"+id, "clr-"+id)
+				act = uc.analysis.StartSolution(txCtx, ev.RequestID, domain.ClarificationFeedbackPrefix+id, "clr-"+id)
 			}
 		case domain.RequestStatusExecuting:
 			act = uc.execution.Advance(txCtx, ev.RequestID)

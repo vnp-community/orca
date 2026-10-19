@@ -12,12 +12,12 @@ var builderCtx = TaskPromptContext{Ref: "REQ-142", ChangeID: "req-142-nen-ai", B
 func TestBuildTaskPromptTemplate_Golden(t *testing.T) {
 	with := domain.TaskProposal{Title: "Dựng client", Satisfies: []string{"AC-1", "AC-2"}}
 	without := domain.TaskProposal{Title: "Hồi quy"}
-	checkGolden(t, "openspec_task_prompt_with_ac.golden", BuildTaskPromptTemplate(builderCtx, "T1.2", with))
-	checkGolden(t, "openspec_task_prompt_without_ac.golden", BuildTaskPromptTemplate(builderCtx, "T3.1", without))
+	checkGolden(t, "openspec_task_prompt_with_ac.golden", mustTaskPrompt(t, "T1.2", with))
+	checkGolden(t, "openspec_task_prompt_without_ac.golden", mustTaskPrompt(t, "T3.1", without))
 }
 
 func TestBuildTaskPromptTemplate_Contract(t *testing.T) {
-	p := BuildTaskPromptTemplate(builderCtx, "T1.2", domain.TaskProposal{Satisfies: []string{"AC-7"}})
+	p := mustTaskPrompt(t, "T1.2", domain.TaskProposal{Satisfies: []string{"AC-7"}})
 	for _, must := range []string{
 		"task T1.2 of the OpenSpec change req-142-nen-ai", "Request REQ-142", "git show request/142-proposal:<path>", "NOT checked out",
 		"acceptance criteria AC-7", "docs/tdd/", ".tdd-agent/", "tdd-knowledge-writeback", "Run the Verify command",
@@ -26,7 +26,7 @@ func TestBuildTaskPromptTemplate_Contract(t *testing.T) {
 			t.Fatalf("prompt lacks %q:\n%s", must, p)
 		}
 	}
-	if strings.Contains(BuildTaskPromptTemplate(builderCtx, "T1.1", domain.TaskProposal{}), "acceptance criteria") {
+	if strings.Contains(mustTaskPrompt(t, "T1.1", domain.TaskProposal{}), "acceptance criteria") {
 		t.Fatal("a task without ac= must not claim criteria")
 	}
 	if len([]rune(p)) > 2000 {
@@ -39,7 +39,7 @@ func TestFillTaskPrompts_NumbersTasksPerContainerAndKeepsTheRest(t *testing.T) {
 		{Title: "a", Tasks: []domain.TaskProposal{{Title: "x"}, {Title: "y", DependsOnIndices: []int{0}}}},
 		{Title: "b", DependsOnPhaseIndices: []int{0}, Tasks: []domain.TaskProposal{{Title: "z"}}},
 	}}
-	got := FillTaskPrompts(phased, builderCtx)
+	got := mustFillTaskPrompts(t, phased)
 	if !strings.Contains(got.Phases[0].Tasks[1].PromptTemplate, "task T1.2 ") || !strings.Contains(got.Phases[1].Tasks[0].PromptTemplate, "task T2.1 ") {
 		t.Fatal("ids are T<phase>.<n>")
 	}
@@ -49,11 +49,11 @@ func TestFillTaskPrompts_NumbersTasksPerContainerAndKeepsTheRest(t *testing.T) {
 	if phased.Phases[0].Tasks[0].PromptTemplate != "" {
 		t.Fatal("the input proposal must not be modified")
 	}
-	flat := FillTaskPrompts(domain.PlanProposal{Tasks: []domain.TaskProposal{{Title: "only"}}}, builderCtx)
+	flat := mustFillTaskPrompts(t, domain.PlanProposal{Tasks: []domain.TaskProposal{{Title: "only"}}})
 	if !strings.Contains(flat.Tasks[0].PromptTemplate, "task T1.1 ") || len(flat.Phases) != 0 {
 		t.Fatalf("%+v", flat)
 	}
-	if empty := FillTaskPrompts(domain.PlanProposal{}, builderCtx); len(empty.Tasks) != 0 || len(empty.Phases) != 0 {
+	if empty := mustFillTaskPrompts(t, domain.PlanProposal{}); len(empty.Tasks) != 0 || len(empty.Phases) != 0 {
 		t.Fatalf("%+v", empty)
 	}
 }
@@ -63,7 +63,7 @@ func TestFillTaskPrompts_LabelsEachTaskWithItsTasksMdLine(t *testing.T) {
 		{Title: "a", Tasks: []domain.TaskProposal{{Title: "x", Labels: []string{"test:regression"}}, {Title: "y"}}},
 		{Title: "b", Tasks: []domain.TaskProposal{{Title: "z"}}},
 	}}
-	got := FillTaskPrompts(in, builderCtx)
+	got := mustFillTaskPrompts(t, in)
 	for _, c := range []struct {
 		task domain.TaskProposal
 		want string
@@ -78,4 +78,22 @@ func TestFillTaskPrompts_LabelsEachTaskWithItsTasksMdLine(t *testing.T) {
 	if len(in.Phases[0].Tasks[0].Labels) != 1 {
 		t.Fatal("the input proposal must not be modified")
 	}
+}
+
+func mustTaskPrompt(t *testing.T, taskID string, task domain.TaskProposal) string {
+	t.Helper()
+	text, err := renderTaskPrompt(builderCtx, taskID, task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return text
+}
+
+func mustFillTaskPrompts(t *testing.T, p domain.PlanProposal) domain.PlanProposal {
+	t.Helper()
+	out, err := FillTaskPrompts(p, builderCtx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }

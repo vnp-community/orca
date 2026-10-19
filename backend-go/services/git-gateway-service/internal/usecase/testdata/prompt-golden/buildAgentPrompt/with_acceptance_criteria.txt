@@ -1,0 +1,9 @@
+# Fix the login redirect
+
+## Description
+Users land on a blank page.
+
+## Acceptance Criteria
+- The user lands on the dashboard
+- The redirect keeps the query string
+

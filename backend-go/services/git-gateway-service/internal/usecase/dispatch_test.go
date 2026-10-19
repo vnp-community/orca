@@ -34,6 +34,8 @@ type fakeGitExecutor struct {
 	mu   sync.Mutex
 	name string // "local" or "relay", for assertion messages
 
+	gotPreferredBranch string // last BaseRefDefault hint
+
 	calledGetStatus              bool
 	calledGetDiff                bool
 	calledCommit                 bool
@@ -378,9 +380,10 @@ func (f *fakeGitExecutor) InitRepo(ctx context.Context, destPath, defaultBranch,
 	return f.initPath, f.defaultBranch, remoteURL != "", nil
 }
 
-func (f *fakeGitExecutor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
+func (f *fakeGitExecutor) BaseRefDefault(ctx context.Context, repoPath, preferredBranch string) (string, error) {
 	f.calledBaseRefDefault = true
 	f.gotRepoPath = repoPath
+	f.gotPreferredBranch = preferredBranch
 	if f.baseRefDefaultErr != nil {
 		return "", f.baseRefDefaultErr
 	}

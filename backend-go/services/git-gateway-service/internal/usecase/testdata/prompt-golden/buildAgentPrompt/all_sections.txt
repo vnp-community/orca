@@ -1,0 +1,11 @@
+# Fix the login redirect
+
+## Description
+Users land on a blank page.
+
+## Acceptance Criteria
+- The user lands on the dashboard
+
+## Comments
+- Seen on staging too.
+- Started after the last release.

@@ -1,0 +1,6 @@
+Do not modify any files outside openspec/changes/req-4/.
+<request>
+Title: No body
+Body:
+
+</request>

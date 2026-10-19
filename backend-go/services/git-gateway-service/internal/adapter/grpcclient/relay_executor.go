@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
@@ -33,13 +34,18 @@ import (
 // shape redesigns, methods still needing TASK-227 for reachability).
 type RelayExecutor struct {
 	client infrafleetv1.InfraFleetServiceClient
+	// complete sends ai.complete; every other method goes through relay().
+	complete *agentrelay.Relayer
 }
 
 // NewRelayExecutor wraps an already-constructed infrafleetv1 client — used
 // with Dial's connection (resolver.go) in cmd/server/main.go, and with a
 // fake client in tests.
 func NewRelayExecutor(client infrafleetv1.InfraFleetServiceClient) *RelayExecutor {
-	return &RelayExecutor{client: client}
+	return &RelayExecutor{
+		client:   client,
+		complete: agentrelay.New(completeRelayClient{client: client}, agentrelay.WithMetadata(withTenantMetadata)),
+	}
 }
 
 // relay marshals params and calls infra-fleet-service's agent-execution
@@ -761,11 +767,17 @@ func (r *RelayExecutor) InitRepo(ctx context.Context, destPath, defaultBranch, r
 	return result.Path, result.DefaultBranch, result.RemoteAdded, err
 }
 
-func (r *RelayExecutor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
+// BaseRefDefault forwards preferredBranch only when set, so an agent that
+// predates the field sees exactly the old request.
+func (r *RelayExecutor) BaseRefDefault(ctx context.Context, repoPath, preferredBranch string) (string, error) {
 	var result struct {
 		Ref string `json:"ref"`
 	}
-	err := r.relay(ctx, repoPath, "git.baseRefDefault", map[string]any{"repoPath": repoPath}, &result)
+	params := map[string]any{"repoPath": repoPath}
+	if preferredBranch != "" {
+		params["preferredBranch"] = preferredBranch
+	}
+	err := r.relay(ctx, repoPath, "git.baseRefDefault", params, &result)
 	return result.Ref, err
 }
 
@@ -972,9 +984,10 @@ func (g gitExecResult) failed(what string) error {
 func (r *RelayExecutor) ListLocalBranches(ctx context.Context, repoPath string) ([]domain.BranchInfo, error) {
 	var result gitExecResult
 	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
+		// `branch` and not `for-each-ref`: the agent's git.exec allowlist has no for-each-ref, so the listing (and the
+		// suggestions of a "ref not found" error) silently came back empty on every dev server reached through the relay.
 		"args": []string{
-			"for-each-ref", "--format=%(refname:short)\t%(upstream:short)\t%(upstream:track)\t%(HEAD)",
-			"refs/heads/",
+			"branch", "--list", "--format=%(refname:short)\t%(upstream:short)\t%(upstream:track)\t%(HEAD)",
 		},
 		"cwd": repoPath,
 	}, &result)
@@ -1000,7 +1013,7 @@ func parseForEachRefBranches(out string) []domain.BranchInfo {
 			continue
 		}
 		fields := strings.Split(line, "\t")
-		if len(fields) < 4 {
+		if len(fields) < 4 || strings.HasPrefix(fields[0], "(") { // `git branch` also prints "(HEAD detached at ...)"
 			continue
 		}
 		ahead, behind := parseAheadBehindTrack(fields[2])
@@ -1171,13 +1184,17 @@ func isMethodNotFoundError(err error) bool {
 // ai.complete has no filesystem-path argument, so there's no equivalent of
 // those methods' repoPath/connectionID conflation to inherit.
 func (r *RelayExecutor) Complete(ctx context.Context, connectionID, prompt string) (string, error) {
-	var result struct {
-		Content string `json:"content"`
+	target := agentrelay.Target{ConnectionID: connectionID}
+	// Same routing as relay(): a repo whose dev server has no connection row is reached by the dev server id. The
+	// hidden-target rewrite does not apply: ai.complete is not a per-repo method and the agent has no variant for it.
+	if devServerID, ok := usecase.DevServerIDFromContext(ctx); ok {
+		target.DevServerID = devServerID
 	}
-	err := r.relay(ctx, connectionID, "ai.complete", map[string]any{
-		"prompt": prompt,
-	}, &result)
-	return result.Content, err
+	res, err := r.complete.Complete(ctx, target, agentrelay.CompleteParams{Prompt: prompt})
+	if err != nil {
+		return "", err
+	}
+	return res.Content, nil
 }
 
 // ── usecase.FilesystemExecutor ──────────────────────────────────────────

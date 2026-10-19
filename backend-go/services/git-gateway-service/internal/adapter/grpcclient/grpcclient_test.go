@@ -916,9 +916,9 @@ func TestRelayExecutor_Checkout_SendsWorktreePathAndBranch(t *testing.T) {
 	}
 }
 
-func TestRelayExecutor_ListLocalBranches_ComposesViaGitExecForEachRef(t *testing.T) {
+func TestRelayExecutor_ListLocalBranches_ComposesViaGitExecBranch(t *testing.T) {
 	resultJSON, err := json.Marshal(map[string]any{
-		"stdout": "main\t\t\t*\nfeature\torigin/feature\t[ahead 1, behind 2]\t\n",
+		"stdout": "main\t\t\t*\nfeature\torigin/feature\t[ahead 1, behind 2]\t\n(HEAD detached at abc1234)\t\t\t*\n",
 	})
 	if err != nil {
 		t.Fatalf("marshal fixture: %v", err)
@@ -931,15 +931,15 @@ func TestRelayExecutor_ListLocalBranches_ComposesViaGitExecForEachRef(t *testing
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if fake.gotRelay.GetMethod() != "git.exec" {
-		t.Errorf("expected method=git.exec (composing via for-each-ref, not the narrower git.localBranches), got %q", fake.gotRelay.GetMethod())
+		t.Errorf("expected method=git.exec (composing via branch --list, not the narrower git.localBranches), got %q", fake.gotRelay.GetMethod())
 	}
 	var params map[string]any
 	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
 		t.Fatalf("unmarshal params: %v", err)
 	}
 	args, ok := params["args"].([]any)
-	if !ok || len(args) == 0 || args[0] != "for-each-ref" {
-		t.Errorf("expected args[0]=for-each-ref, got %+v", params["args"])
+	if !ok || len(args) == 0 || args[0] != "branch" {
+		t.Errorf("expected args[0]=branch (for-each-ref is not on the agent allowlist), got %+v", params["args"])
 	}
 	if len(branches) != 2 {
 		t.Fatalf("expected 2 branches, got %+v", branches)

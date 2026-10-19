@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/stablyai/orca-go/prompts/git_commit_message"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
 
@@ -34,57 +35,28 @@ func extractIssueRef(branch string) string {
 // maxFullDiffFiles is BR-CR-15's threshold — file stats only beyond this.
 const maxFullDiffFiles = 50
 
-// commitMessagePromptPrefix frames the staged diff for ai.complete — moved
-// here from generate_commit_message.go so every prompt-composing constant
-// lives in one file.
-const commitMessagePromptPrefix = "Write a concise, conventional-commits-style commit message for the following staged diff. Reply with only the commit message text.\n\n"
-
-// buildCommitMessagePrompt composes the full ai.complete prompt: staged
-// diff (or stats-only fallback), recent-commit style context, and branch/
-// issue context. All inputs are already-fetched values (Execute's job) —
-// this function only formats, no I/O, no ports.
-func buildCommitMessagePrompt(branch string, recent []domain.CommitRef, diffOrStats string, issueRef string) string {
-	var b strings.Builder
-	b.WriteString(commitMessagePromptPrefix)
-
-	if len(recent) > 0 {
-		b.WriteString("\nRecent commits on this project, for style/convention matching:\n")
-		for _, c := range recent {
-			sha := c.SHA
-			if len(sha) > 7 {
-				sha = sha[:7]
-			}
-			fmt.Fprintf(&b, "%s %s\n", sha, firstLine(c.Message))
-		}
+// renderCommitMessagePrompt maps the already-fetched context (Execute's job) to the ai.complete prompt; no I/O here.
+func renderCommitMessagePrompt(branch string, recent []domain.CommitRef, diffOrStats string, issueRef string) (string, error) {
+	in := git_commit_message.Input{Branch: branch, IssueRef: issueRef, Diff: diffOrStats}
+	for _, c := range recent {
+		in.Recent = append(in.Recent, git_commit_message.Commit{SHA: c.SHA, Message: c.Message})
 	}
-	if branch != "" {
-		fmt.Fprintf(&b, "\nCurrent branch: %s\n", branch)
+	prompt, err := git_commit_message.Render(in)
+	if err != nil {
+		return "", fmt.Errorf("render commit message prompt: %w", err)
 	}
-	if issueRef != "" {
-		fmt.Fprintf(&b, "Issue/ticket reference to include (as a trailing \"Refs: %s\" line): %s\n", issueRef, issueRef)
-	}
-	b.WriteString("\n")
-	b.WriteString(diffOrStats)
-	return b.String()
+	return prompt, nil
 }
 
-// firstLine returns s up to its first newline — recent-commit messages may
-// be multi-line, but the style-matching context only needs the summary
-// line.
-func firstLine(s string) string {
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		return s[:i]
-	}
-	return s
-}
-
-// statsOnlySummary is BR-CR-15's fallback body — one line per changed
-// file, no diff content, when the change is too large to send in full.
-func statsOnlySummary(files []domain.FileStatus) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "Staged changes are large (%d files) — showing file stats only:\n", len(files))
+// renderStatsOnlySummary is BR-CR-15's fallback body: one line per changed file, no diff content.
+func renderStatsOnlySummary(files []domain.FileStatus) (string, error) {
+	in := git_commit_message.StatsOnlyInput{}
 	for _, f := range files {
-		fmt.Fprintf(&b, "%s %s\n", f.State, f.Path)
+		in.Files = append(in.Files, git_commit_message.File{State: string(f.State), Path: f.Path})
 	}
-	return b.String()
+	summary, err := git_commit_message.RenderStatsOnly(in)
+	if err != nil {
+		return "", fmt.Errorf("render file stats summary: %w", err)
+	}
+	return summary, nil
 }

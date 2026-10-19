@@ -40,6 +40,12 @@ agent_rpcs := {
 	"authenticated": {"GetRequestFlow", "GetRequestFlowSettings", "ListPendingForUser"},
 }
 
+# Analysis steering RPCs a project member may reach: the Go side decides, because the approver set depends on data. Asking an
+# analysis to be revised and choosing among its options are part of deciding it (CR-REQ-041), so a designated approver who
+# is a plain member must get through the front door; the reporter/admin/approver rule stays in request-service. A person who
+# is not a project member cannot read the repository the analysis needs, so they stay outside.
+member_steering_rpcs := {"GenerateSolution", "ChooseSolutionOption"}
+
 caller_roles contains role if {
 	role := input.caller_project_role
 	role != ""
@@ -65,6 +71,13 @@ allow if {
 	human
 	some role in caller_roles
 	role in group_roles[input.action]
+}
+
+allow if {
+	human
+	input.action == "analyze"
+	input.rpc in member_steering_rpcs
+	input.caller_project_role == "member"
 }
 
 allow if {

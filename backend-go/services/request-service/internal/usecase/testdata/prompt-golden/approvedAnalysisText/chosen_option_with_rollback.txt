@@ -1,0 +1,7 @@
+chosen option: Edge cache
+summary: CDN
+approach:
+Use a CDN.
+rollback: Remove the CDN rule.
+assumption: Traffic is read heavy
+assumption: Pages are public

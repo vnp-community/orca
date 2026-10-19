@@ -19,7 +19,7 @@ const revisionFeedbackMarker = "REVISION-FEEDBACK-MUST-NOT-LEAK"
 
 var (
 	sqlLineComment      = regexp.MustCompile(`(?m)--[^\n]*`)
-	feedbackPredicateRE = regexp.MustCompile(`(?i)feedback\s+IS\s+NOT\s+NULL\s+AND\s+feedback\s*<>\s*''`)
+	feedbackPredicateRE = regexp.MustCompile(`(?i)feedback\s+IS\s+NOT\s+NULL\s+AND\s+feedback\s*<>\s*''\s+AND\s+feedback\s+NOT\s+LIKE\s+'clarification:%'`)
 )
 
 // AssertActivityUnionOmitsFeedback reads the text of a dialect's activity UNION: the revision branch must filter on the
@@ -84,6 +84,8 @@ func activityRevisionRequested(t *testing.T, env ExecutionEnv) {
 	// The first analysis and runs with a null or empty feedback are not revisions.
 	initial := revisionRun(tenantID, req.ID, sol1, alice, nil, at(2))
 	blank := revisionRun(tenantID, req.ID, sol1, alice, "", at(3))
+	// A run the system started after a clarification carries a marker, not a reviewer's ask.
+	afterClarification := revisionRun(tenantID, req.ID, sol1, "", domain.ClarificationFeedbackPrefix+uuid.NewString(), at(4))
 	// Rounds 2 and 3 start in the same instant, so the keyset tie-break is part of the scenario.
 	r1 := revisionRun(tenantID, req.ID, sol1, alice, revisionFeedbackMarker+" one", at(7))
 	r2 := revisionRun(tenantID, req.ID, sol2, bob, revisionFeedbackMarker+" two", at(9))
@@ -92,7 +94,7 @@ func activityRevisionRequested(t *testing.T, env ExecutionEnv) {
 	other, _, _ := seedActivity(t, env, tenantID)
 	foreign := revisionRun(tenantID, other.ID, uuid.NewString(), alice, revisionFeedbackMarker+" other request", at(8))
 	crossTenant := revisionRun(newTenant(), req.ID, uuid.NewString(), alice, revisionFeedbackMarker+" other tenant", at(8))
-	for _, r := range []map[string]any{initial, blank, r1, r2, r3, foreign, crossTenant} {
+	for _, r := range []map[string]any{initial, blank, afterClarification, r1, r2, r3, foreign, crossTenant} {
 		activityRaw(t, env, "analysis_runs", r)
 	}
 

@@ -386,3 +386,38 @@ func TestGenerateSolution_SystemStartActsAsReporterForConnectionLookup(t *testin
 		t.Fatal("a caller-less user start must be rejected")
 	}
 }
+
+// reporterOnlyConns accepts only the reporter's identity, like a dev server bound to the reporter.
+type reporterOnlyConns struct{ reporter string }
+
+func (c reporterOnlyConns) ResolveForProject(ctx context.Context, _ string) (AnalysisConnection, error) {
+	if u, _ := tenant.UserID(ctx); u != c.reporter {
+		return AnalysisConnection{}, ErrNoDevServer
+	}
+	return AnalysisConnection{DevServerID: "ds-1"}, nil
+}
+
+func TestGenerateSolution_CallerWhoIsNotTheReporterResolvesTheDevServerAsTheReporter(t *testing.T) {
+	w := newSolWorld()
+	r := w.seedRequest(domain.RequestTypeChangeRequest, domain.RequestStatusAnalyzing)
+	approver := "approver-1"
+	if approver == r.ReporterID {
+		t.Fatal("test setup: the caller must differ from the reporter")
+	}
+	uc := w.newGenerate(&capturingSpawner{}, reporterOnlyConns{reporter: r.ReporterID})
+	uc.auth = allowAllAuthorizer{}
+
+	res, err := uc.Execute(tenant.WithRole(tenant.WithUserID(lcCtx(), approver), "member"), GenerateSolutionInput{RequestID: r.ID})
+	if err != nil || !res.Created {
+		t.Fatalf("res=%+v err=%v", res, err)
+	}
+	if run := w.runs[res.RunID]; run.ActorID != approver {
+		t.Errorf("the run stays attributed to the caller %q, got %q", approver, run.ActorID)
+	}
+}
+
+type allowAllAuthorizer struct{}
+
+func (allowAllAuthorizer) AuthorizeGenerate(context.Context, domain.Request) error { return nil }
+func (allowAllAuthorizer) AuthorizeChoose(context.Context, domain.Request) error   { return nil }
+func (allowAllAuthorizer) AuthorizeRevise(context.Context, domain.Request) error   { return nil }

@@ -53,6 +53,9 @@ func TestSolutionMapping(t *testing.T) {
 	if got := toProtoSolution(domain.Solution{ID: "s3"}).GetRevisionFeedback(); got != "" {
 		t.Fatalf("a first version has no revision_feedback, got %q", got)
 	}
+	if got := toProtoSolution(domain.Solution{ID: "s4", Seq: 3}).GetSeq(); got != 3 {
+		t.Fatalf("seq = %d, the screen numbers versions by it", got)
+	}
 	if got := toProtoSolution(domain.Solution{Kind: domain.SolutionKindSolution, Status: domain.SolutionStatusDraft}).GetChosenOption(); got != -1 {
 		t.Fatalf("unchosen = %d, the wire uses -1", got)
 	}

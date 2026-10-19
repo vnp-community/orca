@@ -48,13 +48,13 @@ func checkGolden(t *testing.T, name, got string) {
 
 func TestBuildOpenSpecPlanPrompt_Golden(t *testing.T) {
 	in := openSpecPromptInput()
-	checkGolden(t, "openspec_plan_prompt_phases.golden", BuildOpenSpecPlanPrompt(in))
+	checkGolden(t, "openspec_plan_prompt_phases.golden", mustOpenSpecPlanPrompt(t, in))
 	in.Shape, in.KnowledgeAvailable, in.Feedback, in.RetryNote = domain.ShapePlanTasks, false, "chia nhỏ hơn", "TASKSMD_ID_ORDER line 12: expected id T1.2, got T1.3"
-	checkGolden(t, "openspec_plan_prompt_tasks_retry.golden", BuildOpenSpecPlanPrompt(in))
+	checkGolden(t, "openspec_plan_prompt_tasks_retry.golden", mustOpenSpecPlanPrompt(t, in))
 }
 
 func TestBuildOpenSpecPlanPrompt_Contract(t *testing.T) {
-	p := BuildOpenSpecPlanPrompt(openSpecPromptInput())
+	p := mustOpenSpecPlanPrompt(t, openSpecPromptInput())
 	for _, must := range []string{
 		"openspec/changes/req-142-nen-ai/", "request=REQ-142 schema=1", "tdd-openspec-author", "tdd-knowledge", "between 6 and 30 tasks",
 		"ORCA_RESULT_BEGIN abcdefghijklmnop0123456789", "ORCA_RESULT_END abcdefghijklmnop0123456789", "openspec validate --strict",
@@ -73,7 +73,7 @@ func TestBuildOpenSpecPlanPrompt_Contract(t *testing.T) {
 func TestBuildOpenSpecPlanPrompt_NeverCarriesKnowledgeContent(t *testing.T) {
 	in := openSpecPromptInput()
 	in.KnowledgeAvailable = false
-	p := BuildOpenSpecPlanPrompt(in)
+	p := mustOpenSpecPlanPrompt(t, in)
 	if !strings.Contains(p, "No design knowledge graph is available") || strings.Contains(p, "MCP server tdd-agent") {
 		t.Fatalf("an unavailable graph must not be advertised:\n%s", p)
 	}

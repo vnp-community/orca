@@ -39,9 +39,23 @@ func (uc *BaseRefDefault) Execute(ctx context.Context, in BaseRefDefaultInput) (
 	if err != nil {
 		return "", apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve repo's owning host", err)
 	}
-	ref, err := executor.BaseRefDefault(ctx, repoPath)
+	ref, err := executor.BaseRefDefault(ctx, repoPath, uc.configuredDefaultBranch(ctx, repo.ProjectID))
 	if err != nil {
 		return "", apperrors.New(apperrors.KindInternal, "GITGATEWAY_BASE_REF_DEFAULT_FAILED", "failed to resolve default base ref", err)
 	}
 	return ref, nil
+}
+
+// configuredDefaultBranch is only a hint for local-only repos, so a failed or
+// empty lookup must not fail the call: the executor then falls back to
+// conventional names.
+func (uc *BaseRefDefault) configuredDefaultBranch(ctx context.Context, projectID string) string {
+	if projectID == "" {
+		return ""
+	}
+	branch, err := uc.projects.GetProjectDefaultBranch(ctx, projectID)
+	if err != nil {
+		return ""
+	}
+	return branch
 }

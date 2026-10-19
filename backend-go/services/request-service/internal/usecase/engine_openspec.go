@@ -222,11 +222,14 @@ func (e *openspecEngine) runAgent(ctx context.Context, run domain.AnalysisRun, r
 	min, max := TaskRangeFor(req.Size, in.Limits)
 	call := func(withKnowledge bool) (AgentPromptResult, error) {
 		nonce := e.nonce()
-		prompt := BuildOpenSpecPlanPrompt(OpenSpecPlanPromptInput{
+		prompt, perr := RenderOpenSpecPlanPrompt(OpenSpecPlanPromptInput{
 			Request: req, Ref: ref, ChangeID: changeID, Shape: in.Shape, Limits: in.Limits, MinTasks: min, MaxTasks: max,
 			ProjectName: in.ProjectName, RepoURL: in.RepoURL, Analysis: in.Analysis, Feedback: in.Feedback,
 			KnowledgeAvailable: withKnowledge, ResultNonce: nonce, RetryNote: in.RetryNote,
 		})
+		if perr != nil {
+			return AgentPromptResult{}, perr
+		}
 		input := AgentPromptInput{
 			StepID: run.ID, Prompt: prompt, RepoPath: ws.Path, RequestID: req.ID, ProjectID: req.ProjectID,
 			TimeoutMS: e.d.Settings.SpecTimeoutMS, WriteProfile: OpenSpecWriteProfile, ResultNonce: nonce,
@@ -302,6 +305,8 @@ func (e *openspecEngine) checkScope(ctx context.Context, run domain.AnalysisRun,
 
 func specAgentFailure(run domain.AnalysisRun, err error) *AnalysisFailure {
 	switch {
+	case errors.Is(err, errPromptBuild):
+		return promptBuildFailure(run, err)
 	case errors.Is(err, ErrNoDevServer):
 		return newFailure(run, domain.RunErrAnalysisNoConn, "no dev server could run the authoring agent")
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, ErrClassifierTimeout):

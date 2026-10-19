@@ -35,6 +35,10 @@ type fakeProjectClient struct {
 	findByIdempotencyKeyErr    error
 	calledFindByIdempotencyKey bool
 
+	projectDefaultBranch      string
+	projectDefaultBranchErr   error
+	gotDefaultBranchProjectID string
+
 	issueStatusSyncEnabled    bool
 	issueStatusSyncEnabledErr error
 
@@ -86,6 +90,14 @@ func (f *fakeProjectClient) FindWorktreeByIdempotencyKey(ctx context.Context, pr
 		return domain.WorktreeRecord{}, false, f.findByIdempotencyKeyErr
 	}
 	return f.findByIdempotencyKeyResult, f.findByIdempotencyKeyFound, nil
+}
+
+func (f *fakeProjectClient) GetProjectDefaultBranch(ctx context.Context, projectID string) (string, error) {
+	f.gotDefaultBranchProjectID = projectID
+	if f.projectDefaultBranchErr != nil {
+		return "", f.projectDefaultBranchErr
+	}
+	return f.projectDefaultBranch, nil
 }
 
 func (f *fakeProjectClient) IsIssueStatusSyncEnabled(ctx context.Context, projectID string) (bool, error) {

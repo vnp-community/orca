@@ -76,6 +76,8 @@ func RunSolutionContract(t *testing.T, newEnv func(t *testing.T) SolutionEnv) {
 		{"SubjectHandlerContract", solSubjectHandlerContract},
 		{"RunFeedbackByIDs", solRunFeedbackByIDs},
 		{"RevisionRoundsCarryFeedback", solRevisionRoundsCarryFeedback},
+		{"FailedRevisionIsRecoverable", solFailedRevisionIsRecoverable},
+		{"ConcurrentRevisionsStartOneRun", solConcurrentRevisionsStartOneRun},
 	}
 	if env.Artifacts.Index != nil {
 		scenarios = append(scenarios, struct {
@@ -120,17 +122,32 @@ type solCompleter struct {
 	mu      sync.Mutex
 	replies []string
 	prompts []string
+	// hold, when set, keeps every call waiting until it is closed, so a run stays running while a scenario races it.
+	hold chan struct{}
 }
 
-func (c *solCompleter) Complete(_ context.Context, _ string, prompt string) (string, error) {
+func (c *solCompleter) Complete(ctx context.Context, _ string, prompt string) (string, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	n := len(c.prompts)
 	c.prompts = append(c.prompts, prompt)
-	if len(c.replies) == 0 {
+	hold := c.hold
+	scripted := len(c.replies) > 0
+	reply := ""
+	if scripted {
+		reply = c.replies[min(n, len(c.replies)-1)]
+	}
+	c.mu.Unlock()
+	if hold != nil {
+		select {
+		case <-hold:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+	if !scripted {
 		return "", errors.New("no scripted reply")
 	}
-	return c.replies[min(n, len(c.replies)-1)], nil
+	return reply, nil
 }
 
 type solAgent struct {

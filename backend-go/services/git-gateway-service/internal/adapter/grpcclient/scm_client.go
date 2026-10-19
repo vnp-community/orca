@@ -43,7 +43,7 @@ func (c *ScmSourceClient) GetIssue(ctx context.Context, ref domain.IssueRef) (do
 				Title:    iss.GetTitle(),
 				Provider: ref.Provider,
 				// No description/AC/labels/comments on scmintegrationv1.Issue
-				// today (id/title/state/url/number only) — buildAgentPrompt
+				// today (id/title/state/url/number only) — renderAgentPrompt
 				// degrades gracefully with empty Description/AcceptanceCriteria.
 				ExternalRef: fmt.Sprintf("%s#%d", ref.Repo, ref.Number),
 			}, nil

@@ -125,3 +125,50 @@ Với git 2.54.0 (Apple Git-157), trong bản clone mà `release/y` chỉ tồn 
 ### Chưa kiểm chứng
 
 Chưa chạy với agent và git-gateway thật (không chạy e2e theo quy tắc phiên). Chưa chạy trên git 2.25 thật; các lệnh dùng (`rev-parse --verify --quiet`, `remote`, `symbolic-ref --short`, `worktree remove --force`) đều có từ trước 2.25.
+
+## Bổ sung 2026-10-20: BaseRefDefault
+
+### Lỗi (e2e BRF-07)
+
+Mọi worktree của Request không có `base_ref` xuất phát từ `BaseRefDefault` của git-gateway. Hàm này sai hai chỗ:
+
+1. `lastRefSegment` (Go) và `.split('/').pop()` (agent) chỉ giữ đoạn sau dấu `/` cuối: `refs/remotes/origin/release/1.x` ra `1.x`, `refs/heads/feature/other` ra `other`.
+2. Repo không có `origin` (fixture LedgerLite, mọi repo chỉ cục bộ): bước cuối cùng là "nhánh đang checkout" (`symbolic-ref HEAD`), nên Request không có `base_ref` bắt đầu từ một nhánh feature bất kỳ đang được checkout. Vi phạm quy tắc "mặc định = nhánh mặc định của repo".
+
+### Thứ tự phân giải mới (Go `localgit` và agent giống hệt nhau)
+
+(a) đích của `refs/remotes/origin/HEAD`, chỉ nhận khi nhánh đó tồn tại (cục bộ hoặc `refs/remotes/origin/<b>`), để origin/HEAD treo không thắng ứng viên thật; (b) `git ls-remote --symref origin HEAD`; (c) `preferredBranch` (nhánh mặc định cấu hình của project) khi nó là nhánh cục bộ; (d) `main` rồi `master` cục bộ; (e) nhánh đang checkout, chỉ cho repo `git init` chưa có commit. HEAD detached không panic: không có ứng viên nào thì trả lỗi. Chỉ cắt các tiền tố đã biết (`refs/heads/`, `refs/remotes/<remote>/`, tên remote không chứa `/`), nên tên nhánh có dấu `/` được giữ nguyên. Mọi kiểm tra tồn tại dùng `show-ref --verify --quiet refs/heads/<b>` (ref đầy đủ), nên gợi ý dạng `--upload-pack=x` không bao giờ bị hiểu là cờ.
+
+### Thiết kế và hợp đồng
+
+- `usecase.GitExecutor.BaseRefDefault(ctx, repoPath, preferredBranch)`: thêm tham số gợi ý tùy chọn (hai bản cài đặt: `localgit`, `grpcclient.RelayExecutor`, cộng agent).
+- `usecase.ProjectClient.GetProjectDefaultBranch(ctx, projectID)` mới, cài bằng `GetProject` hiện có (`Project.default_branch`, field 6). Giữ `GetRepo` nguyên để không thêm một RPC cho mọi bên gọi khác. `Repo` proto không có `default_branch`, nên không cần đổi proto.
+- `BaseRefDefault.Execute` tra nhánh cấu hình theo `repo.ProjectID`; lỗi tra cứu hoặc project không có ID chỉ làm mất gợi ý (không làm hỏng lời gọi).
+- Dây dẫn `git.baseRefDefault` tương thích ngược: `RelayExecutor` chỉ gửi `preferredBranch` khi khác rỗng (agent cũ thấy đúng request cũ); agent mới coi trường thiếu là rỗng. Gateway `BaseRefDefaultRequest` (proto git-gateway) không đổi.
+
+### Tệp đổi
+
+- `backend-go/services/git-gateway-service/internal/adapter/localgit/base_ref_default.go` (mới; `BaseRefDefault`, `defaultBranchFromRemoteHead`, `branchFromRef` chuyển khỏi `executor.go` và viết lại; `executor.go` giảm 77 dòng) và `base_ref_default_test.go` (mới; 4 test cũ rời `executor_test.go`).
+- `internal/usecase/ports.go`, `base_ref_default.go`, `base_ref_default_test.go`, `dispatch_test.go`, `worktree_fakes_test.go`; `internal/adapter/grpcclient/project_client.go`, `relay_executor.go`, `relay_executor_base_ref_default_test.go` (mới); `internal/adapter/grpc/server_test.go`.
+- `agent/src/relay/agent-git-base-ref-resolver.ts` (mới), `agent-git-base-ref-handler.ts` (gọi resolver), `agent/src/relay/__tests__/agent-git-base-ref-handler.test.ts` (mới, git thật), `__tests__/agent-git-handler.test.ts` (bỏ khối `handleGitBaseRefDefault` cũ, đã chuyển sang tệp mới).
+- `agent-rpc-dispatch-git.ts` không phải sửa: nó chuyển nguyên `rpc.params`.
+
+### Kiểm thử (git thật, không mock git)
+
+Bảng ca, giống nhau ở Go và TS: clone thật; đích origin/HEAD có dấu `/` (`release/1.x`) trong khi checkout đang ở `feature/work`; origin/HEAD thắng nhánh feature đang checkout; origin/HEAD treo; `init` + `remote add` qua ls-remote với nhánh có `/`; repo cục bộ với mặc định cấu hình `main` khi HEAD ở `feature/other` (trả `main`); mặc định cấu hình có `/` (có và không có `refs/heads/`); mặc định cấu hình không tồn tại cục bộ rơi về `main`; không gợi ý thì `main` thắng nhánh đang checkout; chỉ có `master`; có cả hai thì `main`; gợi ý dạng cờ bị bỏ qua; `git init` chưa commit trả nhánh hiện tại (và không trả gợi ý chưa tồn tại); remote rỗng; HEAD detached tìm được `main`; HEAD detached không ứng viên trả lỗi; thư mục không phải repo trả lỗi; bảng `branchFromRef`. Usecase: gợi ý được truyền xuống executor, lỗi tra project không làm hỏng, repo không có project ID không gọi tra cứu. Relay: `preferredBranch` đi tới agent; rỗng thì wire cũ.
+
+Lệnh đã chạy:
+- `cd backend-go/services/git-gateway-service && go build ./... && go vet ./... && go test ./... -race -count=1`: xanh.
+- `cd agent && npx vitest run src/relay/__tests__/agent-git-base-ref-handler.test.ts src/relay/__tests__/agent-git-handler.test.ts`: xanh (89 test); thêm `agent-rpc-dispatch.test.ts`: chỉ lỗi có sẵn `notification.send ... delivered:false`. `node agent/build.mjs`: thành công. `oxlint` sạch, `oxfmt --check` sạch trên các tệp agent đã đổi; `tsc` không có lỗi ở tệp đã đổi.
+
+### Blast radius (không sửa mã của họ)
+
+Chung một RPC `GitGatewayService.BaseRefDefault` (proto và hình dạng response không đổi); đổi duy nhất là giá trị `ref` trả về cho repo cục bộ và tên nhánh có `/`:
+- request-service `ProposalWorkspace.Ensure` (`proposal_workspace_create.go:87`): Request không có `base_ref` giờ xuất phát từ nhánh mặc định thật thay vì nhánh đang checkout; nhánh có `/` giờ đúng.
+- task-service `worktree_provisioner.go:144`: như trên cho worktree của task.
+- api-gateway kênh `repo.baseRefDefault` (`channels_repo_ssh_status_workspace.go:498`) và MCP `pack1_workspace.go`: cùng nguồn; frontend `getRuntimeRepoBaseRefDefault` (`runtime-repo-client.ts`), `use-repo-default-base-ref.ts`, `RepoRefPicker`, `SourceControl`, `useCreatePullRequestDialogFields`, `CreateRequestDialog` hiển thị và chọn mặc định theo giá trị này nên cũng sẽ thấy giá trị đúng.
+- Bên cài `GitExecutor`/`ProjectClient`: chỉ trong git-gateway-service (đã cập nhật hết, kể cả fake trong test).
+
+### Chưa kiểm chứng
+
+Chưa chạy với agent và gateway thật hay e2e BRF-07 (không chạy e2e/docker theo quy tắc phiên); không có test hợp đồng gRPC cho `GetProjectDefaultBranch` với project-service thật (dùng `GetProject` có sẵn). Nếu project-service đặt `default_branch` mặc định `main` cho repo có nhánh khác, gợi ý chỉ được dùng khi nhánh đó tồn tại cục bộ, nên không gây hại. Chưa chạy với git 2.25: các lệnh dùng (`symbolic-ref`, `ls-remote --symref`, `show-ref --verify --quiet`) đều có từ trước 2.25; test chạy với git 2.54 cục bộ.

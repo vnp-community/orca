@@ -134,3 +134,25 @@ test_missing_actor_type_is_not_agent_but_roles_still_needed if {
 test_system_actor_follows_person_rules if {
 	not request.allow with input as object.union(callers.stranger, {"action": "read", "rpc": "GetRequest", "actor_type": "system"})
 }
+
+# CR-REQ-041: a project member reaches the two steering RPCs (request-service checks reporter/admin/approver); a stranger,
+# every other analyze RPC and every agent stay as before.
+test_member_reaches_analysis_steering_rpcs if {
+	every rpc in ["GenerateSolution", "ChooseSolutionOption"] {
+		request.allow with input as object.union(callers.member, {"action": "analyze", "rpc": rpc, "actor_type": "user"})
+	}
+}
+
+test_stranger_does_not_reach_analysis_steering_rpcs if {
+	every rpc in ["GenerateSolution", "ChooseSolutionOption"] {
+		not request.allow with input as object.union(callers.stranger, {"action": "analyze", "rpc": rpc, "actor_type": "user"})
+	}
+}
+
+test_member_does_not_reach_other_analyze_rpcs if {
+	not request.allow with input as object.union(callers.member, {"action": "analyze", "rpc": "GetSolutionPrompt", "actor_type": "user"})
+}
+
+test_agent_member_does_not_reach_steering_rpc_through_member_rule if {
+	not request.allow with input as object.union(callers.member, {"action": "analyze", "rpc": "ChooseSolutionOption", "actor_type": "agent"})
+}

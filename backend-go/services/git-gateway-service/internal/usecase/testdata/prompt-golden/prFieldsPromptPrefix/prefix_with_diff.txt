@@ -1,0 +1,4 @@
+Write a pull request title and description for the following diff against the base branch. Reply with the title on the first line and the description on subsequent lines.
+
+diff --git a/cache.go b/cache.go
++package cache

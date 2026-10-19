@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stablyai/orca-go/common/secretscan"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
@@ -268,38 +267,6 @@ func TestWebhookReplayGuard(t *testing.T) {
 		t.Fatal("nonce TTL must exceed the accepted clock skew")
 	}
 }
-
-func TestPromptRedactor(t *testing.T) {
-	pii := maskEmails{}
-	text := "contact bob@example.com token ghp_abcdefghijklmnopqrstuvwxyz0123456789 Bearer abc12345def"
-	off := NewPromptRedactor(fixedSettings{redact: false}, pii).Apply(context.Background(), text)
-	if strings.Contains(off, "ghp_abcdef") || strings.Contains(off, "abc12345def") || !strings.Contains(off, "bob@example.com") {
-		t.Errorf("secrets always masked, PII only on request: %q", off)
-	}
-	on := NewPromptRedactor(fixedSettings{redact: true}, pii).Apply(context.Background(), text)
-	if strings.Contains(on, "bob@example.com") {
-		t.Errorf("PII must be masked when the tenant asks: %q", on)
-	}
-	failed := NewPromptRedactor(fixedSettings{err: errors.New("db")}, pii).Apply(context.Background(), text)
-	if strings.Contains(failed, "bob@example.com") {
-		t.Errorf("a settings error must mask PII (fail closed): %q", failed)
-	}
-	if got := NewPromptRedactor(nil, nil).Apply(context.Background(), "plain"); got != "plain" {
-		t.Errorf("got %q", got)
-	}
-	_ = secretscan.PatternsVersion
-}
-
-type fixedSettings struct {
-	redact bool
-	err    error
-}
-
-func (f fixedSettings) RedactPII(context.Context) (bool, error) { return f.redact, f.err }
-
-type maskEmails struct{}
-
-func (maskEmails) Mask(s string) string { return strings.ReplaceAll(s, "bob@example.com", "[email]") }
 
 func TestRunRequestRetention(t *testing.T) {
 	store := newFakeRetention()

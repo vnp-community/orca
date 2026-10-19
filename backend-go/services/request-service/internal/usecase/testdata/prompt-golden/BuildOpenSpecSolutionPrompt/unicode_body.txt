@@ -1,0 +1,6 @@
+Do not modify any files outside openspec/changes/req-3/.
+<request>
+Title: Tải chậm
+Body:
+Trang chủ tải chậm, cần cache.
+</request>

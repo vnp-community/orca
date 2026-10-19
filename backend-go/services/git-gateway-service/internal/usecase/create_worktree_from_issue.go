@@ -71,7 +71,12 @@ func (uc *CreateWorktreeFromIssue) Execute(ctx context.Context, in CreateWorktre
 	}
 
 	if !in.SkipAgentStart {
-		prompt := buildAgentPrompt(issue.Title, issue.Description, issue.AcceptanceCriteria, issue.Comments) // BR-PI-05
+		prompt, promptErr := renderAgentPrompt(issue.Title, issue.Description, issue.AcceptanceCriteria, issue.Comments) // BR-PI-05
+		if promptErr != nil {
+			// Same posture as a failed spawn: the worktree exists and stays; the error text names a template, never the issue.
+			result.AgentStartError = promptErr.Error()
+			return result, nil
+		}
 		sessionID, err := uc.agents.SpawnAndInject(ctx, wtResult.WorktreeID, wtResult.Path, prompt)
 		if err != nil {
 			// Non-fatal: the worktree exists; agent spawn is a separate

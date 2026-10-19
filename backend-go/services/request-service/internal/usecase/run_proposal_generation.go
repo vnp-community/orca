@@ -224,7 +224,10 @@ func (w *RunProposalGeneration) assemble(ctx context.Context, req domain.Request
 	}
 	proposal.Title = req.Title
 	proposal.Summary = "OpenSpec change " + res.ChangeID
-	proposal = FillTaskPrompts(proposal, TaskPromptContext{Ref: res.Ref, ChangeID: res.ChangeID, Branch: res.Workspace.Branch})
+	proposal, err := FillTaskPrompts(proposal, TaskPromptContext{Ref: res.Ref, ChangeID: res.ChangeID, Branch: res.Workspace.Branch})
+	if err != nil {
+		return domain.PlanProposal{}, nil, err
+	}
 	proposal = domain.NormalizePlanProposal(proposal)
 	if err := domain.ValidatePlanProposal(req.Type, shape, w.limits, proposal); err != nil {
 		if !planErrorIsModelFault(err) {

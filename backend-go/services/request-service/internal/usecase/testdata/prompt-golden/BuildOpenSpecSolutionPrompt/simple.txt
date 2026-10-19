@@ -1,0 +1,6 @@
+Do not modify any files outside openspec/changes/req-142-cache/.
+<request>
+Title: Cache the landing page
+Body:
+The page is slow.
+</request>

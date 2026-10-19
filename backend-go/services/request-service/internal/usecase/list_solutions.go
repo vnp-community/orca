@@ -84,7 +84,7 @@ func (uc *ListSolutions) fillRevisionFeedback(ctx context.Context, sols []domain
 		return err
 	}
 	for i := range sols {
-		sols[i].RevisionFeedback = feedback[sols[i].GenerationRunID]
+		sols[i].RevisionFeedback = domain.ReviewerRevisionFeedback(feedback[sols[i].GenerationRunID])
 	}
 	return nil
 }

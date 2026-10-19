@@ -122,8 +122,12 @@ func (a *RunAgentReadonlyAnalysis) Execute(ctx context.Context, run domain.Analy
 
 	var lastRaw string
 	for {
+		prompt, perr := RenderSolutionPrompt(in)
+		if perr != nil {
+			return promptBuildFailure(run, perr)
+		}
 		call := AgentPromptInput{
-			StepID: run.ID, Prompt: BuildSolutionPrompt(in), RepoPath: conn.RepoPath, RequestID: req.ID, ProjectID: req.ProjectID,
+			StepID: run.ID, Prompt: prompt, RepoPath: conn.RepoPath, RequestID: req.ID, ProjectID: req.ProjectID,
 			TimeoutMS: timeoutMS, ReadOnlyEnforced: enforced,
 		}
 		if in.UseKnowledge {
@@ -134,7 +138,11 @@ func (a *RunAgentReadonlyAnalysis) Execute(ctx context.Context, run domain.Analy
 			// The run did not start, so asking again without the graph costs nothing; the prompt then says the graph is absent.
 			slog.WarnContext(ctx, "knowledge hub unavailable; proposing without it", slog.String("run_id", run.ID), slog.Any("error", err))
 			in.UseKnowledge = false
-			call.Prompt, call.KnowledgeRoot = BuildSolutionPrompt(in), ""
+			noGraphPrompt, perr := RenderSolutionPrompt(in)
+			if perr != nil {
+				return promptBuildFailure(run, perr)
+			}
+			call.Prompt, call.KnowledgeRoot = noGraphPrompt, ""
 			res, err = a.agent.ExecPrompt(ctx, conn, call)
 		}
 		if err != nil {

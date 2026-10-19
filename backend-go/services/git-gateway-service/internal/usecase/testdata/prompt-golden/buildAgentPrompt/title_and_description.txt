@@ -1,0 +1,5 @@
+# Fix the login redirect
+
+## Description
+Users land on a blank page after login.
+

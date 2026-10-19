@@ -71,6 +71,7 @@ var requestEventRegistry = []requestEventMapping{
 	{Stream: requestStreamName, Subject: "orca.request.request.status_changed", EventType: "request.status_changed"},
 	{Stream: requestStreamName, Subject: "orca.request.request.returned", EventType: "request.returned"},
 	{Stream: requestStreamName, Subject: "orca.request.request.completed", EventType: "request.completed"},
+	{Stream: requestStreamName, Subject: "orca.request.request.base_ref_changed", EventType: "request.base_ref_changed"},
 	{Stream: requestStreamName, Subject: "orca.request.solution.proposed", EventType: "solution.proposed"},
 	{Stream: requestStreamName, Subject: "orca.request.solution.approved", EventType: "solution.approved"},
 	{Stream: requestStreamName, Subject: "orca.request.approval.requested", EventType: "approval.requested"},

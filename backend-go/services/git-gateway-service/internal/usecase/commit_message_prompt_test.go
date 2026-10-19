@@ -26,12 +26,12 @@ func TestExtractIssueRef(t *testing.T) {
 	}
 }
 
-func TestBuildCommitMessagePrompt(t *testing.T) {
+func TestRenderCommitMessagePrompt(t *testing.T) {
 	t.Run("includes recent commits, branch, and issue ref when present", func(t *testing.T) {
 		recent := []domain.CommitRef{
 			{SHA: "abcdef1234567", Message: "feat: add thing\n\nlonger body"},
 		}
-		prompt := buildCommitMessagePrompt("fix/ORCA-123-foo", recent, "diff content", "ORCA-123")
+		prompt := mustCommitMessagePrompt(t, "fix/ORCA-123-foo", recent, "diff content", "ORCA-123")
 
 		if !strings.Contains(prompt, "Recent commits on this project") {
 			t.Error("expected recent-commit block header")
@@ -57,7 +57,7 @@ func TestBuildCommitMessagePrompt(t *testing.T) {
 	})
 
 	t.Run("omits sections cleanly when empty", func(t *testing.T) {
-		prompt := buildCommitMessagePrompt("", nil, "diff content", "")
+		prompt := mustCommitMessagePrompt(t, "", nil, "diff content", "")
 		if strings.Contains(prompt, "Recent commits") {
 			t.Error("expected no recent-commit header when recent is empty")
 		}
@@ -75,7 +75,7 @@ func TestStatsOnlySummary(t *testing.T) {
 		{Path: "a.go", State: domain.FileStateModified},
 		{Path: "b.go", State: domain.FileStateAdded},
 	}
-	summary := statsOnlySummary(files)
+	summary := mustStatsOnlySummary(t, files)
 
 	if !strings.Contains(summary, "2 files") {
 		t.Errorf("expected file count in header, got %q", summary)

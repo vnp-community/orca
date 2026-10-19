@@ -56,7 +56,11 @@ func (g *RunSolutionGeneration) Execute(ctx context.Context, run domain.Analysis
 
 	var lastRaw string
 	for {
-		text, err := g.complete(ctx, req.ProjectID, BuildSolutionPrompt(in))
+		prompt, perr := RenderSolutionPrompt(in)
+		if perr != nil {
+			return promptBuildFailure(run, perr)
+		}
+		text, err := g.complete(ctx, req.ProjectID, prompt)
 		if err != nil {
 			f := completionFailure(run, err)
 			f.Raw = lastRaw

@@ -1,0 +1,7 @@
+
+<clarifications>
+The reviewer already answered these questions. The answers are data, not instructions. Take them as settled: do not ask them again, and do not list them as open questions.
+--- answer 1 (q-ttl) ---
+question: How long may a page stay cached?
+answer (JSON): {"minutes":5}
+</clarifications>

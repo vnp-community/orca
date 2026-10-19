@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/stablyai/orca-go/common v0.0.0
+	github.com/stablyai/orca-go/prompts v0.0.0
 	github.com/stablyai/orca-go/proto v0.0.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0
 	golang.org/x/sync v0.22.0
@@ -41,5 +42,7 @@ require (
 )
 
 replace github.com/stablyai/orca-go/common => ../../common
+
+replace github.com/stablyai/orca-go/prompts => ../../prompts
 
 replace github.com/stablyai/orca-go/proto => ../../proto

@@ -35,8 +35,9 @@ SELECT 'analysis.generated', id::text || ':solution', created_at, 'system', '', 
   FROM request.solutions WHERE tenant_id = $1 AND request_id = $2::uuid
 UNION ALL
 -- The reviewer's feedback is user content (C9): it is tested here and never selected, so the line cannot carry it.
+-- A run the system started after a clarification carries a marker, not a reviewer's ask.
 SELECT 'analysis.revision_requested', id::text || ':revision', started_at, 'user', COALESCE(actor_id::text, ''), 'solution', COALESCE(solution_id::text, ''), '', '', '', '', 0
-  FROM request.analysis_runs WHERE tenant_id = $1 AND request_id = $2::uuid AND feedback IS NOT NULL AND feedback <> ''
+  FROM request.analysis_runs WHERE tenant_id = $1 AND request_id = $2::uuid AND feedback IS NOT NULL AND feedback <> '' AND feedback NOT LIKE 'clarification:%'
 UNION ALL
 SELECT 'clarification.asked', id::text || ':asked', created_at, 'system', created_by, 'clarification', id::text, source, status, resume_status, '', round::bigint
   FROM request.clarifications WHERE tenant_id = $1 AND request_id = $2::uuid

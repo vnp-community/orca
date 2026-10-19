@@ -2,38 +2,18 @@ package usecase
 
 import (
 	"fmt"
-	"html"
-	"regexp"
-	"strings"
+
+	"github.com/stablyai/orca-go/prompts/git_agent_prompt"
 )
 
-const maxPromptFieldLen = 4000
-
-var htmlTagPattern = regexp.MustCompile(`<[^>]*>`)
-
-// buildAgentPrompt implements BR-PI-05: sanitize before composing — strip
-// HTML/script content, truncate any single field so one hostile/huge issue
-// body can't blow the agent's context budget.
-func buildAgentPrompt(title, description, acceptanceCriteria string, comments []string) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "# %s\n\n", sanitize(title))
-	if description != "" {
-		fmt.Fprintf(&b, "## Description\n%s\n\n", sanitize(description))
+// renderAgentPrompt maps an issue to the prompt injected into the agent session started in its worktree. BR-PI-05:
+// the fields are sanitized (HTML stripped, length cut) by the template package, never composed raw.
+func renderAgentPrompt(title, description, acceptanceCriteria string, comments []string) (string, error) {
+	prompt, err := git_agent_prompt.Render(git_agent_prompt.Input{
+		Title: title, Description: description, AcceptanceCriteria: acceptanceCriteria, Comments: comments,
+	})
+	if err != nil {
+		return "", fmt.Errorf("render issue agent prompt: %w", err)
 	}
-	if acceptanceCriteria != "" {
-		fmt.Fprintf(&b, "## Acceptance Criteria\n%s\n\n", sanitize(acceptanceCriteria))
-	}
-	if len(comments) > 0 {
-		b.WriteString("## Comments\n")
-		for _, c := range comments {
-			fmt.Fprintf(&b, "- %s\n", sanitize(c))
-		}
-	}
-	return b.String()
-}
-
-func sanitize(s string) string {
-	s = htmlTagPattern.ReplaceAllString(s, "")
-	s = html.UnescapeString(s)
-	return truncate(s, maxPromptFieldLen)
+	return prompt, nil
 }

@@ -194,7 +194,11 @@ type GitExecutor interface {
 	// remoteURL empty = no remote added (remoteName is ignored in that case).
 	InitRepo(ctx context.Context, destPath, defaultBranch, remoteName, remoteURL string) (path, resolvedDefaultBranch string, remoteAdded bool, err error)
 
-	BaseRefDefault(ctx context.Context, repoPath string) (ref string, err error)
+	// BaseRefDefault returns the repo's default branch. preferredBranch is the
+	// project's configured default branch (may be empty); it is used only
+	// when neither origin/HEAD nor the remote names a default and the branch
+	// exists locally.
+	BaseRefDefault(ctx context.Context, repoPath, preferredBranch string) (ref string, err error)
 	SearchRefs(ctx context.Context, repoPath, query string) (refs []string, err error)
 	CheckHooks(ctx context.Context, repoPath string) (installedHooks []string, orcaHooksCurrent bool, err error)
 	ReadIssueCommand(ctx context.Context, repoPath string) (content string, exists bool, err error)
@@ -457,6 +461,9 @@ func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver
 // ForRepo can route without a second RPC.
 type ProjectClient interface {
 	GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error)
+	// GetProjectDefaultBranch reads the project's configured default_branch
+	// (empty when unset). BaseRefDefault uses it as a hint for local-only repos.
+	GetProjectDefaultBranch(ctx context.Context, projectID string) (string, error)
 	// RecordWorktreeCreated's lineage param carries the linked-issue
 	// reference CreateWorktreeFromIssue resolved (SOL-PI-02) plus the
 	// parent-worktree/orchestration lineage-capture context — a plain

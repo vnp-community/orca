@@ -65,7 +65,7 @@ func TestAnsweredForPrompt_BestEffortAndBounded(t *testing.T) {
 
 func TestBuildSolutionPrompt_ShowsAnswersAsFencedRedactedData(t *testing.T) {
 	secret := "AKIAIOSFODNN7EXAMPLE"
-	p := BuildSolutionPrompt(SolutionPromptInput{
+	p := mustSolutionPrompt(t, SolutionPromptInput{
 		Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), MinOptions: 2,
 		Answers: []PromptAnswer{
 			{Key: "open_question:Q-1", Question: "Which database?", Answer: `"postgres"`},
@@ -83,7 +83,7 @@ func TestBuildSolutionPrompt_ShowsAnswersAsFencedRedactedData(t *testing.T) {
 	if strings.Count(p, "</clarifications>") != 1 {
 		t.Error("an answer closed the block early")
 	}
-	if strings.Contains(BuildSolutionPrompt(SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), MinOptions: 2}), "<clarifications>") {
+	if strings.Contains(mustSolutionPrompt(t, SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), MinOptions: 2}), "<clarifications>") {
 		t.Error("no answers, no block")
 	}
 }

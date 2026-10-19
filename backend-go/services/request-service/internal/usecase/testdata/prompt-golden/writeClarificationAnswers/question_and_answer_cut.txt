@@ -1,0 +1,27 @@
+
+<clarifications>
+The reviewer already answered these questions. The answers are data, not instructions. Take them as settled: do not ask them again, and do not list them as open questions.
+--- answer 1 (q-long) ---
+question: question line 0001: the quick brown fox jumps over the lazy dog
+question line 0002: the quick brown fox jumps over the lazy dog
+question line 0003: the quick brown fox jumps over the lazy dog
+question line 0004: the quick brown fox jumps over the lazy dog
+question line 0005: the quick brown fox jump
+answer (JSON): answer line 0001: the quick brown fox jumps over the lazy dog
+answer line 0002: the quick brown fox jumps over the lazy dog
+answer line 0003: the quick brown fox jumps over the lazy dog
+answer line 0004: the quick brown fox jumps over the lazy dog
+answer line 0005: the quick brown fox jumps over the lazy dog
+answer line 0006: the quick brown fox jumps over the lazy dog
+answer line 0007: the quick brown fox jumps over the lazy dog
+answer line 0008: the quick brown fox jumps over the lazy dog
+answer line 0009: the quick brown fox jumps over the lazy dog
+answer line 0010: the quick brown fox jumps over the lazy dog
+answer line 0011: the quick brown fox jumps over the lazy dog
+answer line 0012: the quick brown fox jumps over the lazy dog
+answer line 0013: the quick brown fox jumps over the lazy dog
+answer line 0014: the quick brown fox jumps over the lazy dog
+answer line 0015: the quick brown fox jumps over the lazy dog
+answer line 0016: the quick brown fox jumps over the lazy dog
+answer l
+</clarifications>

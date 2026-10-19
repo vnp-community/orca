@@ -49,7 +49,11 @@ func (e *nativeEngine) GenerateAnalysis(ctx context.Context, p ProjectRef, in An
 	}
 	var raw string
 	for attempt := 0; attempt < 2; attempt++ {
-		text, err := e.completer.Complete(ctx, BuildSolutionPrompt(prompt))
+		rendered, perr := RenderSolutionPrompt(prompt)
+		if perr != nil {
+			return AnalysisOutput{Raw: raw}, perr
+		}
+		text, err := e.completer.Complete(ctx, rendered)
 		if err != nil {
 			return AnalysisOutput{Raw: raw}, err
 		}

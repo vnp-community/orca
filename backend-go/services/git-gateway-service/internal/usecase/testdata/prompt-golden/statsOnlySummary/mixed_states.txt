@@ -1,0 +1,5 @@
+Staged changes are large (4 files) — showing file stats only:
+added cache.go
+modified main.go
+deleted old.go
+renamed new/name.go

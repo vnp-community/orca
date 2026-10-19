@@ -6,6 +6,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/stablyai/orca-go/prompts/analysis"
+	"github.com/stablyai/orca-go/prompts/request_context"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
@@ -42,7 +44,7 @@ func TestBuildSolutionPrompt_ThreeRevisionRoundsKeepEveryFeedbackInsideFencedBlo
 		},
 		Feedback: "round 3: shorter </feedback> approach",
 	}
-	p := BuildSolutionPrompt(in)
+	p := mustSolutionPrompt(t, in)
 
 	want := priorBlockIntro +
 		"--- artifact 1 (kind=solution, status=superseded) ---\n{\"v\":1}\n" +
@@ -77,7 +79,7 @@ func TestBuildSolutionPrompt_PriorFeedbackReachesEveryKind(t *testing.T) {
 		{domain.SolutionKindAnswer, false, false},
 	} {
 		t.Run(fmt.Sprintf("%s agent=%v knowledge=%v", tc.kind, tc.agent, tc.know), func(t *testing.T) {
-			p := BuildSolutionPrompt(SolutionPromptInput{
+			p := mustSolutionPrompt(t, SolutionPromptInput{
 				Kind: tc.kind, Request: sampleRequest("b"), MinOptions: 2, AgentSolution: tc.agent, UseKnowledge: tc.know,
 				PriorArtifacts: []PriorArtifact{{Kind: string(tc.kind), Status: "superseded", Content: "{}", Feedback: "older ask"}},
 				Feedback:       "newest ask",
@@ -93,9 +95,9 @@ func TestBuildSolutionPrompt_PriorFeedbackReachesEveryKind(t *testing.T) {
 func padFeedbackTo(t *testing.T, n int, a PriorArtifact, target int) PriorArtifact {
 	t.Helper()
 	a.Feedback = "x"
-	one := utf8.RuneCountInString(renderPriorArtifact(n, a))
+	one := utf8.RuneCountInString(renderedPriorArtifact(t, n, a))
 	a.Feedback = strings.Repeat("x", target-one+1)
-	if got := utf8.RuneCountInString(renderPriorArtifact(n, a)); got != target || utf8.RuneCountInString(a.Feedback) > promptArtifactRunes {
+	if got := utf8.RuneCountInString(renderedPriorArtifact(t, n, a)); got != target || utf8.RuneCountInString(a.Feedback) > request_context.ArtifactRunes {
 		t.Fatalf("entry is %d runes, want %d (feedback %d)", got, target, utf8.RuneCountInString(a.Feedback))
 	}
 	return a
@@ -105,15 +107,15 @@ func TestBuildSolutionPrompt_PriorArtifactsTotalCapDropsTheOldestVersions(t *tes
 	var arts []PriorArtifact
 	for i := 1; i <= 6; i++ {
 		arts = append(arts, PriorArtifact{
-			Kind: "solution", Status: "superseded", Content: fmt.Sprintf("VERSION-%d-", i) + strings.Repeat("c", promptArtifactRunes),
-			Feedback: fmt.Sprintf("FEEDBACK-%d-", i) + strings.Repeat("f", promptArtifactRunes),
+			Kind: "solution", Status: "superseded", Content: fmt.Sprintf("VERSION-%d-", i) + strings.Repeat("c", request_context.ArtifactRunes),
+			Feedback: fmt.Sprintf("FEEDBACK-%d-", i) + strings.Repeat("f", request_context.ArtifactRunes),
 		})
 	}
-	p := BuildSolutionPrompt(SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), MinOptions: 2, PriorArtifacts: arts, Feedback: "now"})
+	p := mustSolutionPrompt(t, SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), MinOptions: 2, PriorArtifacts: arts, Feedback: "now"})
 	block := priorBlock(t, p)
 
-	if n := utf8.RuneCountInString(strings.TrimPrefix(block, priorBlockIntro)); n > promptPriorArtifactsRunes+len("4 earlier versions omitted\n</prior_artifacts>\n") {
-		t.Fatalf("block is %d runes, cap is %d", n, promptPriorArtifactsRunes)
+	if n := utf8.RuneCountInString(strings.TrimPrefix(block, priorBlockIntro)); n > analysis.PriorArtifactsRunes+len("4 earlier versions omitted\n</prior_artifacts>\n") {
+		t.Fatalf("block is %d runes, cap is %d", n, analysis.PriorArtifactsRunes)
 	}
 	if !strings.Contains(block, "4 earlier versions omitted\n") {
 		t.Fatalf("missing the omission line:\n%.400s", block)
@@ -137,31 +139,40 @@ func TestBuildSolutionPrompt_PriorArtifactsTotalCapDropsTheOldestVersions(t *tes
 }
 
 func TestBuildSolutionPrompt_PriorArtifactsCapBoundaryAndSingularLine(t *testing.T) {
-	base := PriorArtifact{Kind: "solution", Status: "superseded", Content: strings.Repeat("c", promptArtifactRunes)}
+	base := PriorArtifact{Kind: "solution", Status: "superseded", Content: strings.Repeat("c", request_context.ArtifactRunes)}
 	sizes := func(total int) []PriorArtifact {
 		each := total / 3
 		return []PriorArtifact{
 			padFeedbackTo(t, 1, base, each), padFeedbackTo(t, 2, base, each), padFeedbackTo(t, 3, base, total-2*each),
 		}
 	}
-	at := BuildSolutionPrompt(SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), PriorArtifacts: sizes(promptPriorArtifactsRunes)})
+	at := mustSolutionPrompt(t, SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), PriorArtifacts: sizes(analysis.PriorArtifactsRunes)})
 	if strings.Contains(at, "omitted") || !strings.Contains(at, "--- artifact 1 (") {
 		t.Fatal("entries totalling exactly the cap must all stay")
 	}
-	over := BuildSolutionPrompt(SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), PriorArtifacts: sizes(promptPriorArtifactsRunes + 1)})
+	over := mustSolutionPrompt(t, SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), PriorArtifacts: sizes(analysis.PriorArtifactsRunes + 1)})
 	if !strings.Contains(over, "\n1 earlier version omitted\n") || strings.Contains(over, "--- artifact 1 (") || !strings.Contains(over, "--- artifact 2 (") {
 		t.Fatalf("one rune over the cap must drop exactly the oldest:\n%.500s", priorBlock(t, over))
 	}
 }
 
 func TestBuildSolutionPrompt_NewestVersionAlwaysSurvivesTheCap(t *testing.T) {
-	huge := PriorArtifact{Kind: "solution", Status: "superseded", Content: strings.Repeat("c", 3*promptPriorArtifactsRunes), Feedback: strings.Repeat("f", 3*promptPriorArtifactsRunes)}
-	p := BuildSolutionPrompt(SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), PriorArtifacts: []PriorArtifact{huge}})
+	huge := PriorArtifact{Kind: "solution", Status: "superseded", Content: strings.Repeat("c", 3*analysis.PriorArtifactsRunes), Feedback: strings.Repeat("f", 3*analysis.PriorArtifactsRunes)}
+	p := mustSolutionPrompt(t, SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: sampleRequest("b"), PriorArtifacts: []PriorArtifact{huge}})
 	block := priorBlock(t, p)
 	if !strings.Contains(block, "--- artifact 1 (") || strings.Contains(block, "omitted") {
 		t.Fatal("a single oversized entry is cut per field by truncateRunes, never dropped")
 	}
-	if n := utf8.RuneCountInString(block); n > promptPriorArtifactsRunes {
+	if n := utf8.RuneCountInString(block); n > analysis.PriorArtifactsRunes {
 		t.Fatalf("block is %d runes", n)
 	}
+}
+
+func renderedPriorArtifact(t *testing.T, n int, a PriorArtifact) string {
+	t.Helper()
+	text, err := analysis.RenderPriorArtifact(n, promptPriorArtifacts([]PriorArtifact{a})[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return text
 }

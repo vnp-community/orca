@@ -201,8 +201,14 @@ func (uc *GenerateSolution) start(ctx context.Context, in GenerateSolutionInput,
 		actor = req.ReporterID
 		ctx = tenant.WithUserID(ctx, actor)
 	}
+	// The dev server is bound to the reporter, so an approver or admin who steers the analysis resolves it as the reporter; the run
+	// stays attributed to the caller.
+	connCtx := ctx
+	if req.ReporterID != "" && actor != req.ReporterID {
+		connCtx = tenant.WithUserID(ctx, req.ReporterID)
+	}
 	// Resolve the connection before any write: no dev server means no run row at all.
-	conn, err := uc.conns.ResolveForProject(ctx, req.ProjectID)
+	conn, err := uc.conns.ResolveForProject(connCtx, req.ProjectID)
 	if err != nil {
 		if errors.Is(err, ErrNoDevServer) {
 			if mode == domain.AnalysisModeAgentReadonly {
@@ -240,6 +246,12 @@ func (uc *GenerateSolution) start(ctx context.Context, in GenerateSolutionInput,
 		if actor == "" {
 			actor = cur.ReporterID
 		}
+		feedback := in.Feedback
+		if feedback == "" {
+			if feedback, err = inheritedFeedback(ctx, uc.runs, cur.ID, kind); err != nil {
+				return err
+			}
+		}
 		now := uc.now()
 		owner := uc.leaseOwner
 		runID := uc.newID()
@@ -251,7 +263,7 @@ func (uc *GenerateSolution) start(ctx context.Context, in GenerateSolutionInput,
 		run := domain.AnalysisRun{
 			ID: runID, TenantID: tenantID, RequestID: cur.ID, Kind: domain.RunKind(kind), Mode: mode, Status: domain.RunStatusRunning,
 			IdempotencyKey: idem, Attempt: 1, LeaseOwner: &owner, StartedAt: now,
-			SolutionID: uc.newID(), ProjectID: cur.ProjectID, ActorID: actor, Feedback: in.Feedback,
+			SolutionID: uc.newID(), ProjectID: cur.ProjectID, ActorID: actor, Feedback: feedback,
 		}
 		draft := domain.Solution{
 			ID: run.SolutionID, TenantID: tenantID, RequestID: cur.ID, Kind: kind, Status: domain.SolutionStatusDraft,
@@ -259,8 +271,11 @@ func (uc *GenerateSolution) start(ctx context.Context, in GenerateSolutionInput,
 			InputRequestRevision: maxInt(cur.ContentRevision, 1),
 		}
 		res, err = uc.runs.StartRun(ctx, run, draft, StartRunOptions{LeaseTTL: uc.settings.LeaseTTL, MaxAgentRuns: uc.settings.MaxAgentRunsPerProject})
-		if err != nil || !res.Created {
+		if err != nil {
 			return err
+		}
+		if !res.Created {
+			return refuseSecondRevision(in, system, cur.Status, res.Run)
 		}
 		if cur.Status != domain.RequestStatusAwaitingAnalysisApproval {
 			return nil

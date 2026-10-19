@@ -131,7 +131,7 @@ func toProtoSolution(s domain.Solution) *requestv1.Solution {
 	return &requestv1.Solution{
 		Id: s.ID, RequestId: s.RequestID, Kind: kindToProto[s.Kind], Status: statusToProto[s.Status], OptionsJson: string(s.OptionsJSON),
 		ChosenOption: chosen, ContentRef: s.ContentRef, GenerationRunId: s.GenerationRunID, CreatedAt: timestamppb.New(s.CreatedAt), Version: s.Version,
-		RevisionFeedback: s.RevisionFeedback,
+		RevisionFeedback: s.RevisionFeedback, Seq: int32(s.Seq),
 	}
 }
 

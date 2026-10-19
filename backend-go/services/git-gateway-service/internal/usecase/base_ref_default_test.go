@@ -60,4 +60,49 @@ func TestBaseRefDefault_DispatchesToResolvedExecutor(t *testing.T) {
 			t.Fatal("expected error when GetRepo fails")
 		}
 	})
+
+	t.Run("the project's configured default branch is passed to the executor as a hint", func(t *testing.T) {
+		projects := &fakeProjectClient{
+			getRepoResult:        domain.RepoInfo{ID: "repo-1", ProjectID: "proj-1", URL: "/local/repo"},
+			projectDefaultBranch: "main",
+		}
+		local := &fakeGitExecutor{baseRef: "main"}
+		uc := NewBaseRefDefault(&fakeDevServerReachability{allowLocal: true}, projects, local, &fakeGitExecutor{})
+
+		if _, err := uc.Execute(context.Background(), BaseRefDefaultInput{RepoID: "repo-1"}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if projects.gotDefaultBranchProjectID != "proj-1" || local.gotPreferredBranch != "main" {
+			t.Errorf("project=%q preferred=%q", projects.gotDefaultBranchProjectID, local.gotPreferredBranch)
+		}
+	})
+
+	t.Run("a failed project lookup degrades to no hint instead of failing", func(t *testing.T) {
+		projects := &fakeProjectClient{
+			getRepoResult:           domain.RepoInfo{ID: "repo-1", ProjectID: "proj-1", URL: "/local/repo"},
+			projectDefaultBranchErr: context.DeadlineExceeded,
+		}
+		local := &fakeGitExecutor{baseRef: "main"}
+		uc := NewBaseRefDefault(&fakeDevServerReachability{allowLocal: true}, projects, local, &fakeGitExecutor{})
+
+		ref, err := uc.Execute(context.Background(), BaseRefDefaultInput{RepoID: "repo-1"})
+		if err != nil || ref != "main" {
+			t.Fatalf("ref=%q err=%v", ref, err)
+		}
+		if local.gotPreferredBranch != "" {
+			t.Errorf("no hint expected, got %q", local.gotPreferredBranch)
+		}
+	})
+
+	t.Run("a repo without a project id never calls the project lookup", func(t *testing.T) {
+		projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/local/repo"}, projectDefaultBranch: "main"}
+		local := &fakeGitExecutor{baseRef: "main"}
+		uc := NewBaseRefDefault(&fakeDevServerReachability{allowLocal: true}, projects, local, &fakeGitExecutor{})
+		if _, err := uc.Execute(context.Background(), BaseRefDefaultInput{RepoID: "repo-1"}); err != nil {
+			t.Fatal(err)
+		}
+		if projects.gotDefaultBranchProjectID != "" || local.gotPreferredBranch != "" {
+			t.Errorf("lookup=%q preferred=%q", projects.gotDefaultBranchProjectID, local.gotPreferredBranch)
+		}
+	})
 }

@@ -1,0 +1,8 @@
+Do not modify any files outside openspec/changes/req-1/.
+<request>
+Title: Title
+Body:
+keep	tab
+keep newline
+dropnulbellesc end
+</request>

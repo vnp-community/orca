@@ -25,6 +25,8 @@ type fakeRequestService struct {
 	createFn func(*requestv1.CreateRequestRequest) (*requestv1.CreateRequestResponse, error)
 	getResp  *requestv1.Request
 	solResp  *requestv1.ListSolutionsResponse
+	// generates records solution_generate calls so a test can read what reached request-service.
+	generates []*requestv1.GenerateSolutionRequest
 }
 
 func (f *fakeRequestService) CreateRequest(_ context.Context, in *requestv1.CreateRequestRequest, _ ...grpc.CallOption) (*requestv1.CreateRequestResponse, error) {
@@ -50,6 +52,13 @@ func (f *fakeRequestService) GetRequest(_ context.Context, _ *requestv1.GetReque
 
 func (f *fakeRequestService) ListSolutions(_ context.Context, _ *requestv1.ListSolutionsRequest, _ ...grpc.CallOption) (*requestv1.ListSolutionsResponse, error) {
 	return f.solResp, nil
+}
+
+func (f *fakeRequestService) GenerateSolution(_ context.Context, in *requestv1.GenerateSolutionRequest, _ ...grpc.CallOption) (*requestv1.GenerateSolutionResponse, error) {
+	f.mu.Lock()
+	f.generates = append(f.generates, in)
+	f.mu.Unlock()
+	return &requestv1.GenerateSolutionResponse{SolutionId: "s2", RunId: "run2"}, nil
 }
 
 func (f *fakeRequestService) ListRequests(_ context.Context, _ *requestv1.ListRequestsRequest, _ ...grpc.CallOption) (*requestv1.ListRequestsResponse, error) {

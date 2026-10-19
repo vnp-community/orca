@@ -16,8 +16,6 @@ type PRFields struct {
 	Description string
 }
 
-const prFieldsPromptPrefix = "Write a pull request title and description for the following diff against the base branch. Reply with the title on the first line and the description on subsequent lines.\n\n"
-
 // GeneratePullRequestFields follows GenerateCommitMessage's already
 // established pattern exactly: gather diff context via the same dispatch
 // path, relay to the Dev Server Agent's ai.complete. Per SOL-032, this
@@ -51,7 +49,11 @@ func (uc *GeneratePullRequestFields) Execute(ctx context.Context, in GeneratePul
 	if err != nil {
 		return PRFields{}, err
 	}
-	content, err := uc.completer.Complete(ctx, conn.ConnectionID, prFieldsPromptPrefix+fullDiff)
+	prompt, err := renderPullRequestPrompt(fullDiff)
+	if err != nil {
+		return PRFields{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_PROMPT_BUILD_FAILED", "failed to build the PR fields prompt", err)
+	}
+	content, err := uc.completer.Complete(ctx, conn.ConnectionID, prompt)
 	if err != nil {
 		return PRFields{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_AI_COMPLETE_FAILED", "failed to generate PR fields via AI relay", err)
 	}

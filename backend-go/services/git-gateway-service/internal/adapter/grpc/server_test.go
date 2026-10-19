@@ -170,7 +170,7 @@ func (fakeExecutor) InitRepo(context.Context, string, string, string, string) (s
 	return "/repo/init", "main", false, nil
 }
 
-func (fakeExecutor) BaseRefDefault(context.Context, string) (string, error) {
+func (fakeExecutor) BaseRefDefault(context.Context, string, string) (string, error) {
 	return "main", nil
 }
 
@@ -324,6 +324,10 @@ func (fakeProjectClient) RecordWorktreeRemoved(context.Context, string) error {
 
 func (fakeProjectClient) FindWorktreeByIdempotencyKey(context.Context, string, string) (domain.WorktreeRecord, bool, error) {
 	return domain.WorktreeRecord{}, false, nil
+}
+
+func (fakeProjectClient) GetProjectDefaultBranch(context.Context, string) (string, error) {
+	return "main", nil
 }
 
 func (fakeProjectClient) IsIssueStatusSyncEnabled(context.Context, string) (bool, error) {

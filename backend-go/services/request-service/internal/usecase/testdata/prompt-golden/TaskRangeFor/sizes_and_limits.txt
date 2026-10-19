@@ -1,0 +1,8 @@
+size=S max_total=100 -> min=1 max=5
+size=M max_total=100 -> min=3 max=12
+size=L max_total=100 -> min=6 max=30
+size= max_total=100 -> min=3 max=12
+size=S max_total=4 -> min=1 max=4
+size=M max_total=4 -> min=3 max=4
+size=L max_total=4 -> min=4 max=4
+size= max_total=4 -> min=3 max=4

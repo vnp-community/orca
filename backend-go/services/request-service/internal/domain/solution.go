@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -70,6 +71,18 @@ type Solution struct {
 	// RevisionFeedback is the reviewer's request for changes that produced this version: the feedback of its generation
 	// run, loaded on read and never stored on the row.
 	RevisionFeedback string
+}
+
+// ClarificationFeedbackPrefix marks run feedback the system itself supplies after a clarification is answered; it is a
+// trigger key, not a reviewer's request, so it is never shown as a revision ask.
+const ClarificationFeedbackPrefix = "clarification:"
+
+// ReviewerRevisionFeedback returns the run feedback only when a person wrote it.
+func ReviewerRevisionFeedback(runFeedback string) string {
+	if strings.HasPrefix(runFeedback, ClarificationFeedbackPrefix) {
+		return ""
+	}
+	return runFeedback
 }
 
 // StampArtifact records how and from which Request revision the document was produced (CR-REQ-027).

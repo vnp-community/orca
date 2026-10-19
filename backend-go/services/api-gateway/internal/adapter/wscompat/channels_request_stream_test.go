@@ -53,9 +53,9 @@ func openRequestStream(t *testing.T, bus ephemeralSubscriber, fake *fakeRequestC
 	}
 }
 
-func TestRequestStream_FourteenEventsMapToTheirType(t *testing.T) {
-	if len(requestEventRegistry) != 14 {
-		t.Fatalf("registry has %d rows, want the 14 of CONTRACT section 3", len(requestEventRegistry))
+func TestRequestStream_EveryRegisteredEventMapsToItsType(t *testing.T) {
+	if len(requestEventRegistry) != 15 {
+		t.Fatalf("registry has %d rows, want the 15 of CONTRACT section 3 (14 + base_ref_changed, CR-REQ-039)", len(requestEventRegistry))
 	}
 	bus := &fakeEphemeralSubscriber{events: map[string][]commoneventbus.Event{}}
 	for _, m := range requestEventRegistry {
@@ -92,8 +92,8 @@ func TestRequestStream_FourteenEventsMapToTheirType(t *testing.T) {
 			t.Errorf("%s: frame leaks content: %s", m.EventType, b)
 		}
 	}
-	if len(frames) != 14 {
-		t.Errorf("got %d frames, want 14", len(frames))
+	if len(frames) != len(requestEventRegistry) {
+		t.Errorf("got %d frames, want %d", len(frames), len(requestEventRegistry))
 	}
 }
 

@@ -231,6 +231,8 @@ func requestChannelCases() []requestChannelCase {
 				mustEqual(t, s["chosenOptionId"], "opt-1")
 				mustEqual(t, s["kind"], "solution")
 				mustEqual(t, s["status"], "proposed")
+				mustEqual(t, s["revisionFeedback"], "keep the public API")
+				mustEqual(t, s["seq"], float64(2))
 				if s["options"].(map[string]any)["options"].([]any)[1].(map[string]any)["risk_level"] != "low" {
 					t.Errorf("options keys must stay as the AI wrote them: %v", s["options"])
 				}
@@ -239,6 +241,9 @@ func requestChannelCases() []requestChannelCase {
 		{channel: "solution.generate", args: `{"requestId":"r1","idempotencyKey":"k","feedback":"f","analysisMode":"agent_readonly"}`, rpc: "GenerateSolution", lo: short[0], hi: short[1],
 			check: func(t *testing.T, res map[string]any, in proto.Message) {
 				mustEqual(t, in.(*requestv1.GenerateSolutionRequest).GetAnalysisMode(), requestv1.AnalysisMode_ANALYSIS_MODE_AGENT_READONLY)
+				// The revision ask and the double-click key reach request-service untouched: who may revise is decided there.
+				mustEqual(t, in.(*requestv1.GenerateSolutionRequest).GetFeedback(), "f")
+				mustEqual(t, in.(*requestv1.GenerateSolutionRequest).GetIdempotencyKey(), "k")
 				mustEqual(t, res["runId"], "run1")
 				mustEqual(t, res["solutionId"], "s1")
 			}},

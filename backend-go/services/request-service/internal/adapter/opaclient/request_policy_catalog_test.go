@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
@@ -56,6 +57,10 @@ func TestCatalogPersonMatrixAgainstRego(t *testing.T) {
 			got, err := p.Allow(context.Background(), domain.AccessInput{Action: e.Group, RPC: domain.RPCName(method), CallerGlobalRole: g, CallerProjectRole: pr, IsReporter: rep, ActorType: "user"})
 			if err != nil {
 				t.Fatal(err)
+			}
+			// CR-REQ-041: a project member may reach the two steering RPCs; the use case then checks reporter, admin or approver.
+			if role == "member" && (strings.HasSuffix(method, "/GenerateSolution") || strings.HasSuffix(method, "/ChooseSolutionOption")) {
+				allowed[role] = true
 			}
 			if got != allowed[role] {
 				t.Errorf("%s as %s: allow=%v want %v", method, role, got, allowed[role])
