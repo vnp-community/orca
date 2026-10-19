@@ -59,7 +59,11 @@ async function reloadRequest(id: string): Promise<OrcaRequest | null> {
   return fresh
 }
 
-export function useRequestBaseRefSave(request: OrcaRequest): {
+export function useRequestBaseRefSave(
+  request: OrcaRequest,
+  // Why: the pane keeps its own copy of the Request (and its version); after any outcome that changed the store it must refetch.
+  onChanged?: () => void
+): {
   state: BaseRefSaveState
   save: (baseRef: string) => Promise<void>
   applyConflict: () => Promise<void>
@@ -67,9 +71,11 @@ export function useRequestBaseRefSave(request: OrcaRequest): {
 } {
   const [state, setState] = useState<BaseRefSaveState>(IDLE)
   const latest = useRef(request)
+  const changed = useRef(onChanged)
   useEffect(() => {
     latest.current = request
-  }, [request])
+    changed.current = onChanged
+  }, [request, onChanged])
 
   const save = useCallback(async (baseRef: string): Promise<void> => {
     const current = latest.current
@@ -87,15 +93,17 @@ export function useRequestBaseRefSave(request: OrcaRequest): {
         toast(failure.message)
         await reloadRequest(current.id)
         setState((s) => ({ ...s, saving: false }))
+        changed.current?.()
       } else if (failure.kind === 'conflict') {
         const fresh = await reloadRequest(current.id)
-        const changed = fresh !== null && fresh.baseRef !== baseRef
+        const differs = fresh !== null && fresh.baseRef !== baseRef
         setState((s) => ({
           ...s,
           saving: false,
-          conflict: changed ? { mine: baseRef } : null,
+          conflict: differs ? { mine: baseRef } : null,
           failure: fresh === null ? failure : null
         }))
+        changed.current?.()
       } else {
         setState((s) => ({
           ...s,
@@ -136,6 +144,7 @@ export function useRequestBaseRefSave(request: OrcaRequest): {
       saving: false,
       unverifiedRef: written.baseRefUnverified ? baseRef : null
     }))
+    changed.current?.()
   }, [])
 
   const applyConflict = useCallback(async (): Promise<void> => {

@@ -35,6 +35,7 @@ describe('groupOfKind', () => {
     ['request.type_changed', 'changes'],
     ['request.classified', 'changes'],
     ['analysis.generated', 'changes'],
+    ['analysis.revision_requested', 'changes'],
     ['request.returned', 'changes'],
     ['request.created', null],
     ['something.new', null]
@@ -59,6 +60,7 @@ describe('activityTone', () => {
     ['approval.decided', 'info', { result: 'approved' }, 'success'],
     ['approval.decided', 'attention', { result: 'rejected' }, 'attention'],
     ['task.started', 'info', {}, 'neutral'],
+    ['analysis.revision_requested', 'info', {}, 'neutral'],
     ['something.new', 'info', {}, 'neutral']
   ])('%s/%s %j -> %s', (kind, severity, details, tone) => {
     expect(
@@ -91,6 +93,13 @@ describe('activityIcon', () => {
   it('knows which kinds are built in', () => {
     expect(isKnownActivityKind('task.failed')).toBe(true)
     expect(isKnownActivityKind('task.exploded')).toBe(false)
+    expect(isKnownActivityKind('analysis.revision_requested')).toBe(true)
+  })
+
+  it('gives a revision request its own icon, not the neutral one of an unknown kind', () => {
+    expect(activityIcon(entry({ kind: 'analysis.revision_requested' }))).not.toBe(
+      activityIcon(entry({ kind: 'something.new' }))
+    )
   })
 })
 
@@ -132,6 +141,7 @@ describe('activityTargetTab', () => {
     ['approval.decided', 'phase', 'plan'],
     ['approval.decided', 'solution', 'analysis'],
     ['analysis.generated', 'solution', 'analysis'],
+    ['analysis.revision_requested', 'solution', 'analysis'],
     ['clarification.asked', 'clarification', 'overview']
   ] as const)('%s on %s opens %s', (kind, subjectType, tab) => {
     expect(activityTargetTab({ kind, subjectType })).toBe(tab)

@@ -14344,7 +14344,8 @@
             "agentError": "エージェントエラー",
             "needsInfo": "追加情報が必要でした",
             "cancelled": "キャンセル済み",
-            "unknown": "原因不明"
+            "unknown": "原因不明",
+            "baseRefNotFound": "開始ブランチが見つかりません"
           },
           "title": {
             "requestCreated": "リクエストを作成しました",
@@ -14369,7 +14370,8 @@
             "taskCancelled": "{{task}} をキャンセルしました",
             "requestReturned": "バックログに戻しました",
             "requestReopened": "再開しました",
-            "requestCancelled": "キャンセル済み"
+            "requestCancelled": "キャンセル済み",
+            "analysisRevisionRequested": "分析への変更が依頼されました"
           },
           "analysis": {
             "generic": "分析"

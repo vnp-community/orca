@@ -30,7 +30,13 @@ function Field({
   )
 }
 
-export function RequestOverviewTab({ request }: { request: OrcaRequest }): React.JSX.Element {
+type Props = {
+  request: OrcaRequest
+  /** Called when something on the tab changed the Request (the starting branch), so the pane refetches it. */
+  onChanged?: () => void
+}
+
+export function RequestOverviewTab({ request, onChanged }: Props): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4 p-4" data-testid="request-overview">
       {request.body ? (
@@ -60,7 +66,7 @@ export function RequestOverviewTab({ request }: { request: OrcaRequest }): React
           </Field>
         )}
       </dl>
-      <RequestBaseRefRow key={request.id} request={request} />
+      <RequestBaseRefRow key={request.id} request={request} onChanged={onChanged} />
     </div>
   )
 }

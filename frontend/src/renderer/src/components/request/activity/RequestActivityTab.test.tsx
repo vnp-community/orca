@@ -175,6 +175,31 @@ describe('RequestActivityTab', () => {
     expect(screen.getByTestId('activity-entry')).toHaveTextContent('Something new happened')
   })
 
+  it('renders a revision request as one plain line that never carries the reviewer text', () => {
+    hook.mockReturnValue(
+      state({
+        entries: [
+          entry({
+            id: 'run-1:revision',
+            kind: 'analysis.revision_requested',
+            actorKind: 'user',
+            severity: 'info',
+            subjectType: 'solution',
+            subjectId: 's-2',
+            summary: 'Requested changes to the analysis',
+            attempt: undefined,
+            details: { solutionId: 's-2' }
+          })
+        ]
+      })
+    )
+    renderTab()
+    const row = screen.getByTestId('activity-entry')
+    expect(row).toHaveTextContent('Requested changes to the analysis')
+    expect(row).toHaveTextContent('User')
+    expect(within(row).queryByTestId('activity-entry-severity')).toBeNull()
+  })
+
   it('passes filter changes to the hook', () => {
     renderTab()
     expect(lastCall()[1].filter).toEqual({})

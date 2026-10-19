@@ -61,6 +61,11 @@ describe('activityTitle', () => {
       'solution version 2 generated'
     ],
     [
+      'analysis revision requested',
+      { kind: 'analysis.revision_requested', details: { solutionId: 's-1' } },
+      'Requested changes to the analysis'
+    ],
+    [
       'unknown kind uses the summary',
       { kind: 'thing.happened', summary: 'Something happened' },
       'Something happened'
@@ -102,6 +107,11 @@ describe('activityDetailText', () => {
     ['failure cause only', { details: { cause: 'verify_failed' } }, 'Verification failed'],
     ['unknown cause kept raw', { details: { cause: 'weird' } }, 'weird'],
     [
+      'starting branch not found',
+      { details: { cause: 'base_ref_not_found', error: 'unknown revision release/9' } },
+      'Starting branch not found: unknown revision release/9'
+    ],
+    [
       'approval comment',
       { kind: 'approval.decided', details: { comment: 'Looks good' } },
       'Looks good'
@@ -116,7 +126,15 @@ describe('activityDetailText', () => {
       { kind: 'request.type_changed', details: { reason: 'It is a bug' } },
       'It is a bug'
     ],
-    ['no detail', { kind: 'task.started' }, null]
+    ['no detail', { kind: 'task.started' }, null],
+    [
+      'a revision request never shows text, even if the backend sent some',
+      {
+        kind: 'analysis.revision_requested',
+        details: { solutionId: 's-1', feedback: 'secret reviewer text', reason: 'also hidden' }
+      },
+      null
+    ]
   ])('%s', (_name, over, expected) => {
     expect(activityDetailText(entry(over))).toBe(expected)
   })

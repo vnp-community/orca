@@ -14344,7 +14344,8 @@
             "agentError": "Agent error",
             "needsInfo": "Needed more information",
             "cancelled": "Cancelled",
-            "unknown": "Unknown cause"
+            "unknown": "Unknown cause",
+            "baseRefNotFound": "Starting branch not found"
           },
           "title": {
             "requestCreated": "Request created",
@@ -14369,7 +14370,8 @@
             "taskCancelled": "{{task}} cancelled",
             "requestReturned": "Returned to backlog",
             "requestReopened": "Reopened",
-            "requestCancelled": "Cancelled"
+            "requestCancelled": "Cancelled",
+            "analysisRevisionRequested": "Requested changes to the analysis"
           },
           "analysis": {
             "generic": "Analysis"

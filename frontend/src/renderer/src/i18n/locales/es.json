@@ -14344,7 +14344,8 @@
             "agentError": "Error del agente",
             "needsInfo": "Necesitaba más información",
             "cancelled": "Cancelado",
-            "unknown": "Causa desconocida"
+            "unknown": "Causa desconocida",
+            "baseRefNotFound": "Rama de inicio no encontrada"
           },
           "title": {
             "requestCreated": "Solicitud creada",
@@ -14369,7 +14370,8 @@
             "taskCancelled": "{{task}} cancelada",
             "requestReturned": "Devuelta al backlog",
             "requestReopened": "Reabierta",
-            "requestCancelled": "Cancelado"
+            "requestCancelled": "Cancelado",
+            "analysisRevisionRequested": "Se pidieron cambios en el análisis"
           },
           "analysis": {
             "generic": "Análisis"

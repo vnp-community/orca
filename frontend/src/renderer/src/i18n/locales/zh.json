@@ -14344,7 +14344,8 @@
             "agentError": "智能体错误",
             "needsInfo": "需要更多信息",
             "cancelled": "已取消",
-            "unknown": "原因未知"
+            "unknown": "原因未知",
+            "baseRefNotFound": "找不到起始分支"
           },
           "title": {
             "requestCreated": "请求已创建",
@@ -14369,7 +14370,8 @@
             "taskCancelled": "{{task}} 已取消",
             "requestReturned": "已退回待办",
             "requestReopened": "已重新打开",
-            "requestCancelled": "已取消"
+            "requestCancelled": "已取消",
+            "analysisRevisionRequested": "已请求修改分析"
           },
           "analysis": {
             "generic": "分析"

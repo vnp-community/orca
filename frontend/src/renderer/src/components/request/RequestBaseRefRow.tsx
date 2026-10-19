@@ -23,11 +23,17 @@ import type { OrcaRequest } from '../../../../shared/request-types'
 
 const T = 'auto.components.request.RequestBaseRefRow.'
 
-export function RequestBaseRefRow({ request }: { request: OrcaRequest }): React.JSX.Element | null {
+type Props = {
+  request: OrcaRequest
+  /** Called after a save, a lock refusal or a conflict reload changed the stored Request, so the pane can refetch it. */
+  onChanged?: () => void
+}
+
+export function RequestBaseRefRow({ request, onChanged }: Props): React.JSX.Element | null {
   const supported = useAppStore(supportsBaseRef)
   const flow = useRequestFlow(request.type, request.size)
   const current = useFreshestRequest(request)
-  const { state, save, applyConflict, dismiss } = useRequestBaseRefSave(current)
+  const { state, save, applyConflict, dismiss } = useRequestBaseRefSave(current, onChanged)
 
   // A flow without a plan (question, spike) never makes a worktree; an unclassified Request has no flow yet and keeps the row.
   if (!supported || current.baseRef === undefined || flow?.planKind === 'none') {

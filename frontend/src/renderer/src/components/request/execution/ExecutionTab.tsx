@@ -169,6 +169,8 @@ export function ExecutionTab({
               onReopen={onReopen}
               onViewLog={openTaskById}
               onCancel={onStop}
+              request={request}
+              onChanged={onChanged}
             />
           )}
           {hasRun && (

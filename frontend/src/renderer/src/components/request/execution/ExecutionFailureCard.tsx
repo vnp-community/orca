@@ -34,18 +34,22 @@ type Props = {
   onCancel: () => void
   /** The Request this card is about, for "Change starting branch"; the open Request of the page when absent. */
   request?: OrcaRequest
+  /** Called after the starting branch changed, so the pane refetches the Request. */
+  onChanged?: () => void
 }
 
 /** Offered when the starting branch is gone and no worktree exists yet, so choosing another one can still fix the run. */
 function ChangeStartingBranch({
   request,
-  busy
+  busy,
+  onChanged
 }: {
   request: OrcaRequest
   busy: boolean
+  onChanged?: () => void
 }): React.JSX.Element | null {
   const current = useFreshestRequest(request)
-  const { state, save, applyConflict, dismiss } = useRequestBaseRefSave(current)
+  const { state, save, applyConflict, dismiss } = useRequestBaseRefSave(current, onChanged)
   if (current.baseRefLocked === true || state.forbidden) {
     return null
   }
@@ -82,7 +86,8 @@ export function ExecutionFailureCard({
   onReopen,
   onViewLog,
   onCancel,
-  request
+  request,
+  onChanged
 }: Props): React.JSX.Element {
   const error = shortError(failed.lastError)
   const supported = useAppStore(supportsBaseRef)
@@ -138,7 +143,7 @@ export function ExecutionFailureCard({
           {translate(`${T}log`, 'View last log')}
         </Button>
         {failed.lastCause === 'base_ref_not_found' && supported && baseRefRequest && (
-          <ChangeStartingBranch request={baseRefRequest} busy={busy} />
+          <ChangeStartingBranch request={baseRefRequest} busy={busy} onChanged={onChanged} />
         )}
         <Button
           size="sm"

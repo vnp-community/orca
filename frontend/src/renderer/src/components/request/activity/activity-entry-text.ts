@@ -75,6 +75,8 @@ export function activityFailureCauseLabel(cause: string): string {
       return translate(`${T}cause.needsInfo`, 'Needed more information')
     case 'cancelled':
       return translate(`${T}cause.cancelled`, 'Cancelled')
+    case 'base_ref_not_found':
+      return translate(`${T}cause.baseRefNotFound`, 'Starting branch not found')
     case 'unknown':
       return translate(`${T}cause.unknown`, 'Unknown cause')
     default:
@@ -108,6 +110,9 @@ export function activityTitle(entry: RequestActivityEntry): string {
           )
         : translate(`${T}title.analysisGenerated`, '{{kind}} generated', { kind })
     }
+    // Why: the reviewer's text is never in the line (CONTRACT C9); it is read from the version it produced.
+    case 'analysis.revision_requested':
+      return translate(`${T}title.analysisRevisionRequested`, 'Requested changes to the analysis')
     case 'clarification.asked':
       return translate(`${T}title.clarificationAsked`, 'Clarification asked')
     case 'clarification.answered':

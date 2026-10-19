@@ -14,6 +14,7 @@ import {
   CircleCheck,
   CirclePlay,
   CircleX,
+  FilePenLine,
   FilePlus2,
   FileText,
   Flag,
@@ -52,6 +53,7 @@ export const ACTIVITY_GROUP_KINDS: Record<Exclude<ActivityKindGroup, 'all'>, rea
     'request.classified',
     'request.type_changed',
     'analysis.generated',
+    'analysis.revision_requested',
     'request.returned',
     'request.reopened',
     'request.cancelled'
@@ -67,6 +69,7 @@ const KIND_FACTS: Record<string, KindFacts> = {
   'request.classified': { icon: Sparkles },
   'request.type_changed': { icon: ArrowLeftRight },
   'analysis.generated': { icon: FileText },
+  'analysis.revision_requested': { icon: FilePenLine },
   'clarification.asked': { icon: MessageCircleQuestion },
   'clarification.answered': { icon: MessageSquareReply },
   'approval.requested': { icon: ShieldQuestion },
@@ -186,7 +189,7 @@ export function activityTargetTab(
       ? 'analysis'
       : null
   }
-  if (kind === 'analysis.generated') {
+  if (kind === 'analysis.generated' || kind === 'analysis.revision_requested') {
     return 'analysis'
   }
   if (kind.startsWith('clarification.')) {

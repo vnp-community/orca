@@ -17,6 +17,7 @@ import { useAppStore } from '@/store'
 import { useRequest } from '../../hooks/useRequest'
 import { useRequestActions } from '../../hooks/useRequestActions'
 import { useRequestPostAnswerRefresh } from '../../hooks/useRequestPostAnswerRefresh'
+import { useRequestRefreshOnReturn } from '../../hooks/useRequestRefreshOnReturn'
 import { useRequestSubscription } from '../../hooks/useRequestSubscription'
 import { useRequestFlow } from '../../hooks/useRequestFlow'
 import { useExecutionSummary } from '../../hooks/useExecutionSummary'
@@ -96,6 +97,8 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
   }, [])
 
   useRequestSubscription({ requestId, onEvent: refetch })
+  // Why: no gateway event announces a changed starting branch, so coming back to the window is the refresh point.
+  useRequestRefreshOnReturn(refetch)
   const armPostAnswerRefresh = useRequestPostAnswerRefresh(request?.status, refetch)
   const onClarificationAnswered = useCallback(() => {
     refetch()
@@ -282,7 +285,7 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
             <TabsTrigger value="related">{translate(`${T}tab.related`, 'Related')}</TabsTrigger>
           </TabsList>
           <TabsContent value="overview">
-            <RequestOverviewTab request={request} />
+            <RequestOverviewTab request={request} onChanged={refetch} />
           </TabsContent>
           {tabs.analysis && (
             <TabsContent value="analysis">
