@@ -7,7 +7,7 @@ import { callRuntimeRpc } from '../runtime/runtime-rpc-client'
 import type { TaskKGContext, TaskEnrichment } from '../types/task-types'
 
 // Task shape được hỗ trợ bởi hook này
-interface TaskWithKGContext {
+type TaskWithKGContext = {
   id: string
   kg_context?: TaskKGContext
 }
@@ -16,22 +16,22 @@ interface TaskWithKGContext {
 const KG_CACHE_TTL_MS = 5 * 60 * 1000
 
 export function useTaskEnrichment(task: TaskWithKGContext, environmentId?: string) {
-  const {
-    taskEnrichments,
-    setTaskEnrichmentLoading,
-    setTaskEnrichment,
-    setTaskEnrichmentError,
-  } = useAppStore()
+  const { taskEnrichments, setTaskEnrichmentLoading, setTaskEnrichment, setTaskEnrichmentError } =
+    useAppStore()
 
   const entry: TaskEnrichment | undefined = taskEnrichments[task.id]
   const kgCtx = task.kg_context
 
   useEffect(() => {
     // Skip nếu không có KG refs (backend: CRSID == "" → skip enrichment)
-    if (kgCtx?.crs_id == null && kgCtx?.feature_ref == null) return
+    if (kgCtx?.crs_id == null && kgCtx?.feature_ref == null) {
+      return
+    }
 
     // Cache: skip nếu đã fetch < 5 phút
-    if (entry?.fetchedAt != null && Date.now() - entry.fetchedAt < KG_CACHE_TTL_MS) return
+    if (entry?.fetchedAt != null && Date.now() - entry.fetchedAt < KG_CACHE_TTL_MS) {
+      return
+    }
 
     const target =
       environmentId != null
@@ -46,15 +46,15 @@ export function useTaskEnrichment(task: TaskWithKGContext, environmentId?: strin
       kgCtx?.crs_id != null
         ? callRuntimeRpc(target, 'agent.tool_call', {
             tool: 'pis_query_crs',
-            input: { crs_id: kgCtx.crs_id },
+            input: { crs_id: kgCtx.crs_id }
           })
         : Promise.resolve(undefined),
       kgCtx?.feature_ref != null
         ? callRuntimeRpc(target, 'agent.tool_call', {
             tool: 'pis_query_feature_context',
-            input: { feature_id: kgCtx.feature_ref },
+            input: { feature_id: kgCtx.feature_ref }
           })
-        : Promise.resolve(undefined),
+        : Promise.resolve(undefined)
     ])
       .then(([crsResult, featureResult]) => {
         // Best-effort: luôn gọi setTaskEnrichment dù có failure
