@@ -8,9 +8,10 @@ CI has no Claude account, so `run_acceptance.py --ai-stub` puts this script wher
   claude --help
   claude auth status --json                         loggedIn follows FAKE_CLAUDE_LOGGED_IN (exit 1 when false, like the real CLI)
   claude -p --output-format json --tools "" [--no-session-persistence] --system-prompt <text> [--model <m>]   prompt on stdin (ai.complete)
-  claude --print <prompt> [--output-format stream-json --verbose] [--permission-mode plan --tools Read,Glob,Grep]
-                                                    prompt in argv (agent.execPrompt, read-only analysis); stdout is plain text, or with
-                                                    stream-json one JSON event per line (system init, assistant text, result), like the real CLI
+  claude --print [--output-format stream-json --verbose] [--permission-mode plan --tools Read,Glob,Grep]
+                                                    prompt on stdin (agent.execPrompt, read-only analysis; since CR-REQ-042). The old form
+                                                    `claude --print <prompt> ...` (ORCA_AGENT_PROMPT_VIA_ARGV=1) is still accepted. stdout is plain
+                                                    text, or with stream-json one JSON event per line (system init, assistant text, result), like the real CLI
 
 Answers are keyed on the prompts the real request-service builds (classification, Solution, Plan, and the read-only
 diagnosis / findings / answer analyses) and are written to pass the real parsers and validators (ParseClassificationProposal,
@@ -363,13 +364,15 @@ def run_print_arg(argv):
     """agent.execPrompt: `claude --print <prompt> [flags]`, cwd is the project's repo. Plain text on stdout (no JSON envelope), or
     one JSON event per line with `--output-format stream-json --verbose`."""
     i = argv.index("--print")
-    prompt = argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith("--") else ""
+    in_argv = i + 1 < len(argv) and not argv[i + 1].startswith("--")
+    # Since CR-REQ-042 the agent sends the prompt on stdin; the argv form stays for the rollback switch.
+    prompt = argv[i + 1] if in_argv else sys.stdin.read()
     tools = flag_value(argv, "--tools")
     mode = flag_value(argv, "--permission-mode")
     output_format = flag_value(argv, "--output-format") or "text"
     verbose = "--verbose" in argv
     kind = prompt_kind(prompt)
-    record("print", argv, len(prompt.encode("utf-8")), {"mode": "arg", "tools": tools, "permissionMode": mode, "promptKind": kind,
+    record("print", argv, 0 if in_argv else len(prompt.encode("utf-8")), {"mode": "arg" if in_argv else "print-stdin", "tools": tools, "permissionMode": mode, "promptKind": kind,
                                                          "outputFormat": output_format, "verbose": verbose,
                                                          "prompt": prompt[:6000]})  # test fixture only: lets a failing run be diagnosed
     if output_format not in ("text", "stream-json"):

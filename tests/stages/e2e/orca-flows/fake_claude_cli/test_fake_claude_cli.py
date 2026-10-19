@@ -61,6 +61,15 @@ class FakeClaudeCli(unittest.TestCase):
         self.assertEqual(call["cwdEntries"], [])
         self.assertEqual(call["argv"], argv)
 
+    def test_print_reads_the_prompt_from_stdin_and_still_accepts_it_in_argv(self):
+        flags = ["--output-format", "stream-json", "--verbose", "--permission-mode", "plan", "--tools", "Read,Glob,Grep"]
+        prompt = "You analyse a repository in READ-ONLY mode.\nsomething the stub does not know\n"
+        _, calls, _ = run_stub(["--print"] + flags, stdin=prompt)
+        self.assertEqual((calls[0]["mode"], calls[0]["stdinBytes"]), ("print-stdin", len(prompt.encode())))
+        self.assertEqual(calls[0]["argv"], ["--print"] + flags)
+        _, calls, _ = run_stub(["--print", prompt] + flags)
+        self.assertEqual((calls[0]["mode"], calls[0]["stdinBytes"]), ("arg", 0))
+
     def test_print_without_tools_disabled_is_refused(self):
         done, _, _ = run_stub(["-p", "--output-format", "json"], stdin=CLASSIFY_PROMPT)
         self.assertEqual(done.returncode, 1)

@@ -37,19 +37,21 @@ READONLY_PRINT_FLAGS = ["--output-format", "stream-json", "--verbose", "--permis
 
 def _check_readonly_analysis_call(c: dict, repo: str, stack_env: dict) -> None:
     argv = c["argv"]
-    assert argv[0] == "--print" and len(argv) > 1 and not argv[1].startswith("--"), f"read-only analysis argv does not start with `--print <prompt>`: {argv[:2]!r}"
+    # CR-REQ-042: the prompt travels on stdin, so argv is `--print` followed by flags only (nothing the prompt could leak through ps).
+    assert argv[0] == "--print" and (len(argv) == 1 or argv[1].startswith("--")), f"read-only analysis argv carries the prompt: {argv[:2]!r}"
+    assert c["mode"] == "print-stdin" and c["stdinBytes"] > 0, f"read-only analysis prompt was not delivered on stdin: mode={c['mode']!r}, stdinBytes={c['stdinBytes']!r}"
     assert c["promptKind"].startswith("readonly:"), f"a `--print` call carried a {c['promptKind']!r} prompt; only read-only analyses may use the repo-wide form"
     assert c["permissionMode"] == "plan", f"read-only analysis ran with --permission-mode {c['permissionMode']!r}, expected 'plan'"
     tools = set(t for t in (c["tools"] or "").split(",") if t)
     assert tools and tools <= READONLY_TOOLS, f"read-only analysis was given tools {sorted(tools)!r}; only {sorted(READONLY_TOOLS)} may be allowed"
     # Exact form: the activity stream (stream-json needs --verbose) first, then the read-only guard. An extra or reordered flag is a change to review.
-    assert argv[2:] == READONLY_PRINT_FLAGS, f"read-only analysis flags are {argv[2:]!r}, expected exactly {READONLY_PRINT_FLAGS!r}"
+    assert argv[1:] == READONLY_PRINT_FLAGS, f"read-only analysis flags are {argv[1:]!r}, expected exactly {READONLY_PRINT_FLAGS!r}"
     assert (c["outputFormat"], c["verbose"]) == ("stream-json", True), f"read-only analysis did not use the activity stream: {c['outputFormat']!r}, verbose={c['verbose']!r}"
-    flags = [a for a in argv[2:] if a.startswith("--")]
+    flags = [a for a in argv[1:] if a.startswith("--")]
     forbidden = [f for f in flags if f in ("--dangerously-skip-permissions", "--allow-dangerously-skip-permissions", "--allowedTools", "--allowed-tools")]
     assert not forbidden, f"read-only analysis passed {forbidden!r}"
     assert os.path.realpath(c["cwd"]) == repo, f"read-only analysis ran in {c['cwd']!r}, expected the project's repository {repo!r}"
-    text = "\n".join(argv)
+    text = "\n".join(argv) + "\n" + (c.get("prompt") or "")
     for shape in SECRET_SHAPES:
         assert not shape.search(text), "the read-only prompt contains something shaped like a credential"
     for key, value in stack_env.items():
@@ -110,7 +112,7 @@ def run_after_logged_in_suites(ctx: AcceptanceContext) -> None:
     def readonly_analysis_reached_the_stub():
         if not ctx.state.get("readonly_analysis_ran"):
             raise Blocked("the 'analysis' suite did not run (or was skipped), so no read-only analysis was exercised")
-        kinds = {c["promptKind"] for c in _stub(ctx).calls() if c["kind"] == "print" and c["mode"] == "arg"}
+        kinds = {c["promptKind"] for c in _stub(ctx).calls() if c["kind"] == "print" and c["mode"] in ("arg", "print-stdin")}
         want = {"readonly:" + k for k in ctx.state.get("readonly_analysis_kinds", set())}
         assert want <= kinds, f"read-only analyses of kinds {sorted(want)} passed the e2e checks but the stub saw {sorted(kinds)}: the answers came from somewhere else"
     rec.run("AST-06", "Read-only analyses (diagnosis, findings, answer) were answered by the stub through `claude --print`", readonly_analysis_reached_the_stub)

@@ -59,6 +59,8 @@ def run(ctx: AcceptanceContext) -> None:
         ctx.state["project_id"] = proj["id"]
         ctx.state["repo_path"] = repo["path"]
         ctx.on_cleanup(f"delete project {proj['id']}", lambda: ws.call("project.delete", {"projectId": proj["id"]}))
+        if ctx.state.get("ai_stub"):
+            _native_without_knowledge_hub(ws, proj["id"])
     rec.run("DEV-04", "Project can be created on the dev server (validates repo path via the agent)", project_with_dev_server)
 
     def rejects_missing_path():
@@ -99,3 +101,13 @@ def run(ctx: AcceptanceContext) -> None:
             ctx.on_cleanup(f"delete project {proj['id']}", lambda: ws.call("project.delete", {"projectId": proj["id"]}))
         except RpcError:
             pass
+
+
+def _native_without_knowledge_hub(ws, project_id: str) -> None:
+    """The fake claude cannot load a knowledge hub (MCP), and the deployment default is OpenSpec plus an agent-written Solution, which need one.
+    Under --ai-stub the test project runs the native engine with the plain Solution, as the real-AI runs of a throwaway repo do."""
+    cur = ws.call("request.engineSettings", {"projectId": project_id})
+    ws.call("request.engineSettingsSet", {
+        "projectId": project_id, "engine": "native", "openspecMinVersion": cur.get("openspecMinVersion", "") or "",
+        "solutionAgent": False, "executionMode": cur.get("executionMode", "") or "", "expectedVersion": cur.get("version", 0) or 0,
+    })
