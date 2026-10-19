@@ -31,9 +31,24 @@ func (s *sweepCounter) sweeps() int {
 	return s.sweep
 }
 
+// unusedApprovalStores stands in for the approval stores, which this wiring test never queries.
+type unusedApprovalStores struct {
+	usecase.ApprovalRepository
+	usecase.ApprovalApproverRepository
+}
+
+func TestWireSolution_FailsWithoutApprovalStores(t *testing.T) {
+	var wg sync.WaitGroup
+	stores := &requestStores{analysisRuns: &sweepCounter{}}
+	life := &requestLifecycle{Return: &usecase.ReturnRequestToBacklog{}}
+	if _, err := wireSolution(context.Background(), &wg, config.Config{}, slog.Default(), stores, life, &approvalDirectories{}); err == nil {
+		t.Fatal("startup must fail when the solution authorizer has no approval repository")
+	}
+}
+
 func TestWireSolution_RegistersRealHandlersAndStartsTheSweeper(t *testing.T) {
 	runs := &sweepCounter{}
-	stores := &requestStores{analysisRuns: runs}
+	stores := &requestStores{analysisRuns: runs, approvals: unusedApprovalStores{}, approvers: unusedApprovalStores{}}
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg := config.Config{AnalysisRecoveryInterval: 20 * time.Millisecond, AgentReadonlyUseAgentFlag: true}

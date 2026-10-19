@@ -142,9 +142,11 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	w.conns, w.completer, w.projects, w.settings, w.owner = conns, completer, projects, settings, owner
 	w.agent, w.caps, w.infra, w.proj, w.git = agent, caps, infraC, projectC, gitC
 
-	// Reporter and admins steer analysis; whoever the pending approval's snapshot lets decide may also choose the option.
-	auth := usecase.ApproverAwareAuthorizer{
-		Approvals: stores.approvals, Decider: &usecase.AuthorizeApprovalDecision{ApproverRepo: stores.approvers, Teams: dirs.teams},
+	// Reporter and admins steer analysis; whoever the pending approval's snapshot lets decide may also choose the option
+	// and ask for a revision (never start the first analysis).
+	auth, err := usecase.NewApproverAwareAuthorizer(stores.approvals, &usecase.AuthorizeApprovalDecision{ApproverRepo: stores.approvers, Teams: dirs.teams})
+	if err != nil {
+		return nil, err
 	}
 	w.generate = usecase.NewGenerateSolution(usecase.GenerateSolutionDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Runs: stores.analysisRuns, Conns: conns, Auth: auth, Approvals: lifecycle.Canceller,

@@ -299,7 +299,7 @@ func (uc *GenerateSolution) prepare(ctx context.Context, in GenerateSolutionInpu
 		return domain.Request{}, "", "", err
 	}
 	if !system {
-		if err := uc.auth.AuthorizeGenerate(ctx, req); err != nil {
+		if err := uc.authorizeCaller(ctx, req, in.Feedback); err != nil {
 			return domain.Request{}, "", "", err
 		}
 	}
@@ -319,6 +319,16 @@ func (uc *GenerateSolution) prepare(ctx context.Context, in GenerateSolutionInpu
 		return domain.Request{}, "", "", err
 	}
 	return req, kind, mode, nil
+}
+
+// authorizeCaller picks the revision rule only for a revision (feedback on a pending gate): approvers may refine what they
+// are about to decide, but never start the first analysis. It runs before the transaction that cancels the pending
+// Approval, after which the caller would no longer be its approver.
+func (uc *GenerateSolution) authorizeCaller(ctx context.Context, req domain.Request, feedback string) error {
+	if req.Status == domain.RequestStatusAwaitingAnalysisApproval && feedback != "" {
+		return uc.auth.AuthorizeRevise(ctx, req)
+	}
+	return uc.auth.AuthorizeGenerate(ctx, req)
 }
 
 // checkAnalysisState allows analyzing, or awaiting_analysis_approval with feedback (the regenerate path).

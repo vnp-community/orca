@@ -280,6 +280,7 @@ type allowAll struct{}
 
 func (allowAll) AuthorizeGenerate(context.Context, domain.Request) error { return nil }
 func (allowAll) AuthorizeChoose(context.Context, domain.Request) error   { return nil }
+func (allowAll) AuthorizeRevise(context.Context, domain.Request) error   { return nil }
 
 type fakeConns struct {
 	conn AnalysisConnection

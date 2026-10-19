@@ -163,9 +163,12 @@ type AnalysisSpawner interface {
 }
 
 // SolutionActorAuthorizer decides who may steer analysis of a request (D6 is provisional: reporter or admin).
+// AuthorizeRevise covers asking for changes while the Analysis gate is pending; implementations may let the gate's
+// approvers in, unlike AuthorizeGenerate, which starts the first analysis.
 type SolutionActorAuthorizer interface {
 	AuthorizeGenerate(ctx context.Context, req domain.Request) error
 	AuthorizeChoose(ctx context.Context, req domain.Request) error
+	AuthorizeRevise(ctx context.Context, req domain.Request) error
 }
 
 type OpenSolutionApprovalInput struct {

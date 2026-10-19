@@ -42,7 +42,7 @@ func ErrSolutionOptionNotChosen() error {
 }
 
 func ErrSolutionForbidden() error {
-	return apperrors.New(apperrors.KindPermissionDenied, "REQUEST_SOLUTION_FORBIDDEN", "only the reporter or an administrator may run or steer analysis", nil)
+	return apperrors.New(apperrors.KindPermissionDenied, "REQUEST_SOLUTION_FORBIDDEN", "only the reporter, an administrator or an approver of the pending decision may run or steer analysis", nil)
 }
 
 func ErrSolutionFeedbackTooLong() error {

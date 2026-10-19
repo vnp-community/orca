@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
@@ -21,6 +23,11 @@ func (ReporterOrAdminAuthorizer) AuthorizeChoose(ctx context.Context, req domain
 	return reporterOrAdmin(ctx, req)
 }
 
+// AuthorizeRevise has no approver rule here; ApproverAwareAuthorizer widens it.
+func (ReporterOrAdminAuthorizer) AuthorizeRevise(ctx context.Context, req domain.Request) error {
+	return reporterOrAdmin(ctx, req)
+}
+
 func reporterOrAdmin(ctx context.Context, req domain.Request) error {
 	if uid, _ := tenant.UserID(ctx); uid != "" && uid == req.ReporterID {
 		return nil
@@ -31,9 +38,14 @@ func reporterOrAdmin(ctx context.Context, req domain.Request) error {
 	return domain.ErrSolutionForbidden()
 }
 
-// ApproverAwareAuthorizer lets the people who may decide the pending approval steer it too: choosing an option is
-// part of deciding. Generating stays with the reporter and admins. The decision check is the engine's own
-// (AuthorizeApprovalDecision), so team and role approvers count exactly as they do at Approve time.
+// analysisGateSubjects are the Approval kinds the Analysis gate opens, one per flow: solution, findings (spike) and
+// answer (question). Revising must accept any of them, not only solution.
+var analysisGateSubjects = []domain.SubjectType{domain.SubjectSolution, domain.SubjectFindings, domain.SubjectAnswer}
+
+// ApproverAwareAuthorizer lets the people who may decide the pending approval steer it too: choosing an option or
+// asking for a revision is part of deciding. Starting the first analysis stays with the reporter and admins. The
+// decision check is the engine's own (AuthorizeApprovalDecision), so user, team and role approvers count exactly as they
+// do at Approve time.
 type ApproverAwareAuthorizer struct {
 	Base      ReporterOrAdminAuthorizer
 	Approvals ApprovalRepository
@@ -42,12 +54,32 @@ type ApproverAwareAuthorizer struct {
 
 var _ SolutionActorAuthorizer = ApproverAwareAuthorizer{}
 
+// NewApproverAwareAuthorizer refuses to build without its approval lookups: a nil one would panic on the first
+// revision by a non-reporter, so startup fails instead.
+func NewApproverAwareAuthorizer(approvals ApprovalRepository, decider ApprovalAuthorizer) (ApproverAwareAuthorizer, error) {
+	if approvals == nil || decider == nil {
+		return ApproverAwareAuthorizer{}, errors.New("approver-aware solution authorizer needs the approval repository and the decision authorizer")
+	}
+	return ApproverAwareAuthorizer{Approvals: approvals, Decider: decider}, nil
+}
+
 func (a ApproverAwareAuthorizer) AuthorizeGenerate(ctx context.Context, req domain.Request) error {
 	return a.Base.AuthorizeGenerate(ctx, req)
 }
 
 func (a ApproverAwareAuthorizer) AuthorizeChoose(ctx context.Context, req domain.Request) error {
-	baseErr := a.Base.AuthorizeChoose(ctx, req)
+	return a.orPendingApprover(ctx, req, a.Base.AuthorizeChoose(ctx, req), domain.SubjectSolution)
+}
+
+// AuthorizeRevise must run before the revision cancels the pending Approval: once it is cancelled the caller no longer
+// counts as its approver.
+func (a ApproverAwareAuthorizer) AuthorizeRevise(ctx context.Context, req domain.Request) error {
+	return a.orPendingApprover(ctx, req, a.Base.AuthorizeRevise(ctx, req), analysisGateSubjects...)
+}
+
+// orPendingApprover passes when the base rule did, or when the caller may decide a pending Approval of one of the
+// subjects. A failed lookup is returned as is: an outage must not read as "not allowed".
+func (a ApproverAwareAuthorizer) orPendingApprover(ctx context.Context, req domain.Request, baseErr error, subjects ...domain.SubjectType) error {
 	if baseErr == nil {
 		return nil
 	}
@@ -55,14 +87,27 @@ func (a ApproverAwareAuthorizer) AuthorizeChoose(ctx context.Context, req domain
 	if err != nil {
 		return domain.ErrRequestTenantRequired()
 	}
-	pending, _, err := a.Approvals.List(ctx, tenantID, ApprovalListFilter{RequestID: req.ID, SubjectType: domain.SubjectSolution, Status: domain.ApprovalStatusPending, PageSize: 5})
-	if err != nil {
-		return err
-	}
-	for _, ap := range pending {
-		if a.Decider.CanDecide(ctx, req, ap) == nil {
-			return nil
+	for _, subject := range subjects {
+		pending, _, err := a.Approvals.List(ctx, tenantID, ApprovalListFilter{RequestID: req.ID, SubjectType: subject, Status: domain.ApprovalStatusPending, PageSize: 5})
+		if err != nil {
+			return err
+		}
+		for _, ap := range pending {
+			decideErr := a.Decider.CanDecide(ctx, req, ap)
+			if decideErr == nil {
+				return nil
+			}
+			if !isApproverRefusal(decideErr) {
+				return decideErr
+			}
 		}
 	}
 	return baseErr
+}
+
+// isApproverRefusal tells "this caller may not decide" (permission denied or no signed-in user) from a failure of the
+// check itself (directory or database outage), which the caller must see as such.
+func isApproverRefusal(err error) bool {
+	var ae *apperrors.AppError
+	return errors.As(err, &ae) && (ae.Kind == apperrors.KindPermissionDenied || ae.Kind == apperrors.KindUnauthenticated)
 }

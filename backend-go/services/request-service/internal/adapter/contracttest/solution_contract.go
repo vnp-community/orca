@@ -1341,9 +1341,18 @@ func solApproverCanChoose(t *testing.T, env SolutionEnv) {
 	if err != nil || res.GetSolution().GetChosenOption() != 1 {
 		t.Fatalf("approver choose: %+v %v", res, err)
 	}
-	// Generating is not opened to approvers: only the reporter and admins may start or regenerate.
-	_, err = k.client.GenerateSolution(rpcAs(k.tenantID, approver), &requestv1.GenerateSolutionRequest{RequestId: r.ID, Feedback: "again"})
+	// Starting or re-running an analysis stays with the reporter and admins: an approver without feedback is refused.
+	_, err = k.client.GenerateSolution(rpcAs(k.tenantID, approver), &requestv1.GenerateSolutionRequest{RequestId: r.ID})
 	wantStatus(t, err, codes.PermissionDenied, "REQUEST_SOLUTION_FORBIDDEN")
+	// CR-REQ-041: the approver of the pending decision may ask for changes (feedback while awaiting approval); a stranger may not.
+	_, err = k.client.GenerateSolution(rpcAs(k.tenantID, stranger), &requestv1.GenerateSolutionRequest{RequestId: r.ID, Feedback: "again"})
+	wantStatus(t, err, codes.PermissionDenied, "REQUEST_SOLUTION_FORBIDDEN")
+	k.completer.replies = []string{validSolutionDoc(t)}
+	rev, err := k.client.GenerateSolution(rpcAs(k.tenantID, approver), &requestv1.GenerateSolutionRequest{RequestId: r.ID, Feedback: "again"})
+	if err != nil {
+		t.Fatalf("approver revise: %v", err)
+	}
+	k.waitRun(t, rev.GetRunId())
 }
 
 // solSubjectHandlerContract runs the approval engine's shared handler contract on the three handlers with real stores.
