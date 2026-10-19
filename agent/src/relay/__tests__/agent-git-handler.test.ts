@@ -10,7 +10,7 @@ import {
   handleGitWorktreeAdd,
   handleGitWorktreeRemove
 } from '../agent-git-worktree-handler'
-import { handleGitBaseRefDefault, handleGitSearchRefs } from '../agent-git-base-ref-handler'
+import { handleGitSearchRefs } from '../agent-git-base-ref-handler'
 import { setConnectionGitIdentity } from '../git-identity-registry'
 import { registerTraceSink, type TraceEvent } from '../../shared/trace'
 import type { AgentConfig } from '../agent-config'
@@ -247,76 +247,7 @@ describe('handleGitWorktreeList', () => {
   })
 })
 
-// ─── handleGitBaseRefDefault / handleGitSearchRefs — backfilled gap
-// (RelayExecutor.BaseRefDefault/SearchRefs have always called these method
-// names; the agent never had a handler for either — see agent-git-handler.ts's
-// doc comment on these two handlers) ──────────────────────────────────────────
-describe('handleGitBaseRefDefault', () => {
-  let repoDir: string
-
-  beforeEach(() => {
-    repoDir = mkdtempSync(join(tmpdir(), 'base-ref-default-test-'))
-    execSync('git init -q', { cwd: repoDir })
-    // No real remote needed to exercise this — refs/remotes/origin/HEAD is
-    // just a ref, settable directly, matching what a real `git clone` leaves
-    // behind without this test needing a live remote to fetch from.
-    execSync('git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main', { cwd: repoDir })
-  })
-
-  afterEach(() => {
-    rmSync(repoDir, { recursive: true, force: true })
-  })
-
-  it('resolves the short branch name from refs/remotes/origin/HEAD', async () => {
-    const resp = (await handleGitBaseRefDefault(
-      1,
-      { repoPath: repoDir },
-      mockConfig,
-      mockLog
-    )) as GitHandlerTestResponse
-    expect(resp.result?.ref).toBe('main')
-  })
-
-  it('falls back to the local HEAD branch when there is no remote at all (no crash)', async () => {
-    // A repo with no origin/HEAD ref AND no remote configured — e.g. a bare
-    // `git init` with nothing pushed anywhere yet. `git symbolic-ref HEAD`
-    // still resolves (it only depends on local HEAD, not a remote), so this
-    // succeeds with the branch `git init` set up rather than erroring for a
-    // repo that legitimately has no commits/remote yet.
-    const bareDir = mkdtempSync(join(tmpdir(), 'base-ref-default-bare-'))
-    execSync('git init -q -b main', { cwd: bareDir })
-    try {
-      const resp = (await handleGitBaseRefDefault(
-        1,
-        { repoPath: bareDir },
-        mockConfig,
-        mockLog
-      )) as GitHandlerTestResponse
-      expect(resp.error).toBeUndefined()
-      expect(resp.result!.ref).toBe('main')
-    } finally {
-      rmSync(bareDir, { recursive: true, force: true })
-    }
-  })
-
-  it('returns an error when there is no ref anywhere, not even a local HEAD', async () => {
-    // Not a git repo at all (no .git dir) — every fallback tier fails, so
-    // the original symbolic-ref error must still surface rather than crash.
-    const notARepoDir = mkdtempSync(join(tmpdir(), 'base-ref-default-not-a-repo-'))
-    try {
-      const resp = (await handleGitBaseRefDefault(
-        1,
-        { repoPath: notARepoDir },
-        mockConfig,
-        mockLog
-      )) as GitHandlerTestResponse
-      expect(resp.error).toBeDefined()
-    } finally {
-      rmSync(notARepoDir, { recursive: true, force: true })
-    }
-  })
-})
-
+// ─── handleGitSearchRefs (git.baseRefDefault is covered by agent-git-base-ref-handler.test.ts) ──
 describe('handleGitSearchRefs', () => {
   let repoDir: string
 
