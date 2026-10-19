@@ -9,3 +9,5 @@
 /agent/src/relay/__fixtures__/agent-capabilities-golden.json text eol=lf
 /backend-go/services/**/testdata/agent_capabilities_v1.golden.json text eol=lf
 /backend-go/services/**/testdata/prompt-golden/**/*.txt text eol=lf
+# This golden pins a literal carriage return in the prompt; eol=lf would rewrite it on commit.
+/backend-go/services/request-service/internal/usecase/testdata/prompt-golden/BuildOpenSpecSolutionPrompt/control_chars_stripped.txt -text
