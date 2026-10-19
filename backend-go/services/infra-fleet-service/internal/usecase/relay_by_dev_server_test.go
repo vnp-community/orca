@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
@@ -36,7 +35,7 @@ func TestRelayByDevServer_RequiresMethod(t *testing.T) {
 
 func TestRelayByDevServer_DevServerNotFound(t *testing.T) {
 	repo := &fakeDevServerRepository{}
-	repo.getErr = errors.New("not found")
+	repo.getErr = domain.ErrDevServerNotFound
 	uc := NewRelayByDevServer(repo, &fakeDevServerAgentClient{})
 	ctx := withTenant(context.Background(), "tenant-1")
 

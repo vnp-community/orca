@@ -44,3 +44,15 @@ func TestOutcome_CompletesContainer(t *testing.T) {
 		}
 	}
 }
+
+func TestCauseOf_ARunLostToTransportTroubleIsADispatchError(t *testing.T) {
+	if got := CauseOf(OutcomeFailed, "execution_failed", "execution failed: retryable RELAY_UNAVAILABLE: relay agent.execPrompt: unavailable"); got != CauseDispatchError {
+		t.Fatalf("got %q", got)
+	}
+	if got := CauseOf(OutcomeFailed, "execution_failed", "execution failed: agent_defect VERIFY_NOT_PASSED"); got != "execution_failed" {
+		t.Fatalf("a failure about the task keeps its cause: %q", got)
+	}
+	if got := CauseOf(OutcomeSucceeded, "execution_completed", "RELAY_UNAVAILABLE"); got != "execution_completed" {
+		t.Fatalf("only a failed outcome is reclassified: %q", got)
+	}
+}

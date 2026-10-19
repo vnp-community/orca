@@ -34,6 +34,9 @@ func (r *Repository) GetSubtree(ctx context.Context, tenantID, rootID string, ma
 		SELECT `+taskColumns+` FROM subtree ORDER BY depth
 	`, tenantID, rootID, maxDepth)
 	if err != nil {
+		if isMalformedUUID(err) {
+			return nil, nil, fmt.Errorf("postgres: task %s while resolving subtree: %w", rootID, domain.ErrTaskNotFound)
+		}
 		return nil, nil, fmt.Errorf("postgres: query subtree: %w", err)
 	}
 	defer rows.Close()
@@ -49,10 +52,13 @@ func (r *Repository) GetSubtree(ctx context.Context, tenantID, rootID string, ma
 		ids = append(ids, t.ID)
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, nil, fmt.Errorf("postgres: task %s while resolving subtree: %w", rootID, domain.ErrTaskNotFound)
+		}
 		return nil, nil, fmt.Errorf("postgres: iterate subtree rows: %w", err)
 	}
 	if len(tasks) == 0 {
-		return nil, nil, fmt.Errorf("postgres: task %s not found while resolving subtree", rootID)
+		return nil, nil, fmt.Errorf("postgres: task %s while resolving subtree: %w", rootID, domain.ErrTaskNotFound)
 	}
 
 	edgeRows, err := r.db.Query(ctx, `
@@ -97,6 +103,9 @@ func (r *Repository) GetSubtreeWithChildPercents(ctx context.Context, tenantID, 
 		ORDER BY depth DESC
 	`, tenantID, rootID)
 	if err != nil {
+		if isMalformedUUID(err) {
+			return nil, fmt.Errorf("postgres: task %s while recalculating progress: %w", rootID, domain.ErrTaskNotFound)
+		}
 		return nil, fmt.Errorf("postgres: query subtree with child percents: %w", err)
 	}
 	defer rows.Close()
@@ -118,7 +127,13 @@ func (r *Repository) GetSubtreeWithChildPercents(ctx context.Context, tenantID, 
 		}
 		out = append(out, row)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, fmt.Errorf("postgres: task %s while recalculating progress: %w", rootID, domain.ErrTaskNotFound)
+		}
+		return nil, fmt.Errorf("postgres: iterate subtree progress rows: %w", err)
+	}
+	return out, nil
 }
 
 // BatchUpdateProgress persists every (taskID -> progress_percent) pair in

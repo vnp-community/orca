@@ -44,6 +44,11 @@ type TaskClient interface {
 	SetStatus(ctx context.Context, taskID, status string) error
 	// ListExecutionStates batches its ids itself (at most 500 per call).
 	ListExecutionStates(ctx context.Context, taskIDs []string) (map[string]ExecutionStateView, error)
+	// CanExecute reports whether userID may run tasks under taskID (task-service's own grant resolution).
+	CanExecute(ctx context.Context, taskID, userID string) (bool, error)
+	// GrantExecute gives userID the grant level 'user' on taskID and its subtree, written as grantorID, who must
+	// manage the task (its owner); domain.ErrTaskForbidden when task-service refuses.
+	GrantExecute(ctx context.Context, taskID, grantorID, userID string) error
 }
 
 // ExecutionSettings are the REQUEST_* knobs of the execution loop.
@@ -99,6 +104,8 @@ type TaskRunOutcomeRepository interface {
 	DispatchRetrySince(ctx context.Context, taskID string) (since time.Time, ok bool, err error)
 	// LatestDispatchError is the newest dispatch_error outcome of the task, for the backlog reason.
 	LatestDispatchError(ctx context.Context, taskID string) (domain.TaskRunOutcome, bool, error)
+	// ListByRequest returns every outcome of the Request, oldest first, for the execution summary.
+	ListByRequest(ctx context.Context, requestID string) ([]domain.TaskRunOutcome, error)
 }
 
 // RequestCheckRepository is append-only: there is no update or delete path.
@@ -144,4 +151,23 @@ type FollowUpExecutor interface {
 type ExecutionActors interface {
 	// ActorFor returns the Phase's starter when phaseID is set, else the approver of the Plan (or reporter as a last resort).
 	ActorFor(ctx context.Context, req domain.Request, phaseID string) (string, error)
+}
+
+// ContractRun asks task-service for a run that must end in a nonce-fenced result block. The zero value is not a contract run.
+type ContractRun struct {
+	ResultNonce string
+	// UseKnowledgeHub gives the agent the project's knowledge graph; RequirePassingCheck makes a "done" without a passing
+	// check count as a failed attempt.
+	UseKnowledgeHub, RequirePassingCheck bool
+}
+
+// ContractTaskClient is implemented by task clients that can dispatch a contract run; a client that cannot keeps every task
+// on the plain path.
+type ContractTaskClient interface {
+	ExecuteContract(ctx context.Context, taskID, executionRequestID string, run ContractRun) error
+}
+
+// ContractRunPlanner decides how one task of a Request is dispatched. ok=false means the plain run.
+type ContractRunPlanner interface {
+	Plan(ctx context.Context, req domain.Request, task domain.TaskView) (ContractRun, bool)
 }

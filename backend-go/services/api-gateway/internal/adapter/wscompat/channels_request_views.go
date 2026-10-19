@@ -39,6 +39,10 @@ type RequestView struct {
 	CreatedAt            string   `json:"createdAt"`
 	UpdatedAt            string   `json:"updatedAt"`
 	Version              int64    `json:"version"`
+	// Engine is native or openspec, empty when it could not be worked out. ExecutionMode is step_by_step or continuous once the
+	// Request entered executing, empty before (CR-REQ-038).
+	Engine        string `json:"engine,omitempty"`
+	ExecutionMode string `json:"executionMode,omitempty"`
 }
 
 // RequestViewOf converts a Request; nil yields a zero view so callers never panic on a thin fake.
@@ -52,6 +56,7 @@ func RequestViewOf(r *requestv1.Request, withBody bool) RequestView {
 		ReturnedFromStage: r.GetReturnedFromStage(), ReturnCategory: r.GetReturnedCategory(), ReturnReason: r.GetReturnReason(),
 		PlanTaskID: r.GetPlanTaskId(), ReporterID: r.GetReporterId(),
 		CreatedAt: rfc3339(r.GetCreatedAt()), UpdatedAt: rfc3339(r.GetUpdatedAt()), Version: r.GetVersion(),
+		Engine: r.GetEngine(), ExecutionMode: r.GetExecutionMode(),
 	}
 	if r != nil && r.Confidence != nil {
 		c := r.GetConfidence()
@@ -148,6 +153,9 @@ type AnalysisRunView struct {
 	ErrorMessage string `json:"errorMessage,omitempty"`
 	StartedAt    string `json:"startedAt"`
 	FinishedAt   string `json:"finishedAt,omitempty"`
+	// Engine is native or openspec; Stats is set for an agent run that reported anything.
+	Engine string        `json:"engine,omitempty"`
+	Stats  *RunStatsView `json:"stats,omitempty"`
 }
 
 func solutionViews(ss []*requestv1.Solution) []SolutionView {
@@ -165,6 +173,7 @@ func analysisRunViews(rs []*requestv1.AnalysisRun) []AnalysisRunView {
 			ID: r.GetId(), Kind: enumLower(r.GetKind().String(), "SOLUTION_KIND_"), Status: r.GetStatus(),
 			ErrorCode: r.GetErrorCode(), ErrorMessage: r.GetErrorMessage(),
 			StartedAt: rfc3339(r.GetStartedAt()), FinishedAt: rfc3339(r.GetFinishedAt()),
+			Engine: r.GetEngine(), Stats: runStatsView(r.GetStats()),
 		})
 	}
 	return out

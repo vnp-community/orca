@@ -985,9 +985,13 @@ export type PreloadApi = {
   repos: {
     list: () => Promise<Repo[]>
     // Why: error union matches the IPC handler's return shape; renderer callers branch on `'error' in result`.
+    // devServerId: web-only host binding (ignored by Electron); web rejects an add without one.
+    // projectName: web-only; given, the repo goes into a NEW project of that name instead of the host's default project.
     add: (args: {
       path: string
       kind?: 'git' | 'folder'
+      devServerId?: string
+      projectName?: string
     }) => Promise<{ repo: Repo } | { error: string }>
     remove: (args: { repoId: string }) => Promise<void>
     // Forget a project on one execution host only, leaving the same repo id on
@@ -1024,7 +1028,12 @@ export type PreloadApi = {
     pickFolder: () => Promise<string | null>
     pickFolders: () => Promise<string[]>
     pickDirectory: () => Promise<string | null>
-    clone: (args: { url: string; destination: string }) => Promise<Repo>
+    clone: (args: {
+      url: string
+      destination: string
+      devServerId?: string
+      projectName?: string
+    }) => Promise<Repo>
     cloneRemote: (args: { connectionId: string; url: string; destination: string }) => Promise<Repo>
     createRemote: (args: {
       connectionId: string
@@ -1039,12 +1048,15 @@ export type PreloadApi = {
       remotePath: string
       displayName?: string
       kind?: 'git' | 'folder'
+      devServerId?: string
     }) => Promise<{ repo: Repo } | { error: string }>
     // Why: error union matches the IPC handler's return shape; renderer callers branch on `'error' in result`.
     create: (args: {
       parentPath: string
       name: string
       kind: 'git' | 'folder'
+      devServerId?: string
+      projectName?: string
     }) => Promise<{ repo: Repo } | { error: string }>
     isGitAvailable: () => Promise<boolean>
     getDefaultCreateProjectParent: () => Promise<string>
@@ -2350,9 +2362,12 @@ export type PreloadApi = {
      * Used by the web-mode folder picker (RemoteFileBrowser) when the
      * selected host is a Dev Server rather than an Orca runtime environment.
      */
-    browseDir?: (args: { id: string; path: string }) => Promise<{
+    browseDir?: (args: { id: string; path: string; limit?: number; query?: string }) => Promise<{
       resolvedPath: string
       entries: { name: string; isDirectory: boolean; isSymlink: boolean }[]
+      // Set by backends that cap the listing; absent means the full listing.
+      truncated?: boolean
+      totalEntries?: number
     }>
     /** Creates a directory on a connected dev server. */
     mkdir?: (args: { id: string; path: string }) => Promise<{ path: string }>

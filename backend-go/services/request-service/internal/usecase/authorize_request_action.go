@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -40,6 +41,20 @@ type AuthorizeRequestAction struct {
 	roles     ProjectRoleResolver
 	policy    AccessPolicy
 	audit     AccessAuditor
+	// projects and orphans are optional: together they count Requests found with their project gone.
+	projects ProjectExistence
+	orphans  OrphanObserver
+}
+
+// orphanProbeTimeout keeps a slow project-service from delaying the RPC being authorized: the probe only feeds a metric.
+const orphanProbeTimeout = 2 * time.Second
+
+// WithOrphanObserver makes every RPC that targets an existing Request check, best effort, that its project still
+// exists and count it when it does not. It never changes the authorization outcome, and it looks at one Request of
+// the caller's own tenant at a time, so it cannot be used to sweep across tenants.
+func (a *AuthorizeRequestAction) WithOrphanObserver(projects ProjectExistence, o OrphanObserver) *AuthorizeRequestAction {
+	a.projects, a.orphans = projects, o
+	return a
 }
 
 func NewAuthorizeRequestAction(requests RequestReader, approvals ApprovalLocator, roles ProjectRoleResolver, policy AccessPolicy, audit AccessAuditor) *AuthorizeRequestAction {
@@ -139,6 +154,7 @@ func (a *AuthorizeRequestAction) locate(ctx context.Context, e domain.Entry, ten
 			return t, err
 		}
 		t.requestID, projectID, t.reporter = req.ID, req.ProjectID, req.ReporterID == userID
+		a.observeOrphan(ctx, tenantID, req.ProjectID, e.Group)
 	case domain.LocProjectID:
 		projectID = targetID
 		if projectID == "" && e.Group == domain.GroupRead {
@@ -167,6 +183,19 @@ func (a *AuthorizeRequestAction) locate(ctx context.Context, e domain.Entry, ten
 	}
 	t.projectRole = role
 	return t, nil
+}
+
+// observeOrphan counts a Request whose project is gone. An unverifiable project (project-service down or too old to
+// answer) counts as present: a metric must never claim an orphan it did not see.
+func (a *AuthorizeRequestAction) observeOrphan(ctx context.Context, tenantID, projectID string, action domain.Group) {
+	if a.projects == nil || a.orphans == nil || projectID == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, orphanProbeTimeout)
+	defer cancel()
+	if exists, err := a.projects.Exists(ctx, tenantID, projectID); err == nil && !exists {
+		a.orphans.ObserveOrphanRequest(string(action))
+	}
 }
 
 func (a *AuthorizeRequestAction) scopeToMemberProjects(ctx context.Context, tenantID, userID string, isAdmin bool) (context.Context, error) {

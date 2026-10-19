@@ -1,5 +1,13 @@
 # BACKLOG-015: `task.addComment`/`task.listComments` không tồn tại ở bất kỳ tầng nào
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟢 RESOLVED (phần AddComment/ListComments)** · Backlog ship: —
+>
+> `task.addComment` và `task.listComments` đã đăng ký ở `wscompat/channels.go`; usecase `comment.go` và repository Postgres + MySQL có sẵn. Còn dư nhỏ: `task.removeEdge` vẫn chưa tồn tại; UI `TaskComments` cần bỏ phần fallback — chưa xác minh. Sau khi xác nhận, xoá file.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** Phát hiện trong lúc thực thi `docs/crs/v3/flow-task` + `specs/{backend-go,frontend}/bugs/task-v1` (2026-09-08) — `SOL-FE-TASKV1-002/003/008`, `TASK-FE-TASKV1-04/06/08`
 **Priority:** Medium — chặn 1 tính năng UI đã build sẵn (`TaskComments`) nhưng chưa hoạt động thật
 **Blocked on:** Cần thiết kế usecase + RPC mới (bảng `task.task_comments` đã tồn tại ở migration nhưng chết — 0 Go code nào dùng)

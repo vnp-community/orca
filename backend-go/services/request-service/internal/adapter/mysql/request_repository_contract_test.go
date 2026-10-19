@@ -12,3 +12,13 @@ func TestMySQL_RequestRepositoryContract(t *testing.T) {
 	f := newMigratedMySQL(t)
 	contracttest.RunRequestRepositoryContract(t, func(*testing.T) contracttest.Env { return f.contractEnv() })
 }
+
+func TestMySQL_EngineSettingsContract(t *testing.T) {
+	f := newMigratedMySQL(t)
+	contracttest.RunEngineSettingsContract(t, NewProjectEngineSettingsRepository(New(f.db)))
+}
+
+func TestMySQL_OpenSpecChangeContract(t *testing.T) {
+	f := newMigratedMySQL(t)
+	contracttest.RunOpenSpecChangeContract(t, f.contractEnv(), NewOpenSpecChangeRepository(New(f.db)))
+}

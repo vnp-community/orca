@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 )
@@ -27,6 +29,9 @@ func TestRequestChannels_RefusedBeforeTheRPC(t *testing.T) {
 		{"reject without digest", "approval.reject", `{"id":"a1","expectedVersion":2,"comment":"c"}`, testRequestIdentity, "INVALID_ARGUMENT"},
 		{"reject blank comment", "approval.reject", `{"id":"a1","expectedVersion":2,"expectedDigest":"d","comment":"  "}`, testRequestIdentity, "REQUEST_APPROVAL_COMMENT_REQUIRED"},
 		{"flowSet by a member", "request.flowSet", `{"enabled":true}`, testRequestIdentity, "REQUEST_FORBIDDEN"},
+		{"engineSettingsSet by a member", "request.engineSettingsSet", `{"projectId":"p1","engine":"openspec"}`, testRequestIdentity, "REQUEST_FORBIDDEN"},
+		{"engineSettingsSet without a project", "request.engineSettingsSet", `{"engine":"openspec"}`, admin, "INVALID_ARGUMENT"},
+		{"engineSettings without a project", "request.engineSettings", `{}`, testRequestIdentity, "INVALID_ARGUMENT"},
 		{"flowSet without enabled", "request.flowSet", `{}`, admin, "INVALID_ARGUMENT"},
 		{"commit without proposal", "request.generatePlan", `{"id":"r1","mode":"commit"}`, testRequestIdentity, "INVALID_ARGUMENT: proposal required for commit"},
 		{"commit with garbage proposal", "request.generatePlan", `{"id":"r1","mode":"commit","proposal":{"phases":"x"}}`, testRequestIdentity, "INVALID_ARGUMENT"},
@@ -202,4 +207,42 @@ func TestRequestChannelError_Nil(t *testing.T) {
 		t.Fatal("requestClientMissing must see a nil pointer inside an interface")
 	}
 	_ = fmt.Sprint(time.Second)
+}
+
+func TestRequestChannelError_RateLimitCarriesRetryAfter(t *testing.T) {
+	withRetry := func(msg string, d time.Duration) error {
+		st, err := status.New(codes.ResourceExhausted, msg).WithDetails(&errdetails.RetryInfo{RetryDelay: durationpb.New(d)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return st.Err()
+	}
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"coded by the service", withRetry("REQUEST_RATE_LIMITED: write rate", 1500*time.Millisecond), `REQUEST_RATE_LIMITED: write rate {"retryAfterMs":1500}`},
+		{"uncoded", withRetry("slow down", 40*time.Millisecond), `REQUEST_RATE_LIMITED: too many requests {"retryAfterMs":40}`},
+		{"sub-millisecond rounds up", withRetry("REQUEST_RATE_LIMITED: ai rate", 100*time.Microsecond), `REQUEST_RATE_LIMITED: ai rate {"retryAfterMs":1}`},
+		{"no RetryInfo, no trailer", status.Error(codes.ResourceExhausted, "REQUEST_RATE_LIMITED: ai concurrency"), "REQUEST_RATE_LIMITED: ai concurrency"},
+	}
+	for _, c := range cases {
+		if got := requestChannelError(c.err).Error(); got != c.want {
+			t.Errorf("%s: got %q want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// The twelve lifecycle statuses of CR-REQ-003 plus awaiting_information (CR-REQ-028); a status the filter
+// rejects is a status the UI cannot list (awaiting_information was missing once).
+func TestRequestStatusFilterAcceptsEveryLifecycleStatus(t *testing.T) {
+	for _, st := range []string{
+		"new", "classifying", "awaiting_type_confirmation", "awaiting_information", "analyzing", "awaiting_analysis_approval",
+		"planning", "awaiting_plan_approval", "executing", "completed", "request_backlog", "cancelled",
+	} {
+		if err := checkRequestEnum("status", requestStatuses, st); err != nil {
+			t.Errorf("status %q rejected: %v", st, err)
+		}
+	}
 }

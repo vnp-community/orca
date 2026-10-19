@@ -871,6 +871,49 @@ func TestTaskListChannel_Success(t *testing.T) {
 	}
 }
 
+// task.list forwards the optional Plan-tab filters; without them the request
+// stays identical to the old shape so task-service keeps hiding plan/phase.
+func TestTaskListChannel_ForwardsTypeRequestAndParentFilters(t *testing.T) {
+	var got *taskv1.ListTasksRequest
+	fake := &fakeTaskServiceClient{
+		listTasksFunc: func(ctx context.Context, in *taskv1.ListTasksRequest) (*taskv1.ListTasksResponse, error) {
+			got = in
+			return &taskv1.ListTasksResponse{Tasks: []*taskv1.Task{{Id: "pl", TaskType: "plan", RequestId: "req-1"}}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerTaskCRUDChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t"}, "task.list", argsJSON(t, map[string]any{
+		"projectId": "proj-1", "taskTypes": []string{"plan", "phase"}, "requestId": "req-1", "parentId": "pl",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetProjectId() != "proj-1" || got.GetParentId() != "pl" ||
+		strings.Join(got.GetTaskTypes(), ",") != "plan,phase" || strings.Join(got.GetRequestIds(), ",") != "req-1" {
+		t.Errorf("forwarded request = %v", got)
+	}
+	tasks := result.(map[string]any)["tasks"].([]taskView)
+	if tasks[0].RequestID != "req-1" || tasks[0].Type != "plan" {
+		t.Errorf("view = %+v", tasks[0])
+	}
+
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t"}, "task.list", argsJSON(t, map[string]any{"projectId": "proj-1"})); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.GetTaskTypes()) != 0 || len(got.GetRequestIds()) != 0 || got.GetParentId() != "" {
+		t.Errorf("absent filters must stay empty, got %v", got)
+	}
+
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t"}, "task.list", argsJSON(t, map[string]any{"requestIds": []string{"a", "b"}, "requestId": "c"})); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got.GetRequestIds(), ",") != "a,b,c" {
+		t.Errorf("request ids = %v", got.GetRequestIds())
+	}
+}
+
 // TestTaskUpdateChannel_LeavesUnsetFieldsAsNilWrapperValues is task.update's
 // analog of TestAutomationUpdateChannel_LeavesUnsetFieldsAsNilWrapperValues
 // — only a status-only edit should reach UpdateTaskRequest, title must stay

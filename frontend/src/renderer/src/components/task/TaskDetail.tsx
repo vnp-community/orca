@@ -3,6 +3,7 @@ import { useAppStore } from '../../store'
 import { useTask } from '../../hooks/useTask'
 import { useTaskActivity } from '../../hooks/useTaskActivity'
 import { useWorkspace } from '../../context/WorkspaceContext'
+import { openTaskWorktreeInGit } from './open-task-worktree-in-git'
 import { Input } from '../ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select'
@@ -11,10 +12,12 @@ import { TaskPromptEditor } from './TaskPromptEditor'
 import { TaskStatusBadge } from './TaskStatusBadge'
 import { TaskComments } from './TaskComments'
 import { TaskDispatchStatusPanel } from './TaskDispatchStatusPanel'
+import { TaskAgentActivityPanel } from './agent-activity/TaskAgentActivityPanel'
 import { ExecutionEngineBadge } from './ExecutionEngineBadge'
 import { TaskSourceBadge } from './TaskSourceBadge'
 import { AttachWorkflowTemplateAction } from './AttachWorkflowTemplateAction'
 import { TaskGrantModal } from './TaskGrantModal'
+import { TaskDependenciesSection } from './TaskDependenciesSection'
 import { Button } from '../ui/button'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { useTaskPermission } from '../../hooks/useTaskPermission'
@@ -27,6 +30,7 @@ import { ReadinessBadge } from '../request/readiness/ReadinessBadge'
 import { ReadinessReportSheet } from '../request/readiness/ReadinessReportSheet'
 import { isRunBlockedByReadiness } from '../request/readiness/readiness-action-rules'
 import { ExecutionResultPanel } from '../request/execution/ExecutionResultPanel'
+import { hasSavedExecutionOutput } from '../request/execution/execution-saved-output'
 import { useOpenDevServerSettings } from '../request/use-open-dev-server-settings'
 import type { OrcaTask, TaskPriority, TaskStatus } from '../../../../shared/task-types'
 
@@ -44,21 +48,18 @@ const TASK_STATUSES: OrcaTask['status'][] = [
   'cancelled'
 ]
 
-type WorktreeListItem = { id: string; path: string; branch: string }
-
 export function TaskDetail() {
   const activeTaskId = useAppStore((s) => s.activeTaskId)
   const { task, updateTask } = useTask(activeTaskId!)
-  const { project, setCurrentWorktree } = useWorkspace()
-  const setActiveWorkspaceTab = useAppStore((s) => s.setActiveWorkspaceTab)
+  const { project } = useWorkspace()
   const [openingInGit, setOpeningInGit] = useState(false)
   const [localTitle, setLocalTitle] = useState(task?.title ?? '')
   const [activeTab, setActiveTab] = useState<
     'details' | 'subtasks' | 'ai' | 'comments' | 'access' | 'result'
   >('details')
-  // Polling fallback (FE-TASK-003) — no push channel for task activity exists yet, see
-  // useTaskActivity.ts's header comment. `polledTask` reflects status changes (e.g.
-  // 'in_progress' → 'done') without the user needing to F5.
+  // Polling for task status (FE-TASK-003); the agent's live output comes from the push channel
+  // via TaskAgentActivityPanel. `polledTask` reflects status changes (e.g. 'in_progress' → 'done')
+  // without the user needing to F5.
   const { task: polledTask } = useTaskActivity(task?.id ?? null)
   // isDispatching covers the gap between clicking "Execute with Agent" and
   // the next poll tick actually reporting in_progress (BUG-027 follow-up —
@@ -113,6 +114,20 @@ export function TaskDetail() {
     requestOwned ? (task?.id ?? null) : null,
     task?.requestId ?? null
   )
+  // Why: show the tab only when there is something to read (a record or the last output); `legacy`
+  // (TASK_NOT_FOUND) and `unsupported` (older gateway, desktop-local) leave nothing to show.
+  const showResultTab =
+    requestOwned &&
+    (execApi.status === 'ready' ||
+      execApi.status === 'error' ||
+      (execApi.status === 'loading' && execApi.result !== null))
+  // Why: the live panel is empty after a reload (no history on the backend); point to the saved output.
+  const hasSavedResult = showResultTab && hasSavedExecutionOutput(execApi.status, execApi.result)
+  useEffect(() => {
+    if (!showResultTab && activeTab === 'result') {
+      setActiveTab('details')
+    }
+  }, [showResultTab, activeTab])
   const [readinessOpen, setReadinessOpen] = useState(false)
   const openDevServerSettings = useOpenDevServerSettings()
   const readinessBlocked = isRunBlockedByReadiness(
@@ -166,7 +181,9 @@ export function TaskDetail() {
       // requirement of its own) — found live.
       await callRuntimeRpc(target, 'task.execute', {
         taskId: task.id,
-        projectId: project!.id,
+        // Why: the Workspace context only knows a project after the user picked one there; a
+        // Request's task sheet has none, but the task itself always knows its project.
+        projectId: task.projectId || project?.id,
         traceId: span.id
       })
       span.ok({ taskId: task.id })
@@ -180,56 +197,64 @@ export function TaskDetail() {
     }
   }
 
-  // Jumps straight to this task's own worktree in the Git tab — before this,
-  // seeing an agent's changes meant manually finding the right worktree in
-  // the sidebar, which (unlike the Tasks tab) has no relation to which task
-  // it came from. worktree.list is the only RPC that resolves task.worktreeId
-  // (a plain UUID, same as project.worktrees.id) to a path/branch — there is
-  // no single-worktree-by-id fetch.
+  // Jumps to this task's own worktree with its Source Control open, so the user sees the files the
+  // agent changed. Every outcome that does not navigate says why (nothing is silent).
   const handleOpenInGit = async () => {
-    if (!task.worktreeId || !project) {
+    const projectId = task.projectId || project?.id
+    if (!task.worktreeId || !projectId) {
+      toast.error(
+        translate(
+          'auto.components.task.TaskDetail.openInGit.noProject',
+          'Cannot open Git: this task is not linked to a project'
+        )
+      )
       return
     }
     setOpeningInGit(true)
     try {
-      const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-      const { worktrees } = await callRuntimeRpc<{ worktrees: WorktreeListItem[] }>(
-        target,
-        'worktree.list',
-        { projectId: project.id }
-      )
-      const worktree = worktrees.find((w) => w.id === task.worktreeId)
-      if (!worktree) {
-        toast.error("This task's worktree no longer exists")
-        return
+      const outcome = await openTaskWorktreeInGit(projectId, task.worktreeId)
+      if (outcome === 'unknown') {
+        toast.error(
+          translate(
+            'auto.components.task.TaskDetail.openInGit.unknown',
+            "This task's worktree no longer exists"
+          )
+        )
+      } else if (outcome === 'not-on-host') {
+        toast.error(
+          translate(
+            'auto.components.task.TaskDetail.openInGit.notOnHost',
+            "This task's worktree is no longer on this host. It may have been cleaned up."
+          )
+        )
       }
-      setCurrentWorktree({
-        id: worktree.id,
-        path: worktree.path,
-        branch: worktree.branch,
-        isMain: false
-      })
-      setActiveWorkspaceTab('git')
     } catch (err) {
-      toast.error(`Failed to open worktree: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(
+        translate(
+          'auto.components.task.TaskDetail.openInGit.failed',
+          'Failed to open worktree: {{message}}',
+          { message: err instanceof Error ? err.message : String(err) }
+        )
+      )
     } finally {
       setOpeningInGit(false)
     }
   }
 
   return (
-    <div className="task-detail flex flex-col h-full p-4" data-testid="task-detail">
+    <div className="task-detail flex min-w-0 flex-col h-full p-4" data-testid="task-detail">
       {/* Title */}
       <Input
         value={localTitle}
         onChange={(e) => setLocalTitle(e.target.value)}
         onBlur={() => localTitle !== task.title && updateTask({ title: localTitle })}
-        className="text-base font-semibold border-0 px-0 shadow-none"
+        className="min-w-0 truncate text-base font-semibold border-0 px-0 shadow-none"
+        title={localTitle}
         data-testid="task-title-input"
       />
 
-      {/* Action Buttons */}
-      <div className="flex gap-2 mt-2 items-center">
+      {/* Action Buttons — wrap onto further rows in a narrow sheet instead of overflowing it */}
+      <div className="flex flex-wrap gap-2 mt-2 items-center">
         <ExecutionEngineBadge task={task} />
         {requestOwned && (
           <ReadinessBadge report={readinessApi.report} onOpen={() => setReadinessOpen(true)} />
@@ -281,13 +306,20 @@ export function TaskDetail() {
         )}
       </div>
 
-      <TaskDispatchStatusPanel taskId={task.id} />
+      {/* Why: a Request's tasks always run directly (Engine 1), so "no orchestration dispatch" would be noise. */}
+      {!requestOwned && <TaskDispatchStatusPanel taskId={task.id} />}
 
-      {/* Live status from useTaskActivity's polling fallback (FE-TASK-003) — reflects
-          status changes (e.g. 'in_progress' → 'done') without the user needing to F5. */}
+      {/* Live status from useTaskActivity's polling (FE-TASK-003) — reflects status changes
+          (e.g. 'in_progress' → 'done') without the user needing to F5. */}
       <div className="text-xs text-muted-foreground mt-1" data-testid="task-live-status">
         Status: {polledTask?.status ?? task.status}
       </div>
+
+      <TaskAgentActivityPanel
+        task={polledTask ?? task}
+        isRunning={isRunning}
+        onOpenSavedResult={hasSavedResult ? () => setActiveTab('result') : undefined}
+      />
 
       {/* Tabs */}
       <Tabs
@@ -295,15 +327,15 @@ export function TaskDetail() {
         onValueChange={(v) =>
           setActiveTab(v as 'details' | 'subtasks' | 'ai' | 'comments' | 'access' | 'result')
         }
-        className="mt-4"
+        className="mt-4 min-w-0"
       >
-        <TabsList>
+        <TabsList className="max-w-full justify-start overflow-x-auto scrollbar-sleek">
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="subtasks">Subtasks</TabsTrigger>
           <TabsTrigger value="ai">AI Agent</TabsTrigger>
           <TabsTrigger value="comments">Comments</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
-          {requestOwned && execApi.status !== 'unsupported' && (
+          {showResultTab && (
             <TabsTrigger value="result">
               {translate('auto.components.request.execution.tab', 'Result')}
             </TabsTrigger>
@@ -350,26 +382,7 @@ export function TaskDetail() {
               </Select>
             </div>
 
-            {/* Dependencies */}
-            <div className="pt-2 text-xs">
-              <p className="font-semibold mb-1">Dependencies</p>
-              {blockedBy.length > 0 ? (
-                <div className="text-muted-foreground flex gap-1">
-                  <span>← Blocked by:</span>
-                  <span>{blockedBy.map((d) => d.title).join(', ')}</span>
-                </div>
-              ) : null}
-              <div className="text-muted-foreground flex gap-1 mt-1">
-                <span>→ Blocks:</span>
-                <span>Not supported on the Details tab — see the DAG tab</span>
-              </div>
-              {blockedBy.length === 0 && (
-                <div className="text-muted-foreground">No dependencies</div>
-              )}
-              {depsError && (
-                <div className="text-destructive mt-1">Failed to load dependencies</div>
-              )}
-            </div>
+            <TaskDependenciesSection dependencies={blockedBy} loadFailed={depsError} />
           </div>
         </TabsContent>
         <TabsContent value="subtasks">
@@ -388,7 +401,7 @@ export function TaskDetail() {
         <TabsContent value="access">
           <TaskGrantModal taskId={task.id} />
         </TabsContent>
-        {requestOwned && execApi.status !== 'unsupported' && (
+        {showResultTab && (
           <TabsContent value="result">
             <ExecutionResultPanel taskId={task.id} requestId={task.requestId} execution={execApi} />
           </TabsContent>

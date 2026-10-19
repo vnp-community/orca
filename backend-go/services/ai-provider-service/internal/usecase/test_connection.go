@@ -33,7 +33,7 @@ func (uc *TestConnection) Execute(ctx context.Context, in TestConnectionInput) (
 	}
 	account, err := uc.repo.Get(ctx, tenantID, in.AccountID)
 	if err != nil {
-		return ConnectionTestResult{}, err
+		return ConnectionTestResult{}, accountRepoError(err, "AIPROVIDER_ACCOUNT_FETCH_FAILED", "failed to load provider account")
 	}
 	if account.DevServerID == "" {
 		return ConnectionTestResult{}, apperrors.New(apperrors.KindFailedPrecondition, "AIPROVIDER_NO_DEV_SERVER", "account has no dev server bound yet — push a credential first", nil)

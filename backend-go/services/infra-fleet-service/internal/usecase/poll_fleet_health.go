@@ -142,6 +142,30 @@ func (uc *PollFleetHealth) Execute(ctx context.Context) error {
 	return nil
 }
 
+// PollDevServer samples one dev server right now. The agent-connect hook calls it so a
+// dev server that just (re)connected is not seen as unreachable until the next tick.
+func (uc *PollFleetHealth) PollDevServer(ctx context.Context, devServerID string) error {
+	servers, err := uc.devServers.ListAllDevServers(ctx)
+	if err != nil {
+		return err
+	}
+	for _, ds := range servers {
+		if ds.ID != devServerID {
+			continue
+		}
+		if uc.lock != nil {
+			locked, unlock, lockErr := uc.lock.TryLock(ctx, ds.ID)
+			if lockErr != nil || !locked {
+				return lockErr
+			}
+			defer unlock()
+		}
+		uc.pollOne(ctx, ds)
+		return nil
+	}
+	return nil
+}
+
 func (uc *PollFleetHealth) pollOne(ctx context.Context, ds domain.DevServer) {
 	pollCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

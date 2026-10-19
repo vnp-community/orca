@@ -1,16 +1,21 @@
 package grpcclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/grpcmw"
@@ -291,15 +296,34 @@ func (f *fakeOutboxWriter) snapshot() []fakeOutboxEvent {
 // blocks Execute" contract for the tests that don't care about streaming.
 type fakeAgentExecOutputStreamer struct {
 	chunks chan usecase.AgentExecOutputChunk
+	// failWith, when set, is reported through onFailure the way the real adapter reports a broken stream.
+	failWith error
+
+	mu     sync.Mutex
+	target usecase.AgentExecOutputTarget
+	calls  int
 }
 
-func (f *fakeAgentExecOutputStreamer) StreamExecOutput(ctx context.Context, connectionID, stepID string) <-chan usecase.AgentExecOutputChunk {
+func (f *fakeAgentExecOutputStreamer) StreamExecOutput(ctx context.Context, target usecase.AgentExecOutputTarget, onFailure func(error)) <-chan usecase.AgentExecOutputChunk {
+	f.mu.Lock()
+	f.target = target
+	f.calls++
+	f.mu.Unlock()
+	if f.failWith != nil && onFailure != nil {
+		onFailure(f.failWith)
+	}
 	if f.chunks == nil {
 		ch := make(chan usecase.AgentExecOutputChunk)
 		close(ch)
 		return ch
 	}
 	return f.chunks
+}
+
+func (f *fakeAgentExecOutputStreamer) lastTarget() (usecase.AgentExecOutputTarget, int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.target, f.calls
 }
 
 // newTestSimpleExecutor builds a SimpleExecutor with fresh no-op profile/
@@ -939,5 +963,93 @@ func TestSimpleExecutor_Execute_StreamingFailureDoesNotFailExecute(t *testing.T)
 	}
 	if len(outbox.snapshot()) != 0 {
 		t.Error("expected no outbox events when the stream never delivered any chunks")
+	}
+}
+
+// A project bound to a dev server without an infra.connections row has an empty connectionId: live output must be
+// requested by dev server id, the same target the agent.execPrompt Relay call uses. Passing "" was why no frame
+// ever reached the UI.
+func TestSimpleExecutor_Execute_StreamsOutputByDevServerWhenThereIsNoConnection(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "", worktreePath: "/srv/worktrees/p1", devServerID: "ds-1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
+	}
+	streamer := &fakeAgentExecOutputStreamer{}
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, streamer)
+
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	target, calls := streamer.lastTarget()
+	if calls != 1 {
+		t.Fatalf("expected one stream subscription, got %d", calls)
+	}
+	if target.DevServerID != "ds-1" || target.ConnectionID != "" || target.StepID != "req-1" {
+		t.Errorf("stream target = %+v, want dev server ds-1, no connection, step req-1", target)
+	}
+}
+
+// The connection path is unchanged: connectionId is forwarded and no dev server id is added.
+func TestSimpleExecutor_Execute_StreamsOutputByConnectionWhenThereIsOne(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
+	}
+	streamer := &fakeAgentExecOutputStreamer{}
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, streamer)
+
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	target, _ := streamer.lastTarget()
+	if target.ConnectionID != "conn-1" || target.DevServerID != "" {
+		t.Errorf("stream target = %+v, want connection conn-1 only", target)
+	}
+}
+
+// A broken stream no longer vanishes: it is logged (task id, no content) and the run still succeeds.
+func TestSimpleExecutor_Execute_LogsStreamFailureAndKeepsRunning(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "", worktreePath: "/srv/worktrees/p1", devServerID: "ds-1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"SECRET-OUTPUT","stderr":"","exitCode":0,"timedOut":false}`},
+	}
+	streamer := &fakeAgentExecOutputStreamer{failWith: status.Error(codes.InvalidArgument, "connectionId is required")}
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, streamer)
+
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
+		t.Fatalf("a failed stream must not fail the run: %v", err)
+	}
+	out := logs.String()
+	for _, want := range []string{"level=WARN", "agent output stream failed", "task_id=t1", "request_id=req-1", "grpc_code=InvalidArgument"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "SECRET-OUTPUT") {
+		t.Errorf("log must never carry run output:\n%s", out)
+	}
+}
+
+// A frame with NUL bytes or an oversized run must still be stored: jsonb rejects NUL and a huge frame would
+// block the outbox on the NATS message limit.
+func TestBoundPartialStream_StripsNULAndKeepsTail(t *testing.T) {
+	if got := boundPartialStream("a\x00b\xffc"); got != "abc" {
+		t.Errorf("got %q, want NUL and invalid UTF-8 removed", got)
+	}
+	long := strings.Repeat("é", maxPartialStreamBytes) // 2 bytes each, twice the cap
+	got := boundPartialStream(long)
+	if len(got) > maxPartialStreamBytes || !utf8.ValidString(got) || !strings.HasSuffix(long, got) {
+		t.Errorf("tail not kept on a rune boundary: len=%d valid=%v", len(got), utf8.ValidString(got))
+	}
+	if short := "· Session started\n▸ Read x\n"; boundPartialStream(short) != short {
+		t.Error("small frames must pass through unchanged")
 	}
 }

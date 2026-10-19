@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/stablyai/orca-go/common/grpcmw"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -24,7 +25,7 @@ type TenantProvisioner struct {
 }
 
 func NewTenantProvisioner(addr string) (*TenantProvisioner, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	conn, err := grpcmw.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return nil, fmt.Errorf("grpcclient: dial tenant-service at %q: %w", addr, err)
 	}

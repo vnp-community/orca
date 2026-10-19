@@ -48,7 +48,7 @@ func NewDetectDevServerAgents(devServers DevServerRepository, agent DevServerAge
 func (uc *DetectDevServerAgents) Execute(ctx context.Context, tenantID, devServerID string) (DetectedAgents, error) {
 	ds, err := uc.devServers.Get(ctx, tenantID, devServerID)
 	if err != nil {
-		return DetectedAgents{}, err
+		return DetectedAgents{}, devServerLookupError(err)
 	}
 	result, err := uc.agent.Exec(ctx, ds, "preflight.detectAgents", map[string]any{
 		"commands": defaultAgentProbes,

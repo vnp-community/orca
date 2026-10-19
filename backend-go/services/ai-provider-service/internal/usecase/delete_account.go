@@ -24,7 +24,7 @@ func (uc *DeleteAccount) Execute(ctx context.Context, accountID string) error {
 		return apperrors.New(apperrors.KindInvalidArgument, "AIPROVIDER_NO_ACCOUNT_ID", "account_id is required", nil)
 	}
 	if err := uc.repo.Delete(ctx, tenantID, accountID); err != nil {
-		return apperrors.New(apperrors.KindInternal, "AIPROVIDER_DELETE_FAILED", "failed to delete provider account", err)
+		return accountRepoError(err, "AIPROVIDER_DELETE_FAILED", "failed to delete provider account")
 	}
 	return nil
 }

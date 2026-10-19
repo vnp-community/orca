@@ -303,4 +303,35 @@ describe('TaskGraph', () => {
       expect(screen.queryByTestId('batch-merge-btn')).not.toBeInTheDocument()
     })
   })
+
+  it('tells an empty project, a failed load and a filtered-out list apart (TASK-FE-E2E-007)', () => {
+    const base = mockUseTasks('p1')
+    const withState = (over: Record<string, unknown>): void => {
+      mockUseTasks.mockReturnValue({
+        ...base,
+        loaded: true,
+        totalTaskCount: 0,
+        loadError: null,
+        ...over
+      } as unknown as ReturnType<typeof useTasks>)
+    }
+    withState({})
+    const empty = render(<TaskGraph projectId="p1" />)
+    expect(screen.getByTestId('task-empty')).toBeInTheDocument()
+    expect(screen.queryByTestId('task-load-error')).not.toBeInTheDocument()
+    empty.unmount()
+
+    const retry = vi.fn()
+    withState({ loadError: { kind: 'forbidden', code: 'TASK_FORBIDDEN' }, refetch: retry })
+    const failed = render(<TaskGraph projectId="p1" />)
+    expect(screen.getByTestId('task-load-error')).toHaveAttribute('data-error-kind', 'forbidden')
+    expect(screen.queryByTestId('task-empty')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retry).toHaveBeenCalledTimes(1)
+    failed.unmount()
+
+    withState({ totalTaskCount: 3, searchQuery: 'zzz' })
+    render(<TaskGraph projectId="p1" />)
+    expect(screen.getByTestId('task-empty-filtered')).toBeInTheDocument()
+  })
 })

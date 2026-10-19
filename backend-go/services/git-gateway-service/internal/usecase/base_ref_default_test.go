@@ -9,7 +9,7 @@ import (
 
 func TestBaseRefDefault_DispatchesToResolvedExecutor(t *testing.T) {
 	t.Run("missing repo id is rejected", func(t *testing.T) {
-		uc := NewBaseRefDefault(&fakeDevServerReachability{}, &fakeProjectClient{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+		uc := NewBaseRefDefault(&fakeDevServerReachability{allowLocal: true}, &fakeProjectClient{}, &fakeGitExecutor{}, &fakeGitExecutor{})
 		_, err := uc.Execute(context.Background(), BaseRefDefaultInput{})
 		if err == nil {
 			t.Fatal("expected error for missing repo_id")
@@ -37,7 +37,7 @@ func TestBaseRefDefault_DispatchesToResolvedExecutor(t *testing.T) {
 
 	t.Run("no dev server bound dispatches to local executor", func(t *testing.T) {
 		projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{ID: "repo-1", URL: "/local/repo"}}
-		reachability := &fakeDevServerReachability{}
+		reachability := &fakeDevServerReachability{allowLocal: true}
 		local := &fakeGitExecutor{baseRef: "main"}
 		relay := &fakeGitExecutor{}
 		uc := NewBaseRefDefault(reachability, projects, local, relay)
@@ -53,7 +53,7 @@ func TestBaseRefDefault_DispatchesToResolvedExecutor(t *testing.T) {
 
 	t.Run("repo not found is reported", func(t *testing.T) {
 		projects := &fakeProjectClient{getRepoErr: context.DeadlineExceeded}
-		uc := NewBaseRefDefault(&fakeDevServerReachability{}, projects, &fakeGitExecutor{}, &fakeGitExecutor{})
+		uc := NewBaseRefDefault(&fakeDevServerReachability{allowLocal: true}, projects, &fakeGitExecutor{}, &fakeGitExecutor{})
 
 		_, err := uc.Execute(context.Background(), BaseRefDefaultInput{RepoID: "repo-1"})
 		if err == nil {

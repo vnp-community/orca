@@ -36,7 +36,7 @@ func TestGetAgentCapabilities_RequiresDevServerID(t *testing.T) {
 }
 
 func TestGetAgentCapabilities_DevServerNotFoundOrOtherTenant(t *testing.T) {
-	repo := &fakeDevServerRepository{getErr: errors.New("dev server not found")}
+	repo := &fakeDevServerRepository{getErr: domain.ErrDevServerNotFound}
 	uc := NewGetAgentCapabilities(repo, &fakeDevServerAgentClient{})
 	ctx := withTenant(context.Background(), "tenant-1")
 

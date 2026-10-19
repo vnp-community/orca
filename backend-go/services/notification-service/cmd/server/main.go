@@ -170,7 +170,7 @@ func run() error {
 	// clear error at call time if credential-broker-service is actually
 	// unreachable, same graceful-degradation shape the previous direct-Vault
 	// version had.
-	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	brokerConn, err := grpcmw.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}

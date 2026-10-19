@@ -144,7 +144,7 @@ type capabilityFakeDevServers struct {
 func (r *capabilityFakeDevServers) Get(_ context.Context, tenantID, id string) (domain.DevServer, error) {
 	ds, ok := r.byID[id]
 	if !ok || ds.TenantID != tenantID {
-		return domain.DevServer{}, domain.ErrNotFound
+		return domain.DevServer{}, domain.ErrDevServerNotFound
 	}
 	return ds, nil
 }

@@ -2,7 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import {
   createFakeCodeIntelBackend,
   type FakeCodeIntelBackend
-} from '../../../../frontend/src/renderer/src/test-support/code-intel-fake-backend'
+} from '../../../../../../frontend/src/renderer/src/test-support/code-intel-fake-backend'
 import { BOOT_CHANNEL_STUBS } from '../../mcp-web/support/mock-orca-boot-channels'
 import { WORKSPACE_CHANNEL_STUBS } from './code-intel-workspace-stubs'
 

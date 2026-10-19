@@ -110,7 +110,7 @@ func (s *TerminalSessionStore) Touch(ctx context.Context, tenantID, ptyID string
 		return fmt.Errorf("mysql: rows affected: %w", err)
 	}
 	if n == 0 {
-		return fmt.Errorf("mysql: terminal session %q not found for tenant", ptyID)
+		return fmt.Errorf("mysql: touch terminal session %q for tenant: %w", ptyID, domain.ErrTerminalSessionNotFound)
 	}
 	return nil
 }
@@ -133,7 +133,7 @@ func (s *TerminalSessionStore) Close(ctx context.Context, tenantID, ptyID string
 		return fmt.Errorf("mysql: rows affected: %w", err)
 	}
 	if n == 0 {
-		return fmt.Errorf("mysql: terminal session %q not found for tenant", ptyID)
+		return fmt.Errorf("mysql: close terminal session %q for tenant: %w", ptyID, domain.ErrTerminalSessionNotFound)
 	}
 	return nil
 }

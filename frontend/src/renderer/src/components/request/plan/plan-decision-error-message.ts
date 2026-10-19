@@ -5,7 +5,7 @@
  */
 
 import { translate } from '@/i18n/i18n'
-import { requestErrorMessage } from '../request-error-message'
+import { requestErrorMessage, requestErrorMessageForError } from '../request-error-message'
 import { splitErrorCode } from '../../../../../shared/request-errors'
 import { backendErrorCode } from '../solution/solution-error-classification'
 import type { PlanDecisionFailure } from '../../../hooks/usePlanDecision'
@@ -18,6 +18,13 @@ export function planDecisionErrorMessage(failure: PlanDecisionFailure): string {
   // Phase-start refusals carry the backend's own explanation; show it without the code prefix.
   if (code === 'REQUEST_TRANSITION_NOT_ALLOWED' || code.startsWith('REQUEST_PHASE_')) {
     return splitErrorCode(failure.error.message ?? '').rest || requestErrorMessage('invalid_state')
+  }
+  // Why: approving a plan starts the run as the approver, so someone who cannot execute is refused up front.
+  if (code === 'REQUEST_EXECUTION_ACTOR_NOT_ALLOWED') {
+    return translate(
+      `${P}PlanApprovalBar.executionNotAllowed`,
+      'You can approve plans only if you are allowed to run their execution. Ask someone who is, or request access.'
+    )
   }
   if (failure.errorClass === 'notApprover' || failure.errorClass === 'forbidden') {
     return translate(`${P}PlanApprovalBar.notApprover`, 'You are not allowed to approve this.')
@@ -40,5 +47,5 @@ export function planDecisionErrorMessage(failure: PlanDecisionFailure): string {
   if (failure.errorClass === 'rateLimited') {
     return requestErrorMessage('rate_limited')
   }
-  return requestErrorMessage(failure.error.kind)
+  return requestErrorMessageForError(failure.error)
 }

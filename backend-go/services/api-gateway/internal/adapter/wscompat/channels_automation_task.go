@@ -133,6 +133,7 @@ func parseGrantLevel(v string) taskv1.GrantLevel {
 func registerAutomationTaskChannels(r *Registry, automationClient automationv1.AutomationServiceClient, taskClient taskv1.TaskServiceClient) {
 	registerAutomationCRUDChannels(r, automationClient)
 	registerTaskCRUDChannels(r, taskClient)
+	registerTaskExecutionChannels(r, taskClient)
 }
 
 // automationRunsListView/automationsListView are plain (non-proto.Message)
@@ -345,13 +346,23 @@ func registerTaskCRUDChannels(r *Registry, client taskv1.TaskServiceClient) {
 			ProjectID string `json:"projectId"`
 			PageToken string `json:"pageToken"`
 			PageSize  int32  `json:"pageSize"`
+			// Optional filters; absent keeps task-service's default (no plan/phase).
+			TaskTypes  []string `json:"taskTypes"`
+			RequestID  string   `json:"requestId"`
+			RequestIDs []string `json:"requestIds"`
+			ParentID   string   `json:"parentId"`
 		}
 		in, err := decodeArg[listArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
+		requestIDs := in.RequestIDs
+		if in.RequestID != "" {
+			requestIDs = append(append([]string(nil), requestIDs...), in.RequestID)
+		}
 		resp, err := client.ListTasks(ctx, &taskv1.ListTasksRequest{
 			ProjectId: in.ProjectID, PageToken: in.PageToken, PageSize: in.PageSize,
+			TaskTypes: in.TaskTypes, RequestIds: requestIDs, ParentId: in.ParentID,
 		})
 		if err != nil {
 			return nil, err

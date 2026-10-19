@@ -11,7 +11,10 @@ copies=(
   "$root/backend-go/services/request-service/internal/adapter/grpcclient/testdata/agent_capabilities_v1.golden.json"
 )
 
-hash_of() { sha256sum "$1" | cut -d' ' -f1; }
+# sha256sum on Linux, shasum on macOS.
+hash_of() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi
+}
 
 [ -f "$source_file" ] || { echo "missing agent fixture: $source_file" >&2; exit 2; }
 want="$(hash_of "$source_file")"

@@ -269,3 +269,25 @@ func TestAgentSubscribeStatusChannel_NilBus_ReturnsClosedChannel(t *testing.T) {
 		t.Fatal("timed out waiting for the nil-bus events channel to close")
 	}
 }
+
+func TestDevServerSubscribeStatusChannel_NilBus_ReturnsClosedChannel(t *testing.T) {
+	r := NewRegistry()
+	registerDevServerStatusSubscribeChannel(r, nil)
+
+	h, ok := r.StreamHandlerFor("devServer.subscribeStatus")
+	if !ok {
+		t.Fatal("expected devServer.subscribeStatus to be registered as a StreamHandler")
+	}
+	events, err := h(context.Background(), Identity{TenantID: "tenant-1"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	select {
+	case _, ok := <-events:
+		if ok {
+			t.Fatal("expected the events channel to be closed immediately when bus is nil")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the nil-bus events channel to close")
+	}
+}

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/engine_openspec.go`, `internal/usecase/openspec_solution_prompt.go`, `internal/usecase/proposal_scope_check.go`, `internal/adapter/grpcclient/proposal_workspace.go`, `internal/usecase/ports.go` (sửa) và test (mới)
 **Depends on:** TASK-REQ-026-01, 026-02, 026-03 (không bắt buộc cho task này), 026-04, 026-05, TASK-REQ-008-01 (`RedactSecrets`), TASK-REQ-027-04 (parser khối `orca-json`, `RenderArtifact`)
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL (2026-10-14): `GenerateAnalysis` không dùng (SOL-TDD-002: Solution bằng agent chỉ đọc có KG, T2.9); `ProposalWorkspace`, kiểm phạm vi, `GenerateProposal` đã xong (T2.3, T2.4)
 
 ---
 

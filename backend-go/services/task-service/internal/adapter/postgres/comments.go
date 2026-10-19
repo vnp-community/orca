@@ -2,10 +2,7 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
-
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
@@ -19,9 +16,8 @@ func (r *Repository) AddComment(ctx context.Context, tenantID string, c domain.T
 	var out domain.TaskComment
 	out.TaskID = c.TaskID
 	if err := row.Scan(&out.ID, &out.AuthorID, &out.Content, &out.CreatedAt); err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-			return domain.TaskComment{}, domain.ErrTaskNotFound
+		if isMissingTaskReference(err) {
+			return domain.TaskComment{}, fmt.Errorf("postgres: task %s: %w", c.TaskID, domain.ErrTaskNotFound)
 		}
 		return domain.TaskComment{}, fmt.Errorf("postgres: insert task comment: %w", err)
 	}

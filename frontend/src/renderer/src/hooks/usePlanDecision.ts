@@ -10,6 +10,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { callRequestRpc } from '../runtime/request-rpc-client'
 import { generatePlanProposeCommit } from './request-plan-generation'
+import { useRequestCooldown } from './useRequestCooldown'
 import { REQUEST_RPC_METHODS } from '../../../shared/request-rpc-methods'
 import {
   classifySolutionError,
@@ -36,6 +37,9 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
   const [failure, setFailure] = useState<PlanDecisionFailure | null>(null)
   const [deniedApprovalIds, setDeniedApprovalIds] = useState<ReadonlySet<string>>(new Set())
   const inFlight = useRef(new Set<string>())
+  // Why: the limiter told us to wait; gate buttons read these instead of firing into it.
+  const writeCooldown = useRequestCooldown('write')
+  const aiCooldown = useRequestCooldown('ai')
 
   const run = useCallback(
     async (
@@ -160,6 +164,10 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
 
   return {
     busyKeys,
+    /** True while approve/reject/start-phase calls are being throttled. */
+    coolingDown: writeCooldown.coolingDown,
+    /** True while plan generation (an AI call) is being throttled. */
+    generateCoolingDown: aiCooldown.coolingDown,
     isBusy: (key: string) => busyKeys.has(key),
     failure,
     clearFailure: () => setFailure(null),

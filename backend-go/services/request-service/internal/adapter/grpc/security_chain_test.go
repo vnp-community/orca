@@ -197,6 +197,8 @@ func TestChain_StreamAdminOnly(t *testing.T) {
 func TestChain_AIRateLimitReturnsRetryInfo(t *testing.T) {
 	cfg := newChainConfig(t)
 	cfg.Limiter = usecase.NewRateLimiter(map[string]domain.Limit{domain.RateAI: {PerSecond: 0.1, Burst: 1}}, nil)
+	var limited []string
+	cfg.OnRateLimited = func(class string) { limited = append(limited, class) }
 	env := startChain(t, cfg)
 	c := requestv1.NewRequestServiceClient(env.conn)
 	call := func() error {
@@ -218,6 +220,9 @@ func TestChain_AIRateLimitReturnsRetryInfo(t *testing.T) {
 	}
 	if retry == nil || retry.GetRetryDelay().AsDuration() <= 0 {
 		t.Fatalf("RetryInfo with a positive delay expected, got %v", retry)
+	}
+	if len(limited) != 1 || limited[0] != domain.RateAI {
+		t.Fatalf("OnRateLimited calls = %v, want one for the ai class", limited)
 	}
 	// The read class is separate: a GetRequest is not limited by the exhausted ai bucket.
 	if _, err := c.GetRequest(withMD(gatewayToken, userOwner, "", "user"), &requestv1.GetRequestRequest{Id: testRequest}); status.Code(err) == codes.ResourceExhausted {
@@ -301,4 +306,49 @@ type captureRPCAudit struct{ events []usecase.RPCAuditEvent }
 
 func (c *captureRPCAudit) Record(_ context.Context, e usecase.RPCAuditEvent) {
 	c.events = append(c.events, e)
+}
+
+// RequestClarification is how a reviewer "asks again" through the gateway: the reporter and a tenant admin may call
+// it with the gateway token, nobody else, and an agent never. Platform sources are refused later by the handler.
+func TestChain_RequestClarificationIsAPersonRPCOfTheReporterAndAdmin(t *testing.T) {
+	aud := &recordingAuditor{}
+	cfg := newChainConfig(t)
+	cfg.Authorize = newAuthorizer(realPolicy(t), newAccessRoles(), aud)
+	env := startChain(t, cfg)
+	c := requestv1.NewRequestServiceClient(env.conn)
+	req := &requestv1.RequestClarificationRequest{RequestId: testRequest, Source: "solution_open_question"}
+
+	// Reaching the unwired handler (Unimplemented) proves the call got past the token guard and the authorizer.
+	for name, ctx := range map[string]context.Context{
+		"reporter":     withMD(gatewayToken, userReporter, "", "user"),
+		"tenant admin": withMD(gatewayToken, userAdmin, "admin", "user"),
+	} {
+		if _, err := c.RequestClarification(ctx, req); status.Code(err) != codes.Unimplemented {
+			t.Errorf("%s through the gateway should reach the handler, got %v", name, err)
+		}
+	}
+	for name, ctx := range map[string]context.Context{
+		"stranger":        withMD(gatewayToken, userStranger, "", "user"),
+		"project member":  withMD(gatewayToken, userMember, "", "user"),
+		"agent for admin": withMD(gatewayToken, userAdmin, "admin", "agent"),
+	} {
+		_, err := c.RequestClarification(ctx, req)
+		expectForbidden(t, "RequestClarification by "+name, err)
+	}
+	// Another tenant's Request does not exist for the caller.
+	other := metadata.Pairs(grpcmw.MetadataTenantID, otherTenant, grpcmw.MetadataUserID, userReporter, internalcaller.MetadataKey, gatewayToken)
+	if _, err := c.RequestClarification(metadata.NewOutgoingContext(context.Background(), other), req); status.Code(err) == codes.Unimplemented {
+		t.Errorf("a reporter of another tenant reached the handler")
+	}
+	if len(aud.denied) != 3 {
+		t.Errorf("each denial by the authorizer must be audited, got %d", len(aud.denied))
+	}
+
+	// Without the gateway token, or with the internal service token, the call never reaches authorization.
+	for name, tok := range map[string]string{"no token": "", "wrong token": "wrong", "service token": serviceToken} {
+		_, err := c.RequestClarification(withMD(tok, userReporter, "", "user"), req)
+		if status.Code(err) != codes.PermissionDenied || !strings.Contains(err.Error(), "INTERNAL_CALLER_REQUIRED") {
+			t.Errorf("%s: want INTERNAL_CALLER_REQUIRED, got %v", name, err)
+		}
+	}
 }

@@ -55,6 +55,57 @@ func (r *Repository) Create(ctx context.Context, p domain.Project) (domain.Proje
 	return p, nil
 }
 
+// CreateWithOwner writes project, creator membership and first repo in one
+// transaction: a repo that cannot be stored (including a lost race on its
+// registration key) must not leave a project behind.
+func (r *Repository) CreateWithOwner(ctx context.Context, p domain.Project, owner domain.ProjectMember, repo *domain.Repo) (domain.Project, *domain.Repo, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Project{}, nil, fmt.Errorf("mysql: begin create project transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	now := time.Now().UTC()
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO projects (id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by, issue_status_sync_enabled, jira_project_key, jira_site_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, p.ID, p.TenantID, p.Name, nullableString(p.DevServerID), p.Description, p.DefaultBranch, p.Visibility, nullableString(p.CreatedBy), p.IssueStatusSyncEnabled, p.JiraProjectKey, p.JiraSiteID, now, now); err != nil {
+		return domain.Project{}, nil, fmt.Errorf("mysql: insert project: %w", err)
+	}
+	p.CreatedAt, p.UpdatedAt = now, now
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO project_members (project_id, user_id, role)
+		VALUES (?, ?, ?)
+		ON DUPLICATE KEY UPDATE role = VALUES(role)
+	`, p.ID, owner.UserID, string(owner.Role)); err != nil {
+		return domain.Project{}, nil, fmt.Errorf("mysql: insert project owner: %w", err)
+	}
+
+	var createdRepo *domain.Repo
+	if repo != nil {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO repos (id, project_id, url, display_name, position, dev_server_id, registration_key)
+			VALUES (?, ?, ?, ?, 0, ?, ?)
+		`, repo.ID, p.ID, repo.URL, repo.DisplayName, nullableString(repo.DevServerID), nullableString(repo.RegistrationKey)); err != nil {
+			if isRepoRegistrationConflict(err) {
+				return domain.Project{}, nil, fmt.Errorf("mysql: insert project repo: %w", domain.ErrRepoAlreadyRegistered)
+			}
+			return domain.Project{}, nil, fmt.Errorf("mysql: insert project repo: %w", err)
+		}
+		out, err := scanRepo(tx.QueryRowContext(ctx, `SELECT `+repoColumns+` FROM repos WHERE id = ?`, repo.ID))
+		if err != nil {
+			return domain.Project{}, nil, fmt.Errorf("mysql: read inserted project repo: %w", err)
+		}
+		createdRepo = &out
+	}
+
+	if err := tx.Commit(); err != nil {
+		return domain.Project{}, nil, fmt.Errorf("mysql: commit create project transaction: %w", err)
+	}
+	return p, createdRepo, nil
+}
+
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Project, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT `+projectColumns+`

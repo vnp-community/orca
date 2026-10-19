@@ -55,7 +55,7 @@ func (uc *GenerateShareLink) Execute(ctx context.Context, in GenerateShareLinkIn
 
 	task, err := uc.tasks.Get(ctx, tenantID, in.TaskID)
 	if err != nil {
-		return "", apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		return "", taskRepoError(err, "task not found", "TASK_SHARE_LINK_TASK_LOAD_FAILED", "failed to load task")
 	}
 
 	token, err := generateShareToken()

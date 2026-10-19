@@ -52,7 +52,7 @@ func (uc *ListIssues) Execute(ctx context.Context, in ListIssuesInput) ([]domain
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, in.Provider, in.WorkspaceID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no credential available for provider", err)
+		return nil, credentialResolveError(err, "no credential available for provider")
 	}
 
 	issues, err := provider.ListIssues(ctx, cred, in.ProjectKey, in.FilterJSON, int(in.Limit))

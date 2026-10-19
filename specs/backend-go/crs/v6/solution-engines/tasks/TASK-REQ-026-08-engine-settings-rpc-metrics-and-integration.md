@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `proto/orca/request/v1/request_engine.proto`, `internal/usecase/manage_project_engine_settings.go`, `internal/adapter/grpc/engine_settings_server.go`, `internal/adapter/metrics/engine_metrics.go`, `services/request-service/README.md` (sửa phần cấu hình), `internal/usecase/engine_flow_integration_test.go` (mới)
 **Depends on:** TASK-REQ-026-02, 026-05, 026-06, 026-07, TASK-REQ-001-05 (gRPC server, health), TASK-REQ-024-01 (`AppendDetailed`, nếu chưa có thì dùng `auditclient.Append`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-14): RPC, audit, kênh/REST/CLI, bốn series metric, tích hợp hai dialect (T2.10, T2.14)
 
 ---
 

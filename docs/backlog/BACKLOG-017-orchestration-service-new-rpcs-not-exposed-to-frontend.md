@@ -1,5 +1,13 @@
 # BACKLOG-017: 6 RPC mới của `orchestration-service` (coordinator lifecycle) chưa lộ ra `wscompat` — Task Execute dashboard UI vẫn chỉ dùng được `dispatchShow`
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟡 NARROWED — chỉ còn wiring + UI** · Backlog ship: SHIP-UX-03
+>
+> 6 RPC coordinator **đã tồn tại** ở proto/usecase/gRPC (`orchestration-service/internal/adapter/grpc/server.go`: `StartCoordinatorRun`, `ListPendingDecisionGates`, …), nên kết luận 'không tồn tại ở bất kỳ layer nào' của bản 2026-09-08 không còn đúng. Phần còn thiếu đúng như mô tả ban đầu: wscompat chưa đăng ký `orchestration.getCoordinatorRun` / `orchestration.listPendingDecisionGates` và chưa có `CoordinatorRunPanel`.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** Phát hiện trong lúc thực thi `specs/backend-go/bugs/task-v1` (`TASK-TASKV1-005-01..10`, 2026-09-08) và `TASK-FE-TASKV1-10`
 **Priority:** Medium — orchestration coordinator giờ đã tự động thật (tick loop, 6 RPC mới), nhưng frontend không có cách nào hiển thị chi tiết
 **Blocked on:** **Cập nhật 2026-09-08:** không đúng — cả 6 RPC đều **chưa tồn tại** ở bất kỳ layer nào (proto/usecase/gRPC handler), không phải chỉ "chưa wire vào wscompat" như tiêu đề file này giả định. Xem "Update 2026-09-08 (session 2)" bên dưới.

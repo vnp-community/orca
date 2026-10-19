@@ -31,7 +31,7 @@ func (uc *UpdateTemplate) Execute(ctx context.Context, in UpdateTemplateInput) (
 	existing, err := uc.templates.GetTemplate(ctx, tenantID, in.ID)
 	if err != nil {
 		if errors.Is(err, domain.ErrTemplateNotFound) {
-			return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindNotFound, "WORKFLOW_TEMPLATE_NOT_FOUND", "template does not exist", nil)
+			return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindNotFound, "WORKFLOW_TEMPLATE_NOT_FOUND", "template does not exist", err)
 		}
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_TEMPLATE_LOOKUP_FAILED", "failed to look up template", err)
 	}
@@ -53,6 +53,10 @@ func (uc *UpdateTemplate) Execute(ctx context.Context, in UpdateTemplateInput) (
 	if in.ParentTemplateID != "" {
 		chain, err := uc.templates.ResolveChain(ctx, tenantID, in.ParentTemplateID, maxTemplateChainDepth)
 		if err != nil {
+			// Same code/kind as CreateTemplate's unknown-parent case; must not surface as Internal.
+			if errors.Is(err, domain.ErrTemplateNotFound) {
+				return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindFailedPrecondition, "WORKFLOW_PARENT_TEMPLATE_NOT_FOUND", "parent template does not exist", err)
+			}
 			return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_TEMPLATE_CHAIN_FAILED", "failed to resolve parent chain", err)
 		}
 		for _, ancestor := range chain {

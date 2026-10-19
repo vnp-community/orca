@@ -8,11 +8,11 @@ import {
   IMPACT_GRAPH_NO_EDGES,
   SEQUENCE_MODEL,
   SYMBOL_DETAIL_WITH_SOURCE
-} from '../../../../frontend/src/renderer/src/test-support/code-intel-fixtures'
+} from '../../../../../../frontend/src/renderer/src/test-support/code-intel-fixtures'
 import {
   CONTRACT_DIFF_MIXED,
   FINDINGS_MIXED
-} from '../../../../frontend/src/renderer/src/test-support/contract-findings-fixtures'
+} from '../../../../../../frontend/src/renderer/src/test-support/contract-findings-fixtures'
 import { sampleErdModel } from '../../../../../../frontend/src/renderer/src/components/review-map/erd/erd-model.fixture'
 import { sampleStorageMap } from '../../../../../../frontend/src/renderer/src/components/review-map/storage/storage-map.fixture'
 import type { FakeCodeIntelBackend } from './mock-code-intel-ws'

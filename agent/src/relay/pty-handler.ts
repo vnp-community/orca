@@ -1,7 +1,11 @@
 /* oxlint-disable max-lines */
 import type { IPty } from 'node-pty'
 import type * as NodePty from 'node-pty'
+import type * as NodePath from 'node:path'
+import type * as NodeFs from 'node:fs'
+import type * as NodeOs from 'node:os'
 import { resolveWindowsGitBashShellPath } from '../main/git-bash'
+import { ensureNodePtySpawnHelperExecutable } from './node-pty-spawn-helper-permissions'
 import { WINDOWS_GIT_BASH_SHELL } from '../shared/windows-terminal-shell'
 import type { RelayDispatcher, RequestContext } from './dispatcher'
 import {
@@ -37,6 +41,7 @@ async function loadPty(): Promise<typeof NodePty | null> {
   }
   try {
     ptyModule = await import('node-pty')
+    ensureNodePtySpawnHelperExecutable()
     return ptyModule
   } catch {
     return null
@@ -240,6 +245,22 @@ export type PtyEnvAugmenter = (ctx: {
   command?: string
 }) => Record<string, string>
 
+/** The directory to open, or null when `rawCwd` cannot be used (empty, NUL byte, missing, not a directory). */
+export function resolveUsablePtyCwd(rawCwd: string): string | null {
+  const { resolve } = require('node:path') as typeof NodePath
+  const { statSync } = require('node:fs') as typeof NodeFs
+
+  if (!rawCwd || rawCwd.includes('\0')) {
+    return null
+  }
+  const resolved = resolve(rawCwd)
+  try {
+    return statSync(resolved).isDirectory() ? resolved : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * validatePtyCwd — TM-002: Validate the cwd parameter for PTY spawn requests.
  *
@@ -247,28 +268,9 @@ export type PtyEnvAugmenter = (ctx: {
  * Falls back to home directory if cwd is invalid or does not exist.
  * Does NOT throw — callers get a safe cwd or the home directory.
  */
-function validatePtyCwd(rawCwd: string): string {
-  const { resolve } = require('node:path') as typeof import('node:path')
-  const { statSync } = require('node:fs') as typeof import('node:fs')
-  const { homedir } = require('node:os') as typeof import('node:os')
-
-  const home = homedir()
-  if (!rawCwd) {return home}
-
-  // Reject null bytes
-  if (rawCwd.includes('\0')) {return home}
-
-  const resolved = resolve(rawCwd)
-
-  // Must exist and be a directory
-  try {
-    const stat = statSync(resolved)
-    if (!stat.isDirectory()) {return home}
-  } catch {
-    return home
-  }
-
-  return resolved
+export function validatePtyCwd(rawCwd: string): string {
+  const { homedir } = require('node:os') as typeof NodeOs
+  return resolveUsablePtyCwd(rawCwd) ?? homedir()
 }
 
 export class PtyHandler {
@@ -633,7 +635,14 @@ export class PtyHandler {
   private async spawn(
     params: Record<string, unknown>,
     context?: RequestContext
-  ): Promise<{ id: string; cols: number; rows: number; cwd: string; shell: string }> {
+  ): Promise<{
+    id: string
+    cols: number
+    rows: number
+    cwd: string
+    shell: string
+    cwdFellBack?: true
+  }> {
     if (this.ptys.size >= 50) {
       throw new Error('Maximum number of PTY sessions reached (50)')
     }
@@ -646,7 +655,12 @@ export class PtyHandler {
     const rows = (params.rows as number) || 24
     // TM-002: Validate cwd — reject path traversal, fallback to home if invalid/missing
     const rawCwd = (params.cwd as string) || resolveDefaultCwd()
-    const cwd = validatePtyCwd(rawCwd)
+    const usableCwd = resolveUsablePtyCwd(rawCwd)
+    const cwd = usableCwd ?? validatePtyCwd(rawCwd)
+    // Why: a caller that asked for a directory must be told when it was not usable (missing, not a directory, traversal) and
+    // the home directory was opened instead; silently landing in $HOME looks like a working terminal in the wrong place.
+    const requestedCwd = typeof params.cwd === 'string' ? params.cwd : ''
+    const cwdFellBack = requestedCwd !== '' && usableCwd === null
     const env = params.env as Record<string, string> | undefined
     const envToDelete = sanitizeEnvToDelete(params.envToDelete)
     const explicitTerm =
@@ -663,9 +677,8 @@ export class PtyHandler {
     // TM-003: On Linux/macOS, resolvePtyShellOverride() always returns '' (only
     // processes Windows shell overrides). Fall back to env.SHELL if provided.
     // This lets callers set a specific shell (bash, zsh, fish) via env.SHELL.
-    const envShell = (env && typeof env.SHELL === 'string' && env.SHELL.trim())
-      ? env.SHELL.trim()
-      : ''
+    const envShell =
+      env && typeof env.SHELL === 'string' && env.SHELL.trim() ? env.SHELL.trim() : ''
     const shell = resolvedShellOverride || envShell || resolveDefaultShell()
     const id = `pty-${this.nextId++}`
 
@@ -698,9 +711,11 @@ export class PtyHandler {
     // binary name keeps this from also matching an unrelated "ghost"-style
     // binary.
     const providerEnv =
-      userId && command?.startsWith('gh ') ? buildGhEnv(userId, {}) :
-      userId && command?.startsWith('glab ') ? buildGlabEnv(userId, {}) :
-      undefined
+      userId && command?.startsWith('gh ')
+        ? buildGhEnv(userId, {})
+        : userId && command?.startsWith('glab ')
+          ? buildGlabEnv(userId, {})
+          : undefined
     const spawnEnv = this.buildSpawnEnv(
       // buildGhEnv/buildGlabEnv are typed as NodeJS.ProcessEnv (values may be
       // `string | undefined`) but only ever assign string literals — safe to
@@ -814,7 +829,7 @@ export class PtyHandler {
     // id alone is insufficient — clients need cols/rows to verify spawn matches
     // their resize request, cwd to update the path display, and shell to show
     // the shell type in the UI.
-    return { id, cols, rows, cwd, shell }
+    return { id, cols, rows, cwd, shell, ...(cwdFellBack ? { cwdFellBack: true as const } : {}) }
   }
 
   private async attach(params: Record<string, unknown>): Promise<{ replay?: string }> {

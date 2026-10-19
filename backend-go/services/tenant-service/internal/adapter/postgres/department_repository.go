@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/tenant-service/internal/domain"
@@ -48,7 +46,7 @@ func (r *DepartmentRepository) Get(ctx context.Context, companyID, id string) (d
 	var d domain.Department
 	var settingsJSON string
 	if err := row.Scan(&d.ID, &d.CompanyID, &d.Name, &settingsJSON); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.Department{}, false, nil
 		}
 		return domain.Department{}, false, fmt.Errorf("postgres: query department: %w", err)
@@ -68,6 +66,9 @@ func (r *DepartmentRepository) ExistsByName(ctx context.Context, companyID, name
 	err := r.pool.QueryRow(ctx, `
 		SELECT EXISTS(SELECT 1 FROM tenant.departments WHERE company_id = $1 AND name = $2)
 	`, companyID, name).Scan(&exists)
+	if isMalformedUUID(err) {
+		return false, nil
+	}
 	if err != nil {
 		return false, fmt.Errorf("postgres: check department name exists: %w", err)
 	}
@@ -81,6 +82,9 @@ func (r *DepartmentRepository) List(ctx context.Context, companyID string) ([]do
 		WHERE company_id = $1
 		ORDER BY id
 	`, companyID)
+	if isMalformedUUID(err) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query departments: %w", err)
 	}
@@ -101,6 +105,9 @@ func (r *DepartmentRepository) List(ctx context.Context, companyID string) ([]do
 		out = append(out, d)
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("postgres: iterate department rows: %w", err)
 	}
 	return out, nil
@@ -134,7 +141,7 @@ func (r *DepartmentRepository) Update(ctx context.Context, companyID, id string,
 	var d domain.Department
 	var settingsJSON string
 	if err := row.Scan(&d.ID, &d.CompanyID, &d.Name, &settingsJSON); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.Department{}, false, nil
 		}
 		return domain.Department{}, false, fmt.Errorf("postgres: update department: %w", err)

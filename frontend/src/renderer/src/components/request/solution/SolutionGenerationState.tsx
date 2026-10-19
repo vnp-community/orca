@@ -17,6 +17,10 @@ export type SolutionGenerationStateProps = {
   /** 'analyzing' = no solution yet, AI working; 'drafting' = a draft exists; 'failed' = generate failed. */
   variant: 'analyzing' | 'drafting' | 'failed'
   errorKind?: string | null
+  /** Backend code of the failed run/call, quoted so operators can search for it. */
+  errorCode?: string | null
+  /** Overrides the copy derived from `errorKind` (code-specific text). */
+  errorText?: string | null
   onRegenerate?: () => void
   /** True while a generate call is in flight or briefly rate-limited. */
   regenerateDisabled?: boolean
@@ -25,17 +29,39 @@ export type SolutionGenerationStateProps = {
 export function SolutionGenerationState({
   variant,
   errorKind,
+  errorCode,
+  errorText,
   onRegenerate,
   regenerateDisabled = false
 }: SolutionGenerationStateProps): React.JSX.Element {
   if (variant === 'failed') {
     return (
-      <div role="alert" data-testid="solution-generation-failed" className="space-y-2 rounded-md border border-destructive/30 p-3">
+      <div
+        role="alert"
+        data-testid="solution-generation-failed"
+        className="space-y-2 rounded-md border border-destructive/30 p-3"
+      >
         <p className="flex items-center gap-2 text-sm text-destructive">
           <AlertCircle className="size-4" aria-hidden />
-          {translate('auto.components.request.SolutionGenerationState.failed', 'Could not generate the analysis.')}
+          {translate(
+            'auto.components.request.SolutionGenerationState.failed',
+            'Could not generate the analysis.'
+          )}
         </p>
-        {errorKind && <p className="text-xs text-muted-foreground">{requestErrorMessage(errorKind)}</p>}
+        {(errorText || errorKind) && (
+          <p className="text-xs text-muted-foreground">
+            {errorText ?? requestErrorMessage(errorKind)}
+          </p>
+        )}
+        {errorCode && (
+          <p className="text-xs text-muted-foreground" data-testid="solution-generation-error-code">
+            {translate(
+              'auto.components.request.SolutionGenerationState.errorCode',
+              'Error code: {{code}}',
+              { code: errorCode }
+            )}
+          </p>
+        )}
         {onRegenerate && (
           <Button size="sm" variant="outline" disabled={regenerateDisabled} onClick={onRegenerate}>
             {translate('auto.components.request.SolutionGenerationState.regenerate', 'Regenerate')}
@@ -49,8 +75,14 @@ export function SolutionGenerationState({
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" aria-hidden />
         {variant === 'analyzing'
-          ? translate('auto.components.request.SolutionGenerationState.analyzing', 'AI is analyzing this request')
-          : translate('auto.components.request.SolutionGenerationState.drafting', 'AI is drafting the analysis')}
+          ? translate(
+              'auto.components.request.SolutionGenerationState.analyzing',
+              'AI is analyzing this request'
+            )
+          : translate(
+              'auto.components.request.SolutionGenerationState.drafting',
+              'AI is drafting the analysis'
+            )}
       </p>
       <Skeleton className="h-4 w-2/3" />
       <Skeleton className="h-4 w-full" />

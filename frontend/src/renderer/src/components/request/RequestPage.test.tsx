@@ -5,8 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../hooks/useRequestFlowSupport', () => ({ useRequestFlowSupport: () => undefined }))
 vi.mock('./RequestsTab', () => ({ RequestsTab: () => <div data-testid="request-tab-requests" /> }))
-vi.mock('./approval/ApprovalInboxTab', () => ({ ApprovalInboxTab: () => <div data-testid="request-tab-approvals" /> }))
-vi.mock('./backlog/BacklogTab', () => ({ BacklogTab: () => <div data-testid="request-tab-backlog" /> }))
+vi.mock('./approval/ApprovalInboxTab', () => ({
+  ApprovalInboxTab: () => <div data-testid="request-tab-approvals" />
+}))
+vi.mock('./backlog/BacklogTab', () => ({
+  BacklogTab: () => <div data-testid="request-tab-backlog" />
+}))
 
 import { useAppStore } from '@/store'
 import RequestPage from './RequestPage'
@@ -50,6 +54,17 @@ describe('RequestPage', () => {
     expect(useAppStore.getState().activeView).toBe('requests')
     screen.getByTestId('field').blur()
     fireEvent.keyDown(window, { key: 'Escape' })
+    expect(useAppStore.getState().activeView).toBe('terminal')
+  })
+
+  it('Escape that a sheet or dialog on top already consumed does not also close the page', () => {
+    render(<RequestPage />)
+    const consumed = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
+    consumed.preventDefault()
+    window.dispatchEvent(consumed)
+    expect(useAppStore.getState().activeView).toBe('requests')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
     expect(useAppStore.getState().activeView).toBe('terminal')
   })
 

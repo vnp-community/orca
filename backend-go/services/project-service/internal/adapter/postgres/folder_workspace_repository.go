@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -74,7 +73,7 @@ func (r *FolderWorkspaceRepository) Update(ctx context.Context, id, name string)
 	)
 
 	out, err := scanFolderWorkspace(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.FolderWorkspace{}, domain.ErrFolderWorkspaceNotFound
 	}
 	if err != nil {
@@ -85,6 +84,9 @@ func (r *FolderWorkspaceRepository) Update(ctx context.Context, id, name string)
 
 func (r *FolderWorkspaceRepository) Delete(ctx context.Context, id string) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM project.folder_workspaces WHERE id = $1`, id)
+	if isMalformedUUID(err) {
+		return domain.ErrFolderWorkspaceNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete folder workspace: %w", err)
 	}
@@ -128,7 +130,7 @@ func (r *FolderWorkspaceRepository) FindByPath(ctx context.Context, tenantID, de
 	`, tenantID, devServerID, path)
 
 	fw, err := scanFolderWorkspace(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return nil, nil
 	}
 	if err != nil {
@@ -167,7 +169,7 @@ func (r *FolderWorkspaceRepository) Get(ctx context.Context, id string) (*domain
 	`, id)
 
 	fw, err := scanFolderWorkspace(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return nil, nil
 	}
 	if err != nil {

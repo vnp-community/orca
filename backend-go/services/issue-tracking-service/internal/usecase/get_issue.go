@@ -38,7 +38,7 @@ func (uc *GetIssue) Execute(ctx context.Context, in GetIssueInput) (domain.Issue
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, in.Provider, in.WorkspaceID)
 	if err != nil {
-		return domain.Issue{}, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no credential available for provider", err)
+		return domain.Issue{}, credentialResolveError(err, "no credential available for provider")
 	}
 	issue, err := provider.GetIssue(ctx, cred, in.IssueID)
 	if err != nil {

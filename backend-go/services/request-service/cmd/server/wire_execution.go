@@ -29,6 +29,7 @@ type executionStores struct {
 	leases        usecase.ReconcileLeases
 	gateApprovals usecase.ApprovalGateReader
 	backlog       usecase.BacklogRequestReader
+	activity      usecase.RequestActivityReader
 }
 
 func postgresExecutionStores(base *postgresadapter.Repository) executionStores {
@@ -37,6 +38,7 @@ func postgresExecutionStores(base *postgresadapter.Repository) executionStores {
 		phaseStarts: postgresadapter.NewPhaseStartRepository(base), outcomes: postgresadapter.NewTaskRunOutcomeRepository(base),
 		checks: postgresadapter.NewRequestCheckRepository(base), scanner: executing, leases: executing,
 		gateApprovals: postgresadapter.NewApprovalGateReader(base), backlog: postgresadapter.NewBacklogRequestReader(base),
+		activity: postgresadapter.NewRequestActivityRepository(base),
 	}
 }
 
@@ -46,6 +48,7 @@ func mysqlExecutionStores(base *mysqladapter.Repository) executionStores {
 		phaseStarts: mysqladapter.NewPhaseStartRepository(base), outcomes: mysqladapter.NewTaskRunOutcomeRepository(base),
 		checks: mysqladapter.NewRequestCheckRepository(base), scanner: executing, leases: executing,
 		gateApprovals: mysqladapter.NewApprovalGateReader(base), backlog: mysqladapter.NewBacklogRequestReader(base),
+		activity: mysqladapter.NewRequestActivityRepository(base),
 	}
 }
 
@@ -74,8 +77,10 @@ func dialExecutionTasks(cfg config.Config, log *slog.Logger) (*executionTasks, e
 	return t, nil
 }
 
-func (t *executionTasks) subjectArtifacts() map[domain.SubjectType]usecase.SubjectArtifacts {
+func (t *executionTasks) subjectArtifacts(changes usecase.OpenSpecChangeRepository) map[domain.SubjectType]usecase.SubjectArtifacts {
 	return map[domain.SubjectType]usecase.SubjectArtifacts{
+		domain.SubjectPlan:      &usecase.PlanArtifacts{Tasks: t.client, Changes: changes},
+		domain.SubjectTaskList:  &usecase.PlanArtifacts{Tasks: t.client, Changes: changes},
 		domain.SubjectPhase:     &usecase.PhaseArtifacts{Tasks: t.client},
 		domain.SubjectPreDeploy: &usecase.PreDeployArtifacts{Tasks: t.client},
 	}
@@ -88,8 +93,12 @@ func (t *executionTasks) close() {
 }
 
 type executionWiring struct {
-	Server  requestgrpc.ExecutionUseCases
-	closers []func()
+	Server requestgrpc.ExecutionUseCases
+	// Policies are shared with CommitPlan, which runs each type's plan preconditions.
+	Policies *domain.PolicyRegistry
+	// taskSync is filled by wirePlan, which owns the workspace the sync writes in; until then a succeeded task is only recorded.
+	taskSync *taskSyncSlot
+	closers  []func()
 }
 
 func (w *executionWiring) close() {
@@ -102,8 +111,9 @@ func (w *executionWiring) close() {
 // (CR-REQ-015) and starts their background parts: the task-outcome, status and gate consumers (need NATS) and
 // the reconcile loop.
 func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, log *slog.Logger, stores *requestStores,
-	lifecycle *requestLifecycle, approval *approvalWiring, tasks *executionTasks, bus *commoneventbus.Consumer) (*executionWiring, error) {
-	w := &executionWiring{}
+	lifecycle *requestLifecycle, approval *approvalWiring, tasks *executionTasks, bus *commoneventbus.Consumer,
+	contractRuns usecase.ContractRunPlanner) (*executionWiring, error) {
+	w := &executionWiring{taskSync: &taskSyncSlot{}}
 	ex := stores.execution
 	settings := usecase.ExecutionSettings{
 		MaxParallelTasks: cfg.MaxParallelTasks, MaxTaskAttempts: cfg.MaxTaskAttempts, AutoCompleteTasks: cfg.AutoCompleteTasks,
@@ -113,6 +123,7 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 		Checks:    &usecase.CheckReaderFromRepository{Checks: ex.checks},
 		Approvals: &usecase.ApprovalLookupFromGateReader{Approvals: ex.gateApprovals},
 	})
+	w.Policies = policies
 	var opener usecase.ApprovalOpener // nil when approval is off: gated tasks then refuse to dispatch
 	var authorizer usecase.ApprovalAuthorizer
 	if approval.Enabled {
@@ -131,10 +142,18 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	}
 	visibility := &usecase.MemberRequestVisibility{Members: members}
 
-	actors := &usecase.ApprovalExecutionActors{Approvals: ex.gateApprovals, PhaseStarts: ex.phaseStarts}
+	access := &usecase.ExecutionAccess{Tasks: tasks.client, Log: log}
+	if approval.Enabled && approval.Server.Decide != nil {
+		// A continuous run is driven by whoever approves the plan; refuse an approver task-service would not let run it.
+		approval.Server.Decide.StartPrecheck = &usecase.ExecutionStartPrecheck{
+			Requests: stores.requests, Access: access, Authorizer: authorizer,
+			Modes: &usecase.ExecutionModeResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults},
+		}
+	}
+	actors := &usecase.ApprovalExecutionActors{Approvals: ex.gateApprovals, PhaseStarts: ex.phaseStarts, Access: access}
 	advance := &usecase.AdvanceExecution{
 		Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Policies: policies,
-		Approvals: opener, Settings: settings, Log: log,
+		Approvals: opener, Settings: settings, Contract: contractRuns, Log: log,
 	}
 	evaluate := &usecase.EvaluateExecution{
 		Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Checks: ex.checks, Approvals: ex.gateApprovals, Open: opener,
@@ -143,9 +162,12 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	}
 	report := &usecase.ReportTaskOutcome{
 		Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, Processed: stores.processed, Evaluate: evaluate,
-		Tx: stores.tx, Outbox: stores.outboxWriter, Settings: settings, Log: log,
+		Tx: stores.tx, Outbox: stores.outboxWriter, Settings: settings, TaskSync: w.taskSync, Log: log,
 	}
-	startExecution := &usecase.StartExecution{Requests: stores.requests, Evaluate: evaluate}
+	startExecution := &usecase.StartExecution{
+		Requests: stores.requests, Evaluate: evaluate, Pinner: stores.executionModes,
+		Modes: &usecase.ExecutionModeResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults},
+	}
 	resume := &usecase.ResumeAfterGate{Requests: stores.requests, Evaluate: evaluate}
 	host, _ := os.Hostname()
 	reconcile := &usecase.ReconcileExecutingRequests{
@@ -155,13 +177,21 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	w.Server = requestgrpc.ExecutionUseCases{
 		StartPhase: &usecase.StartPhase{
 			Requests: stores.requests, Tasks: tasks.client, PhaseStarts: ex.phaseStarts, Approvals: ex.gateApprovals,
-			Authorizer: &usecase.ApprovalStartPhaseAuthorizer{Approvals: authorizer}, Advance: advance, Tx: stores.tx, Outbox: stores.outboxWriter,
+			Authorizer: &usecase.ApprovalStartPhaseAuthorizer{Approvals: authorizer}, Advance: advance, Access: access, Tx: stores.tx, Outbox: stores.outboxWriter,
 		},
 		ReportOutcome: report,
 		RecordCheck: &usecase.RecordRequestCheck{
 			Requests: stores.requests, Checks: ex.checks, Authorizer: &usecase.ParticipantWriteAuthorizer{Approvals: ex.gateApprovals},
 		},
 		ListChecks: &usecase.ListRequestChecks{Requests: stores.requests, Checks: ex.checks, Visibility: visibility},
+		Activity: &usecase.ListRequestActivity{
+			Requests: stores.requests, Activity: ex.activity, Tasks: tasks.client, MaxAttempts: settings.MaxTaskAttempts, Log: log,
+		},
+		Summary: &usecase.GetExecutionSummary{
+			Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Approvals: ex.gateApprovals,
+			Authorizer: authorizer, Clarifications: stores.artifact.clarifications, Changes: stores.openspecChanges,
+			Engine: &usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}, MaxAttempts: settings.MaxTaskAttempts, Log: log,
+		},
 		Backlog: &usecase.ListBacklog{
 			Requests: &usecase.ListBacklogRequests{Reader: ex.backlog, Visibility: visibility},
 			Tasks: &usecase.ListBacklogTasks{
@@ -176,6 +206,7 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 		"AdvanceExecution": advance, "EvaluateExecution": evaluate, "ReportTaskOutcome": report, "StartExecution": startExecution,
 		"ResumeAfterGate": resume, "ReconcileExecutingRequests": reconcile, "StartPhase": w.Server.StartPhase,
 		"RecordRequestCheck": w.Server.RecordCheck, "ListRequestChecks": w.Server.ListChecks,
+		"ListRequestActivity": w.Server.Activity, "GetExecutionSummary": w.Server.Summary,
 		"ListBacklogRequests": w.Server.Backlog.Requests, "ListBacklogTasks": w.Server.Backlog.Tasks,
 	} {
 		if err := requireWired(name, v, optional...); err != nil {
@@ -202,4 +233,10 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	run("request-status", eventbusadapter.NewRequestStatusConsumer(bus, startExecution).Run)
 	run("approval-gate", eventbusadapter.NewApprovalDecidedConsumer(bus, resume).Run)
 	return w, nil
+}
+
+// wireContractRuns puts the tasks of an OpenSpec plan on the contract path. Without the dev server stack there is no agent
+// to ask about the knowledge hub, and the plain run stays as it was.
+func wireContractRuns(solution *solutionWiring) usecase.ContractRunPlanner {
+	return usecase.OpenSpecContractRuns{Knowledge: usecase.CapabilityKnowledgeProbe{Conns: solution.conns, Caps: solution.caps}}
 }

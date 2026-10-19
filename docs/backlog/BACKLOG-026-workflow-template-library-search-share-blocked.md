@@ -1,5 +1,13 @@
 # BACKLOG-026: Workflow Template Library's search/sort/share — blocked on unbuilt backend RPCs
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟡 PARTIAL** · Backlog ship: SHIP-UX-03
+>
+> `workflow.template.clone` đã đăng ký (`channels_workflow.go`). Không thấy tìm kiếm/sắp xếp phía server hay chia sẻ; Library vẫn lọc phía client.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/frontend/crs/v4/workflow/tasks/FE-TASK-002-workflow-template-library.md` (FE-SOL-001, CR-WF-006)
 **Priority:** Low — Browse and Use (the core flow) work today against the real `workflow.template.list` RPC; only the enhancement features are missing
 **Blocked on:** `BE-SOL-005` (`template-sharing-library-and-list-executions`, backend-go, **📋 Proposed**) — full-text search, trending sort, and sharing/cloning RPCs don't exist

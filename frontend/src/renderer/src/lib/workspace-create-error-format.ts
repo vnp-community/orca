@@ -5,9 +5,17 @@ export type WorkspaceCreateErrorDisplay = {
   help?: string
   /** 'not-a-git-repo' drives WorktreeCreationPanel's "Initialize as Git repo"
    *  action — kept a discriminant here (not string-matched again downstream)
-   *  so the detection signature lives in exactly one place. */
-  kind?: 'not-a-git-repo'
+   *  so the detection signature lives in exactly one place. The host-* kinds
+   *  come from backend host-binding codes (SOL-FE-E2E-004): 'host-unbound'
+   *  offers "Choose host"; the other two are retryable infrastructure states. */
+  kind?: WorkspaceCreateErrorKind
 }
+
+export type WorkspaceCreateErrorKind =
+  | 'not-a-git-repo'
+  | 'host-unbound'
+  | 'host-unreachable'
+  | 'host-check-failed'
 
 const MISSING_BASE_REF_ANCHOR = 'could not resolve a default base ref'
 
@@ -18,6 +26,21 @@ const MISSING_BASE_REF_ANCHOR = 'could not resolve a default base ref'
 // INFRA_AGENT_EXEC_FAILED wrapping a bare "not a git repository" from the
 // agent's own spawned git process. Matching all three keeps this robust to
 // which layer's wrapping happens to be on top for a given failure path.
+// Host-binding codes checked before NOT_A_GIT_REPO_ANCHORS: a repo with no usable host fails with
+// these (never with "not a git repository"), and WORKTREE_DETECT_FAILED may wrap them.
+const HOST_UNBOUND_ANCHORS = [
+  'gitgateway_repo_host_unbound',
+  'repo_host_unbound',
+  'project_repo_host_required',
+  'gitgateway_missing_dev_server_id'
+]
+const HOST_UNREACHABLE_ANCHORS = [
+  'gitgateway_dev_server_unreachable',
+  'dev_server_unreachable',
+  'infra_dev_server_not_connected'
+]
+const HOST_CHECK_FAILED_ANCHORS = ['gitgateway_host_check_failed']
+
 const NOT_A_GIT_REPO_ANCHORS = [
   'not a git repository',
   'not a valid git repository',
@@ -36,6 +59,48 @@ export function formatWorkspaceCreateError(error: unknown): WorkspaceCreateError
         'Orca could not resolve a usable base ref for this workspace.'
       ),
       help: 'Create an initial commit (for example on main), or select an existing branch in Create From, then try again.'
+    }
+  }
+
+  if (HOST_UNBOUND_ANCHORS.some((anchor) => lower.includes(anchor))) {
+    return {
+      title: translate(
+        'auto.lib.workspace.create.error.format.hostUnbound.title',
+        'This project isn’t assigned to a dev server'
+      ),
+      message: translate(
+        'auto.lib.workspace.create.error.format.hostUnbound.message',
+        'Choose the dev server this project lives on, then try again.'
+      ),
+      kind: 'host-unbound'
+    }
+  }
+
+  if (HOST_UNREACHABLE_ANCHORS.some((anchor) => lower.includes(anchor))) {
+    return {
+      title: translate(
+        'auto.lib.workspace.create.error.format.hostUnreachable.title',
+        'The dev server is offline'
+      ),
+      message: translate(
+        'auto.lib.workspace.create.error.format.hostUnreachable.message',
+        'Orca can’t reach the dev server this project lives on. Reconnect it, then retry.'
+      ),
+      kind: 'host-unreachable'
+    }
+  }
+
+  if (HOST_CHECK_FAILED_ANCHORS.some((anchor) => lower.includes(anchor))) {
+    return {
+      title: translate(
+        'auto.lib.workspace.create.error.format.hostCheckFailed.title',
+        'Couldn’t check the dev server'
+      ),
+      message: translate(
+        'auto.lib.workspace.create.error.format.hostCheckFailed.message',
+        'Orca couldn’t confirm the dev server is online. Retry in a moment.'
+      ),
+      kind: 'host-check-failed'
     }
   }
 

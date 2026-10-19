@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -35,8 +36,11 @@ func (uc *FindTaskByNumber) Execute(ctx context.Context, in FindTaskByNumberInpu
 		return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_MISSING_PROJECT_ID", "project_id is required", nil)
 	}
 	task, err := uc.repo.FindByNumber(ctx, tenantID, in.ProjectID, in.TaskNumber)
-	if err != nil {
+	if errors.Is(err, domain.ErrTaskNotFound) {
 		return domain.Task{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND_BY_NUMBER", "no task with this number in this project", err)
+	}
+	if err != nil {
+		return domain.Task{}, apperrors.New(apperrors.KindInternal, "TASK_FIND_BY_NUMBER_FAILED", "failed to look up task by number", err)
 	}
 	return task, nil
 }

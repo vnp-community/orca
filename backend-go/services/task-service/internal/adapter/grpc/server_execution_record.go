@@ -17,6 +17,23 @@ func (s *Server) WithExecutionRecords(list *usecase.ListExecutionRecords) *Serve
 	return s
 }
 
+// WithTaskExecutionOutput enables GetTaskExecutionOutput; otherwise it answers Unimplemented.
+func (s *Server) WithTaskExecutionOutput(get *usecase.GetTaskExecutionOutput) *Server {
+	s.getTaskExecutionOutput = get
+	return s
+}
+
+func (s *Server) GetTaskExecutionOutput(ctx context.Context, req *taskv1.GetTaskExecutionOutputRequest) (*taskv1.GetTaskExecutionOutputResponse, error) {
+	if s.getTaskExecutionOutput == nil {
+		return s.UnimplementedTaskServiceServer.GetTaskExecutionOutput(ctx, req)
+	}
+	out, err := s.getTaskExecutionOutput.Execute(ctx, req.GetTaskId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.GetTaskExecutionOutputResponse{Found: out.Found, Output: out.Output, Redacted: out.Redacted, Truncated: out.Truncated}, nil
+}
+
 func toProtoExecutionRecord(r domain.ExecutionRecord) *taskv1.ExecutionRecord {
 	return &taskv1.ExecutionRecord{
 		Id: r.ID, TaskId: r.TaskID, ExecutionLinkId: r.ExecutionLinkID, Attempt: int32(r.Attempt),

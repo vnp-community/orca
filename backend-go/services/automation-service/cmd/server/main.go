@@ -157,7 +157,7 @@ func run() error {
 	// deploys terminate mTLS via the service mesh sidecar, per
 	// architecture/07-security-architecture.md, not a disabled-security
 	// choice made in application code.
-	workflowConn, err := grpc.NewClient(cfg.WorkflowServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	workflowConn, err := grpcmw.NewClient(cfg.WorkflowServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing workflow-service at %s: %w", cfg.WorkflowServiceAddr, err)
 	}
@@ -170,7 +170,7 @@ func run() error {
 	// a real PullRequestCreator here — same insecure-transport-credentials
 	// local-dev/scaffold convention as workflowConn above (production
 	// terminates mTLS via the service mesh sidecar).
-	scmConn, err := grpc.NewClient(cfg.ScmIntegrationServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	scmConn, err := grpcmw.NewClient(cfg.ScmIntegrationServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing scm-integration-service at %s: %w", cfg.ScmIntegrationServiceAddr, err)
 	}

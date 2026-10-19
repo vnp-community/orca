@@ -102,12 +102,18 @@ func (uc *ExportArtifactProjection) exportRequest(req domain.Request) ([]byte, e
 
 func (uc *ExportArtifactProjection) exportSolution(ctx context.Context, req domain.Request, ref string) ([]byte, error) {
 	entry, err := uc.index.Resolve(ctx, ref)
+	if err != nil && !isNotFoundKind(err) {
+		return nil, err
+	}
 	if err != nil || entry.RequestID != req.ID {
 		return nil, domain.ErrArtifactNotFound(ref)
 	}
 	sol, err := uc.solutions.Get(ctx, entry.ArtifactID)
 	if err != nil {
-		return nil, domain.ErrArtifactNotFound(ref)
+		if isNotFoundKind(err) {
+			return nil, domain.ErrArtifactNotFound(ref)
+		}
+		return nil, err
 	}
 	meta := domain.ProjectionMeta{ID: ref, Title: req.Title, Status: string(sol.Status), Request: domain.FormatRequestID(req.Number)}
 	if sol.InputRequestRevision > 0 {

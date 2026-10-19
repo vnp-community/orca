@@ -91,9 +91,17 @@ func TestAnalysisSettings_MapsConfigAndKeepsDefaults(t *testing.T) {
 		AgentReadonlyTimeoutMS: 5, AgentReadonlyMaxPerProject: 6, RequireEnforcedReadonly: true,
 	})
 	want := usecase.AnalysisSettings{AICompleteTimeout: time.Second, LeaseTTL: 2 * time.Second, Heartbeat: 3 * time.Second, RecoveryInterval: 4 * time.Second,
-		AgentTimeoutMS: 5, HotfixTimeoutMS: d.HotfixTimeoutMS, MaxAgentRunsPerProject: 6, UseAgentReadonlyFlag: false, RequireEnforcedReadonly: true}
+		AgentTimeoutMS: 5, HotfixTimeoutMS: d.HotfixTimeoutMS, SpecTimeoutMS: d.SpecTimeoutMS, MaxAgentRunsPerProject: 6, UseAgentReadonlyFlag: false, RequireEnforcedReadonly: true}
 	if got != want {
 		t.Fatalf("got %+v\nwant %+v", got, want)
+	}
+	spec := analysisSettings(config.Config{SpecTimeoutMS: 300_000})
+	if spec.SpecTimeoutMS != 300_000 || spec.SpecTotalTimeoutMS != 0 {
+		t.Fatalf("the total is left unset so the use cases derive it from the attempt budget: %+v", spec)
+	}
+	pinned := analysisSettings(config.Config{SpecTimeoutMS: 300_000, SpecTotalTimeoutMS: 400_000})
+	if pinned.SpecTotalTimeoutMS != 400_000 {
+		t.Fatalf("%+v", pinned)
 	}
 }
 

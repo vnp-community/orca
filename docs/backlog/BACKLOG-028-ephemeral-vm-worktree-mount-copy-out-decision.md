@@ -1,5 +1,13 @@
 # BACKLOG-028: Ephemeral VM worktree mount/copy-out — spec is wrong, real feature needs a product decision
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — chờ quyết định sản phẩm** · Backlog ship: SHIP-CLI-04
+>
+> Không đổi. Khuyến nghị cũ vẫn là nhánh A (sửa spec F18) trừ khi có nhu cầu cụ thể.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/frontend/crs/v3/ephemeral-vm/tasks/FE-TASK-EVM-007-worktree-mount-decision.md` (FE-SOL-EVM-005) + `specs/agent/crs/v3/ephemeral-vm/tasks/TASK-AG-EVM-012-worktree-mount-decision.md` (SOL-AG-EVM-005), CR-EVM-009
 **Priority:** Low — nothing is broken today; `docs/features/F18-ephemeral-vm.md` just describes a mechanism that was never built
 **Blocked on:** **A product decision** between two options (below) — both tasks that investigated this were explicitly scoped "investigation only, do not merge/code"

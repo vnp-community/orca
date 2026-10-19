@@ -158,4 +158,49 @@ describe('useTask().aiDecompose() tracing', () => {
       labels: ['phase:spec-review']
     })
   })
+
+  it('deleteTask sends {id}, the key the real task.delete handler decodes, and removes the task', async () => {
+    mockRpc.mockResolvedValueOnce({ success: true })
+    const { useTask } = await import('../useTask')
+    const { result } = renderHook(() => useTask('task-1'))
+
+    await act(async () => {
+      await result.current.deleteTask()
+    })
+
+    expect(mockRpc.mock.calls[0]?.[1]).toBe('task.delete')
+    expect(mockRpc.mock.calls[0]?.[2]).toEqual({ id: 'task-1' })
+    expect(mockStore.removeTask).toHaveBeenCalledWith('task-1')
+  })
+
+  it('deleteTask treats TASK_NOT_FOUND as success: a repeated delete is not an error', async () => {
+    mockRpc.mockRejectedValueOnce(
+      Object.assign(new Error('TASK_NOT_FOUND: task not found'), { code: 'runtime_error' })
+    )
+    const { useTask } = await import('../useTask')
+    const { result } = renderHook(() => useTask('task-1'))
+
+    await act(async () => {
+      await result.current.deleteTask()
+    })
+
+    expect(mockStore.removeTask).toHaveBeenCalledWith('task-1')
+  })
+
+  it('deleteTask still fails loudly for any other error and keeps the task', async () => {
+    mockRpc.mockRejectedValueOnce(
+      Object.assign(new Error('TASK_DELETE_FAILED: failed to delete task'), {
+        code: 'runtime_error'
+      })
+    )
+    const { useTask } = await import('../useTask')
+    const { result } = renderHook(() => useTask('task-1'))
+
+    await expect(
+      act(async () => {
+        await result.current.deleteTask()
+      })
+    ).rejects.toThrow('TASK_DELETE_FAILED')
+    expect(mockStore.removeTask).not.toHaveBeenCalled()
+  })
 })

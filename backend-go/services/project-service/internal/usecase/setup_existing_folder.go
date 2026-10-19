@@ -29,12 +29,12 @@ type pathCheckResult struct {
 type SetupExistingFolder struct {
 	repo     HostSetupRepository
 	projects ProjectRepository
-	repos    RepoRepository
 	relay    DevServerRelay
+	guard    repoLocationGuard
 }
 
 func NewSetupExistingFolder(repo HostSetupRepository, projects ProjectRepository, repos RepoRepository, relay DevServerRelay) *SetupExistingFolder {
-	return &SetupExistingFolder{repo: repo, projects: projects, repos: repos, relay: relay}
+	return &SetupExistingFolder{repo: repo, projects: projects, relay: relay, guard: repoLocationGuard{repos: repos, members: projects}}
 }
 
 func (uc *SetupExistingFolder) Execute(ctx context.Context, in SetupExistingFolderInput) (domain.HostSetup, domain.Project, error) {
@@ -78,6 +78,12 @@ func (uc *SetupExistingFolder) Execute(ctx context.Context, in SetupExistingFold
 		return domain.HostSetup{}, domain.Project{}, apperrors.New(apperrors.KindFailedPrecondition, "PROJECT_FOLDER_NOT_FOUND_ON_HOST", domain.ErrFolderNotFoundOnHost.Error(), domain.ErrFolderNotFoundOnHost)
 	}
 
+	// A taken location is not the setup's fault, so it is left pending (not
+	// marked failed): the user can pick another folder or remove the other repo.
+	if err := uc.guard.ensureFree(ctx, tenantID, setup.DevServerID, setup.FolderPath, ""); err != nil {
+		return domain.HostSetup{}, domain.Project{}, err
+	}
+
 	displayName := setup.DisplayName
 	if displayName == "" {
 		displayName = setup.FolderPath
@@ -92,22 +98,27 @@ func (uc *SetupExistingFolder) Execute(ctx context.Context, in SetupExistingFold
 	project.CreatedBy = userID
 	project.DevServerID = setup.DevServerID
 
-	created, err := uc.projects.Create(ctx, project)
-	if err != nil {
-		_ = uc.repo.SetStatus(ctx, tenantID, in.ID, domain.HostSetupFailed)
-		return domain.HostSetup{}, domain.Project{}, apperrors.New(apperrors.KindInternal, "PROJECT_CREATE_FAILED", "failed to create project", err)
-	}
-
 	// Reuses project.repos.url to carry the absolute on-disk path — same
 	// simplification TASK-138's ImportNested applies.
-	repo, err := domain.NewRepo(uuid.NewString(), created.ID, setup.FolderPath, displayName, setup.DevServerID)
+	repo, err := domain.NewRepo(uuid.NewString(), project.ID, setup.FolderPath, displayName, setup.DevServerID)
 	if err != nil {
 		_ = uc.repo.SetStatus(ctx, tenantID, in.ID, domain.HostSetupFailed)
 		return domain.HostSetup{}, domain.Project{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_INVALID_REPO", err.Error(), err)
 	}
-	if _, err := uc.repos.AddRepo(ctx, repo); err != nil {
+	repo.RegistrationKey = domain.RepoRegistrationKey(tenantID, setup.DevServerID, setup.FolderPath)
+	owner, err := domain.NewProjectMember(project.ID, userID, domain.ProjectRoleOwner)
+	if err != nil {
+		return domain.HostSetup{}, domain.Project{}, apperrors.New(apperrors.KindInternal, "PROJECT_OWNER_INVALID", err.Error(), err)
+	}
+
+	// One transaction: a repo that cannot be stored must not leave a project behind.
+	created, _, err := uc.projects.CreateWithOwner(ctx, project, owner, &repo)
+	if raced := uc.guard.translateWriteError(ctx, err, tenantID, setup.DevServerID, setup.FolderPath, ""); raced != nil {
+		return domain.HostSetup{}, domain.Project{}, raced
+	}
+	if err != nil {
 		_ = uc.repo.SetStatus(ctx, tenantID, in.ID, domain.HostSetupFailed)
-		return domain.HostSetup{}, domain.Project{}, apperrors.New(apperrors.KindInternal, "PROJECT_ADD_REPO_FAILED", "failed to attach repo", err)
+		return domain.HostSetup{}, domain.Project{}, apperrors.New(apperrors.KindInternal, "PROJECT_CREATE_FAILED", "failed to create project", err)
 	}
 
 	completed, err := uc.repo.Complete(ctx, tenantID, in.ID, created.ID)

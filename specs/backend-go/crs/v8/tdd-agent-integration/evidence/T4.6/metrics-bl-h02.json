@@ -1,0 +1,404 @@
+{
+  "runs": [
+    {
+      "id": "4d0fc2d9-7f76-46e1-ba1a-293246c40474",
+      "kind": "solution",
+      "mode": "agent_readonly",
+      "engine": "native",
+      "status": "succeeded",
+      "error": "",
+      "started": "2026-10-15 01:02:54.189641+00",
+      "finished": "2026-10-15 01:10:49.422162+00",
+      "seconds": 475.232521,
+      "cost": 3.2464645000000005,
+      "turns": 62,
+      "knowledge_calls": 19,
+      "tool_calls": 61
+    },
+    {
+      "id": "505348b8-8a8b-4195-bde7-5f1555ba7644",
+      "kind": "plan",
+      "mode": "agent_proposal",
+      "engine": "openspec",
+      "status": "succeeded",
+      "error": "",
+      "started": "2026-10-15 01:16:36.398373+00",
+      "finished": "2026-10-15 01:32:57.989958+00",
+      "seconds": 981.591585,
+      "cost": 10.366279500000003,
+      "turns": 149,
+      "knowledge_calls": 39,
+      "tool_calls": 148
+    }
+  ],
+  "tasks": [
+    {
+      "id": "e0898540-0253-4e29-bc1c-ac8bade1224a",
+      "title": "Vi\u1ebft test c\u1ea5u h\u00ecnh: m\u1eb7c \u0111\u1ecbnh, l\u01b0u/\u0111\u1ecdc l\u1ea1i, t\u1eeb ch\u1ed1i theo t\u1eebng tr\u01b0\u1eddng b\u1eaft bu\u1ed9c",
+      "status": "done",
+      "phase": "`case_ai_config` sang MySQL v\u1edbi ba tr\u01b0\u1eddng b\u1eaft bu\u1ed9c",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "missing",
+          "failure": "retryable",
+          "at": "2026-10-15 03:21:34.622797+00"
+        },
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 03:25:46.68778+00"
+        }
+      ]
+    },
+    {
+      "id": "1b365b41-d5b2-4628-9b04-b2702a8efa62",
+      "title": "Vi\u1ebft test chat: marker \u0111\u00fang, kh\u00f4ng marker, c\u1edd t\u1eaft, c\u1ea5u h\u00ecnh thi\u1ebfu tr\u01b0\u1eddng b\u1eaft bu\u1ed9c",
+      "status": "done",
+      "phase": "C\u1ed5ng AI c\u00f3 b\u1ea3n fake v\u00e0 chat tr\u1ea3 chu\u1ed7i markdown",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 03:53:39.6084+00"
+        }
+      ]
+    },
+    {
+      "id": "fce3d214-1c52-4b19-97e1-a49f6a520a15",
+      "title": "Th\u00eam `CaseTransformSchema` v\u00e0 `ValidateTransform` (t\u00ean \u2264 255, \u2265 1 b\u01b0\u1edbc khi `STEP`, lo\u1ea1i chu\u1ed7i r\u1ed7ng)",
+      "status": "done",
+      "phase": "Th\u01b0 vi\u1ec7n prompt, marker v\u00e0 schema trong `shared/pkg/aiprompt`",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 01:57:22.449247+00"
+        }
+      ]
+    },
+    {
+      "id": "b0cb70fa-2220-4642-8a93-9cb5e0262132",
+      "title": "C\u1eadp nh\u1eadt t\u00e0i li\u1ec7u t\u00ednh n\u0103ng F24 v\u00e0 d\u00f2ng FR-SYS-07 c\u1ee7a SRS cho \u0111\u01b0\u1eddng AI th\u1eadt, n\u00eau `AI_ENABLED=false \u21d2 503`",
+      "status": "open",
+      "phase": "Nghi\u1ec7m thu \u0111\u1ea7u-cu\u1ed1i v\u1edbi mock-ext v\u00e0 c\u1eadp nh\u1eadt t\u00e0i li\u1ec7u",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "needs_info",
+          "at": "2026-10-15 05:35:30.483011+00"
+        },
+        {
+          "attempt": 2,
+          "parse": "ok",
+          "failure": "needs_info",
+          "at": "2026-10-15 05:41:48.283193+00"
+        }
+      ]
+    },
+    {
+      "id": "1b31aaa7-7f2b-4160-95e7-85be449e6cbb",
+      "title": "Th\u00eam c\u1edd `AI_ENABLED` v\u00e0o config v\u00e0 c\u1ed5ng 503 cho nh\u00f3m route `/functional/case/ai`",
+      "status": "done",
+      "phase": "C\u1ed5ng AI c\u00f3 b\u1ea3n fake v\u00e0 chat tr\u1ea3 chu\u1ed7i markdown",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 03:31:54.423723+00"
+        }
+      ]
+    },
+    {
+      "id": "21ef814a-0a7f-4afb-adf0-aac1bc551c18",
+      "title": "Ghi chi ti\u1ebft thay \u0111\u1ed5i cho t\u1eebng case b\u1eb1ng `audit.RecordAdded` v\u00e0 kh\u1eb3ng \u0111\u1ecbnh route kh\u1edbp `routeTable` module `FUNCTIONAL_CASE`",
+      "status": "done",
+      "phase": "L\u01b0u h\u00e0ng lo\u1ea1t: gi\u1edbi h\u1ea1n v\u00e0o c\u1ed5ng, m\u1ed9t giao d\u1ecbch, audit",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 04:44:03.642736+00"
+        }
+      ]
+    },
+    {
+      "id": "04ce1a47-7700-4aeb-a554-733e7f4a145d",
+      "title": "Vi\u1ebft test l\u01b0u h\u00e0ng lo\u1ea1t: 21 kh\u1ed1i \u21d2 400 v\u00e0 s\u1ed1 case kh\u00f4ng \u0111\u1ed5i, l\u1ed7i \u1edf case th\u1ee9 5 \u21d2 0 d\u00f2ng, l\u00f4 th\u00e0nh c\u00f4ng \u21d2 audit v\u00e0 `num` li\u00ean t\u1ee5c",
+      "status": "done",
+      "phase": "L\u01b0u h\u00e0ng lo\u1ea1t: gi\u1edbi h\u1ea1n v\u00e0o c\u1ed5ng, m\u1ed9t giao d\u1ecbch, audit",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 05:21:55.700256+00"
+        }
+      ]
+    },
+    {
+      "id": "d22163f7-c9c6-4052-9ee3-eb3226a65147",
+      "title": "Th\u00eam `FakeGate` tr\u1ea3 chu\u1ed7i/JSON d\u1ef1ng s\u1eb5n (marker \u0111\u00fang, thi\u1ebfu `featureCaseEnd`, JSON h\u1ecfng) cho test",
+      "status": "done",
+      "phase": "C\u1ed5ng AI c\u00f3 b\u1ea3n fake v\u00e0 chat tr\u1ea3 chu\u1ed7i markdown",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 03:59:50.83276+00"
+        }
+      ]
+    },
+    {
+      "id": "b99cd064-f3d3-45a2-a8a0-e0fac49ceaa1",
+      "title": "Th\u00eam `AddMany`: m\u1ed9t `ev.Do`, m\u1ed9t `AllocNums(projectID, n)`, l\u1ecbch s\u1eed trong c\u00f9ng tx, m\u1ed9t `case.imported` thay N `case.created`",
+      "status": "done",
+      "phase": "L\u01b0u h\u00e0ng lo\u1ea1t: gi\u1edbi h\u1ea1n v\u00e0o c\u1ed5ng, m\u1ed9t giao d\u1ecbch, audit",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 04:35:33.753537+00"
+        }
+      ]
+    },
+    {
+      "id": "8972abf7-2b6d-4fe4-aeaf-e741c43e1e00",
+      "title": "Vi\u1ebft test transform: JSON h\u1ee3p l\u1ec7, h\u1ecfng r\u1ed3i \u0111\u00fang, h\u1ecfng c\u1ea3 hai l\u1ea7n (\u0111\u1ebfm s\u1ed1 l\u1ea7n g\u1ecdi v\u00e0 s\u1ed1 case)",
+      "status": "done",
+      "phase": "`Transform` theo JSON schema v\u1edbi \u0111\u00fang m\u1ed9t l\u1ea7n th\u1eed l\u1ea1i",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 04:22:36.38003+00"
+        }
+      ]
+    },
+    {
+      "id": "367fc1b3-16a2-4d06-add5-a425debdf98c",
+      "title": "Thay `domain.AIConfig` b\u1eb1ng `CaseAiChatConfig{designConfig, templateConfig}` k\u00e8m h\u00e0m m\u1eb7c \u0111\u1ecbnh t\u00e0i li\u1ec7u ho\u00e1",
+      "status": "done",
+      "phase": "`case_ai_config` sang MySQL v\u1edbi ba tr\u01b0\u1eddng b\u1eaft bu\u1ed9c",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 02:08:39.270645+00"
+        }
+      ]
+    },
+    {
+      "id": "0b72aae5-abc7-4466-9b7a-2374fd3a91db",
+      "title": "Th\u00eam repository MySQL \u0111\u1ecdc/ghi `case_ai_config` theo kho\u00e1 `(user_id, project_id)`",
+      "status": "done",
+      "phase": "`case_ai_config` sang MySQL v\u1edbi ba tr\u01b0\u1eddng b\u1eaft bu\u1ed9c",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 03:09:18.648942+00"
+        }
+      ]
+    },
+    {
+      "id": "ca603d11-6299-4979-9548-c7ac000a631d",
+      "title": "Vi\u1ebft l\u1ea1i `GetConfig`/`SaveConfig` v\u00e0 handler theo h\u1ee3p \u0111\u1ed3ng UI, t\u1eeb ch\u1ed1i theo tr\u01b0\u1eddng khi thi\u1ebfu ba tr\u01b0\u1eddng b\u1eaft bu\u1ed9c, b\u1ecf nh\u00e1nh Redis",
+      "status": "done",
+      "phase": "`case_ai_config` sang MySQL v\u1edbi ba tr\u01b0\u1eddng b\u1eaft bu\u1ed9c",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 03:18:37.065266+00"
+        }
+      ]
+    },
+    {
+      "id": "442f6e65-4259-4661-be0d-399960cc4822",
+      "title": "Vi\u1ebft l\u1ea1i `Chat` tr\u1ea3 chu\u1ed7i markdown theo h\u1ee3p \u0111\u1ed3ng UI (bind `{prompt, chatModelId, conversationId, organizationId}`, b\u1ecf SSE)",
+      "status": "done",
+      "phase": "C\u1ed5ng AI c\u00f3 b\u1ea3n fake v\u00e0 chat tr\u1ea3 chu\u1ed7i markdown",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 03:49:35.195279+00"
+        }
+      ]
+    },
+    {
+      "id": "ff60e087-8de3-433a-b833-70b1e702ddfb",
+      "title": "Th\u1eed l\u1ea1i \u0111\u00fang m\u1ed9t l\u1ea7n k\u00e8m ch\u1ec9 d\u1eabn \"ch\u1ec9 tr\u1ea3 JSON\", v\u1eabn sai th\u00ec 502 v\u1edbi th\u00f4ng \u0111i\u1ec7p th\u1eadt v\u00e0 kh\u00f4ng ghi g\u00ec",
+      "status": "done",
+      "phase": "`Transform` theo JSON schema v\u1edbi \u0111\u00fang m\u1ed9t l\u1ea7n th\u1eed l\u1ea1i",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 04:17:05.85118+00"
+        }
+      ]
+    },
+    {
+      "id": "0f7a87a1-13f5-4e26-86a7-d3a3e21cfe67",
+      "title": "Th\u00eam h\u00e0m repository t\u1ea1o l\u00f4 case + blob + custom values b\u1eb1ng `CreateInBatches` trong m\u1ed9t giao d\u1ecbch, theo m\u1eabu `CopyCases`",
+      "status": "done",
+      "phase": "L\u01b0u h\u00e0ng lo\u1ea1t: gi\u1edbi h\u1ea1n v\u00e0o c\u1ed5ng, m\u1ed9t giao d\u1ecbch, audit",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 04:28:32.761076+00"
+        }
+      ]
+    },
+    {
+      "id": "6d938645-53ca-4b78-b747-cf71f4062747",
+      "title": "Th\u00eam ca e2e drawer AI \u0111\u1ebfn Transform \u0111\u1ebfn l\u01b0u v\u00e0o module, r\u1ed3i ch\u1ea1y l\u1ea1i to\u00e0n b\u1ed9 test c\u1ee7a s\u00e1u ti\u00eau ch\u00ed",
+      "status": "blocked",
+      "phase": "Nghi\u1ec7m thu \u0111\u1ea7u-cu\u1ed1i v\u1edbi mock-ext v\u00e0 c\u1eadp nh\u1eadt t\u00e0i li\u1ec7u",
+      "attempts": []
+    },
+    {
+      "id": "597569b4-a502-41dc-9149-6e70342ce30e",
+      "title": "Vi\u1ebft l\u1ea1i `BatchSave`: transform c\u00e1c kh\u1ed1i (song song \u2264 4) ngo\u00e0i giao d\u1ecbch r\u1ed3i g\u1ecdi `AddMany` m\u1ed9t l\u1ea7n",
+      "status": "done",
+      "phase": "L\u01b0u h\u00e0ng lo\u1ea1t: gi\u1edbi h\u1ea1n v\u00e0o c\u1ed5ng, m\u1ed9t giao d\u1ecbch, audit",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 05:08:10.944482+00"
+        }
+      ]
+    },
+    {
+      "id": "bed8a860-cc6c-4369-b6a1-00146fe35f13",
+      "title": "Ch\u1eb7n > 20 kh\u1ed1i ho\u1eb7c > 100 case b\u1eb1ng 400 ngay sau `ParseCaseBlocks`, tr\u01b0\u1edbc m\u1ecdi l\u1eddi g\u1ecdi m\u00f4 h\u00ecnh v\u00e0 m\u1ecdi l\u1ec7nh ghi",
+      "status": "done",
+      "phase": "L\u01b0u h\u00e0ng lo\u1ea1t: gi\u1edbi h\u1ea1n v\u00e0o c\u1ed5ng, m\u1ed9t giao d\u1ecbch, audit",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 04:53:05.451476+00"
+        }
+      ]
+    },
+    {
+      "id": "333de33e-29ef-4429-a91a-44fe5d90727d",
+      "title": "Khai b\u00e1o interface `Gate` (`Chat`, `ResolveModel`, `AppendTurn`, `ListMessages`) l\u00e0m \u0111i\u1ec3m n\u1ed1i duy nh\u1ea5t t\u1edbi `aiclient` c\u1ee7a CR-H01",
+      "status": "done",
+      "phase": "C\u1ed5ng AI c\u00f3 b\u1ea3n fake v\u00e0 chat tr\u1ea3 chu\u1ed7i markdown",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 03:36:55.945191+00"
+        }
+      ]
+    },
+    {
+      "id": "c7a8fdfe-22d8-4b89-83e4-46cb494769a2",
+      "title": "Th\u00eam `ParseCaseBlocks(s) []Block{Title,Body}` ch\u1ecbu \u0111\u01b0\u1ee3c kho\u1ea3ng tr\u1eafng, `##` v\u00e0 kh\u1ed1i thi\u1ebfu `featureCaseEnd`",
+      "status": "done",
+      "phase": "Th\u01b0 vi\u1ec7n prompt, marker v\u00e0 schema trong `shared/pkg/aiprompt`",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 01:46:24.543485+00"
+        }
+      ]
+    },
+    {
+      "id": "e8ecffb7-45af-418f-9203-6c7fecbe5e41",
+      "title": "Th\u00eam test t\u00edch h\u1ee3p `test_f3_case_ai.py` v\u1edbi mock-ext: chat \u2265 10 kh\u1ed1i, transform, batch/save, case c\u00f3 trong `/functional/case/page`",
+      "status": "open",
+      "phase": "Nghi\u1ec7m thu \u0111\u1ea7u-cu\u1ed1i v\u1edbi mock-ext v\u00e0 c\u1eadp nh\u1eadt t\u00e0i li\u1ec7u",
+      "attempts": []
+    },
+    {
+      "id": "2cdf1c13-9558-4198-b0e3-c0c2e88e118f",
+      "title": "Vi\u1ebft test b\u1ea3ng cho `aiprompt` (prompt, t\u00e1ch kh\u1ed1i, ki\u1ec3m tra schema)",
+      "status": "done",
+      "phase": "Th\u01b0 vi\u1ec7n prompt, marker v\u00e0 schema trong `shared/pkg/aiprompt`",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 02:02:30.970269+00"
+        }
+      ]
+    },
+    {
+      "id": "b0884270-fd39-49f8-9c4d-69cc41d3caec",
+      "title": "Th\u00eam package `aiprompt` v\u1edbi h\u1eb1ng marker v\u00e0 `CaseChatSystemPrompt(lang, cfg, projectCtx)` b\u1eaft bu\u1ed9c \u0111\u1ecbnh d\u1ea1ng `featureCaseStart/caseExpand/featureCaseEnd`",
+      "status": "done",
+      "phase": "Th\u01b0 vi\u1ec7n prompt, marker v\u00e0 schema trong `shared/pkg/aiprompt`",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 01:41:40.313666+00"
+        }
+      ]
+    },
+    {
+      "id": "da54d6d1-664c-4611-85a4-5debb6d7fc8d",
+      "title": "Th\u00eam migration `V025__case_ai_config.sql` v\u00e0 khai b\u00e1o b\u1ea3ng `case_ai_config` trong `backend/db/ownership.yaml`",
+      "status": "done",
+      "phase": "`case_ai_config` sang MySQL v\u1edbi ba tr\u01b0\u1eddng b\u1eaft bu\u1ed9c",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "missing",
+          "failure": "retryable",
+          "at": "2026-10-15 02:33:40.503224+00"
+        },
+        {
+          "attempt": 2,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 02:51:42.568519+00"
+        }
+      ]
+    },
+    {
+      "id": "27b1462c-4da6-4fae-82b1-51bcfb13545b",
+      "title": "G\u1ecdi JSON mode theo `CaseTransformSchema` v\u00e0 map sang `AiCaseTransformResult` v\u1edbi `stepDescription[{id,num,desc,result}]`",
+      "status": "done",
+      "phase": "`Transform` theo JSON schema v\u1edbi \u0111\u00fang m\u1ed9t l\u1ea7n th\u1eed l\u1ea1i",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-15 04:08:44.288554+00"
+        }
+      ]
+    }
+  ]
+}

@@ -90,8 +90,8 @@ func (s *FleetDefinitionStore) Get(ctx context.Context, tenantID, id string) (do
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 	def, err := scanFleetDefinition(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.FleetDefinition{}, domain.ErrFleetDefinitionNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.FleetDefinition{}, fmt.Errorf("postgres: get fleet definition %s: %w", id, domain.ErrFleetDefinitionNotFound)
 	}
 	if err != nil {
 		return domain.FleetDefinition{}, fmt.Errorf("postgres: get fleet definition: %w", err)

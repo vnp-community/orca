@@ -22,6 +22,7 @@ func TestSetupExistingFolder_PathCheckFailureMarksFailedNoProjectCreated(t *test
 	hostSetups := newHostSetupFixture(domain.HostSetupPending)
 	projects := newFakeProjectRepository()
 	repos := newFakeRepoRepository()
+	projects.repoSink, repos.projectDirectory = repos, projects
 	relay := &fakeDevServerRelay{relayResult: []byte(`{"exists":false}`)}
 	uc := NewSetupExistingFolder(hostSetups, projects, repos, relay)
 
@@ -41,6 +42,7 @@ func TestSetupExistingFolder_RelayErrorMarksFailed(t *testing.T) {
 	hostSetups := newHostSetupFixture(domain.HostSetupPending)
 	projects := newFakeProjectRepository()
 	repos := newFakeRepoRepository()
+	projects.repoSink, repos.projectDirectory = repos, projects
 	relay := &fakeDevServerRelay{relayErr: errors.New("transport failure")}
 	uc := NewSetupExistingFolder(hostSetups, projects, repos, relay)
 
@@ -60,6 +62,7 @@ func TestSetupExistingFolder_SuccessCreatesExactlyOneProjectAndRepo(t *testing.T
 	hostSetups := newHostSetupFixture(domain.HostSetupPending)
 	projects := newFakeProjectRepository()
 	repos := newFakeRepoRepository()
+	projects.repoSink, repos.projectDirectory = repos, projects
 	relay := &fakeDevServerRelay{relayResult: []byte(`{"exists":true,"isDir":true}`)}
 	uc := NewSetupExistingFolder(hostSetups, projects, repos, relay)
 
@@ -92,6 +95,7 @@ func TestSetupExistingFolder_RejectsAlreadyCompleted(t *testing.T) {
 	hostSetups := newHostSetupFixture(domain.HostSetupCompleted)
 	projects := newFakeProjectRepository()
 	repos := newFakeRepoRepository()
+	projects.repoSink, repos.projectDirectory = repos, projects
 	relay := &fakeDevServerRelay{}
 	uc := NewSetupExistingFolder(hostSetups, projects, repos, relay)
 
@@ -116,6 +120,7 @@ func TestSetupExistingFolder_NeverStatsLocalFilesystem(t *testing.T) {
 	hostSetups := newHostSetupFixture(domain.HostSetupPending)
 	projects := newFakeProjectRepository()
 	repos := newFakeRepoRepository()
+	projects.repoSink, repos.projectDirectory = repos, projects
 	// folder_path points at a path this test process cannot possibly have
 	// created locally — the ONLY way this call can succeed is via the fake
 	// relay's canned {"exists":true,"isDir":true} answer, never a real

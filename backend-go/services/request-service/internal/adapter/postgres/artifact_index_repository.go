@@ -92,6 +92,9 @@ func (r *ArtifactIndexRepository) NextPlanSeq(ctx context.Context, requestID str
 
 func (r *ArtifactIndexRepository) SetSolutionSeq(ctx context.Context, solutionID string, seq int) error {
 	return r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(solutionID) {
+			return domain.ErrSolutionNotFound(solutionID)
+		}
 		tag, err := db.Exec(ctx, `UPDATE request.solutions SET seq = $3 WHERE id = $1 AND tenant_id = $2 AND seq IS NULL`, solutionID, tenantID, seq)
 		if isUniqueViolation(err, "solutions_request_seq") {
 			return domain.ErrArtifactSeqConflict()

@@ -169,6 +169,14 @@ service AuthService {
   // ("suspended"); nothing is revoked, so clearing it restores them. tenant_id
   // comes ONLY from gRPC metadata. Idempotent. Internal-caller guarded.
   rpc SetMcpPatSuspension(SetMcpPatSuspensionRequest) returns (google.protobuf.Empty);
+
+  // --- Internal directory read for background jobs (TASK-V2-018) ---
+  // ListActiveTenantAdmins returns the ids of the ACTIVE admins of the tenant carried in gRPC
+  // metadata. Unlike ListUsers it needs no acting user: request-service uses it from its outbox
+  // relay, which has a tenant but no actor. Read-only, ids only (no email/name). tenant_id comes
+  // ONLY from gRPC metadata. Internal-caller guarded (AUTH_DIRECTORY_CALLER_TOKEN); an empty
+  // configured token refuses every call.
+  rpc ListActiveTenantAdmins(ListActiveTenantAdminsRequest) returns (ListActiveTenantAdminsResponse);
 }
 
 enum Role {
@@ -767,4 +775,11 @@ message ResolveMcpPrincipalResponse {
   // revoked|expired|user_inactive|client_blocked|grant_revoked|unknown_token|suspended
   string inactive_reason = 2;
   string role = 3; // "admin" | "user", read live from auth.users
+}
+
+message ListActiveTenantAdminsRequest {}
+message ListActiveTenantAdminsResponse {
+  repeated string user_ids = 1;
+  // True when the tenant has more users than the server scans in one call; the list is then partial.
+  bool truncated = 2;
 }

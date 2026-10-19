@@ -25,6 +25,10 @@ type TerminalSession struct {
 	// Origin is non-nil only for sessions an MCP client created
 	// (BE-MCP-SOL-009); UI-created sessions leave it nil.
 	Origin *SessionOrigin
+	// CwdRequested and CwdFellBack are answers to a spawn only, never stored: the agent opened the home directory because
+	// CwdRequested was not usable.
+	CwdRequested string
+	CwdFellBack  bool
 	// ClosedAt is nil while the session is open — set by
 	// usecase.KillTerminalSession, mirrors Connection/DevServer's convention
 	// of a real Go zero value (nil pointer) over a sentinel time, per

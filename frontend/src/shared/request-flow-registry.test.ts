@@ -3,38 +3,79 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { REQUEST_FLOW_REGISTRY, flowHasPhase, LOW_CONFIDENCE_THRESHOLD } from './request-flow-registry'
+import {
+  REQUEST_FLOW_REGISTRY,
+  flowHasPhase,
+  LOW_CONFIDENCE_THRESHOLD
+} from './request-flow-registry'
+import fixture from './request-flow-registry.fixture.json'
+
+type FixtureEntry = {
+  analysisKind: string
+  analysisGate: string
+  planKind: string
+  phaseRule: string
+  startGate: string
+  executionGates: string[]
+  completesAfterAnalysis: boolean
+  humanConfirmRequired: boolean
+  openSpecProfile: string
+}
+
+// Why: the table is generated from request-service `domain.FlowFor` (a Go test fails when the fixture is stale), so this
+// comparison is what keeps the fallback the screens use without `request.flow` from drifting from the backend.
+const FIXTURE = fixture as Record<string, FixtureEntry>
+const PHASE_RULES: Record<string, string> = {
+  never: 'never',
+  always: 'always',
+  when_size_L: 'size_l'
+}
 
 describe('REQUEST_FLOW_REGISTRY', () => {
   it('has exactly 11 entries (one per RequestType excluding unknown)', () => {
     expect(Object.keys(REQUEST_FLOW_REGISTRY)).toHaveLength(11)
+    expect(Object.keys(FIXTURE).sort()).toEqual(Object.keys(REQUEST_FLOW_REGISTRY).sort())
   })
 
-  // Spot-check every row matches README v6 §3.4
+  it.each(Object.keys(FIXTURE))('%s matches the backend registry fixture', (type) => {
+    const want = FIXTURE[type]
+    const got = REQUEST_FLOW_REGISTRY[type as keyof typeof REQUEST_FLOW_REGISTRY]
+    expect(got.analysisKind ?? 'none').toBe(want.analysisKind)
+    expect(got.analysisGate ?? '').toBe(want.analysisGate)
+    expect(got.plan).toBe(want.planKind)
+    expect(got.phase).toBe(PHASE_RULES[want.phaseRule])
+    expect(got.startGate ?? '').toBe(want.startGate)
+    expect([...got.executionGates]).toEqual(want.executionGates)
+    expect(got.completesAfterAnalysis).toBe(want.completesAfterAnalysis)
+    expect(got.humanConfirmRequired).toBe(want.humanConfirmRequired)
+    expect(got.openSpecProfile).toBe(want.openSpecProfile)
+  })
+
+  // The three yes/no questions older screens read are derived from the gates, so check the cases that were wrong before.
   it.each([
-    ['bug', 'diagnosis', 'task_list', 'size_l', false, true, false],
-    ['task', null, 'task_list', 'never', false, true, false],
-    ['docs', null, 'task_list', 'never', false, false, false],
-    ['question', 'answer', 'none', 'never', false, false, false],
-    ['hotfix', 'diagnosis', 'single_task', 'never', false, false, true],
-    ['security', 'findings', 'plan', 'size_l', true, true, true],
-    ['ops_request', null, 'task_list', 'never', false, true, false],
-    ['change_request', 'solution', 'plan', 'always', true, true, true],
-    ['refactor', 'solution', 'plan', 'size_l', true, true, false],
-    ['spike', 'findings', 'none', 'never', true, false, false],
-    ['performance', 'findings', 'task_list', 'size_l', true, true, false]
+    ['change_request', true, true, false],
+    ['docs', false, true, false],
+    ['security', true, false, true],
+    ['hotfix', false, false, true],
+    ['ops_request', false, true, true],
+    ['question', true, false, false],
+    ['spike', true, false, false]
   ] as const)(
-    '%s: analysisKind=%s plan=%s phase=%s analysisApproval=%s planApproval=%s preDeployApproval=%s',
-    (type, analysisKind, plan, phase, analysisApproval, planApproval, preDeployApproval) => {
-      const entry = REQUEST_FLOW_REGISTRY[type]
-      expect(entry.analysisKind).toBe(analysisKind)
-      expect(entry.plan).toBe(plan)
-      expect(entry.phase).toBe(phase)
-      expect(entry.gates.analysisApproval).toBe(analysisApproval)
-      expect(entry.gates.planApproval).toBe(planApproval)
-      expect(entry.gates.preDeployApproval).toBe(preDeployApproval)
+    '%s: analysisApproval=%s planApproval=%s preDeployApproval=%s',
+    (type, analysis, plan, preDeploy) => {
+      const g = REQUEST_FLOW_REGISTRY[type].gates
+      expect(g.analysisApproval).toBe(analysis)
+      expect(g.planApproval).toBe(plan)
+      expect(g.preDeployApproval).toBe(preDeploy)
     }
   )
+
+  it('only change_request has a Phase gate in executing', () => {
+    const withPhaseGate = Object.entries(REQUEST_FLOW_REGISTRY)
+      .filter(([, e]) => e.executionGates.includes('phase'))
+      .map(([t]) => t)
+    expect(withPhaseGate).toEqual(['change_request'])
+  })
 })
 
 describe('flowHasPhase', () => {

@@ -11,7 +11,9 @@ describe('agent-exec-prompt-options', () => {
   it('returns defaults when no new param is present', () => {
     const res = parseExecPromptOptions({})
     expect(res.ok).toBe(true)
-    if (!res.ok) return
+    if (!res.ok) {
+      return
+    }
     expect(res.value.accessMode).toBe('write')
     expect(res.value.workspaceKind).toBe('worktree')
     expect(res.value.explicit.accessMode).toBe(false)
@@ -107,12 +109,12 @@ describe('agent-exec-prompt-options', () => {
     }
 
     const invalidNonces = [
-      'a'.repeat(15),           // too short
-      'a'.repeat(65),           // too long
-      'a'.repeat(15) + '-',     // contains hyphen
-      'a'.repeat(15) + ' ',     // contains space
-      'a'.repeat(15) + '_',     // contains underscore
-      1234567890123456          // not string
+      'a'.repeat(15), // too short
+      'a'.repeat(65), // too long
+      `${'a'.repeat(15)}-`, // contains hyphen
+      `${'a'.repeat(15)} `, // contains space
+      `${'a'.repeat(15)}_`, // contains underscore
+      1234567890123456 // not string
     ]
 
     for (const nonce of invalidNonces) {
@@ -140,7 +142,7 @@ describe('agent-exec-prompt-options', () => {
     }
 
     // Fractional, NaN, string
-    const invalidValues = [100000.5, NaN, '1000000', null, Infinity]
+    const invalidValues = [100000.5, Number.NaN, '1000000', null, Infinity]
     for (const val of invalidValues) {
       const res = parseExecPromptOptions({ maxOutputBytes: val })
       expect(res.ok).toBe(false)
@@ -154,12 +156,74 @@ describe('agent-exec-prompt-options', () => {
     const errResp = toExecPromptErrorResponse('agent.execPrompt', 'req-1', {
       code: 'INVALID_ACCESS_MODE',
       message: 'accessMode must be "write" or "readonly"'
-    }) as any
+    }) as {
+      jsonrpc: string
+      id: string
+      error: { code: number; message: string; data: { reason: string } }
+    }
 
     expect(errResp.jsonrpc).toBe('2.0')
     expect(errResp.id).toBe('req-1')
     expect(errResp.error.code).toBe(-32602)
     expect(errResp.error.message).toContain('INVALID_ACCESS_MODE')
     expect(errResp.error.data).toEqual({ reason: 'INVALID_ACCESS_MODE' })
+  })
+})
+
+describe('agent-exec-prompt-options knowledge hub', () => {
+  it('defaults to no knowledge root and no proposals', () => {
+    const res = parseExecPromptOptions({})
+    expect(res.ok && res.value.knowledgeRoot).toBeNull()
+    expect(res.ok && res.value.proposeChangesets).toBe(false)
+  })
+
+  it('accepts a knowledgeRoot and proposeChangesets', () => {
+    const res = parseExecPromptOptions({ knowledgeRoot: '/repo', proposeChangesets: true })
+    expect(res.ok && res.value.knowledgeRoot).toBe('/repo')
+    expect(res.ok && res.value.proposeChangesets).toBe(true)
+  })
+
+  it.each([
+    ['empty knowledgeRoot', { knowledgeRoot: '' }, 'INVALID_KNOWLEDGE_ROOT'],
+    ['non-string knowledgeRoot', { knowledgeRoot: 7 }, 'INVALID_KNOWLEDGE_ROOT'],
+    [
+      'non-boolean proposeChangesets',
+      { knowledgeRoot: '/r', proposeChangesets: 'yes' },
+      'INVALID_PROPOSE_CHANGESETS'
+    ],
+    ['proposeChangesets without a root', { proposeChangesets: true }, 'INVALID_PROPOSE_CHANGESETS']
+  ])('rejects %s', (_name, params, code) => {
+    const res = parseExecPromptOptions(params)
+    expect(res.ok).toBe(false)
+    if (!res.ok) {
+      expect(res.error.code).toBe(code)
+    }
+  })
+})
+
+describe('agent-exec-prompt-options permission profile', () => {
+  it('defaults to no profile and accepts a known one in write mode', () => {
+    expect(
+      parseExecPromptOptions({}).ok && parseExecPromptOptions({}).value.permissionProfile
+    ).toBeNull()
+    const res = parseExecPromptOptions({
+      accessMode: 'write',
+      permissionProfile: 'openspec-author'
+    })
+    expect(res.ok && res.value.permissionProfile).toBe('openspec-author')
+    const implicit = parseExecPromptOptions({ permissionProfile: 'openspec-author' })
+    expect(implicit.ok && implicit.value.permissionProfile).toBe('openspec-author')
+  })
+
+  it.each([
+    ['an unknown profile', { permissionProfile: 'root' }],
+    ['a non-string profile', { permissionProfile: 3 }],
+    ['read-only mode', { accessMode: 'readonly', permissionProfile: 'openspec-author' }]
+  ])('rejects %s', (_name, params) => {
+    const res = parseExecPromptOptions(params)
+    expect(res.ok).toBe(false)
+    if (!res.ok) {
+      expect(res.error.code).toBe('INVALID_PERMISSION_PROFILE')
+    }
   })
 })

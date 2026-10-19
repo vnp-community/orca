@@ -10,6 +10,34 @@ type ExecutionTree struct {
 	byID   map[string]TaskView
 }
 
+// BuildExecutionTreeOf is BuildExecutionTree for the Plan the Request currently runs. A Request that was planned again keeps the
+// tasks of its earlier Plan; reading both mixed their phases (the gate of one Plan's third phase opened first because the edges
+// of the other Plan's phases were the ones read). An empty planID, or one that matches no task, reads everything as before.
+func BuildExecutionTreeOf(planID string, tasks []TaskView) ExecutionTree {
+	if planID == "" {
+		return BuildExecutionTree(tasks)
+	}
+	parent := make(map[string]string, len(tasks))
+	known := false
+	for _, t := range tasks {
+		parent[t.ID] = t.ParentID
+		known = known || t.ID == planID
+	}
+	if !known {
+		return BuildExecutionTree(tasks)
+	}
+	var scoped []TaskView
+	for _, t := range tasks {
+		for id, hops := t.ID, 0; id != "" && hops < 16; id, hops = parent[id], hops+1 {
+			if id == planID {
+				scoped = append(scoped, t)
+				break
+			}
+		}
+	}
+	return BuildExecutionTree(scoped)
+}
+
 func BuildExecutionTree(tasks []TaskView) ExecutionTree {
 	t := ExecutionTree{byID: make(map[string]TaskView, len(tasks))}
 	for _, task := range tasks {
@@ -115,4 +143,29 @@ func (t ExecutionTree) NextPhase(started map[string]bool) (TaskView, bool) {
 		}
 	}
 	return TaskView{}, false
+}
+
+// NextReadyPhase is NextPhase that skips a Phase waiting on a Phase that has not finished (depends_on: From waits for To),
+// so no Approval is opened for a Phase that cannot start yet. The listing order of task-service is not the dependency
+// order: opening the gate of the dependent Phase first leaves the one it waits for with no gate, and the Request stuck.
+func (t ExecutionTree) NextReadyPhase(started map[string]bool, edges []DependsEdge) (TaskView, bool) {
+	for _, p := range t.Phases {
+		if taskFinished(p.Status) || started[p.ID] || t.waitsOnUnfinishedPhase(p.ID, edges) {
+			continue
+		}
+		return p, true
+	}
+	return TaskView{}, false
+}
+
+func (t ExecutionTree) waitsOnUnfinishedPhase(id string, edges []DependsEdge) bool {
+	for _, e := range edges {
+		if e.From != id {
+			continue
+		}
+		if dep, ok := t.Phase(e.To); ok && !taskFinished(dep.Status) {
+			return true
+		}
+	}
+	return false
 }

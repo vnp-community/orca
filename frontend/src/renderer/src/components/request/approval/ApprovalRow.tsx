@@ -27,6 +27,8 @@ export type ApprovalRowProps = {
   locale: string
   canQuick: boolean
   busy: boolean
+  /** True while write calls are being throttled: approve/reject wait, opening stays available. */
+  actionsLocked?: boolean
   onOpen: (approval: Approval) => void
   onQuickApprove: (approval: Approval) => void
   onReject: (approval: Approval) => void
@@ -37,7 +39,16 @@ export function requestHeading(requestId: string, request?: OrcaRequest): string
 }
 
 export function ApprovalRow({
-  approval, request, now, locale, canQuick, busy, onOpen, onQuickApprove, onReject
+  approval,
+  request,
+  now,
+  locale,
+  canQuick,
+  busy,
+  actionsLocked = false,
+  onOpen,
+  onQuickApprove,
+  onReject
 }: ApprovalRowProps): React.JSX.Element {
   const kind = subjectKindOf(approval)
   const requester =
@@ -59,7 +70,9 @@ export function ApprovalRow({
           {request && <RequestTypeBadge type={request.type} size="xs" />}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-          <span>{translate(`${T}ApprovalRow.requestedBy`, 'Requested by {{name}}', { name: requester })}</span>
+          <span>
+            {translate(`${T}ApprovalRow.requestedBy`, 'Requested by {{name}}', { name: requester })}
+          </span>
           <span title={formatAbsoluteTime(approval.createdAt, locale)}>
             {formatRelativeTime(approval.createdAt, now, locale)}
           </span>
@@ -71,12 +84,21 @@ export function ApprovalRow({
           {translate(`${T}ApprovalRow.open`, 'Open')}
         </Button>
         {canQuick && (
-          <Button size="sm" disabled={busy} onClick={() => onQuickApprove(approval)}>
+          <Button
+            size="sm"
+            disabled={busy || actionsLocked}
+            onClick={() => onQuickApprove(approval)}
+          >
             {busy && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
             {translate(`${T}ApprovalRow.approve`, 'Quick approve')}
           </Button>
         )}
-        <Button variant="ghost" size="sm" disabled={busy} onClick={() => onReject(approval)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={busy || actionsLocked}
+          onClick={() => onReject(approval)}
+        >
           {translate(`${T}ApprovalRow.reject`, 'Reject')}
         </Button>
       </div>

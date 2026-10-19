@@ -20,6 +20,8 @@ type SecurityChainConfig struct {
 	// (RPC audit goes here). Both keep their order.
 	AfterGuard []grpc.UnaryServerInterceptor
 	AfterAuthz []grpc.UnaryServerInterceptor
+	// OnRateLimited receives the rate class of each refused call; nil disables the metric.
+	OnRateLimited func(class string)
 }
 
 // SecurityChain returns the server options placed after grpcmw.ChainUnary (recovery, tenant extraction,
@@ -35,7 +37,7 @@ func SecurityChain(c SecurityChainConfig) []grpc.ServerOption {
 	unary = append(unary, c.AfterGuard...)
 	unary = append(unary, RequestAccessInterceptor(c.Authorize))
 	unary = append(unary, c.AfterAuthz...)
-	unary = append(unary, RateLimitInterceptor(c.Limiter, c.Gate))
+	unary = append(unary, RateLimitInterceptor(c.Limiter, c.Gate, c.OnRateLimited))
 	return []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(unary...),
 		grpc.ChainStreamInterceptor(

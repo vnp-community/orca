@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/tenant-service/internal/domain"
@@ -46,7 +44,7 @@ func (r *TeamRepository) Get(ctx context.Context, companyID, id string) (domain.
 	var team domain.Team
 	var settingsJSON string
 	if err := row.Scan(&team.ID, &team.CompanyID, &team.Name, &settingsJSON); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.Team{}, false, nil
 		}
 		return domain.Team{}, false, fmt.Errorf("postgres: query team: %w", err)
@@ -66,6 +64,9 @@ func (r *TeamRepository) ListByCompany(ctx context.Context, companyID string) ([
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, company_id, name, settings_json FROM tenant.teams WHERE company_id = $1
 	`, companyID)
+	if isMalformedUUID(err) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query teams: %w", err)
 	}
@@ -86,6 +87,9 @@ func (r *TeamRepository) ListByCompany(ctx context.Context, companyID string) ([
 		out = append(out, t)
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("postgres: iterate team rows: %w", err)
 	}
 	return out, nil
@@ -98,6 +102,9 @@ func (r *TeamRepository) AddMember(ctx context.Context, m domain.TeamMember) err
 		INSERT INTO tenant.team_members (team_id, user_id, priority) VALUES ($1, $2, $3)
 		ON CONFLICT (team_id, user_id) DO UPDATE SET priority = EXCLUDED.priority
 	`, m.TeamID, m.UserID, m.Priority)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: upsert team member: %w", domain.ErrMalformedUserID)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: upsert team member: %w", err)
 	}
@@ -111,6 +118,9 @@ func (r *TeamRepository) RemoveMember(ctx context.Context, teamID, userID string
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM tenant.team_members WHERE team_id = $1 AND user_id = $2
 	`, teamID, userID)
+	if isMalformedUUID(err) {
+		return false, nil // ids that cannot be uuids name no membership
+	}
 	if err != nil {
 		return false, fmt.Errorf("postgres: delete team member: %w", err)
 	}
@@ -121,6 +131,9 @@ func (r *TeamRepository) ListMembers(ctx context.Context, teamID string) ([]doma
 	rows, err := r.pool.Query(ctx, `
 		SELECT team_id, user_id, priority FROM tenant.team_members WHERE team_id = $1
 	`, teamID)
+	if isMalformedUUID(err) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query team members: %w", err)
 	}
@@ -135,6 +148,9 @@ func (r *TeamRepository) ListMembers(ctx context.Context, teamID string) ([]doma
 		out = append(out, m)
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("postgres: iterate team member rows: %w", err)
 	}
 	return out, nil
@@ -152,6 +168,9 @@ func (r *TeamRepository) ListUserTeamLayers(ctx context.Context, companyID, user
 		JOIN tenant.teams t ON t.id = tm.team_id
 		WHERE tm.user_id = $1 AND t.company_id = $2
 	`, userID, companyID)
+	if isMalformedUUID(err) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query user team layers: %w", err)
 	}
@@ -171,6 +190,9 @@ func (r *TeamRepository) ListUserTeamLayers(ctx context.Context, companyID, user
 		out = append(out, domain.TeamSettingsLayer{TeamID: teamID, Priority: priority, Settings: settings})
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("postgres: iterate user team layer rows: %w", err)
 	}
 	return out, nil

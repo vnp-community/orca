@@ -13,22 +13,43 @@ import { AlertTriangle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { translate } from '@/i18n/i18n'
 import { getScreenSubmitShortcutLabel, isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import { useRequestActions } from '../../hooks/useRequestActions'
+import { useRequestCooldown } from '../../hooks/useRequestCooldown'
 import { notifyRequestActionFailure } from './request-action-feedback'
 import { FILTERABLE_TYPES } from './request-list-filters'
 import { summarizeRequestFlow } from './request-flow-summary'
 import { isLowConfidence } from './request-stage-timeline-model'
+import { RequestAiSetupBanner } from './RequestAiSetupBanner'
+import { aiSetupCodeOf } from './request-ai-setup'
 import { RequestTypeBadge } from './RequestTypeBadge'
-import type { OrcaRequest, RequestSize, RequestType, RequestUrgency } from '../../../../shared/request-types'
+import type {
+  OrcaRequest,
+  RequestSize,
+  RequestType,
+  RequestUrgency
+} from '../../../../shared/request-types'
 
 const T = 'auto.components.request.TypeConfirmationCard.'
 const STUCK_CLASSIFYING_MS = 60_000
 const SIZES: RequestSize[] = ['S', 'M', 'L']
 const URGENCIES: Exclude<RequestUrgency, 'unknown'>[] = ['normal', 'urgent']
+// Why: the service stores these fixed strings as the reason of a failed classification;
+// shown raw they read like a crash, so say what happened and what to do.
+const GENERIC_CLASSIFY_FAILURES: ReadonlySet<string> = new Set([
+  'classifier error',
+  'classifier timeout',
+  'invalid classifier output'
+])
 
 type Props = {
   request: OrcaRequest
@@ -37,6 +58,8 @@ type Props = {
 
 export function TypeConfirmationCard({ request, onChanged }: Props): React.JSX.Element {
   const { confirmType, classify } = useRequestActions()
+  const aiCooldown = useRequestCooldown('ai')
+  const writeCooldown = useRequestCooldown('write')
   const proposed: RequestType | '' = request.type === 'unknown' ? '' : request.type
   const [type, setType] = useState<RequestType | ''>(proposed)
   const [size, setSize] = useState<RequestSize | undefined>(request.size)
@@ -55,18 +78,23 @@ export function TypeConfirmationCard({ request, onChanged }: Props): React.JSX.E
   }, [request.type, request.size, request.urgency])
 
   useEffect(() => {
-    if (request.status !== 'classifying') {return}
+    if (request.status !== 'classifying') {
+      return
+    }
     const timer = setInterval(() => setNow(Date.now()), 5_000)
     return () => clearInterval(timer)
   }, [request.status])
 
   const runClassify = async (): Promise<void> => {
-    if (busy) {return}
+    if (busy) {
+      return
+    }
     setBusy(true)
     const result = await classify(request.id)
     setBusy(false)
     if (!result.ok) {
-      if (result.error.kind === 'rate_limited' || result.error.code === 'REQUEST_CLASSIFICATION_LIMIT') {
+      // Why: only the 5-attempt cap is permanent; a throttle or quota error has its own cooldown/copy.
+      if ((result.error.backendCode ?? result.error.code) === 'REQUEST_CLASSIFICATION_LIMIT') {
         setClassifyLocked(true)
       } else {
         notifyRequestActionFailure(result.error, onChanged)
@@ -79,11 +107,21 @@ export function TypeConfirmationCard({ request, onChanged }: Props): React.JSX.E
   if (request.status === 'classifying') {
     const stuck = now - Date.parse(request.updatedAt) > STUCK_CLASSIFYING_MS
     return (
-      <div className="flex items-center gap-2 rounded border border-border px-3 py-2 text-sm" data-testid="request-classifying">
+      <div
+        className="flex items-center gap-2 rounded border border-border px-3 py-2 text-sm"
+        data-testid="request-classifying"
+      >
         <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
-        <span className="flex-1">{translate(`${T}classifying`, 'AI is classifying this request')}</span>
+        <span className="flex-1">
+          {translate(`${T}classifying`, 'AI is classifying this request')}
+        </span>
         {stuck && (
-          <Button size="xs" variant="outline" disabled={busy || classifyLocked} onClick={() => void runClassify()}>
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={busy || classifyLocked || aiCooldown.coolingDown}
+            onClick={() => void runClassify()}
+          >
             {translate(`${T}reclassify`, 'Reclassify')}
           </Button>
         )}
@@ -92,12 +130,18 @@ export function TypeConfirmationCard({ request, onChanged }: Props): React.JSX.E
   }
 
   const changed = type !== '' && type !== proposed
-  const confidencePct = request.confidence === undefined ? null : Math.round(request.confidence * 100)
+  const confidencePct =
+    request.confidence === undefined ? null : Math.round(request.confidence * 100)
   const reasonText = request.classificationReason ?? ''
+  const aiSetupCode = aiSetupCodeOf(reasonText)
+  const genericFailure = GENERIC_CLASSIFY_FAILURES.has(reasonText.trim())
+  const showReasonText = reasonText !== '' && !aiSetupCode
   const longReason = reasonText.split('\n').length > 6 || reasonText.length > 400
 
   const confirm = async (): Promise<void> => {
-    if (busy || type === '') {return}
+    if (busy || type === '') {
+      return
+    }
     setBusy(true)
     const result = await confirmType({
       id: request.id,
@@ -122,7 +166,9 @@ export function TypeConfirmationCard({ request, onChanged }: Props): React.JSX.E
       data-testid="type-confirmation-card"
     >
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-medium text-foreground">{translate(`${T}title`, 'Confirm request type')}</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {translate(`${T}title`, 'Confirm request type')}
+        </h2>
         {proposed && <RequestTypeBadge type={proposed} />}
         {changed && (
           <span className="rounded border border-border px-1 text-[10px] text-muted-foreground">
@@ -134,22 +180,52 @@ export function TypeConfirmationCard({ request, onChanged }: Props): React.JSX.E
       {confidencePct !== null && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{translate(`${T}confidence`, 'Confidence')}</span>
-          <Progress value={confidencePct} className="h-1.5 w-32" aria-label={translate(`${T}confidence`, 'Confidence')} />
+          <Progress
+            value={confidencePct}
+            className="h-1.5 w-32"
+            aria-label={translate(`${T}confidence`, 'Confidence')}
+          />
           <span>{confidencePct}%</span>
         </div>
       )}
       {proposed !== '' && isLowConfidence(request.confidence) && (
         <p role="alert" className="flex items-center gap-1 text-xs text-destructive">
           <AlertTriangle className="size-3.5" aria-hidden />
-          {translate(`${T}lowConfidence`, 'The AI is not confident about this type. Please check it.')}
+          {translate(
+            `${T}lowConfidence`,
+            'The AI is not confident about this type. Please check it.'
+          )}
         </p>
       )}
-      {reasonText && (
+      {aiSetupCode && (
+        <RequestAiSetupBanner
+          code={aiSetupCode}
+          onRetry={() => void runClassify()}
+          retryDisabled={busy || classifyLocked || aiCooldown.coolingDown}
+        />
+      )}
+      {genericFailure && (
+        <p role="alert" className="text-xs text-destructive" data-testid="classification-failed">
+          {translate(
+            `${T}classifyFailed`,
+            'The AI could not classify this request automatically. Pick the type yourself or reclassify.'
+          )}
+        </p>
+      )}
+      {showReasonText && (
         <div className="text-xs text-muted-foreground">
-          <p className={showAllReason ? 'whitespace-pre-wrap' : 'line-clamp-6 whitespace-pre-wrap'}>{reasonText}</p>
+          <p className={showAllReason ? 'whitespace-pre-wrap' : 'line-clamp-6 whitespace-pre-wrap'}>
+            {reasonText}
+          </p>
           {longReason && (
-            <button type="button" className="mt-0.5 text-primary hover:underline" onClick={() => setShowAllReason((v) => !v)}>
-              {showAllReason ? translate(`${T}showLess`, 'Show less') : translate(`${T}showMore`, 'Show more')}
+            <button
+              type="button"
+              className="mt-0.5 text-primary hover:underline"
+              onClick={() => setShowAllReason((v) => !v)}
+            >
+              {showAllReason
+                ? translate(`${T}showLess`, 'Show less')
+                : translate(`${T}showMore`, 'Show more')}
             </button>
           )}
         </div>
@@ -194,9 +270,18 @@ export function TypeConfirmationCard({ request, onChanged }: Props): React.JSX.E
           </Select>
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">{translate(`${T}urgency`, 'Urgency')}</span>
-          <Select value={urgency && urgency !== 'unknown' ? urgency : ''} onValueChange={(v) => setUrgency(v as RequestUrgency)}>
-            <SelectTrigger size="sm" className="w-28" aria-label={translate(`${T}urgency`, 'Urgency')}>
+          <span className="text-xs text-muted-foreground">
+            {translate(`${T}urgency`, 'Urgency')}
+          </span>
+          <Select
+            value={urgency && urgency !== 'unknown' ? urgency : ''}
+            onValueChange={(v) => setUrgency(v as RequestUrgency)}
+          >
+            <SelectTrigger
+              size="sm"
+              className="w-28"
+              aria-label={translate(`${T}urgency`, 'Urgency')}
+            >
               <SelectValue placeholder="-" />
             </SelectTrigger>
             <SelectContent>
@@ -235,10 +320,20 @@ export function TypeConfirmationCard({ request, onChanged }: Props): React.JSX.E
       )}
 
       <div className="flex items-center gap-2">
-        <Button size="sm" disabled={busy || type === ''} onClick={() => void confirm()} title={getScreenSubmitShortcutLabel()}>
+        <Button
+          size="sm"
+          disabled={busy || type === '' || writeCooldown.coolingDown}
+          onClick={() => void confirm()}
+          title={getScreenSubmitShortcutLabel()}
+        >
           {translate(`${T}confirm`, 'Confirm type')}
         </Button>
-        <Button size="sm" variant="outline" disabled={busy || classifyLocked} onClick={() => void runClassify()}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy || classifyLocked || aiCooldown.coolingDown}
+          onClick={() => void runClassify()}
+        >
           {translate(`${T}reclassify`, 'Reclassify')}
         </Button>
         {classifyLocked && (

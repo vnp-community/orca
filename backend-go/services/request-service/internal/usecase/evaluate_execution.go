@@ -66,7 +66,7 @@ func (e *EvaluateExecution) Run(ctx context.Context, req domain.Request) error {
 	if err != nil {
 		return err
 	}
-	tree := domain.BuildExecutionTree(tasks)
+	tree := domain.BuildExecutionTreeOf(req.PlanTaskID, tasks)
 	started, err := startedPhases(ctx, e.PhaseStarts, req.ID)
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func (e *EvaluateExecution) Run(ctx context.Context, req domain.Request) error {
 		if rerr != nil {
 			return errors.Join(err, rerr)
 		}
-		tree = domain.BuildExecutionTree(tasks)
+		tree = domain.BuildExecutionTreeOf(req.PlanTaskID, tasks)
 	}
 	if err != nil {
 		return err
@@ -90,6 +90,9 @@ func (e *EvaluateExecution) Run(ctx context.Context, req domain.Request) error {
 		return err
 	}
 	if err := e.completePhases(ctx, req, tree, started, flow); err != nil {
+		if returned, rerr := e.returnWhenActorForbidden(ctx, req, err); returned || rerr != nil {
+			return rerr
+		}
 		return err
 	}
 	if tree.ScopeFinished() {
@@ -113,7 +116,7 @@ func (e *EvaluateExecution) autoComplete(ctx context.Context, req domain.Request
 		if err != nil {
 			return completed, err
 		}
-		if err := e.Tasks.SetStatus(tenant.WithUserID(ctx, actor), l.ID, domain.TaskStatusDone); err != nil {
+		if err := e.Tasks.SetStatus(asExecutionActor(ctx, actor), l.ID, domain.TaskStatusDone); err != nil {
 			errs = append(errs, fmt.Errorf("complete task %s: %w", l.ID, err))
 			continue
 		}
@@ -181,7 +184,7 @@ func (e *EvaluateExecution) exhaustedReturn(ctx context.Context, req domain.Requ
 	}
 	reason := fmt.Sprintf("Task %q lỗi sau %d lần: %s", task.Title, failed, lastErr)
 	if hinter, ok := e.Policies.PolicyFor(req.Type).(domain.FailureHinter); ok {
-		all := e.refsWithEdges(ctx, tree)
+		all := e.refsWithEdges(ctx, req, tree)
 		if hint := hinter.FailureHint(req, task.Ref(), all); hint != "" {
 			reason += ". " + hint
 		}
@@ -190,7 +193,7 @@ func (e *EvaluateExecution) exhaustedReturn(ctx context.Context, req domain.Requ
 }
 
 // refsWithEdges loads depends_on edges (one GetSubtree) so a policy can tell which tasks follow the failed one.
-func (e *EvaluateExecution) refsWithEdges(ctx context.Context, tree domain.ExecutionTree) []domain.TaskRef {
+func (e *EvaluateExecution) refsWithEdges(ctx context.Context, req domain.Request, tree domain.ExecutionTree) []domain.TaskRef {
 	refs := make([]domain.TaskRef, 0, len(tree.Leaves))
 	for _, l := range tree.Leaves {
 		refs = append(refs, l.Ref())
@@ -198,7 +201,11 @@ func (e *EvaluateExecution) refsWithEdges(ctx context.Context, tree domain.Execu
 	if tree.Plan == nil {
 		return refs
 	}
-	sub, err := e.Tasks.GetSubtree(ctx, tree.Plan.ID)
+	actor, err := e.Actors.ActorFor(ctx, req, "")
+	if err != nil {
+		return refs
+	}
+	sub, err := e.Tasks.GetSubtree(asExecutionActor(ctx, actor), tree.Plan.ID)
 	if err != nil {
 		return refs
 	}
@@ -237,20 +244,22 @@ func (e *EvaluateExecution) allCancelledReturn(tree domain.ExecutionTree, starte
 	return nil
 }
 
-// completePhases records finished Phases and, when the flow gates Phases, opens the Approval of the next one.
+// completePhases records finished Phases and, when the flow gates Phases, opens the Approval of the next one. The first
+// Phase is opened the same way (StartExecution calls this when the Request enters executing): nothing else would.
 func (e *EvaluateExecution) completePhases(ctx context.Context, req domain.Request, tree domain.ExecutionTree, started map[string]bool, flow domain.FlowDefinition) error {
-	finishedAny := false
 	for _, p := range tree.Phases {
 		if p.Status != domain.TaskStatusDone {
 			continue
 		}
-		finishedAny = true
 		count := len(tree.LeavesOf(p.ID))
 		if err := e.recordContainerDone(ctx, req, p, domain.OutcomePhaseDone, uuid.NewString(), e.now(), count, true); err != nil {
 			return err
 		}
 	}
-	if !finishedAny || e.Open == nil || !flow.HasExecutionGate(domain.GatePhase) {
+	if flow.StartsPhasesItself(req.ExecutionMode, req.Size) {
+		return e.startNextPhase(ctx, req, tree, started)
+	}
+	if e.Open == nil || !flow.HasExecutionGateFor(domain.GatePhase, req.ExecutionMode) {
 		return nil
 	}
 	for _, p := range tree.Phases {
@@ -258,9 +267,13 @@ func (e *EvaluateExecution) completePhases(ctx context.Context, req domain.Reque
 			return nil // a Phase is still running: the next one waits
 		}
 	}
-	next, ok := tree.NextPhase(started)
-	if !ok {
-		return nil
+	actor, err := e.Actors.ActorFor(ctx, req, "")
+	if err != nil {
+		return err
+	}
+	next, ok, err := e.nextReadyPhase(ctx, actor, tree, started)
+	if err != nil || !ok {
+		return err
 	}
 	tenantID, _ := tenant.TenantID(ctx)
 	approvals, err := e.Approvals.ListGateApprovals(ctx, tenantID, []string{req.ID})
@@ -271,12 +284,26 @@ func (e *EvaluateExecution) completePhases(ctx context.Context, req domain.Reque
 		latest.Status != domain.ApprovalStatusExpired && latest.Status != domain.ApprovalStatusCancelled {
 		return nil
 	}
-	actor, err := e.Actors.ActorFor(ctx, req, "")
-	if err != nil {
-		return err
-	}
-	_, err = e.Open.Execute(ctx, OpenApprovalInput{RequestID: req.ID, SubjectType: domain.SubjectPhase, SubjectID: next.ID, RequestedBy: actor})
+	// Opening validates the Phase against task-service, which only shows the tree to its owner or a grantee.
+	_, err = e.Open.Execute(asExecutionActor(ctx, actor), OpenApprovalInput{RequestID: req.ID, SubjectType: domain.SubjectPhase, SubjectID: next.ID, RequestedBy: actor})
 	return err
+}
+
+// nextReadyPhase reads the depends_on edges (one GetSubtree) so the gate opens for a Phase whose predecessors are done. A failed
+// read is an error, not a guess: the reconcile loop retries, whereas a wrong gate would never open the one it waits for.
+func (e *EvaluateExecution) nextReadyPhase(ctx context.Context, actor string, tree domain.ExecutionTree, started map[string]bool) (domain.TaskView, bool, error) {
+	var edges []domain.DependsEdge
+	if tree.Plan != nil {
+		sub, err := e.Tasks.GetSubtree(asExecutionActor(ctx, actor), tree.Plan.ID)
+		if err != nil {
+			return domain.TaskView{}, false, err
+		}
+		for _, edge := range sub.DependsOn {
+			edges = append(edges, domain.DependsEdge{From: edge.From, To: edge.To})
+		}
+	}
+	next, ok := tree.NextReadyPhase(started, edges)
+	return next, ok, nil
 }
 
 func taskFinishedStatus(s string) bool {

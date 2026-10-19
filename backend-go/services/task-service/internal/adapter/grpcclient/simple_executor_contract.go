@@ -17,6 +17,9 @@ import (
 )
 
 const (
+	// contractRunTimeoutMs is how long a task of a Request may run on the agent: it writes code and runs the task's own checks,
+	// which the agent's five minute default for a plain prompt cut off twice in a row and sent the whole Request back to the backlog.
+	contractRunTimeoutMs   = 25 * 60 * 1000
 	contractMaxOutputBytes = 1 << 20
 	// stdoutScanLimit bounds what the parser sees; the block is printed last so only the tail matters.
 	stdoutScanLimit = 2 << 20
@@ -35,12 +38,16 @@ type agentParsedResult struct {
 	Detail string          `json:"detail,omitempty"`
 }
 
-type contractRunOptions struct{ nonce string }
+type contractRunOptions struct {
+	nonce                                string
+	useKnowledgeHub, requirePassingCheck bool
+}
 
 func (o *contractRunOptions) apply(p *agentExecPromptParams) {
 	p.ResultBlock = &resultBlockParam{Nonce: o.nonce}
 	p.ReportChanges = true
 	p.MaxOutputBytes = contractMaxOutputBytes
+	p.TimeoutMs = contractRunTimeoutMs
 }
 
 // relayError marks failures of the relay call itself, as opposed to preparation errors, so the
@@ -72,14 +79,11 @@ func (s *SimpleExecutor) ExecuteWithContract(ctx context.Context, in usecase.Con
 	if s.records == nil {
 		return usecase.ContractExecuteOutput{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_CONTRACT_UNAVAILABLE", "execution records are not configured", nil)
 	}
-	if strings.TrimSpace(in.Prompt) == "" {
-		return usecase.ContractExecuteOutput{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_EXECUTE_PROMPT_REQUIRED", "a contract run needs the prompt built from the task spec", nil)
-	}
 	// Full trust is acceptable only because request-service gates readiness and verifies afterwards.
 	if !strings.HasPrefix(in.RequestID, contractRequestPrefix) {
 		return usecase.ContractExecuteOutput{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_CONTRACT_REQUIRES_REQUEST", "contract runs must come from a request execution", nil)
 	}
-	result, runErr := s.runAgentPrompt(ctx, in.TenantID, in.TaskID, in.RequestID, in.WorktreePath, in.Prompt, &contractRunOptions{nonce: in.ResultNonce})
+	result, runErr := s.runAgentPrompt(ctx, in.TenantID, in.TaskID, in.RequestID, in.WorktreePath, in.Prompt, &contractRunOptions{nonce: in.ResultNonce, useKnowledgeHub: in.UseKnowledgeHub, requirePassingCheck: in.RequirePassingCheck})
 	var relayErr *relayError
 	if runErr != nil && !errors.As(runErr, &relayErr) {
 		return usecase.ContractExecuteOutput{}, runErr
@@ -97,7 +101,7 @@ func (s *SimpleExecutor) ExecuteWithContract(ctx context.Context, in usecase.Con
 	if relayErr != nil {
 		parsed = domain.ParsedExecution{Status: domain.ParseStatusMissing, Code: domain.ResultCodeBlockMissing}
 	}
-	class, code := domain.ClassifyRunFailure(result.TimedOut, result.ExitCode, parsed, runErr)
+	class, code := domain.ClassifyRunFailureChecked(result.TimedOut, result.ExitCode, parsed, runErr, in.RequirePassingCheck)
 
 	rec, insertErr := s.records.InsertExecutionRecord(ctx, domain.ExecutionRecord{
 		TenantID: in.TenantID, TaskID: in.TaskID, ExecutionLinkID: in.ExecutionLinkID, Attempt: max(in.Attempt, 1),

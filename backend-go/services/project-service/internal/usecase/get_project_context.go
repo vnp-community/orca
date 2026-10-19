@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -37,8 +38,11 @@ func (uc *GetProjectContext) Execute(ctx context.Context, projectID string) (dom
 	}
 
 	project, err := uc.projects.Get(ctx, tenantID, projectID)
-	if err != nil {
+	if errors.Is(err, domain.ErrProjectNotFound) {
 		return domain.ProjectContext{}, apperrors.New(apperrors.KindNotFound, "PROJECT_NOT_FOUND", "project does not exist", err)
+	}
+	if err != nil {
+		return domain.ProjectContext{}, apperrors.New(apperrors.KindInternal, "PROJECT_FETCH_FAILED", "failed to fetch project", err)
 	}
 
 	repos, _ := uc.repos.ListRepos(ctx, projectID) // best-effort; a project with no repos yet has an empty RepoURL

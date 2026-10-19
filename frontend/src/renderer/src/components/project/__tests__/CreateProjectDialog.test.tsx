@@ -218,18 +218,17 @@ describe('CreateProjectDialog', () => {
       fireEvent.click(submit)
     })
 
-    // Why project.create's args have neither devServerId nor repoPath:
-    // CreateProjectRequest (project.proto) has no such fields — both used
-    // to be sent here and were silently dropped by the wscompat handler.
+    // Why project.create carries devServerId and repoPath: the gateway decodes both, so the
+    // project is bound to the chosen host from the start (SOL-FE-E2E-004).
     expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'project.create', {
       name: 'My Project',
       description: undefined,
-      visibility: 'private'
+      visibility: 'private',
+      devServerId: 'ds-1',
+      repoPath: '/home/user/repo'
     })
-    // The repo attaches via a follow-up repo.add call, with the shape the Go
-    // handler actually decodes (projectId/url/displayName) — Phase 10 gave
-    // AddRepoRequest its own devServerId, so the dev server binds directly on
-    // this same call now instead of a separate project.rebindDevServer step.
+    // When project.create did not attach the repo (repo.list has none), repo.add registers it with
+    // the same dev server — Phase 10 gave AddRepoRequest its own devServerId.
     expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'repo.add', {
       projectId: 'new-p',
       url: '/home/user/repo',
@@ -245,8 +244,11 @@ describe('CreateProjectDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
-  it('still creates and closes when the repo.add follow-up fails, but shows a toast', async () => {
-    const { toast } = await import('sonner')
+  const projectCreateCalls = (): number =>
+    vi.mocked(callRuntimeRpc).mock.calls.filter(([, method]) => method === 'project.create').length
+
+  it('keeps the dialog open with an inline error when repo.add fails, and retries without a second project', async () => {
+    let repoAddFails = true
     vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
       if (method === 'devServer.list') {
         return devServers
@@ -255,7 +257,10 @@ describe('CreateProjectDialog', () => {
         return { id: 'new-p', name: 'New Project' }
       }
       if (method === 'repo.add') {
-        throw new Error('repo path already registered')
+        if (repoAddFails) {
+          throw new Error('repo path already registered')
+        }
+        return { id: 'r1' }
       }
       return null
     })
@@ -274,9 +279,20 @@ describe('CreateProjectDialog', () => {
       fireEvent.click(submit)
     })
 
-    // The project row already exists at this point — a repo.add failure is
-    // "couldn't fully set it up", not "creation failed".
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('repo could not be added'))
+    // The project row already exists, but without its repo it is unusable: the error stays inline
+    // (not a toast) and the dialog stays open so the user can retry.
+    expect(
+      screen.getByText(/repo could not be added: repo path already registered/)
+    ).toBeInTheDocument()
+    expect(onCreated).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalledWith(false)
+
+    const createsBeforeRetry = projectCreateCalls()
+    repoAddFails = false
+    await act(async () => {
+      fireEvent.click(submit)
+    })
+    expect(projectCreateCalls()).toBe(createsBeforeRetry)
     expect(onCreated).toHaveBeenCalledWith({ id: 'new-p', name: 'New Project' })
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
@@ -311,16 +327,84 @@ describe('CreateProjectDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
   })
 
-  // BUG-FE-PW-001
-  describe('duplicate repo warning', () => {
-    it('warns when repoPath + devServerId already exist in the sidebar', async () => {
+  // BUG-FE-PW-001, SOL-FE-E2E-005: a repo already registered on that host is blocked, not warned about
+  describe('duplicate repo is blocked', () => {
+    const existingRepo = {
+      id: 'repo-old',
+      projectId: 'p-existing',
+      path: '/home/user/repo',
+      executionHostId: 'devServer:ds-1',
+      displayName: 'my-repo'
+    }
+
+    function mockStoreRepos(repos: Record<string, unknown>[]): void {
       vi.mocked(useAppStore.getState).mockReturnValue({
         settings: {},
-        repos: [
-          { path: '/home/user/repo', executionHostId: 'devServer:ds-1', displayName: 'my-repo' }
-        ],
+        repos,
         projects: []
-      } as MockAppState)
+      } as never)
+    }
+
+    function mockProjectList(): void {
+      vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
+        if (method === 'devServer.list') {
+          return devServers
+        }
+        if (method === 'project.list') {
+          return [{ id: 'p-existing', name: 'Existing project' }]
+        }
+        return null
+      })
+    }
+
+    it('blocks submit and names the project that already holds repoPath + devServerId', async () => {
+      mockStoreRepos([existingRepo])
+      mockProjectList()
+
+      const createsBefore = projectCreateCalls()
+      await act(async () => {
+        render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
+      })
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My Project' } })
+      fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
+      // Trailing slash and the same folder: still the same repo.
+      fireEvent.change(screen.getByLabelText('Repo Path'), {
+        target: { value: '/home/user/repo/' }
+      })
+
+      expect(await screen.findByTestId('cp-duplicate-repo-blocked')).toHaveTextContent(
+        'Existing project'
+      )
+      expect(screen.getByRole('button', { name: /create project/i })).toBeDisabled()
+      fireEvent.submit(screen.getByRole('button', { name: /create project/i }).closest('form')!)
+      expect(projectCreateCalls()).toBe(createsBefore)
+    })
+
+    it('Open that project hands the project id to the caller and closes the dialog', async () => {
+      mockStoreRepos([existingRepo])
+      mockProjectList()
+      const onOpenExistingProject = vi.fn()
+
+      await act(async () => {
+        render(
+          <CreateProjectDialog
+            open
+            onOpenChange={onOpenChange}
+            onCreated={onCreated}
+            onOpenExistingProject={onOpenExistingProject}
+          />
+        )
+      })
+      fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
+      fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
+      fireEvent.click(await screen.findByTestId('cp-open-existing-project'))
+
+      expect(onOpenExistingProject).toHaveBeenCalledWith('p-existing')
+      expect(onOpenChange).toHaveBeenCalledWith(false)
+    })
+
+    it('does not block when the path matches but the dev server differs', async () => {
+      mockStoreRepos([{ ...existingRepo, executionHostId: 'devServer:ds-2' }])
 
       await act(async () => {
         render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
@@ -328,28 +412,10 @@ describe('CreateProjectDialog', () => {
       fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
       fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
 
-      expect(await screen.findByTestId('cp-duplicate-repo-warning')).toHaveTextContent('my-repo')
+      expect(screen.queryByTestId('cp-duplicate-repo-blocked')).not.toBeInTheDocument()
     })
 
-    it('does not warn when the path matches but the dev server differs', async () => {
-      vi.mocked(useAppStore.getState).mockReturnValue({
-        settings: {},
-        repos: [
-          { path: '/home/user/repo', executionHostId: 'devServer:ds-2', displayName: 'my-repo' }
-        ],
-        projects: []
-      } as MockAppState)
-
-      await act(async () => {
-        render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
-      })
-      fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
-      fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
-
-      expect(screen.queryByTestId('cp-duplicate-repo-warning')).not.toBeInTheDocument()
-    })
-
-    it('does not warn, and submits normally, when there is no matching repo', async () => {
+    it('does not block, and submits normally, when there is no matching repo', async () => {
       await act(async () => {
         render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
       })
@@ -357,9 +423,41 @@ describe('CreateProjectDialog', () => {
       fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
       fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
 
-      expect(screen.queryByTestId('cp-duplicate-repo-warning')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('cp-duplicate-repo-blocked')).not.toBeInTheDocument()
       const submit = screen.getByRole('button', { name: /create project/i })
       await waitFor(() => expect(submit).not.toBeDisabled())
+    })
+
+    it('shows the same block when the backend reports PROJECT_REPO_ALREADY_REGISTERED', async () => {
+      vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
+        if (method === 'devServer.list') {
+          return devServers
+        }
+        if (method === 'project.create') {
+          throw new Error(
+            'PROJECT_REPO_ALREADY_REGISTERED: /home/user/repo already in project Server side (p-srv)'
+          )
+        }
+        return null
+      })
+
+      await act(async () => {
+        render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
+      })
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My Project' } })
+      fireEvent.change(screen.getByLabelText('Dev Server'), { target: { value: 'ds-1' } })
+      fireEvent.change(screen.getByLabelText('Repo Path'), { target: { value: '/home/user/repo' } })
+      const submit = screen.getByRole('button', { name: /create project/i })
+      await waitFor(() => expect(submit).not.toBeDisabled())
+      await act(async () => {
+        fireEvent.click(submit)
+      })
+
+      expect(await screen.findByTestId('cp-duplicate-repo-blocked')).toHaveTextContent(
+        'Server side'
+      )
+      expect(onCreated).not.toHaveBeenCalled()
+      expect(submit).toBeDisabled()
     })
   })
 

@@ -2,7 +2,10 @@ package mysql
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	drivermysql "github.com/go-sql-driver/mysql"
 
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
@@ -16,6 +19,10 @@ func (r *Repository) Add(ctx context.Context, tenantID string, edge domain.TaskE
 		INSERT INTO task_edges (tenant_id, from_task_id, to_task_id, edge_type)
 		VALUES (?, ?, ?, ?)
 	`, tenantID, edge.FromTaskID, edge.ToTaskID, string(edge.Kind))
+	var myErr *drivermysql.MySQLError
+	if errors.As(err, &myErr) && myErr.Number == mysqlFKFailsChild {
+		return fmt.Errorf("mysql: task edge %s -> %s: %w", edge.FromTaskID, edge.ToTaskID, domain.ErrTaskNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("mysql: insert task edge: %w", err)
 	}

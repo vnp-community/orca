@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/openspec_plan_prompt.go`, `internal/usecase/engine_openspec.go` (sửa), `internal/usecase/tasks_md_sync.go`, `internal/usecase/openspec_archive_consumer.go`, `internal/adapter/eventbus/openspec_consumers.go`, `internal/usecase/commit_plan.go` (sửa, của SOL-012) và test (mới trừ các file sửa)
 **Depends on:** TASK-REQ-026-03 (parser, `TickTask`), 026-05, 026-06, TASK-REQ-012-05 (`GeneratePlan`, `CommitPlan`), TASK-REQ-013-06 (`task_run_outcomes`, consumer), TASK-REQ-001-04 (outbox, `processed_events`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-14): `GeneratePlan` do agent viết change (T2.4 đến T2.8); `TasksMdSyncer` và archive thật (T3.3). Khác mô tả gốc: vòng quét thay cho consumer bền, không dùng `processed_events`
 
 ---
 

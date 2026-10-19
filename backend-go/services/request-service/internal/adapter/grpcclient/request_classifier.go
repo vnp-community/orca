@@ -28,10 +28,17 @@ type RelayClassifier struct {
 	infra     infrafleetv1.InfraFleetServiceClient
 	resolver  connectionResolver
 	providers aiproviderv1.AiProviderServiceClient // optional: picks the account for ai.complete
+	caps      usecase.DevServerCapabilityReader    // optional: lets an unusable dev server fail fast with a remedy
 	timeout   time.Duration
 }
 
 var _ usecase.RequestClassifier = (*RelayClassifier)(nil)
+
+// WithCapabilities enables the readiness check before each AI call.
+func (c *RelayClassifier) WithCapabilities(caps usecase.DevServerCapabilityReader) *RelayClassifier {
+	c.caps = caps
+	return c
+}
 
 func NewRelayClassifier(infra infrafleetv1.InfraFleetServiceClient, resolver connectionResolver, providers aiproviderv1.AiProviderServiceClient) *RelayClassifier {
 	return &RelayClassifier{infra: infra, resolver: resolver, providers: providers, timeout: defaultClassifierTimeout}
@@ -40,6 +47,9 @@ func NewRelayClassifier(infra infrafleetv1.InfraFleetServiceClient, resolver con
 func (c *RelayClassifier) Classify(ctx context.Context, in usecase.ClassificationInput) (domain.ClassificationProposal, error) {
 	conn, err := c.resolver.ResolveForProject(ctx, in.ProjectID)
 	if err != nil {
+		return domain.ClassificationProposal{}, err
+	}
+	if err := checkAIReady(ctx, c.caps, conn); err != nil {
 		return domain.ClassificationProposal{}, err
 	}
 	accountID := c.accountID(ctx, in.ProjectID)
@@ -118,6 +128,9 @@ func relayAIComplete(ctx context.Context, infra infrafleetv1.InfraFleetServiceCl
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
 			return "", usecase.ErrClassifierTimeout
+		}
+		if mapped := mapAIRelayError(err); mapped != err {
+			return "", mapped
 		}
 		return "", fmt.Errorf("grpcclient: relay ai.complete: %w", err)
 	}

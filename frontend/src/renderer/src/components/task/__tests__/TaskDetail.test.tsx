@@ -7,9 +7,11 @@ import { useTask } from '../../../hooks/useTask'
 import { registerTraceSink, type TraceEvent } from '../../../../../shared/trace'
 
 // Mock useAppStore for activeTaskId and settings
-const { mockSetActiveWorkspaceTab, mockSetCurrentWorktree } = vi.hoisted(() => ({
-  mockSetActiveWorkspaceTab: vi.fn(),
-  mockSetCurrentWorktree: vi.fn()
+const { mockOpenTaskWorktreeInGit } = vi.hoisted(() => ({
+  mockOpenTaskWorktreeInGit: vi.fn()
+}))
+vi.mock('../open-task-worktree-in-git', () => ({
+  openTaskWorktreeInGit: mockOpenTaskWorktreeInGit
 }))
 vi.mock('../../../store', () => ({
   useAppStore: Object.assign(
@@ -19,8 +21,7 @@ vi.mock('../../../store', () => ({
         settings: {},
         tasks: [],
         templates: [],
-        currentUser: { id: 'u1' },
-        setActiveWorkspaceTab: mockSetActiveWorkspaceTab
+        currentUser: { id: 'u1' }
       })
     ),
     { getState: () => ({ settings: {}, updateTask: vi.fn() }) }
@@ -36,8 +37,7 @@ vi.mock('../../../hooks/useTask', () => ({
 vi.mock('../../../context/WorkspaceContext', () => ({
   useWorkspace: vi.fn().mockReturnValue({
     project: { id: 'p1' },
-    currentWorktree: { id: 'wt-1', path: '/repo/p1', branch: 'main', isMain: true },
-    setCurrentWorktree: mockSetCurrentWorktree
+    currentWorktree: { id: 'wt-1', path: '/repo/p1', branch: 'main', isMain: true }
   })
 }))
 import { useWorkspace } from '../../../context/WorkspaceContext'
@@ -209,6 +209,36 @@ describe('TaskDetail', () => {
     })
   })
 
+  it('finished dependencies read "Depends on 3 of 3 done", never "Blocked by"', async () => {
+    mockRpcByMethod({
+      'task.getDependencies': () =>
+        Promise.resolve([
+          { id: 'b1', title: 'Blocker 1', status: 'done' },
+          { id: 'b2', title: 'Blocker 2', status: 'done' },
+          { id: 'b3', title: 'Blocker 3', status: 'done' }
+        ])
+    })
+    render(<TaskDetail />)
+    await waitFor(() => expect(screen.getByText('Depends on')).toBeInTheDocument())
+    expect(screen.getByTestId('task-dependency-progress')).toHaveTextContent('3 of 3 done')
+    expect(screen.queryByText(/Blocked by/)).toBeNull()
+  })
+
+  it('"Blocked by" lists only the dependencies that are not finished', async () => {
+    mockRpcByMethod({
+      'task.getDependencies': () =>
+        Promise.resolve([
+          { id: 'b1', title: 'Schema', status: 'done' },
+          { id: 'b2', title: 'Migration', status: 'in_progress' }
+        ])
+    })
+    render(<TaskDetail />)
+    const blocked = await screen.findByText('← Blocked by:')
+    expect(blocked.nextElementSibling).toHaveTextContent('Migration')
+    expect(blocked.nextElementSibling).not.toHaveTextContent('Schema')
+    expect(screen.getByTestId('task-dependency-progress')).toHaveTextContent('1 of 2 done')
+  })
+
   it('renders AttachWorkflowTemplateAction next to the Run button, populated from workflow.template.list', async () => {
     mockRpcByMethod({
       'workflow.template.list': () =>
@@ -365,16 +395,11 @@ describe('TaskDetail', () => {
     })
   })
 
-  // "Open in Git": before this, seeing a task's agent-created files meant
-  // manually finding the right worktree in the sidebar — nothing connected
-  // Task Detail to which worktree the task's own execution actually used.
+  // "Open in Git": takes the user from the task to the files its agent changed. The navigation
+  // itself is covered in open-task-worktree-in-git.test.ts; here: what the button does with the
+  // outcome, and that no outcome is silent.
   describe('Open in Git', () => {
-    it('task has no worktreeId → button is not rendered', () => {
-      render(<TaskDetail />)
-      expect(screen.queryByTestId('open-in-git-btn')).not.toBeInTheDocument()
-    })
-
-    it('task has worktreeId → clicking resolves it via worktree.list, then switches worktree + tab', async () => {
+    const withWorktree = (over: Record<string, unknown> = {}) =>
       vi.mocked(useTask).mockReturnValue({
         task: {
           id: 't1',
@@ -382,67 +407,89 @@ describe('TaskDetail', () => {
           status: 'done',
           priority: 'high',
           projectId: 'p1',
-          worktreeId: 'wt-task-1'
+          worktreeId: 'wt-task-1',
+          ...over
         },
         updateTask
       } as unknown as ReturnType<typeof useTask>)
-      mockRpcByMethod({
-        'worktree.list': () =>
-          Promise.resolve({
-            worktrees: [
-              { id: 'wt-other', path: '/repo/other', branch: 'main' },
-              { id: 'wt-task-1', path: '/repo/task-1', branch: 'task/t1' }
-            ]
-          })
-      })
-      render(<TaskDetail />)
-      fireEvent.click(screen.getByTestId('open-in-git-btn'))
 
-      await waitFor(() => {
-        expect(mockSetCurrentWorktree).toHaveBeenCalledWith({
-          id: 'wt-task-1',
-          path: '/repo/task-1',
-          branch: 'task/t1',
-          isMain: false
-        })
-      })
-      expect(mockSetActiveWorkspaceTab).toHaveBeenCalledWith('git')
+    beforeEach(() => {
+      mockOpenTaskWorktreeInGit.mockResolvedValue('opened')
+      vi.mocked(useWorkspace).mockReturnValue({ project: { id: 'p1' } } as unknown as ReturnType<
+        typeof useWorkspace
+      >)
     })
 
-    it('worktree.list has no matching entry → toast.error, never switches worktree/tab', async () => {
-      vi.mocked(useTask).mockReturnValue({
-        task: {
-          id: 't1',
-          title: 'My Task',
-          status: 'done',
-          projectId: 'p1',
-          worktreeId: 'wt-gone'
-        },
-        updateTask
-      } as unknown as ReturnType<typeof useTask>)
-      mockRpcByMethod({ 'worktree.list': () => Promise.resolve({ worktrees: [] }) })
+    it('task has no worktreeId → button is not rendered', () => {
+      render(<TaskDetail />)
+      expect(screen.queryByTestId('open-in-git-btn')).not.toBeInTheDocument()
+    })
+
+    it("opens the task worktree of the task's own project; success shows no error", async () => {
+      withWorktree({ projectId: 'p9' })
       render(<TaskDetail />)
       fireEvent.click(screen.getByTestId('open-in-git-btn'))
+      await waitFor(() => expect(mockOpenTaskWorktreeInGit).toHaveBeenCalledWith('p9', 'wt-task-1'))
+      await waitFor(() => expect(screen.getByTestId('open-in-git-btn')).toBeEnabled())
+      expect(mockToast.error).not.toHaveBeenCalled()
+    })
 
+    it('works from a Request sheet where the Workspace context has no project (found live: silent no-op)', async () => {
+      withWorktree()
+      vi.mocked(useWorkspace).mockReturnValue({ project: null } as unknown as ReturnType<
+        typeof useWorkspace
+      >)
+      render(<TaskDetail />)
+      fireEvent.click(screen.getByTestId('open-in-git-btn'))
+      await waitFor(() => expect(mockOpenTaskWorktreeInGit).toHaveBeenCalledWith('p1', 'wt-task-1'))
+    })
+
+    it('no project anywhere → says so, does not navigate', async () => {
+      withWorktree({ projectId: undefined })
+      vi.mocked(useWorkspace).mockReturnValue({ project: null } as unknown as ReturnType<
+        typeof useWorkspace
+      >)
+      render(<TaskDetail />)
+      fireEvent.click(screen.getByTestId('open-in-git-btn'))
+      await waitFor(() =>
+        expect(mockToast.error).toHaveBeenCalledWith(
+          'Cannot open Git: this task is not linked to a project'
+        )
+      )
+      expect(mockOpenTaskWorktreeInGit).not.toHaveBeenCalled()
+    })
+
+    it('worktree row is gone → toast.error', async () => {
+      withWorktree({ worktreeId: 'wt-gone' })
+      mockOpenTaskWorktreeInGit.mockResolvedValue('unknown')
+      render(<TaskDetail />)
+      fireEvent.click(screen.getByTestId('open-in-git-btn'))
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith("This task's worktree no longer exists")
       })
-      expect(mockSetCurrentWorktree).not.toHaveBeenCalled()
-      expect(mockSetActiveWorkspaceTab).not.toHaveBeenCalled()
     })
 
-    it('worktree.list RPC fails → toast.error with the failure message', async () => {
-      vi.mocked(useTask).mockReturnValue({
-        task: { id: 't1', title: 'My Task', status: 'done', projectId: 'p1', worktreeId: 'wt-1' },
-        updateTask
-      } as unknown as ReturnType<typeof useTask>)
-      mockRpcByMethod({ 'worktree.list': () => Promise.reject(new Error('boom')) })
+    it('checkout is not on the host any more → toast.error that says it may have been cleaned up', async () => {
+      withWorktree()
+      mockOpenTaskWorktreeInGit.mockResolvedValue('not-on-host')
       render(<TaskDetail />)
       fireEvent.click(screen.getByTestId('open-in-git-btn'))
+      await waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith(
+          "This task's worktree is no longer on this host. It may have been cleaned up."
+        )
+      })
+    })
 
+    it('the lookup fails → toast.error with the failure message, button usable again', async () => {
+      withWorktree()
+      mockOpenTaskWorktreeInGit.mockRejectedValue(new Error('boom'))
+      render(<TaskDetail />)
+      fireEvent.click(screen.getByTestId('open-in-git-btn'))
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith('Failed to open worktree: boom')
       })
+      expect(screen.getByTestId('open-in-git-btn')).toBeEnabled()
     })
   })
 })

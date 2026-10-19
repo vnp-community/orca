@@ -148,8 +148,8 @@ func (r *Repository) GetDailyRollup(ctx context.Context, tenantID, userID string
 
 	rollup := domain.DailyUsageRollup{TenantID: tenantID, UserID: userID, Provider: provider, Day: day}
 	err := row.Scan(&rollup.TotalInputTokens, &rollup.TotalOutputTokens, &rollup.TotalCostUSD, &rollup.SessionCount)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return rollup, nil // no usage yet today is not an error, just zeros
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return rollup, nil // no usage yet today (or a user id that cannot own any) is not an error, just zeros
 	}
 	if err != nil {
 		return domain.DailyUsageRollup{}, fmt.Errorf("postgres: query daily rollup: %w", err)
@@ -180,6 +180,9 @@ func (r *Repository) ListSessions(ctx context.Context, tenantID, userID, pageTok
 		ORDER BY id
 		LIMIT $4
 	`, tenantID, userIDParam, pageToken, pageSize)
+	if isMalformedUUID(err) {
+		return nil, "", nil // a user filter that cannot be a uuid owns no sessions
+	}
 	if err != nil {
 		return nil, "", fmt.Errorf("postgres: query sessions: %w", err)
 	}
@@ -211,6 +214,9 @@ func (r *Repository) ListSessions(ctx context.Context, tenantID, userID, pageTok
 		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {
+		if isMalformedUUID(err) {
+			return nil, "", nil
+		}
 		return nil, "", fmt.Errorf("postgres: iterate session rows: %w", err)
 	}
 

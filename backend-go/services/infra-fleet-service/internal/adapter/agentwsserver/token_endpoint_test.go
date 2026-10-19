@@ -265,6 +265,9 @@ func TestTokenEndpoint_WithResolver_RegistrySlotKeyIsResolvedUUIDNotRawDevServer
 	}
 }
 
+// runtimeUUID is a realistic ephemeral_vm_runtimes.id (the column is a uuid).
+const runtimeUUID = "6f1c2f0e-7a53-4b0e-9d36-0b1d2c3e4f50"
+
 // fakeEphemeralVmRuntimeRepo is a minimal usecase.EphemeralVmRuntimeRepository
 // double — only SetEnvironmentID is exercised by TokenIssuer, the rest exist
 // solely to satisfy the interface.
@@ -320,10 +323,10 @@ func TestTokenEndpoint_WithResolverAndRuntimes_LinksMatchingEphemeralVmRuntime(t
 	t.Cleanup(registry.Stop)
 	devServerRepo := &fakeResolverRepo{}
 	resolver := usecase.NewResolveDirectWebSocketDevServer(devServerRepo)
-	runtimes := &fakeEphemeralVmRuntimeRepo{existingRuntimeIDs: map[string]bool{"runtime-abc": true}}
+	runtimes := &fakeEphemeralVmRuntimeRepo{existingRuntimeIDs: map[string]bool{runtimeUUID: true}}
 	issuer := NewTokenIssuer(registry, Config{APISecret: "s3cr3t", OrcaVersion: "test-version", Port: 6768, DefaultTenantID: "tenant-1"}, nil, resolver, runtimes)
 
-	doRequest(t, issuer, http.MethodPost, `{"devServerId":"runtime-abc"}`, "s3cr3t")
+	doRequest(t, issuer, http.MethodPost, `{"devServerId":"`+runtimeUUID+`"}`, "s3cr3t")
 
 	if len(runtimes.setCalls) != 1 {
 		t.Fatalf("want exactly 1 SetEnvironmentID call, got %d", len(runtimes.setCalls))
@@ -332,8 +335,8 @@ func TestTokenEndpoint_WithResolverAndRuntimes_LinksMatchingEphemeralVmRuntime(t
 	if call.tenantID != "tenant-1" {
 		t.Errorf("tenantID = %q, want tenant-1", call.tenantID)
 	}
-	if call.runtimeID != "runtime-abc" {
-		t.Errorf("runtimeID = %q, want runtime-abc (the caller's devServerID)", call.runtimeID)
+	if call.runtimeID != runtimeUUID {
+		t.Errorf("runtimeID = %q, want the runtime id (the caller's devServerID)", call.runtimeID)
 	}
 	registeredID := devServerRepo.registered[0].ID
 	if call.environmentID != registeredID {
@@ -354,7 +357,7 @@ func TestTokenEndpoint_WithResolverAndRuntimes_NoMatchingRuntimeIsSilent(t *test
 	runtimes := &fakeEphemeralVmRuntimeRepo{existingRuntimeIDs: map[string]bool{}}
 	issuer := NewTokenIssuer(registry, Config{APISecret: "s3cr3t", OrcaVersion: "test-version", Port: 6768, DefaultTenantID: "tenant-1"}, nil, resolver, runtimes)
 
-	rec := doRequest(t, issuer, http.MethodPost, `{"devServerId":"dev-01"}`, "s3cr3t")
+	rec := doRequest(t, issuer, http.MethodPost, `{"devServerId":"`+runtimeUUID+`"}`, "s3cr3t")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 — a not-found SetEnvironmentID result must not fail token issuance", rec.Code)
@@ -442,5 +445,20 @@ func TestTokenEndpoint_GET_OmitsConsumedToken(t *testing.T) {
 	tokens, _ := getBody["tokens"].([]any)
 	if len(tokens) != 0 {
 		t.Errorf("tokens = %v, want empty — the token was already consumed", tokens)
+	}
+}
+
+// A hand-named agent id can never be a runtime id; passing it on made postgres fail the uuid cast on every connect.
+func TestTokenEndpoint_NonUUIDDevServerID_SkipsRuntimeLinking(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	resolver := usecase.NewResolveDirectWebSocketDevServer(&fakeResolverRepo{})
+	runtimes := &fakeEphemeralVmRuntimeRepo{}
+	issuer := NewTokenIssuer(registry, Config{APISecret: "s3cr3t", OrcaVersion: "test-version", Port: 6768, DefaultTenantID: "tenant-1"}, nil, resolver, runtimes)
+
+	doRequest(t, issuer, http.MethodPost, `{"devServerId":"dev-local-mac"}`, "s3cr3t")
+
+	if len(runtimes.setCalls) != 0 {
+		t.Fatalf("want no SetEnvironmentID call for a non-uuid id, got %d", len(runtimes.setCalls))
 	}
 }

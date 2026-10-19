@@ -22,6 +22,9 @@ type ExecuteTaskInput struct {
 	// close with an ORCA_RESULT block carrying this nonce. Attempt 0 is derived from RequestID.
 	ResultNonce string
 	Attempt     int
+	// UseKnowledgeHub gives the contract run's agent the project's knowledge graph; RequirePassingCheck makes a "done"
+	// without a passing check a failed attempt. Both apply to the contract path only.
+	UseKnowledgeHub, RequirePassingCheck bool
 }
 
 // ExecuteResult replaces the bare execution-ref string Execute used to
@@ -42,7 +45,8 @@ type ExecuteResult struct {
 // parent_child (subtask) or depends_on edge FROM it makes it "complex" and
 // hands off to Engine 2 (ComplexExecutor/orchestration-service); everything
 // else is "simple" and relays directly to Engine 1 (SimpleExecutor/
-// infra-fleet-service).
+// infra-fleet-service). A task that belongs to a Request (request_id set) is
+// always Engine 1 unless it has subtasks: request-service orders its tasks.
 //
 // Execute (SOL-TG-04) does the following, in order, BEFORE marking the task
 // StatusInProgress: (1) resolves the caller's permission to "execute" the
@@ -113,9 +117,8 @@ type ExecuteTask struct {
 	releaser TaskExecutionReleaser
 	outbox   OutboxWriter
 
-	// contract/specs back the spec-task path, see WithContract.
+	// contract backs the spec-task path, see WithContract.
 	contract ContractAgentExecutor
-	specs    TaskSpecLookup
 }
 
 // WithRunEvents lets a failed dispatch revert through the link-guarded release
@@ -194,7 +197,7 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 
 	task, err := uc.repo.Get(ctx, tenantID, in.TaskID)
 	if err != nil {
-		return ExecuteResult{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		return ExecuteResult{}, taskRepoError(err, "task not found", "TASK_EXECUTE_TASK_LOAD_FAILED", "failed to load task")
 	}
 
 	// Plan/phase are derived containers: one worktree and coordinator per phase would contradict
@@ -431,17 +434,12 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 // in-process, so an in-process goroutine plays the same role, with no
 // external callback RPC needed.
 //
-// dispatchCtx is deliberately NOT ctx: ctx dies with this RPC (the very
-// problem being fixed here). dispatchCtx rebuilds only the identity values
-// SimpleExecutor.Execute and its downstream resolvers actually read from
-// context (tenant id, user id) onto a fresh context.Background() — no
-// deadline, no tie to the client connection, the same shape a real
-// completion callback's own fresh inbound request would carry.
+// dispatchCtx is deliberately NOT ctx itself: ctx dies with this RPC (the very
+// problem being fixed here). tenant.Detach keeps every identity value (tenant,
+// user, role, actor type) that downstream calls forward, and drops only the
+// cancellation, so an agent-initiated run is still an agent downstream.
 func (uc *ExecuteTask) dispatchDirectAgentAsync(ctx context.Context, tenantID, userID string, in ExecuteTaskInput, task domain.Task, worktreePath, linkID string, previousStatus domain.Status, dispatchStart time.Time) (ExecuteResult, error) {
-	dispatchCtx := tenant.WithTenantID(context.Background(), tenantID)
-	if userID != "" {
-		dispatchCtx = tenant.WithUserID(dispatchCtx, userID)
-	}
+	dispatchCtx := tenant.Detach(ctx)
 	uc.runAsync(func() {
 		stopHeartbeat := uc.startHeartbeat(dispatchCtx, tenantID, linkID)
 		defer stopHeartbeat()
@@ -495,16 +493,11 @@ func (uc *ExecuteTask) selectEngine(ctx context.Context, tenantID string, task d
 	if len(children) > 0 {
 		return domain.EngineOrchestration, nil
 	}
-	// A task with a spec carries a prompt override, which only Engine 1 honors; ordering between
-	// spec tasks is AdvanceExecution's job, so depends_on must not push it to the coordinator.
-	if uc.specs != nil && task.RequestID != "" {
-		has, err := uc.specs.HasSpec(ctx, tenantID, task.ID)
-		if err != nil {
-			return "", err
-		}
-		if has {
-			return domain.EngineDirectAgent, nil
-		}
+	// A task of a Request is ordered by request-service's AdvanceExecution, which dispatches it only once its
+	// dependencies are done. Handing depends_on to the coordinator instead started a run that never launched the
+	// agent nor reported back, leaving the task in_progress for good.
+	if task.RequestID != "" {
+		return domain.EngineDirectAgent, nil
 	}
 	deps, err := uc.edges.ListFrom(ctx, tenantID, task.ID, domain.EdgeKindDependsOn)
 	if err != nil {

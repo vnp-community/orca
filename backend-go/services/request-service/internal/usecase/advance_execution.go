@@ -41,8 +41,10 @@ type AdvanceExecution struct {
 	// Approvals opens the Approval a type-policy gate asks for; nil refuses to dispatch gated tasks.
 	Approvals ApprovalOpener
 	Settings  ExecutionSettings
-	Log       *slog.Logger
-	Now       func() time.Time
+	// Contract, when set, puts the tasks of an OpenSpec plan on the contract path; nil keeps every task on the plain run.
+	Contract ContractRunPlanner
+	Log      *slog.Logger
+	Now      func() time.Time
 
 	locks keyedLock
 }
@@ -83,7 +85,7 @@ func (uc *AdvanceExecution) Execute(ctx context.Context, in AdvanceInput) (Advan
 	if err != nil {
 		return AdvanceResult{}, err
 	}
-	return uc.run(ctx, req, domain.BuildExecutionTree(tasks), in)
+	return uc.run(ctx, req, domain.BuildExecutionTreeOf(req.PlanTaskID, tasks), in)
 }
 
 // run is Execute without the lock and the reads; EvaluateExecution calls it holding both.
@@ -112,7 +114,7 @@ func (uc *AdvanceExecution) run(ctx context.Context, req domain.Request, tree do
 	}
 	policy := uc.Policies.PolicyFor(req.Type)
 	shared := sharedWorktree(tree)
-	execCtx := tenant.WithUserID(ctx, in.ActorID)
+	execCtx := asExecutionActor(ctx, in.ActorID)
 
 	var res AdvanceResult
 	var errs []error
@@ -135,7 +137,7 @@ func (uc *AdvanceExecution) run(ctx context.Context, req domain.Request, tree do
 			return res, err
 		}
 		if gate != nil {
-			if err := uc.openGate(ctx, req, *gate, in.ActorID); err != nil {
+			if err := uc.openGate(execCtx, req, *gate, in.ActorID); err != nil {
 				errs = append(errs, fmt.Errorf("gate for task %s: %w", task.ID, err))
 				continue
 			}
@@ -149,7 +151,7 @@ func (uc *AdvanceExecution) run(ctx context.Context, req domain.Request, tree do
 			}
 		}
 		execRef := fmt.Sprintf("req:%s:%s:%d", req.ID, task.ID, failed+1)
-		switch err := uc.Tasks.Execute(execCtx, task.ID, execRef); {
+		switch err := uc.dispatch(execCtx, req, task, execRef); {
 		case err == nil, errors.Is(err, domain.ErrTaskAlreadyRunning):
 			res.Dispatched = append(res.Dispatched, task.ID)
 			slots--
@@ -169,6 +171,18 @@ func (uc *AdvanceExecution) run(ctx context.Context, req domain.Request, tree do
 		}
 	}
 	return res, errors.Join(errs...)
+}
+
+// dispatch starts one task: on the contract path when the plan and the task client allow it, otherwise the plain run.
+func (uc *AdvanceExecution) dispatch(ctx context.Context, req domain.Request, task domain.TaskView, execRef string) error {
+	if uc.Contract != nil {
+		if client, ok := uc.Tasks.(ContractTaskClient); ok {
+			if run, planned := uc.Contract.Plan(ctx, req, task); planned {
+				return client.ExecuteContract(ctx, task.ID, execRef, run)
+			}
+		}
+	}
+	return uc.Tasks.Execute(ctx, task.ID, execRef)
 }
 
 func (uc *AdvanceExecution) openGate(ctx context.Context, req domain.Request, gate domain.GateRequirement, actorID string) error {

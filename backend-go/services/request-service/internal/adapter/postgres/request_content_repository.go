@@ -24,6 +24,9 @@ var _ usecase.RequestContentWriter = (*RequestContentRepository)(nil)
 func (r *RequestContentRepository) UpdateContent(ctx context.Context, req domain.Request, expectedVersion int64) (domain.Request, error) {
 	var out domain.Request
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(req.ID) {
+			return domain.ErrRequestNotFound(req.ID)
+		}
 		// content_revision is part of the guard so two writers that both read revision N cannot both produce N+1.
 		row := db.QueryRow(ctx, `
 			UPDATE request.requests SET title = $4, body = $5, acceptance_criteria = $6::jsonb, type_fields = $7::jsonb,

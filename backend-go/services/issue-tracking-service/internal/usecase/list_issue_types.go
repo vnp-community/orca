@@ -40,7 +40,7 @@ func (uc *ListIssueTypes) Execute(ctx context.Context, in ListIssueTypesInput) (
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, domain.ProviderJira, in.WorkspaceID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no jira credential available", err)
+		return nil, credentialResolveError(err, "no jira credential available")
 	}
 	types, err := provider.ListIssueTypes(ctx, cred, in.ProjectIDOrKey)
 	if err != nil {

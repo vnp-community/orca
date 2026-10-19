@@ -62,8 +62,8 @@ func (s *EphemeralVmRuntimeStore) Get(ctx context.Context, tenantID, id string) 
 	var r domain.EphemeralVmRuntime
 	err := s.pool.QueryRow(ctx, q, tenantID, id).Scan(&r.ID, &r.RepoID, &r.RecipeID, &r.ConnectionType,
 		&r.Status, &r.EnvironmentID, &r.WorkspaceID, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: get ephemeral vm runtime %s: %w", id, domain.ErrEphemeralVmRuntimeNotFound)
 	}
 	if err != nil {
 		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: get ephemeral vm runtime: %w", err)
@@ -82,8 +82,8 @@ func (s *EphemeralVmRuntimeStore) GetByWorkspaceID(ctx context.Context, tenantID
 	var r domain.EphemeralVmRuntime
 	err := s.pool.QueryRow(ctx, q, tenantID, workspaceID).Scan(&r.ID, &r.RepoID, &r.RecipeID, &r.ConnectionType,
 		&r.Status, &r.EnvironmentID, &r.WorkspaceID, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: get ephemeral vm runtime by workspace %s: %w", workspaceID, domain.ErrEphemeralVmRuntimeNotFound)
 	}
 	if err != nil {
 		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: get ephemeral vm runtime by workspace: %w", err)
@@ -107,8 +107,8 @@ func (s *EphemeralVmRuntimeStore) UpdateStatus(ctx context.Context, tenantID, id
 	var r domain.EphemeralVmRuntime
 	err := s.pool.QueryRow(ctx, q, tenantID, id, status, workspaceID, lastError).Scan(&r.ID, &r.RepoID, &r.RecipeID,
 		&r.ConnectionType, &r.Status, &r.EnvironmentID, &r.WorkspaceID, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: update ephemeral vm runtime status %s: %w", id, domain.ErrEphemeralVmRuntimeNotFound)
 	}
 	if err != nil {
 		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: update ephemeral vm runtime status: %w", err)
@@ -133,8 +133,8 @@ func (s *EphemeralVmRuntimeStore) UpdateProvisionResult(ctx context.Context, ten
 	var r domain.EphemeralVmRuntime
 	err := s.pool.QueryRow(ctx, q, tenantID, id, status, connectionType, lastError).Scan(&r.ID, &r.RepoID, &r.RecipeID,
 		&r.ConnectionType, &r.Status, &r.EnvironmentID, &r.WorkspaceID, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: update ephemeral vm runtime provision result %s: %w", id, domain.ErrEphemeralVmRuntimeNotFound)
 	}
 	if err != nil {
 		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: update ephemeral vm runtime provision result: %w", err)
@@ -161,8 +161,8 @@ func (s *EphemeralVmRuntimeStore) SetEnvironmentID(ctx context.Context, tenantID
 	var r domain.EphemeralVmRuntime
 	err := s.pool.QueryRow(ctx, q, tenantID, runtimeID, environmentID).Scan(&r.ID, &r.RepoID, &r.RecipeID,
 		&r.ConnectionType, &r.Status, &r.EnvironmentID, &r.WorkspaceID, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: set ephemeral vm runtime environment id %s: %w", runtimeID, domain.ErrEphemeralVmRuntimeNotFound)
 	}
 	if err != nil {
 		return domain.EphemeralVmRuntime{}, fmt.Errorf("postgres: set ephemeral vm runtime environment id: %w", err)

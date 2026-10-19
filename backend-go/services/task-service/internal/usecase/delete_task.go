@@ -2,9 +2,11 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
 
 // DeleteTaskInput mirrors the DeleteTask RPC request. See CreateTaskInput's
@@ -30,6 +32,9 @@ func (uc *DeleteTask) Execute(ctx context.Context, in DeleteTaskInput) error {
 		return apperrors.New(apperrors.KindInvalidArgument, "TASK_MISSING_ID", "id is required", nil)
 	}
 	if err := uc.repo.Delete(ctx, tenantID, in.ID); err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			return apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		}
 		return apperrors.New(apperrors.KindInternal, "TASK_DELETE_FAILED", "failed to delete task", err)
 	}
 	return nil

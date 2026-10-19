@@ -36,18 +36,26 @@ type Config struct {
 	// ApprovalSubjects limits which subject types need a handler; empty means all.
 	ApprovalSubjects []string
 	// Analysis tunables (CR-REQ-007/008); zero values mean the defaults in usecase.DefaultAnalysisSettings.
-	AICompleteTimeout          time.Duration
-	AnalysisLeaseTTL           time.Duration
-	AnalysisHeartbeat          time.Duration
-	AnalysisRecoveryInterval   time.Duration
-	AgentReadonlyTimeoutMS     int
+	AICompleteTimeout        time.Duration
+	AnalysisLeaseTTL         time.Duration
+	AnalysisHeartbeat        time.Duration
+	AnalysisRecoveryInterval time.Duration
+	AgentReadonlyTimeoutMS   int
+	// SpecTimeoutMS bounds one OpenSpec authoring run; SpecTotalTimeoutMS bounds the run with its one retry.
+	SpecTimeoutMS              int
+	SpecTotalTimeoutMS         int
 	AgentReadonlyMaxPerProject int
 	// AgentReadonlyUseAgentFlag defaults to true: set false to force prompt-only runs on every agent.
 	AgentReadonlyUseAgentFlag bool
 	RequireEnforcedReadonly   bool
 	GatewayInternalToken      string
 	ServiceInternalToken      string
-	OPABundlePath             string
+	// ProjectInternalCallerToken authenticates this service to project-service's internal-only RPCs (ResolveProjectAccess).
+	ProjectInternalCallerToken string
+	// AuthDirectoryCallerToken authenticates this service to auth-service's internal ListActiveTenantAdmins (role:admin
+	// approver expansion). Without it admin approvers cannot be resolved for notifications.
+	AuthDirectoryCallerToken string
+	OPABundlePath            string
 	// StuckThresholds says how long a Request may sit in a status before orca_request_stuck counts it
 	// (REQUEST_STUCK_THRESHOLD_<STATUS>, Go duration). Proposed values, not yet tuned on real traffic.
 	StuckThresholds map[string]time.Duration
@@ -153,6 +161,8 @@ func Load() Config {
 	c.AnalysisHeartbeat = envDuration("REQUEST_ANALYSIS_HEARTBEAT")
 	c.AnalysisRecoveryInterval = envDuration("REQUEST_ANALYSIS_RECOVERY_INTERVAL")
 	c.AgentReadonlyTimeoutMS = envPositiveInt("REQUEST_AGENT_READONLY_TIMEOUT_MS")
+	c.SpecTimeoutMS = envPositiveInt("REQUEST_SPEC_TIMEOUT_MS")
+	c.SpecTotalTimeoutMS = envPositiveInt("REQUEST_SPEC_TOTAL_TIMEOUT_MS")
 	c.AgentReadonlyMaxPerProject = envPositiveInt("REQUEST_AGENT_READONLY_MAX_PER_PROJECT")
 	if s := os.Getenv("REQUEST_AGENT_READONLY_USE_AGENT_FLAG"); s != "" {
 		if b, err := strconv.ParseBool(s); err == nil {
@@ -190,6 +200,12 @@ func Load() Config {
 	}
 	if tok := os.Getenv("SERVICE_INTERNAL_TOKEN"); tok != "" {
 		c.ServiceInternalToken = tok
+	}
+	if tok := os.Getenv("PROJECT_INTERNAL_CALLER_TOKEN"); tok != "" {
+		c.ProjectInternalCallerToken = tok
+	}
+	if tok := os.Getenv("AUTH_DIRECTORY_CALLER_TOKEN"); tok != "" {
+		c.AuthDirectoryCallerToken = tok
 	}
 	if p := os.Getenv("OPA_BUNDLE_PATH"); p != "" {
 		c.OPABundlePath = p

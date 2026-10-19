@@ -20,3 +20,6 @@ const (
 	SubjectDecisionRecorded       = "orca.request.decision.recorded"
 	SubjectDecisionConfirmed      = "orca.request.decision.confirmed"
 )
+
+// SubjectPlanGenerated is emitted when a Plan has been written to task-service and sent for approval.
+const SubjectPlanGenerated = "orca.request.plan.generated"

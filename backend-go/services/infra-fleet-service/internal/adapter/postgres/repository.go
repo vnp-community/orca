@@ -61,7 +61,8 @@ func (r *Repository) Register(ctx context.Context, ds domain.DevServer) (domain.
 // specs/backend-go/services/infra-fleet-service.md §9.
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevServer, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status,
+		       COALESCE(platform, ''), COALESCE(arch, ''), COALESCE(node_version, ''), COALESCE(agent_version, '')
 		FROM infra.dev_servers
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
@@ -69,9 +70,10 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 	var ds domain.DevServer
 	var mode, status, kind, healthStatus string
 	var sshTargetID, groupID *string
-	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags, &status, &groupID, &kind, &healthStatus)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.DevServer{}, fmt.Errorf("postgres: dev server %q not found for tenant: %w", id, err)
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags, &status, &groupID, &kind, &healthStatus,
+		&ds.Platform, &ds.Arch, &ds.NodeVersion, &ds.AgentVersion)
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.DevServer{}, fmt.Errorf("postgres: dev server %q for tenant: %w", id, domain.ErrDevServerNotFound)
 	}
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("postgres: query dev server: %w", err)
@@ -92,7 +94,8 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 // List returns every dev server registered for tenantID.
 func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevServer, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status,
+		       COALESCE(platform, ''), COALESCE(arch, ''), COALESCE(node_version, ''), COALESCE(agent_version, '')
 		FROM infra.dev_servers
 		WHERE tenant_id = $1
 		ORDER BY created_at DESC
@@ -107,7 +110,8 @@ func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevSer
 		var ds domain.DevServer
 		var mode, status, kind, healthStatus string
 		var sshTargetID, groupID *string
-		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags, &status, &groupID, &kind, &healthStatus); err != nil {
+		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags, &status, &groupID, &kind, &healthStatus,
+			&ds.Platform, &ds.Arch, &ds.NodeVersion, &ds.AgentVersion); err != nil {
 			return nil, fmt.Errorf("postgres: scan dev server row: %w", err)
 		}
 		ds.Mode = domain.ConnectionMode(mode)
@@ -209,7 +213,8 @@ func (r *Repository) UpdateApprovalStatus(ctx context.Context, tenantID, devServ
 		UPDATE infra.dev_servers
 		SET approval_status = $3
 		WHERE tenant_id = $1 AND id = $2
-		RETURNING id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind, status
+		RETURNING id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind, status,
+		          COALESCE(platform, ''), COALESCE(arch, ''), COALESCE(node_version, ''), COALESCE(agent_version, '')
 	`, tenantID, devServerID, string(status))
 	return scanDevServerRow(row)
 }
@@ -223,20 +228,22 @@ func (r *Repository) AssignGroup(ctx context.Context, tenantID, devServerID, gro
 		UPDATE infra.dev_servers
 		SET group_id = NULLIF($3, '')::uuid
 		WHERE tenant_id = $1 AND id = $2
-		RETURNING id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind, status
+		RETURNING id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind, status,
+		          COALESCE(platform, ''), COALESCE(arch, ''), COALESCE(node_version, ''), COALESCE(agent_version, '')
 	`, tenantID, devServerID, groupID)
 	return scanDevServerRow(row)
 }
 
-// scanDevServerRow factors out the 9-column dev_servers row scan shared by
+// scanDevServerRow factors out the 13-column dev_servers row scan shared by
 // UpdateApprovalStatus/AssignGroup's RETURNING clauses.
 func scanDevServerRow(row pgx.Row) (domain.DevServer, error) {
 	var ds domain.DevServer
 	var mode, status, kind, healthStatus string
 	var sshTargetID, groupID *string
-	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status, &groupID, &kind, &healthStatus)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.DevServer{}, fmt.Errorf("postgres: dev server not found for tenant: %w", err)
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status, &groupID, &kind, &healthStatus,
+		&ds.Platform, &ds.Arch, &ds.NodeVersion, &ds.AgentVersion)
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.DevServer{}, fmt.Errorf("postgres: update dev server for tenant: %w", domain.ErrDevServerNotFound)
 	}
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("postgres: update dev server: %w", err)
@@ -333,8 +340,8 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 	var target domain.SshTarget
 	var jumpHostID *string
 	err := row.Scan(&target.ID, &target.TenantID, &target.Host, &target.Port, &target.UserName, &target.VaultSSHRole, &target.KnownHostsFingerprint, &jumpHostID, &target.Project, &target.Tags)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.SshTarget{}, fmt.Errorf("postgres: ssh target %q not found for tenant: %w", id, err)
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.SshTarget{}, fmt.Errorf("postgres: ssh target %q for tenant: %w", id, domain.ErrSshTargetNotFound)
 	}
 	if err != nil {
 		return domain.SshTarget{}, fmt.Errorf("postgres: query ssh target: %w", err)
@@ -477,6 +484,10 @@ func (r *Repository) scanConnectionRow(ctx context.Context, query string, args .
 		// error, the caller's cue to execute locally.
 		return false, domain.DevServer{}, domain.Connection{}, nil
 	}
+	if isMalformedUUID(err) {
+		// A connectionId that cannot be a uuid owns no dev server either.
+		return false, domain.DevServer{}, domain.Connection{}, nil
+	}
 	if err != nil {
 		return false, domain.DevServer{}, domain.Connection{}, fmt.Errorf("postgres: resolve connection: %w", err)
 	}
@@ -571,7 +582,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, tenantID string, conn dom
 		return fmt.Errorf("postgres: update connection status: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: update connection status: no connection %s for tenant %s", conn.ID, tenantID)
+		return fmt.Errorf("postgres: update connection status %s for tenant %s: %w", conn.ID, tenantID, domain.ErrConnectionNotFound)
 	}
 	return nil
 }

@@ -139,6 +139,10 @@ func (uc *PolicyAdmin) Upsert(ctx context.Context, in UpsertInput) (domain.ToolP
 			return domain.ToolPolicy{}, wrapRepoErr(err, "failed to create policy")
 		}
 	} else {
+		// Same guard as Delete: an id that is not a uuid names no policy, so it is NotFound rather than a bind error.
+		if _, err := uuid.Parse(p.ID); err != nil {
+			return domain.ToolPolicy{}, domain.ErrNotFound()
+		}
 		evs, err := uc.policyEvents(id, domain.ToolPolicy{ID: p.ID, Version: p.Version + 1, Match: p.Match, Decision: p.Decision}, "update", domain.AuditActionPolicyUpsert, now)
 		if err != nil {
 			return domain.ToolPolicy{}, domain.ErrInternal("failed to build events", err)

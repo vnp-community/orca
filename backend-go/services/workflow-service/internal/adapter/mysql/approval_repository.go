@@ -119,7 +119,7 @@ func (t *approvalTx) Get(ctx context.Context, approvalID string) (domain.Approva
 	`, approvalID)
 	a, err := scanApproval(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Approval{}, domain.ErrApprovalNotFound
+		return domain.Approval{}, fmt.Errorf("mysql: approval %s: %w", approvalID, domain.ErrApprovalNotFound)
 	}
 	if err != nil {
 		return domain.Approval{}, fmt.Errorf("mysql: query approval: %w", err)
@@ -134,7 +134,7 @@ func (t *approvalTx) Update(ctx context.Context, approval domain.Approval) error
 	var exists int
 	err := t.tx.QueryRowContext(ctx, `SELECT 1 FROM approvals WHERE id = ? FOR UPDATE`, approval.ID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.ErrApprovalNotFound
+		return fmt.Errorf("mysql: update approval %s: %w", approval.ID, domain.ErrApprovalNotFound)
 	}
 	if err != nil {
 		return fmt.Errorf("mysql: lock approval: %w", err)

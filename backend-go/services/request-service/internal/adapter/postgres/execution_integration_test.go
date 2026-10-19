@@ -47,6 +47,8 @@ func (f *pgFixture) executionEnv() contracttest.ExecutionEnv {
 		Leases:        executing,
 		Backlog:       NewBacklogRequestReader(base),
 		Processed:     NewProcessedEventRepository(base),
+		Activity:      NewRequestActivityRepository(base),
+		InsertRaw:     func(table string, row map[string]any) error { return f.rawInsert(table, nil, row) },
 		InsertRawOutcome: func(tenantID string, ov map[string]any) error {
 			return f.rawInsert("task_run_outcomes", map[string]any{
 				"id": uuid.NewString(), "tenant_id": tenantID, "task_id": uuid.NewString(), "event_id": uuid.NewString(), "occurred_at": "2026-10-01T00:00:00Z",

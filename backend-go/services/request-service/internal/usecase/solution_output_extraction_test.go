@@ -76,3 +76,24 @@ func TestExtractJSONObject(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractJSONObject_PutsBackAnArrayCloserTheModelLeftOut(t *testing.T) {
+	text := "```json\n{\"schema_version\":1,\"options\":[{\"id\":\"opt-1\"}],\"design_references\":{\"gaps\":[\"a \\\"quoted] bit\",\"b\"}}\n```"
+	got, err := ExtractJSONObject(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"schema_version":1,"options":[{"id":"opt-1"}],"design_references":{"gaps":["a \"quoted] bit","b"]}}`
+	if string(got) != want {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestExtractJSONObject_DoesNotGuessAtTruncatedText(t *testing.T) {
+	if _, err := ExtractJSONObject(`{"schema_version":1,"options":[{"id":"opt-1"`); err == nil {
+		t.Fatal("a truncated document must not be completed")
+	}
+	if _, ok := insertMissingClosers(`{"a":1]}`); ok {
+		t.Fatal("an extra closer is not a missing one")
+	}
+}

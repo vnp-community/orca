@@ -14,13 +14,13 @@ type WriteIssueCommandInput struct {
 // WriteIssueCommand resolves repoID's owning host and writes its issue
 // command file. Repo-scoped — see CheckHooks' doc comment for why.
 type WriteIssueCommand struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewWriteIssueCommand(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *WriteIssueCommand {
+func NewWriteIssueCommand(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *WriteIssueCommand {
 	return &WriteIssueCommand{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

@@ -47,7 +47,8 @@ func (f *pgFixture) securityEnv() contracttest.SecurityEnv {
 					VALUES (gen_random_uuid(), $1, $2, 'solution', '1', repeat('a', 64), repeat('b', 64), 1, 1, '["SECRET"]', '["SECRET"]', 'SECRET') RETURNING id)
 				INSERT INTO request.evidence (id, tenant_id, request_id, context_pack_id, seq, source_id, ref, retrieved_at, freshness, trust, digest, size, title, excerpt)
 				SELECT gen_random_uuid(), $1, $2, p.id, 1, 's', 'r', now(), 'fresh', 'high', repeat('c', 64), 1, 'SECRET', 'SECRET' FROM p`, tenantID, requestID)
-			f.execAdmin(t, `INSERT INTO request.openspec_changes (id, tenant_id, request_id, change_id, status, tasks_sync_state, tasks_sync_error) VALUES (gen_random_uuid(), $1, $2, 'c', 'ready', 'failed', 'SECRET')`, tenantID, requestID)
+			f.execAdmin(t, `INSERT INTO request.openspec_changes (id, tenant_id, request_id, change_id, status, tasks_sync_state, tasks_sync_error, bundle_json, kg_gaps, kg_conflicts)
+				VALUES (gen_random_uuid(), $1, $2, 'c', 'ready', 'failed', 'SECRET', '{"tasks.md":"SECRET"}', '["SECRET"]', '["SECRET"]')`, tenantID, requestID)
 			f.execAdmin(t, `INSERT INTO request.request_revisions (id, tenant_id, request_id, revision, cause, snapshot, digest, actor_kind) VALUES (gen_random_uuid(), $1, $2, 1, 'created', '{"title":"SECRET"}', 'd', 'user')`, tenantID, requestID)
 			f.execAdmin(t, `WITH c AS (
 					INSERT INTO request.clarifications (id, tenant_id, request_id, seq, source, status, resume_status, asked_request_revision, due_at, cancel_reason, created_by)

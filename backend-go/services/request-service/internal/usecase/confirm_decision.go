@@ -44,7 +44,10 @@ func (uc *ConfirmDecision) Execute(ctx context.Context, in ConfirmDecisionInput)
 		}
 		r, err := uc.repo.Get(txCtx, d.RequestID)
 		if err != nil {
-			return domain.ErrDecisionNotFound(in.DecisionID)
+			if isNotFoundKind(err) {
+				return domain.ErrDecisionNotFound(in.DecisionID)
+			}
+			return err
 		}
 		me := callerID(txCtx)
 		if !callerIsAdmin(txCtx) && (me == "" || me != d.ChooserID) {
@@ -104,7 +107,10 @@ func (q *DecisionQueries) Get(ctx context.Context, id string) (domain.Decision, 
 	}
 	r, err := q.repo.Get(ctx, d.RequestID)
 	if err != nil {
-		return domain.Decision{}, 0, domain.ErrDecisionNotFound(id)
+		if isNotFoundKind(err) {
+			return domain.Decision{}, 0, domain.ErrDecisionNotFound(id)
+		}
+		return domain.Decision{}, 0, err
 	}
 	return d, r.Number, nil
 }

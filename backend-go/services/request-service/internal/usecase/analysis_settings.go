@@ -15,6 +15,10 @@ type AnalysisSettings struct {
 	// AgentTimeoutMS bounds one read-only agent run; HotfixTimeoutMS is the shorter hotfix budget.
 	AgentTimeoutMS  int
 	HotfixTimeoutMS int
+	// SpecTimeoutMS bounds one OpenSpec authoring run; it equals the agent's own 30 minute ceiling, since a longer ask is cut there.
+	SpecTimeoutMS int
+	// SpecTotalTimeoutMS bounds an authoring run with its one retry; each attempt still has its own SpecTimeoutMS.
+	SpecTotalTimeoutMS int
 	// MaxAgentRunsPerProject caps concurrent read-only runs on one dev server (a double click once dropped its connection).
 	MaxAgentRunsPerProject int
 	// UseAgentReadonlyFlag lets the runner send accessMode=readonly to agents that advertise it; off forces prompt-only runs.
@@ -25,12 +29,14 @@ type AnalysisSettings struct {
 
 func DefaultAnalysisSettings() AnalysisSettings {
 	return AnalysisSettings{
-		AICompleteTimeout:      120 * time.Second,
-		LeaseTTL:               90 * time.Second,
-		Heartbeat:              30 * time.Second,
-		RecoveryInterval:       30 * time.Second,
-		AgentTimeoutMS:         600_000,
-		HotfixTimeoutMS:        300_000,
+		AICompleteTimeout: 120 * time.Second,
+		LeaseTTL:          90 * time.Second,
+		Heartbeat:         30 * time.Second,
+		RecoveryInterval:  30 * time.Second,
+		AgentTimeoutMS:    600_000,
+		HotfixTimeoutMS:   300_000,
+		SpecTimeoutMS:     1_800_000,
+		// SpecTotalTimeoutMS stays 0 here: withDefaults derives it from SpecTimeoutMS, so a shorter attempt budget shrinks it too.
 		MaxAgentRunsPerProject: 2,
 		UseAgentReadonlyFlag:   true,
 	}
@@ -56,6 +62,13 @@ func (s AnalysisSettings) withDefaults() AnalysisSettings {
 	}
 	if s.HotfixTimeoutMS <= 0 {
 		s.HotfixTimeoutMS = d.HotfixTimeoutMS
+	}
+	if s.SpecTimeoutMS <= 0 {
+		s.SpecTimeoutMS = d.SpecTimeoutMS
+	}
+	if s.SpecTotalTimeoutMS <= 0 {
+		// Two attempts and a little slack, derived from the attempt budget unless the operator set one.
+		s.SpecTotalTimeoutMS = 2*s.SpecTimeoutMS + 120_000
 	}
 	if s.MaxAgentRunsPerProject <= 0 {
 		s.MaxAgentRunsPerProject = d.MaxAgentRunsPerProject

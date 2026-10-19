@@ -32,12 +32,21 @@ func mountRequestRoutes(r chi.Router, req requestv1.RequestServiceClient, appr r
 		sub.Post("/", h.create)
 		sub.Get("/", h.list)
 		sub.Get("/{id}", h.get)
+		h.mountFlow(sub, requestFlowRoutes)
 	})
 	r.Route("/v1/approvals", func(sub chi.Router) {
 		sub.Get("/pending", h.listPending)
 		sub.Post("/{id}/approve", h.decide("approval.approve"))
 		sub.Post("/{id}/reject", h.decide("approval.reject"))
+		h.mountFlow(sub, approvalFlowRoutes)
 	})
+	r.Route("/v1/clarifications", func(sub chi.Router) { h.mountFlow(sub, clarificationFlowRoutes) })
+	r.Route("/v1/decisions", func(sub chi.Router) { h.mountFlow(sub, decisionFlowRoutes) })
+	// A project's engine switches live under the project, whose own routes (project_routes.go) own the /v1/projects prefix;
+	// registering the two paths one by one keeps both files from mounting the same prefix.
+	for _, rt := range projectEngineRoutes {
+		r.Method(rt.method, rt.pattern, h.bridge(rt))
+	}
 }
 
 type requestRoutes struct{ reg *wscompat.Registry }

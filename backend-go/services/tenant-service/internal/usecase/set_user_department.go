@@ -60,7 +60,7 @@ func (uc *SetUserDepartment) Execute(ctx context.Context, in SetUserDepartmentIn
 		return apperrors.New(apperrors.KindInvalidArgument, "TENANT_INVALID_PROFILE", err.Error(), err)
 	}
 	if err := uc.profiles.Upsert(ctx, profile); err != nil {
-		return apperrors.New(apperrors.KindInternal, "TENANT_SET_DEPARTMENT_FAILED", "failed to persist user profile", err)
+		return userWriteError(err, "TENANT_SET_DEPARTMENT_FAILED", "failed to persist user profile")
 	}
 
 	// Invalidation correctness (tenant-service.md §8): this write changes

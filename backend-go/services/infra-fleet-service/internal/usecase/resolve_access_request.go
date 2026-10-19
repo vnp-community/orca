@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -48,6 +49,9 @@ func (uc *ResolveAccessRequest) Execute(ctx context.Context, in ResolveAccessReq
 
 	req, err := uc.requests.Get(ctx, tenantID, in.RequestID)
 	if err != nil {
+		if errors.Is(err, domain.ErrDevServerAccessRequestNotFound) {
+			return ResolveAccessRequestOutput{}, apperrors.New(apperrors.KindNotFound, "INFRA_ACCESS_REQUEST_NOT_FOUND", "access request not found", err)
+		}
 		return ResolveAccessRequestOutput{}, apperrors.New(apperrors.KindInternal, "INFRA_GET_ACCESS_REQUEST_FAILED", "failed to look up access request", err)
 	}
 	// Why: resolving twice must never double-grant, and a rejected request
@@ -63,6 +67,9 @@ func (uc *ResolveAccessRequest) Execute(ctx context.Context, in ResolveAccessReq
 	}
 	updated, err := uc.requests.UpdateStatus(ctx, tenantID, in.RequestID, newStatus)
 	if err != nil {
+		if errors.Is(err, domain.ErrDevServerAccessRequestNotFound) {
+			return ResolveAccessRequestOutput{}, apperrors.New(apperrors.KindNotFound, "INFRA_ACCESS_REQUEST_NOT_FOUND", "access request not found", err)
+		}
 		return ResolveAccessRequestOutput{}, apperrors.New(apperrors.KindInternal, "INFRA_RESOLVE_ACCESS_REQUEST_FAILED", "failed to resolve access request", err)
 	}
 

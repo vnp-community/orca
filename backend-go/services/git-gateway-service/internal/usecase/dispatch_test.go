@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -434,7 +435,11 @@ func (f *fakeGitExecutor) ScanSetupScriptImports(ctx context.Context, repoPath s
 type fakeDevServerReachability struct {
 	reachable bool
 	err       error
+	// allowLocal mirrors ORCA_ALLOW_LOCAL_REPOS for the unbound-repo branch.
+	allowLocal bool
 }
+
+func (f *fakeDevServerReachability) LocalReposAllowed() bool { return f.allowLocal }
 
 func (f *fakeDevServerReachability) IsReachable(ctx context.Context, devServerID string) (bool, error) {
 	return f.reachable, f.err
@@ -1870,20 +1875,112 @@ func TestDispatchExecutorForRepo_NoHiddenTargetID_UnchangedBehavior(t *testing.T
 	}
 }
 
-func TestDispatchExecutorForRepo_LocalFallback_NeverSetsHiddenTargetID(t *testing.T) {
-	reachability := &fakeDevServerReachability{reachable: false}
+func TestDispatchExecutorForRepo_Unreachable_NeverFallsBackToLocal(t *testing.T) {
 	local := &fakeGitExecutor{name: "local"}
 	relay := &fakeGitExecutor{name: "relay"}
 	repo := domain.RepoInfo{ID: "repo-1", URL: "/repo", DevServerID: "ds-1", HiddenTargetID: "runtime-1"}
 
-	ctx, executor, _, err := dispatchExecutorForRepo(context.Background(), reachability, local, relay, repo)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	for _, allowLocal := range []bool{false, true} {
+		reachability := &fakeDevServerReachability{reachable: false, allowLocal: allowLocal}
+		ctx, executor, _, err := dispatchExecutorForRepo(context.Background(), reachability, local, relay, repo)
+		ae := HostDispatchError(err)
+		if ae == nil || ae.Code != CodeDevServerUnreachable || ae.Kind != apperrors.KindUnavailable {
+			t.Fatalf("allowLocal=%v: expected %s (Unavailable), got %v", allowLocal, CodeDevServerUnreachable, err)
+		}
+		if executor != nil {
+			t.Errorf("allowLocal=%v: expected no executor", allowLocal)
+		}
+		if _, ok := HiddenTargetIDFromContext(ctx); ok {
+			t.Errorf("allowLocal=%v: expected no hiddenTargetID in ctx", allowLocal)
+		}
 	}
-	if executor != local {
-		t.Fatal("expected the local executor when the dev server is unreachable")
+}
+
+// The full routing matrix of RouteRepoHost: dev server x reachability x flag.
+func TestDispatchExecutorForRepo_RoutingMatrix(t *testing.T) {
+	cases := []struct {
+		name        string
+		devServerID string
+		reachable   bool
+		reachErr    error
+		allowLocal  bool
+		wantTarget  string // "relay", "local" or "" when an error is expected
+		wantCode    string
+		wantKind    apperrors.Kind
+	}{
+		{name: "bound and reachable relays", devServerID: "ds-1", reachable: true, wantTarget: "relay"},
+		{name: "bound and reachable relays even when local allowed", devServerID: "ds-1", reachable: true, allowLocal: true, wantTarget: "relay"},
+		{name: "bound but unreachable fails", devServerID: "ds-1", wantCode: CodeDevServerUnreachable, wantKind: apperrors.KindUnavailable},
+		{name: "bound but unreachable fails even when local allowed", devServerID: "ds-1", allowLocal: true, wantCode: CodeDevServerUnreachable, wantKind: apperrors.KindUnavailable},
+		{name: "health check error is retryable, not local", devServerID: "ds-1", reachErr: errors.New("infra-fleet down"), allowLocal: true, wantCode: CodeHostCheckFailed, wantKind: apperrors.KindUnavailable},
+		{name: "unbound with local not allowed fails", devServerID: "", reachable: true, wantCode: CodeRepoHostUnbound, wantKind: apperrors.KindFailedPrecondition},
+		{name: "unbound with local allowed runs locally", devServerID: "", allowLocal: true, wantTarget: "local"},
 	}
-	if _, ok := HiddenTargetIDFromContext(ctx); ok {
-		t.Error("expected no hiddenTargetID in ctx when falling back to local execution")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reachability := &fakeDevServerReachability{reachable: tc.reachable, err: tc.reachErr, allowLocal: tc.allowLocal}
+			local := &fakeGitExecutor{name: "local"}
+			relay := &fakeGitExecutor{name: "relay"}
+			repo := domain.RepoInfo{ID: "repo-1", URL: "/repo", DevServerID: tc.devServerID}
+
+			ctx, executor, repoPath, err := dispatchExecutorForRepo(context.Background(), reachability, local, relay, repo)
+			if tc.wantCode != "" {
+				ae := HostDispatchError(err)
+				if ae == nil || ae.Code != tc.wantCode || ae.Kind != tc.wantKind {
+					t.Fatalf("expected %s kind=%v, got %v", tc.wantCode, tc.wantKind, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if repoPath != "/repo" {
+				t.Errorf("expected repoPath=/repo, got %q", repoPath)
+			}
+			want := GitExecutor(local)
+			if tc.wantTarget == "relay" {
+				want = relay
+			}
+			if executor != want {
+				t.Errorf("expected the %s executor", tc.wantTarget)
+			}
+			_, hasDS := DevServerIDFromContext(ctx)
+			if hasDS != (tc.wantTarget == "relay") {
+				t.Errorf("DevServerID in ctx = %v, want %v", hasDS, tc.wantTarget == "relay")
+			}
+		})
+	}
+}
+
+// The filesystem variant must follow the same routing as the git variant.
+func TestDispatchFilesystemExecutorForRepo_RoutingMatrix(t *testing.T) {
+	reachable := &fakeDevServerReachability{reachable: false, allowLocal: true}
+	_, _, _, err := dispatchFilesystemExecutorForRepo(context.Background(), reachable, nil, nil, domain.RepoInfo{URL: "/repo", DevServerID: "ds-1"})
+	if ae := HostDispatchError(err); ae == nil || ae.Code != CodeDevServerUnreachable {
+		t.Fatalf("expected %s, got %v", CodeDevServerUnreachable, err)
+	}
+	unbound := &fakeDevServerReachability{}
+	_, _, _, err = dispatchFilesystemExecutorForRepo(context.Background(), unbound, nil, nil, domain.RepoInfo{URL: "/repo"})
+	if ae := HostDispatchError(err); ae == nil || ae.Code != CodeRepoHostUnbound {
+		t.Fatalf("expected %s, got %v", CodeRepoHostUnbound, err)
+	}
+	allowed := &fakeDevServerReachability{allowLocal: true}
+	if _, _, _, err = dispatchFilesystemExecutorForRepo(context.Background(), allowed, nil, nil, domain.RepoInfo{URL: "/repo"}); err != nil {
+		t.Fatalf("unexpected error for allowed local repo: %v", err)
+	}
+}
+
+// HostDispatchError must see through the generic *_FAILED wrappers usecases add.
+func TestHostDispatchError_SeesThroughWrappers(t *testing.T) {
+	inner := ErrRepoHostUnbound()
+	wrapped := apperrors.New(apperrors.KindInternal, "WORKTREE_RESOLVE_FAILED", "failed to resolve host", fmt.Errorf("ctx: %w", inner))
+	if got := HostDispatchError(wrapped); got != inner {
+		t.Fatalf("expected the inner host error, got %v", got)
+	}
+	if got := HostDispatchError(apperrors.New(apperrors.KindInternal, "WORKTREE_CREATE_FAILED", "x", errors.New("boom"))); got != nil {
+		t.Fatalf("expected nil for a non host-routing error, got %v", got)
+	}
+	if HostDispatchError(nil) != nil {
+		t.Fatal("expected nil for nil")
 	}
 }

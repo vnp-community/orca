@@ -1634,6 +1634,15 @@
     "props": ["member_user_id", "repo_id", "role"]
   },
   {
+    "name": "request_activity",
+    "channel": "request.activity",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["actor_kind", "id", "kinds", "min_severity", "page_size", "page_token", "subject_id"]
+  },
+  {
     "name": "request_changeType",
     "channel": "request.changeType",
     "pack": 2,
@@ -1660,6 +1669,15 @@
     "scope": "orca:write",
     "required": ["project_id", "title"],
     "props": ["body", "client_request_id", "project_id", "title"]
+  },
+  {
+    "name": "request_executionSummary",
+    "channel": "request.executionSummary",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["id"]
   },
   {
     "name": "request_flowStatus",

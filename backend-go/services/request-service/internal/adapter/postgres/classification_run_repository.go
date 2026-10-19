@@ -73,6 +73,9 @@ func (r *ClassificationRunRepository) Start(ctx context.Context, run domain.Clas
 func (r *ClassificationRunRepository) Get(ctx context.Context, runID string) (domain.ClassificationRun, error) {
 	var run domain.ClassificationRun
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(runID) {
+			return domain.ErrRequestNotFound(runID)
+		}
 		got, err := scanClassificationRun(db.QueryRow(ctx, `SELECT `+classificationRunColumns+` FROM request.classification_runs
 			WHERE tenant_id = $1 AND id = $2`, tenantID, runID))
 		if errors.Is(err, pgx.ErrNoRows) {

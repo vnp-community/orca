@@ -23,6 +23,7 @@ export type ApprovalListProps = {
   now: number
   locale: string
   busyIds: Set<string>
+  actionsLocked?: boolean
   hasMore: boolean
   isLoadingMore: boolean
   dimmed?: boolean
@@ -33,8 +34,19 @@ export type ApprovalListProps = {
 }
 
 export function ApprovalList({
-  groups, requestsById, now, locale, busyIds, hasMore, isLoadingMore, dimmed,
-  onOpen, onQuickApprove, onReject, onLoadMore
+  groups,
+  requestsById,
+  now,
+  locale,
+  busyIds,
+  actionsLocked,
+  hasMore,
+  isLoadingMore,
+  dimmed,
+  onOpen,
+  onQuickApprove,
+  onReject,
+  onLoadMore
 }: ApprovalListProps): React.JSX.Element {
   const flat = useMemo(() => groups.flatMap((g) => g.rows), [groups])
   const { containerProps, getRowProps, activeKey } = useRowListKeyboardNavigation({
@@ -55,7 +67,9 @@ export function ApprovalList({
         return (
           <section key={group.requestId} aria-label={requestHeading(group.requestId, request)}>
             <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
-              <span className="truncate font-medium text-foreground">{requestHeading(group.requestId, request)}</span>
+              <span className="truncate font-medium text-foreground">
+                {requestHeading(group.requestId, request)}
+              </span>
               {request && <RequestTypeBadge type={request.type} size="xs" />}
               <span className="ml-auto tabular-nums">{group.rows.length}</span>
             </header>
@@ -76,6 +90,7 @@ export function ApprovalList({
                   locale={locale}
                   canQuick={canQuickApprove(row)}
                   busy={busyIds.has(row.id)}
+                  actionsLocked={actionsLocked}
                   onOpen={onOpen}
                   onQuickApprove={onQuickApprove}
                   onReject={onReject}

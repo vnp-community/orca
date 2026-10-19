@@ -39,8 +39,10 @@ type StartPhase struct {
 	Approvals   ApprovalGateReader
 	Authorizer  StartPhaseAuthorizer
 	Advance     *AdvanceExecution
-	Tx          TxRunner
-	Outbox      OutboxWriter
+	// Access makes the actor able to execute the Plan tree once the caller is authorized to start; nil skips it.
+	Access *ExecutionAccess
+	Tx     TxRunner
+	Outbox OutboxWriter
 }
 
 func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPhaseResult, error) {
@@ -66,10 +68,10 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 	if err != nil {
 		return StartPhaseResult{}, err
 	}
-	tree := domain.BuildExecutionTree(tasks)
+	tree := domain.BuildExecutionTreeOf(req.PlanTaskID, tasks)
 
 	if in.PhaseTaskID == "" {
-		return uc.startWholePlan(ctx, req, tree, in, actor)
+		return uc.startWholePlan(ctx, req, tasks, tree, in, actor)
 	}
 	phase, ok := tree.Phase(in.PhaseTaskID)
 	if !ok || phase.RequestID != req.ID {
@@ -86,14 +88,22 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 		}
 	}
 	flow, _ := domain.FlowFor(req.Type)
-	if flow.HasExecutionGate(domain.GatePhase) && (latest == nil || latest.Status != domain.ApprovalStatusApproved) {
+	// A continuous run has no Phase gate: the approval of the plan already covers every Phase.
+	if flow.HasExecutionGateFor(domain.GatePhase, req.ExecutionMode) && (latest == nil || latest.Status != domain.ApprovalStatusApproved) {
 		return StartPhaseResult{}, domain.ErrPhaseNotApproved(phase.ID)
 	}
-	if err := uc.checkPredecessors(ctx, tree, phase); err != nil {
+	if err := uc.ensureAccess(ctx, tasks, actor); err != nil {
+		return StartPhaseResult{}, err
+	}
+	if err := uc.checkPredecessors(ctx, tree, phase, actor); err != nil {
 		return StartPhaseResult{}, err
 	}
 
-	inserted, err := uc.claim(ctx, req, phase.ID, actor)
+	trigger := domain.PhaseStartManual
+	if in.Internal {
+		trigger = domain.PhaseStartAuto
+	}
+	inserted, err := claimPhase(ctx, uc.Tx, uc.PhaseStarts, uc.Outbox, req, phase.ID, actor, trigger)
 	if err != nil {
 		return StartPhaseResult{}, err
 	}
@@ -102,7 +112,7 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 }
 
 // startWholePlan is the no-Phase path: the Plan itself is the unit that starts.
-func (uc *StartPhase) startWholePlan(ctx context.Context, req domain.Request, tree domain.ExecutionTree, in StartPhaseInput, actor string) (StartPhaseResult, error) {
+func (uc *StartPhase) startWholePlan(ctx context.Context, req domain.Request, tasks []domain.TaskView, tree domain.ExecutionTree, in StartPhaseInput, actor string) (StartPhaseResult, error) {
 	if tree.HasPhases() {
 		return StartPhaseResult{}, domain.ErrPhaseRequired()
 	}
@@ -111,18 +121,35 @@ func (uc *StartPhase) startWholePlan(ctx context.Context, req domain.Request, tr
 			return StartPhaseResult{}, err
 		}
 	}
+	if err := uc.ensureAccess(ctx, tasks, actor); err != nil {
+		return StartPhaseResult{}, err
+	}
 	res, err := uc.Advance.Execute(ctx, AdvanceInput{RequestID: req.ID, ActorID: actor})
 	return StartPhaseResult{Dispatched: res.Dispatched}, err
 }
 
+// ensureAccess runs after the caller is authorized to start and before the claim, so a person task-service would
+// refuse leaves no phase_starts row behind that makes them the actor of every later dispatch.
+func (uc *StartPhase) ensureAccess(ctx context.Context, tasks []domain.TaskView, actor string) error {
+	if uc.Access == nil {
+		return nil
+	}
+	return uc.Access.EnsureOnRoots(ctx, tasks, actor)
+}
+
 // checkPredecessors requires every Phase this one depends_on to be done or cancelled.
-func (uc *StartPhase) checkPredecessors(ctx context.Context, tree domain.ExecutionTree, phase domain.TaskView) error {
+func (uc *StartPhase) checkPredecessors(ctx context.Context, tree domain.ExecutionTree, phase domain.TaskView, actor string) error {
 	if tree.Plan == nil {
 		return nil
 	}
-	sub, err := uc.Tasks.GetSubtree(ctx, tree.Plan.ID)
+	sub, err := uc.Tasks.GetSubtree(asExecutionActor(ctx, actor), tree.Plan.ID)
 	if err != nil {
 		return err
+	}
+	// task-service hides what the actor has no grant on, and edges of a hidden Phase vanish with it: without this
+	// check an actor who cannot see the Phase would pass the predecessor test with no edges to look at.
+	if _, visible := findTask(sub.Tasks, phase.ID); !visible {
+		return domain.ErrExecuteForbidden()
 	}
 	for _, edge := range sub.DependsOn {
 		if edge.From != phase.ID {
@@ -135,12 +162,15 @@ func (uc *StartPhase) checkPredecessors(ctx context.Context, tree domain.Executi
 	return nil
 }
 
-func (uc *StartPhase) claim(ctx context.Context, req domain.Request, phaseID, actor string) (bool, error) {
+// claimPhase records "this Phase was released" and emits phase.started in the same transaction. The phase_starts row is the
+// claim, so releasing twice (a double click, a repeated event) dispatches once. trigger tells a person's click from Orca
+// starting the Phase itself.
+func claimPhase(ctx context.Context, tx TxRunner, starts PhaseStartRepository, outbox OutboxWriter, req domain.Request, phaseID, actor string, trigger domain.PhaseStartTrigger) (bool, error) {
 	tenantID, _ := tenant.TenantID(ctx)
 	var inserted bool
-	err := uc.Tx.InTx(ctx, func(ctx context.Context) error {
+	err := tx.InTx(ctx, func(ctx context.Context) error {
 		var err error
-		inserted, err = uc.PhaseStarts.TryStart(ctx, domain.PhaseStart{TenantID: tenantID, PhaseTaskID: phaseID, RequestID: req.ID, StartedBy: actor})
+		inserted, err = starts.TryStart(ctx, domain.PhaseStart{TenantID: tenantID, PhaseTaskID: phaseID, RequestID: req.ID, StartedBy: actor, Trigger: trigger})
 		if err != nil || !inserted {
 			return err
 		}
@@ -148,7 +178,7 @@ func (uc *StartPhase) claim(ctx context.Context, req domain.Request, phaseID, ac
 		if err != nil {
 			return err
 		}
-		return uc.Outbox.InsertOutboxEvent(ctx, ev)
+		return outbox.InsertOutboxEvent(ctx, ev)
 	})
 	return inserted, err
 }

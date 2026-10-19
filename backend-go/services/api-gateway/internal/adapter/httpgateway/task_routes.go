@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wscompat"
 
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 )
@@ -26,6 +28,8 @@ func mountTaskRoutes(r chi.Router, client taskv1.TaskServiceClient) {
 		sub.Post("/{id}/execute", handleExecuteTask(client))
 		sub.Get("/{id}/active-executions", handleHasActiveExecutions(client))
 		sub.Get("/{id}/subtree", handleGetSubtree(client))
+		sub.Get("/{id}/execution", handleGetTaskExecution(client))
+		sub.Get("/{id}/writebacks", handleGetPlanWritebacks(client))
 		sub.Post("/{id}/progress:recalculate", handleRecalculateProgress(client))
 		sub.Post("/{id}/comments", handleAddComment(client))
 		sub.Get("/{id}/comments", handleListComments(client))
@@ -275,6 +279,57 @@ func handleGetSubtree(client taskv1.TaskServiceClient) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+// handleGetTaskExecution serves GET /v1/tasks/{id}/execution: the newest run's result, the same view the task sheet's
+// Result tab reads (channel execution.get). Task-service checks read access on the task.
+func handleGetTaskExecution(client taskv1.TaskServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		view, err := wscompat.ExecutionResultFor(ctx, client, chi.URLParam(r, "id"))
+		if err != nil {
+			code, message, _ := strings.Cut(err.Error(), ": ")
+			switch code {
+			case "TASK_NOT_FOUND":
+				writeJSONError(w, http.StatusNotFound, code, message)
+			case "TASK_FORBIDDEN":
+				writeJSONError(w, http.StatusForbidden, code, message)
+			case "TASK_INVALID_ARGUMENT":
+				writeJSONError(w, http.StatusBadRequest, code, message)
+			default:
+				writeJSONError(w, http.StatusBadGateway, "TASK_UNAVAILABLE", "could not read the execution result")
+			}
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
+	}
+}
+
+// handleGetPlanWritebacks serves GET /v1/tasks/{planId}/writebacks: what the agents of a Plan's tasks reported writing back to
+// the design knowledge (documents changed, ChangeSet proposals), gathered for one Request. Nothing is applied by this route
+// or by anything in Orca; a person applies a proposal.
+func handleGetPlanWritebacks(client taskv1.TaskServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		view, err := wscompat.WritebacksFor(ctx, client, chi.URLParam(r, "id"))
+		if err != nil {
+			code, message, _ := strings.Cut(err.Error(), ": ")
+			switch code {
+			case "TASK_NOT_FOUND":
+				writeJSONError(w, http.StatusNotFound, code, message)
+			case "TASK_FORBIDDEN":
+				writeJSONError(w, http.StatusForbidden, code, message)
+			case "TASK_INVALID_ARGUMENT":
+				writeJSONError(w, http.StatusBadRequest, code, message)
+			default:
+				writeJSONError(w, http.StatusBadGateway, "TASK_UNAVAILABLE", "could not read the write-back reports")
+			}
+			return
+		}
+		writeJSON(w, http.StatusOK, view)
 	}
 }
 

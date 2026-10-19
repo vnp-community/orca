@@ -2,6 +2,8 @@ package domain
 
 import (
 	"encoding/json"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -34,7 +36,42 @@ type DevServerCapability struct {
 	ClaudeFlags     ClaudeFlags
 	EnvPresent      map[string]bool
 	EnvKnown        bool
-	ProbedAt        time.Time
+	// AISources names where ai.complete can get credentials ("env_key", "cli_session"); known only when the agent reports it.
+	AISources      []string
+	AISourcesKnown bool
+	// Skills are the knowledge-hub skills the agent found under ~/.claude/skills (name and content hash only).
+	Skills      map[string]SkillStatus
+	SkillsKnown bool
+	ProbedAt    time.Time
+}
+
+// SkillStatus is one skill as the agent reports it.
+type SkillStatus struct {
+	Installed bool
+	// SHA256 is a prefix of the content hash; empty when the skill is not installed.
+	SHA256 string
+}
+
+// KnowledgeSkillNames are the skills the engine relies on; the agent reports exactly these and nothing else.
+var KnowledgeSkillNames = []string{"tdd-knowledge", "tdd-knowledge-writeback", "tdd-openspec-author", "tdd-orca-task"}
+
+// SkillHash names the installed skill versions in one string, so a stored change says which instructions the agent worked
+// under. It is empty unless every named skill is installed.
+func (c DevServerCapability) SkillHash(names []string) string {
+	if !c.SkillsKnown {
+		return ""
+	}
+	sorted := append([]string(nil), names...)
+	sort.Strings(sorted)
+	parts := make([]string, 0, len(sorted))
+	for _, n := range sorted {
+		st, ok := c.Skills[n]
+		if !ok || !st.Installed || st.SHA256 == "" {
+			return ""
+		}
+		parts = append(parts, n+"="+st.SHA256)
+	}
+	return strings.Join(parts, ",")
 }
 
 func (c DevServerCapability) HasFeature(name string) bool {
@@ -112,6 +149,12 @@ func ParseCapabilityProfile(source string, degraded, connected bool, buildVersio
 			Name    string `json:"name"`
 			Present bool   `json:"present"`
 		} `json:"env"`
+		AISources []string `json:"aiSources"`
+		Skills    []struct {
+			Name      string `json:"name"`
+			Installed bool   `json:"installed"`
+			SHA256    string `json:"sha256"`
+		} `json:"skills"`
 	}
 
 	// Try minimal structural check first
@@ -165,5 +208,58 @@ func ParseCapabilityProfile(source string, degraded, connected bool, buildVersio
 		}
 	}
 
+	if _, ok := m["skills"]; ok {
+		c.SkillsKnown = true
+		c.Skills = make(map[string]SkillStatus, len(root.Skills))
+		for _, sk := range root.Skills {
+			c.Skills[sk.Name] = SkillStatus{Installed: sk.Installed, SHA256: sk.SHA256}
+		}
+	}
+
+	if _, ok := m["aiSources"]; ok {
+		c.AISourcesKnown = true
+		c.AISources = root.AISources
+	}
+
 	return c, nil
+}
+
+// AIReadiness says whether ai.complete can work on this dev server.
+type AIReadiness int
+
+const (
+	// AIReadinessUnknown: the agent did not say (older build, or a partial probe); callers should still try.
+	AIReadinessUnknown AIReadiness = iota
+	AIReady
+	// AINotConfigured: the host has neither an API key nor a usable Claude login.
+	AINotConfigured
+)
+
+// AIReadiness prefers the agent's own aiSources; for agents that predate the field it derives the same answer from
+// the claude and env probes. A login that was not probed is unknown, never "not configured".
+func (c DevServerCapability) AIReadiness() AIReadiness {
+	if c.AISourcesKnown {
+		if len(c.AISources) > 0 {
+			return AIReady
+		}
+		if c.Partial {
+			return AIReadinessUnknown
+		}
+		return AINotConfigured
+	}
+	if !c.ClaudeKnown && !c.EnvKnown {
+		return AIReadinessUnknown
+	}
+	for _, name := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"} {
+		if present, _ := c.EnvVar(name); present {
+			return AIReady
+		}
+	}
+	if c.ClaudeKnown && c.ClaudeInstalled && c.ClaudeAuth == "logged_in" && c.ClaudeFlags.Tools {
+		return AIReady
+	}
+	if c.ClaudeKnown && c.ClaudeAuth == "unknown" {
+		return AIReadinessUnknown
+	}
+	return AINotConfigured
 }

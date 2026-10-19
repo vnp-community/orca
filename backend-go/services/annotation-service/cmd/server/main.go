@@ -141,7 +141,7 @@ func run() error {
 	// auth-service's audit_log. Lazy dial (grpc.NewClient doesn't block on
 	// connect), same convention as every other outbound client in this
 	// codebase's composition roots.
-	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	authConn, err := grpcmw.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing auth-service: %w", err)
 	}

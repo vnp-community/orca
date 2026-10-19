@@ -93,6 +93,12 @@ import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { formatFolderWorkspaceCreateError } from '../../lib/folder-workspace-path-status'
 import { isWebClientLocation } from '@/lib/web-client-location'
+import { requireDevServerIdForWeb, resolveProjectIdForDevServer } from '@/lib/repo-host-binding'
+import { registerRepoInOwnProject } from '@/lib/own-project-registration'
+import {
+  parseRepoAlreadyRegistered,
+  type RepoAlreadyRegisteredError
+} from '@/lib/registered-repo-lookup'
 
 const ERROR_TOAST_DURATION = 60_000
 const SAFE_AUTO_FORK_SYNC_COOLDOWN_MS = 10 * 60 * 1000
@@ -129,6 +135,8 @@ type ProjectUpdate = ProjectUpdateArgs['updates']
 type NestedRepoScanControls = {
   scanId?: string
   onProgress?: (scan: NestedRepoScanResult) => void
+  // Host picked in the Add Project dialog; the global activeDevServerId is only a fallback.
+  devServerId?: string | null
 }
 
 export type FolderWorkspacePathStatusCacheEntry = {
@@ -1068,10 +1076,12 @@ type FetchedRepoCatalog = {
 // Cached per session (module-scoped, not store state) since it's resolved
 // far more often than it changes — reset between tests via
 // resetDefaultProjectCacheForTests.
-let cachedDefaultProjectId: string | null = null
+// Keyed by dev server id ('' = host-less, desktop/runtime): a repo's host is its project's host,
+// so repos from different hosts must not share one implicit project.
+const cachedDefaultProjectIdByHost = new Map<string, string>()
 
 export function resetDefaultProjectCacheForTests(): void {
-  cachedDefaultProjectId = null
+  cachedDefaultProjectIdByHost.clear()
 }
 
 const DEFAULT_PROJECT_NAME = 'My Repos'
@@ -1094,17 +1104,39 @@ async function listCallerProjects(
 }
 
 export async function getOrCreateDefaultProject(
-  target: Extract<ReturnType<typeof getActiveRuntimeTarget>, { kind: 'environment' }>
+  target: Extract<ReturnType<typeof getActiveRuntimeTarget>, { kind: 'environment' }>,
+  devServerId?: string | null
 ): Promise<string> {
-  if (cachedDefaultProjectId) {
-    return cachedDefaultProjectId
+  const hostKey = devServerId?.trim() ?? ''
+  const cached = cachedDefaultProjectIdByHost.get(hostKey)
+  if (cached) {
+    return cached
+  }
+  if (hostKey) {
+    const projectId = await resolveProjectIdForDevServer({
+      devServerId: hostKey,
+      listProjects: () => listCallerProjects(target),
+      createProject: async (id) =>
+        callRuntimeRpc<OrcaProject>(
+          target,
+          'project.create',
+          {
+            name: await resolveDevServerDisplayName(target, id),
+            devServerId: id,
+            visibility: 'private'
+          },
+          { timeoutMs: 15_000 }
+        )
+    })
+    cachedDefaultProjectIdByHost.set(hostKey, projectId)
+    return projectId
   }
   // Reuse the earliest-created project the caller already has access to,
   // rather than creating a redundant new one.
   const projects = await listCallerProjects(target)
   const earliest = projects.slice().sort((a, b) => a.createdAt - b.createdAt)[0]
   if (earliest) {
-    cachedDefaultProjectId = earliest.id
+    cachedDefaultProjectIdByHost.set(hostKey, earliest.id)
     return earliest.id
   }
   const created = await callRuntimeRpc<OrcaProject>(
@@ -1113,8 +1145,25 @@ export async function getOrCreateDefaultProject(
     { name: DEFAULT_PROJECT_NAME, visibility: 'private' },
     { timeoutMs: 15_000 }
   )
-  cachedDefaultProjectId = created.id
+  cachedDefaultProjectIdByHost.set(hostKey, created.id)
   return created.id
+}
+
+async function resolveDevServerDisplayName(
+  target: Extract<ReturnType<typeof getActiveRuntimeTarget>, { kind: 'environment' }>,
+  devServerId: string
+): Promise<string> {
+  try {
+    const servers = await callRuntimeRpc<{ id: string; name: string }[]>(
+      target,
+      'devServer.list',
+      null,
+      { timeoutMs: 15_000 }
+    )
+    return servers?.find((server) => server.id === devServerId)?.name || devServerId
+  } catch {
+    return devServerId
+  }
 }
 
 // RemoteRepoView mirrors channels_repo_ssh_status_workspace.go's repoView —
@@ -1132,6 +1181,8 @@ export type RemoteRepoView = {
   // getRepoExecutionHostId (settings gates like SparsePresetSettingsSection's)
   // reads to tell a dev-server-bound repo from a genuinely local one.
   devServerId?: string
+  // Set client-side when devServerId was taken from the owning project, not the repo itself.
+  devServerInherited?: boolean
   // hookSettings: JSON-encoded RepoHookSettings (project.proto's
   // Repo.hook_settings — an opaque blob backend-go stores/returns verbatim).
   // Empty/absent = never set. See migrations/0018_repo_hook_settings.
@@ -1167,6 +1218,9 @@ export function mergeRepoViewIntoRepo(view: RemoteRepoView, existing?: Repo): Re
     badgeColor: existing?.badgeColor ?? '',
     addedAt: existing?.addedAt ?? Date.now(),
     devServerId: view.devServerId ?? existing?.devServerId,
+    ...(view.devServerInherited !== undefined
+      ? { devServerInherited: view.devServerInherited }
+      : {}),
     hookSettings: parseRepoHookSettings(view.hookSettings) ?? existing?.hookSettings
   }
 }
@@ -1314,7 +1368,8 @@ async function fetchAllRemoteRepoViews(
         (result) =>
           result.repos.map((repo) => ({
             ...repo,
-            devServerId: repo.devServerId || project.devServerId || undefined
+            devServerId: repo.devServerId || project.devServerId || undefined,
+            ...(!repo.devServerId && project.devServerId ? { devServerInherited: true } : {})
           })),
         (err) => {
           console.error(`[repos] repo.list failed for project ${project.id}:`, err)
@@ -1619,8 +1674,35 @@ function getRuntimeTargetCachePrefix(
   return target.kind === 'local' ? 'local' : `environment:${target.environmentId}`
 }
 
-type FolderWorkspacePathStatusRouteOptions = { runtimeEnvironmentId?: string | null }
-type AddRepoPathRouteOptions = { runtimeEnvironmentId?: string | null }
+type FolderWorkspacePathStatusRouteOptions = {
+  runtimeEnvironmentId?: string | null
+  devServerId?: string | null
+}
+type AddRepoPathRouteOptions = {
+  runtimeEnvironmentId?: string | null
+  devServerId?: string | null
+  // Add Project: put this repo in a NEW project of this name instead of the host's default project.
+  ownProject?: { name: string }
+}
+
+// Why a one-time warning: an explicit host from the caller is authoritative; the global selection
+// is only a fallback for callers without dialog context and is lost on reload. Path-status
+// polling hits this often, so it must not flood the console.
+let warnedGlobalDevServerFallback = false
+function resolveExplicitDevServerId(
+  explicit: string | null | undefined,
+  fallback: string | null
+): string | null {
+  const trimmed = explicit?.trim()
+  if (trimmed) {
+    return trimmed
+  }
+  if (fallback && !warnedGlobalDevServerFallback) {
+    warnedGlobalDevServerFallback = true
+    console.warn('[repos] no explicit devServerId; falling back to the global active dev server')
+  }
+  return fallback
+}
 
 function getFolderWorkspacePathStatusRouteSettings(
   options: FolderWorkspacePathStatusRouteOptions | undefined,
@@ -1629,6 +1711,23 @@ function getFolderWorkspacePathStatusRouteSettings(
   return options && 'runtimeEnvironmentId' in options
     ? { activeRuntimeEnvironmentId: options.runtimeEnvironmentId ?? null }
     : fallbackSettings
+}
+
+// Safety net behind the dialog's own pre-check (cross-tab race, or a caller without the dialog).
+function notifyRepoAlreadyRegistered(duplicate: RepoAlreadyRegisteredError): void {
+  toast.error(translate('auto.store.slices.repos.repoAlreadyAdded', 'Project already added'), {
+    description: duplicate.message,
+    duration: ERROR_TOAST_DURATION,
+    action: {
+      label: translate('auto.store.slices.repos.openExistingProject', 'Open project'),
+      onClick: () => {
+        // Why lazy: open-registered-repo imports the store root, which imports this slice.
+        void import('@/lib/open-registered-repo').then(({ openRegisteredRepo }) =>
+          openRegisteredRepo({ repoId: duplicate.repoId, projectId: duplicate.projectId })
+        )
+      }
+    }
+  })
 }
 
 function getAddRepoPathRouteSettings(
@@ -1909,6 +2008,7 @@ export type RepoSlice = {
     connectionId?: string
     scanId?: string
     mode: 'group' | 'separate'
+    devServerId?: string | null
     // Why optional, remote-only: the remote projectGroup.importNested RPC
     // needs each candidate's suggestedName/isGitRepo (project.proto's
     // NestedRepoCandidate), not just its path — local (Electron) mode
@@ -2430,7 +2530,13 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
               await callRuntimeRpc<RemoteFolderWorkspacePathStatusResult>(
                 target,
                 'folderWorkspace.getPathStatus',
-                { devServerId: get().activeDevServerId, path },
+                {
+                  devServerId: resolveExplicitDevServerId(
+                    options?.devServerId,
+                    get().activeDevServerId
+                  ),
+                  path
+                },
                 { timeoutMs: 15_000 }
               )
             )
@@ -2492,7 +2598,13 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           await callRuntimeRpc<RemoteNestedRepoCandidate[]>(
             target,
             'projectGroup.scanNested',
-            { devServerId: get().activeDevServerId, rootPath: path },
+            {
+              devServerId: resolveExplicitDevServerId(
+                controls?.devServerId,
+                get().activeDevServerId
+              ),
+              rootPath: path
+            },
             // Why: older runtime servers cannot stream or cancel scans, so the
             // renderer must retain a bounded failure path for large folders.
             { timeoutMs: 20_000 }
@@ -2541,7 +2653,10 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
                 target,
                 'projectGroup.importNested',
                 {
-                  devServerId: get().activeDevServerId,
+                  devServerId: resolveExplicitDevServerId(
+                    args.devServerId,
+                    get().activeDevServerId
+                  ),
                   parentGroupId: '',
                   selected: args.projectPaths.map((path) => {
                     const candidate = args.selectedCandidates?.find((c) => c.path === path)
@@ -2633,7 +2748,10 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
                 target,
                 'folderWorkspace.create',
                 {
-                  devServerId: get().activeDevServerId,
+                  devServerId: resolveExplicitDevServerId(
+                    options?.devServerId,
+                    get().activeDevServerId
+                  ),
                   path: args.folderPath ?? '',
                   name: args.name,
                   projectGroupId: args.projectGroupId
@@ -3012,10 +3130,21 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
   addRepoPath: async (path, kind = 'git', options) => {
     try {
       const target = getActiveRuntimeTarget(getAddRepoPathRouteSettings(options, get().settings))
+      // Why before any RPC: web has no local filesystem, so a repo without a host can never run git.
+      const devServerId = requireDevServerIdForWeb(
+        isWebClientLocation()
+          ? resolveExplicitDevServerId(options?.devServerId, get().activeDevServerId)
+          : options?.devServerId
+      )
       let repo: Repo
       try {
         if (target.kind === 'local') {
-          const result = await window.api.repos.add({ path, kind })
+          const result = await window.api.repos.add({
+            path,
+            kind,
+            ...(devServerId ? { devServerId } : {}),
+            ...(devServerId && options?.ownProject ? { projectName: options.ownProject.name } : {})
+          })
           if ('error' in result) {
             throw new Error(result.error)
           }
@@ -3030,17 +3159,35 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           // below work through the same call. The bare repoView response
           // has no `kind` field (project-service doesn't model one) — set
           // it back from the caller's own already-known kind.
-          const projectId = await getOrCreateDefaultProject(target)
-          repo = {
-            ...mergeRepoViewIntoRepo(
-              await callRuntimeRpc<RemoteRepoView>(
-                target,
-                'repo.add',
-                { projectId, url: path, displayName: repoDisplayNameFromUrl(path) },
-                { timeoutMs: 15_000 }
-              )
-            ),
-            kind
+          if (devServerId && options?.ownProject) {
+            repo = {
+              ...mergeRepoViewIntoRepo(
+                await registerRepoInOwnProject(
+                  (method, params, timeoutMs) =>
+                    callRuntimeRpc(target, method, params, { timeoutMs }),
+                  { devServerId, path, projectName: options.ownProject.name }
+                )
+              ),
+              kind
+            }
+          } else {
+            const projectId = await getOrCreateDefaultProject(target, devServerId)
+            repo = {
+              ...mergeRepoViewIntoRepo(
+                await callRuntimeRpc<RemoteRepoView>(
+                  target,
+                  'repo.add',
+                  {
+                    projectId,
+                    url: path,
+                    displayName: repoDisplayNameFromUrl(path),
+                    ...(devServerId ? { devServerId } : {})
+                  },
+                  { timeoutMs: 15_000 }
+                )
+              ),
+              kind
+            }
           }
         }
       } catch (err) {
@@ -3052,7 +3199,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           const status = await fetchRuntimeAddProjectPathStatus({
             target,
             path,
-            devServerId: get().activeDevServerId
+            devServerId: devServerId ?? get().activeDevServerId
           })
           if (status?.exists !== true) {
             const hostName = getRuntimeEnvironmentDisplayName(get(), target.environmentId)
@@ -3080,7 +3227,9 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         const { openModal } = get()
         openModal('confirm-non-git-folder', {
           folderPath: path,
-          ...(target.kind === 'environment' ? { runtimeEnvironmentId: target.environmentId } : {})
+          ...(target.kind === 'environment' ? { runtimeEnvironmentId: target.environmentId } : {}),
+          ...(devServerId ? { devServerId } : {}),
+          ...(devServerId && options?.ownProject ? { projectName: options.ownProject.name } : {})
         })
         return null
       }
@@ -3125,6 +3274,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       }
       return repo
     } catch (err) {
+      const duplicate = parseRepoAlreadyRegistered(err)
+      if (duplicate) {
+        notifyRepoAlreadyRegistered(duplicate)
+        return null
+      }
       console.error('Failed to add project:', err)
       const message = err instanceof Error ? err.message : String(err)
       const duration = ERROR_TOAST_DURATION
@@ -3335,7 +3489,10 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       // onto the Orca server's own filesystem instead of the Dev Server.
       if (parsedHost?.kind === 'devServer') {
         throw new Error(
-          'Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.'
+          translate(
+            'auto.store.slices.repos.setupProjectCloneDevServerUnsupported',
+            'Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.'
+          )
         )
       }
       const target = getProjectSetupRuntimeTarget(args.hostId)

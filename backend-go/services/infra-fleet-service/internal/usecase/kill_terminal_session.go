@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -68,6 +69,9 @@ func (uc *KillTerminalSession) ExecuteWithInput(ctx context.Context, in KillTerm
 	agentErr := uc.agent.KillPty(ctx, devServer, ptyID, true)
 
 	if err := uc.markClosed(ctx, tenantID, session, in); err != nil {
+		if errors.Is(err, domain.ErrTerminalSessionNotFound) {
+			return apperrors.New(apperrors.KindNotFound, "INFRA_TERMINAL_NOT_FOUND", "terminal session not found", err)
+		}
 		return apperrors.New(apperrors.KindInternal, "INFRA_CLOSE_TERMINAL_SESSION_FAILED", "failed to mark terminal session closed", err)
 	}
 	if agentErr != nil {

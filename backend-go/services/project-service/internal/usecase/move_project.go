@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -31,13 +32,19 @@ func (uc *MoveProject) Execute(ctx context.Context, tenantID string, in MoveProj
 
 	if in.TargetParentGroupID != "" {
 		if _, err := uc.groupRepo.GetProjectGroup(ctx, tenantID, in.TargetParentGroupID); err != nil {
-			return domain.ProjectGroup{}, apperrors.New(apperrors.KindNotFound, "PROJECT_GROUP_NOT_FOUND", "target parent group does not exist", err)
+			if errors.Is(err, domain.ErrProjectGroupNotFound) {
+				return domain.ProjectGroup{}, apperrors.New(apperrors.KindNotFound, "PROJECT_GROUP_NOT_FOUND", "target parent group does not exist", err)
+			}
+			return domain.ProjectGroup{}, apperrors.New(apperrors.KindInternal, "PROJECT_GROUP_FETCH_FAILED", "failed to fetch target parent group", err)
 		}
 	}
 
 	project, err := uc.repo.Get(ctx, tenantID, in.ProjectID)
-	if err != nil {
+	if errors.Is(err, domain.ErrProjectNotFound) {
 		return domain.ProjectGroup{}, apperrors.New(apperrors.KindNotFound, "PROJECT_NOT_FOUND", "project does not exist", err)
+	}
+	if err != nil {
+		return domain.ProjectGroup{}, apperrors.New(apperrors.KindInternal, "PROJECT_FETCH_FAILED", "failed to fetch project", err)
 	}
 
 	// A leaf group holding exactly one project_id has no children by

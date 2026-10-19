@@ -189,3 +189,40 @@ func TestClassifySubject_CoversEveryTaskActivitySubject(t *testing.T) {
 		t.Errorf("unknown subject classified as engine=%q eventType=%q, want both empty", engine, eventType)
 	}
 }
+
+// Subscribers only see their own tenant's output even when they know another tenant's task id.
+func TestRegisterTaskActivityStreamChannel_OtherTenantsEventIsNotDelivered(t *testing.T) {
+	bus := &fakeEphemeralSubscriber{events: map[string][]commoneventbus.Event{
+		"orca.task.agent_output_partial": {
+			{ID: "evt-other", TenantID: "tenant-B", Payload: mustMarshalOrigin(t, "task-1"), OccurredAt: time.Now()},
+			{ID: "evt-own", TenantID: "tenant-A", Payload: mustMarshalOrigin(t, "task-1"), OccurredAt: time.Now()},
+		},
+	}}
+	registry := NewRegistry()
+	RegisterTaskActivityStreamChannel(registry, bus)
+	sh, _ := registry.StreamHandlerFor("task.activity.subscribe")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	args, _ := json.Marshal(struct {
+		TaskID string `json:"taskId"`
+	}{TaskID: "task-1"})
+	events, err := sh(ctx, Identity{TenantID: "tenant-A"}, []json.RawMessage{args})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case ev := <-events:
+		if _, ok := ev.Args[0].(TaskActivityFrame); !ok {
+			t.Fatalf("Args[0] = %T, want TaskActivityFrame", ev.Args[0])
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected the subscriber's own tenant event")
+	}
+	select {
+	case ev := <-events:
+		t.Fatalf("another tenant's event leaked: %+v", ev)
+	case <-time.After(200 * time.Millisecond):
+	}
+}

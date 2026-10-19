@@ -49,7 +49,7 @@ func (s *TerminalScrollbackSnapshotStore) Get(ctx context.Context, tenantID, wor
 	var snap domain.TerminalScrollbackSnapshot
 	err := row.Scan(&snap.TenantID, &snap.WorktreeID, &snap.PaneKey, &snap.Cols, &snap.Rows,
 		&snap.DataGzip, &snap.UncompressedBytes, &snap.LastTitle, &snap.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
 		return false, domain.TerminalScrollbackSnapshot{}, nil
 	}
 	if err != nil {

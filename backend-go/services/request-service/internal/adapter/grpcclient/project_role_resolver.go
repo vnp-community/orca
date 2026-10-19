@@ -34,6 +34,7 @@ type cachedProjects struct {
 // member keeps the cached role for up to the TTL (accepted in CR-REQ-035; shorten it to tighten).
 type ProjectRoleResolver struct {
 	client projectv1.ProjectServiceClient
+	access *ProjectAccessLookup // optional: authoritative existence + role when project-service supports it
 	ttl    time.Duration
 	now    func() time.Time
 
@@ -46,6 +47,12 @@ func NewProjectRoleResolver(client projectv1.ProjectServiceClient) *ProjectRoleR
 	return &ProjectRoleResolver{client: client, ttl: projectRoleTTL, now: time.Now, roles: map[roleKey]cachedRole{}, projects: map[roleKey]cachedProjects{}}
 }
 
+// WithAccessLookup makes RoleOf use ResolveProjectAccess, which separates "no such project" from "not a member".
+func (r *ProjectRoleResolver) WithAccessLookup(l *ProjectAccessLookup) *ProjectRoleResolver {
+	r.access = l
+	return r
+}
+
 func asUser(ctx context.Context, tenantID, userID string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataTenantID, tenantID, grpcmw.MetadataUserID, userID)
 }
@@ -56,6 +63,17 @@ func (r *ProjectRoleResolver) RoleOf(ctx context.Context, tenantID, projectID, u
 	k := roleKey{tenantID, projectID, userID}
 	if role, ok := r.cachedRole(k); ok {
 		return role, nil
+	}
+	if r.access != nil {
+		if _, role, supported, err := r.access.Lookup(ctx, tenantID, projectID, userID); err != nil {
+			return "", err
+		} else if supported {
+			r.mu.Lock()
+			r.sweepLocked()
+			r.roles[k] = cachedRole{role: role, expires: r.now().Add(r.ttl)}
+			r.mu.Unlock()
+			return role, nil
+		}
 	}
 	resp, err := r.client.ListMembers(asUser(ctx, tenantID, userID), &projectv1.ListMembersRequest{ProjectId: projectID})
 	role := ""

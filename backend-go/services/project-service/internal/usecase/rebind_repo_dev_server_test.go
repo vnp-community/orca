@@ -13,7 +13,7 @@ func TestRebindRepoDevServer_AllowedWhenNoActiveExecutions(t *testing.T) {
 	repos := newFakeRepoRepository()
 	repos.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1", DevServerID: "dev-1"}
 
-	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{active: false}, &fakeExecutionChecker{active: false}, &fakeDevServerLister{exists: true})
+	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{active: false}, &fakeExecutionChecker{active: false}, &fakeDevServerLister{exists: true}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	got, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: "dev-2"})
@@ -29,7 +29,7 @@ func TestRebindRepoDevServer_RejectedWhenWorkflowHasActiveExecutions(t *testing.
 	repos := newFakeRepoRepository()
 	repos.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1", DevServerID: "dev-1"}
 
-	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{active: true}, &fakeExecutionChecker{active: false}, &fakeDevServerLister{exists: true})
+	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{active: true}, &fakeExecutionChecker{active: false}, &fakeDevServerLister{exists: true}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: "dev-2"})
@@ -44,7 +44,7 @@ func TestRebindRepoDevServer_RejectedWhenTaskHasActiveExecutions(t *testing.T) {
 	repos := newFakeRepoRepository()
 	repos.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1", DevServerID: "dev-1"}
 
-	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{active: false}, &fakeExecutionChecker{active: true}, &fakeDevServerLister{exists: true})
+	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{active: false}, &fakeExecutionChecker{active: true}, &fakeDevServerLister{exists: true}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: "dev-2"})
@@ -59,7 +59,7 @@ func TestRebindRepoDevServer_FailsClosedOnCheckerError(t *testing.T) {
 	repos := newFakeRepoRepository()
 	repos.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1", DevServerID: "dev-1"}
 
-	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{err: errors.New("workflow-service unreachable")}, &fakeExecutionChecker{active: false}, &fakeDevServerLister{exists: true})
+	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{err: errors.New("workflow-service unreachable")}, &fakeExecutionChecker{active: false}, &fakeDevServerLister{exists: true}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: "dev-2"})
@@ -68,7 +68,7 @@ func TestRebindRepoDevServer_FailsClosedOnCheckerError(t *testing.T) {
 
 func TestRebindRepoDevServer_RepoNotFound(t *testing.T) {
 	repos := newFakeRepoRepository()
-	uc := NewRebindRepoDevServer(repos, newFakeProjectRepository(), allowAllOPA(), &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: true})
+	uc := NewRebindRepoDevServer(repos, newFakeProjectRepository(), allowAllOPA(), &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: true}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "missing", NewDevServerID: "dev-2"})
@@ -81,7 +81,7 @@ func TestRebindRepoDevServer_OwnerAllowedMemberDenied(t *testing.T) {
 	membership := newFakeProjectRepository()
 	membership.members = append(membership.members, domain.ProjectMember{ProjectID: "p1", UserID: "member-1", Role: domain.ProjectRoleMember})
 
-	uc := NewRebindRepoDevServer(repos, membership, &fakeOPAClient{decide: projectRegoDecide}, &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: true})
+	uc := NewRebindRepoDevServer(repos, membership, &fakeOPAClient{decide: projectRegoDecide}, &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: true}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "member-1")
 	_, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: "dev-2"})
@@ -96,7 +96,7 @@ func TestRebindRepoDevServer_GlobalAdminAllowedRegardlessOfProjectRole(t *testin
 	repos.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1", DevServerID: "dev-1"}
 	opa := &fakeOPAClient{decide: func(callerProjectRole, callerGlobalRole, action string) bool { return true }}
 
-	uc := NewRebindRepoDevServer(repos, newFakeProjectRepository(), opa, &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: true})
+	uc := NewRebindRepoDevServer(repos, newFakeProjectRepository(), opa, &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: true}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "admin-1")
 	if _, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: "dev-2"}); err != nil {
@@ -108,7 +108,7 @@ func TestRebindRepoDevServer_RejectsUnknownDevServerID(t *testing.T) {
 	repos := newFakeRepoRepository()
 	repos.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1", DevServerID: "dev-1"}
 
-	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: false})
+	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: false}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: "dev-missing"})
@@ -123,7 +123,7 @@ func TestRebindRepoDevServer_EmptyNewDevServerIDUnbindsToLocal(t *testing.T) {
 	repos.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1", DevServerID: "dev-1"}
 	// A lister that would reject anything — proves an empty NewDevServerID
 	// (unbind to local) never calls Exists at all.
-	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: false})
+	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), allowAllOPA(), &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: false}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	got, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: ""})
@@ -137,7 +137,7 @@ func TestRebindRepoDevServer_EmptyNewDevServerIDUnbindsToLocal(t *testing.T) {
 
 func TestRebindRepoDevServer_RequiresTenantContext(t *testing.T) {
 	repos := newFakeRepoRepository()
-	uc := NewRebindRepoDevServer(repos, newFakeProjectRepository(), allowAllOPA(), &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{})
+	uc := NewRebindRepoDevServer(repos, newFakeProjectRepository(), allowAllOPA(), &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{}, RepoHostPolicy{AllowLocalRepos: true})
 
 	_, err := uc.Execute(context.Background(), RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: "dev-2"})
 	if err == nil {
@@ -149,7 +149,7 @@ func TestRebindRepoDevServer_FailsClosedOnPolicyEvalError(t *testing.T) {
 	repos := newFakeRepoRepository()
 	repos.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1", DevServerID: "dev-1"}
 
-	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), &fakeOPAClient{err: errors.New("opa unreachable")}, &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: true})
+	uc := NewRebindRepoDevServer(repos, ownerMembership("p1", "u1"), &fakeOPAClient{err: errors.New("opa unreachable")}, &fakeExecutionChecker{}, &fakeExecutionChecker{}, &fakeDevServerLister{exists: true}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, RebindRepoDevServerInput{RepoID: "r1", NewDevServerID: "dev-2"})

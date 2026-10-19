@@ -85,7 +85,7 @@ func TestResolveTaskGate_AllTypes_Table(t *testing.T) {
 func TestResolveTaskGate_EveryTypeHasAnApprovedAndAnUnapprovedCase(t *testing.T) {
 	for _, typ := range AllFlowTypes() {
 		flow, _ := FlowFor(typ)
-		subject, ok := startGateSubject(flow.StartGate)
+		subject, ok := StartGateSubject(flow.StartGate)
 		if flow.PlanKind == PlanNone {
 			continue
 		}

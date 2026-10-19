@@ -37,10 +37,12 @@ RUN mkdir -p /data/repos && chown 65532:65532 /data/repos
 # re-discovering this one .so at a time for every git subcommand that
 # happens to need one.
 FROM gcr.io/distroless/base-debian12:nonroot
+# Multiarch lib dir differs per CPU (aarch64-linux-gnu on arm64); default keeps amd64 deploys unchanged.
+ARG LIB_TRIPLET=x86_64-linux-gnu
 COPY --from=git /usr/bin/git /usr/bin/git
 COPY --from=git /usr/lib/git-core /usr/lib/git-core
 COPY --from=git /usr/share/git-core /usr/share/git-core
-COPY --from=git /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
-COPY --from=git /lib/x86_64-linux-gnu /lib/x86_64-linux-gnu
+COPY --from=git /usr/lib/${LIB_TRIPLET} /usr/lib/${LIB_TRIPLET}
+COPY --from=git /lib/${LIB_TRIPLET} /lib/${LIB_TRIPLET}
 COPY --from=git /etc/ssl/certs /etc/ssl/certs
 COPY --from=git --chown=65532:65532 /data/repos /data/repos

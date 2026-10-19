@@ -71,7 +71,7 @@ func NewCheckDevServerPreflight(devServers DevServerRepository, agent DevServerA
 func (uc *CheckDevServerPreflight) Execute(ctx context.Context, tenantID, devServerID string, probePort int32) (PreflightCheckResult, error) {
 	ds, err := uc.devServers.Get(ctx, tenantID, devServerID)
 	if err != nil {
-		return PreflightCheckResult{}, err
+		return PreflightCheckResult{}, devServerLookupError(err)
 	}
 	result, err := uc.agent.Exec(ctx, ds, "shell.exec", map[string]any{
 		"script": fmt.Sprintf(preflightScript, probePort), "timeoutMs": 8000,

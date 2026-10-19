@@ -3,6 +3,10 @@
 package config
 
 import (
+	"fmt"
+	"os"
+	"strconv"
+
 	commonconfig "github.com/stablyai/orca-go/common/config"
 )
 
@@ -49,10 +53,22 @@ type Config struct {
 	// (via Base) when the file doesn't exist, which is what local dev and
 	// this scaffold's testcontainers path use instead.
 	DatabaseCredentialsFile string
+	// InternalCallerToken is the shared secret a sibling service presents to call internal-only RPCs
+	// (ResolveProjectAccess). Empty denies every such call (fail closed).
+	InternalCallerToken string
+	// AllowLocalRepos (ORCA_ALLOW_LOCAL_REPOS, default false) permits repos
+	// with no dev server — only for deployments where git-gateway shares a
+	// filesystem with users. Must match git-gateway-service's flag: Docker
+	// cannot operate on such repos, so storing them would only defer the error.
+	AllowLocalRepos bool
 }
 
 func Load() (Config, error) {
 	base, err := commonconfig.LoadBase("project-service")
+	if err != nil {
+		return Config{}, err
+	}
+	allowLocal, err := boolEnv("ORCA_ALLOW_LOCAL_REPOS", false)
 	if err != nil {
 		return Config{}, err
 	}
@@ -66,5 +82,19 @@ func Load() (Config, error) {
 		AuthServiceAddr:         commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
 		OPABundlePath:           commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
+		InternalCallerToken:     commonconfig.StringEnv("PROJECT_INTERNAL_CALLER_TOKEN", ""),
+		AllowLocalRepos:         allowLocal,
 	}, nil
+}
+
+func boolEnv(key string, def bool) (bool, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return def, nil
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("config: invalid bool for %s=%q: %w", key, v, err)
+	}
+	return b, nil
 }

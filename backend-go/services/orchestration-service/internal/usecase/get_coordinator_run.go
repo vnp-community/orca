@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -29,7 +30,7 @@ func (uc *GetCoordinatorRun) Execute(ctx context.Context, id string) (domain.Coo
 	}
 	run, err := uc.repo.GetRun(ctx, tenantID, id)
 	if err != nil {
-		if err == ErrRunNotFound {
+		if errors.Is(err, ErrRunNotFound) {
 			return domain.CoordinatorRun{}, apperrors.New(apperrors.KindNotFound, "ORCH_RUN_NOT_FOUND", "coordinator run not found", err)
 		}
 		return domain.CoordinatorRun{}, apperrors.New(apperrors.KindInternal, "ORCH_GET_COORDINATOR_RUN_FAILED", "failed to get coordinator run", err)

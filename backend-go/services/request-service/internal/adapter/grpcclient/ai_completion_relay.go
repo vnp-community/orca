@@ -18,6 +18,7 @@ type AICompletionRelay struct {
 	infra     infrafleetv1.InfraFleetServiceClient
 	resolver  connectionResolver
 	providers aiproviderv1.AiProviderServiceClient // optional: picks the account for ai.complete
+	caps      usecase.DevServerCapabilityReader    // optional: lets an unusable dev server fail fast with a remedy
 	timeout   time.Duration
 }
 
@@ -30,9 +31,18 @@ func NewAICompletionRelay(infra infrafleetv1.InfraFleetServiceClient, resolver c
 	return &AICompletionRelay{infra: infra, resolver: resolver, providers: providers, timeout: timeout}
 }
 
+// WithCapabilities enables the readiness check before each AI call.
+func (c *AICompletionRelay) WithCapabilities(caps usecase.DevServerCapabilityReader) *AICompletionRelay {
+	c.caps = caps
+	return c
+}
+
 func (c *AICompletionRelay) Complete(ctx context.Context, projectID, prompt string) (string, error) {
 	conn, err := c.resolver.ResolveForProject(ctx, projectID)
 	if err != nil {
+		return "", err
+	}
+	if err := checkAIReady(ctx, c.caps, conn); err != nil {
 		return "", err
 	}
 	return relayAIComplete(ctx, c.infra, conn, c.accountID(ctx, projectID), prompt, c.timeout)

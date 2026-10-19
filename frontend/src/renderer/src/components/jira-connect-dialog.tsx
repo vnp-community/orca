@@ -127,7 +127,7 @@ export function JiraConnectDialog({
           <DialogDescription>
             {translate(
               'auto.components.jira.connect.dialog.d785c42b8b',
-              'Use a Jira Cloud site URL, Atlassian email, and API token to browse issues.'
+              'Use your Jira site URL (Cloud or Server/Data Center) and an API token or Personal Access Token to browse issues.'
             )}
           </DialogDescription>
         </DialogHeader>
@@ -162,7 +162,7 @@ export function JiraConnectDialog({
               <Label htmlFor={emailId} className="text-xs">
                 {translate(
                   'auto.components.jira.connect.dialog.2849ddb295',
-                  'Atlassian email (optional — leave blank for a Server/Data Center Personal Access Token)'
+                  'Email (optional — Jira Cloud uses it with an API token; a Server/Data Center Personal Access Token works with or without it)'
                 )}
               </Label>
               <Input

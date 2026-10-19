@@ -169,6 +169,9 @@ func (r *SolutionRecordRepository) ListByRequest(ctx context.Context, f usecase.
 func (r *SolutionRecordRepository) Update(ctx context.Context, s domain.Solution, expectedVersion int64) (domain.Solution, error) {
 	var out domain.Solution
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(s.ID) {
+			return domain.ErrSolutionNotFound(s.ID)
+		}
 		got, err := scanSolution(db.QueryRow(ctx, `UPDATE request.solutions SET options = $4::jsonb, chosen_option = $5,
 			status = $6, content_ref = $7, version = version + 1, updated_at = now(),
 			schema_version = CASE WHEN $8 > 0 THEN $8 ELSE schema_version END,
@@ -193,6 +196,9 @@ func (r *SolutionRecordRepository) Update(ctx context.Context, s domain.Solution
 func (r *SolutionRecordRepository) Choose(ctx context.Context, id string, idx int, expectedVersion int64) (bool, error) {
 	ok := false
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return nil // ok stays false: nothing to choose
+		}
 		tag, err := db.Exec(ctx, `UPDATE request.solutions SET chosen_option = $3, version = version + 1, updated_at = now()
 			WHERE id = $1 AND tenant_id = $2 AND status = 'proposed' AND version = $4`, id, tenantID, idx, expectedVersion)
 		if err != nil {
@@ -221,6 +227,9 @@ func (r *SolutionRecordRepository) SupersedeOpen(ctx context.Context, requestID 
 
 func (r *SolutionRecordRepository) DeleteDraft(ctx context.Context, id string) error {
 	return r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return nil
+		}
 		if _, err := db.Exec(ctx, `DELETE FROM request.solutions WHERE id = $1 AND tenant_id = $2 AND status = 'draft'`, id, tenantID); err != nil {
 			return fmt.Errorf("postgres: delete draft solution: %w", err)
 		}

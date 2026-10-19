@@ -1511,3 +1511,41 @@ func TestPreflightCheckChannel_AuthStatusRelayFailureIsPerCheckSkip(t *testing.T
 		}
 	}
 }
+
+// A connected dev server with agent runs in flight is busy, the platform facts of its handshake reach the view, and a
+// dev server that is not connected is never busy.
+func TestDevServerListChannel_ReportsBusyAndHandshakeFacts(t *testing.T) {
+	fake := &fakeInfraFleetClient{
+		listDevServersFunc: func(ctx context.Context, in *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error) {
+			return &infrafleetv1.ListDevServersResponse{DevServers: []*infrafleetv1.DevServer{
+				{Id: "busy", Host: "a", HealthStatus: "healthy", Platform: "darwin", Arch: "arm64", NodeVersion: "v22.1.0", ActiveExecutions: 2},
+				{Id: "idle", Host: "b"},
+				{Id: "gone", Host: "c", ActiveExecutions: 1},
+			}}, nil
+		},
+		isDevServerConnectedFunc: func(ctx context.Context, in *infrafleetv1.IsDevServerConnectedRequest) (*infrafleetv1.IsDevServerConnectedResponse, error) {
+			return &infrafleetv1.IsDevServerConnectedResponse{Connected: in.GetDevServerId() != "gone"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerDevServerChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "devServer.list", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	views := result.([]devServerView)
+	busy, idle, gone := views[0], views[1], views[2]
+	if !busy.Busy || busy.ActiveExecutions != 2 || busy.Status != "connected" {
+		t.Errorf("busy: %+v", busy)
+	}
+	if busy.Platform == nil || *busy.Platform != "darwin" || busy.Arch == nil || *busy.Arch != "arm64" || busy.NodeVersion == nil || *busy.NodeVersion != "v22.1.0" || busy.HealthStatus != "healthy" {
+		t.Errorf("handshake facts: %+v", busy)
+	}
+	if idle.Busy || idle.ActiveExecutions != 0 || idle.Platform != nil {
+		t.Errorf("idle with unknown facts stays null: %+v", idle)
+	}
+	if gone.Busy || gone.ActiveExecutions != 0 || gone.Status != "disconnected" {
+		t.Errorf("a disconnected dev server is not busy: %+v", gone)
+	}
+}

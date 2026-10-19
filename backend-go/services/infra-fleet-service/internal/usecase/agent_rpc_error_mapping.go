@@ -12,6 +12,9 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
+// agentPathNotFoundCode is AgentErrorCode.PathNotFound of the agent's wire protocol (agent/src/shared/agent-wire-protocol.ts).
+const agentPathNotFoundCode = -33003
+
 var allowedAgentErrorCodes = map[string]apperrors.Kind{
 	"CODEINTEL_TOOL_UNAVAILABLE":    apperrors.KindFailedPrecondition,
 	"CODEINTEL_INDEX_MISSING":       apperrors.KindFailedPrecondition,
@@ -32,9 +35,63 @@ var allowedAgentErrorCodes = map[string]apperrors.Kind{
 	"CODEINTEL_TOOL_FAILED":         apperrors.KindInternal,
 }
 
-// MapAgentExecError maps errors from Client.Exec for codeintel.* and quality.* methods
-// into domain/apperrors taxonomy per contract §3.4.
+// aiCompleteReasons maps the agent's ai.complete error.data.reason to a typed error the caller can act on:
+// "log in on the dev server" and "quota exhausted" need different fixes than "try again".
+var aiCompleteReasons = map[string]struct {
+	kind apperrors.Kind
+	code string
+}{
+	"NO_API_KEY":             {apperrors.KindFailedPrecondition, "AI_COMPLETE_NOT_CONFIGURED"},
+	"CLI_NOT_LOGGED_IN":      {apperrors.KindFailedPrecondition, "AI_COMPLETE_CLI_NOT_LOGGED_IN"},
+	"CLI_SESSION_EXPIRED":    {apperrors.KindFailedPrecondition, "AI_COMPLETE_SESSION_EXPIRED"},
+	"CLI_UNAVAILABLE":        {apperrors.KindFailedPrecondition, "AI_COMPLETE_CLI_UNAVAILABLE"},
+	"CLI_QUOTA_EXHAUSTED":    {apperrors.KindResourceExhausted, "AI_COMPLETE_QUOTA_EXHAUSTED"},
+	"CLI_BUSY":               {apperrors.KindUnavailable, "AI_COMPLETE_BUSY"},
+	"CLI_FAILED":             {apperrors.KindInternal, "AI_COMPLETE_FAILED"},
+	"PROVIDER_TIMEOUT":       {apperrors.KindDeadlineExceeded, "AI_COMPLETE_TIMEOUT"},
+	"PROVIDER_NETWORK":       {apperrors.KindUnavailable, "AI_COMPLETE_PROVIDER_UNAVAILABLE"},
+	"PROVIDER_HTTP_ERROR":    {apperrors.KindUnavailable, "AI_COMPLETE_PROVIDER_UNAVAILABLE"},
+	"UNKNOWN_MODEL_PROVIDER": {apperrors.KindInvalidArgument, "AI_COMPLETE_UNKNOWN_MODEL"},
+}
+
+func mapAIExecError(err error) error {
+	var rpcErr *domain.AgentRPCError
+	if errors.As(err, &rpcErr) {
+		var payload struct {
+			Reason string `json:"reason"`
+		}
+		if len(rpcErr.Data) > 0 && json.Unmarshal(rpcErr.Data, &payload) == nil {
+			if m, ok := aiCompleteReasons[payload.Reason]; ok {
+				return apperrors.New(m.kind, m.code, sanitizeMessage(rpcErr.Message, 300), err)
+			}
+		}
+	}
+	if errors.Is(err, domain.ErrAgentMethodNotFound) {
+		return apperrors.New(apperrors.KindFailedPrecondition, "AI_COMPLETE_UNSUPPORTED", "this dev server agent does not support ai.complete", err)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return apperrors.New(apperrors.KindDeadlineExceeded, "AI_COMPLETE_TIMEOUT", "ai.complete timed out", err)
+	}
+	return apperrors.New(apperrors.KindInternal, "INFRA_AGENT_EXEC_FAILED", "failed to relay to dev server agent", err)
+}
+
+// MapAgentExecError maps errors from Client.Exec into domain/apperrors taxonomy: codeintel.* and quality.* per
+// contract §3.4, and ai.complete by its structured reason.
 func MapAgentExecError(method string, err error) error {
+	if method == "ai.complete" {
+		return mapAIExecError(err)
+	}
+	if strings.Contains(err.Error(), "connection lost") {
+		// The agent's socket dropped while the call was waiting: the peer is gone for now, not broken, so callers may retry.
+		return apperrors.New(apperrors.KindUnavailable, "INFRA_AGENT_CONNECTION_LOST", "the dev server agent connection dropped during the call", err)
+	}
+	if strings.HasPrefix(method, "fs.") {
+		var rpcErr *domain.AgentRPCError
+		if errors.As(err, &rpcErr) && rpcErr.Code == agentPathNotFoundCode {
+			// A missing path is an answer, not a relay failure: callers such as git-gateway's StatFile turn it into exists=false.
+			return apperrors.New(apperrors.KindNotFound, "INFRA_AGENT_PATH_NOT_FOUND", "path not found on the dev server", err)
+		}
+	}
 	if !strings.HasPrefix(method, "codeintel.") && !strings.HasPrefix(method, "quality.") {
 		return apperrors.New(apperrors.KindInternal, "INFRA_AGENT_EXEC_FAILED", "failed to relay to dev server agent", err)
 	}

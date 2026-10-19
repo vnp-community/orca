@@ -164,7 +164,7 @@ func (f fakeRuns) StartRun(ctx context.Context, run domain.AnalysisRun, draft do
 			return StartRunResult{Run: r}, nil
 		}
 	}
-	if run.Mode == domain.AnalysisModeAgentReadonly && opts.MaxAgentRuns > 0 {
+	if run.Mode.IsAgent() && opts.MaxAgentRuns > 0 {
 		n, _ := f.CountRunning(ctx, run.ProjectID, domain.AnalysisModeAgentReadonly)
 		if n >= opts.MaxAgentRuns {
 			return StartRunResult{}, domain.ErrAnalysisBusy()
@@ -173,7 +173,9 @@ func (f fakeRuns) StartRun(ctx context.Context, run domain.AnalysisRun, draft do
 	exp := f.w.now.Add(opts.LeaseTTL)
 	run.LeaseExpiresAt = &exp
 	f.w.runs[run.ID] = run
-	f.w.solutions[draft.ID] = draft
+	if draft.ID != "" { // plan runs have no draft Solution
+		f.w.solutions[draft.ID] = draft
+	}
 	return StartRunResult{Run: run, Created: true}, nil
 }
 

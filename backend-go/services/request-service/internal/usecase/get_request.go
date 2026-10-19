@@ -9,7 +9,14 @@ import (
 )
 
 type GetRequest struct {
-	repo RequestRepository
+	repo   RequestRepository
+	engine *RequestEngineResolver
+}
+
+// WithEngine makes the answer carry the engine the Request runs on.
+func (uc *GetRequest) WithEngine(r *RequestEngineResolver) *GetRequest {
+	uc.engine = r
+	return uc
 }
 
 func NewGetRequest(repo RequestRepository) *GetRequest {
@@ -24,5 +31,11 @@ func (uc *GetRequest) Execute(ctx context.Context, id string) (domain.Request, e
 	if _, err := uuid.Parse(id); err != nil {
 		return domain.Request{}, domain.ErrRequestNotFound(id)
 	}
-	return uc.repo.Get(ctx, id)
+	req, err := uc.repo.Get(ctx, id)
+	if err != nil {
+		return domain.Request{}, err
+	}
+	one := []domain.Request{req}
+	uc.engine.Annotate(ctx, one)
+	return one[0], nil
 }

@@ -26,9 +26,11 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
-// HealthDegradedSubject is the outbox subject/event type
-// infra-fleet-service.md §7 documents for this event.
-const HealthDegradedSubject = "dev_server.health_degraded"
+// HealthDegradedSubject is the outbox subject of the event infra-fleet-service.md §7
+// documents as dev_server.health_degraded. It must sit under the INFRAFLEET stream's
+// orca.infrafleet.> filter: a bare subject matches no stream, so JetStream never acks it and
+// the relay retries the row forever.
+const HealthDegradedSubject = "orca.infrafleet.dev_server.health_degraded"
 
 // OutboxEnqueuer is the narrow port this package needs — declared here
 // (consumer-side), not in adapter/postgres, per this codebase's existing

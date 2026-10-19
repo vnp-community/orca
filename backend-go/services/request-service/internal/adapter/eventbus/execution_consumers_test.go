@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
@@ -181,5 +182,29 @@ func TestApprovalDecidedConsumer_OnlyApprovedPreDeployResumes(t *testing.T) {
 	send("pre_deploy", "approved")
 	if len(r.calls) != 1 || r.calls[0] != "req-1/pre_deploy" {
 		t.Fatalf("got %v", r.calls)
+	}
+}
+
+// A permanent failure must not spin the bus: the bus NAKs without delay, and the reconcile loop retries at its own pace.
+func TestRequestStatusConsumer_PermanentFailureIsAckedTransientIsRedelivered(t *testing.T) {
+	s := &recordingStarter{}
+	c := &RequestStatusConsumer{starter: s}
+	for _, err := range []error{
+		apperrors.New(apperrors.KindPermissionDenied, "REQUEST_EXECUTE_FORBIDDEN", "no", nil),
+		apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_PHASE_NOT_IN_PLAN", "no", nil),
+	} {
+		s.err = err
+		if got := c.Handle(context.Background(), executionStatusEvent("executing")); got != nil {
+			t.Errorf("%v: a failure a retry cannot fix is acked, got %v", err, got)
+		}
+	}
+	for _, err := range []error{
+		apperrors.New(apperrors.KindUnavailable, "REQUEST_EXECUTION_TASK_SERVICE_UNAVAILABLE", "down", nil),
+		context.DeadlineExceeded,
+	} {
+		s.err = err
+		if got := c.Handle(context.Background(), executionStatusEvent("executing")); got == nil {
+			t.Errorf("%v: a transient failure must be redelivered", err)
+		}
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
+	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
@@ -52,6 +53,10 @@ func (r *resolver) Resolve(ctx context.Context, tenantID, target string) (string
 	// path — this outbound hop must forward it explicitly, never trust
 	// callee-side re-derivation.
 	ctx = metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataTenantID, tenantID)
+	// GetProject is membership-gated (PROJECT_NO_USER otherwise), so forward the acting user when the execution carries one.
+	if userID, ok := tenant.UserID(ctx); ok && userID != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataUserID, userID)
+	}
 
 	switch {
 	case target == "":

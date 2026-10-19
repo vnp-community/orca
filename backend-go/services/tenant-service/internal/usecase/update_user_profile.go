@@ -76,7 +76,7 @@ func (uc *UpdateUserProfile) Execute(ctx context.Context, in UpdateUserProfileIn
 		return domain.UserProfile{}, apperrors.New(apperrors.KindInvalidArgument, "TENANT_INVALID_PROFILE", err.Error(), err)
 	}
 	if err := uc.profiles.Upsert(ctx, profile); err != nil {
-		return domain.UserProfile{}, apperrors.New(apperrors.KindInternal, "TENANT_UPDATE_PROFILE_FAILED", "failed to persist user profile", err)
+		return domain.UserProfile{}, userWriteError(err, "TENANT_UPDATE_PROFILE_FAILED", "failed to persist user profile")
 	}
 
 	if uc.cache != nil {

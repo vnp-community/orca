@@ -6,10 +6,11 @@ import { HEADER_SIZE } from 'orca-dev-agent-transport'
 import type { AgentConfig } from '../agent-config'
 import type { ToolDefinition } from '../agent-tool-registry'
 import type { AgentLogger } from '../agent-logger'
+import type WebSocket from 'ws'
 
 // ─── MockWs ──────────────────────────────────────────────────────────────────
 class MockWs extends EventEmitter {
-  readyState = 1  // WebSocket.OPEN
+  readyState = 1 // WebSocket.OPEN
   send = vi.fn()
   close = vi.fn()
   // ping/terminate: the liveness monitor (startRemoteRuntimeSocketLiveness)
@@ -22,24 +23,32 @@ class MockWs extends EventEmitter {
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 function buildFrame(payloadObj: object): Buffer {
   const payload = Buffer.from(JSON.stringify(payloadObj), 'utf8')
-  const header  = Buffer.allocUnsafe(HEADER_SIZE)
-  header.writeUInt8(1, 0)               // TYPE Regular
-  header.writeUInt32BE(1, 1)            // SEQ=1
-  header.writeUInt32BE(0, 5)            // ACK=0
+  const header = Buffer.allocUnsafe(HEADER_SIZE)
+  header.writeUInt8(1, 0) // TYPE Regular
+  header.writeUInt32BE(1, 1) // SEQ=1
+  header.writeUInt32BE(0, 5) // ACK=0
   header.writeUInt32BE(payload.length, 9)
   return Buffer.concat([header, payload])
 }
 
 function buildKeepaliveFrame(): Buffer {
   const header = Buffer.allocUnsafe(HEADER_SIZE)
-  header.writeUInt8(9, 0)   // TYPE KeepAlive
+  header.writeUInt8(9, 0) // TYPE KeepAlive
   header.writeUInt32BE(5, 1)
   header.writeUInt32BE(0, 5)
   header.writeUInt32BE(0, 9)
   return header
 }
 
-function extractJson(ws: MockWs, callIndex = 0): Record<string, unknown> {
+// Why: tests read arbitrary params fields; a params record avoids `any` without per-call casts.
+type ExtractedRpc = {
+  jsonrpc?: string
+  id?: unknown
+  method?: string
+  params: Record<string, unknown>
+  [key: string]: unknown
+}
+function extractJson(ws: MockWs, callIndex = 0): ExtractedRpc {
   const buf = ws.send.mock.calls[callIndex]![0] as Buffer
   return JSON.parse(buf.subarray(HEADER_SIZE).toString('utf8'))
 }
@@ -56,7 +65,7 @@ const mockConfig: AgentConfig = {
   toolPath: '/usr/bin',
   toolEnv: {},
   credentialDir: '/tmp/.creds',
-  tlsRejectUnauthorized: true,
+  tlsRejectUnauthorized: true
 }
 
 const mockTool: ToolDefinition = {
@@ -64,7 +73,9 @@ const mockTool: ToolDefinition = {
   binary: null,
   description: 'Test tool',
   inputSchema: { type: 'object', properties: {} },
-  async handler() { return { stdout: 'ok', stderr: '', exitCode: 0 } },
+  async handler() {
+    return { stdout: 'ok', stderr: '', exitCode: 0 }
+  }
 }
 
 const mockLog: AgentLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
@@ -72,12 +83,20 @@ const mockLog: AgentLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), deb
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 /** Pre-built capabilities for tests — avoids async git/pty checks in most tests */
-const MOCK_CAPS = ['fs', 'git', 'preflight', 'ai.providers', 'agent.spawn', 'worktrees', 'pty'] as const
+const MOCK_CAPS = [
+  'fs',
+  'git',
+  'preflight',
+  'ai.providers',
+  'agent.spawn',
+  'worktrees',
+  'pty'
+] as const
 
 /** Create session with pre-built capabilities (sync handshake path — no git/pty I/O) */
 function createTestSession(
   cfg: AgentConfig = mockConfig,
-  tools: typeof mockTool[] = [],
+  tools: (typeof mockTool)[] = [],
   log: typeof mockLog = mockLog
 ) {
   return createSession(cfg, tools, log, MOCK_CAPS)
@@ -89,57 +108,71 @@ function createTestSession(
  * Only used in tests that explicitly test dynamic capability detection.
  */
 async function waitForHandshake(ws: MockWs): Promise<void> {
-  await vi.waitFor(() => {
-    if (ws.send.mock.calls.length === 0) {
-      throw new Error('waitForHandshake: ws.send not called yet')
-    }
-  }, { timeout: 5000 })
+  await vi.waitFor(
+    () => {
+      if (ws.send.mock.calls.length === 0) {
+        throw new Error('waitForHandshake: ws.send not called yet')
+      }
+    },
+    { timeout: 5000 }
+  )
 }
 
 describe('createSession().start()', () => {
   it('sends handshake immediately when ws.readyState=1 (OPEN)', () => {
     const ws = new MockWs()
-    createTestSession(mockConfig, [mockTool]).start(ws as any)
+    createTestSession(mockConfig, [mockTool]).start(ws as unknown as WebSocket)
     expect(ws.send).toHaveBeenCalledOnce()
     const rpc = extractJson(ws, 0)
     expect(rpc.method).toBe('agent.handshake')
   })
 
+  // The backend shows these on the dev server card; they were null for WebSocket-connected servers.
+  it('handshake reports the host platform, arch and node version', () => {
+    const ws = new MockWs()
+    createTestSession(mockConfig, [mockTool]).start(ws as unknown as WebSocket)
+    const params = extractJson(ws, 0).params
+    expect(params.platform).toBe(process.platform)
+    expect(params.arch).toBe(process.arch)
+    expect(params.nodeVersion).toBe(process.version)
+    expect(params.nodeVersion).toMatch(/^v\d+\./)
+  })
+
   it('handshake jsonrpc version is "2.0"', () => {
     const ws = new MockWs()
-    createTestSession(mockConfig, [mockTool]).start(ws as any)
+    createTestSession(mockConfig, [mockTool]).start(ws as unknown as WebSocket)
     expect(extractJson(ws, 0).jsonrpc).toBe('2.0')
   })
 
   it('handshake params include devServerId', () => {
     const ws = new MockWs()
-    createTestSession(mockConfig, [mockTool]).start(ws as any)
-    expect((extractJson(ws, 0).params as any).devServerId).toBe('test-server')
+    createTestSession(mockConfig, [mockTool]).start(ws as unknown as WebSocket)
+    expect(extractJson(ws, 0).params.devServerId).toBe('test-server')
   })
 
   it('handshake params include tools list', () => {
     const ws = new MockWs()
-    createTestSession(mockConfig, [mockTool]).start(ws as any)
-    expect((extractJson(ws, 0).params as any).tools).toContain('tool1')
+    createTestSession(mockConfig, [mockTool]).start(ws as unknown as WebSocket)
+    expect(extractJson(ws, 0).params.tools).toContain('tool1')
   })
 
   it('handshake params include agentToken when non-empty', () => {
     const ws = new MockWs()
-    createTestSession(mockConfig).start(ws as any)
-    expect((extractJson(ws, 0).params as any).agentToken).toBe('tok-test')
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
+    expect(extractJson(ws, 0).params.agentToken).toBe('tok-test')
   })
 
   it('handshake does NOT include agentToken when empty string', () => {
     const ws = new MockWs()
     const cfg = { ...mockConfig, agentToken: '' }
-    createTestSession(cfg).start(ws as any)
-    expect((extractJson(ws, 0).params as any).agentToken).toBeUndefined()
+    createTestSession(cfg).start(ws as unknown as WebSocket)
+    expect(extractJson(ws, 0).params.agentToken).toBeUndefined()
   })
 
   it('waits for open event when ws.readyState != 1', () => {
     const ws = new MockWs()
-    ws.readyState = 0  // CONNECTING
-    createTestSession(mockConfig).start(ws as any)
+    ws.readyState = 0 // CONNECTING
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
     expect(ws.send).not.toHaveBeenCalled()
     ws.readyState = 1
     ws.emit('open')
@@ -148,8 +181,8 @@ describe('createSession().start()', () => {
 
   it('handshake params include capabilities array', () => {
     const ws = new MockWs()
-    createTestSession(mockConfig).start(ws as any)
-    const caps = (extractJson(ws, 0).params as any).capabilities
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
+    const caps = extractJson(ws, 0).params.capabilities
     expect(Array.isArray(caps)).toBe(true)
     expect(caps).toContain('fs')
     expect(caps).toContain('preflight')
@@ -159,9 +192,9 @@ describe('createSession().start()', () => {
   it('dynamic buildCapabilities runs when no prebuilt caps provided', async () => {
     const ws = new MockWs()
     // No MOCK_CAPS — triggers real async buildCapabilities()
-    createSession(mockConfig, [], mockLog).start(ws as any)
+    createSession(mockConfig, [], mockLog).start(ws as unknown as WebSocket)
     await waitForHandshake(ws)
-    const caps = (extractJson(ws, 0).params as any).capabilities
+    const caps = extractJson(ws, 0).params.capabilities
     expect(Array.isArray(caps)).toBe(true)
     expect(caps).toContain('fs')
   })
@@ -175,22 +208,22 @@ describe('keepalive', () => {
     const ws = new MockWs()
     // createTestSession uses MOCK_CAPS → sync handshake path (no I/O)
     // doHandshake() uses .then() → drain microtask queue with await Promise.resolve()
-    createTestSession(mockConfig).start(ws as any)
-    await Promise.resolve()  // drain .then() chain so startKeepalive is registered
-    ws.send.mockClear()  // clear handshake
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
+    await Promise.resolve() // drain .then() chain so startKeepalive is registered
+    ws.send.mockClear() // clear handshake
 
     vi.advanceTimersByTime(5001)
 
     expect(ws.send).toHaveBeenCalledOnce()
     const frame = ws.send.mock.calls[0]![0] as Buffer
-    expect(frame.readUInt8(0)).toBe(9)   // TYPE_KEEPALIVE
+    expect(frame.readUInt8(0)).toBe(9) // TYPE_KEEPALIVE
     expect(frame.length).toBe(HEADER_SIZE)
   })
 
   it('sends multiple keepalives over 10s', async () => {
     const ws = new MockWs()
-    createTestSession(mockConfig).start(ws as any)
-    await Promise.resolve()  // drain microtask queue
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
+    await Promise.resolve() // drain microtask queue
     ws.send.mockClear()
     vi.advanceTimersByTime(10001)
     expect(ws.send.mock.calls.length).toBeGreaterThanOrEqual(2)
@@ -199,8 +232,8 @@ describe('keepalive', () => {
   it('stop() prevents further keepalive sends', async () => {
     const ws = new MockWs()
     const session = createTestSession(mockConfig)
-    session.start(ws as any)
-    await Promise.resolve()  // drain microtask queue
+    session.start(ws as unknown as WebSocket)
+    await Promise.resolve() // drain microtask queue
     session.stop()
     ws.send.mockClear()
     vi.advanceTimersByTime(10000)
@@ -220,8 +253,8 @@ describe('liveness monitor (AGENT_TIMEOUT_MS enforcement, terminate() not close(
 
   it('terminates the connection after 20s with no frames/pings/pongs received', async () => {
     const ws = new MockWs()
-    createTestSession(mockConfig).start(ws as any)
-    await Promise.resolve()  // drain microtask queue
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
+    await Promise.resolve() // drain microtask queue
     ws.terminate.mockClear()
 
     // Liveness monitor checks every 5s (AGENT_KEEPALIVE_INTERVAL_MS) —
@@ -237,7 +270,7 @@ describe('liveness monitor (AGENT_TIMEOUT_MS enforcement, terminate() not close(
     // closing handshake), which is exactly why three production agents
     // never recovered for hours under the old close()-based watchdog.
     const ws = new MockWs()
-    createTestSession(mockConfig).start(ws as any)
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
     await Promise.resolve()
     ws.close.mockClear()
 
@@ -248,7 +281,7 @@ describe('liveness monitor (AGENT_TIMEOUT_MS enforcement, terminate() not close(
 
   it('pings the socket on a 5s cadence', async () => {
     const ws = new MockWs()
-    createTestSession(mockConfig).start(ws as any)
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
     await Promise.resolve()
     ws.ping.mockClear()
 
@@ -259,8 +292,8 @@ describe('liveness monitor (AGENT_TIMEOUT_MS enforcement, terminate() not close(
 
   it('does not terminate while frames keep arriving', async () => {
     const ws = new MockWs()
-    createTestSession(mockConfig).start(ws as any)
-    await Promise.resolve()  // drain microtask queue
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
+    await Promise.resolve() // drain microtask queue
     ws.terminate.mockClear()
 
     // Simulate the peer's own keepalive arriving every 5s, well under the
@@ -275,7 +308,7 @@ describe('liveness monitor (AGENT_TIMEOUT_MS enforcement, terminate() not close(
 
   it('does not terminate while pong frames keep arriving with no data frames at all', async () => {
     const ws = new MockWs()
-    createTestSession(mockConfig).start(ws as any)
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
     await Promise.resolve()
 
     // No message frames at all — only RFC 6455 pong replies to our own
@@ -291,10 +324,10 @@ describe('liveness monitor (AGENT_TIMEOUT_MS enforcement, terminate() not close(
 
   it('does not terminate an already-idle connection once ws is no longer OPEN', async () => {
     const ws = new MockWs()
-    createTestSession(mockConfig).start(ws as any)
-    await Promise.resolve()  // drain microtask queue
+    createTestSession(mockConfig).start(ws as unknown as WebSocket)
+    await Promise.resolve() // drain microtask queue
     ws.terminate.mockClear()
-    ws.readyState = 3  // WebSocket.CLOSED
+    ws.readyState = 3 // WebSocket.CLOSED
 
     vi.advanceTimersByTime(25001)
 
@@ -308,22 +341,32 @@ describe('message handling — handshake phase', () => {
     const session = createSession(mockConfig, [], mockLog)
     const cb = vi.fn()
     session.onHandshakeOk(cb)
-    session.start(ws as any)
+    session.start(ws as unknown as WebSocket)
 
-    ws.emit('message', buildFrame({ jsonrpc: '2.0', id: 1, result: { ok: true, sessionId: 's1', orcaVersion: '1.0' } }))
+    ws.emit(
+      'message',
+      buildFrame({
+        jsonrpc: '2.0',
+        id: 1,
+        result: { ok: true, sessionId: 's1', orcaVersion: '1.0' }
+      })
+    )
     expect(cb).toHaveBeenCalledOnce()
   })
 
   it('calls ws.close(1008) on handshake error', () => {
     const ws = new MockWs()
-    createSession(mockConfig, [], mockLog).start(ws as any)
-    ws.emit('message', buildFrame({ jsonrpc: '2.0', id: 1, error: { code: -33101, message: 'AuthFailed' } }))
+    createSession(mockConfig, [], mockLog).start(ws as unknown as WebSocket)
+    ws.emit(
+      'message',
+      buildFrame({ jsonrpc: '2.0', id: 1, error: { code: -33101, message: 'AuthFailed' } })
+    )
     expect(ws.close).toHaveBeenCalledWith(1008, expect.any(String))
   })
 
   it('ignores non-Buffer message data', () => {
     const ws = new MockWs()
-    createSession(mockConfig, [], mockLog).start(ws as any)
+    createSession(mockConfig, [], mockLog).start(ws as unknown as WebSocket)
     ws.send.mockClear()
     ws.emit('message', 'text data')
     expect(ws.send).not.toHaveBeenCalled()
@@ -333,14 +376,14 @@ describe('message handling — handshake phase', () => {
 describe('KeepAlive frame response', () => {
   it('responds to KeepAlive frame with a keepalive frame', () => {
     const ws = new MockWs()
-    createSession(mockConfig, [], mockLog).start(ws as any)
+    createSession(mockConfig, [], mockLog).start(ws as unknown as WebSocket)
     ws.send.mockClear()
 
     ws.emit('message', buildKeepaliveFrame())
 
     expect(ws.send).toHaveBeenCalledOnce()
     const resp = ws.send.mock.calls[0]![0] as Buffer
-    expect(resp.readUInt8(0)).toBe(9)  // KeepAlive type
+    expect(resp.readUInt8(0)).toBe(9) // KeepAlive type
     expect(resp.length).toBe(HEADER_SIZE)
   })
 })
@@ -353,7 +396,7 @@ describe('onHandshakeOk', () => {
     const cb2 = vi.fn()
     session.onHandshakeOk(cb1)
     session.onHandshakeOk(cb2)
-    session.start(ws as any)
+    session.start(ws as unknown as WebSocket)
 
     ws.emit('message', buildFrame({ jsonrpc: '2.0', id: 1, result: { ok: true } }))
     expect(cb1).toHaveBeenCalledOnce()

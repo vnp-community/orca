@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -21,7 +22,7 @@ func NewGetWorktree(repo WorktreeRepository) *GetWorktree {
 func (uc *GetWorktree) Execute(ctx context.Context, worktreeID string) (domain.Worktree, error) {
 	wt, err := uc.repo.GetWorktree(ctx, worktreeID)
 	if err != nil {
-		if err == domain.ErrWorktreeNotFound {
+		if errors.Is(err, domain.ErrWorktreeNotFound) {
 			return domain.Worktree{}, apperrors.New(apperrors.KindNotFound, "PROJECT_WORKTREE_NOT_FOUND", "worktree not found", err)
 		}
 		return domain.Worktree{}, apperrors.New(apperrors.KindInternal, "PROJECT_GET_WORKTREE_FAILED", "failed to fetch worktree", err)

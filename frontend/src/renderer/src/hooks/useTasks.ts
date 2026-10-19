@@ -4,6 +4,10 @@ import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-c
 import type { OrcaTask } from '../../../shared/task-types'
 import { normalizeTask } from '../../../shared/task-status-normalization'
 import { hidePlanningTasks, isPlanningTask } from '../../../shared/task-hierarchy'
+import { classifyRequestRpcError, type RequestRpcErrorKind } from '../../../shared/request-errors'
+
+/** Why the project's task list could not be loaded; `code` is the backend code to quote to operators. */
+export type TaskLoadError = { kind: RequestRpcErrorKind; code: string }
 
 export function useTasks(projectId: string) {
   // Use Option B: flat filter since store doesn't have tasksByProject index yet.
@@ -28,6 +32,9 @@ export function useTasks(projectId: string) {
   // Plan/Phase nodes are structure, not work: hidden from Tree/Board/DAG unless toggled on.
   const [showPlanningTasks, setShowPlanningTasks] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  // Why: "no tasks" and "could not load" must look different, and neither may show before the first load ends.
+  const [loadError, setLoadError] = useState<TaskLoadError | null>(null)
+  const [loaded, setLoaded] = useState(false)
   // FE-TASK-001 (task-graph v4): bumped by refetch() to force the fetch effect below to
   // re-run — there is no other trigger for a manual reload (e.g. right after task.create).
   const [refetchTrigger, setRefetchTrigger] = useState(0)
@@ -55,6 +62,8 @@ export function useTasks(projectId: string) {
     }
     setSelectedIds(new Set())
     setIsLoading(true)
+    setLoadError(null)
+    setLoaded(false)
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
     // Why {tasks, nextPageToken}, not a bare array: the Go handler
     // (channels_automation_task.go's task.list) returns the raw
@@ -72,10 +81,14 @@ export function useTasks(projectId: string) {
           setTasks((response.tasks ?? []).map(normalizeTask))
         }
       })
-      .catch(() => {
-        /* silently fail */
+      .catch((err: unknown) => {
+        const failure = classifyRequestRpcError(err)
+        setLoadError({ kind: failure.kind, code: failure.backendCode ?? failure.code })
       })
-      .finally(() => setIsLoading(false))
+      .finally(() => {
+        setIsLoading(false)
+        setLoaded(true)
+      })
   }, [projectId, setTasks, refetchTrigger])
 
   // Filter + search
@@ -151,6 +164,10 @@ export function useTasks(projectId: string) {
     searchQuery,
     setSearchQuery,
     isLoading,
+    loaded,
+    loadError,
+    /** Every task of the project before search/status/planning filters. */
+    totalTaskCount: allTasks.length,
     refetch,
     dagView: null, // future: DAG graph data
     createTask,

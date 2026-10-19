@@ -143,6 +143,10 @@ func (s *memStore) UpdateSolutionEngine(context.Context, string, domain.EngineNa
 	return nil
 }
 
+func (s *memStore) PinSolutionEngineIfUnset(_ context.Context, _ string, name domain.EngineName) (domain.EngineName, error) {
+	return name, nil
+}
+
 func (s *memStore) NextNumber(ctx context.Context) (int64, error) {
 	defer s.lock(ctx)()
 	s.counter++
@@ -371,9 +375,13 @@ type recordingApprovals struct {
 	opened, approved int
 	cancelled        []string
 	active           bool
+	openErr          error // returned by RequestTypeApproval when set
 }
 
 func (a *recordingApprovals) RequestTypeApproval(context.Context, string) error {
+	if a.openErr != nil {
+		return a.openErr
+	}
 	a.opened++
 	return nil
 }

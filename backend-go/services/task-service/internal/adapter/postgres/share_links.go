@@ -2,9 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
 
 // ShareLinkStore implements usecase.ShareLinkRepository against
@@ -47,6 +51,9 @@ func (s *ShareLinkStore) ResolveActive(ctx context.Context, tenantID, tokenHash 
 	`, tenantID, tokenHash)
 	var taskID string
 	if err := row.Scan(&taskID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+			return "", fmt.Errorf("postgres: active share link: %w", domain.ErrShareLinkNotFound)
+		}
 		return "", fmt.Errorf("postgres: resolve active share link: %w", err)
 	}
 	return taskID, nil
@@ -60,11 +67,14 @@ func (s *ShareLinkStore) Revoke(ctx context.Context, tenantID, linkID string) er
 		UPDATE task.task_share_links SET revoked_at = now()
 		WHERE tenant_id = $1 AND id = $2 AND revoked_at IS NULL
 	`, tenantID, linkID)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: share link %s: %w", linkID, domain.ErrShareLinkNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: revoke share link: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: share link %s not found or already revoked", linkID)
+		return fmt.Errorf("postgres: share link %s not found or already revoked: %w", linkID, domain.ErrShareLinkNotFound)
 	}
 	return nil
 }
@@ -76,6 +86,9 @@ func (s *ShareLinkStore) TaskIDFor(ctx context.Context, tenantID, linkID string)
 	row := s.db.QueryRow(ctx, `SELECT task_id FROM task.task_share_links WHERE tenant_id = $1 AND id = $2`, tenantID, linkID)
 	var taskID string
 	if err := row.Scan(&taskID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+			return "", fmt.Errorf("postgres: share link %s: %w", linkID, domain.ErrShareLinkNotFound)
+		}
 		return "", fmt.Errorf("postgres: query share link task id: %w", err)
 	}
 	return taskID, nil

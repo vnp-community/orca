@@ -1,5 +1,13 @@
 # BACKLOG-025: Task Grant modal's list/revoke/share-link — blocked on unbuilt backend RPCs
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟡 NARROWED — chỉ còn wiring + review** · Backlog ship: SHIP-UX-03, SHIP-SEC-10
+>
+> Use case `ListGrants`, `RevokeGrant`, `GenerateShareLink` đã có ở `task-service` (`list_grants.go`, `revoke_grant.go`, `generate_share_link.go`; gRPC `ListGrants`), nhưng wscompat chưa đăng ký `task.listGrants` / `task.revokeGrant` / `task.generateShareLink`. Share link chủ ý chưa expose, chờ security review.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/frontend/crs/v4/task-graph/tasks/FE-TASK-004-task-grant-modal-access-tab.md` (FE-SOL-001, CR-TG-007)
 **Priority:** Low-Medium — the core Access-tab flow (grant a user, see permission badge) works today; only the view/manage-existing-grants part is missing
 **Blocked on:** `BE-SOL-003` (`task-access-control-team-scope-and-sharing`, backend-go, **📋 Proposed**) — `task.listGrants`/`task.revokeGrant`/`task.generateShareLink` don't exist at any layer

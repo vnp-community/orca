@@ -1,0 +1,31 @@
+# Methods a backend service relays to the dev server agent that the agent does not implement, found when the
+# check was introduced (BUG-E2E-004 follow-up). They are real gaps: the feature behind each one fails against a
+# genuine agent. The check only fails on NEW gaps; remove a line when the agent gains the method.
+#
+# method                      called from
+fs.scanNestedRepos            project-service  usecase/scan_nested.go          (import nested repositories)
+git.fetchRef                  git-gateway-service  grpcclient/relay_executor.go
+git.forceDeleteBranch         git-gateway-service  grpcclient/relay_executor.go
+git.merge                     git-gateway-service  grpcclient/relay_executor.go
+git.remoteCommitUrl           git-gateway-service  grpcclient/relay_executor.go
+git.remoteFileUrl             git-gateway-service  grpcclient/relay_executor.go
+
+# Names that look like methods but are notifications or result keys, not calls the agent must answer.
+fs.changed
+pty.data
+pty.exit
+pty.replay
+shell.exec.output
+agent.handshake
+agent.hook
+agent.js
+agent.execOutput
+agent.execPrompt.changes
+agent.execPrompt.output
+agent.execPrompt.readonly
+agent.execPrompt.resultBlock
+agent.execPrompt.workspaceKind
+ai.complete.usage
+ai.budget.set
+ai.egress.set
+git.worktreeAdd

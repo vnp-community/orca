@@ -26,6 +26,10 @@ func (p *RequestPolicy) Warm(ctx context.Context) error {
 	return p.evaluator.Warm(ctx, requestDecisionQuery)
 }
 
+// Ready reports whether the bundle is still loadable. Warm serves the cached rules until the evaluator notices the
+// directory changed, so a bundle removed or broken after startup turns readiness red within its check period.
+func (p *RequestPolicy) Ready(ctx context.Context) error { return p.Warm(ctx) }
+
 // RequestPolicyInput contains the parameters passed to the Rego policy.
 type RequestPolicyInput struct {
 	Action            string `json:"action"`

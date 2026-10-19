@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/tenant-service/internal/domain"
@@ -38,6 +36,9 @@ func (r *UserProfileRepository) Upsert(ctx context.Context, p domain.UserProfile
 			settings_json  = EXCLUDED.settings_json,
 			updated_at     = now()
 	`, p.UserID, p.CompanyID, departmentID, settingsJSON)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: upsert user profile: %w", domain.ErrMalformedUserID)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: upsert user profile: %w", err)
 	}
@@ -58,7 +59,7 @@ func (r *UserProfileRepository) Get(ctx context.Context, companyID, userID strin
 	var departmentID *string
 	var settingsJSON string
 	if err := row.Scan(&p.UserID, &p.CompanyID, &departmentID, &settingsJSON); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.UserProfile{}, false, nil
 		}
 		return domain.UserProfile{}, false, fmt.Errorf("postgres: query user profile: %w", err)
@@ -80,6 +81,9 @@ func (r *UserProfileRepository) ListUserIDsByDepartment(ctx context.Context, com
 		SELECT user_id FROM tenant.user_profiles
 		WHERE company_id = $1 AND department_id = $2
 	`, companyID, departmentID)
+	if isMalformedUUID(err) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query user ids by department: %w", err)
 	}
@@ -93,13 +97,21 @@ func (r *UserProfileRepository) ListUserIDsByDepartment(ctx context.Context, com
 		}
 		out = append(out, uid)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); isMalformedUUID(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *UserProfileRepository) ListUserIDsByCompany(ctx context.Context, companyID string) ([]string, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT user_id FROM tenant.user_profiles WHERE company_id = $1
 	`, companyID)
+	if isMalformedUUID(err) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query user ids by company: %w", err)
 	}
@@ -113,7 +125,12 @@ func (r *UserProfileRepository) ListUserIDsByCompany(ctx context.Context, compan
 		}
 		out = append(out, uid)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); isMalformedUUID(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // GetOnboardingState reads userID's stored onboarding progress. Returns
@@ -128,7 +145,7 @@ func (r *UserProfileRepository) GetOnboardingState(ctx context.Context, companyI
 
 	var stateJSON *string
 	if err := row.Scan(&stateJSON); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return "", false, nil
 		}
 		return "", false, fmt.Errorf("postgres: query onboarding state: %w", err)
@@ -217,7 +234,7 @@ func (r *UserProfileRepository) GetClientStateColumn(ctx context.Context, compan
 
 	var valueJSON *string
 	if err := row.Scan(&valueJSON); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return "", false, nil
 		}
 		return "", false, fmt.Errorf("postgres: query client state column %s: %w", col, err)

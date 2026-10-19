@@ -252,7 +252,10 @@
           "3be0f7df04": "선택한 런타임에서 폴더를 열 수 없습니다.",
           "15cf5319ec": "{{path}}이(가) {{hostName}}에서 확인되었지만 해당 호스트가 사용 가능한 폴더를 보고하지 않았습니다.",
           "2dcd706774": "프로젝트가 다른 프로필에도 있습니다",
-          "presenceProfileOverflow": "{{names}} 외 {{count}}개"
+          "presenceProfileOverflow": "{{names}} 외 {{count}}개",
+          "setupProjectCloneDevServerUnsupported": "개발 서버에 새 저장소를 복제하는 기능은 아직 지원되지 않습니다. 대신 기존 폴더를 추가하세요.",
+          "repoAlreadyAdded": "이미 추가된 프로젝트입니다",
+          "openExistingProject": "프로젝트 열기"
         },
         "settings": {
           "e12dab333b": "서버를 전환하지 못했습니다.",
@@ -525,7 +528,19 @@
           "error": {
             "format": {
               "37cf0bc991": "Orca가 이 워크스페이스에 대해 사용 가능한 기본 참조를 확인할 수 없습니다.",
-              "64555d0014": "기본 브랜치를 찾을 수 없습니다."
+              "64555d0014": "기본 브랜치를 찾을 수 없습니다.",
+              "hostUnbound": {
+                "title": "이 프로젝트는 개발 서버에 할당되지 않았습니다",
+                "message": "이 프로젝트가 있는 개발 서버를 선택한 후 다시 시도하세요."
+              },
+              "hostUnreachable": {
+                "title": "개발 서버가 오프라인입니다",
+                "message": "Orca가 이 프로젝트가 있는 개발 서버에 연결할 수 없습니다. 다시 연결한 후 재시도하세요."
+              },
+              "hostCheckFailed": {
+                "title": "개발 서버를 확인하지 못했습니다",
+                "message": "Orca가 개발 서버가 온라인인지 확인하지 못했습니다. 잠시 후 다시 시도하세요."
+              }
             }
           }
         }
@@ -590,6 +605,22 @@
       },
       "workspaceTabPalette": {
         "reviewTab": "리뷰 탭"
+      },
+      "repoHostBinding": {
+        "hostRequired": "먼저 이 프로젝트의 개발 서버를 선택하세요."
+      },
+      "repoHostRebind": {
+        "activeWorkflows": "개발 서버를 변경하기 전에 이 프로젝트에서 실행 중인 작업을 중지하세요.",
+        "devServerNotFound": "해당 개발 서버가 더 이상 존재하지 않습니다. 다른 서버를 선택하세요.",
+        "forbidden": "이 프로젝트의 개발 서버를 변경할 권한이 없습니다.",
+        "failed": "개발 서버를 변경하지 못했습니다."
+      },
+      "ownProjectRegistration": {
+        "repoAddFailed": "\"{{name}}\" 프로젝트는 만들어졌지만 저장소를 추가하지 못했습니다: {{message}}"
+      },
+      "registeredRepoLookup": {
+        "alreadyInProject": "이 폴더는 이 개발 서버의 \"{{project}}\" 프로젝트에 이미 추가되어 있습니다.",
+        "alreadyAdded": "이 폴더는 이 개발 서버에 이미 추가되어 있습니다."
       }
     },
     "hooks": {
@@ -2295,7 +2326,8 @@
             "767951265d": "작업 트리를 만드는 중에 문제가 발생했습니다.",
             "vmProvisioningTitle": "VM 프로비저닝",
             "cancelProvisioning": "취소",
-            "vmProvisioningLogEmpty": "레시피 출력을 기다리는 중…"
+            "vmProvisioningLogEmpty": "레시피 출력을 기다리는 중…",
+            "chooseHost": "개발 서버 선택"
           }
         }
       },
@@ -2691,7 +2723,8 @@
             "removedBody": "이 워크트리의 SSH 호스트가 제거되어 더 이상 연결할 수 없습니다. 워크트리를 제거하여 정리하세요 — 원격 파일은 그대로 남아 있습니다.",
             "removeWorkspaceButton": "워크트리 제거"
           }
-        }
+        },
+        "cwdFellBack": "이 호스트에서 {{path}} 디렉터리를 찾을 수 없어 홈 디렉터리를 열었습니다."
       },
       "tab": {
         "group": {
@@ -3694,7 +3727,10 @@
           "0adf083af7": "서버 찾아보기",
           "8efa930eb5": "선택한 호스트에서 다른 프로젝트를 추가하세요.",
           "39bd249b3a": "프로젝트 추가",
-          "0f8aba944c": "디렉터리로 이동한 후 선택을 클릭하여 선택합니다."
+          "0f8aba944c": "디렉터리로 이동한 후 선택을 클릭하여 선택합니다.",
+          "projectName": "프로젝트 이름",
+          "projectNamePlaceholder": "기본값은 폴더 이름입니다",
+          "projectNameHint": "선택한 호스트의 이 폴더용으로 새 프로젝트가 만들어집니다."
         },
         "AddRepoStartSteps": {
           "acf895cb42": "Orca를 시작하려면 프로젝트를 추가하세요.",
@@ -3836,7 +3872,11 @@
           "51001182e3": "빈 디렉토리",
           "971d85cc84": "이 호스트에서 프로젝트로 열립니다 · {{value0}}",
           "00c4235c10": "'{{value0}}'과(와) 일치하는 항목이 없습니다.",
-          "largeInputNoMatches": "이 긴 입력과 일치하는 항목 없음"
+          "largeInputNoMatches": "이 긴 입력과 일치하는 항목 없음",
+          "hostReconnecting": "호스트를 다시 연결하는 중입니다. 연결되면 이 폴더가 자동으로 다시 로드됩니다.",
+          "retry": "다시 시도",
+          "truncated": "{{total}}개 중 {{shown}}개 항목을 표시합니다. 입력하여 목록을 좁히세요.",
+          "hostOffline": "호스트가 연결되어 있지 않습니다. 이 선택기는 열린 상태로 유지되며 다시 연결되면 새로 고쳐집니다."
         },
         "RemoveFolderDialog": {
           "4dc5b5065b": "제거",
@@ -4545,7 +4585,8 @@
           "addRemoteHostTooltip": "로그인할 수 있는 시스템의 경우 SSH를 선택하고 Orca 서버의 경우 원격 서버를 선택합니다.",
           "addSshHostDetail": "SSH를 통해 기존 머신을 사용합니다.",
           "addRemoteServerDetail": "다른 컴퓨터에서 실행 중인 Orca와 페어링합니다.",
-          "addRemoteHostDetail": "SSH 호스트 또는 Orca 서버"
+          "addRemoteHostDetail": "SSH 호스트 또는 Orca 서버",
+          "chooseHost": "호스트 선택"
         },
         "sidebarHostOptions": {
           "3e102f111c": "모든 호스트",
@@ -4695,6 +4736,37 @@
           "cancel": "취소",
           "forget": "Orca에서 제거",
           "reconnectAndDelete": "재연결 후 삭제"
+        },
+        "AddRepoHostGateNotice": {
+          "reconnecting": "{{host}}에 다시 연결하는 중입니다. 선택은 유지되며 다시 온라인이 되면 프로젝트 추가를 이어갈 수 있습니다.",
+          "removed": "{{host}}을(를) 더 이상 사용할 수 없습니다. 다른 개발 서버를 선택하세요.",
+          "offline": "{{host}}이(가) 오프라인입니다. 선택은 유지되며 다시 연결되면 프로젝트 추가를 이어갈 수 있습니다. 다른 개발 서버를 선택할 수도 있습니다.",
+          "noHostTitle": "연결된 개발 서버가 없습니다",
+          "noHostBody": "프로젝트는 개발 서버에 있습니다. 개발 서버를 연결한 후 프로젝트를 추가하세요.",
+          "openDevServers": "개발 서버 열기",
+          "chooseHostBody": "이 프로젝트가 있는 개발 서버를 선택하세요. 선택하면 찾아보기와 추가를 사용할 수 있습니다."
+        },
+        "RepoHostBadge": {
+          "noHost": "개발 서버 없음",
+          "inheritedTitle": "{{name}} (프로젝트에서 상속)"
+        },
+        "RepoHostPickerDialog": {
+          "updated": "개발 서버를 업데이트했습니다",
+          "title": "개발 서버 선택",
+          "description": "Orca는 {{project}}의 git을 개발 서버에서 실행합니다. 이 프로젝트가 있는 서버를 선택하세요.",
+          "hostLabel": "개발 서버",
+          "placeholder": "개발 서버 선택",
+          "unavailableHost": "{{name}} ({{status}})",
+          "noConnectedHost": "연결된 개발 서버가 없습니다. 개발 서버를 연결한 후 여기에서 선택하세요.",
+          "openDevServers": "개발 서버 열기",
+          "cancel": "취소",
+          "saving": "저장 중…",
+          "confirm": "이 개발 서버 사용"
+        },
+        "AddRepoDuplicateNotice": {
+          "message": "이 폴더는 이 개발 서버의 \"{{project}}\" 프로젝트에 이미 추가되어 있어 다시 추가하지 않았습니다.",
+          "messageUnknownProject": "이 폴더는 이 개발 서버에 이미 추가되어 있어 다시 추가하지 않았습니다.",
+          "open": "해당 프로젝트 열기"
         }
       },
       "shared": {
@@ -9057,6 +9129,14 @@
         "TerminalInteractionSection": {
           "567633ff50": "Right-click pastes the clipboard into the terminal. Control-click to open the context menu.",
           "c64497148a": "Right-click pastes the clipboard. Control-click opens the context menu."
+        },
+        "RepositoryDevServerHostSection": {
+          "title": "개발 서버",
+          "description": "이 프로젝트가 있는 개발 서버입니다. Orca는 git과 에이전트를 여기에서 실행합니다.",
+          "unbound": "할당된 개발 서버가 없어 Orca가 이 프로젝트에서 git을 실행할 수 없습니다. 하나를 선택하세요.",
+          "unknownStatus": "상태 알 수 없음",
+          "fromProject": "프로젝트에서 상속",
+          "change": "개발 서버 변경"
         }
       },
       "right": {
@@ -12673,10 +12753,10 @@
             "7b3967c12f": "Atlassian API 토큰",
             "3d81bf3ab3": "API 토큰",
             "e91b9a4073": "you@example.com",
-            "2849ddb295": "Atlassian 이메일",
+            "2849ddb295": "이메일 (선택 사항 — Jira Cloud는 API 토큰과 함께 사용하며, Server/Data Center 개인 액세스 토큰은 있어도 없어도 동작합니다)",
             "70fcd360c4": "https://example.atlassian.net",
             "e176f9d0c5": "Jira Cloud 사이트 URL",
-            "d785c42b8b": "Jira Cloud 사이트 URL, Atlassian 이메일, API 토큰을 사용해 이슈를 탐색합니다.",
+            "d785c42b8b": "Jira 사이트 URL(Cloud 또는 Server/Data Center)과 API 토큰 또는 개인 액세스 토큰으로 이슈를 조회하세요.",
             "8388bdea2b": "Jira 사이트 연결"
           }
         }
@@ -12800,7 +12880,19 @@
           "showPlanning": "계획/단계 표시"
         },
         "TaskDetail": {
-          "phaseNotApproved": "이 작업을 실행하기 전에 단계 또는 계획을 승인하세요"
+          "phaseNotApproved": "이 작업을 실행하기 전에 단계 또는 계획을 승인하세요",
+          "openInGit": {
+            "noProject": "Git을 열 수 없습니다. 이 작업이 프로젝트에 연결되어 있지 않습니다",
+            "unknown": "이 작업의 worktree가 더 이상 존재하지 않습니다",
+            "notOnHost": "이 작업의 worktree가 이 호스트에 더 이상 없습니다. 정리되었을 수 있습니다.",
+            "failed": "worktree를 열지 못했습니다: {{message}}"
+          },
+          "dependencies": "의존성",
+          "blockedBy": "차단 원인:",
+          "dependsOn": "의존 대상",
+          "dependsOnProgress": "{{total}}개 중 {{done}}개 완료",
+          "noDependencies": "의존성 없음",
+          "dependenciesFailed": "의존성을 불러오지 못했습니다"
         },
         "TaskDAGView": {
           "status": {
@@ -12815,6 +12907,39 @@
         "TaskBoardView": {
           "backlogMoved": "시작하지 않은 작업은 요청 > 백로그에 있습니다",
           "openBacklog": "백로그 열기"
+        },
+        "TaskLoadStates": {
+          "loading": "작업을 불러오는 중...",
+          "empty": "아직 작업이 없습니다.",
+          "emptyFiltered": "현재 검색 또는 필터와 일치하는 작업이 없습니다.",
+          "emptyPlanningHidden": "계획 및 단계 작업만 있습니다. \"계획/단계 표시\"를 켜면 볼 수 있습니다.",
+          "errorTitle": "작업을 불러오지 못했습니다.",
+          "staleTitle": "작업을 새로 고치지 못했습니다. 마지막으로 불러온 목록을 표시합니다.",
+          "forbidden": "이 프로젝트의 작업에 접근할 권한이 없습니다.",
+          "code": "오류 코드: {{code}}",
+          "retry": "다시 시도"
+        },
+        "agentActivity": {
+          "title": "에이전트 활동",
+          "live": "실시간",
+          "finished": "완료",
+          "idle": "대기 중",
+          "reconnecting": "다시 연결하는 중…",
+          "olderHidden": "이전 활동은 표시되지 않습니다.",
+          "log": "에이전트 활동 로그",
+          "unavailable": "에이전트 실시간 활동을 보려면 연결된 런타임 환경이 필요합니다.",
+          "waiting": "에이전트가 하고 있는 일을 보고하기를 기다리는 중…",
+          "empty": "아직 표시할 내용이 없습니다. 활동은 에이전트가 실행되는 동안 여기에 표시되며 페이지를 새로고침하면 유지되지 않습니다.",
+          "jumpToLatest": "최신으로 이동",
+          "savedElsewhere": "실시간 활동은 페이지를 새로고침하면 유지되지 않습니다. 저장된 출력은 Result 탭에서 확인하세요.",
+          "openResult": "Result 탭 열기"
+        },
+        "dispatch": {
+          "loading": "디스패치 상태를 불러오는 중…",
+          "none": "이 작업에는 아직 오케스트레이션 디스패치가 없습니다(엔진 2로 실행된 적이 없거나 엔진 1에서 직접 실행 중입니다).",
+          "status": "상태:",
+          "assignee": "담당자:",
+          "focusTerminal": "이 디스패치를 실행 중인 터미널로 이동"
         }
       },
       "taskPageEmptyState": {
@@ -13046,6 +13171,9 @@
           "saving": "저장 중…",
           "saved": "Jira 매핑이 업데이트되었습니다",
           "saveFailed": "Jira 매핑을 업데이트하지 못했습니다."
+        },
+        "CreateProjectDialog": {
+          "repoAddFailed": "프로젝트는 만들어졌지만 저장소를 추가하지 못했습니다: {{message}}. 다시 시도하세요."
         }
       },
       "request": {
@@ -13161,16 +13289,37 @@
           "notFound": "이 항목은 더 이상 존재하지 않습니다.",
           "conflict": "다른 사람이 변경했습니다. 새로고침 후 다시 시도하세요.",
           "invalidState": "현재 상태에서는 이 작업을 할 수 없습니다.",
+          "blockingQuestions": "아직 승인할 수 없습니다. 분석에 답변이 필요한 차단 미해결 질문이 있습니다.",
+          "unconfirmedAssumptions": "아직 이 계획을 승인할 수 없습니다. 확인이 필요한 가정에 기록된 답변이 아직 없습니다.",
           "network": "네트워크 오류입니다. 연결을 확인하세요.",
           "unavailable": "요청 서비스를 사용할 수 없습니다. 잠시 후 다시 시도하세요.",
           "rateLimited": "시도가 너무 많습니다. 잠시 후 다시 시도하세요.",
           "validation": "입력 내용을 확인하고 다시 시도하세요.",
           "unknown": "문제가 발생했습니다.",
-          "retry": "다시 시도"
+          "retry": "다시 시도",
+          "unsupported": "이 서버는 아직 이 작업을 지원하지 않습니다.",
+          "expired": "이 항목은 만료되었습니다.",
+          "pending": "아직 준비 중입니다. 잠시 후 다시 시도하세요.",
+          "noDevServer": "이 프로젝트에 연결된 개발 서버가 없습니다. 서버를 연결한 후 다시 시도하세요.",
+          "noAi": "개발 서버에서 AI를 사용할 수 없습니다. AI 설정을 확인하세요.",
+          "featureOff": "이 조직에서는 요청 흐름이 활성화되어 있지 않습니다.",
+          "code": {
+            "rateLimited": "너무 빠르게 요청하고 있습니다. 잠시 기다린 후 다시 시도하세요.",
+            "projectNotFound": "이 프로젝트는 더 이상 존재하지 않습니다.",
+            "aiQuotaExhausted": "개발 서버의 AI 사용 한도를 모두 소진했습니다. 나중에 다시 시도하세요.",
+            "aiBusy": "AI가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요.",
+            "aiTimeout": "AI 응답이 너무 오래 걸렸습니다. 다시 시도하세요.",
+            "aiAgentUnavailable": "연결된 개발 서버가 없어 AI를 실행할 수 없습니다."
+          }
         },
         "AnswerView": {
           "answer": "답변",
-          "citations": "인용"
+          "citations": "인용",
+          "confidence": "신뢰도: {{percent}}%",
+          "assumptions": "가정",
+          "limitations": "한계",
+          "followUp": "권장 후속 작업",
+          "followUpWithType": "{{title}} ({{type}})"
         },
         "DiagnosisView": {
           "rootCause": "근본 원인",
@@ -13224,7 +13373,12 @@
           "analyzing": "AI가 이 요청을 분석하고 있습니다",
           "drafting": "AI가 분석을 작성하고 있습니다",
           "failed": "분석을 생성하지 못했습니다.",
-          "regenerate": "다시 생성"
+          "regenerate": "다시 생성",
+          "errorCode": "오류 코드: {{code}}"
+        },
+        "SolutionStartPrompt": {
+          "description": "이 요청의 분석이 아직 시작되지 않았습니다. 시작하면 검토할 솔루션 옵션을 받을 수 있습니다.",
+          "generate": "솔루션 생성"
         },
         "SolutionOptionCard": {
           "chosen": "선택됨",
@@ -13316,7 +13470,9 @@
             "analysis": "분석",
             "plan": "계획",
             "history": "기록",
-            "related": "관련"
+            "related": "관련",
+            "needsAttention": "확인 필요",
+            "execution": "실행"
           }
         },
         "RequestOverviewTab": {
@@ -13336,16 +13492,30 @@
             "analysis": "분석",
             "plan": "계획",
             "phase": "단계",
-            "execution": "실행"
+            "execution": "실행",
+            "handover": "인계",
+            "taskList": "작업 목록"
           },
           "state": {
             "done": "완료",
             "current": "현재",
             "pending": "대기",
-            "skipped": "중단됨"
+            "skipped": "중단됨",
+            "running": "실행 중",
+            "waiting": "내 응답 대기",
+            "stopped": "중단됨"
           },
           "note": {
             "hotfix": "핫픽스: 빠른 진단, 계획 전 승인 없음."
+          },
+          "caption": {
+            "progressPhases": "단계 {{phase}}/{{phases}} · 작업 {{done}}/{{total}}",
+            "progress": "작업 {{done}}/{{total}}",
+            "stoppedProgress": "작업 {{done}}/{{total}} · 중단됨",
+            "waitingApproval": "승인 대기 중",
+            "waitingYou": "내 응답 대기",
+            "archiving": "보관 중",
+            "handoverFailed": "보관 실패"
           }
         },
         "RequestsTab": {
@@ -13408,7 +13578,8 @@
             "phase": "단계",
             "gates": "승인 게이트 {{count}}개",
             "noGates": "승인 게이트 없음"
-          }
+          },
+          "classifyFailed": "AI가 이 요청을 자동으로 분류하지 못했습니다. 유형을 직접 선택하거나 다시 분류하세요."
         },
         "RequestHistoryTab": {
           "empty": "유형이 아직 변경되지 않았습니다.",
@@ -13486,7 +13657,8 @@
             "notApprover": "이 항목을 승인할 권한이 없습니다.",
             "conflict": "검토하는 동안 내용이 변경되었습니다. 최신 버전을 불러왔으니 다시 검토하세요.",
             "alreadyDecided": "이미 결정되었습니다.",
-            "expired": "이 승인이 만료되었습니다. 최신 버전을 불러왔습니다."
+            "expired": "이 승인이 만료되었습니다. 최신 버전을 불러왔습니다.",
+            "executionNotAllowed": "계획의 실행 권한이 있는 사람만 승인할 수 있습니다. 권한이 있는 사람에게 요청하거나 접근 권한을 신청하세요."
           },
           "PlanGateChips": {
             "plan": "계획",
@@ -13505,7 +13677,8 @@
             "notYet": "아직 계획이 없습니다.",
             "notFound": "계획을 찾을 수 없습니다.",
             "empty": "계획이 비어 있습니다.",
-            "currentStep": "현재 단계: {{step}}"
+            "currentStep": "현재 단계: {{step}}",
+            "notFoundHint": "삭제되었거나 해당 작업에 접근할 권한이 없을 수 있습니다."
           },
           "PlanSummaryHeader": {
             "counts": "{{phases}}개 단계, {{tasks}}개 작업",
@@ -13523,7 +13696,32 @@
           },
           "RequestPlanTab": {
             "reload": "새로고침",
-            "truncated": "작업 목록이 잘렸습니다. 일부 작업이 누락되었을 수 있습니다."
+            "truncated": "작업 목록이 잘렸습니다. 일부 작업이 누락되었을 수 있습니다.",
+            "approvedStrip": "계획이 {{when}} 승인되었습니다. 에이전트가 자동으로 실행합니다.",
+            "followInExecution": "실행 탭에서 보기"
+          },
+          "PlanUnconfirmedAssumptionsNotice": {
+            "ids": "아직 확인되지 않음: {{ids}}"
+          },
+          "PlanApprovalCard": {
+            "steps": "{{count}}개 단계",
+            "tasks": "작업 {{count}}개",
+            "titleTaskList": "한 번 승인하면 에이전트가 {{unit}}을(를) 모두 실행합니다",
+            "title": "한 번 승인하면 에이전트가 {{unit}}을(를) 모두 실행합니다",
+            "stopsWhen": "다음 경우에만 멈추고 물어봅니다:",
+            "needsInfo": "당신만 가진 정보가 필요할 때",
+            "failsTwice": "작업이 계속 실패할 때 — 요청은 백로그로 돌아갑니다",
+            "drift": "변경이 이 계획에서 벗어나 검토가 필요할 때",
+            "preDeploy": "배포 전 승인에 도달할 때",
+            "riskWhole": "위험은 모든 단계를 포함한 계획 전체에 대해 평가됩니다. 승인하기 전에 아래에서 검토하세요.",
+            "approve": "승인하고 실행 시작",
+            "requestChanges": "변경 요청"
+          },
+          "PlanOutline": {
+            "hours": "약 {{hours}}시간 (예상)",
+            "done": "완료",
+            "step": "{{index}}. {{title}}",
+            "taskCount": "작업 {{count}}개"
           }
         },
         "approval": {
@@ -13723,7 +13921,14 @@
             "solution_open_question": "솔루션 미해결 질문",
             "plan_assumption": "계획 가정",
             "task_blocked": "작업 차단됨"
-          }
+          },
+          "loadFailedTitle": "질문을 불러오지 못했습니다",
+          "loadFailedUnsupported": "이 서버는 아직 질문 답변을 지원하지 않습니다. 관리자에게 업데이트를 요청하세요.",
+          "loadFailedCode": "오류 코드: {{code}}",
+          "refresh": "새로고침",
+          "invalidNumber": "숫자가 아닙니다. 숫자만 입력하세요(예: 8 또는 2.5)",
+          "numberHint": "숫자를 입력하세요(예: 8 또는 2.5)",
+          "listHint": "한 줄에 한 항목"
         },
         "decision": {
           "rationaleLabel": "선택 이유",
@@ -13917,7 +14122,261 @@
             "env_defect": "시도 횟수에 포함되지 않습니다",
             "agent_defect": "형식 안내와 함께 한 번 재시도합니다",
             "unknown": "분류되지 않은 실패"
+          },
+          "agentOutput": {
+            "title": "에이전트 출력",
+            "note": "이 실행은 구조화된 결과를 보고하지 않았습니다. 에이전트가 출력한 내용의 끝부분을 표시합니다.",
+            "cut": "마지막 부분만 표시됩니다.",
+            "redacted": "비밀 정보는 숨겨졌습니다."
+          },
+          "ExecutionFailureCard": {
+            "title": "중단됨: “{{task}}”이(가) {{attempts}}/{{max}}회 실패했습니다",
+            "cause": "원인: {{cause}}",
+            "kept": "그 이전 작업은 모두 완료되어 보존됩니다 (작업 {{done}}/{{total}}).",
+            "reopen": "다시 열고 재실행",
+            "log": "마지막 로그 보기",
+            "cancel": "요청 취소"
+          },
+          "ExecutionNeedsYou": {
+            "due": "기한 {{when}}",
+            "preDeploy": "배포 전 승인{{what}}",
+            "phase": "단계 승인{{what}}",
+            "approve": "승인",
+            "reject": "거부",
+            "rejectTitle": "이 승인 거부",
+            "heading": "내 확인 필요",
+            "clarification": "에이전트가 질문이 있습니다",
+            "answer": "답변",
+            "drift": "변경이 계획에서 벗어났습니다{{what}}",
+            "driftHint": "위 배너의 “검토”에서 수락하거나 되돌리세요.",
+            "failedTask": "“{{task}}”이(가) 시도 횟수를 모두 소진했습니다",
+            "viewLog": "마지막 로그 보기"
+          },
+          "ExecutionStepList": {
+            "stepTitle": "단계 {{index}}/{{total}} · {{title}}",
+            "tasksDone": "작업 {{done}}/{{total}} 완료",
+            "empty": "이 계획에는 아직 작업이 없습니다.",
+            "later": "남은 단계 {{count}}개 · 작업 {{tasks}}개"
+          },
+          "ExecutionSummaryStrip": {
+            "running": "실행 중",
+            "needsYou": "내 확인 필요",
+            "stopped": "중단됨",
+            "done": "완료",
+            "progressSteps": "작업 {{done}}/{{total}} · 단계 {{step}}/{{steps}}",
+            "progress": "작업 {{done}}/{{total}}",
+            "elapsed": "{{time}} 동안 실행 중",
+            "stop": "실행 중지",
+            "progressLabel": "실행 진행률"
+          },
+          "ExecutionTab": {
+            "notStarted": "시작되지 않았습니다. 계획 승인을 기다리는 중입니다.",
+            "openPlan": "계획 열기"
+          },
+          "ExecutionTaskRow": {
+            "done": "완료",
+            "runningAttempt": "실행 중 · {{max}}회 중 {{attempt}}회째",
+            "running": "실행 중",
+            "failedAttempts": "{{max}}회 중 {{attempt}}회 실패",
+            "failed": "실패",
+            "blocked": "차단됨",
+            "waiting": "“{{title}}” 대기 중",
+            "queued": "대기열",
+            "log": "로그",
+            "details": "상세",
+            "noCause": "기록된 원인 없음"
+          },
+          "ExecutionTaskSheet": {
+            "title": "작업",
+            "description": "작업 상세"
+          },
+          "HandoverRow": {
+            "nativeDone": "마지막 작업이 끝나면 완료됩니다.",
+            "archiving": "변경 사항을 보관하고 인계를 준비하는 중",
+            "ready": "변경 사항이 보관되어 인계 준비가 끝났습니다",
+            "failed": "{{count}}회 시도 후 보관 실패",
+            "pending": "마지막 작업 후 변경 사항이 보관되고 인계됩니다"
+          },
+          "cause": {
+            "timedOut": "시간 초과",
+            "modelError": "모델 오류",
+            "verifyFailed": "검증 실패",
+            "envDefect": "환경 문제",
+            "specDefect": "작업 명세 문제",
+            "agentError": "에이전트 오류",
+            "needsInfo": "정보 필요",
+            "cancelled": "취소됨",
+            "unknown": "원인 알 수 없음",
+            "adviceTimedOut": "에이전트의 시간이 초과되었습니다. 재실행하면 대개 해결되며, 반복되면 작업을 나누세요.",
+            "adviceModelError": "모델을 사용할 수 없었습니다. 에이전트와 모델 설정을 확인한 뒤 재실행하세요.",
+            "adviceVerifyFailed": "작업이 검사를 통과하지 못했습니다. 로그를 확인한 뒤 재실행하세요.",
+            "adviceEnvDefect": "작업 공간이나 도구에 문제가 있습니다. 환경을 고친 뒤 재실행하세요.",
+            "adviceSpecDefect": "작업 명세가 잘못되었거나 불완전합니다. 재실행 전에 계획을 수정하세요.",
+            "adviceAgentError": "에이전트가 사용할 수 있는 결과 없이 멈췄습니다. 로그를 확인한 뒤 재실행하세요.",
+            "adviceNeedsInfo": "계속하려면 에이전트가 당신의 답변을 필요로 합니다.",
+            "adviceUnknown": "로그에서 무슨 일이 있었는지 확인한 뒤 재실행하세요."
           }
+        },
+        "aiSetup": {
+          "title": {
+            "notConfigured": "개발 서버에 AI가 설정되어 있지 않습니다",
+            "credentialUnavailable": "AI 자격 증명을 읽을 수 없습니다",
+            "sessionExpired": "개발 서버의 Claude Code 세션이 만료되었습니다",
+            "quotaExhausted": "개발 서버의 AI 사용 한도를 모두 소진했습니다",
+            "agentUnavailable": "AI를 실행할 수 있는 개발 서버가 없습니다",
+            "busy": "AI가 사용 중입니다"
+          },
+          "body": {
+            "notConfigured": "개발 서버가 Claude Code에 로그인되어 있지 않습니다. 개발 서버에서 claude auth login 을 실행(또는 에이전트에 API 키를 설정)한 후 다시 시도하세요.",
+            "credentialUnavailable": "개발 서버에 설정된 AI 자격 증명을 확인한 후 다시 시도하세요.",
+            "sessionExpired": "개발 서버에서 claude auth login 으로 다시 로그인한 후 다시 시도하세요.",
+            "quotaExhausted": "개발 서버의 Claude Code에 로그인된 계정의 한도가 남아 있지 않습니다. 초기화될 때까지 기다리거나 계정을 전환하세요.",
+            "agentUnavailable": "이 프로젝트에 개발 서버를 연결하거나 에이전트를 업데이트한 후 다시 시도하세요.",
+            "busy": "개발 서버가 허용된 최대 AI 작업을 이미 실행 중입니다. 잠시 후 다시 시도하세요."
+          },
+          "code": "오류 코드: {{code}}",
+          "retry": "다시 시도",
+          "openSettings": "개발 서버 설정 열기",
+          "askAdmin": "관리자에게 해결을 요청하세요."
+        },
+        "SolutionOpenQuestions": {
+          "title": "미해결 질문",
+          "notice": "아래의 차단 질문마다 답변이 기록될 때까지 승인할 수 없습니다.",
+          "refused": "승인이 거부되었습니다. 다음 차단 질문에 아직 답변이 없습니다: {{ids}}",
+          "blocking": "차단",
+          "nonBlocking": "차단 아님"
+        },
+        "SolutionAskBackDialog": {
+          "ask": "다시 질문",
+          "title": "다시 질문",
+          "description": "차단 질문을 보고자에게 보냅니다. 답변이 오면 솔루션이 다시 생성되며 옵션을 다시 선택합니다.",
+          "reasonDefault": "이 질문에 답변이 있기 전에는 솔루션을 승인할 수 없습니다 ({{id}}): {{text}}",
+          "notAllowed": "지금은 질문할 수 없습니다. 다른 질문 라운드가 열려 있거나 요청이 질문할 수 없는 상태입니다.",
+          "invalid": "질문이 거부되었습니다. 모든 사유가 입력되었고 너무 길지 않은지 확인하세요.",
+          "reasonLabel": "질문하는 이유 ({{id}})",
+          "pickOne": "질문을 하나 이상 선택하세요.",
+          "reasonRequired": "선택한 질문마다 사유가 필요합니다.",
+          "cancel": "취소",
+          "submit": "보고자에게 보내기"
+        },
+        "CreateRequestProjectRepoNote": {
+          "noRepo": "이 프로젝트에는 아직 저장소가 없어 요청을 실행할 수 없습니다. 먼저 프로젝트에 저장소를 추가하세요.",
+          "runsOnWithHost": "요청은 {{host}}의 저장소 {{repo}}({{path}})에서 실행됩니다.",
+          "runsOn": "요청은 저장소 {{repo}}({{path}})에서 실행됩니다.",
+          "firstOfMany": "이 프로젝트의 저장소 {{count}}개 중 첫 번째입니다."
+        },
+        "activity": {
+          "filter": {
+            "approvals": "승인",
+            "tasks": "작업",
+            "clarifications": "확인 요청",
+            "changes": "유형 및 계획 변경",
+            "all": "전체",
+            "actor": {
+              "user": "사용자",
+              "ai": "AI",
+              "agent": "에이전트",
+              "system": "시스템",
+              "any": "모두"
+            },
+            "groupLabel": "종류별 필터",
+            "needsAttention": "확인 필요 항목만",
+            "actorLabel": "수행자별 필터"
+          },
+          "day": {
+            "today": "오늘",
+            "yesterday": "어제",
+            "unknown": "날짜 알 수 없음"
+          },
+          "empty": "아직 활동이 없습니다",
+          "emptyFiltered": "이 필터와 일치하는 활동이 없습니다.",
+          "loadingMore": "불러오는 중…",
+          "loadMore": "더 보기",
+          "type": {
+            "unknown": "미분류"
+          },
+          "task": {
+            "unnamed": "작업"
+          },
+          "actor": {
+            "user": "사용자",
+            "ai": "AI",
+            "agent": "에이전트",
+            "system": "시스템"
+          },
+          "severity": {
+            "error": "중단됨",
+            "attention": "확인 필요"
+          },
+          "cause": {
+            "timedOut": "시간 초과",
+            "modelError": "모델 오류",
+            "verifyFailed": "검증 실패",
+            "envDefect": "환경 문제",
+            "specDefect": "작업 명세 문제",
+            "agentError": "에이전트 오류",
+            "needsInfo": "추가 정보가 필요했음",
+            "cancelled": "취소됨",
+            "unknown": "원인 알 수 없음"
+          },
+          "title": {
+            "requestCreated": "요청이 생성됨",
+            "requestClassified": "{{type}}(으)로 분류됨",
+            "typeChanged": "유형이 {{from}}에서 {{to}}(으)로 변경됨",
+            "analysisGeneratedVersion": "{{kind}} 버전 {{version}} 생성됨",
+            "analysisGenerated": "{{kind}} 생성됨",
+            "clarificationAsked": "확인 요청이 접수됨",
+            "clarificationAnswered": "확인 요청에 답변함",
+            "approvalRequested": "{{subject}} 승인을 요청함",
+            "approvalApproved": "{{subject}}이(가) 승인됨",
+            "approvalRejected": "{{subject}}이(가) 거부됨",
+            "approvalDecided": "{{subject}}에 대한 결정",
+            "phaseStartedAuto": "단계가 자동으로 시작됨",
+            "phaseStarted": "단계 시작됨",
+            "phaseDone": "단계 완료됨",
+            "planDone": "모든 작업 완료",
+            "taskStarted": "{{task}} 시작됨",
+            "taskSucceeded": "{{task}} 완료됨",
+            "taskAccepted": "{{task}} 완료 처리됨",
+            "taskFailed": "{{task}} 실패",
+            "taskCancelled": "{{task}} 취소됨",
+            "requestReturned": "백로그로 반환됨",
+            "requestReopened": "다시 열림",
+            "requestCancelled": "취소됨"
+          },
+          "analysis": {
+            "generic": "분석"
+          },
+          "approval": {
+            "subjectFallback": "항목"
+          },
+          "attemptOf": "{{max}}회 중 {{attempt}}회째 시도",
+          "attempt": "{{attempt}}회째 시도",
+          "detail": {
+            "failure": "{{cause}}: {{error}}"
+          },
+          "openTab": "{{tab}} 열기"
+        },
+        "NextAction": {
+          "failed": "“{{task}}”이(가) {{attempts}}/{{max}}회 실패했습니다",
+          "failedDetail": "요청이 백로그로 돌아갔습니다. 그 이전 작업은 보존됩니다.",
+          "reopen": "다시 열고 재실행",
+          "question": "답변을 기다리는 질문이 있습니다",
+          "answer": "답변",
+          "preDeploy": "배포 전 승인이 대기 중입니다",
+          "drift": "변경이 계획에서 벗어나 검토가 필요합니다",
+          "approval": "승인이 대기 중입니다",
+          "review": "검토",
+          "confirmType": "이 요청의 유형을 확인하세요",
+          "running": "에이전트가 “{{task}}” 작업 중입니다",
+          "runningDetail": "{{max}}회 중 {{attempt}}회째 시도입니다. 지금은 확인할 것이 없습니다.",
+          "nextTask": "다음 작업이 시작되기를 기다리는 중",
+          "classifying": "Orca가 이 요청을 분류하는 중입니다",
+          "analyzing": "Orca가 이 요청을 분석하는 중입니다",
+          "planning": "Orca가 계획을 작성하는 중입니다",
+          "waitingApproval": "누군가의 승인을 기다리는 중",
+          "waitingInfo": "누군가 질문에 답하기를 기다리는 중",
+          "done": "이 요청은 완료되었습니다"
         }
       },
       "reviewMap": {
@@ -15762,6 +16221,12 @@
           "waiveErrConflict": "이 항목이 변경되었습니다. 목록을 새로고침한 뒤 다시 시도하세요.",
           "waiveErrValidation": "면제가 거부되었습니다. 사유와 만료일을 확인하세요.",
           "waiveErrUnknown": "면제를 저장하지 못했습니다."
+        }
+      },
+      "devServer": {
+        "card": {
+          "busy": "사용 중 (실행 {{count}}건)",
+          "idle": "대기 중"
         }
       }
     },

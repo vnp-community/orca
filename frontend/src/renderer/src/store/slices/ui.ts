@@ -805,6 +805,7 @@ export type UISlice = {
     | 'confirm-add-project-from-folder'
     | 'confirm-non-git-folder'
     | 'init-repo-as-git'
+    | 'repo-host-picker'
     | 'confirm-remove-folder'
     | 'add-repo'
     | 'quick-open'

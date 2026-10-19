@@ -86,7 +86,7 @@ func (f *fakeTerminalSessionRepository) Touch(ctx context.Context, tenantID, pty
 	}
 	s, ok := f.byPtyID[ptyID]
 	if !ok || s.TenantID != tenantID {
-		return fmt.Errorf("fake: terminal session %q not found", ptyID)
+		return fmt.Errorf("fake: terminal session %q: %w", ptyID, domain.ErrTerminalSessionNotFound)
 	}
 	s.LastActiveAt = now
 	f.byPtyID[ptyID] = s
@@ -102,7 +102,7 @@ func (f *fakeTerminalSessionRepository) Close(ctx context.Context, tenantID, pty
 	}
 	s, ok := f.byPtyID[ptyID]
 	if !ok || s.TenantID != tenantID {
-		return fmt.Errorf("fake: terminal session %q not found", ptyID)
+		return fmt.Errorf("fake: terminal session %q: %w", ptyID, domain.ErrTerminalSessionNotFound)
 	}
 	t := closedAt
 	s.ClosedAt = &t

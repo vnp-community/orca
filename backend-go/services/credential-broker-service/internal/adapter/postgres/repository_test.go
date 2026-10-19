@@ -92,6 +92,24 @@ func TestRepository_Get_NotFound(t *testing.T) {
 	}
 }
 
+// An id that is not a uuid (SQLSTATE 22P02) names no credential: 404, not a 500.
+func TestRepository_MalformedID_IsNotFound(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	if _, err := repo.Get(ctx, "not-a-uuid"); !errors.Is(err, domain.ErrCredentialNotFound) {
+		t.Errorf("Get: expected ErrCredentialNotFound, got %v", err)
+	}
+	if err := repo.UpdateStatus(ctx, "not-a-uuid", domain.StatusRevoked, time.Now()); !errors.Is(err, domain.ErrCredentialNotFound) {
+		t.Errorf("UpdateStatus: expected ErrCredentialNotFound, got %v", err)
+	}
+	if err := repo.UpdateStatus(ctx, uuid.NewString(), domain.StatusRevoked, time.Now()); !errors.Is(err, domain.ErrCredentialNotFound) {
+		t.Errorf("UpdateStatus unknown: expected ErrCredentialNotFound, got %v", err)
+	}
+	if _, err := repo.GetByOwner(ctx, uuid.NewString(), domain.CategoryAiProviderKey, "not-a-uuid"); !errors.Is(err, domain.ErrCredentialNotFound) {
+		t.Errorf("GetByOwner: expected ErrCredentialNotFound, got %v", err)
+	}
+}
+
 // TestRepository_RunInTx_CommitsBothOnSuccess proves RunInTx's metadata
 // mutation and audit append land together against a real Postgres
 // transaction, per credential-broker-service.md §8.

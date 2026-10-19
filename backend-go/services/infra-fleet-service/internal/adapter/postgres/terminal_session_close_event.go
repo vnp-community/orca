@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -40,8 +41,8 @@ func (s *TerminalSessionStore) CloseWithEvent(ctx context.Context, tenantID, pty
 	} else {
 		var one int
 		err := tx.QueryRow(ctx, `SELECT 1 FROM infra.terminal_sessions WHERE tenant_id = $1 AND pty_id = $2`, tenantID, ptyID).Scan(&one)
-		if err == pgx.ErrNoRows {
-			return false, fmt.Errorf("postgres: terminal session %q not found for tenant", ptyID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, fmt.Errorf("postgres: close terminal session %q for tenant: %w", ptyID, domain.ErrTerminalSessionNotFound)
 		}
 		if err != nil {
 			return false, fmt.Errorf("postgres: check terminal session: %w", err)

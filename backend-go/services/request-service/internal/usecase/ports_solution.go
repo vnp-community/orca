@@ -14,6 +14,10 @@ var ErrProbeUnavailable = errors.New("repository state probe unavailable")
 // ErrAgentReadonlyUnsupported means the dev server's agent refused accessMode=readonly (it would have run in write mode).
 var ErrAgentReadonlyUnsupported = errors.New("agent does not support readonly mode")
 
+// ErrAgentKnowledgeHubUnavailable means the agent refused knowledgeRoot (claude lacks the MCP flags, or the root is not a usable
+// tdd-agent project). The run did not start, so a caller may retry without the knowledge graph.
+var ErrAgentKnowledgeHubUnavailable = errors.New("agent cannot load the knowledge hub")
+
 type SolutionListFilter struct {
 	RequestID string
 	Kind      domain.SolutionKind
@@ -35,7 +39,7 @@ type SolutionStore interface {
 
 type StartRunOptions struct {
 	LeaseTTL time.Duration
-	// MaxAgentRuns caps running agent_readonly runs per project; 0 disables the cap.
+	// MaxAgentRuns caps running agent runs (agent_readonly and agent_proposal together) per project; 0 disables the cap.
 	MaxAgentRuns int
 }
 
@@ -103,6 +107,16 @@ type AgentPromptInput struct {
 	TimeoutMS int
 	// ReadOnlyEnforced asks the agent to enforce read-only (accessMode=readonly); only set after the capability check.
 	ReadOnlyEnforced bool
+	// KnowledgeRoot is the absolute path of the project checkout holding .tdd-agent/. The agent, not Orca, builds the MCP
+	// config from it. Only set after the capability check (agent.execPrompt.knowledgeHub).
+	KnowledgeRoot string
+	// ProposeChangesets additionally lets the agent call changeset_propose (a dry run that never commits).
+	ProposeChangesets bool
+	// WriteProfile asks for a write run under a named permission profile (never full trust): the agent edits files inside
+	// RepoPath, which must then be a git worktree. Mutually exclusive with ReadOnlyEnforced.
+	WriteProfile string
+	// ResultNonce asks the agent for a structured result block fenced by this nonce (see the tdd-orca-task skill).
+	ResultNonce string
 }
 
 type AgentPromptResult struct {
@@ -117,6 +131,11 @@ type AgentPromptResult struct {
 	ChangesAvailable  bool
 	HeadMoved         bool
 	ChangedFiles      int
+	// ResultBlock is the JSON object between the nonce markers; empty when none was found, with the reason in ResultBlockCode.
+	ResultBlock     []byte
+	ResultBlockCode string
+	// Stats is the tool call counts and usage the agent saw in the claude stream; zero for an older agent or a plain-text run.
+	Stats domain.RunStats
 }
 
 type AgentPromptRunner interface {

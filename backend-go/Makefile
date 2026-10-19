@@ -11,7 +11,7 @@ SERVICES := ai-provider-service annotation-service api-gateway auth-service \
             task-service tenant-service usage-service workflow-service
 
 .PHONY: dev-up dev-down build vet test test-integration lint fmt fmt-check \
-        proto-gen proto-lint check-agent-capability-golden migrate-all tidy-all opa-test help
+        proto-gen proto-lint check-agent-capability-golden check-agent-methods-called check-grpc-dials migrate-all tidy-all opa-test help
 
 help:
 	@echo "make dev-up            - start postgres/vault/nats via docker compose"
@@ -83,6 +83,14 @@ proto-lint:
 # Separate from proto-lint (whose `|| true` swallows failures): a drifted copy must fail.
 check-agent-capability-golden:
 	bash ci/check-agent-capability-golden.sh
+
+# Every agent method a service calls must exist in the agent (known gaps are listed, and may only shrink).
+check-agent-methods-called:
+	bash ci/check-agent-methods-called.sh
+
+# Service-to-service dials must go through grpcmw.NewClient so tenant and user metadata are forwarded.
+check-grpc-dials:
+	bash ci/check-grpc-dials.sh
 
 tidy-all:
 	@for m in common proto $(addprefix services/,$(SERVICES)); do \

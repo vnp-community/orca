@@ -100,7 +100,11 @@ func (uc *EphemeralVmRelay) AttachWorkspace(ctx context.Context, runtimeID, work
 	if err != nil {
 		return domain.EphemeralVmRuntime{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
-	return uc.runtimes.UpdateStatus(ctx, tenantID, runtimeID, "active", workspaceID, "")
+	rt, err := uc.runtimes.UpdateStatus(ctx, tenantID, runtimeID, "active", workspaceID, "")
+	if err != nil {
+		return domain.EphemeralVmRuntime{}, ephemeralVmRuntimeError(err, "runtime not found")
+	}
+	return rt, nil
 }
 
 // SuspendWorkspace relays command (the recipe's `suspend` field, resolved
@@ -112,7 +116,7 @@ func (uc *EphemeralVmRelay) SuspendWorkspace(ctx context.Context, connectionID, 
 	}
 	runtime, err := uc.runtimes.GetByWorkspaceID(ctx, tenantID, workspaceID)
 	if err != nil {
-		return domain.EphemeralVmRuntime{}, apperrors.New(apperrors.KindNotFound, "INFRA_EPHEMERAL_VM_RUNTIME_NOT_FOUND", "no runtime is attached to this workspace", err)
+		return domain.EphemeralVmRuntime{}, ephemeralVmRuntimeError(err, "no runtime is attached to this workspace")
 	}
 	if command == "" {
 		return uc.runtimes.UpdateStatus(ctx, tenantID, runtime.ID, "suspended", "", "")
@@ -140,7 +144,7 @@ func (uc *EphemeralVmRelay) ResumeWorkspace(ctx context.Context, connectionID, w
 	}
 	runtime, err := uc.runtimes.GetByWorkspaceID(ctx, tenantID, workspaceID)
 	if err != nil {
-		return domain.EphemeralVmRuntime{}, apperrors.New(apperrors.KindNotFound, "INFRA_EPHEMERAL_VM_RUNTIME_NOT_FOUND", "no runtime is attached to this workspace", err)
+		return domain.EphemeralVmRuntime{}, ephemeralVmRuntimeError(err, "no runtime is attached to this workspace")
 	}
 	if command != "" {
 		devServer, repoPath, err := uc.resolveDevServerAndRepoPath(ctx, tenantID, connectionID)
@@ -179,7 +183,7 @@ func (uc *EphemeralVmRelay) CleanupWorkspace(ctx context.Context, connectionID, 
 	if command != "" {
 		runtime, err := uc.runtimes.Get(ctx, tenantID, runtimeID)
 		if err != nil {
-			return domain.EphemeralVmRuntime{}, apperrors.New(apperrors.KindNotFound, "INFRA_EPHEMERAL_VM_RUNTIME_NOT_FOUND", "runtime not found", err)
+			return domain.EphemeralVmRuntime{}, ephemeralVmRuntimeError(err, "runtime not found")
 		}
 		devServer, repoPath, err := uc.resolveDevServerAndRepoPath(ctx, tenantID, connectionID)
 		if err != nil {

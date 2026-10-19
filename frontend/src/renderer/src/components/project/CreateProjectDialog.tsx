@@ -1,7 +1,6 @@
 // CreateProjectDialog.tsx — "Create New Project" form for ProjectSwitcher (F38 Workspace, TDD-FE-12)
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { toast } from 'sonner'
 import {
   callRuntimeRpc,
   getActiveRuntimeTarget,
@@ -22,6 +21,9 @@ import {
 } from '../ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
+import { translate } from '@/i18n/i18n'
+import { findRegisteredRepo, parseRepoAlreadyRegistered } from '@/lib/registered-repo-lookup'
+import { AddRepoDuplicateNotice } from '../sidebar/AddRepoDuplicateNotice'
 
 type DevServerOption = { id: string; name: string; status: string }
 
@@ -44,6 +46,8 @@ type CreateProjectDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (project: OrcaProject) => void
+  // Where "Open that project" goes when the repo is already registered (SOL-FE-E2E-005).
+  onOpenExistingProject?: (projectId: string) => void
 }
 
 // requireAdmin()/assertAccess() throw a plain Error with no structured .code —
@@ -56,7 +60,12 @@ function describeError(err: unknown, fallback: string): string {
   return message || fallback
 }
 
-export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreateProjectDialogProps) {
+export function CreateProjectDialog({
+  open,
+  onOpenChange,
+  onCreated,
+  onOpenExistingProject
+}: CreateProjectDialogProps) {
   const [devServers, setDevServers] = useState<DevServerOption[]>([])
   const [devServersLoading, setDevServersLoading] = useState(false)
   const [myOrcaProjects, setMyOrcaProjects] = useState<OrcaProject[]>([])
@@ -71,6 +80,14 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Set once project.create succeeded but registering the repo failed: a retry must reuse it
+  // instead of creating a second project.
+  const [createdProject, setCreatedProject] = useState<OrcaProject | null>(null)
+  // Set when the backend rejected the repo as already registered (store list was stale).
+  const [serverDuplicate, setServerDuplicate] = useState<{
+    projectId: string
+    projectName: string
+  } | null>(null)
 
   // BUG-FE-PW-001: existing sidebar repo data, used to warn when
   // repoPath+devServerId already exists there — already lives in the client
@@ -107,21 +124,38 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
     setVisibility('private')
     setSelectedProjectId('')
     setError(null)
+    setCreatedProject(null)
+    setServerDuplicate(null)
   }
 
+  // Why match the same host + normalised path: two sidebar entries for one folder confuse which
+  // project a Request runs on, so it is blocked, not just warned about.
   function findDuplicateRepo(path: string, targetDevServerId: string) {
-    const normalizedPath = path.trim().replace(/\/+$/, '')
-    if (!normalizedPath || !targetDevServerId) {
-      return undefined
-    }
-    return existingRepos.find(
-      (r) =>
-        r.path.replace(/\/+$/, '') === normalizedPath &&
-        r.executionHostId === `devServer:${targetDevServerId}`
+    return findRegisteredRepo(
+      existingRepos.map((r) => ({
+        id: r.id ?? '',
+        projectId: r.projectId,
+        path: r.path,
+        devServerId:
+          r.devServerId?.trim() ||
+          (r.executionHostId?.startsWith('devServer:')
+            ? r.executionHostId.slice('devServer:'.length)
+            : undefined),
+        displayName: r.displayName
+      })),
+      { devServerId: targetDevServerId, path }
     )
   }
 
   const duplicateRepo = mode === 'new-repo' ? findDuplicateRepo(repoPath, devServerId) : undefined
+  const duplicateProject = duplicateRepo
+    ? {
+        projectId: duplicateRepo.projectId ?? '',
+        projectName:
+          myOrcaProjects.find((p) => p.id === duplicateRepo.projectId)?.name ??
+          duplicateRepo.displayName
+      }
+    : serverDuplicate
 
   // OrcaProjects not yet linked into *some other* OrcaProject aren't
   // distinguishable here (that state lives per-container, not on the
@@ -164,47 +198,63 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
       return
     }
 
-    if (!name.trim() || !devServerId || !repoPath.trim()) {
+    if (!name.trim() || !devServerId || !repoPath.trim() || duplicateProject) {
       return
     }
     setSubmitting(true)
     setError(null)
     try {
       const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-      // Why devServerId/repoPath aren't sent here: CreateProjectRequest
-      // (project.proto) has neither field — a repo path only makes sense as
-      // a follow-up AddRepo call against the new project's id. Both used to
-      // be sent here anyway and were silently dropped by the wscompat
-      // handler — this project's dev server/repo were never actually set.
-      const project = await callRuntimeRpc<OrcaProject>(target, 'project.create', {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        visibility
-      })
+      // Why devServerId/repoPath go with project.create: the gateway decodes both (CreateProjectRequest
+      // carries dev_server_id + repo_path), so the project is bound to the host from the start.
+      const project =
+        createdProject ??
+        (await callRuntimeRpc<OrcaProject>(target, 'project.create', {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          visibility,
+          devServerId,
+          repoPath: repoPath.trim()
+        }))
 
-      // Phase 10 (project.repos.dev_server_id): the repo now carries its own
-      // dev-server binding, set directly here — no more separate
-      // project.rebindDevServer step before it. The project row already
-      // exists past this point — a follow-up failure is "couldn't fully set
-      // it up", not "creation failed", so it surfaces as a toast (same
-      // reasoning as ProjectSwitcher's onCreated catch) rather than blocking
-      // onCreated/closing the dialog.
-      await callRuntimeRpc(target, 'repo.add', {
-        projectId: project.id,
-        url: repoPath.trim(),
-        displayName: name.trim(),
-        devServerId
-      }).catch(() => {
-        toast.error(
-          'Project created, but the repo could not be added. Add it from Project Settings.'
+      // Why list-then-add: project.create already attaches the repo best-effort, and a second add
+      // would duplicate it; add only when the project really lacks it (repo carries devServerId).
+      try {
+        const listed = await callRuntimeRpc<{ repos?: { url: string }[] }>(target, 'repo.list', {
+          projectId: project.id
+        })
+        if (!listed?.repos?.some((repo) => repo.url === repoPath.trim())) {
+          await callRuntimeRpc(target, 'repo.add', {
+            projectId: project.id,
+            url: repoPath.trim(),
+            displayName: name.trim(),
+            devServerId
+          })
+        }
+      } catch (repoErr) {
+        // Why inline, not a toast: the project exists but is unusable without its repo; keep the
+        // dialog open so the user can retry without creating a duplicate project.
+        setCreatedProject(project)
+        setError(
+          translate(
+            'auto.components.project.CreateProjectDialog.repoAddFailed',
+            'Project created, but its repo could not be added: {{message}}. Try again.',
+            { message: describeError(repoErr, 'repo.add failed') }
+          )
         )
-      })
+        return
+      }
 
       onCreated(project)
       onOpenChange(false)
       resetForm()
     } catch (err) {
-      setError(describeError(err, 'Failed to create project.'))
+      const duplicate = parseRepoAlreadyRegistered(err)
+      if (duplicate) {
+        setServerDuplicate({ projectId: duplicate.projectId, projectName: duplicate.projectName })
+      } else {
+        setError(describeError(err, 'Failed to create project.'))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -212,6 +262,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
 
   const submitDisabled =
     submitting ||
+    !!duplicateProject ||
     !name.trim() ||
     (mode === 'new-repo' ? !devServerId || !repoPath.trim() : !selectedProjectId)
 
@@ -269,7 +320,13 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
               <TabsContent value="new-repo" className="grid gap-3 pt-3">
                 <div className="grid gap-1.5">
                   <Label htmlFor="cp-dev-server">Dev Server</Label>
-                  <Select value={devServerId} onValueChange={setDevServerId}>
+                  <Select
+                    value={devServerId}
+                    onValueChange={(value) => {
+                      setDevServerId(value)
+                      setServerDuplicate(null)
+                    }}
+                  >
                     <SelectTrigger id="cp-dev-server" data-testid="cp-dev-server-trigger">
                       <SelectValue
                         placeholder={devServersLoading ? 'Loading…' : 'Select a dev server'}
@@ -296,22 +353,29 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
                     id="cp-repo-path"
                     placeholder="/home/user/projects/my-repo"
                     value={repoPath}
-                    onChange={(e) => setRepoPath(e.target.value)}
+                    onChange={(e) => {
+                      setRepoPath(e.target.value)
+                      setServerDuplicate(null)
+                    }}
                     required={mode === 'new-repo'}
                   />
                   <p className="text-xs text-muted-foreground">
                     Absolute path on the dev server&apos;s filesystem.
                   </p>
-                  {duplicateRepo ? (
-                    <p className="text-xs text-amber-600" data-testid="cp-duplicate-repo-warning">
-                      This repo is already in your sidebar ({duplicateRepo.displayName}). Creating a
-                      new Project here will NOT link to that data — they will stay independent.{' '}
-                      {myOrcaProjects.length > 0 ? (
-                        <button type="button" className="underline" onClick={() => setMode('link')}>
-                          Link an existing Project instead?
-                        </button>
-                      ) : null}
-                    </p>
+                  {mode === 'new-repo' && duplicateProject ? (
+                    <AddRepoDuplicateNotice
+                      projectName={duplicateProject.projectName}
+                      testId="cp-duplicate-repo-blocked"
+                      openTestId="cp-open-existing-project"
+                      onOpen={
+                        onOpenExistingProject && duplicateProject.projectId
+                          ? () => {
+                              onOpenExistingProject(duplicateProject.projectId)
+                              onOpenChange(false)
+                            }
+                          : undefined
+                      }
+                    />
                   ) : null}
                 </div>
               </TabsContent>

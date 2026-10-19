@@ -13,6 +13,8 @@ const (
 	RunKindDiagnosis RunKind = "diagnosis"
 	RunKindFindings  RunKind = "findings"
 	RunKindAnswer    RunKind = "answer"
+	// RunKindPlan writes a Plan proposal; unlike the others it has no draft Solution.
+	RunKindPlan RunKind = "plan"
 )
 
 type AnalysisMode string
@@ -20,7 +22,22 @@ type AnalysisMode string
 const (
 	AnalysisModeComplete      AnalysisMode = "complete"
 	AnalysisModeAgentReadonly AnalysisMode = "agent_readonly"
+	// AnalysisModeAgentProposal runs an agent that writes an OpenSpec change on the proposal branch (engine "openspec").
+	AnalysisModeAgentProposal AnalysisMode = "agent_proposal"
 )
+
+// EngineFor is the engine recorded on a run: only the agent_proposal mode belongs to the openspec engine.
+func (m AnalysisMode) EngineFor() EngineName {
+	if m == AnalysisModeAgentProposal {
+		return EngineOpenSpec
+	}
+	return EngineNative
+}
+
+// IsAgent reports whether the run occupies an agent on the dev server; those runs share one concurrency cap per project.
+func (m AnalysisMode) IsAgent() bool {
+	return m == AnalysisModeAgentReadonly || m == AnalysisModeAgentProposal
+}
 
 type RunStatus string
 
@@ -57,6 +74,8 @@ type AnalysisRun struct {
 	// Enforcement and RepoCheck are only set by agent_readonly runs.
 	Enforcement string
 	RepoCheck   string
+	// Stats is what an agent run says about its tool calls and usage; nil for a run without an agent.
+	Stats *RunStats
 }
 
 // Run enforcement and repo-check values recorded on agent_readonly runs.

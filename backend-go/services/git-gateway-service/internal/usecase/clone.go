@@ -24,12 +24,12 @@ type CloneResult struct {
 // worktree/connectionId exists yet (see ports.go's doc comment on this
 // port).
 type Clone struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewClone(reachability DevServerReachability, local, relay GitExecutor) *Clone {
+func NewClone(reachability RepoHostRouting, local, relay GitExecutor) *Clone {
 	return &Clone{reachability: reachability, local: local, relay: relay}
 }
 
@@ -38,16 +38,13 @@ func (uc *Clone) Execute(ctx context.Context, in CloneInput) (CloneResult, error
 		return CloneResult{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_DEV_SERVER_ID", "dev_server_id is required", nil)
 	}
 
-	reachable, err := uc.reachability.IsReachable(ctx, in.DevServerID)
-	if err != nil {
-		return CloneResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve dev server reachability", err)
+	// Never fall back to uc.local when the dev server is unreachable: git
+	// would run in this container, not on the host the caller named.
+	if _, err := RouteRepoHost(ctx, uc.reachability, in.DevServerID); err != nil {
+		return CloneResult{}, err
 	}
-
-	executor := uc.local
-	if reachable {
-		ctx = WithDevServerID(ctx, in.DevServerID)
-		executor = uc.relay
-	}
+	ctx = WithDevServerID(ctx, in.DevServerID)
+	executor := uc.relay
 	worktreePath, defaultBranch, err := executor.Clone(ctx, in.URL, in.DestPath)
 	if err != nil {
 		return CloneResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_CLONE_FAILED", "failed to clone repository", err)

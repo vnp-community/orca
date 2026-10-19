@@ -70,6 +70,8 @@ type Server struct {
 	getTaskSpecs         *usecase.GetTaskSpecs
 	lockTaskSpecs        *usecase.LockTaskSpecs
 	listExecutionRecords *usecase.ListExecutionRecords
+	// Wired through WithTaskExecutionOutput.
+	getTaskExecutionOutput *usecase.GetTaskExecutionOutput
 }
 
 func New(
@@ -143,7 +145,7 @@ func (s *Server) GenerateAgentPrompt(ctx context.Context, req *taskv1.GenerateAg
 func (s *Server) CreateTask(ctx context.Context, req *taskv1.CreateTaskRequest) (*taskv1.CreateTaskResponse, error) {
 	// No ID field on CreateTaskRequest — the usecase assigns one (uuid) when
 	// Input.ID is left empty.
-	task, err := s.createTask.Execute(ctx, toCreateTaskInput(req))
+	task, err := s.createTask.Execute(ctx, toCreateTaskInput(ctx, req))
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -282,10 +284,11 @@ func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermi
 
 func (s *Server) Execute(ctx context.Context, req *taskv1.TaskServiceExecuteRequest) (*taskv1.TaskServiceExecuteResponse, error) {
 	result, err := s.executeTask.Execute(ctx, usecase.ExecuteTaskInput{
-		TaskID:      req.GetTaskId(),
-		RequestID:   req.GetRequestId(),
-		Prompt:      req.GetPrompt(),
-		ResultNonce: req.GetResultNonce(),
+		TaskID:          req.GetTaskId(),
+		RequestID:       req.GetRequestId(),
+		Prompt:          req.GetPrompt(),
+		ResultNonce:     req.GetResultNonce(),
+		UseKnowledgeHub: req.GetUseKnowledgeHub(), RequirePassingCheck: req.GetRequirePassingCheck(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

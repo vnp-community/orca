@@ -9,23 +9,28 @@ const mockLog: AgentLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), deb
 const mockConfig = {} as AgentConfig
 
 describe('handleAIComplete — agent:aiComplete tracing', () => {
-  afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks() })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
 
-  it('emits start/fail with reason="no API key for model", never includes an API key value', async () => {
+  it('emits start/fail with reason="no AI source for model", never includes an API key value', async () => {
+    // Why: with the CLI session on, the handler would spawn a real `claude` on a dev machine that has one.
+    vi.stubEnv('ORCA_AI_CLI_SESSION', 'off')
     vi.stubEnv('ANTHROPIC_API_KEY', '')
     vi.stubEnv('OPENAI_API_KEY', '')
     vi.stubEnv('GOOGLE_API_KEY', '')
     const events: TraceEvent[] = []
-    const unregister = registerTraceSink(e => events.push(e))
+    const unregister = registerTraceSink((e) => events.push(e))
 
     await expect(
       handleAIComplete({ prompt: 'diff summary', model: 'claude-haiku' }, mockConfig, mockLog)
-    ).rejects.toThrow('No API key found')
+    ).rejects.toThrow('No AI credential')
 
     unregister()
-    expect(events.some(e => e.flow === 'agent:aiComplete' && e.level === 'start')).toBe(true)
-    const fail = events.find(e => e.flow === 'agent:aiComplete' && e.level === 'fail')
-    expect(fail?.fields.err).toBe('no API key for model')
+    expect(events.some((e) => e.flow === 'agent:aiComplete' && e.level === 'start')).toBe(true)
+    const fail = events.find((e) => e.flow === 'agent:aiComplete' && e.level === 'fail')
+    expect(fail?.fields.err).toBe('no AI source for model')
     expect(JSON.stringify(events)).not.toContain('sk-')
   })
 
@@ -34,11 +39,15 @@ describe('handleAIComplete — agent:aiComplete tracing', () => {
     // check (so promptLength/taskId/format are always captured, even on the
     // empty-prompt failure path) — a start event IS emitted here, followed by a fail.
     const events: TraceEvent[] = []
-    const unregister = registerTraceSink(e => events.push(e))
-    await expect(handleAIComplete({ prompt: '   ', taskId: 't-1' }, mockConfig, mockLog)).rejects.toThrow('prompt must not be empty')
+    const unregister = registerTraceSink((e) => events.push(e))
+    await expect(
+      handleAIComplete({ prompt: '   ', taskId: 't-1' }, mockConfig, mockLog)
+    ).rejects.toThrow('prompt must not be empty')
     unregister()
-    expect(events.filter(e => e.flow === 'agent:aiComplete' && e.level === 'start')).toHaveLength(1)
-    const fail = events.find(e => e.flow === 'agent:aiComplete' && e.level === 'fail')
+    expect(events.filter((e) => e.flow === 'agent:aiComplete' && e.level === 'start')).toHaveLength(
+      1
+    )
+    const fail = events.find((e) => e.flow === 'agent:aiComplete' && e.level === 'fail')
     expect(fail?.fields.err).toBe('empty prompt')
     expect(fail?.fields.taskId).toBe('t-1')
   })
@@ -46,7 +55,7 @@ describe('handleAIComplete — agent:aiComplete tracing', () => {
   it('providerNameFromModel classification reaches step("provider-call") with provider=anthropic for claude models', async () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'test-key')
     const events: TraceEvent[] = []
-    const unregister = registerTraceSink(e => events.push(e))
+    const unregister = registerTraceSink((e) => events.push(e))
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
 
     await expect(
@@ -54,7 +63,7 @@ describe('handleAIComplete — agent:aiComplete tracing', () => {
     ).rejects.toThrow()
 
     unregister()
-    const step = events.find(e => e.flow === 'agent:aiComplete' && e.level === 'step')
+    const step = events.find((e) => e.flow === 'agent:aiComplete' && e.level === 'step')
     expect(step?.label).toBe('provider-call')
     expect(step?.fields.provider).toBe('anthropic')
   })
@@ -62,17 +71,24 @@ describe('handleAIComplete — agent:aiComplete tracing', () => {
   it('ok() includes contentLength and promptLength, never prompt or response content', async () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'test-key')
     const events: TraceEvent[] = []
-    const unregister = registerTraceSink(e => events.push(e))
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ content: [{ type: 'text', text: 'ok response body' }] }),
-    }))
+    const unregister = registerTraceSink((e) => events.push(e))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ content: [{ type: 'text', text: 'ok response body' }] })
+      })
+    )
 
-    await handleAIComplete({ prompt: 'a very long secret diff body', model: 'claude-haiku' }, mockConfig, mockLog)
+    await handleAIComplete(
+      { prompt: 'a very long secret diff body', model: 'claude-haiku' },
+      mockConfig,
+      mockLog
+    )
 
     unregister()
-    const start = events.find(e => e.flow === 'agent:aiComplete' && e.level === 'start')
-    const ok = events.find(e => e.flow === 'agent:aiComplete' && e.level === 'ok')
+    const start = events.find((e) => e.flow === 'agent:aiComplete' && e.level === 'start')
+    const ok = events.find((e) => e.flow === 'agent:aiComplete' && e.level === 'ok')
     expect(start?.fields.promptLength).toBe('a very long secret diff body'.length)
     expect(ok?.fields.contentLength).toBe('ok response body'.length)
     expect(JSON.stringify(events)).not.toContain('a very long secret diff body')

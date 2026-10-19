@@ -23,7 +23,6 @@ import (
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
-	"github.com/stablyai/orca-go/common/internalcaller"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/secrets"
@@ -219,14 +218,7 @@ func run() error {
 		logger.Warn("event bus unavailable: StreamEvents is empty and caches refresh only by TTL")
 	}
 
-	serverOpts := []grpc.ServerOption{grpcmw.ChainUnary(logger), grpcmw.StatsHandler()}
-	if govCfg.InternalCallerToken != "" {
-		serverOpts = append(serverOpts, grpc.ChainUnaryInterceptor(internalcaller.Guard(govCfg.InternalCallerToken, append(append([]string{}, gatewayOnlyMethods...), registryInternalMethods...)...)))
-		// Unary interceptors never see streams, so StreamEvents needs its own.
-		serverOpts = append(serverOpts, grpc.ChainStreamInterceptor(internalcaller.StreamGuard(govCfg.InternalCallerToken, gatewayOnlyStreamMethods...)))
-	} else {
-		logger.Warn("MCP_INTERNAL_CALLER_TOKEN is empty: gateway-only governance RPCs and StreamEvents rely on network policy alone")
-	}
+	serverOpts := append([]grpc.ServerOption{grpcmw.ChainUnary(logger), grpcmw.StatsHandler()}, internalCallerServerOptions(govCfg.InternalCallerToken, logger)...)
 	grpcServer := grpc.NewServer(serverOpts...)
 	mcpv1.RegisterMcpServiceServer(grpcServer, mcpServer)
 	mcpv1.RegisterMcpRegistryServiceServer(grpcServer, extReg.server)

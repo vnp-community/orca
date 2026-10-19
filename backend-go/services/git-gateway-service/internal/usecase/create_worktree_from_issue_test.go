@@ -57,7 +57,7 @@ func newHappyIssue() domain.Issue {
 
 func TestCreateWorktreeFromIssue_HappyPath(t *testing.T) {
 	issues := &fakeIssueSourceClient{issue: newHappyIssue()}
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-fix", HeadSHA: "sha1"}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{
@@ -108,7 +108,7 @@ func TestCreateWorktreeFromIssue_HappyPath(t *testing.T) {
 // with no agent spawn attempted.
 func TestCreateWorktreeFromIssue_DuplicateBranch_SurfacesCreateWorktreeErrorUnchanged(t *testing.T) {
 	issues := &fakeIssueSourceClient{issue: newHappyIssue()}
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{createWorktreeErr: errors.New("git worktree add failed: branch 'fix/login-button-is-broken-owner-repo-42' already exists")}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
@@ -140,7 +140,7 @@ func TestCreateWorktreeFromIssue_DuplicateBranch_SurfacesCreateWorktreeErrorUnch
 // failure is non-fatal, and must NOT roll back an already-created worktree.
 func TestCreateWorktreeFromIssue_AgentSpawnFailure_WorktreeStillReturnedNoRollback(t *testing.T) {
 	issues := &fakeIssueSourceClient{issue: newHappyIssue()}
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-fix", HeadSHA: "sha1"}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-fix"}}
@@ -171,7 +171,7 @@ func TestCreateWorktreeFromIssue_AgentSpawnFailure_WorktreeStillReturnedNoRollba
 
 func TestCreateWorktreeFromIssue_SkipAgentStart_AgentSpawnerNeverCalled(t *testing.T) {
 	issues := &fakeIssueSourceClient{issue: newHappyIssue()}
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-fix", HeadSHA: "sha1"}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-fix"}}
@@ -201,7 +201,7 @@ func TestCreateWorktreeFromIssue_SkipAgentStart_AgentSpawnerNeverCalled(t *testi
 // saga's own in-memory state.
 func TestCreateWorktreeFromIssue_SkipStatusUpdate_LineageIssueFieldsEmpty(t *testing.T) {
 	issues := &fakeIssueSourceClient{issue: newHappyIssue()}
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-fix", HeadSHA: "sha1"}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-fix"}, issueStatusSyncEnabled: true}
@@ -227,7 +227,7 @@ func TestCreateWorktreeFromIssue_SkipStatusUpdate_LineageIssueFieldsEmpty(t *tes
 
 func TestCreateWorktreeFromIssue_IssueStatusSyncDisabled_LineageIssueFieldsEmpty(t *testing.T) {
 	issues := &fakeIssueSourceClient{issue: newHappyIssue()}
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-fix", HeadSHA: "sha1"}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-fix"}, issueStatusSyncEnabled: false}
@@ -256,7 +256,7 @@ func TestCreateWorktreeFromIssue_IssueStatusSyncDisabled_LineageIssueFieldsEmpty
 // successful saga result (err == nil), worktree intact.
 func TestCreateWorktreeFromIssue_AgentAndStatusFailuresNeverFailTheSaga(t *testing.T) {
 	issues := &fakeIssueSourceClient{issue: newHappyIssue()}
-	reachability := &fakeDevServerReachability{}
+	reachability := &fakeDevServerReachability{allowLocal: true}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-fix", HeadSHA: "sha1"}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{

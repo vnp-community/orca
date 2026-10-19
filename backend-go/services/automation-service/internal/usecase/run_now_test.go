@@ -66,7 +66,7 @@ func (f *fakeAutomationRepository) Create(ctx context.Context, a domain.Automati
 func (f *fakeAutomationRepository) Get(ctx context.Context, tenantID, id string) (domain.Automation, error) {
 	a, ok := f.byID[id]
 	if !ok || a.TenantID != tenantID {
-		return domain.Automation{}, errors.New("not found")
+		return domain.Automation{}, domain.ErrAutomationNotFound
 	}
 	return a, nil
 }

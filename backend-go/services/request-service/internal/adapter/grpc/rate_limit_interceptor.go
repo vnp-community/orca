@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -16,12 +15,10 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-// RateLimitedTotal counts refusals (request_rate_limited_total); the class is not a tenant label on purpose.
-var RateLimitedTotal atomic.Int64
-
 // RateLimitInterceptor enforces the per-class token buckets and the DB-backed concurrency caps. It runs after
 // RequestAccessInterceptor so refused callers cost no tokens and the target project is already in ctx.
-func RateLimitInterceptor(l *usecase.RateLimiter, gate *usecase.ConcurrencyGate) grpc.UnaryServerInterceptor {
+// onLimited, when set, is told the class of every refusal (orca_request_rate_limited_total).
+func RateLimitInterceptor(l *usecase.RateLimiter, gate *usecase.ConcurrencyGate, onLimited func(class string)) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		e, ok := domain.Catalog[info.FullMethod]
 		if !ok || e.RateClass == domain.RateNone {
@@ -33,11 +30,11 @@ func RateLimitInterceptor(l *usecase.RateLimiter, gate *usecase.ConcurrencyGate)
 		}
 		class, subject := effectiveRateClass(ctx, info.FullMethod, e, req)
 		if ok, wait := l.Allow(tenantID, class, subject); !ok {
-			return nil, rateLimitedStatus(&domain.RateLimitedError{Class: class, Detail: "rate", RetryAfter: wait})
+			return nil, rateLimitedStatus(&domain.RateLimitedError{Class: class, Detail: "rate", RetryAfter: wait}, onLimited)
 		}
 		if err := checkConcurrency(ctx, gate, info.FullMethod, e, class); err != nil {
 			if rl, ok := domain.IsRateLimited(err); ok {
-				return nil, rateLimitedStatus(rl)
+				return nil, rateLimitedStatus(rl, onLimited)
 			}
 			return nil, apperrors.ToGRPCStatus(err)
 		}
@@ -77,8 +74,10 @@ func checkConcurrency(ctx context.Context, gate *usecase.ConcurrencyGate, method
 	return nil
 }
 
-func rateLimitedStatus(rl *domain.RateLimitedError) error {
-	RateLimitedTotal.Add(1)
+func rateLimitedStatus(rl *domain.RateLimitedError, onLimited func(class string)) error {
+	if onLimited != nil {
+		onLimited(rl.Class)
+	}
 	st := status.New(codes.ResourceExhausted, "REQUEST_RATE_LIMITED: "+rl.Class+" "+rl.Detail)
 	if d, err := st.WithDetails(&errdetails.RetryInfo{RetryDelay: durationpb.New(rl.RetryAfter)}); err == nil {
 		st = d

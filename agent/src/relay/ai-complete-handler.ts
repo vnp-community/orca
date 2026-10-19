@@ -23,6 +23,8 @@
 import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 import { createTracer } from '../shared/trace'
+import { AICompleteProviderError } from './ai-complete-errors'
+import { CLI_PROVIDER_NAME, cliSessionEnabled, cliSessionSupported, completeWithCliSession } from './ai-complete-cli-session'
 
 const aiCompleteTracer = createTracer('agent:aiComplete')
 
@@ -52,30 +54,8 @@ export type AICompleteResult = {
   usage?: AICompleteUsage
 }
 
-export type AICompleteErrorReason =
-  | 'PROVIDER_HTTP_ERROR'
-  | 'PROVIDER_TIMEOUT'
-  | 'PROVIDER_NETWORK'
-  | 'NO_API_KEY'
-  | 'UNKNOWN_MODEL_PROVIDER'
-
-export type AICompleteErrorData = {
-  provider: string
-  httpStatus: number | null
-  retryable: boolean
-  reason: AICompleteErrorReason
-}
-
-/** Structured error thrown by provider call functions — caught by dispatchAiRpc. */
-export class AICompleteProviderError extends Error {
-  constructor(
-    message: string,
-    public readonly errorData: AICompleteErrorData
-  ) {
-    super(message)
-    this.name = 'AICompleteProviderError'
-  }
-}
+export { AICompleteProviderError } from './ai-complete-errors'
+export type { AICompleteErrorReason, AICompleteErrorData } from './ai-complete-errors'
 
 /** HTTP status codes where a retry may succeed. */
 function isRetryableHttpStatus(status: number): boolean {
@@ -117,7 +97,7 @@ export async function handleAIComplete(
     ?? process.env['ORCA_AI_MODEL_ID']
     ?? 'claude-opus-4-5'
 
-  // Resolve API key
+  // Source order: agent env key, then a key the server forwarded, then the dev server's own CLI login.
   let apiKey: string | null
   try {
     apiKey = await resolveApiKey(model, params.accountId, params.resolvedApiKey, config, log)
@@ -126,11 +106,14 @@ export async function handleAIComplete(
     throw err
   }
   if (!apiKey) {
-    span.fail('no API key for model', { model, taskId })
-    throw new Error(
-      `ai.complete: No API key found for model "${model}". ` +
-      'Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY in the agent environment, ' +
-      'or configure an AI provider in Orca settings.'
+    if (isAnthropicModel(model) && cliSessionEnabled() && (await cliSessionSupported())) {
+      return await completeViaCliSession(params, model, format, span, log)
+    }
+    span.fail('no AI source for model', { model, taskId })
+    throw new AICompleteProviderError(
+      `ai.complete: No AI credential for model "${model}". Log in to Claude Code on the dev server (claude auth login), ` +
+        'or set ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY in the agent environment.',
+      { provider: providerNameFromModel(model), httpStatus: null, retryable: false, reason: 'NO_API_KEY' }
     )
   }
 
@@ -146,6 +129,40 @@ export async function handleAIComplete(
     return { content, model, provider, latencyMs, ...(usage ? { usage } : {}) }
   } catch (err: unknown) {
     span.fail(err, { model, taskId })
+    throw err
+  }
+}
+
+function isAnthropicModel(model: string): boolean {
+  return model.startsWith('claude')
+}
+
+/** The CLI chooses its own default model unless the caller (or ORCA_AI_MODEL_ID) names a Claude one. */
+function explicitClaudeModel(params: AICompleteParams): string | undefined {
+  const named = params.model ?? process.env['ORCA_AI_MODEL_ID']
+  return named && isAnthropicModel(named) ? named : undefined
+}
+
+async function completeViaCliSession(
+  params: AICompleteParams,
+  model: string,
+  format: 'json' | 'text',
+  span: ReturnType<typeof aiCompleteTracer.start>,
+  log: AgentLogger
+): Promise<AICompleteResult> {
+  log.info(`ai.complete: source=cli_session format=${format} promptLen=${params.prompt.length}`)
+  span.step('provider-call', { model, provider: CLI_PROVIDER_NAME })
+  const started = Date.now()
+  try {
+    const { content, usage, model: usedModel } = await completeWithCliSession({
+      prompt: params.prompt,
+      format,
+      model: explicitClaudeModel(params)
+    })
+    span.ok({ model: usedModel ?? model, contentLength: content.length })
+    return { content, model: usedModel ?? model, provider: CLI_PROVIDER_NAME, latencyMs: Date.now() - started, ...(usage ? { usage } : {}) }
+  } catch (err: unknown) {
+    span.fail(err, { model, taskId: params.taskId })
     throw err
   }
 }
@@ -272,6 +289,15 @@ async function dispatch(
 
 // ── Anthropic Claude ──────────────────────────────────────────────────────────
 
+/**
+ * ORCA_AI_ANTHROPIC_BASE_URL exists only so tests can point the call at a local server; production leaves it unset
+ * and always reaches the official API.
+ */
+function anthropicMessagesUrl(): string {
+  const base = (process.env['ORCA_AI_ANTHROPIC_BASE_URL'] ?? '').trim().replace(/\/+$/, '')
+  return `${base || 'https://api.anthropic.com'}/v1/messages`
+}
+
 async function callAnthropic(
   model:     string,
   apiKey:    string,
@@ -289,7 +315,7 @@ async function callAnthropic(
     body['system'] = 'Respond with valid JSON only. No markdown code fences, no explanation outside the JSON object.'
   }
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch(anthropicMessagesUrl(), {
     method:  'POST',
     headers: {
       'Content-Type':      'application/json',

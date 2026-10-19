@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -46,7 +44,7 @@ func (r *ProjectGroupRepository) GetProjectGroup(ctx context.Context, tenantID, 
 	`, tenantID, id)
 
 	out, err := scanProjectGroup(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.ProjectGroup{}, domain.ErrProjectGroupNotFound
 	}
 	if err != nil {
@@ -64,7 +62,7 @@ func (r *ProjectGroupRepository) UpdateProjectGroup(ctx context.Context, tenantI
 	)
 
 	out, err := scanProjectGroup(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.ProjectGroup{}, domain.ErrProjectGroupNotFound
 	}
 	if err != nil {
@@ -77,6 +75,9 @@ func (r *ProjectGroupRepository) DeleteProjectGroup(ctx context.Context, tenantI
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM project.project_groups WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
+	if isMalformedUUID(err) {
+		return domain.ErrProjectGroupNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete project group: %w", err)
 	}
@@ -171,20 +172,23 @@ func (r *ProjectGroupRepository) ImportNested(ctx context.Context, tenantID, cre
 			name = c.Path
 		}
 
-		var p domain.Project
-		if err := tx.QueryRow(ctx, `
+		p, err := scanProject(tx.QueryRow(ctx, `
 			INSERT INTO project.projects (id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by)
 			VALUES (gen_random_uuid(), $1, $2, $3, '', 'main', 'private', $4)
 			RETURNING `+projectColumns,
 			tenantID, name, nullableString(devServerID), createdBy,
-		).Scan(&p.ID, &p.TenantID, &p.Name, &p.DevServerID, &p.Description, &p.DefaultBranch, &p.Visibility, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		))
+		if err != nil {
 			return nil, nil, fmt.Errorf("postgres: insert imported project: %w", err)
 		}
 
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO project.repos (id, project_id, url, display_name, position, dev_server_id)
-			VALUES (gen_random_uuid(), $1, $2, $3, 0, $4)
-		`, p.ID, c.Path, name, nullableString(devServerID)); err != nil {
+			INSERT INTO project.repos (id, project_id, url, display_name, position, dev_server_id, registration_key)
+			VALUES (gen_random_uuid(), $1, $2, $3, 0, $4, $5)
+		`, p.ID, c.Path, name, nullableString(devServerID), nullableString(domain.RepoRegistrationKey(tenantID, devServerID, c.Path))); err != nil {
+			if isRepoRegistrationConflict(err) {
+				return nil, nil, fmt.Errorf("postgres: insert imported repo: %w", domain.ErrRepoAlreadyRegistered)
+			}
 			return nil, nil, fmt.Errorf("postgres: insert imported repo: %w", err)
 		}
 

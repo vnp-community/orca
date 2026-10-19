@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
 import { useAppStore } from '../store'
 import { useApprovals } from './useApprovals'
+import { keepTasksOfRequest, planTaskListParams } from './plan-task-list-filter'
 import { useRequestSubscription } from './useRequestSubscription'
 import { classifyRequestRpcError } from '../../../shared/request-errors'
 import { normalizeTask } from '../../../shared/task-status-normalization'
@@ -21,6 +22,8 @@ import type { Approval, OrcaRequest, RequestEvent } from '../../../shared/reques
 export const PLAN_TREE_PAGE_SIZE = 200
 export const PLAN_TREE_MAX_PAGES = 20
 export const PLAN_TREE_POLL_MS = 15_000
+
+const FINISHED_STATUSES = new Set<string>(['done', 'cancelled'])
 
 const REFRESH_EVENT_RE =
   /(plan\.generated|phase\.started|phase\.completed|approval\.[a-z_]+|request\.status_changed)$/
@@ -39,6 +42,7 @@ export type UsePlanTreeResult = {
 export function usePlanTree(request: OrcaRequest): UsePlanTreeResult {
   const planTaskId = request.planTaskId
   const projectId = request.projectId
+  const requestId = request.id
   const [tasks, setTasks] = useState<OrcaTask[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -69,14 +73,13 @@ export function usePlanTree(request: OrcaRequest): UsePlanTreeResult {
       let pages = 0
       let more = false
       do {
-        // Swap to requestId/planTaskId filter here once task.list supports it (CR-REQ-011/016).
         const res = await callRuntimeRpc<{ tasks: OrcaTask[] | null; nextPageToken?: string }>(
           target,
           'task.list',
-          { projectId, pageSize: PLAN_TREE_PAGE_SIZE, ...(pageToken ? { pageToken } : {}) }
+          planTaskListParams({ projectId, requestId, pageSize: PLAN_TREE_PAGE_SIZE, pageToken })
         )
         pages++
-        collected.push(...(res.tasks ?? []).map(normalizeTask))
+        collected.push(...keepTasksOfRequest((res.tasks ?? []).map(normalizeTask), requestId))
         pageToken = res.nextPageToken || undefined
         more = !!pageToken
       } while (more && pages < PLAN_TREE_MAX_PAGES)
@@ -97,7 +100,7 @@ export function usePlanTree(request: OrcaRequest): UsePlanTreeResult {
         setIsLoading(false)
       }
     }
-  }, [planTaskId, projectId])
+  }, [planTaskId, projectId, requestId])
 
   const refetch = useCallback(() => {
     void load()
@@ -117,8 +120,13 @@ export function usePlanTree(request: OrcaRequest): UsePlanTreeResult {
     }
   })
 
-  // Polling is only a fallback while executing; skipped when the tab is hidden.
-  const executing = request.status === 'executing'
+  // Polling is only a fallback while executing; skipped when the tab is hidden. It also runs after the Request completed for as
+  // long as the tree still shows unfinished work: the status event can reach us before task-service has the derived "done"
+  // statuses, and with no later event the tab would keep an old percentage until reloaded.
+  const settling =
+    request.status === 'completed' &&
+    tasks.some((x) => x.type !== 'plan' && x.type !== 'phase' && !FINISHED_STATUSES.has(x.status))
+  const executing = request.status === 'executing' || settling
   useEffect(() => {
     if (!executing || !planTaskId) {
       return

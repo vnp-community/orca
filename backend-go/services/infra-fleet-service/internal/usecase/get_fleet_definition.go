@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -26,7 +27,7 @@ func (uc *GetFleetDefinition) Execute(ctx context.Context, id string) (domain.Fl
 	}
 	def, err := uc.repo.Get(ctx, tenantID, id)
 	if err != nil {
-		if err == domain.ErrFleetDefinitionNotFound {
+		if errors.Is(err, domain.ErrFleetDefinitionNotFound) {
 			return domain.FleetDefinition{}, apperrors.New(apperrors.KindNotFound, "INFRA_FLEET_DEFINITION_NOT_FOUND", "fleet definition not found", err)
 		}
 		return domain.FleetDefinition{}, apperrors.New(apperrors.KindInternal, "INFRA_GET_FLEET_DEFINITION_FAILED", "failed to get fleet definition", err)

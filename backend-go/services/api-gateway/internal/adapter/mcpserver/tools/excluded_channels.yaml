@@ -610,6 +610,10 @@
   category: human_gate
   reason: "Cancelling a Request cannot be undone in the state machine; left to a person. Agents use request_returnToBacklog, which request_reopen undoes."
 
+- pattern: "clarification.*"
+  category: human_gate
+  reason: "Clarification questions are answered by the people who own the requirement; an agent must not answer or cancel them for a person."
+
 - pattern: "request.flowSet"
   category: human_gate
   reason: "Turning the Request flow on or off is tenant administration done in the UI by an admin."
@@ -633,3 +637,35 @@
 - pattern: "request.planProposal"
   category: request_flow
   reason: "Reads the result of the asynchronous plan proposal run; waits for request_generatePlan to leave the Declared state."
+
+- pattern: "request.planBundleFile"
+  category: request_flow
+  reason: "Reads one file of the OpenSpec change behind a Plan for the approver's view; file text is agent-written, so no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "request.engineSettings"
+  category: request_flow
+  reason: "Administrator configuration of a project (which engine writes the Plan, whether the Solution uses the agent); no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "request.engineSettingsSet"
+  category: request_flow
+  reason: "Administrator configuration that switches agents on for a project; an MCP caller must not change it, add a ToolSpec with admin gating before exposing it."
+
+- pattern: "request.cleanupProposal"
+  category: request_flow
+  reason: "Removes a git worktree on a dev server; a person or the CLI does that, no MCP tool is decided yet."
+
+- pattern: "decision.list"
+  category: request_flow
+  reason: "Read channel of the decision log for a person; no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "decision.confirm"
+  category: request_flow
+  reason: "Confirms a high risk choice by typing the option's title; the RPC is human only and must never be an MCP tool."
+
+- pattern: "execution.get"
+  category: request_flow
+  reason: "Read channel for the task sheet's Result tab; carries agent output, so no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "devServer.subscribeStatus"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; devServer.list reports the same state (status, busy, activeExecutions)."

@@ -16,7 +16,9 @@ func newTestCreateProject(repo *fakeProjectRepository) (*CreateProject, *fakeRep
 	devServers := &fakeDevServerLister{}
 	health := &fakeDevServerHealthChecker{}
 	relay := &fakeDevServerRelay{}
-	return NewCreateProject(repo, repos, devServers, health, relay), repos, devServers, health, relay
+	repo.repoSink = repos
+	repos.projectDirectory = repo
+	return NewCreateProject(repo, repos, devServers, health, relay, RepoHostPolicy{AllowLocalRepos: true}), repos, devServers, health, relay
 }
 
 func TestCreateProject_AppliesDefaultsAndCreatedBy(t *testing.T) {
@@ -24,7 +26,7 @@ func TestCreateProject_AppliesDefaultsAndCreatedBy(t *testing.T) {
 	uc, _, _, _, _ := newTestCreateProject(repo)
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "user-1")
-	got, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project"})
+	got, _, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -44,7 +46,7 @@ func TestCreateProject_UsesRequestFieldsWhenProvided(t *testing.T) {
 	uc, _, _, _, _ := newTestCreateProject(repo)
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "user-1")
-	got, err := uc.Execute(ctx, CreateProjectInput{
+	got, _, err := uc.Execute(ctx, CreateProjectInput{
 		Name:          "my-project",
 		Description:   "a description",
 		DefaultBranch: "develop",
@@ -69,7 +71,7 @@ func TestCreateProject_RejectsInvalidVisibility(t *testing.T) {
 	uc, _, _, _, _ := newTestCreateProject(repo)
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "user-1")
-	_, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", Visibility: "bogus"})
+	_, _, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", Visibility: "bogus"})
 	assertAppError(t, err, apperrors.KindInvalidArgument, "PROJECT_INVALID_VISIBILITY")
 }
 
@@ -77,7 +79,7 @@ func TestCreateProject_RequiresTenantContext(t *testing.T) {
 	repo := newFakeProjectRepository()
 	uc, _, _, _, _ := newTestCreateProject(repo)
 
-	_, err := uc.Execute(context.Background(), CreateProjectInput{Name: "my-project"})
+	_, _, err := uc.Execute(context.Background(), CreateProjectInput{Name: "my-project"})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
 	}
@@ -88,7 +90,7 @@ func TestCreateProject_RequiresUserContext(t *testing.T) {
 	uc, _, _, _, _ := newTestCreateProject(repo)
 
 	ctx := withTenant(context.Background(), "tenant-1")
-	_, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project"})
+	_, _, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project"})
 	assertAppError(t, err, apperrors.KindUnauthenticated, "PROJECT_NO_USER")
 }
 
@@ -97,7 +99,7 @@ func TestCreateProject_NoDevServerID_UnchangedExistingBehavior(t *testing.T) {
 	uc, _, devServers, health, relay := newTestCreateProject(repo)
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "user-1")
-	got, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project"})
+	got, _, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -122,7 +124,7 @@ func TestCreateProject_DevServerIDSet_RepoPathEmpty_InvalidArgument(t *testing.T
 	health.reachable = true
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "user-1")
-	_, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1"})
+	_, _, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1"})
 	assertAppError(t, err, apperrors.KindInvalidArgument, "PROJECT_REPO_PATH_REQUIRED")
 	if len(relay.createConnectionCalls) != 0 {
 		t.Errorf("expected no relay/repo call before repo_path check, got %+v", relay.createConnectionCalls)
@@ -135,7 +137,7 @@ func TestCreateProject_DevServerDoesNotExist_InvalidArgument(t *testing.T) {
 	devServers.exists = false
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "user-1")
-	_, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1", RepoPath: "/repo"})
+	_, _, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1", RepoPath: "/repo"})
 	assertAppError(t, err, apperrors.KindInvalidArgument, "PROJECT_DEV_SERVER_NOT_FOUND")
 	if len(health.calls) != 0 {
 		t.Errorf("expected no health check when dev server doesn't exist, got %v", health.calls)
@@ -152,7 +154,7 @@ func TestCreateProject_DevServerUnreachable_FailedPrecondition(t *testing.T) {
 	health.reachable = false
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "user-1")
-	_, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1", RepoPath: "/repo"})
+	_, _, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1", RepoPath: "/repo"})
 	assertAppError(t, err, apperrors.KindFailedPrecondition, "PROJECT_DEV_SERVER_UNREACHABLE")
 	if len(relay.createConnectionCalls) != 0 {
 		t.Errorf("expected no relay call when dev server is unreachable, got %+v", relay.createConnectionCalls)
@@ -167,7 +169,7 @@ func TestCreateProject_RepoPathNotFoundOnDevServer_NoOrphanedProject(t *testing.
 	relay.relayResult = []byte(`{"exists":false,"isDir":false}`)
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "user-1")
-	_, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1", RepoPath: "/missing"})
+	_, _, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1", RepoPath: "/missing"})
 	assertAppError(t, err, apperrors.KindFailedPrecondition, "PROJECT_REPO_PATH_NOT_FOUND")
 
 	if len(repo.projects) != 0 {
@@ -183,7 +185,7 @@ func TestCreateProject_DevServerBinding_Success_AttachesRepo(t *testing.T) {
 	relay.relayResult = []byte(`{"exists":true,"isDir":true}`)
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "user-1")
-	got, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1", RepoPath: "/srv/repo"})
+	got, _, err := uc.Execute(ctx, CreateProjectInput{Name: "my-project", DevServerID: "ds-1", RepoPath: "/srv/repo"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

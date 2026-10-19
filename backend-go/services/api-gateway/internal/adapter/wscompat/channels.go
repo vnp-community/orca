@@ -188,6 +188,7 @@ func RegisterRealChannels(
 	registerOrcaProjectSharingChannels(r, projectClient)
 	registerWorkflowChannels(r, workflowClient)
 	registerAgentChannels(r, infraFleetClient, eventBusConsumer)
+	registerDevServerStatusSubscribeChannel(r, eventBusConsumer)
 	registerAdminUserChannels(r, authClient, tenantClient)
 	registerAdminPolicyChannels(r, authClient)
 	registerAdminSessionChannels(r, authClient)
@@ -458,6 +459,8 @@ type taskView struct {
 	DoneSubtasks       int32    `json:"doneSubtasks"`
 	TotalSubtasks      int32    `json:"totalSubtasks"`
 	ShareToken         string   `json:"shareToken,omitempty"`
+	// RequestID links a task to its Request so the Plan tab can group a tree by request.
+	RequestID string `json:"requestId,omitempty"`
 	// dueDate is passed through as-is (RFC3339 string or "") — task.proto's
 	// due_date is a google.protobuf.Timestamp; converting it to a JS-Date-
 	// parseable string here is enough, no numeric-ms conversion needed.
@@ -475,7 +478,7 @@ func toTaskView(t *taskv1.Task) taskView {
 		WorkflowTemplateID: t.GetWorkflowTemplateId(), WorktreeID: t.GetWorktreeId(),
 		AgentSessionID: t.GetAgentSessionId(), TaskNumber: t.GetTaskNumber(), PRURL: t.GetPrUrl(),
 		WorkflowExecID: t.GetWorkflowExecId(), DoneSubtasks: t.GetDoneSubtasks(),
-		TotalSubtasks: t.GetTotalSubtasks(), ShareToken: t.GetShareToken(),
+		TotalSubtasks: t.GetTotalSubtasks(), ShareToken: t.GetShareToken(), RequestID: t.GetRequestId(),
 	}
 	if t.GetLabels() == nil {
 		v.Labels = []string{}
@@ -522,8 +525,9 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 		if err != nil {
 			return nil, err
 		}
+		// CreatorId makes task-service mint the creator's owner grant; without it GetSubtree's per-node filter hides the creator's own tree.
 		resp, err := client.CreateTask(ctx, &taskv1.CreateTaskRequest{
-			TenantId: id.TenantID, Title: in.Title, ParentId: in.ParentID, ProjectId: in.ProjectID,
+			TenantId: id.TenantID, Title: in.Title, ParentId: in.ParentID, ProjectId: in.ProjectID, CreatorId: id.UserID,
 		})
 		if err != nil {
 			return nil, err
@@ -633,42 +637,6 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 // ── git.* (subset: status/diff — the two ops git-gateway-service
 // implements for real against the local git binary; commit/push/pull relay
 // to the Dev Server Agent, still a stub) ────────────────────────────────
-
-// gitStatusEntryView/gitStatusResultView mirror the frontend's
-// GitStatusEntry/GitStatusResult (frontend/src/shared/git-status-types.ts) —
-// BUG-020: git.status used to return the raw gitgatewayv1.GetStatusResponse
-// proto (`files`/`state` field names, no `head`/`upstreamStatus` at all),
-// which crashed the whole Git tab (`useGit.ts`'s `for (const entry of
-// status.entries)` — `status.entries` was always undefined, since the wire
-// key was `files`) the moment GetStatus ever actually succeeded (it never
-// had, until SOL-013/014 fixed the dispatch/relay chain this session).
-//
-// area is hardcoded "unstaged" for every entry — git-gateway-service's
-// FileStatus has no staged/unstaged concept yet (BUG-020's "Phase 2", not
-// implemented here): parsePorcelainStatus (localgit/executor.go) already
-// extracts the full 2-char porcelain XY code but collapses it into a single
-// FileState, discarding the staged (X) vs unstaged (Y) distinction. This
-// stops the crash and reports accurate file lists/counts; the staged vs.
-// unstaged split in StagingArea.tsx is not yet accurate until Phase 2 lands.
-type gitStatusEntryView struct {
-	Path   string `json:"path"`
-	Status string `json:"status"`
-	Area   string `json:"area"`
-}
-
-type gitStatusResultView struct {
-	Branch  string               `json:"branch,omitempty"`
-	Entries []gitStatusEntryView `json:"entries"`
-}
-
-func toGitStatusResultView(resp *gitgatewayv1.GetStatusResponse) gitStatusResultView {
-	files := resp.GetFiles()
-	entries := make([]gitStatusEntryView, 0, len(files))
-	for _, f := range files {
-		entries = append(entries, gitStatusEntryView{Path: f.GetPath(), Status: f.GetState(), Area: "unstaged"})
-	}
-	return gitStatusResultView{Branch: resp.GetBranch(), Entries: entries}
-}
 
 func registerGitChannels(r *Registry, client gitgatewayv1.GitGatewayServiceClient) {
 	r.Register("git.status", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -797,6 +765,10 @@ type devServerView struct {
 	// "degraded" | "unhealthy". See
 	// docs/backlog/BACKLOG-007-dev-server-bootstrap-status-proto-field.md.
 	HealthStatus string `json:"healthStatus"`
+	// ActiveExecutions counts the agent runs (task runs, model calls) the dev server is working on right now, taken
+	// from its live session; Busy is ActiveExecutions > 0. Both are 0 and false while the dev server is not connected.
+	ActiveExecutions int  `json:"activeExecutions"`
+	Busy             bool `json:"busy"`
 }
 
 // toDevServerView maps a proto DevServer (id/tenant_id/host/mode only) onto
@@ -811,7 +783,13 @@ func toDevServerView(ds *infrafleetv1.DevServer) devServerView {
 		ApprovalStatus: ds.GetApprovalStatus(),
 		GroupID:        ds.GetGroupId(),
 		HealthStatus:   ds.GetHealthStatus(),
+		Platform:       nonEmptyPtr(ds.GetPlatform()),
+		Arch:           nonEmptyPtr(ds.GetArch()),
+		NodeVersion:    nonEmptyPtr(ds.GetNodeVersion()),
+		// Only a connected dev server can be busy; attachConnectionStatus clears this when it is not.
+		ActiveExecutions: int(ds.GetActiveExecutions()),
 	}
+	view.Busy = view.ActiveExecutions > 0
 	if host := ds.GetHost(); host != "" {
 		view.WSUrl = &host
 	}
@@ -833,12 +811,14 @@ func attachConnectionStatus(ctx context.Context, client infrafleetv1.InfraFleetS
 	defer cancel()
 	resp, err := client.IsDevServerConnected(rpcCtx, &infrafleetv1.IsDevServerConnectedRequest{DevServerId: view.ID})
 	if err != nil {
+		view.ActiveExecutions, view.Busy = 0, false // reported "disconnected", so never busy
 		return view
 	}
 	if resp.GetConnected() {
 		view.Status = "connected"
 	} else {
 		view.Status = "disconnected"
+		view.ActiveExecutions, view.Busy = 0, false
 	}
 	return view
 }
@@ -1005,6 +985,7 @@ func registerDevServerChannels(r *Registry, client infrafleetv1.InfraFleetServic
 		type browseDirArgs struct {
 			DevServerID string `json:"id"`
 			Path        string `json:"path"`
+			browseDirOptions
 		}
 		in, err := decodeArg[browseDirArgs](args, 0)
 		if err != nil {
@@ -1036,32 +1017,19 @@ func registerDevServerChannels(r *Registry, client infrafleetv1.InfraFleetServic
 		}
 
 		var relayResult struct {
-			Path    string `json:"path"`
-			Entries []struct {
-				Name string `json:"name"`
-				Type string `json:"type"`
-			} `json:"entries"`
+			Path    string                `json:"path"`
+			Entries []browseDirRelayEntry `json:"entries"`
 		}
 		if raw := resp.GetResultJson(); raw != "" {
 			if err := json.Unmarshal([]byte(raw), &relayResult); err != nil {
 				return nil, fmt.Errorf("devServer.browseDir: decoding relay result: %w", err)
 			}
 		}
-		entries := make([]devServerBrowseDirEntryView, 0, len(relayResult.Entries))
-		for _, e := range relayResult.Entries {
-			entries = append(entries, devServerBrowseDirEntryView{
-				Name:        e.Name,
-				IsDirectory: e.Type == "directory",
-				// fs.readDir does not report symlink-ness — see this
-				// channel's doc comment.
-				IsSymlink: false,
-			})
-		}
 		resolvedPath := relayResult.Path
 		if resolvedPath == "" {
 			resolvedPath = path
 		}
-		return devServerBrowseDirResultView{ResolvedPath: resolvedPath, Entries: entries}, nil
+		return buildBrowseDirView(resolvedPath, relayResult.Entries, in.browseDirOptions), nil
 	})
 }
 
@@ -1078,6 +1046,10 @@ type devServerBrowseDirEntryView struct {
 type devServerBrowseDirResultView struct {
 	ResolvedPath string                        `json:"resolvedPath"`
 	Entries      []devServerBrowseDirEntryView `json:"entries"`
+	// Truncated/TotalEntries: Entries was capped (browseDirOptions.Limit);
+	// TotalEntries counts matches before the cap.
+	Truncated    bool `json:"truncated"`
+	TotalEntries int  `json:"totalEntries"`
 }
 
 // sshTargetPickerView is the minimal subset of frontend/src/shared/

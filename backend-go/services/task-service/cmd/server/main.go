@@ -131,6 +131,7 @@ func run() error {
 		usecase.GrantRepository
 		usecase.CommentRepository
 		usecase.ExecutionLinkRepository
+		usecase.ExecutionStateReader
 		usecase.ExecutionLeaseRepository
 		usecase.TaskExecutionClaimer
 		usecase.TaskSourceRepository
@@ -307,7 +308,7 @@ func run() error {
 	// uses this to record every OPA allow/deny decision to auth-service's
 	// audit_log. Lazy dial (grpc.NewClient doesn't block on connect), same
 	// convention as every other outbound client above.
-	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	authConn, err := grpcmw.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing auth-service: %w", err)
 	}
@@ -337,7 +338,7 @@ func run() error {
 		WithRunEvents(repo, repo).
 		WithExecutionLeases(repo, executionLeaseOwner(), usecase.DefaultLeaseTTL, usecase.DefaultLeaseHeartbeat).
 		WithContainerSync(syncContainerUC).
-		WithContract(simpleExecutor, repo)
+		WithContract(simpleExecutor)
 	recoverInterruptedUC := usecase.NewRecoverInterruptedExecutions(repo).
 		WithRunEvents(repo, SystemClock{}).
 		WithContainerReconcile(usecase.NewReconcileContainerStatuses(repo, syncContainerUC))
@@ -395,6 +396,7 @@ func run() error {
 	getTaskSpecsUC := usecase.NewGetTaskSpecs(repo)
 	lockTaskSpecsUC := usecase.NewLockTaskSpecs(repo, repo, resolvePermissionUC)
 	listExecutionRecordsUC := usecase.NewListExecutionRecords(repo, resolvePermissionUC)
+	getTaskExecutionOutputUC := usecase.NewGetTaskExecutionOutput(repo, resolvePermissionUC)
 
 	// Execution-status mirror consumer (BE-SOL-003/TASK-FT-003-05) —
 	// subscribes orca.orchestration.task.statuschanged /
@@ -459,7 +461,8 @@ func run() error {
 		WithListExecutionStates(listExecutionStatesUC).
 		WithCreatePlanTree(usecase.NewCreatePlanTree(repo, repo, repo)).
 		WithTaskSpecs(setTaskSpecUC, getTaskSpecsUC, lockTaskSpecsUC).
-		WithExecutionRecords(listExecutionRecordsUC))
+		WithExecutionRecords(listExecutionRecordsUC).
+		WithTaskExecutionOutput(getTaskExecutionOutputUC))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// healthSrv (constructed above, alongside the dialect switch that also

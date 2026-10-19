@@ -934,6 +934,8 @@ type SpawnPtyResult struct {
 	Rows  int32
 	Cwd   string
 	Shell string
+	// CwdFellBack is true when the agent could not use the requested cwd and opened the home directory instead.
+	CwdFellBack bool
 }
 
 // PtyEvent is one event pushed by the Dev Server Agent's pty-daemon over a
@@ -1175,4 +1177,10 @@ type AgentSessionOriginFilter struct {
 // many fakes of that interface stay untouched.
 type AgentSessionOriginLister interface {
 	ListByOrigin(ctx context.Context, tenantID string, f AgentSessionOriginFilter) ([]domain.AgentSession, error)
+}
+
+// DevServerActivity says how much a dev server is working: agent runs in flight on its live session.
+// Implemented by devserveragent.Client.
+type DevServerActivity interface {
+	ActiveExecutions(devServerID string) int
 }

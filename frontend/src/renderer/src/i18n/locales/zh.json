@@ -252,7 +252,10 @@
           "3be0f7df04": "无法在所选运行时打开文件夹",
           "15cf5319ec": "已在 {{hostName}} 上检查 {{path}}，但该主机未报告可用文件夹。",
           "2dcd706774": "该项目也存在于另一个配置文件中",
-          "presenceProfileOverflow": "{{names}} 及另外 {{count}} 个"
+          "presenceProfileOverflow": "{{names}} 及另外 {{count}} 个",
+          "setupProjectCloneDevServerUnsupported": "尚不支持将新仓库克隆到开发服务器。请改为添加现有文件夹。",
+          "repoAlreadyAdded": "项目已添加",
+          "openExistingProject": "打开项目"
         },
         "settings": {
           "e12dab333b": "切换服务器失败",
@@ -525,7 +528,19 @@
           "error": {
             "format": {
               "37cf0bc991": "Orca 无法解析此工作区的可用基础引用。",
-              "64555d0014": "未找到基础分支"
+              "64555d0014": "未找到基础分支",
+              "hostUnbound": {
+                "title": "此项目尚未分配开发服务器",
+                "message": "请选择此项目所在的开发服务器，然后重试。"
+              },
+              "hostUnreachable": {
+                "title": "开发服务器已离线",
+                "message": "Orca 无法连接此项目所在的开发服务器。请重新连接后重试。"
+              },
+              "hostCheckFailed": {
+                "title": "无法检查开发服务器",
+                "message": "Orca 无法确认开发服务器是否在线。请稍后重试。"
+              }
             }
           }
         }
@@ -590,6 +605,22 @@
       },
       "workspaceTabPalette": {
         "reviewTab": "审查标签页"
+      },
+      "repoHostBinding": {
+        "hostRequired": "请先为此项目选择开发服务器。"
+      },
+      "repoHostRebind": {
+        "activeWorkflows": "更改开发服务器之前，请先停止此项目上正在运行的任务。",
+        "devServerNotFound": "该开发服务器已不存在。请选择其他服务器。",
+        "forbidden": "您没有权限更改此项目的开发服务器。",
+        "failed": "无法更改开发服务器。"
+      },
+      "ownProjectRegistration": {
+        "repoAddFailed": "项目“{{name}}”已创建，但无法添加其仓库：{{message}}"
+      },
+      "registeredRepoLookup": {
+        "alreadyInProject": "此文件夹已添加到该开发服务器上的项目“{{project}}”中。",
+        "alreadyAdded": "此文件夹已添加到该开发服务器上。"
       }
     },
     "hooks": {
@@ -2295,7 +2326,8 @@
             "767951265d": "创建工作树时出现问题。",
             "vmProvisioningTitle": "正在预配虚拟机",
             "cancelProvisioning": "取消",
-            "vmProvisioningLogEmpty": "正在等待环境模板输出…"
+            "vmProvisioningLogEmpty": "正在等待环境模板输出…",
+            "chooseHost": "选择开发服务器"
           }
         }
       },
@@ -2691,7 +2723,8 @@
             "removedBody": "此工作区的 SSH 主机已被移除，无法再连接。请移除工作区以清理 — 远程文件不会受影响。",
             "removeWorkspaceButton": "移除工作区"
           }
-        }
+        },
+        "cwdFellBack": "此主机上找不到目录 {{path}}，已改为打开你的主目录。"
       },
       "tab": {
         "group": {
@@ -3694,7 +3727,10 @@
           "0adf083af7": "浏览服务器",
           "8efa930eb5": "从选定的运行时服务器添加另一个项目。",
           "39bd249b3a": "添加项目",
-          "0f8aba944c": "导航到目录并单击“选择”以选择它。"
+          "0f8aba944c": "导航到目录并单击“选择”以选择它。",
+          "projectName": "项目名称",
+          "projectNamePlaceholder": "默认使用文件夹名称",
+          "projectNameHint": "将在所选主机上为此文件夹创建一个新项目。"
         },
         "AddRepoStartSteps": {
           "acf895cb42": "添加一个项目以开始使用 Orca。",
@@ -3836,7 +3872,11 @@
           "51001182e3": "空目录",
           "971d85cc84": "作为远程项目打开 · {{value0}}",
           "00c4235c10": "没有匹配“{{value0}}”",
-          "largeInputNoMatches": "没有匹配此长输入的结果"
+          "largeInputNoMatches": "没有匹配此长输入的结果",
+          "hostReconnecting": "主机正在重新连接。恢复后此文件夹将自动重新加载。",
+          "retry": "重试",
+          "truncated": "显示 {{total}} 项中的 {{shown}} 项。输入内容可缩小范围。",
+          "hostOffline": "主机未连接。此选择器会保持打开，并在重新连接后刷新。"
         },
         "RemoveFolderDialog": {
           "4dc5b5065b": "移除",
@@ -4545,7 +4585,8 @@
           "addRemoteHostTooltip": "可选择能通过 SSH 登录的机器，也可选择运行 Orca 的远程服务器。",
           "addSshHostDetail": "通过 SSH 使用现有机器。",
           "addRemoteServerDetail": "与另一台电脑上运行的 Orca 配对。",
-          "addRemoteHostDetail": "SSH 主机或 Orca 服务器"
+          "addRemoteHostDetail": "SSH 主机或 Orca 服务器",
+          "chooseHost": "选择主机"
         },
         "sidebarHostOptions": {
           "3e102f111c": "所有主机",
@@ -4695,6 +4736,37 @@
           "cancel": "取消",
           "forget": "从 Orca 中移除",
           "reconnectAndDelete": "重新连接并删除"
+        },
+        "AddRepoHostGateNotice": {
+          "reconnecting": "{{host}} 正在重新连接。您的选择会保留，重新上线后即可继续添加项目。",
+          "removed": "{{host}} 已不可用。请选择其他开发服务器。",
+          "offline": "{{host}} 已离线。您的选择会保留，重新连接后即可继续添加项目，也可以选择其他开发服务器。",
+          "noHostTitle": "没有已连接的开发服务器",
+          "noHostBody": "项目位于开发服务器上。请先连接一个开发服务器，再回来添加项目。",
+          "openDevServers": "打开开发服务器",
+          "chooseHostBody": "请选择此项目所在的开发服务器。选择后即可浏览和添加。"
+        },
+        "RepoHostBadge": {
+          "noHost": "无开发服务器",
+          "inheritedTitle": "{{name}}（继承自项目）"
+        },
+        "RepoHostPickerDialog": {
+          "updated": "开发服务器已更新",
+          "title": "选择开发服务器",
+          "description": "Orca 在开发服务器上为 {{project}} 运行 git。请选择此项目所在的服务器。",
+          "hostLabel": "开发服务器",
+          "placeholder": "选择开发服务器",
+          "unavailableHost": "{{name}}（{{status}}）",
+          "noConnectedHost": "没有已连接的开发服务器。请先连接，然后在此选择。",
+          "openDevServers": "打开开发服务器",
+          "cancel": "取消",
+          "saving": "正在保存…",
+          "confirm": "使用此开发服务器"
+        },
+        "AddRepoDuplicateNotice": {
+          "message": "此文件夹已添加到该开发服务器上的项目“{{project}}”中，因此没有重复添加。",
+          "messageUnknownProject": "此文件夹已添加到该开发服务器上，因此没有重复添加。",
+          "open": "打开该项目"
         }
       },
       "shared": {
@@ -9057,6 +9129,14 @@
         "TerminalInteractionSection": {
           "567633ff50": "Right-click pastes the clipboard into the terminal. Control-click to open the context menu.",
           "c64497148a": "Right-click pastes the clipboard. Control-click opens the context menu."
+        },
+        "RepositoryDevServerHostSection": {
+          "title": "开发服务器",
+          "description": "此项目所在的开发服务器。Orca 在其上运行 git 和智能体。",
+          "unbound": "尚未分配开发服务器，Orca 无法为此项目运行 git。请选择一个。",
+          "unknownStatus": "状态未知",
+          "fromProject": "继承自项目",
+          "change": "更改开发服务器"
         }
       },
       "right": {
@@ -12673,10 +12753,10 @@
             "7b3967c12f": "Atlassian API token",
             "3d81bf3ab3": "API 令牌",
             "e91b9a4073": "you@example.com",
-            "2849ddb295": "Atlassian 邮箱",
+            "2849ddb295": "邮箱（可选：Jira Cloud 配合 API 令牌使用；Server/Data Center 的个人访问令牌有无邮箱均可）",
             "70fcd360c4": "https://example.atlassian.net",
             "e176f9d0c5": "Jira Cloud 站点 URL",
-            "d785c42b8b": "使用 Jira Cloud 站点 URL、Atlassian 邮箱和 API token 来浏览议题。",
+            "d785c42b8b": "使用 Jira 站点 URL（Cloud 或 Server/Data Center）以及 API 令牌或个人访问令牌来浏览问题。",
             "8388bdea2b": "连接 Jira 站点"
           }
         }
@@ -12800,7 +12880,19 @@
           "showPlanning": "显示计划/阶段"
         },
         "TaskDetail": {
-          "phaseNotApproved": "运行此任务前请先批准阶段或计划"
+          "phaseNotApproved": "运行此任务前请先批准阶段或计划",
+          "openInGit": {
+            "noProject": "无法打开 Git：此任务未关联项目",
+            "unknown": "此任务的 worktree 已不存在",
+            "notOnHost": "此任务的 worktree 已不在此主机上，可能已被清理。",
+            "failed": "无法打开 worktree：{{message}}"
+          },
+          "dependencies": "依赖",
+          "blockedBy": "被以下阻塞：",
+          "dependsOn": "依赖于",
+          "dependsOnProgress": "{{total}} 个中已完成 {{done}} 个",
+          "noDependencies": "无依赖",
+          "dependenciesFailed": "无法加载依赖"
         },
         "TaskDAGView": {
           "status": {
@@ -12815,6 +12907,39 @@
         "TaskBoardView": {
           "backlogMoved": "尚未开始的任务位于 请求 > 待办",
           "openBacklog": "打开待办"
+        },
+        "TaskLoadStates": {
+          "loading": "正在加载任务...",
+          "empty": "还没有任务。",
+          "emptyFiltered": "没有符合当前搜索或筛选条件的任务。",
+          "emptyPlanningHidden": "仅存在计划和阶段任务。打开“显示计划/阶段”即可查看。",
+          "errorTitle": "无法加载任务。",
+          "staleTitle": "无法刷新任务，正在显示上次加载的列表。",
+          "forbidden": "你没有访问此项目任务的权限。",
+          "code": "错误代码：{{code}}",
+          "retry": "重试"
+        },
+        "agentActivity": {
+          "title": "智能体活动",
+          "live": "实时",
+          "finished": "已完成",
+          "idle": "空闲",
+          "reconnecting": "正在重新连接…",
+          "olderHidden": "较早的活动未显示。",
+          "log": "智能体活动日志",
+          "unavailable": "查看智能体实时活动需要已连接的运行时环境。",
+          "waiting": "正在等待智能体报告其正在执行的操作…",
+          "empty": "暂无内容可显示。智能体运行期间，活动会显示在这里；刷新页面后不会保留。",
+          "jumpToLatest": "跳到最新",
+          "savedElsewhere": "刷新页面后不会保留实时活动。请在 Result 标签页查看已保存的输出。",
+          "openResult": "打开 Result 标签页"
+        },
+        "dispatch": {
+          "loading": "正在加载调度状态…",
+          "none": "此任务还没有编排调度（尚未通过引擎 2 运行，或正通过引擎 1 直接运行）。",
+          "status": "状态：",
+          "assignee": "负责人：",
+          "focusTerminal": "聚焦运行此调度的终端"
         }
       },
       "taskPageEmptyState": {
@@ -13046,6 +13171,9 @@
           "saving": "保存中…",
           "saved": "Jira 映射已更新",
           "saveFailed": "更新 Jira 映射失败。"
+        },
+        "CreateProjectDialog": {
+          "repoAddFailed": "项目已创建，但无法添加其仓库：{{message}}。请重试。"
         }
       },
       "request": {
@@ -13161,16 +13289,37 @@
           "notFound": "该项目已不存在。",
           "conflict": "此项已被他人修改,请刷新后重试。",
           "invalidState": "当前状态下不允许此操作。",
+          "blockingQuestions": "暂时无法批准：分析中仍有需要回答的阻塞性开放问题。",
+          "unconfirmedAssumptions": "暂时无法批准此计划：其中需要确认的假设尚无已记录的回答。",
           "network": "网络错误,请检查连接。",
           "unavailable": "请求服务不可用,请稍后重试。",
           "rateLimited": "尝试次数过多,请稍候重试。",
           "validation": "请检查输入后重试。",
           "unknown": "出现了问题。",
-          "retry": "重试"
+          "retry": "重试",
+          "unsupported": "此服务器尚不支持该操作。",
+          "expired": "该项目已过期。",
+          "pending": "仍在准备中，请稍后重试。",
+          "noDevServer": "此项目没有已连接的开发服务器。请先连接后重试。",
+          "noAi": "开发服务器上无法使用 AI。请检查其 AI 配置。",
+          "featureOff": "此组织未启用请求流程。",
+          "code": {
+            "rateLimited": "操作过快，请稍候再试。",
+            "projectNotFound": "该项目已不存在。",
+            "aiQuotaExhausted": "开发服务器的 AI 额度已用完，请稍后再试。",
+            "aiBusy": "AI 正忙于其他任务，请稍后重试。",
+            "aiTimeout": "AI 响应超时，请重试。",
+            "aiAgentUnavailable": "没有已连接的开发服务器，AI 无法运行。"
+          }
         },
         "AnswerView": {
           "answer": "答复",
-          "citations": "引用"
+          "citations": "引用",
+          "confidence": "置信度：{{percent}}%",
+          "assumptions": "假设",
+          "limitations": "局限性",
+          "followUp": "建议的后续事项",
+          "followUpWithType": "{{title}}（{{type}}）"
         },
         "DiagnosisView": {
           "rootCause": "根本原因",
@@ -13224,7 +13373,12 @@
           "analyzing": "AI 正在分析此请求",
           "drafting": "AI 正在撰写分析",
           "failed": "无法生成分析。",
-          "regenerate": "重新生成"
+          "regenerate": "重新生成",
+          "errorCode": "错误代码：{{code}}"
+        },
+        "SolutionStartPrompt": {
+          "description": "此请求的分析尚未开始。开始后即可获得供审阅的方案选项。",
+          "generate": "生成方案"
         },
         "SolutionOptionCard": {
           "chosen": "已选",
@@ -13316,7 +13470,9 @@
             "analysis": "分析",
             "plan": "计划",
             "history": "历史",
-            "related": "相关"
+            "related": "相关",
+            "needsAttention": "需要关注",
+            "execution": "执行"
           }
         },
         "RequestOverviewTab": {
@@ -13336,16 +13492,30 @@
             "analysis": "分析",
             "plan": "计划",
             "phase": "阶段",
-            "execution": "执行"
+            "execution": "执行",
+            "handover": "交接",
+            "taskList": "任务列表"
           },
           "state": {
             "done": "已完成",
             "current": "当前",
             "pending": "待处理",
-            "skipped": "已中止"
+            "skipped": "已中止",
+            "running": "进行中",
+            "waiting": "等待你处理",
+            "stopped": "已停止"
           },
           "note": {
             "hotfix": "热修复:快速诊断,计划前无需审批。"
+          },
+          "caption": {
+            "progressPhases": "第 {{phase}}/{{phases}} 步 · {{done}}/{{total}} 个任务",
+            "progress": "{{done}}/{{total}} 个任务",
+            "stoppedProgress": "{{done}}/{{total}} 个任务 · 已停止",
+            "waitingApproval": "等待批准",
+            "waitingYou": "等待你处理",
+            "archiving": "归档中",
+            "handoverFailed": "归档失败"
           }
         },
         "RequestsTab": {
@@ -13408,7 +13578,8 @@
             "phase": "阶段",
             "gates": "{{count}} 个审批关口",
             "noGates": "无审批关口"
-          }
+          },
+          "classifyFailed": "AI 无法自动分类此请求。请自行选择类型或重新分类。"
         },
         "RequestHistoryTab": {
           "empty": "类型尚未更改过。",
@@ -13486,7 +13657,8 @@
             "notApprover": "您无权批准此项。",
             "conflict": "您审阅期间内容已变更。已加载最新版本,请重新审阅。",
             "alreadyDecided": "此项已有决定。",
-            "expired": "此审批已过期。已加载最新版本。"
+            "expired": "此审批已过期。已加载最新版本。",
+            "executionNotAllowed": "只有具备执行权限的人才能批准计划。请联系有权限的人，或申请访问权限。"
           },
           "PlanGateChips": {
             "plan": "计划",
@@ -13505,7 +13677,8 @@
             "notYet": "尚无计划。",
             "notFound": "未找到计划。",
             "empty": "计划为空。",
-            "currentStep": "当前步骤:{{step}}"
+            "currentStep": "当前步骤:{{step}}",
+            "notFoundHint": "可能已被删除，或者你没有访问其任务的权限。"
           },
           "PlanSummaryHeader": {
             "counts": "{{phases}} 个阶段,{{tasks}} 个任务",
@@ -13523,7 +13696,32 @@
           },
           "RequestPlanTab": {
             "reload": "重新加载",
-            "truncated": "任务列表已被截断,部分任务可能缺失。"
+            "truncated": "任务列表已被截断,部分任务可能缺失。",
+            "approvedStrip": "计划已于 {{when}} 批准，智能体将自动执行。",
+            "followInExecution": "在“执行”中查看"
+          },
+          "PlanUnconfirmedAssumptionsNotice": {
+            "ids": "尚未确认：{{ids}}"
+          },
+          "PlanApprovalCard": {
+            "steps": "{{count}} 个步骤",
+            "tasks": "{{count}} 个任务",
+            "titleTaskList": "批准一次，智能体将执行全部 {{unit}}",
+            "title": "批准一次，智能体将执行全部 {{unit}}",
+            "stopsWhen": "仅在以下情况下才会停下来询问你：",
+            "needsInfo": "需要只有你掌握的信息",
+            "failsTwice": "某个任务持续失败——请求随后退回待办",
+            "drift": "变更偏离此计划，需要审阅",
+            "preDeploy": "到达部署前审批",
+            "riskWhole": "风险按整个计划（含每个步骤）评估。批准前请在下方查看。",
+            "approve": "批准并开始执行",
+            "requestChanges": "请求修改"
+          },
+          "PlanOutline": {
+            "hours": "预计约 {{hours}} 小时",
+            "done": "已完成",
+            "step": "{{index}}. {{title}}",
+            "taskCount": "{{count}} 个任务"
           }
         },
         "approval": {
@@ -13723,7 +13921,14 @@
             "solution_open_question": "方案待决问题",
             "plan_assumption": "计划假设",
             "task_blocked": "任务受阻"
-          }
+          },
+          "loadFailedTitle": "无法加载问题",
+          "loadFailedUnsupported": "此服务器尚不支持回答问题。请联系管理员升级。",
+          "loadFailedCode": "错误代码：{{code}}",
+          "refresh": "刷新",
+          "invalidNumber": "不是有效数字。请仅使用数字，例如 8 或 2.5",
+          "numberHint": "请输入数字，例如 8 或 2.5",
+          "listHint": "每行一项"
         },
         "decision": {
           "rationaleLabel": "选择理由",
@@ -13917,7 +14122,261 @@
             "env_defect": "不计入尝试次数",
             "agent_defect": "将附带格式提醒重试一次",
             "unknown": "未分类的失败"
+          },
+          "agentOutput": {
+            "title": "智能体输出",
+            "note": "本次运行没有报告结构化结果。这里显示的是智能体输出内容的末尾。",
+            "cut": "仅显示最后一部分。",
+            "redacted": "已隐藏敏感信息。"
+          },
+          "ExecutionFailureCard": {
+            "title": "已停止：“{{task}}”失败 {{attempts}}/{{max}} 次",
+            "cause": "原因：{{cause}}",
+            "kept": "此前的内容均已完成并保留（{{done}}/{{total}} 个任务）。",
+            "reopen": "重新打开并重试",
+            "log": "查看最近日志",
+            "cancel": "取消请求"
+          },
+          "ExecutionNeedsYou": {
+            "due": "截止 {{when}}",
+            "preDeploy": "部署前审批{{what}}",
+            "phase": "批准步骤{{what}}",
+            "approve": "批准",
+            "reject": "拒绝",
+            "rejectTitle": "拒绝此审批",
+            "heading": "需要你处理",
+            "clarification": "智能体有问题要问你",
+            "answer": "回答",
+            "drift": "变更偏离了计划{{what}}",
+            "driftHint": "请使用上方横幅中的“审阅”来接受或退回。",
+            "failedTask": "“{{task}}”已用完尝试次数",
+            "viewLog": "查看最近日志"
+          },
+          "ExecutionStepList": {
+            "stepTitle": "第 {{index}}/{{total}} 步 · {{title}}",
+            "tasksDone": "已完成 {{done}}/{{total}} 个任务",
+            "empty": "此计划还没有任务。",
+            "later": "还有 {{count}} 个步骤 · {{tasks}} 个任务"
+          },
+          "ExecutionSummaryStrip": {
+            "running": "运行中",
+            "needsYou": "需要你处理",
+            "stopped": "已停止",
+            "done": "已完成",
+            "progressSteps": "{{done}}/{{total}} 个任务 · 第 {{step}}/{{steps}} 步",
+            "progress": "{{done}}/{{total}} 个任务",
+            "elapsed": "已运行 {{time}}",
+            "stop": "停止运行",
+            "progressLabel": "运行进度"
+          },
+          "ExecutionTab": {
+            "notStarted": "尚未开始，等待计划批准。",
+            "openPlan": "打开计划"
+          },
+          "ExecutionTaskRow": {
+            "done": "已完成",
+            "runningAttempt": "运行中 · 第 {{attempt}}/{{max}} 次",
+            "running": "运行中",
+            "failedAttempts": "失败 {{attempt}}/{{max}} 次",
+            "failed": "失败",
+            "blocked": "已阻塞",
+            "waiting": "等待“{{title}}”",
+            "queued": "排队中",
+            "log": "日志",
+            "details": "详情",
+            "noCause": "未记录原因"
+          },
+          "ExecutionTaskSheet": {
+            "title": "任务",
+            "description": "任务详情"
+          },
+          "HandoverRow": {
+            "nativeDone": "最后一个任务完成即结束。",
+            "archiving": "正在归档变更并准备交接",
+            "ready": "变更已归档，可以交接",
+            "failed": "尝试 {{count}} 次后归档失败",
+            "pending": "最后一个任务之后，变更将被归档并交接"
+          },
+          "cause": {
+            "timedOut": "超时",
+            "modelError": "模型错误",
+            "verifyFailed": "验证失败",
+            "envDefect": "环境问题",
+            "specDefect": "任务规格有问题",
+            "agentError": "智能体错误",
+            "needsInfo": "需要信息",
+            "cancelled": "已取消",
+            "unknown": "原因未知",
+            "adviceTimedOut": "智能体超时。通常重试即可；如果重复出现，请拆分任务。",
+            "adviceModelError": "无法使用该模型。请检查智能体和模型设置后重试。",
+            "adviceVerifyFailed": "工作未通过检查。请查看日志后重试。",
+            "adviceEnvDefect": "工作区或工具出现故障。请修复环境后重试。",
+            "adviceSpecDefect": "任务规格有误或不完整。请先修改计划再重试。",
+            "adviceAgentError": "智能体在没有可用结果的情况下停止。请查看日志后重试。",
+            "adviceNeedsInfo": "智能体需要你的回答才能继续。",
+            "adviceUnknown": "请查看日志了解情况后重试。"
           }
+        },
+        "aiSetup": {
+          "title": {
+            "notConfigured": "开发服务器上尚未配置 AI",
+            "credentialUnavailable": "无法读取 AI 凭据",
+            "sessionExpired": "开发服务器上的 Claude Code 会话已过期",
+            "quotaExhausted": "开发服务器的 AI 额度已用完",
+            "agentUnavailable": "没有可用于运行 AI 的开发服务器",
+            "busy": "AI 正忙"
+          },
+          "body": {
+            "notConfigured": "开发服务器尚未登录 Claude Code。请在开发服务器上运行 claude auth login（或为其代理设置 API 密钥），然后重试。",
+            "credentialUnavailable": "请检查为开发服务器配置的 AI 凭据，然后重试。",
+            "sessionExpired": "请在开发服务器上使用 claude auth login 重新登录，然后重试。",
+            "quotaExhausted": "开发服务器上 Claude Code 登录账号的额度已用完。请等待额度重置或切换账号。",
+            "agentUnavailable": "请为此项目连接开发服务器，或更新其代理，然后重试。",
+            "busy": "开发服务器已在运行允许的最大数量的 AI 任务。请稍后重试。"
+          },
+          "code": "错误代码：{{code}}",
+          "retry": "重试",
+          "openSettings": "打开开发服务器设置",
+          "askAdmin": "请联系管理员解决。"
+        },
+        "SolutionOpenQuestions": {
+          "title": "开放问题",
+          "notice": "在下方每个阻塞性问题都有已记录的回答之前，无法批准。",
+          "refused": "批准被拒绝。以下阻塞性问题仍未回答：{{ids}}",
+          "blocking": "阻塞",
+          "nonBlocking": "非阻塞"
+        },
+        "SolutionAskBackDialog": {
+          "ask": "回问",
+          "title": "回问",
+          "description": "把阻塞性问题发给报告人。对方回答后会重新生成方案，你需要重新选择一个选项。",
+          "reasonDefault": "在回答此问题之前无法批准该方案 ({{id}})：{{text}}",
+          "notAllowed": "现在无法提问：可能已有另一轮提问处于打开状态，或请求所处状态不允许提问。",
+          "invalid": "问题被拒绝。请确认每条理由都已填写且不过长。",
+          "reasonLabel": "提问原因 ({{id}})",
+          "pickOne": "请至少选择一个问题。",
+          "reasonRequired": "每个选中的问题都需要理由。",
+          "cancel": "取消",
+          "submit": "发送给报告人"
+        },
+        "CreateRequestProjectRepoNote": {
+          "noRepo": "此项目还没有仓库，因此其中的请求无法运行。请先为项目添加仓库。",
+          "runsOnWithHost": "请求将在 {{host}} 上的仓库 {{repo}}（{{path}}）中运行。",
+          "runsOn": "请求将在仓库 {{repo}}（{{path}}）中运行。",
+          "firstOfMany": "这是该项目 {{count}} 个仓库中的第一个。"
+        },
+        "activity": {
+          "filter": {
+            "approvals": "审批",
+            "tasks": "任务",
+            "clarifications": "澄清",
+            "changes": "类型与计划变更",
+            "all": "全部",
+            "actor": {
+              "user": "用户",
+              "ai": "AI",
+              "agent": "智能体",
+              "system": "系统",
+              "any": "任何人"
+            },
+            "groupLabel": "按类型筛选",
+            "needsAttention": "仅显示需要关注的",
+            "actorLabel": "按操作者筛选"
+          },
+          "day": {
+            "today": "今天",
+            "yesterday": "昨天",
+            "unknown": "日期未知"
+          },
+          "empty": "暂无活动",
+          "emptyFiltered": "没有符合这些筛选条件的活动。",
+          "loadingMore": "加载中…",
+          "loadMore": "加载更多",
+          "type": {
+            "unknown": "未分类"
+          },
+          "task": {
+            "unnamed": "一个任务"
+          },
+          "actor": {
+            "user": "用户",
+            "ai": "AI",
+            "agent": "智能体",
+            "system": "系统"
+          },
+          "severity": {
+            "error": "已停止",
+            "attention": "需要关注"
+          },
+          "cause": {
+            "timedOut": "超时",
+            "modelError": "模型错误",
+            "verifyFailed": "验证失败",
+            "envDefect": "环境问题",
+            "specDefect": "任务规格有问题",
+            "agentError": "智能体错误",
+            "needsInfo": "需要更多信息",
+            "cancelled": "已取消",
+            "unknown": "原因未知"
+          },
+          "title": {
+            "requestCreated": "请求已创建",
+            "requestClassified": "已分类为 {{type}}",
+            "typeChanged": "类型已从 {{from}} 改为 {{to}}",
+            "analysisGeneratedVersion": "已生成 {{kind}} 版本 {{version}}",
+            "analysisGenerated": "已生成 {{kind}}",
+            "clarificationAsked": "已提出澄清问题",
+            "clarificationAnswered": "澄清已回答",
+            "approvalRequested": "已请求批准 {{subject}}",
+            "approvalApproved": "{{subject}} 已批准",
+            "approvalRejected": "{{subject}} 已拒绝",
+            "approvalDecided": "对 {{subject}} 的决定",
+            "phaseStartedAuto": "阶段已自动开始",
+            "phaseStarted": "阶段已开始",
+            "phaseDone": "阶段已完成",
+            "planDone": "所有任务已完成",
+            "taskStarted": "{{task}} 已开始",
+            "taskSucceeded": "{{task}} 已完成",
+            "taskAccepted": "{{task}} 已标记为完成",
+            "taskFailed": "{{task}} 失败",
+            "taskCancelled": "{{task}} 已取消",
+            "requestReturned": "已退回待办",
+            "requestReopened": "已重新打开",
+            "requestCancelled": "已取消"
+          },
+          "analysis": {
+            "generic": "分析"
+          },
+          "approval": {
+            "subjectFallback": "项目"
+          },
+          "attemptOf": "第 {{attempt}}/{{max}} 次尝试",
+          "attempt": "第 {{attempt}} 次尝试",
+          "detail": {
+            "failure": "{{cause}}：{{error}}"
+          },
+          "openTab": "打开{{tab}}"
+        },
+        "NextAction": {
+          "failed": "“{{task}}”失败 {{attempts}}/{{max}} 次",
+          "failedDetail": "请求已退回待办。此前的内容均已保留。",
+          "reopen": "重新打开并重试",
+          "question": "有一个问题在等你回答",
+          "answer": "回答",
+          "preDeploy": "部署前审批在等你处理",
+          "drift": "有变更偏离了计划，需要你审阅",
+          "approval": "有审批在等你处理",
+          "review": "审阅",
+          "confirmType": "请确认此请求的类型",
+          "running": "智能体正在处理“{{task}}”",
+          "runningDetail": "第 {{attempt}}/{{max}} 次尝试。目前无需你处理。",
+          "nextTask": "等待下一个任务开始",
+          "classifying": "Orca 正在对此请求分类",
+          "analyzing": "Orca 正在分析此请求",
+          "planning": "Orca 正在编写计划",
+          "waitingApproval": "等待有人批准",
+          "waitingInfo": "等待有人回答问题",
+          "done": "此请求已完成"
         }
       },
       "reviewMap": {
@@ -15762,6 +16221,12 @@
           "waiveErrConflict": "该发现已更改。请刷新列表后重试。",
           "waiveErrValidation": "豁免被拒绝。请检查原因和到期时间。",
           "waiveErrUnknown": "无法保存豁免。"
+        }
+      },
+      "devServer": {
+        "card": {
+          "busy": "忙碌（{{count}} 个运行中）",
+          "idle": "空闲"
         }
       }
     },

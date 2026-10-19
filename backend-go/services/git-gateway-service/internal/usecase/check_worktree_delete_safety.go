@@ -37,7 +37,13 @@ func (uc *CheckWorktreeDeleteSafety) Execute(ctx context.Context, worktreeID str
 	}
 
 	report := domain.DeleteSafetyReport{}
+	// A path changed in both index and worktree arrives as two rows; count files, not rows.
+	counted := make(map[string]bool, len(status.Files))
 	for _, f := range status.Files {
+		if counted[f.Path] {
+			continue
+		}
+		counted[f.Path] = true
 		if f.State == domain.FileStateUntracked {
 			report.UntrackedFiles++
 		} else {

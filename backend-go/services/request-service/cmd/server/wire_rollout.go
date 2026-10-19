@@ -63,6 +63,9 @@ func (w *rolloutWiring) SecurityHooks() securityHooks {
 	return securityHooks{
 		AfterGuard: []grpc.UnaryServerInterceptor{requestgrpc.FlowGate(w.Flow.Effective)},
 		AfterAuthz: []grpc.UnaryServerInterceptor{requestgrpc.AuditRPC(w.Audit)},
+
+		OnRateLimited: w.Metrics.ObserveRateLimited,
+		Orphans:       w.Metrics,
 	}
 }
 

@@ -55,6 +55,7 @@ const (
 	TaskService_GetTaskSpecs_FullMethodName              = "/orca.task.v1.TaskService/GetTaskSpecs"
 	TaskService_LockTaskSpecs_FullMethodName             = "/orca.task.v1.TaskService/LockTaskSpecs"
 	TaskService_ListExecutionRecords_FullMethodName      = "/orca.task.v1.TaskService/ListExecutionRecords"
+	TaskService_GetTaskExecutionOutput_FullMethodName    = "/orca.task.v1.TaskService/GetTaskExecutionOutput"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -156,6 +157,9 @@ type TaskServiceClient interface {
 	LockTaskSpecs(ctx context.Context, in *LockTaskSpecsRequest, opts ...grpc.CallOption) (*LockTaskSpecsResponse, error)
 	// ListExecutionRecords returns the structured outcome of contract runs (CR-REQ-029).
 	ListExecutionRecords(ctx context.Context, in *ListExecutionRecordsRequest, opts ...grpc.CallOption) (*ListExecutionRecordsResponse, error)
+	// GetTaskExecutionOutput returns the stdout of the task's last successful run, secrets redacted and capped,
+	// for runs that have no ExecutionRecord (no result block). Needs read access on the task.
+	GetTaskExecutionOutput(ctx context.Context, in *GetTaskExecutionOutputRequest, opts ...grpc.CallOption) (*GetTaskExecutionOutputResponse, error)
 }
 
 type taskServiceClient struct {
@@ -516,6 +520,16 @@ func (c *taskServiceClient) ListExecutionRecords(ctx context.Context, in *ListEx
 	return out, nil
 }
 
+func (c *taskServiceClient) GetTaskExecutionOutput(ctx context.Context, in *GetTaskExecutionOutputRequest, opts ...grpc.CallOption) (*GetTaskExecutionOutputResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTaskExecutionOutputResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetTaskExecutionOutput_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -615,6 +629,9 @@ type TaskServiceServer interface {
 	LockTaskSpecs(context.Context, *LockTaskSpecsRequest) (*LockTaskSpecsResponse, error)
 	// ListExecutionRecords returns the structured outcome of contract runs (CR-REQ-029).
 	ListExecutionRecords(context.Context, *ListExecutionRecordsRequest) (*ListExecutionRecordsResponse, error)
+	// GetTaskExecutionOutput returns the stdout of the task's last successful run, secrets redacted and capped,
+	// for runs that have no ExecutionRecord (no result block). Needs read access on the task.
+	GetTaskExecutionOutput(context.Context, *GetTaskExecutionOutputRequest) (*GetTaskExecutionOutputResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -729,6 +746,9 @@ func (UnimplementedTaskServiceServer) LockTaskSpecs(context.Context, *LockTaskSp
 }
 func (UnimplementedTaskServiceServer) ListExecutionRecords(context.Context, *ListExecutionRecordsRequest) (*ListExecutionRecordsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListExecutionRecords not implemented")
+}
+func (UnimplementedTaskServiceServer) GetTaskExecutionOutput(context.Context, *GetTaskExecutionOutputRequest) (*GetTaskExecutionOutputResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTaskExecutionOutput not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -1381,6 +1401,24 @@ func _TaskService_ListExecutionRecords_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_GetTaskExecutionOutput_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTaskExecutionOutputRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetTaskExecutionOutput(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetTaskExecutionOutput_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetTaskExecutionOutput(ctx, req.(*GetTaskExecutionOutputRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1527,6 +1565,10 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListExecutionRecords",
 			Handler:    _TaskService_ListExecutionRecords_Handler,
+		},
+		{
+			MethodName: "GetTaskExecutionOutput",
+			Handler:    _TaskService_GetTaskExecutionOutput_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

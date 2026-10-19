@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -101,7 +102,11 @@ func (r *RetentionRepository) Anonymize(ctx context.Context, requestID string, p
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
 		var one int
 		if err := db.QueryRowContext(ctx, `SELECT 1 FROM requests WHERE tenant_id = ? AND id = ? FOR UPDATE`, tenantID, requestID).Scan(&one); err != nil {
-			return domain.ErrRequestNotFound(requestID)
+			// Only a missing row is "not found"; a database failure must stay an Internal error.
+			if errors.Is(err, sql.ErrNoRows) {
+				return domain.ErrRequestNotFound(requestID)
+			}
+			return fmt.Errorf("mysql: lock request for erase: %w", err)
 		}
 		var erased bool
 		if err := db.QueryRowContext(ctx, `

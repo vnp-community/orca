@@ -12,6 +12,9 @@ import (
 // ErrTaskNotFound is returned when an operation expects a task to exist but it does not.
 var ErrTaskNotFound = errors.New("task not found")
 
+// ErrShareLinkNotFound is returned when a share link id/token hash names no active link.
+var ErrShareLinkNotFound = errors.New("task share link not found")
+
 // Status is a task's lifecycle state. Widened from a plain string
 // (BE-SOL-001) to a defined type so status parameters/fields get compile-time
 // type safety throughout ports.go/repository.go/server.go, rather than only

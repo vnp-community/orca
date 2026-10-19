@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+import "google/protobuf/timestamp.proto";
+
+// CR-REQ-038: the activity feed and the execution summary of a Request. Both are read models over tables the service
+// already owns; nothing here is written by a client.
+
+message ActivityEntry {
+  // Stable within one source; with kind and occurred_at it identifies the row. The page token carries the cursor.
+  string id = 1;
+  // request.created, request.classified, request.type_changed, analysis.generated, analysis.decided, clarification.asked,
+  // clarification.answered, approval.requested, approval.decided, phase.started, phase.done, plan.done, task.started,
+  // task.succeeded, task.accepted, task.failed, task.cancelled, request.returned, request.reopened, request.cancelled.
+  string kind = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+  // user, ai, system or agent.
+  string actor_kind = 4;
+  string actor_id = 5;
+  string subject_type = 6;
+  string subject_id = 7;
+  // One short line built from structured fields; never the Request body or agent output.
+  string summary = 8;
+  // The attempt number for task rows, else 0.
+  int32 attempt = 9;
+  // info, attention or error.
+  string severity = 10;
+  // Small JSON object (at most 4 KB) with the structured fields behind the summary.
+  string details_json = 11;
+}
+
+message ListRequestActivityRequest {
+  string request_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  repeated string kinds = 4;
+  // Keeps entries at this severity or above: info (all), attention, error.
+  string min_severity = 5;
+  string actor_kind = 6;
+  string subject_id = 7;
+  // Only entries at or after this time; unset means all.
+  google.protobuf.Timestamp since = 8;
+}
+
+message ListRequestActivityResponse {
+  repeated ActivityEntry entries = 1;
+  string next_page_token = 2;
+}
+
+message ExecutionProgress {
+  int32 phases_total = 1;
+  int32 phases_done = 2;
+  int32 tasks_total = 3;
+  int32 tasks_done = 4;
+  int32 tasks_failed = 5;
+  int32 tasks_running = 6;
+}
+
+message ExecutionRunningTask {
+  string task_id = 1;
+  string phase_id = 2;
+  string title = 3;
+  // 1-based number of the attempt that is running.
+  int32 attempt = 4;
+  int32 max_attempts = 5;
+  google.protobuf.Timestamp started_at = 6;
+}
+
+message ExecutionFailedTask {
+  string task_id = 1;
+  string phase_id = 2;
+  string title = 3;
+  // Attempts that ended in failure.
+  int32 attempts = 4;
+  int32 max_attempts = 5;
+  // timed_out, model_error, verify_failed, env_defect, spec_defect, agent_error, needs_info, cancelled or unknown.
+  string last_cause = 6;
+  string last_error = 7;
+  google.protobuf.Timestamp last_at = 8;
+}
+
+message ExecutionNeedsYou {
+  // approval, clarification, failed_task, pre_deploy or drift.
+  string kind = 1;
+  string ref_id = 2;
+  string subject_type = 3;
+  string title = 4;
+  string phase_id = 5;
+  google.protobuf.Timestamp since = 6;
+  google.protobuf.Timestamp due_at = 7;
+}
+
+message ExecutionHandover {
+  // none (native engine, or not reached), archiving, ready or failed.
+  string state = 1;
+  int32 archive_attempts = 2;
+  string summary_ref = 3;
+}
+
+message ExecutionSummary {
+  string request_id = 1;
+  string status = 2;
+  // native or openspec: the engine the Request runs on.
+  string engine = 3;
+  // step_by_step or continuous; empty before the Request entered executing.
+  string execution_mode = 4;
+  ExecutionProgress progress = 5;
+  string current_phase_id = 6;
+  string next_phase_id = 7;
+  repeated ExecutionRunningTask running = 8;
+  repeated ExecutionFailedTask failed = 9;
+  repeated ExecutionNeedsYou needs_you = 10;
+  ExecutionHandover handover = 11;
+  int32 max_attempts = 12;
+  // When the first task of this run started; unset before any did.
+  google.protobuf.Timestamp started_at = 13;
+}
+
+message GetExecutionSummaryRequest {
+  string request_id = 1;
+}
+
+message GetExecutionSummaryResponse {
+  ExecutionSummary summary = 1;
+}

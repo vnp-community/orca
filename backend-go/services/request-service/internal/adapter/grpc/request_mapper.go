@@ -39,6 +39,8 @@ func toProtoRequest(r domain.Request) *requestv1.Request {
 		ContentRevision:        int32(r.ContentRevision),
 		ContentSchemaVersion:   int32(r.ContentSchemaVersion),
 		ContentDigest:          r.ContentDigest,
+		Engine:                 string(r.Engine),
+		ExecutionMode:          string(r.ExecutionMode),
 	}
 	if !r.SourceHints.IsZero() {
 		out.SourceHints = &requestv1.SourceHints{IssueType: r.SourceHints.IssueType, Labels: r.SourceHints.Labels, Priority: r.SourceHints.Priority, TypeHint: r.SourceHints.TypeHint}

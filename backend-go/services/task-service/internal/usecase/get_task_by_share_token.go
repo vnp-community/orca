@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
@@ -35,8 +36,11 @@ func (uc *GetTaskByShareToken) Execute(ctx context.Context, token string) (domai
 		return domain.TaskShareView{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_SHARE_TOKEN_REQUIRED", "share token is required", nil)
 	}
 	task, err := uc.tasks.GetByShareToken(ctx, token)
-	if err != nil {
+	if errors.Is(err, domain.ErrTaskNotFound) {
 		return domain.TaskShareView{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "no task found for this share token", err)
+	}
+	if err != nil {
+		return domain.TaskShareView{}, apperrors.New(apperrors.KindInternal, "TASK_SHARE_TOKEN_LOOKUP_FAILED", "failed to look up task by share token", err)
 	}
 	// Field allowlist is the entire point of this usecase — ONLY these 4
 	// fields, never ai_context/ai_plan_json/comments/grants/owner_id/

@@ -13,35 +13,49 @@ import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '../../../store'
 import { usePlanTree } from '../../../hooks/usePlanTree'
+import { usePlanRunInFlight } from '../../../hooks/usePlanRunInFlight'
 import { usePlanDecision } from '../../../hooks/usePlanDecision'
 import { REQUEST_FLOW_REGISTRY } from '../../../../../shared/request-flow-registry'
 import { buildStageTimeline } from '../request-stage-timeline-model'
-import { attachApprovals, computeExecutionGates } from './plan-approval-model'
+import { attachApprovals, computeExecutionGates, listPlanWorkTasks } from './plan-approval-model'
 import { canGeneratePlan, derivePlanViewState } from './plan-view-state'
 import { planDecisionErrorMessage } from './plan-decision-error-message'
+import { firstAiSetupCode } from '../request-ai-setup'
 import { PhaseApprovalBar } from './PhaseApprovalBar'
 import { PlanApprovalBar } from './PlanApprovalBar'
 import { PlanGateChips } from './PlanGateChips'
 import { PlanStates } from './PlanStates'
 import { PlanSummaryHeader } from './PlanSummaryHeader'
 import { PlanTree } from './PlanTree'
+import { PlanApprovalCard } from './PlanApprovalCard'
+import { PlanOutline } from './PlanOutline'
+import { formatRequestRelativeTime } from '@/lib/request-relative-time'
 import { PlanDriftSection } from '../readiness/PlanDriftSection'
 import { useDecisions } from '../../../hooks/useDecisions'
 import { planBlockedByDecision } from '../decision/decision-rules'
 import { GraphSkeleton } from '../../graph/GraphStates'
+import type { RequestFlowView } from '../../../../../shared/request-execution-types'
 import type { OrcaRequest } from '../../../../../shared/request-types'
 
-const GraphPanel = React.lazy(() => import('../../graph/GraphPanel').then((m) => ({ default: m.GraphPanel })))
+const GraphPanel = React.lazy(() =>
+  import('../../graph/GraphPanel').then((m) => ({ default: m.GraphPanel }))
+)
 
 export type RequestPlanTabProps = {
   request: OrcaRequest
   /** Call after any mutation so the detail pane refetches the request. */
   onChanged: () => void
+  /** The flow of the request's type (phases, gates); the built-in table answers when absent. */
+  flow?: RequestFlowView | null
+  /** Where the approved plan is followed; omitted hides the link. */
+  onOpenExecution?: () => void
 }
 
 export function RequestPlanTab({
   request,
-  onChanged
+  onChanged,
+  flow: flowView = null,
+  onOpenExecution
 }: RequestPlanTabProps): React.JSX.Element | null {
   const flowSupport = useAppStore((s) => s.requestFlowSupport)
   const setTaskExecutionGates = useAppStore((s) => s.setTaskExecutionGates)
@@ -54,14 +68,20 @@ export function RequestPlanTab({
     onChanged()
   }, [refetch, onChanged])
   const decision = usePlanDecision(request, onSettled)
+  // Why: a refreshed tab has lost its local busy state, but the server run goes on and a second click must not look possible.
+  const planRunning = usePlanRunInFlight(request, onSettled)
   const requestDecisions = useDecisions(request.id)
 
   const approvalMap = useMemo(
     () => (tree ? attachApprovals(tree, approvals) : null),
     [tree, approvals]
   )
+  // Why: the backend's flow (request.flow) wins; the built-in table only answers until it arrives or on an older runtime.
   const flow = request.type === 'unknown' ? null : REQUEST_FLOW_REGISTRY[request.type]
-  const planApprovalRequired = flow?.gates.planApproval ?? false
+  const planApprovalRequired = flowView
+    ? flowView.startGate === 'plan' || flowView.startGate === 'task_list'
+    : (flow?.gates.planApproval ?? false)
+  const hasNoPlan = flowView ? flowView.planKind === 'none' : flow?.plan === 'none'
 
   // Gates only exist while this tab is mounted; the backend re-checks on execute anyway.
   useEffect(() => {
@@ -79,7 +99,7 @@ export function RequestPlanTab({
     [request.id, setTaskExecutionGates]
   )
 
-  if (flow?.plan === 'none') {
+  if (hasNoPlan) {
     return null
   }
 
@@ -106,8 +126,9 @@ export function RequestPlanTab({
           state={state === 'ready' ? 'error' : state}
           currentStepLabel={current ? translate(current.labelKey, current.id) : undefined}
           canGenerate={canGeneratePlan(request.status)}
-          generating={decision.isBusy('generatePlan')}
+          generating={decision.isBusy('generatePlan') || planRunning}
           generateError={generateFailure ? planDecisionErrorMessage(generateFailure) : null}
+          generateAiCode={firstAiSetupCode(generateFailure?.error.backendCode)}
           onGenerate={() => void decision.regeneratePlan()}
           onRetry={refetch}
           loadErrorKind={error}
@@ -117,9 +138,24 @@ export function RequestPlanTab({
   }
 
   const planApproval = approvalMap.plan ?? approvalMap.taskList
+  const decisionBlock = planBlockedByDecision(requestDecisions.decisions)
+    ? translate(
+        'auto.components.request.decision.planBlocked',
+        'No decision recorded for the chosen option yet'
+      )
+    : null
+  // Why: a plan that runs on its own has one approval; step_by_step keeps the per-step tree untouched (empty counts as step_by_step).
+  const continuous = request.executionMode === 'continuous'
+  const approvedReadonly = continuous && planApproval?.status === 'approved'
+  const work = listPlanWorkTasks(tree)
   return (
     <div className="flex h-full flex-col overflow-auto" data-testid="request-tab-plan">
-      <PlanSummaryHeader tree={tree} approval={planApproval} view={planView} onViewChange={setPlanView} />
+      <PlanSummaryHeader
+        tree={tree}
+        approval={planApproval}
+        view={planView}
+        onViewChange={setPlanView}
+      />
       {truncated && (
         <div
           role="status"
@@ -136,16 +172,57 @@ export function RequestPlanTab({
           </Button>
         </div>
       )}
-      <PlanDriftSection request={request} approvals={approvals} phases={tree.phases} onChanged={onSettled} />
-      <PlanApprovalBar
-        approval={planApproval}
-        decision={decision}
-        approveBlockedReason={
-          planBlockedByDecision(requestDecisions.decisions)
-            ? translate('auto.components.request.decision.planBlocked', 'No decision recorded for the chosen option yet')
-            : null
-        }
+      <PlanDriftSection
+        request={request}
+        approvals={approvals}
+        phases={tree.phases}
+        onChanged={onSettled}
       />
+      {continuous && planApproval?.status === 'pending' ? (
+        <PlanApprovalCard
+          approval={planApproval}
+          decision={decision}
+          flow={flowView}
+          stepCount={flowView?.hasPhases ? tree.phases.length : 0}
+          taskCount={work.length}
+          approveBlockedReason={decisionBlock}
+        />
+      ) : (
+        <PlanApprovalBar
+          approval={planApproval}
+          decision={decision}
+          approveBlockedReason={decisionBlock}
+        />
+      )}
+      {approvedReadonly && (
+        <div
+          className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs text-muted-foreground"
+          data-testid="plan-approved-strip"
+        >
+          <span className="min-w-0 flex-1">
+            {translate(
+              'auto.components.request.plan.RequestPlanTab.approvedStrip',
+              'Plan approved {{when}}. The agent runs it on its own.',
+              {
+                when: formatRequestRelativeTime(planApproval?.approvedAt ?? planApproval?.updatedAt)
+              }
+            )}
+          </span>
+          {onOpenExecution && (
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={onOpenExecution}
+              data-testid="plan-follow-in-execution"
+            >
+              {translate(
+                'auto.components.request.plan.RequestPlanTab.followInExecution',
+                'Follow in Execution'
+              )}
+            </Button>
+          )}
+        </div>
+      )}
       {planView === 'graph' ? (
         <Suspense fallback={<GraphSkeleton />}>
           <GraphPanel
@@ -155,6 +232,8 @@ export function RequestPlanTab({
             impactAssessed={undefined}
           />
         </Suspense>
+      ) : continuous ? (
+        <PlanOutline tree={tree} hasPhases={flowView?.hasPhases ?? false} />
       ) : (
         <PlanTree
           tree={tree}
@@ -164,7 +243,7 @@ export function RequestPlanTab({
           )}
         />
       )}
-      <PlanGateChips approvals={approvalMap} decision={decision} />
+      {!continuous && <PlanGateChips approvals={approvalMap} decision={decision} />}
     </div>
   )
 }

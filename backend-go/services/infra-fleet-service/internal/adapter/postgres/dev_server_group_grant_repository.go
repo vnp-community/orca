@@ -38,11 +38,14 @@ func (s *DevServerGroupGrantStore) Delete(ctx context.Context, tenantID, grantID
 		DELETE FROM infra.dev_server_group_grants
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, grantID)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: delete grant %q for tenant: %w", grantID, domain.ErrDevServerGroupGrantNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete dev server group grant: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: grant %q not found for tenant", grantID)
+		return fmt.Errorf("postgres: delete grant %q for tenant: %w", grantID, domain.ErrDevServerGroupGrantNotFound)
 	}
 	return nil
 }

@@ -11,13 +11,14 @@ import (
 
 func ownerMembership(projectID, userID string) *fakeProjectRepository {
 	m := newFakeProjectRepository()
+	m.projects[projectID] = domain.Project{ID: projectID, TenantID: "tenant-1"}
 	m.members = append(m.members, domain.ProjectMember{ProjectID: projectID, UserID: userID, Role: domain.ProjectRoleOwner})
 	return m
 }
 
 func TestAddRepo_AppendsAtNextPosition(t *testing.T) {
 	repo := newFakeRepoRepository()
-	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), &fakeOPAClient{decide: projectRegoDecide}, &fakeDevServerLister{})
+	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), &fakeOPAClient{decide: projectRegoDecide}, &fakeDevServerLister{}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	first, err := uc.Execute(ctx, AddRepoInput{ProjectID: "p1", URL: "https://github.com/org/one"})
@@ -39,7 +40,7 @@ func TestAddRepo_AppendsAtNextPosition(t *testing.T) {
 
 func TestAddRepo_RejectsEmptyURL(t *testing.T) {
 	repo := newFakeRepoRepository()
-	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), allowAllOPA(), &fakeDevServerLister{})
+	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), allowAllOPA(), &fakeDevServerLister{}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, AddRepoInput{ProjectID: "p1", URL: ""})
@@ -48,7 +49,7 @@ func TestAddRepo_RejectsEmptyURL(t *testing.T) {
 
 func TestAddRepo_RequiresTenantContext(t *testing.T) {
 	repo := newFakeRepoRepository()
-	uc := NewAddRepo(repo, newFakeProjectRepository(), allowAllOPA(), &fakeDevServerLister{})
+	uc := NewAddRepo(repo, newFakeProjectRepository(), allowAllOPA(), &fakeDevServerLister{}, RepoHostPolicy{AllowLocalRepos: true})
 
 	_, err := uc.Execute(context.Background(), AddRepoInput{ProjectID: "p1", URL: "https://github.com/org/one"})
 	if err == nil {
@@ -60,7 +61,7 @@ func TestAddRepo_OwnerAllowedMemberDenied(t *testing.T) {
 	repo := newFakeRepoRepository()
 	membership := newFakeProjectRepository()
 	membership.members = append(membership.members, domain.ProjectMember{ProjectID: "p1", UserID: "member-1", Role: domain.ProjectRoleMember})
-	uc := NewAddRepo(repo, membership, &fakeOPAClient{decide: projectRegoDecide}, &fakeDevServerLister{})
+	uc := NewAddRepo(repo, membership, &fakeOPAClient{decide: projectRegoDecide}, &fakeDevServerLister{}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "member-1")
 	_, err := uc.Execute(ctx, AddRepoInput{ProjectID: "p1", URL: "https://github.com/org/one"})
@@ -73,7 +74,9 @@ func TestAddRepo_OwnerAllowedMemberDenied(t *testing.T) {
 func TestAddRepo_GlobalAdminAllowedRegardlessOfProjectRole(t *testing.T) {
 	repo := newFakeRepoRepository()
 	opa := &fakeOPAClient{decide: func(callerProjectRole, callerGlobalRole, action string) bool { return true }}
-	uc := NewAddRepo(repo, newFakeProjectRepository(), opa, &fakeDevServerLister{})
+	projects := newFakeProjectRepository()
+	projects.projects["p1"] = domain.Project{ID: "p1", TenantID: "tenant-1"}
+	uc := NewAddRepo(repo, projects, opa, &fakeDevServerLister{}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "admin-1")
 	if _, err := uc.Execute(ctx, AddRepoInput{ProjectID: "p1", URL: "https://github.com/org/one"}); err != nil {
@@ -83,7 +86,7 @@ func TestAddRepo_GlobalAdminAllowedRegardlessOfProjectRole(t *testing.T) {
 
 func TestAddRepo_DevServerIDPersistedWhenValid(t *testing.T) {
 	repo := newFakeRepoRepository()
-	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), allowAllOPA(), &fakeDevServerLister{exists: true})
+	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), allowAllOPA(), &fakeDevServerLister{exists: true}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	created, err := uc.Execute(ctx, AddRepoInput{ProjectID: "p1", URL: "https://github.com/org/one", DevServerID: "ds-1"})
@@ -97,7 +100,7 @@ func TestAddRepo_DevServerIDPersistedWhenValid(t *testing.T) {
 
 func TestAddRepo_RejectsUnknownDevServerID(t *testing.T) {
 	repo := newFakeRepoRepository()
-	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), allowAllOPA(), &fakeDevServerLister{exists: false})
+	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), allowAllOPA(), &fakeDevServerLister{exists: false}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, AddRepoInput{ProjectID: "p1", URL: "https://github.com/org/one", DevServerID: "ds-missing"})
@@ -111,7 +114,7 @@ func TestAddRepo_EmptyDevServerIDSkipsValidation(t *testing.T) {
 	repo := newFakeRepoRepository()
 	// A lister that would reject anything — proves an empty DevServerID
 	// (local repo) never calls Exists at all.
-	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), allowAllOPA(), &fakeDevServerLister{exists: false})
+	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), allowAllOPA(), &fakeDevServerLister{exists: false}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	created, err := uc.Execute(ctx, AddRepoInput{ProjectID: "p1", URL: "https://github.com/org/one"})
@@ -125,7 +128,7 @@ func TestAddRepo_EmptyDevServerIDSkipsValidation(t *testing.T) {
 
 func TestAddRepo_FailsClosedOnPolicyEvalError(t *testing.T) {
 	repo := newFakeRepoRepository()
-	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), &fakeOPAClient{err: errors.New("opa unreachable")}, &fakeDevServerLister{})
+	uc := NewAddRepo(repo, ownerMembership("p1", "u1"), &fakeOPAClient{err: errors.New("opa unreachable")}, &fakeDevServerLister{}, RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, AddRepoInput{ProjectID: "p1", URL: "https://github.com/org/one"})

@@ -53,8 +53,11 @@ func RunSolutionContract(t *testing.T, newEnv func(t *testing.T) SolutionEnv) {
 	}{
 		{"RunUniqueIndexes", solRunUniqueIndexes},
 		{"StartRunSemantics", solStartRunSemantics},
+		{"PlanRunNeedsNoDraftSolution", solPlanRunWithoutDraft},
+		{"FinishedRunKeepsItsToolCallsAndUsage", solRunStatsRoundTrip},
 		{"ConcurrentStartsShareOneRun", solConcurrentStarts},
 		{"AgentGateAllowsExactlyTheMaximum", solAgentGate},
+		{"AgentGateIsSharedAcrossAgentModes", solAgentGateSharedAcrossModes},
 		{"LeaseRenewFinishAndClaim", solLease},
 		{"SolutionStoreCASSupersedeDeleteDraft", solStoreOperations},
 		{"UnicodeAndDigestSurviveTheDatabase", solUnicodeDigest},
@@ -64,6 +67,7 @@ func RunSolutionContract(t *testing.T, newEnv func(t *testing.T) SolutionEnv) {
 		{"InvalidOutputLeavesNoDraft", solFlowInvalid},
 		{"AgentQuestionCompletesWithoutPlan", solFlowQuestion},
 		{"HotfixAutoApproves", solFlowHotfix},
+		{"HotfixFixTaskAndPreDeployApproval", solHotfixFixTaskAndPreDeploy},
 		{"RecoveryFailsInterruptedRun", solRecovery},
 		{"PersistRollsBackEverything", solPersistRollback},
 		{"RPCFlow", solRPCFlow},
@@ -103,6 +107,11 @@ type solKit struct {
 	decide    *usecase.DecideApproval
 	client    requestv1.RequestServiceClient
 	approvals requestv1.ApprovalServiceClient
+	// Kept so a scenario can add the hotfix gate on top of the standard wiring.
+	writer *usecase.AnalysisResultWriter
+	admins *rigAdmins
+	tr     usecase.RequestTransitioner
+	ret    *usecase.ReturnRequestToBacklog
 }
 
 type solCompleter struct {
@@ -216,6 +225,7 @@ func newSolKitWith(t *testing.T, env SolutionEnv, artifacts bool) *solKit {
 	canceler := &usecase.CancelPendingApprovalsForRequest{Repo: env.Approvals, Tx: env.Tx, Locker: env.Locker, Registry: k.registry, Outbox: env.Outbox}
 	canceller := &usecase.PendingApprovalCanceller{Inner: canceler}
 	ret := usecase.NewReturnRequestToBacklog(env.Requests, tr, env.Returns, canceller, usecase.NoActiveExecutionGuard{}, env.Tx, env.Outbox)
+	k.tr, k.ret = tr, ret
 	deps := usecase.AnalysisApprovalHandlerDeps{Requests: env.Requests, Solutions: env.SolutionStore, Returner: ret, Transition: tr, Outbox: env.Outbox}
 	var recorder *usecase.SolutionArtifactRecorder
 	var recordDecision *usecase.RecordDecision
@@ -233,6 +243,7 @@ func newSolKitWith(t *testing.T, env SolutionEnv, artifacts bool) *solKit {
 		k.registry.Register(st, h)
 	}
 	teams, admins := &rigTeams{teamsOf: map[string][]string{}, members: map[string][]string{}}, &rigAdmins{}
+	k.admins = admins
 	open := &usecase.OpenApproval{Repo: env.Approvals, Tx: env.TxScope, Requests: env.Requests, Locker: env.Locker, Registry: k.registry,
 		Resolver: &usecase.ResolveApproverPolicy{Repo: env.Policies}, ApproverRepo: env.Approvers, Outbox: env.Outbox, Teams: teams, Admins: admins}
 	k.opened = &solOpener{inner: usecase.OpenApprovalOpener{Approvals: open}}
@@ -241,6 +252,7 @@ func newSolKitWith(t *testing.T, env SolutionEnv, artifacts bool) *solKit {
 		Authorizer: &usecase.AuthorizeApprovalDecision{ApproverRepo: env.Approvers, Teams: teams}}
 
 	writer := usecase.NewAnalysisResultWriter(env.Requests, env.SolutionStore, env.AnalysisRuns, k.opened, tr, env.Tx, env.Outbox, "worker-1")
+	k.writer = writer
 	gen := usecase.NewRunSolutionGeneration(env.Requests, env.SolutionStore, k.completer, nil, writer, settings)
 	if artifacts {
 		writer.WithArtifacts(recorder)
@@ -458,6 +470,87 @@ func solStartRunSemantics(t *testing.T, env SolutionEnv) {
 	}
 }
 
+// A plan run carries no draft Solution: starting one must not insert a Solution row, must read back whole, must
+// share the one-running-per-kind rule, and must not block the request's own solution run.
+func solPlanRunWithoutDraft(t *testing.T, env SolutionEnv) {
+	k := newSolKit(t, env)
+	r := k.seed(t, domain.RequestTypeChangeRequest, domain.RequestStatusPlanning)
+	run, _ := startInput(t, k, r, domain.AnalysisModeComplete, domain.RunKindPlan, "plan-key")
+	run.SolutionID = ""
+	res, err := startIn(t, k, run, domain.Solution{}, 0)
+	if err != nil || !res.Created || res.Run.Kind != domain.RunKindPlan || res.Run.SolutionID != "" {
+		t.Fatalf("plan run start: %+v %v", res, err)
+	}
+	if got := solutionsOf(t, k, r.ID); len(got) != 0 {
+		t.Fatalf("a plan run must not create a Solution, found %d", len(got))
+	}
+	again, _ := startInput(t, k, r, domain.AnalysisModeComplete, domain.RunKindPlan, "")
+	again.SolutionID = ""
+	res2, err := startIn(t, k, again, domain.Solution{}, 0)
+	if err != nil || res2.Created || res2.Run.ID != run.ID {
+		t.Fatalf("a second plan run for the same request must return the running one: %+v %v", res2, err)
+	}
+	sol, draft := startInput(t, k, r, domain.AnalysisModeComplete, domain.RunKindSolution, "")
+	if res3, err := startIn(t, k, sol, draft, 0); err != nil || !res3.Created {
+		t.Fatalf("a solution run is independent of the plan run: %+v %v", res3, err)
+	}
+	done := res.Run
+	done.Succeed(time.Now())
+	raw := `{"title":"p"}`
+	done.RawOutput = &raw
+	if ok, err := env.AnalysisRuns.FinishOwned(k.ctx, done, "w-test"); err != nil || !ok {
+		t.Fatalf("finish plan run: %v %v", ok, err)
+	}
+	got, err := env.AnalysisRuns.Get(k.ctx, run.ID)
+	if err != nil || got.Status != domain.RunStatusSucceeded || got.RawOutput == nil || *got.RawOutput != raw {
+		t.Fatalf("plan run read back: %+v %v", got, err)
+	}
+}
+
+func solRunStatsRoundTrip(t *testing.T, env SolutionEnv) {
+	k := newSolKit(t, env)
+	r := k.seed(t, domain.RequestTypeChangeRequest, domain.RequestStatusPlanning)
+	run, _ := startInput(t, k, r, domain.AnalysisModeAgentProposal, domain.RunKindPlan, "")
+	run.SolutionID = ""
+	res, err := startIn(t, k, run, domain.Solution{}, 0)
+	if err != nil || !res.Created {
+		t.Fatalf("start: %+v %v", res, err)
+	}
+	cost := 0.75
+	done := res.Run
+	done.Succeed(time.Now())
+	done.Stats = &domain.RunStats{
+		ToolCalls: map[string]int{domain.KnowledgeToolPrefix + "kg_search": 3, "Read": 5},
+		Usage:     &domain.RunUsage{Turns: 7, DurationMS: 4200, CostUSD: &cost, OutputTokens: 321},
+	}
+	if ok, err := env.AnalysisRuns.FinishOwned(k.ctx, done, "w-test"); err != nil || !ok {
+		t.Fatalf("finish: %v %v", ok, err)
+	}
+	got, err := env.AnalysisRuns.Get(k.ctx, res.Run.ID)
+	if err != nil || got.Stats == nil || got.Stats.KnowledgeCalls() != 3 || got.Stats.ToolCalls["Read"] != 5 {
+		t.Fatalf("stats read back: %+v %v", got.Stats, err)
+	}
+	if u := got.Stats.Usage; u == nil || u.Turns != 7 || u.DurationMS != 4200 || u.CostUSD == nil || *u.CostUSD != 0.75 || u.OutputTokens != 321 {
+		t.Fatalf("usage read back: %+v", got.Stats.Usage)
+	}
+	// A run with nothing to say stores nothing and reads back as no stats, not as an empty object.
+	plain := k.seed(t, domain.RequestTypeChangeRequest, domain.RequestStatusPlanning)
+	pr, _ := startInput(t, k, plain, domain.AnalysisModeComplete, domain.RunKindPlan, "")
+	pr.SolutionID = ""
+	pres, err := startIn(t, k, pr, domain.Solution{}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finished := pres.Run
+	finished.Succeed(time.Now())
+	if ok, err := env.AnalysisRuns.FinishOwned(k.ctx, finished, "w-test"); err != nil || !ok {
+		t.Fatalf("finish plain: %v %v", ok, err)
+	}
+	if got, _ := env.AnalysisRuns.Get(k.ctx, pres.Run.ID); got.Stats != nil {
+		t.Fatalf("a run without stats read back %+v", got.Stats)
+	}
+}
+
 func solConcurrentStarts(t *testing.T, env SolutionEnv) {
 	k := newSolKit(t, env)
 	r := k.seed(t, domain.RequestTypeChangeRequest, domain.RequestStatusAnalyzing)
@@ -565,6 +658,44 @@ func solAgentGate(t *testing.T, env SolutionEnv) {
 	run, draft := startInput(t, k, other, domain.AnalysisModeAgentReadonly, domain.RunKindAnswer, "")
 	if res, err := startIn(t, k, run, draft, max); err != nil || !res.Created {
 		t.Fatalf("other project: %+v %v", res, err)
+	}
+}
+
+// An agent_readonly Solution and an agent_proposal Plan occupy the same agent, so they share one per-project cap.
+func solAgentGateSharedAcrossModes(t *testing.T, env SolutionEnv) {
+	k := newSolKit(t, env)
+	project := uuid.NewString()
+	seed := func(typ domain.RequestType) domain.Request {
+		return seedRequest(t, env.IntakeEnv, k.ctx, domain.RequestStatusAnalyzing, func(r *domain.Request) {
+			r.Type, r.TypeSource, r.Size, r.ProjectID, r.ReporterID = typ, domain.TypeSourceHuman, domain.RequestSizeM, project, k.userID
+		})
+	}
+	if err := env.AnalysisRuns.EnsureProjectGate(k.ctx, project); err != nil {
+		t.Fatal(err)
+	}
+	first := seed(domain.RequestTypeQuestion)
+	run, draft := startInput(t, k, first, domain.AnalysisModeAgentReadonly, domain.RunKindAnswer, "")
+	if res, err := startIn(t, k, run, draft, 1); err != nil || !res.Created {
+		t.Fatalf("first agent run: %+v %v", res, err)
+	}
+	second := seed(domain.RequestTypeChangeRequest)
+	plan, _ := startInput(t, k, second, domain.AnalysisModeAgentProposal, domain.RunKindPlan, "")
+	plan.SolutionID = ""
+	if _, err := startIn(t, k, plan, domain.Solution{}, 1); err == nil || errCode(err) != "REQUEST_ANALYSIS_BUSY" {
+		t.Fatalf("a proposal run must count against the same cap, got %v", err)
+	}
+	if n, err := env.AnalysisRuns.CountRunning(k.ctx, project, domain.AnalysisModeAgentProposal); err != nil || n != 0 {
+		t.Fatalf("the refused proposal run left a row: %d %v", n, err)
+	}
+	// Once the cap allows it, the run is stored in mode agent_proposal and tagged with the openspec engine.
+	plan2, _ := startInput(t, k, second, domain.AnalysisModeAgentProposal, domain.RunKindPlan, "")
+	plan2.SolutionID = ""
+	res, err := startIn(t, k, plan2, domain.Solution{}, 2)
+	if err != nil || !res.Created || res.Run.Mode != domain.AnalysisModeAgentProposal {
+		t.Fatalf("proposal run: %+v %v", res, err)
+	}
+	if n, err := env.AnalysisRuns.CountRunning(k.ctx, project, domain.AnalysisModeAgentProposal); err != nil || n != 1 {
+		t.Fatalf("CountRunning(agent_proposal) = %d %v", n, err)
 	}
 }
 

@@ -81,7 +81,7 @@ for svc in "${TARGET_SERVICES[@]}"; do
   # -trimpath: reproducible builds, no local path leakage into the binary.
   # -ldflags "-s -w": strip debug symbols — smaller binary, matches the
   # "smallest possible" priority carried through to the runtime image too.
-  if ! (cd "${svc_dir}" && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
+  if ! (cd "${svc_dir}" && GOOS=linux GOARCH="${GOARCH:-amd64}" CGO_ENABLED=0 \
       go build -trimpath -ldflags="-s -w -X main.version=${ORCA_GO_VERSION:-dev}" \
       -o "${out}" ./cmd/server); then
     echo "  ❌ FAILED: ${svc}"
@@ -121,12 +121,21 @@ if [ "${FAIL}" -ne 0 ]; then
   exit 1
 fi
 
-echo ""
-echo "[2/3] Building frontend/ (vite build)..."
-(cd "${REPO_ROOT}/frontend" && [ -d node_modules ] || pnpm install)
-(cd "${REPO_ROOT}/frontend" && pnpm run build)
-rm -rf "${DIST_DIR}"
-cp -r "${REPO_ROOT}/frontend/out/web" "${DIST_DIR}"
+# Building one service is the inner development loop; the frontend only rebuilds when asked (BUILD_FRONTEND=1)
+# or when the whole set is built.
+if [ "${#TARGET_SERVICES[@]}" -gt 1 ] || [ "${BUILD_FRONTEND:-0}" = "1" ]; then
+  echo ""
+  echo "[2/3] Building frontend/ (vite build)..."
+  (cd "${REPO_ROOT}/frontend" && [ -d node_modules ] || pnpm install)
+  (cd "${REPO_ROOT}/frontend" && pnpm run build)
+  # Why: rsync keeps the directory itself; rm -rf + cp gave it a new inode, so running containers kept
+  # bind-mounting the deleted one and nginx answered 403 until restarted.
+  mkdir -p "${DIST_DIR}"
+  rsync -a --delete "${REPO_ROOT}/frontend/out/web/" "${DIST_DIR}/"
+else
+  echo ""
+  echo "[2/3] Skipping frontend build (single service; set BUILD_FRONTEND=1 to include it)."
+fi
 
 # Why: docker-compose.yml's OPA policy bind mounts must resolve to a real
 # path on the SERVER after sync-to-server.sh — that script only ships this
@@ -145,19 +154,26 @@ cp -r "${REPO_ROOT}/frontend/out/web" "${DIST_DIR}"
 # docker-compose.yml's mount source becomes "./policy/orca-authz", correctly
 # relative to wherever the compose file itself ends up.
 POLICY_DIR="${DEPLOY_DIR}/policy"
-rm -rf "${POLICY_DIR}"
-mkdir -p "${POLICY_DIR}"
-cp -r "${BACKEND_GO_DIR}/policy/orca-authz" "${POLICY_DIR}/orca-authz"
+# Same reason as DIST_DIR above: services mounting ./policy/orca-authz read an empty bundle after a recreate
+# and fail closed (REQUEST_FORBIDDEN for every caller).
+mkdir -p "${POLICY_DIR}/orca-authz"
+rsync -a --delete "${BACKEND_GO_DIR}/policy/orca-authz/" "${POLICY_DIR}/orca-authz/"
 
 echo ""
 echo "[3/3] Building git-gateway-service's own runtime image (needs a real"
 echo "  git binary — see docker-compose.yml's git-gateway-service comment)..."
-# docker build \
-#   --platform linux/amd64 \
-#   -t "orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}" \
-#   -f "${DEPLOY_DIR}/docker/git-gateway-runtime.Dockerfile" \
-#   "${DEPLOY_DIR}/docker"
-echo "✅ Built orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev} (SKIPPED)"
+if [ "${GOARCH:-amd64}" = "arm64" ]; then
+  IMG_PLATFORM=linux/arm64; LIB_TRIPLET=aarch64-linux-gnu
+else
+  IMG_PLATFORM=linux/amd64; LIB_TRIPLET=x86_64-linux-gnu
+fi
+docker build \
+  --platform "${IMG_PLATFORM}" \
+  --build-arg "LIB_TRIPLET=${LIB_TRIPLET}" \
+  -t "orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}" \
+  -f "${DEPLOY_DIR}/docker/git-gateway-runtime.Dockerfile" \
+  "${DEPLOY_DIR}/docker"
+echo "✅ Built orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}"
 
 echo ""
 echo "======================================================"

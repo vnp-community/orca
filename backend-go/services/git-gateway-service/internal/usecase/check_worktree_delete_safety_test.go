@@ -120,3 +120,25 @@ func TestCheckWorktreeDeleteSafety_SafeToDelete_TrueOnlyWhenAllCountsZero(t *tes
 		t.Errorf("expected SafeToDelete=false when there are uncommitted files, got %+v", report2)
 	}
 }
+
+// An agent status lists a path changed in both index and worktree twice (one
+// row per area); the report counts files, not rows.
+func TestCheckWorktreeDeleteSafety_PathInBothAreasCountsOnce(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
+	local := &fakeGitExecutorWithStatus{
+		fakeGitExecutor: &fakeGitExecutor{},
+		status: domain.GitStatus{Files: []domain.FileStatus{
+			{Path: "a.txt", State: domain.FileStateAdded, Area: "staged"},
+			{Path: "a.txt", State: domain.FileStateModified, Area: "unstaged"},
+		}},
+	}
+	uc := NewCheckWorktreeDeleteSafety(resolver, local, &fakeGitExecutor{}, &fakeTerminalSessionLister{})
+
+	report, err := uc.Execute(context.Background(), "wt-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if report.UncommittedFiles != 1 {
+		t.Errorf("UncommittedFiles = %d, want 1", report.UncommittedFiles)
+	}
+}

@@ -64,6 +64,14 @@ export async function handleFsReadDir(
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     span.fail(err, { path: absPath })
+    // Same stable code fs.stat gives a missing path: callers tell "not there" from a real failure without reading the message.
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {
+        jsonrpc: '2.0',
+        id,
+        error: { code: AgentErrorCode.PathNotFound, message: `Not found: ${absPath}` }
+      }
+    }
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }
@@ -157,6 +165,29 @@ export async function handleFsReadFile(
 }
 
 // ─── fs.stat ──────────────────────────────────────────────────────────────────
+
+// project-service calls fs.checkPath to validate a repo path before binding a project to this dev server.
+export async function handleFsCheckPath(
+  id: string | number | null,
+  params: Record<string, unknown>,
+  config: AgentConfig
+): Promise<object> {
+  const rawPath = typeof params.path === 'string' ? params.path : ''
+  if (!rawPath) {
+    return {
+      jsonrpc: '2.0',
+      id,
+      error: { code: AgentErrorCode.InvalidParams, message: 'Missing required param: path' }
+    }
+  }
+  const absPath = isAbsolute(rawPath) ? rawPath : join(config.workDir, rawPath)
+  try {
+    const st = await stat(absPath)
+    return { jsonrpc: '2.0', id, result: { exists: true, isDir: st.isDirectory() } }
+  } catch {
+    return { jsonrpc: '2.0', id, result: { exists: false, isDir: false } }
+  }
+}
 
 export async function handleFsStat(
   id: string | number | null,

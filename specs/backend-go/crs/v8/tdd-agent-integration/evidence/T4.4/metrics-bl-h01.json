@@ -1,0 +1,548 @@
+{
+  "runs": [
+    {
+      "id": "1f132c10-9341-4168-b84a-9a96b80ac794",
+      "kind": "solution",
+      "mode": "agent_readonly",
+      "engine": "native",
+      "status": "failed",
+      "error": "REQUEST_SOLUTION_INTERNAL_ERROR",
+      "started": "2026-10-14 16:03:20.385024+00",
+      "finished": "2026-10-14 16:11:13.286608+00",
+      "seconds": 472.901584,
+      "cost": null,
+      "turns": null,
+      "knowledge_calls": 0,
+      "tool_calls": 0
+    },
+    {
+      "id": "5f7ca2fc-2b10-4d18-a6f9-459c8d685c7b",
+      "kind": "solution",
+      "mode": "agent_readonly",
+      "engine": "native",
+      "status": "succeeded",
+      "error": "",
+      "started": "2026-10-14 16:16:32.663409+00",
+      "finished": "2026-10-14 16:23:40.882119+00",
+      "seconds": 428.21871,
+      "cost": 4.449517500000001,
+      "turns": 79,
+      "knowledge_calls": 21,
+      "tool_calls": 78
+    },
+    {
+      "id": "b5abf8a9-8f78-496b-8371-b29305ee3423",
+      "kind": "solution",
+      "mode": "agent_readonly",
+      "engine": "native",
+      "status": "succeeded",
+      "error": "",
+      "started": "2026-10-14 16:25:36.370109+00",
+      "finished": "2026-10-14 16:32:30.483916+00",
+      "seconds": 414.113807,
+      "cost": 2.8949705000000003,
+      "turns": 59,
+      "knowledge_calls": 23,
+      "tool_calls": 58
+    },
+    {
+      "id": "9734d599-b127-4320-bbd0-7e7f92b13d6c",
+      "kind": "plan",
+      "mode": "agent_proposal",
+      "engine": "openspec",
+      "status": "failed",
+      "error": "REQUEST_OPENSPEC_INVALID_OUTPUT",
+      "started": "2026-10-14 16:32:56.870486+00",
+      "finished": "2026-10-14 16:58:45.088142+00",
+      "seconds": 1548.217656,
+      "cost": 12.730668000000001,
+      "turns": 233,
+      "knowledge_calls": 46,
+      "tool_calls": 231
+    },
+    {
+      "id": "f1c99151-1de5-47ea-94c8-c3c3326199c6",
+      "kind": "plan",
+      "mode": "agent_proposal",
+      "engine": "openspec",
+      "status": "failed",
+      "error": "REQUEST_OPENSPEC_AGENT_FAILED",
+      "started": "2026-10-14 17:01:55.435331+00",
+      "finished": "2026-10-14 17:01:55.498935+00",
+      "seconds": 0.063604,
+      "cost": null,
+      "turns": null,
+      "knowledge_calls": 0,
+      "tool_calls": 0
+    },
+    {
+      "id": "124adc3e-12e7-414c-95e9-eff7be85666c",
+      "kind": "plan",
+      "mode": "agent_proposal",
+      "engine": "openspec",
+      "status": "failed",
+      "error": "REQUEST_OPENSPEC_TIMEOUT",
+      "started": "2026-10-14 17:05:30.009042+00",
+      "finished": "2026-10-14 17:20:30.822139+00",
+      "seconds": 900.813097,
+      "cost": null,
+      "turns": null,
+      "knowledge_calls": 25,
+      "tool_calls": 136
+    },
+    {
+      "id": "1a38ae54-1204-4ea1-8d85-5cbc7538ede5",
+      "kind": "plan",
+      "mode": "agent_proposal",
+      "engine": "openspec",
+      "status": "failed",
+      "error": "REQUEST_ENGINE_NO_CONNECTION",
+      "started": "2026-10-14 17:23:10.710669+00",
+      "finished": "2026-10-14 17:23:10.737889+00",
+      "seconds": 0.02722,
+      "cost": null,
+      "turns": null,
+      "knowledge_calls": 0,
+      "tool_calls": 0
+    },
+    {
+      "id": "47a6bcdd-40e9-4744-a314-2ba0d1aaa5b2",
+      "kind": "plan",
+      "mode": "agent_proposal",
+      "engine": "openspec",
+      "status": "failed",
+      "error": "REQUEST_OPENSPEC_INVALID_OUTPUT",
+      "started": "2026-10-14 17:23:47.790024+00",
+      "finished": "2026-10-14 17:45:58.209142+00",
+      "seconds": 1330.419118,
+      "cost": 13.192238499999997,
+      "turns": 215,
+      "knowledge_calls": 50,
+      "tool_calls": 213
+    },
+    {
+      "id": "73d8af7b-f3ea-4f52-8ab2-a6bc430f3414",
+      "kind": "plan",
+      "mode": "agent_proposal",
+      "engine": "openspec",
+      "status": "succeeded",
+      "error": "",
+      "started": "2026-10-14 17:51:40.590317+00",
+      "finished": "2026-10-14 18:04:57.596395+00",
+      "seconds": 797.006078,
+      "cost": 7.353595500000001,
+      "turns": 128,
+      "knowledge_calls": 36,
+      "tool_calls": 127
+    },
+    {
+      "id": "bbf195d9-dd91-43d4-94ae-b9295a43c756",
+      "kind": "solution",
+      "mode": "agent_readonly",
+      "engine": "native",
+      "status": "succeeded",
+      "error": "",
+      "started": "2026-10-14 18:53:11.955684+00",
+      "finished": "2026-10-14 18:59:20.289367+00",
+      "seconds": 368.333683,
+      "cost": 2.5669195,
+      "turns": 49,
+      "knowledge_calls": 21,
+      "tool_calls": 48
+    },
+    {
+      "id": "1a12a5bb-126a-44d0-b431-781e8a455793",
+      "kind": "plan",
+      "mode": "agent_proposal",
+      "engine": "openspec",
+      "status": "succeeded",
+      "error": "",
+      "started": "2026-10-14 18:59:52.579447+00",
+      "finished": "2026-10-14 19:08:55.625251+00",
+      "seconds": 543.045804,
+      "cost": 7.379361500000002,
+      "turns": 118,
+      "knowledge_calls": 27,
+      "tool_calls": 117
+    }
+  ],
+  "tasks": [
+    {
+      "id": "f9b20952-8bf5-48f0-864f-8c3b1fa2e0d1",
+      "title": "Implement add, update, list and delete with client-id idempotency and owner scoping",
+      "status": "done",
+      "phase": "The six `/ai/conversation/*` routes behind `AI_ENABLED`",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 21:40:08.272888+00"
+        }
+      ]
+    },
+    {
+      "id": "540288dc-38ce-4f1e-9bdc-a21db934e43c",
+      "title": "Implement ResolveModel with the personal to project to organisation to system order and TrimSpace owner types",
+      "status": "done",
+      "phase": "Data model, model resolution and the internal AIService contract",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 20:48:53.597424+00"
+        }
+      ]
+    },
+    {
+      "id": "6debf7a0-53c9-46a9-a8e9-a9b204c5f491",
+      "title": "Revise the documents the change makes false, naming FR-SYS-07 and ENT-17",
+      "status": "blocked",
+      "phase": "Gateway exposure, registers, documents and acceptance",
+      "attempts": []
+    },
+    {
+      "id": "692b8fa7-ea3a-4a3d-b1f8-85ee5ec8677c",
+      "title": "Add the AI_ENABLED flag and the subtree middleware that answers 503 when it is off",
+      "status": "done",
+      "phase": "The six `/ai/conversation/*` routes behind `AI_ENABLED`",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 21:29:38.510974+00"
+        }
+      ]
+    },
+    {
+      "id": "e31eb4dd-ae90-459b-b7d6-de5036405f52",
+      "title": "Add the handler integration tests against the local stack mock provider and its failure control plane",
+      "status": "done",
+      "phase": "The six `/ai/conversation/*` routes behind `AI_ENABLED`",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 22:13:34.697343+00"
+        }
+      ]
+    },
+    {
+      "id": "8288d276-182b-448c-bd4e-388b98e95810",
+      "title": "Move the five route and UI-contract registers to the new status codes",
+      "status": "blocked",
+      "phase": "Gateway exposure, registers, documents and acceptance",
+      "attempts": []
+    },
+    {
+      "id": "ab550fda-656c-43d1-890a-8d9ae34352d3",
+      "title": "Register the new table in both ownership registers and add the grants",
+      "status": "done",
+      "phase": "Data model, model resolution and the internal AIService contract",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 20:54:04.143892+00"
+        }
+      ]
+    },
+    {
+      "id": "d1c3cc6e-7e9f-465f-9fc0-4095bcb74330",
+      "title": "Run the aiclient unit suite for the PH-1 scenarios",
+      "status": "done",
+      "phase": "Shared `aiclient`: OpenAI-compatible provider client, guarded egress, bounded retry",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 20:10:56.666367+00"
+        }
+      ]
+    },
+    {
+      "id": "83813198-2ca0-4086-97e1-74ca72b04eb0",
+      "title": "Check the quota before model resolution and refuse an exhausted organisation with 429",
+      "status": "done",
+      "phase": "Per-organisation quota, cost ceiling and usage ledger",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 22:44:51.969157+00"
+        }
+      ]
+    },
+    {
+      "id": "479292be-f639-4e44-9982-061f8d7b7217",
+      "title": "Create the aiclient package with Client, Provider, ChatRequest/ChatResponse and the OpenAI Chat Completions call",
+      "status": "done",
+      "phase": "Shared `aiclient`: OpenAI-compatible provider client, guarded egress, bounded retry",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 19:23:04.302762+00"
+        }
+      ]
+    },
+    {
+      "id": "4989fb98-af6b-48f4-8f75-7c4357ded01c",
+      "title": "Write the ledger row and the period counter in the same transaction as the turn",
+      "status": "open",
+      "phase": "Per-organisation quota, cost ceiling and usage ledger",
+      "attempts": [
+        {
+          "attempt": 2,
+          "parse": "missing",
+          "failure": "env_defect",
+          "at": "2026-10-14 23:02:18.300489+00"
+        },
+        {
+          "attempt": 1,
+          "parse": "missing",
+          "failure": "env_defect",
+          "at": "2026-10-14 23:02:18.300652+00"
+        }
+      ]
+    },
+    {
+      "id": "4e2e0db4-121f-4919-9427-1a269b767c14",
+      "title": "Implement chat/list and mount the six routes on the router",
+      "status": "done",
+      "phase": "The six `/ai/conversation/*` routes behind `AI_ENABLED`",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 22:04:11.267942+00"
+        }
+      ]
+    },
+    {
+      "id": "2d155d3e-344c-41f2-98e7-cb26c4316e26",
+      "title": "Build the HTTP client through netguard AdminTarget and the telemetry untrusted-target transport",
+      "status": "done",
+      "phase": "Shared `aiclient`: OpenAI-compatible provider client, guarded egress, bounded retry",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 19:30:14.427168+00"
+        }
+      ]
+    },
+    {
+      "id": "e730f036-bdd9-4d70-b3eb-b4cc6da735f0",
+      "title": "Publish the AIService gRPC contract restricted by the identity acl.yaml caller list",
+      "status": "done",
+      "phase": "Data model, model resolution and the internal AIService contract",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 21:08:03.426565+00"
+        }
+      ]
+    },
+    {
+      "id": "84d3866c-260e-4559-bda4-b2e4f6befb50",
+      "title": "Extend the SEC-07 secret test to the AI model-source key and run it",
+      "status": "done",
+      "phase": "Data model, model resolution and the internal AIService contract",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 21:22:46.401291+00"
+        }
+      ]
+    },
+    {
+      "id": "26155648-3cb4-420b-8ccb-63e487a31e82",
+      "title": "Implement the chat turn: resolve, assemble history, call aiclient, persist, return a plain string",
+      "status": "done",
+      "phase": "The six `/ai/conversation/*` routes behind `AI_ENABLED`",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 21:51:37.696601+00"
+        }
+      ]
+    },
+    {
+      "id": "cc0c4d83-5c1f-4012-9114-5e62b3a0cb94",
+      "title": "Run the quota suite including the no-provider-call proof",
+      "status": "open",
+      "phase": "Per-organisation quota, cost ceiling and usage ledger",
+      "attempts": []
+    },
+    {
+      "id": "a5ee23c7-3576-4abf-98a6-529b6059e9d2",
+      "title": "Mask the provider key everywhere but the Authorization header and export the three AI metrics",
+      "status": "done",
+      "phase": "Shared `aiclient`: OpenAI-compatible provider client, guarded egress, bounded retry",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 19:48:02.07953+00"
+        }
+      ]
+    },
+    {
+      "id": "36cb724c-0da4-4545-9711-036d1d4ac872",
+      "title": "Route the /ai/conversation subtree to system-setting with a read timeout of at least 90 s",
+      "status": "open",
+      "phase": "Gateway exposure, registers, documents and acceptance",
+      "attempts": []
+    },
+    {
+      "id": "6f71a378-62cc-4712-a4bf-3642fa79a600",
+      "title": "Record only Claude and Bedrock as deferred and remove the AI chat deferral",
+      "status": "blocked",
+      "phase": "Gateway exposure, registers, documents and acceptance",
+      "attempts": []
+    },
+    {
+      "id": "07d657ec-bc33-4648-8599-4c40000b3a81",
+      "title": "Add the static price table and the pre-call token estimator",
+      "status": "done",
+      "phase": "Per-organisation quota, cost ceiling and usage ledger",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 22:34:33.187775+00"
+        }
+      ]
+    },
+    {
+      "id": "b03eac9e-3a60-4c2a-9730-adcd4ed191c4",
+      "title": "Add the quota and ledger migration and register the tables and grants",
+      "status": "done",
+      "phase": "Per-organisation quota, cost ceiling and usage ledger",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 22:26:50.44514+00"
+        }
+      ]
+    },
+    {
+      "id": "f82c7708-7201-4fc2-b413-db697e671af3",
+      "title": "Add the additive migration for ai_conversation columns, ai_conversation_message and the org/project binding",
+      "status": "done",
+      "phase": "Data model, model resolution and the internal AIService contract",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 20:24:58.229225+00"
+        }
+      ]
+    },
+    {
+      "id": "bac5e2c4-dc7b-4c48-8e04-e686aa765585",
+      "title": "Retry at most twice on 429, 5xx and timeout, honouring a capped and jittered Retry-After",
+      "status": "done",
+      "phase": "Shared `aiclient`: OpenAI-compatible provider client, guarded egress, bounded retry",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 19:56:18.827248+00"
+        }
+      ]
+    },
+    {
+      "id": "a36462d7-9e9a-48c1-bb05-77109c19925e",
+      "title": "Add and run the end-to-end acceptance suite on the real local stack",
+      "status": "blocked",
+      "phase": "Gateway exposure, registers, documents and acceptance",
+      "attempts": []
+    },
+    {
+      "id": "0788073c-8aae-464b-a9b9-10985ba15fc4",
+      "title": "Verify a chat turn against an approved real provider in an egress-enabled environment",
+      "status": "blocked",
+      "phase": "Gateway exposure, registers, documents and acceptance",
+      "attempts": []
+    },
+    {
+      "id": "67415480-aa7a-4ba5-803c-ec33fd2c1426",
+      "title": "Return ErrProviderUnsupported for Claude and AWS Bedrock without any stub path",
+      "status": "done",
+      "phase": "Shared `aiclient`: OpenAI-compatible provider client, guarded egress, bounded retry",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 19:36:14.148062+00"
+        }
+      ]
+    },
+    {
+      "id": "41da032c-6f07-49c2-a47f-50d32c349033",
+      "title": "Implement ListMessages and AppendTurn on the AI usecase",
+      "status": "done",
+      "phase": "Data model, model resolution and the internal AIService contract",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 20:37:34.174709+00"
+        }
+      ]
+    },
+    {
+      "id": "3c6b27c4-e247-453f-8757-d95830fdcd77",
+      "title": "Extend the AI domain types and add the conversation and message repository",
+      "status": "done",
+      "phase": "Data model, model resolution and the internal AIService contract",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 20:31:19.3135+00"
+        }
+      ]
+    },
+    {
+      "id": "04702d13-b406-4bb7-8e76-26e41cbe270e",
+      "title": "Validate the request organisation against the caller's membership before counting usage",
+      "status": "done",
+      "phase": "Per-organisation quota, cost ceiling and usage ledger",
+      "attempts": [
+        {
+          "attempt": 1,
+          "parse": "ok",
+          "failure": "",
+          "at": "2026-10-14 22:56:40.408847+00"
+        }
+      ]
+    }
+  ]
+}

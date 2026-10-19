@@ -67,7 +67,7 @@ func (uc *ReportTaskExecutionResult) Execute(ctx context.Context, in ReportTaskE
 	}
 	task, err := uc.tasks.Get(ctx, tenantID, in.TaskID)
 	if err != nil {
-		return apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		return taskRepoError(err, "task not found", "TASK_FETCH_FAILED", "failed to fetch task")
 	}
 	if task.ActiveExecutionLinkID == "" {
 		// No active link recorded at all — a callback arriving after the
@@ -93,7 +93,7 @@ func (uc *ReportTaskExecutionResult) Execute(ctx context.Context, in ReportTaskE
 		}
 		events := runEvents(task, domain.StatusInProgress, domain.StatusReview, CauseExecutionCompleted, link.ID, link.Engine, "", time.Now())
 		if err := uc.tasks.CompleteExecution(ctx, tenantID, in.TaskID, string(domain.StatusReview), in.ActualHours, events); err != nil {
-			return err
+			return taskRepoError(err, "task not found", "TASK_COMPLETE_EXECUTION_FAILED", "failed to complete task execution")
 		}
 		syncContainerParent(ctx, uc.sync, in.TaskID)
 		return nil

@@ -32,6 +32,7 @@ type fakeTaskServer struct {
 	listCalls   []*taskv1.ListTasksRequest
 	stateCalls  [][]string
 	executeErr  error
+	executes    []*taskv1.TaskServiceExecuteRequest
 	updateErr   error
 	updates     []*taskv1.UpdateTaskRequest
 	md          []metadata.MD
@@ -86,6 +87,7 @@ func (f *fakeTaskServer) Execute(ctx context.Context, req *taskv1.TaskServiceExe
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record(ctx)
+	f.executes = append(f.executes, req)
 	if f.executeErr != nil {
 		return nil, f.executeErr
 	}
@@ -112,7 +114,10 @@ func (f *fakeTaskServer) ListExecutionStates(ctx context.Context, req *taskv1.Li
 	return resp, nil
 }
 
-func startTaskServer(t *testing.T, f *fakeTaskServer) *TaskClient {
+func startTaskServer(t *testing.T, f *fakeTaskServer) *TaskClient { return startTaskServerFor(t, f) }
+
+// startTaskServerFor serves any task-service fake over bufconn and returns the real client pointed at it.
+func startTaskServerFor(t *testing.T, f taskv1.TaskServiceServer) *TaskClient {
 	t.Helper()
 	lis := bufconn.Listen(1 << 20)
 	srv := grpc.NewServer()
@@ -326,5 +331,29 @@ func TestChunkStrings(t *testing.T) {
 	got := chunkStrings([]string{"a", "b", "c", "d", "e"}, 2)
 	if len(got) != 3 || len(got[2]) != 1 {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestTaskClient_ExecuteContract_SendsTheNonceAndTheTwoFlags_AndPlainExecuteSendsNone(t *testing.T) {
+	f := &fakeTaskServer{}
+	c := startTaskServer(t, f)
+	run := usecase.ContractRun{ResultNonce: "n0nce-n0nce-n0nce-n0nce", UseKnowledgeHub: true, RequirePassingCheck: true}
+	if err := c.ExecuteContract(ctxWith("approver-1"), "task-1", "req:r:task-1:2", run); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Execute(ctxWith("approver-1"), "task-2", "req:r:task-2:1"); err != nil {
+		t.Fatal(err)
+	}
+	got, plain := f.executes[0], f.executes[1]
+	if got.GetTaskId() != "task-1" || got.GetRequestId() != "req:r:task-1:2" || got.GetResultNonce() != run.ResultNonce || !got.GetUseKnowledgeHub() || !got.GetRequirePassingCheck() {
+		t.Fatalf("contract request = %v", got)
+	}
+	if plain.GetResultNonce() != "" || plain.GetUseKnowledgeHub() || plain.GetRequirePassingCheck() {
+		t.Fatalf("a plain run must not select the contract path: %v", plain)
+	}
+	// Both go through the same error mapping.
+	f.executeErr = status.Error(codes.FailedPrecondition, "TASK_EXECUTE_ALREADY_IN_PROGRESS: x")
+	if err := c.ExecuteContract(ctxWith("u"), "t", "ref", run); !errors.Is(err, domain.ErrTaskAlreadyRunning) {
+		t.Fatalf("got %v", err)
 	}
 }

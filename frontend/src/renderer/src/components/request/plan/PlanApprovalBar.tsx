@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ApprovalRiskGateSection, useApprovalRiskGate } from '../impact/ApprovalRiskGate'
 import { planDecisionErrorMessage } from './plan-decision-error-message'
 import { PlanDecisionButtons } from './PlanDecisionButtons'
+import { PlanUnconfirmedAssumptionsNotice } from './PlanUnconfirmedAssumptionsNotice'
 import type { PlanDecision } from '../../../hooks/usePlanDecision'
 import type { Approval } from '../../../../../shared/request-types'
 
@@ -22,12 +23,17 @@ type Props = {
   decision: PlanDecision
   /** Why Approve is locked (no effective Decision yet); null/undefined = not blocked. */
   approveBlockedReason?: string | null
+  /** The continuous plan card words the decision as starting the run. */
+  approveLabel?: string
+  rejectLabel?: string
 }
 
 export function PlanApprovalBar({
   approval,
   decision,
-  approveBlockedReason = null
+  approveBlockedReason = null,
+  approveLabel,
+  rejectLabel
 }: Props): React.JSX.Element | null {
   const failure =
     decision.failure &&
@@ -35,7 +41,10 @@ export function PlanApprovalBar({
       ? decision.failure
       : null
   const regenerating = decision.isBusy('generatePlan')
-  const isTaskList = (approval?.subjectType as string | undefined) === 'task_list'
+  // Why: the wire parser folds task_list into plan; the original kind survives in rawSubjectType.
+  const isTaskList =
+    approval?.rawSubjectType === 'task_list' ||
+    (approval?.subjectType as string | undefined) === 'task_list'
   const risk = useApprovalRiskGate(approval, failure?.error ?? null)
 
   // Approved plans are read-only: changing one means regenerating, which needs a new approval.
@@ -47,7 +56,7 @@ export function PlanApprovalBar({
     <Button
       size="sm"
       variant="outline"
-      disabled={regenerating}
+      disabled={regenerating || decision.generateCoolingDown}
       onClick={() => void decision.regeneratePlan()}
       data-testid="plan-regenerate"
     >
@@ -93,11 +102,12 @@ export function PlanApprovalBar({
             approveExtras={risk.gate.approveExtras}
             hideApprove={risk.approverNotAllowed}
             approveLabel={
-              isTaskList
+              approveLabel ??
+              (isTaskList
                 ? translate(`${P}approveTaskList`, 'Approve task list')
-                : translate(`${P}approve`, 'Approve plan')
+                : translate(`${P}approve`, 'Approve plan'))
             }
-            rejectLabel={translate(`${P}reject`, 'Reject')}
+            rejectLabel={rejectLabel ?? translate(`${P}reject`, 'Reject')}
             rejectTitle={translate(`${P}rejectTitle`, 'Reject plan')}
             offerRegenerate
           />
@@ -109,7 +119,10 @@ export function PlanApprovalBar({
           {translate(`${P}notApprover`, 'You are not allowed to approve this.')}
         </p>
       )}
-      {failure && (
+      {failure?.errorClass === 'unconfirmedAssumptions' && (
+        <PlanUnconfirmedAssumptionsNotice message={failure.error.message ?? ''} />
+      )}
+      {failure && failure.errorClass !== 'unconfirmedAssumptions' && (
         <p role="alert" className="text-xs text-destructive" data-testid="plan-decision-error">
           {planDecisionErrorMessage(failure)}
         </p>

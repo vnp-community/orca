@@ -50,7 +50,7 @@ func (uc *CreateAgentToken) Execute(ctx context.Context, devServerID, name strin
 	}
 	dev, err := uc.devServers.Get(ctx, tenantID, devServerID)
 	if err != nil {
-		return "", domain.AgentToken{}, err
+		return "", domain.AgentToken{}, devServerLookupError(err)
 	}
 
 	raw, err := generateHexToken(32)

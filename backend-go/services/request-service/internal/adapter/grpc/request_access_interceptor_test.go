@@ -59,7 +59,10 @@ func callerCtx(role, actor string) context.Context {
 }
 
 // requestFor builds an empty request message of the RPC with the catalog field set to the right id.
-func requestFor(t *testing.T, method string) proto.Message {
+func requestFor(t *testing.T, method string) proto.Message { return requestForID(t, method, "") }
+
+// requestForID is requestFor with an explicit Request id for the RPCs addressed by one ("" keeps the fixture's).
+func requestForID(t *testing.T, method, requestID string) proto.Message {
 	t.Helper()
 	parts := strings.Split(strings.TrimPrefix(method, "/"), "/")
 	d, err := protoregistry.GlobalFiles.FindDescriptorByName(protoreflect.FullName(parts[0]))
@@ -71,6 +74,9 @@ func requestFor(t *testing.T, method string) proto.Message {
 	e := domain.Catalog[method]
 	if e.Field != "" {
 		id := map[domain.Locator]string{domain.LocRequestID: testRequest, domain.LocApprovalID: testApproval, domain.LocProjectID: testProject, domain.LocEntityID: testEntity}[e.Locator]
+		if requestID != "" && e.Locator == domain.LocRequestID {
+			id = requestID
+		}
 		msg.Set(md.Input().Fields().ByName(protoreflect.Name(e.Field)), protoreflect.ValueOfString(id))
 	}
 	return msg

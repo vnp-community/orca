@@ -7,6 +7,7 @@ import { useMountedRef } from '@/hooks/useMountedRef'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { markOnboardingProjectAdded } from '@/lib/onboarding-project-checklist'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { registerRepoInOwnProject } from '@/lib/own-project-registration'
 import {
   getOrCreateDefaultProject,
   mergeRepoViewIntoRepo,
@@ -177,12 +178,28 @@ export function useCreateRepo(
                     'No active runtime environment to register the created repo with a project.'
                 }
               }
-              const projectId = await getOrCreateDefaultProject(target)
+              // Why devServerId on repo.add too: repo.create only initialises the folder on the
+              // host; without it the catalog row is host-less and git runs in the gateway container.
               try {
+                if (options.devServerId) {
+                  // Why: Add Project gives each created repo its own project, named after the repo.
+                  const ownView = await registerRepoInOwnProject(
+                    (method, params, timeoutMs) =>
+                      callRuntimeRpc(target, method, params, { timeoutMs }),
+                    { devServerId: options.devServerId, path: destPath, projectName: name }
+                  )
+                  return { repo: { ...mergeRepoViewIntoRepo(ownView), kind: createKind } }
+                }
+                const projectId = await getOrCreateDefaultProject(target, options.devServerId)
                 const view = await callRuntimeRpc<RemoteRepoView>(
                   target,
                   'repo.add',
-                  { projectId, url: destPath, displayName: name },
+                  {
+                    projectId,
+                    url: destPath,
+                    displayName: name,
+                    ...(options.devServerId ? { devServerId: options.devServerId } : {})
+                  },
                   { timeoutMs: 15_000 }
                 )
                 return { repo: { ...mergeRepoViewIntoRepo(view), kind: createKind } }
@@ -193,7 +210,10 @@ export function useCreateRepo(
           : await window.api.repos.create({
               parentPath,
               name,
-              kind: createKind
+              kind: createKind,
+              ...(options.devServerId
+                ? { devServerId: options.devServerId, projectName: name }
+                : {})
             })
       // Why: if the user closed the dialog or clicked Back mid-create,
       // createGenRef was bumped by resetCreateState. Ignore stale results.

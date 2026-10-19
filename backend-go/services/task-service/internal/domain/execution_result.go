@@ -51,6 +51,71 @@ type ExecutionResult struct {
 	Outputs       map[string]json.RawMessage `json:"outputs"`
 	Questions     []string                   `json:"questions"`
 	Notes         string                     `json:"notes"`
+	// Knowledge and Writeback are what the agent says it read in the project's knowledge graph and which design documents
+	// it touched. They are the agent's word, shown to a reviewer; nothing decides on them.
+	Knowledge *ResultKnowledge `json:"knowledge,omitempty"`
+	Writeback *ResultWriteback `json:"writeback,omitempty"`
+}
+
+type ResultKnowledge struct {
+	Available bool     `json:"available"`
+	Snapshot  string   `json:"snapshot,omitempty"`
+	Read      []string `json:"read,omitempty"`
+	Gaps      []string `json:"gaps,omitempty"`
+	Conflicts []string `json:"conflicts,omitempty"`
+}
+
+type ResultWriteback struct {
+	Documents  []string `json:"documents,omitempty"`
+	ProposalID string   `json:"proposal_id,omitempty"`
+	ProposalOK bool     `json:"proposal_ok,omitempty"`
+	Touched    []string `json:"touched,omitempty"`
+}
+
+// HasPassingCheck reports whether any check the agent ran exited 0.
+func (r ExecutionResult) HasPassingCheck() bool {
+	for _, c := range r.ChecksRun {
+		if c.Exit == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+const (
+	maxReportEntries = 100
+	maxReportRunes   = 600
+)
+
+// trimReports cuts the knowledge and writeback blocks to a size a reviewer can read, instead of refusing the whole result:
+// a long note is no reason to fail a task whose code is done.
+func (r *ExecutionResult) trimReports() {
+	if k := r.Knowledge; k != nil {
+		k.Snapshot = clipRunes(k.Snapshot, 120)
+		k.Read, k.Gaps, k.Conflicts = clipList(k.Read), clipList(k.Gaps), clipList(k.Conflicts)
+	}
+	if w := r.Writeback; w != nil {
+		w.ProposalID = clipRunes(w.ProposalID, 120)
+		w.Documents, w.Touched = clipList(w.Documents), clipList(w.Touched)
+	}
+}
+
+func clipList(in []string) []string {
+	if len(in) > maxReportEntries {
+		in = in[:maxReportEntries]
+	}
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		out = append(out, clipRunes(s, maxReportRunes))
+	}
+	return out
+}
+
+func clipRunes(s string, max int) string {
+	if r := []rune(s); len(r) > max {
+		return string(r[:max])
+	}
+	return s
 }
 
 // AgentParsed is what a protocol-2 agent reports instead of making us scan stdout.
@@ -149,6 +214,7 @@ func ParseExecutionResult(stdout, nonce string, parsed *AgentParsed) ParsedExecu
 	}
 	res, err := decodeExecutionResult(raw)
 	if err == nil {
+		res.trimReports()
 		err = res.Validate()
 	}
 	if err != nil {

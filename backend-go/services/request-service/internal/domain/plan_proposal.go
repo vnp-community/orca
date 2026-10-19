@@ -12,6 +12,8 @@ type PhaseProposal struct {
 	Title       string
 	Description string
 	Tasks       []TaskProposal
+	// DependsOnPhaseIndices index into PlanProposal.Phases: this Phase starts after those finish.
+	DependsOnPhaseIndices []int
 }
 
 type TaskProposal struct {

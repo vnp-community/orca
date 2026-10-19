@@ -34,6 +34,8 @@ type RequestFlowView struct {
 	ExecutionGates         []string `json:"executionGates"`
 	CompletesAfterAnalysis bool     `json:"completesAfterAnalysis"`
 	StatusPath             []string `json:"statusPath"`
+	// OpenSpecProfile is full, light or none: whether this type can run on the OpenSpec engine at all (CR-REQ-038).
+	OpenSpecProfile string `json:"openSpecProfile"`
 }
 
 func requestFlowViewOf(f *requestv1.GetRequestFlowResponse) RequestFlowView {
@@ -42,6 +44,7 @@ func requestFlowViewOf(f *requestv1.GetRequestFlowResponse) RequestFlowView {
 		AnalysisGate: f.GetAnalysisGate(), PlanKind: f.GetPlanKind(), HasPhases: f.GetHasPhases(),
 		StartGate: f.GetStartGate(), ExecutionGates: nonNilStrings(f.GetExecutionGates()),
 		CompletesAfterAnalysis: f.GetCompletesAfterAnalysis(), StatusPath: nonNilStrings(f.GetStatusPath()),
+		OpenSpecProfile: f.GetOpenSpecProfile(),
 	}
 }
 

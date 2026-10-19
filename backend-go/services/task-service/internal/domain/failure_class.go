@@ -31,6 +31,12 @@ type TransientError interface{ Transient() bool }
 // ClassifyRunFailure turns the raw outcome of one run into (class, code); a clean run returns
 // ("", ""). Transport trouble outranks the agent's own words: with no output nothing else can be said.
 func ClassifyRunFailure(timedOut bool, exit *int, p ParsedExecution, relayErr error) (FailureClass, string) {
+	return ClassifyRunFailureChecked(timedOut, exit, p, relayErr, false)
+}
+
+// ClassifyRunFailureChecked is ClassifyRunFailure for a task whose spec names a Verify step: a "done" result is believed
+// only when it lists at least one check that exited 0. An agent that says done without proof counts as a failed attempt.
+func ClassifyRunFailureChecked(timedOut bool, exit *int, p ParsedExecution, relayErr error, requirePassingCheck bool) (FailureClass, string) {
 	if relayErr != nil {
 		var te TransientError
 		if errors.Is(relayErr, context.DeadlineExceeded) || (errors.As(relayErr, &te) && te.Transient()) {
@@ -63,6 +69,9 @@ func ClassifyRunFailure(timedOut bool, exit *int, p ParsedExecution, relayErr er
 	}
 	if *exit != 0 {
 		return FailureAgentDefect, "EXIT_NONZERO_WITH_DONE"
+	}
+	if requirePassingCheck && !p.Result.HasPassingCheck() {
+		return FailureAgentDefect, "VERIFY_NOT_PASSED"
 	}
 	return "", ""
 }

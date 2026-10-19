@@ -41,7 +41,7 @@ x-go-common-env: &go-common-env
   # No insecure default token here (unlike the old dev-mode Vault's
   # ${VAULT_TOKEN:-dev-root-token}): an unset VAULT_TOKEN now fails loudly at
   # `docker compose up` instead of silently degrading to a well-known value.
-  VAULT_ADDR: http://172.20.2.21:8200
+  VAULT_ADDR: ${VAULT_ADDR:-http://172.20.2.21:8200}
   VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN required — the orca-scoped token from the shared Vault, see VAULT-SHARED-MIGRATION.md}
   NATS_URL: nats://nats:4222
   OTLP_ENDPOINT: ${OTLP_ENDPOINT:-}
@@ -71,6 +71,12 @@ x-go-common-env: &go-common-env
   MCP_SERVICE_ADDR: mcp-service:9090
   CREDENTIAL_BROKER_SERVICE_ADDR: credential-broker-service:9090
   CREDENTIAL_BROKER_ADDR: credential-broker-service:9090 # ai-provider-service's own (slightly differently-named) var — see docs/execution-plan.md
+  # Read by project-service (refuse repos with no dev server) and git-gateway-service
+  # (never run git for an unbound repo in the container). Keep OFF in Docker: the
+  # git-gateway container cannot see users' disks. Turn on only when git-gateway runs
+  # on the same filesystem as the users' repos; existing unbound repos are not migrated
+  # (see scripts/rebind-unbound-repos.sh).
+  ORCA_ALLOW_LOCAL_REPOS: ${ORCA_ALLOW_LOCAL_REPOS:-false}
 
 x-go-defaults: &go-defaults
   image: *go-image
@@ -253,6 +259,9 @@ services:
       OAUTH_INTERNAL_CALLER_TOKEN: ${OAUTH_INTERNAL_CALLER_TOKEN:-}
       AUTH_MCP_PRINCIPAL_CALLER_TOKEN: ${AUTH_MCP_PRINCIPAL_CALLER_TOKEN:-}
       OAUTH_DCR_ENABLED: ${OAUTH_DCR_ENABLED:-true}
+      # Guards the internal-only ListActiveTenantAdmins (request-service expands role:admin approvers with it);
+      # empty refuses every such call (fail closed). request-service gets the same value.
+      AUTH_DIRECTORY_CALLER_TOKEN: ${AUTH_DIRECTORY_CALLER_TOKEN:-}
     depends_on:
       postgres: { condition: service_healthy }
       tenant-service: { condition: service_started } # bootstrap.go now calls tenant-service.CreateCompany at startup
@@ -277,6 +286,8 @@ services:
       - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
+      # Guards the internal-only ResolveProjectAccess RPC; empty refuses every such call (fail closed).
+      PROJECT_INTERNAL_CALLER_TOKEN: ${PROJECT_INTERNAL_CALLER_TOKEN:-}
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/project?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
@@ -297,6 +308,9 @@ services:
       # fail-secure-rejects every request (agentwsserver's own startup log
       # warns loudly when this is empty).
       ORCA_AGENT_API_SECRET: ${ORCA_AGENT_API_SECRET:-}
+      # Tenant that direct-websocket agents register under; empty = built-in bootstrap sentinel,
+      # which won't match the admin's tenant when auth-service bootstrap generated its own.
+      ORCA_AGENT_DEFAULT_TENANT_ID: ${ORCA_AGENT_DEFAULT_TENANT_ID:-}
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -439,16 +453,41 @@ services:
     container_name: orca-go-request
     volumes:
       - ./bin/request-service/orca:/app/bin/orca:ro
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/request?sslmode=disable
+      # Default path is relative to the repo layout; the container mounts the bundle at a fixed path.
+      OPA_BUNDLE_PATH: /policy/orca-authz
       # ApprovalService stays closed until the approval wave registers real subject handlers.
       REQUEST_APPROVAL_ENABLED: ${REQUEST_APPROVAL_ENABLED:-false}
       # Global switch of the request flow; each tenant is also switched on with SetRequestFlowSettings
       # (docs/guides/request/admin-enable-request-flow.md). Both must be on for the flow to run.
       REQUEST_FLOW_ENABLED: ${REQUEST_FLOW_ENABLED:-false}
+      # What a project without saved engine settings runs with (a saved setting always wins): the OpenSpec engine for Plan
+      # and the agent-written Solution that reads the knowledge graph. Both default on here (the binary's own default without this file is off);
+      # a repo without .tdd-agent/config.toml needs its project set to native; see docs/guides/request/knowledge-hub-setup.md.
+      REQUEST_DEFAULT_ENGINE: ${REQUEST_DEFAULT_ENGINE:-openspec}
+      REQUEST_DEFAULT_SOLUTION_AGENT: ${REQUEST_DEFAULT_SOLUTION_AGENT:-true}
+      # step_by_step (a person releases every Phase) or continuous (one approval of the plan runs every Phase); a project setting wins.
+      REQUEST_DEFAULT_EXECUTION_MODE: ${REQUEST_DEFAULT_EXECUTION_MODE:-step_by_step}
       # Shared secret issue-status-sync presents for LookupRequestBySource; empty refuses the call.
       SERVICE_INTERNAL_TOKEN: ${REQUEST_SERVICE_INTERNAL_TOKEN:-}
+      # Gateway presents the same value as REQUEST_INTERNAL_CALLER_TOKEN; empty makes every RPC refuse.
+      GATEWAY_INTERNAL_TOKEN: ${REQUEST_INTERNAL_CALLER_TOKEN:-}
+      # Presented to project-service's internal ResolveProjectAccess; empty falls back to the member-list check.
+      PROJECT_INTERNAL_CALLER_TOKEN: ${PROJECT_INTERNAL_CALLER_TOKEN:-}
+      # Presented to auth-service's internal ListActiveTenantAdmins; empty leaves role:admin approvers without
+      # notifications and turns /readyz red while REQUEST_APPROVAL_ENABLED is on.
+      AUTH_DIRECTORY_CALLER_TOKEN: ${AUTH_DIRECTORY_CALLER_TOKEN:-}
+    # The image is distroless (no wget/curl), so the binary probes its own /readyz: internal tokens, OPA bundle and
+    # database. A missing token turns the container unhealthy after start_period + 3 failed probes (about 50 seconds).
+    healthcheck:
+      test: ["CMD", "/app/bin/orca", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       postgres: { condition: service_healthy }
       nats: { condition: service_healthy }
@@ -475,6 +514,10 @@ services:
   # below provide the latter). Per specs/backend-go/tdd/services/
   # git-gateway-service.md §2, host-local exec is "retained for local/dev
   # deployments" — this dev deploy IS that case, not a hypothetical.
+  #
+  # NOTE: unbound repos are only served when ORCA_ALLOW_LOCAL_REPOS=true (default
+  # false, see x-go-common-env); otherwise git-gateway rejects them with
+  # GITGATEWAY_REPO_HOST_UNBOUND and project-service refuses to store them.
   #
   # git-gateway-repos is where any repo NOT bound to a remote dev server
   # (Project.dev_server_id empty — e.g. a repo added via the sidebar's bare
@@ -575,6 +618,7 @@ services:
     environment:
       <<: *go-common-env
       REQUEST_SERVICE_ADDR: request-service:9090
+      REQUEST_INTERNAL_CALLER_TOKEN: ${REQUEST_INTERNAL_CALLER_TOKEN:-}
       PUBLIC_PORT: "8081"
       # CR-LOGIN-001 SSO (internal/adapter/httpgateway/auth_routes.go) —
       # see .env.example's "SSO" section. PUBLIC_BASE_URL is REQUIRED for
@@ -658,7 +702,7 @@ services:
     networks:
       - orca-go-net
     environment:
-      VAULT_ADDR: http://172.20.2.21:8200
+      VAULT_ADDR: ${VAULT_ADDR:-http://172.20.2.21:8200}
       VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN required}
       VAULT_RENEW_INTERVAL_SECONDS: ${VAULT_RENEW_INTERVAL_SECONDS:-43200}
     entrypoint: ["/bin/sh", "-c"]

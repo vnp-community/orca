@@ -212,6 +212,8 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host'
 import { getRepoHeaderCreateState } from './repo-header-create-state'
+import { RepoHostBadge } from './RepoHostBadge'
+import { isUnboundWebRepo } from '@/lib/repo-host-binding'
 import type { PendingSidebarRowReveal, PendingSidebarWorktreeReveal } from '@/store/slices/ui'
 import { getRepositoryIconSectionId } from '@/components/settings/repository-settings-targets'
 import { keybindingMatchesAction } from '../../../../shared/keybindings'
@@ -4248,6 +4250,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                           {row.label}
                         </div>
                         <RepoForkIndicator upstream={row.repo?.upstream} />
+                        {row.repo ? <RepoHostBadge repo={row.repo} /> : null}
                         <FolderPathStatusIndicator status={projectGroupPathStatus} />
                       </div>
                     </div>
@@ -5947,6 +5950,13 @@ const WorktreeList = React.memo(function WorktreeList({
 
   const handleCreateForRepo = useCallback(
     (projectId: string) => {
+      // Why: a web repo without a dev server cannot run git, so "+" asks for the host first
+      // instead of opening a composer that is guaranteed to fail.
+      const repo = useAppStore.getState().repos.find((candidate) => candidate.id === projectId)
+      if (isUnboundWebRepo(repo)) {
+        openModal('repo-host-picker', { repoId: projectId })
+        return
+      }
       openModal('new-workspace-composer', { initialRepoId: projectId, telemetrySource: 'sidebar' })
     },
     [openModal]

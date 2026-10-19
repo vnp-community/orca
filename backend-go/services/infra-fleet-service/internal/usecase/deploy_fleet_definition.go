@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -66,7 +67,7 @@ func (uc *DeployFleetDefinition) Execute(ctx context.Context, in DeployFleetDefi
 	}
 	def, err := uc.repo.Get(ctx, tenantID, in.FleetDefinitionID)
 	if err != nil {
-		if err == domain.ErrFleetDefinitionNotFound {
+		if errors.Is(err, domain.ErrFleetDefinitionNotFound) {
 			return BulkProvisionFleetResult{}, apperrors.New(apperrors.KindNotFound, "INFRA_FLEET_DEFINITION_NOT_FOUND", "fleet definition not found", err)
 		}
 		return BulkProvisionFleetResult{}, apperrors.New(apperrors.KindInternal, "INFRA_GET_FLEET_DEFINITION_FAILED", "failed to get fleet definition", err)

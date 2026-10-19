@@ -1,8 +1,14 @@
+import { fallbackRequestFlow } from '../../../../shared/request-flow-view'
 import { describe, expect, it } from 'vitest'
-import { defaultReturnStage, getRequestActionAvailability, getVisibleDetailTabs } from './request-action-rules'
+import {
+  defaultReturnStage,
+  getRequestActionAvailability,
+  getVisibleDetailTabs
+} from './request-action-rules'
 import type { RequestStatus, RequestType } from '../../../../shared/request-types'
 
-const a = (type: RequestType, status: RequestStatus) => getRequestActionAvailability({ type, status })
+const a = (type: RequestType, status: RequestStatus) =>
+  getRequestActionAvailability({ type, status })
 
 describe('getRequestActionAvailability', () => {
   it('offers cancel until terminal', () => {
@@ -17,10 +23,21 @@ describe('getRequestActionAvailability', () => {
   })
 
   it('offers return-to-backlog only while a stage is in progress', () => {
-    for (const s of ['analyzing', 'awaiting_analysis_approval', 'planning', 'awaiting_plan_approval', 'executing'] as const) {
+    for (const s of [
+      'analyzing',
+      'awaiting_analysis_approval',
+      'planning',
+      'awaiting_plan_approval',
+      'executing'
+    ] as const) {
       expect(a('change_request', s).canReturnToBacklog, s).toBe(true)
     }
-    for (const s of ['submitted', 'awaiting_type_confirmation', 'completed', 'request_backlog'] as const) {
+    for (const s of [
+      'submitted',
+      'awaiting_type_confirmation',
+      'completed',
+      'request_backlog'
+    ] as const) {
       expect(a('change_request', s).canReturnToBacklog, s).toBe(false)
     }
   })
@@ -47,12 +64,21 @@ describe('defaultReturnStage / getVisibleDetailTabs', () => {
     expect(defaultReturnStage('analyzing')).toBe('analysis')
   })
 
-  it('hides analysis for task/docs/ops_request and plan for question/spike', () => {
-    expect(getVisibleDetailTabs('task').analysis).toBe(false)
-    expect(getVisibleDetailTabs('docs').analysis).toBe(false)
-    expect(getVisibleDetailTabs('ops_request').analysis).toBe(false)
-    expect(getVisibleDetailTabs('question').plan).toBe(false)
-    expect(getVisibleDetailTabs('spike').plan).toBe(false)
-    expect(getVisibleDetailTabs('change_request')).toEqual({ analysis: true, plan: true })
+  it('shows the tabs the flow has', () => {
+    const tabs = (type: Parameters<typeof fallbackRequestFlow>[0]) =>
+      getVisibleDetailTabs(fallbackRequestFlow(type, 'M'))
+    expect(tabs('task')).toEqual({ analysis: false, plan: true, execution: true })
+    expect(tabs('docs')).toEqual({ analysis: false, plan: true, execution: true })
+    expect(tabs('ops_request')).toEqual({ analysis: false, plan: true, execution: true })
+    expect(tabs('change_request')).toEqual({ analysis: true, plan: true, execution: true })
+    expect(tabs('bug')).toEqual({ analysis: true, plan: true, execution: true })
+    // A single-task flow has no Plan tab but still has something to execute.
+    expect(tabs('hotfix')).toEqual({ analysis: true, plan: false, execution: true })
+    expect(tabs('question')).toEqual({ analysis: true, plan: false, execution: false })
+    expect(tabs('spike')).toEqual({ analysis: true, plan: false, execution: false })
+  })
+
+  it('shows no flow-specific tab for an unknown flow', () => {
+    expect(getVisibleDetailTabs(null)).toEqual({ analysis: false, plan: false, execution: false })
   })
 })

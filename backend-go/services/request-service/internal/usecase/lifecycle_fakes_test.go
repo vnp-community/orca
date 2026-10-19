@@ -126,6 +126,17 @@ func (s *lcStore) Update(_ context.Context, r domain.Request, expected int64) (d
 func (s *lcStore) UpdateSolutionEngine(context.Context, string, domain.EngineName, int64) error {
 	return errors.New("unused")
 }
+func (s *lcStore) PinSolutionEngineIfUnset(_ context.Context, id string, name domain.EngineName) (domain.EngineName, error) {
+	r, ok := s.requests[id]
+	if !ok {
+		return "", domain.ErrRequestNotFound(id)
+	}
+	if r.SolutionEngine == nil {
+		r.SolutionEngine = &name // versionless, like the real repositories
+		s.requests[id] = r
+	}
+	return *r.SolutionEngine, nil
+}
 func (s *lcStore) NextNumber(context.Context) (int64, error) { return s.nextNum(), nil }
 
 func (s *lcStore) InsertOutboxEvent(_ context.Context, ev domain.OutboxEvent) error {

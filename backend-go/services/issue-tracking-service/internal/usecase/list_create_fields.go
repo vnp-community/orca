@@ -41,7 +41,7 @@ func (uc *ListCreateFields) Execute(ctx context.Context, in ListCreateFieldsInpu
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, domain.ProviderJira, in.WorkspaceID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no jira credential available", err)
+		return nil, credentialResolveError(err, "no jira credential available")
 	}
 	fields, err := provider.ListCreateFields(ctx, cred, in.ProjectIDOrKey, in.IssueTypeID)
 	if err != nil {

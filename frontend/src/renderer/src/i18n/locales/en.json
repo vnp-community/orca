@@ -252,7 +252,10 @@
           "3be0f7df04": "Cannot open folder on selected runtime",
           "15cf5319ec": "{{path}} was checked on {{hostName}}, but that host did not report a usable folder.",
           "2dcd706774": "Project also exists in another profile",
-          "presenceProfileOverflow": "{{names}} +{{count}} more"
+          "presenceProfileOverflow": "{{names}} +{{count}} more",
+          "setupProjectCloneDevServerUnsupported": "Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.",
+          "repoAlreadyAdded": "Project already added",
+          "openExistingProject": "Open project"
         },
         "settings": {
           "e12dab333b": "Failed to switch servers",
@@ -525,7 +528,19 @@
           "error": {
             "format": {
               "37cf0bc991": "Orca could not resolve a usable base ref for this workspace.",
-              "64555d0014": "No base branch found"
+              "64555d0014": "No base branch found",
+              "hostUnbound": {
+                "title": "This project isn’t assigned to a dev server",
+                "message": "Choose the dev server this project lives on, then try again."
+              },
+              "hostUnreachable": {
+                "title": "The dev server is offline",
+                "message": "Orca can’t reach the dev server this project lives on. Reconnect it, then retry."
+              },
+              "hostCheckFailed": {
+                "title": "Couldn’t check the dev server",
+                "message": "Orca couldn’t confirm the dev server is online. Retry in a moment."
+              }
             }
           }
         }
@@ -590,6 +605,22 @@
       },
       "workspaceTabPalette": {
         "reviewTab": "Review tab"
+      },
+      "repoHostBinding": {
+        "hostRequired": "Choose a dev server for this project first."
+      },
+      "repoHostRebind": {
+        "activeWorkflows": "Stop the tasks running on this project before changing its dev server.",
+        "devServerNotFound": "That dev server no longer exists. Choose another one.",
+        "forbidden": "You do not have permission to change this project’s dev server.",
+        "failed": "Failed to change the dev server."
+      },
+      "ownProjectRegistration": {
+        "repoAddFailed": "Project \"{{name}}\" was created, but its repo could not be added: {{message}}"
+      },
+      "registeredRepoLookup": {
+        "alreadyInProject": "This folder is already added in project \"{{project}}\" on this dev server.",
+        "alreadyAdded": "This folder is already added on this dev server."
       }
     },
     "hooks": {
@@ -2295,7 +2326,8 @@
             "767951265d": "Something went wrong while creating the worktree.",
             "vmProvisioningTitle": "Provisioning VM",
             "cancelProvisioning": "Cancel",
-            "vmProvisioningLogEmpty": "Waiting for recipe output…"
+            "vmProvisioningLogEmpty": "Waiting for recipe output…",
+            "chooseHost": "Choose dev server"
           }
         }
       },
@@ -2691,7 +2723,8 @@
             "removedBody": "The SSH host for this workspace was removed, so it can no longer connect. Remove the workspace to clear it — remote files are left untouched.",
             "removeWorkspaceButton": "Remove workspace"
           }
-        }
+        },
+        "cwdFellBack": "Directory {{path}} was not found on this host; opened your home directory instead."
       },
       "tab": {
         "group": {
@@ -3668,7 +3701,8 @@
           "addRemoteHostTooltip": "Choose SSH for a machine you can log into, or remote server for an Orca server.",
           "addSshHostDetail": "Use an existing machine over SSH.",
           "addRemoteServerDetail": "Pair with Orca running on another computer.",
-          "addRemoteHostDetail": "SSH host or Orca server"
+          "addRemoteHostDetail": "SSH host or Orca server",
+          "chooseHost": "Choose a host"
         },
         "AddRepoNestedImportStep": {
           "496f68cf8c": "Scanning repositories. Click to stop.",
@@ -3728,7 +3762,10 @@
           "0adf083af7": "Browse host",
           "8efa930eb5": "Add another project from the selected host.",
           "39bd249b3a": "Add a project",
-          "0f8aba944c": "Navigate to a directory and click Select to choose it."
+          "0f8aba944c": "Navigate to a directory and click Select to choose it.",
+          "projectName": "Project name",
+          "projectNamePlaceholder": "Defaults to the folder name",
+          "projectNameHint": "A new project is created for this folder on the selected host."
         },
         "AddRepoStartSteps": {
           "87596c1446": "Other ways to add",
@@ -3870,7 +3907,11 @@
           "51001182e3": "Empty directory",
           "971d85cc84": "Opens as a project on this host · {{value0}}",
           "00c4235c10": "No matches for '{{value0}}'",
-          "largeInputNoMatches": "No matches for this long input"
+          "largeInputNoMatches": "No matches for this long input",
+          "hostReconnecting": "The host is reconnecting. This folder reloads automatically when it is back.",
+          "retry": "Try again",
+          "truncated": "Showing {{shown}} of {{total}} entries. Type to narrow the list.",
+          "hostOffline": "The host is not connected. This picker stays open and refreshes when it reconnects."
         },
         "RemoveFolderDialog": {
           "4dc5b5065b": "Remove",
@@ -4695,6 +4736,37 @@
           "cancel": "Cancel",
           "forget": "Remove from Orca",
           "reconnectAndDelete": "Reconnect & Delete"
+        },
+        "AddRepoHostGateNotice": {
+          "reconnecting": "{{host}} is reconnecting. Your choice is kept, and Add Project resumes when it is back online.",
+          "removed": "{{host}} is no longer available. Choose another dev server.",
+          "offline": "{{host}} is offline. Your choice is kept; Add Project resumes when it reconnects, or choose another dev server.",
+          "noHostTitle": "No dev server is connected",
+          "noHostBody": "Projects live on a dev server. Connect one, then come back to add a project.",
+          "openDevServers": "Open Dev Servers",
+          "chooseHostBody": "Choose the dev server this project lives on. Browse and Add unlock once you pick one."
+        },
+        "RepoHostBadge": {
+          "noHost": "No dev server",
+          "inheritedTitle": "{{name}} (inherited from the project)"
+        },
+        "RepoHostPickerDialog": {
+          "updated": "Dev server updated",
+          "title": "Choose a dev server",
+          "description": "Orca runs git for {{project}} on its dev server. Pick the one this project lives on.",
+          "hostLabel": "Dev server",
+          "placeholder": "Choose a dev server",
+          "unavailableHost": "{{name}} ({{status}})",
+          "noConnectedHost": "No dev server is connected. Connect one, then choose it here.",
+          "openDevServers": "Open Dev Servers",
+          "cancel": "Cancel",
+          "saving": "Saving…",
+          "confirm": "Use this dev server"
+        },
+        "AddRepoDuplicateNotice": {
+          "message": "This folder is already added in project \"{{project}}\" on this dev server, so it was not added again.",
+          "messageUnknownProject": "This folder is already added on this dev server, so it was not added again.",
+          "open": "Open that project"
         }
       },
       "shared": {
@@ -9057,6 +9129,14 @@
         "TerminalInteractionSection": {
           "567633ff50": "Right-click pastes the clipboard into the terminal. Control-click to open the context menu.",
           "c64497148a": "Right-click pastes the clipboard. Control-click opens the context menu."
+        },
+        "RepositoryDevServerHostSection": {
+          "title": "Dev server",
+          "description": "The dev server this project lives on. Orca runs git and agents there.",
+          "unbound": "No dev server is assigned, so Orca cannot run git for this project. Choose one.",
+          "unknownStatus": "status unknown",
+          "fromProject": "from the project",
+          "change": "Change dev server"
         }
       },
       "right": {
@@ -12673,10 +12753,10 @@
             "7b3967c12f": "Atlassian API token",
             "3d81bf3ab3": "API token",
             "e91b9a4073": "you@example.com",
-            "2849ddb295": "Atlassian email",
+            "2849ddb295": "Email (optional — Jira Cloud uses it with an API token; a Server/Data Center Personal Access Token works with or without it)",
             "70fcd360c4": "https://example.atlassian.net",
             "e176f9d0c5": "Jira Cloud site URL",
-            "d785c42b8b": "Use a Jira Cloud site URL, Atlassian email, and API token to browse issues.",
+            "d785c42b8b": "Use your Jira site URL (Cloud or Server/Data Center) and an API token or Personal Access Token to browse issues.",
             "8388bdea2b": "Connect Jira site"
           }
         }
@@ -12800,7 +12880,19 @@
           "showPlanning": "Show Plan/Phase"
         },
         "TaskDetail": {
-          "phaseNotApproved": "Approve the Phase or Plan before running this task"
+          "phaseNotApproved": "Approve the Phase or Plan before running this task",
+          "openInGit": {
+            "noProject": "Cannot open Git: this task is not linked to a project",
+            "unknown": "This task's worktree no longer exists",
+            "notOnHost": "This task's worktree is no longer on this host. It may have been cleaned up.",
+            "failed": "Failed to open worktree: {{message}}"
+          },
+          "dependencies": "Dependencies",
+          "blockedBy": "Blocked by:",
+          "dependsOn": "Depends on",
+          "dependsOnProgress": "{{done}} of {{total}} done",
+          "noDependencies": "No dependencies",
+          "dependenciesFailed": "Failed to load dependencies"
         },
         "TaskDAGView": {
           "status": {
@@ -12815,6 +12907,39 @@
         "TaskBoardView": {
           "backlogMoved": "Tasks not started yet live under Requests > Backlog",
           "openBacklog": "Open backlog"
+        },
+        "TaskLoadStates": {
+          "loading": "Loading tasks...",
+          "empty": "No tasks yet.",
+          "emptyFiltered": "No tasks match the current search or filter.",
+          "emptyPlanningHidden": "Only Plan and Phase tasks exist. Turn on \"Show Plan/Phase\" to see them.",
+          "errorTitle": "Could not load the tasks.",
+          "staleTitle": "Could not refresh the tasks. Showing the last loaded list.",
+          "forbidden": "You do not have access to the tasks of this project.",
+          "code": "Error code: {{code}}",
+          "retry": "Retry"
+        },
+        "agentActivity": {
+          "title": "Agent activity",
+          "live": "Live",
+          "finished": "Finished",
+          "idle": "Idle",
+          "reconnecting": "Reconnecting…",
+          "olderHidden": "Older activity is not shown.",
+          "log": "Agent activity log",
+          "unavailable": "Live agent activity needs a connected runtime environment.",
+          "waiting": "Waiting for the agent to report what it is doing…",
+          "empty": "Nothing to show yet. Activity appears here while the agent runs; it is not kept after you reload the page.",
+          "jumpToLatest": "Jump to latest",
+          "savedElsewhere": "Live activity is not kept after you reload the page. See the saved output in the Result tab.",
+          "openResult": "Open the Result tab"
+        },
+        "dispatch": {
+          "loading": "Loading dispatch status…",
+          "none": "This task has no orchestration dispatch yet (it has not run through Engine 2, or it is running directly through Engine 1).",
+          "status": "Status:",
+          "assignee": "Assignee:",
+          "focusTerminal": "Focus the terminal running this dispatch"
         }
       },
       "taskPageEmptyState": {
@@ -13046,6 +13171,9 @@
           "saving": "Saving…",
           "saved": "Jira mapping updated",
           "saveFailed": "Failed to update the Jira mapping."
+        },
+        "CreateProjectDialog": {
+          "repoAddFailed": "Project created, but its repo could not be added: {{message}}. Try again."
         }
       },
       "request": {
@@ -13161,16 +13289,37 @@
           "notFound": "This item no longer exists.",
           "conflict": "Someone else changed this. Refresh and try again.",
           "invalidState": "This action is not allowed in the current state.",
+          "blockingQuestions": "This cannot be approved yet: the analysis has blocking open questions that still need an answer.",
+          "unconfirmedAssumptions": "This plan cannot be approved yet: it has assumptions that need confirmation and still have no recorded answer.",
           "network": "Network error. Check your connection.",
           "unavailable": "The request service is unavailable. Try again shortly.",
           "rateLimited": "Too many attempts. Wait a moment and retry.",
           "validation": "Check the highlighted fields and try again.",
           "unknown": "Something went wrong.",
-          "retry": "Retry"
+          "retry": "Retry",
+          "unsupported": "This server does not support this action yet.",
+          "expired": "This item has expired.",
+          "pending": "This is still being prepared. Try again shortly.",
+          "noDevServer": "No dev server is connected to this project. Connect one and try again.",
+          "noAi": "AI is not available on the dev server. Check its AI configuration.",
+          "featureOff": "The Request flow is not enabled for this organization.",
+          "code": {
+            "rateLimited": "You are going too fast. Wait a moment and try again.",
+            "projectNotFound": "This project no longer exists.",
+            "aiQuotaExhausted": "The AI quota of the dev server is used up. Try again later.",
+            "aiBusy": "The AI is busy with another job. Try again shortly.",
+            "aiTimeout": "The AI took too long to answer. Try again.",
+            "aiAgentUnavailable": "No dev server is connected, so the AI cannot run."
+          }
         },
         "AnswerView": {
           "answer": "Answer",
-          "citations": "Citations"
+          "citations": "Citations",
+          "confidence": "Confidence: {{percent}}%",
+          "assumptions": "Assumptions",
+          "limitations": "Limitations",
+          "followUp": "Suggested follow-up",
+          "followUpWithType": "{{title}} ({{type}})"
         },
         "DiagnosisView": {
           "rootCause": "Root cause",
@@ -13224,7 +13373,12 @@
           "analyzing": "AI is analyzing this request",
           "drafting": "AI is drafting the analysis",
           "failed": "Could not generate the analysis.",
-          "regenerate": "Regenerate"
+          "regenerate": "Regenerate",
+          "errorCode": "Error code: {{code}}"
+        },
+        "SolutionStartPrompt": {
+          "description": "No analysis has started for this request yet. Start it to get solution options to review.",
+          "generate": "Generate solution"
         },
         "SolutionOptionCard": {
           "chosen": "Chosen",
@@ -13316,7 +13470,9 @@
             "analysis": "Analysis",
             "plan": "Plan",
             "history": "History",
-            "related": "Related"
+            "related": "Related",
+            "needsAttention": "Needs attention",
+            "execution": "Execution"
           }
         },
         "RequestOverviewTab": {
@@ -13336,16 +13492,30 @@
             "analysis": "Analysis",
             "plan": "Plan",
             "phase": "Phases",
-            "execution": "Execution"
+            "execution": "Execution",
+            "handover": "Handover",
+            "taskList": "Task list"
           },
           "state": {
             "done": "done",
             "current": "current",
             "pending": "pending",
-            "skipped": "stopped"
+            "skipped": "stopped",
+            "running": "running",
+            "waiting": "waiting for you",
+            "stopped": "stopped"
           },
           "note": {
             "hotfix": "Hotfix: fast diagnosis, no approval before the plan."
+          },
+          "caption": {
+            "progressPhases": "step {{phase}}/{{phases}} · {{done}}/{{total}} tasks",
+            "progress": "{{done}}/{{total}} tasks",
+            "stoppedProgress": "{{done}}/{{total}} tasks · stopped",
+            "waitingApproval": "waiting for approval",
+            "waitingYou": "waiting for you",
+            "archiving": "archiving",
+            "handoverFailed": "archive failed"
           }
         },
         "RequestsTab": {
@@ -13408,7 +13578,8 @@
             "phase": "Phases",
             "gates": "{{count}} approval gates",
             "noGates": "No approval gates"
-          }
+          },
+          "classifyFailed": "The AI could not classify this request automatically. Pick the type yourself or reclassify."
         },
         "RequestHistoryTab": {
           "empty": "The type has not been changed yet.",
@@ -13486,7 +13657,8 @@
             "notApprover": "You are not allowed to approve this.",
             "conflict": "This changed while you were reviewing it. The latest version was loaded; review it again.",
             "alreadyDecided": "This was already decided.",
-            "expired": "This approval expired. The latest version was loaded."
+            "expired": "This approval expired. The latest version was loaded.",
+            "executionNotAllowed": "You can approve plans only if you are allowed to run their execution. Ask someone who is, or request access."
           },
           "PlanGateChips": {
             "plan": "Plan",
@@ -13505,7 +13677,8 @@
             "notYet": "No plan yet.",
             "notFound": "Plan not found.",
             "empty": "The plan is empty.",
-            "currentStep": "Current step: {{step}}"
+            "currentStep": "Current step: {{step}}",
+            "notFoundHint": "It may have been deleted, or you may not have access to its tasks."
           },
           "PlanSummaryHeader": {
             "counts": "{{phases}} phases, {{tasks}} tasks",
@@ -13523,7 +13696,32 @@
           },
           "RequestPlanTab": {
             "reload": "Reload",
-            "truncated": "The task list was cut off; some tasks may be missing."
+            "truncated": "The task list was cut off; some tasks may be missing.",
+            "approvedStrip": "Plan approved {{when}}. The agent runs it on its own.",
+            "followInExecution": "Follow in Execution"
+          },
+          "PlanUnconfirmedAssumptionsNotice": {
+            "ids": "Still unconfirmed: {{ids}}"
+          },
+          "PlanApprovalCard": {
+            "steps": "{{count}} steps",
+            "tasks": "{{count}} tasks",
+            "titleTaskList": "Approve once and the agent runs all {{unit}}",
+            "title": "Approve once and the agent runs all {{unit}}",
+            "stopsWhen": "It stops and asks you only when:",
+            "needsInfo": "it needs information only you have",
+            "failsTwice": "a task keeps failing — the request then goes back to the backlog",
+            "drift": "the change drifts from this plan and needs a review",
+            "preDeploy": "it reaches the pre-deploy approval",
+            "riskWhole": "Risk is assessed for the plan as a whole, including every step. Review it below before approving.",
+            "approve": "Approve and start execution",
+            "requestChanges": "Request changes"
+          },
+          "PlanOutline": {
+            "hours": "~{{hours}}h estimated",
+            "done": "Done",
+            "step": "{{index}}. {{title}}",
+            "taskCount": "{{count}} tasks"
           }
         },
         "approval": {
@@ -13723,7 +13921,14 @@
             "solution_open_question": "Solution open question",
             "plan_assumption": "Plan assumption",
             "task_blocked": "Task blocked"
-          }
+          },
+          "loadFailedTitle": "Could not load the questions",
+          "loadFailedUnsupported": "This server does not support answering questions yet. Ask your administrator to update it.",
+          "loadFailedCode": "Error code: {{code}}",
+          "refresh": "Refresh",
+          "invalidNumber": "That is not a number. Use digits only, for example 8 or 2.5",
+          "numberHint": "Enter a number, for example 8 or 2.5",
+          "listHint": "One item per line"
         },
         "decision": {
           "rationaleLabel": "Reason for choosing",
@@ -13917,7 +14122,261 @@
             "env_defect": "Does not count as an attempt",
             "agent_defect": "Retries once with a format reminder",
             "unknown": "Unclassified failure"
+          },
+          "agentOutput": {
+            "title": "Agent output",
+            "note": "This run did not report a structured result. The end of what the agent printed is shown.",
+            "cut": "Only the last part is shown.",
+            "redacted": "Secrets were hidden."
+          },
+          "ExecutionFailureCard": {
+            "title": "Stopped: “{{task}}” failed {{attempts}}/{{max}} times",
+            "cause": "Cause: {{cause}}",
+            "kept": "Everything before it is done and kept ({{done}}/{{total}} tasks).",
+            "reopen": "Reopen and rerun",
+            "log": "View last log",
+            "cancel": "Cancel request"
+          },
+          "ExecutionNeedsYou": {
+            "due": "Due {{when}}",
+            "preDeploy": "Approve before deploy{{what}}",
+            "phase": "Approve step{{what}}",
+            "approve": "Approve",
+            "reject": "Reject",
+            "rejectTitle": "Reject this approval",
+            "heading": "Needs you",
+            "clarification": "The agent has a question for you",
+            "answer": "Answer",
+            "drift": "The change drifted from the plan{{what}}",
+            "driftHint": "Use “Review” in the banner above to accept or return it.",
+            "failedTask": "“{{task}}” ran out of attempts",
+            "viewLog": "View last log"
+          },
+          "ExecutionStepList": {
+            "stepTitle": "Step {{index}}/{{total}} · {{title}}",
+            "tasksDone": "{{done}}/{{total}} tasks done",
+            "empty": "This plan has no tasks yet.",
+            "later": "{{count}} more steps · {{tasks}} tasks to go"
+          },
+          "ExecutionSummaryStrip": {
+            "running": "Running",
+            "needsYou": "Needs you",
+            "stopped": "Stopped",
+            "done": "Done",
+            "progressSteps": "{{done}}/{{total}} tasks · step {{step}}/{{steps}}",
+            "progress": "{{done}}/{{total}} tasks",
+            "elapsed": "running for {{time}}",
+            "stop": "Stop run",
+            "progressLabel": "Run progress"
+          },
+          "ExecutionTab": {
+            "notStarted": "Not started. Waiting for plan approval.",
+            "openPlan": "Open Plan"
+          },
+          "ExecutionTaskRow": {
+            "done": "Done",
+            "runningAttempt": "Running · attempt {{attempt}} of {{max}}",
+            "running": "Running",
+            "failedAttempts": "Failed {{attempt}} of {{max}}",
+            "failed": "Failed",
+            "blocked": "Blocked",
+            "waiting": "Waiting for “{{title}}”",
+            "queued": "Queued",
+            "log": "Log",
+            "details": "Details",
+            "noCause": "No cause recorded"
+          },
+          "ExecutionTaskSheet": {
+            "title": "Task",
+            "description": "Task details"
+          },
+          "HandoverRow": {
+            "nativeDone": "Done when the last task is done.",
+            "archiving": "Archiving the change and preparing the handover",
+            "ready": "Change archived and ready for handover",
+            "failed": "Archiving failed after {{count}} attempts",
+            "pending": "After the last task the change is archived and handed over"
+          },
+          "cause": {
+            "timedOut": "Timed out",
+            "modelError": "Model error",
+            "verifyFailed": "Verification failed",
+            "envDefect": "Environment problem",
+            "specDefect": "Problem in the task spec",
+            "agentError": "Agent error",
+            "needsInfo": "Needs information",
+            "cancelled": "Cancelled",
+            "unknown": "Unknown cause",
+            "adviceTimedOut": "The agent ran out of time. Rerunning usually helps; if it repeats, split the task.",
+            "adviceModelError": "The model could not be used. Check the agent and model settings, then rerun.",
+            "adviceVerifyFailed": "The work did not pass its checks. Read the log, then rerun.",
+            "adviceEnvDefect": "The workspace or tools are broken. Fix the environment, then rerun.",
+            "adviceSpecDefect": "The task spec is wrong or incomplete. Change the plan before rerunning.",
+            "adviceAgentError": "The agent stopped without a usable result. Read the log, then rerun.",
+            "adviceNeedsInfo": "The agent needs an answer from you before it can continue.",
+            "adviceUnknown": "Read the log to see what happened, then rerun."
           }
+        },
+        "aiSetup": {
+          "title": {
+            "notConfigured": "AI is not set up on the dev server",
+            "credentialUnavailable": "The AI credential could not be read",
+            "sessionExpired": "The Claude Code session on the dev server has expired",
+            "quotaExhausted": "The AI quota of the dev server is used up",
+            "agentUnavailable": "No dev server is available to run the AI",
+            "busy": "The AI is busy"
+          },
+          "body": {
+            "notConfigured": "The dev server is not signed in to Claude Code. Run claude auth login on the dev server (or set an API key for its agent), then try again.",
+            "credentialUnavailable": "Check the AI credential configured for the dev server, then try again.",
+            "sessionExpired": "Sign in again with claude auth login on the dev server, then try again.",
+            "quotaExhausted": "The account behind the Claude Code login on the dev server has no quota left. Wait for it to reset or switch accounts.",
+            "agentUnavailable": "Connect a dev server for this project, or update its agent, then try again.",
+            "busy": "The dev server is already running as many AI jobs as it allows. Try again in a moment."
+          },
+          "code": "Error code: {{code}}",
+          "retry": "Try again",
+          "openSettings": "Open dev server settings",
+          "askAdmin": "Ask your administrator to fix this."
+        },
+        "SolutionOpenQuestions": {
+          "title": "Open questions",
+          "notice": "Approval stays blocked until every blocking question below has a recorded answer.",
+          "refused": "Approval was refused. These blocking questions are still unanswered: {{ids}}",
+          "blocking": "Blocking",
+          "nonBlocking": "Not blocking"
+        },
+        "SolutionAskBackDialog": {
+          "ask": "Ask back",
+          "title": "Ask back",
+          "description": "Send the blocking questions to the reporter. After they answer, the solution is generated again and you choose an option again.",
+          "reasonDefault": "The solution cannot be approved until this is answered ({{id}}): {{text}}",
+          "notAllowed": "Questions cannot be asked now: another question round may already be open, or the request is in a state that does not allow it.",
+          "invalid": "The question was rejected. Check that every reason is filled in and not too long.",
+          "reasonLabel": "Why you are asking ({{id}})",
+          "pickOne": "Select at least one question.",
+          "reasonRequired": "Every selected question needs a reason.",
+          "cancel": "Cancel",
+          "submit": "Send to reporter"
+        },
+        "CreateRequestProjectRepoNote": {
+          "noRepo": "This project has no repo yet, so a request in it cannot run. Add a repo to the project first.",
+          "runsOnWithHost": "The request runs on repo {{repo}} ({{path}}) on {{host}}.",
+          "runsOn": "The request runs on repo {{repo}} ({{path}}).",
+          "firstOfMany": "It is the first of this project's {{count}} repos."
+        },
+        "activity": {
+          "filter": {
+            "approvals": "Approvals",
+            "tasks": "Tasks",
+            "clarifications": "Clarifications",
+            "changes": "Type & plan changes",
+            "all": "All",
+            "actor": {
+              "user": "User",
+              "ai": "AI",
+              "agent": "Agent",
+              "system": "System",
+              "any": "Anyone"
+            },
+            "groupLabel": "Filter by kind",
+            "needsAttention": "Needs attention only",
+            "actorLabel": "Filter by who did it"
+          },
+          "day": {
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "unknown": "Unknown date"
+          },
+          "empty": "No activity yet",
+          "emptyFiltered": "No activity matches these filters.",
+          "loadingMore": "Loading…",
+          "loadMore": "Load more",
+          "type": {
+            "unknown": "unclassified"
+          },
+          "task": {
+            "unnamed": "A task"
+          },
+          "actor": {
+            "user": "User",
+            "ai": "AI",
+            "agent": "Agent",
+            "system": "System"
+          },
+          "severity": {
+            "error": "Stopped",
+            "attention": "Needs attention"
+          },
+          "cause": {
+            "timedOut": "Timed out",
+            "modelError": "Model error",
+            "verifyFailed": "Verification failed",
+            "envDefect": "Environment problem",
+            "specDefect": "Problem in the task spec",
+            "agentError": "Agent error",
+            "needsInfo": "Needed more information",
+            "cancelled": "Cancelled",
+            "unknown": "Unknown cause"
+          },
+          "title": {
+            "requestCreated": "Request created",
+            "requestClassified": "Classified as {{type}}",
+            "typeChanged": "Type changed from {{from}} to {{to}}",
+            "analysisGeneratedVersion": "{{kind}} version {{version}} generated",
+            "analysisGenerated": "{{kind}} generated",
+            "clarificationAsked": "Clarification asked",
+            "clarificationAnswered": "Clarification answered",
+            "approvalRequested": "Approval requested for the {{subject}}",
+            "approvalApproved": "The {{subject}} was approved",
+            "approvalRejected": "The {{subject}} was rejected",
+            "approvalDecided": "Decision on the {{subject}}",
+            "phaseStartedAuto": "Phase started automatically",
+            "phaseStarted": "Phase started",
+            "phaseDone": "Phase finished",
+            "planDone": "All tasks finished",
+            "taskStarted": "{{task}} started",
+            "taskSucceeded": "{{task}} finished",
+            "taskAccepted": "{{task}} marked done",
+            "taskFailed": "{{task}} failed",
+            "taskCancelled": "{{task}} cancelled",
+            "requestReturned": "Returned to backlog",
+            "requestReopened": "Reopened",
+            "requestCancelled": "Cancelled"
+          },
+          "analysis": {
+            "generic": "Analysis"
+          },
+          "approval": {
+            "subjectFallback": "item"
+          },
+          "attemptOf": "Attempt {{attempt}} of {{max}}",
+          "attempt": "Attempt {{attempt}}",
+          "detail": {
+            "failure": "{{cause}}: {{error}}"
+          },
+          "openTab": "Open {{tab}}"
+        },
+        "NextAction": {
+          "failed": "“{{task}}” failed {{attempts}}/{{max}} times",
+          "failedDetail": "The request is back in the backlog. Everything before it is kept.",
+          "reopen": "Reopen and rerun",
+          "question": "A question is waiting for your answer",
+          "answer": "Answer",
+          "preDeploy": "Pre-deploy approval is waiting for you",
+          "drift": "A change drifted from the plan and needs your review",
+          "approval": "An approval is waiting for you",
+          "review": "Review",
+          "confirmType": "Confirm the type of this request",
+          "running": "The agent is working on “{{task}}”",
+          "runningDetail": "Attempt {{attempt}} of {{max}}. Nothing needs you right now.",
+          "nextTask": "Waiting for the next task to start",
+          "classifying": "Orca is classifying this request",
+          "analyzing": "Orca is analysing this request",
+          "planning": "Orca is writing the plan",
+          "waitingApproval": "Waiting for someone to approve",
+          "waitingInfo": "Waiting for someone to answer a question",
+          "done": "This request is done"
         }
       },
       "reviewMap": {
@@ -15762,6 +16221,12 @@
           "waiveErrConflict": "This finding changed. Reload the list and try again.",
           "waiveErrValidation": "The waiver was rejected. Check the reason and expiry.",
           "waiveErrUnknown": "Could not save the waiver."
+        }
+      },
+      "devServer": {
+        "card": {
+          "busy": "Busy ({{count}} running)",
+          "idle": "Idle"
         }
       }
     },

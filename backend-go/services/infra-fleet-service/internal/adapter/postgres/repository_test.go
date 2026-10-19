@@ -645,6 +645,63 @@ func TestRepository_UpdateProvisionResult(t *testing.T) {
 	}
 }
 
+// The handshake facts a WebSocket agent reports are stored by UpdateProvisionResult; every read of a dev server must
+// return them too (Get, List, and the rows returned after approving or regrouping), otherwise the UI shows null.
+func TestRepository_ReadsReturnHandshakeFacts(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.9", domain.ConnectionModeDirectWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, ds); err != nil {
+		t.Fatalf("registering dev server: %v", err)
+	}
+
+	before, err := repo.Get(ctx, testTenant1, testDevServer1)
+	if err != nil {
+		t.Fatalf("get before handshake: %v", err)
+	}
+	if before.Platform != "" || before.Arch != "" || before.NodeVersion != "" || before.AgentVersion != "" {
+		t.Errorf("a dev server that never handshook must read empty facts, got %+v", before)
+	}
+
+	info := usecase.HandshakeInfo{Platform: "darwin", Arch: "arm64", NodeVersion: "v22.4.0", AgentVersion: "5.0.0"}
+	if err := repo.UpdateProvisionResult(ctx, testTenant1, testDevServer1, domain.DevServerHealthHealthy, info, time.Now().UTC()); err != nil {
+		t.Fatalf("update provision result: %v", err)
+	}
+
+	check := func(where string, got domain.DevServer) {
+		t.Helper()
+		if got.Platform != "darwin" || got.Arch != "arm64" || got.NodeVersion != "v22.4.0" || got.AgentVersion != "5.0.0" {
+			t.Errorf("%s: facts = %q/%q/%q/%q, want darwin/arm64/v22.4.0/5.0.0", where, got.Platform, got.Arch, got.NodeVersion, got.AgentVersion)
+		}
+		if got.HealthStatus != domain.DevServerHealthHealthy {
+			t.Errorf("%s: health = %q, want healthy", where, got.HealthStatus)
+		}
+	}
+	got, err := repo.Get(ctx, testTenant1, testDevServer1)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	check("Get", got)
+	list, err := repo.List(ctx, testTenant1)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("list: %v (%d rows)", err, len(list))
+	}
+	check("List", list[0])
+	approved, err := repo.UpdateApprovalStatus(ctx, testTenant1, testDevServer1, domain.DevServerStatusApproved)
+	if err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+	check("UpdateApprovalStatus", approved)
+	regrouped, err := repo.AssignGroup(ctx, testTenant1, testDevServer1, "")
+	if err != nil {
+		t.Fatalf("assign group: %v", err)
+	}
+	check("AssignGroup", regrouped)
+}
+
 // registerTestDevServer is a small helper for the fleet-health/advisory-lock
 // tests below — they need a real infra.dev_servers row to satisfy
 // fleet_health's FK, but don't care about its ssh_target/mode details.

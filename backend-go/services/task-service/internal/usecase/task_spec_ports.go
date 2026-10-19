@@ -22,11 +22,6 @@ type TaskSpecRepository interface {
 	HasSpec(ctx context.Context, tenantID, taskID string) (bool, error)
 }
 
-// TaskSpecLookup is the narrow view ExecuteTask needs to route spec tasks to Engine 1.
-type TaskSpecLookup interface {
-	HasSpec(ctx context.Context, tenantID, taskID string) (bool, error)
-}
-
 // TaskSpecLockChecker is the narrow view UpdateTask needs to freeze titles.
 type TaskSpecLockChecker interface {
 	IsLocked(ctx context.Context, tenantID, taskID string) (bool, error)

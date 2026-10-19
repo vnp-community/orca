@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -39,6 +40,9 @@ func (uc *AssignDevServerGroup) Execute(ctx context.Context, in AssignDevServerG
 
 	ds, err := uc.repo.AssignGroup(ctx, tenantID, in.DevServerID, in.GroupID)
 	if err != nil {
+		if errors.Is(err, domain.ErrDevServerNotFound) {
+			return domain.DevServer{}, devServerLookupError(err)
+		}
 		return domain.DevServer{}, apperrors.New(apperrors.KindInternal, "INFRA_ASSIGN_DEV_SERVER_GROUP_FAILED", "failed to assign dev server group", err)
 	}
 	return ds, nil

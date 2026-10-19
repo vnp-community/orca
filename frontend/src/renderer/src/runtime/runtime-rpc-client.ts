@@ -106,7 +106,10 @@ export function subscribeRuntimeStreamChannel<TAck, TEvent>(
   target: RuntimeClientTarget,
   method: string,
   params: unknown,
-  onEvent: (event: TEvent) => void
+  onEvent: (event: TEvent) => void,
+  // Why optional: lets a long-lived viewer (e.g. live agent output) reconnect when the
+  // socket drops or the server ends the stream; existing callers ignore it.
+  options: { onClose?: () => void } = {}
 ): Promise<{ ack: TAck; unsubscribe: () => void }> {
   if (target.kind === 'local') {
     return Promise.reject(new Error(SUBSCRIBE_RUNTIME_STREAM_CHANNEL_LOCAL_TARGET_MESSAGE))
@@ -162,6 +165,17 @@ export function subscribeRuntimeStreamChannel<TAck, TEvent>(
             // the subscription end, matching subscribeSharedFileWatch's own
             // "swallow late errors, let onClose signal teardown" precedent
             // (web-runtime-client.ts).
+          },
+          onClose: () => {
+            if (stopped) {
+              return
+            }
+            if (!settled) {
+              settled = true
+              reject(new Error('stream closed before the subscription was acknowledged'))
+              return
+            }
+            options.onClose?.()
           }
         }
       )

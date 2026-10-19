@@ -57,6 +57,11 @@ func (uc *ListSolutions) Execute(ctx context.Context, in ListSolutionsInput) (Li
 		}
 		out.Solutions = append(out.Solutions, s)
 	}
-	out.Runs, err = uc.runs.ListRecent(ctx, req.ID, domain.RecentRunsLimit)
+	runs, err := uc.runs.ListRecent(ctx, req.ID, domain.RecentRunsLimit)
+	for _, run := range runs {
+		if run.Kind != domain.RunKindPlan { // plan runs are read through GetPlanProposal
+			out.Runs = append(out.Runs, run)
+		}
+	}
 	return out, err
 }

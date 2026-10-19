@@ -13,7 +13,8 @@ import { canConnectAddRepoHost, canSelectAddRepoHost } from './add-repo-host-ava
 
 type AddRepoHostSelectorProps = {
   hosts: SidebarHostOption[]
-  selectedHostId: ExecutionHostId
+  // null = web with several dev servers and none chosen yet.
+  selectedHostId: ExecutionHostId | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onSelectHost: (hostId: ExecutionHostId) => void
@@ -45,8 +46,10 @@ export function AddRepoHostSelector({
     return null
   }
 
-  const selectedHost = hosts.find((host) => host.id === selectedHostId) ?? hosts[0]
-  if (!selectedHost) {
+  const selectedHost = selectedHostId
+    ? (hosts.find((host) => host.id === selectedHostId) ?? hosts[0])
+    : null
+  if (!selectedHost && selectedHostId) {
     return null
   }
   return (
@@ -63,8 +66,15 @@ export function AddRepoHostSelector({
             aria-expanded={open}
             className="h-7 min-w-0 max-w-[18rem] gap-1.5 rounded-md border border-border bg-muted/30 px-2 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
           >
-            <span className="min-w-0 truncate">{selectedHost.label}</span>
-            {selectedHost.health !== 'local' ? (
+            <span className="min-w-0 truncate">
+              {selectedHost
+                ? selectedHost.label
+                : translate(
+                    'auto.components.sidebar.AddRepoHostSelector.chooseHost',
+                    'Choose a host'
+                  )}
+            </span>
+            {selectedHost && selectedHost.health !== 'local' ? (
               <span
                 title={getHostStatusDetail(selectedHost)}
                 className="shrink-0 text-[11px] font-normal text-muted-foreground"

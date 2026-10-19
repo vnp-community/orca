@@ -13,13 +13,13 @@ import (
 // dispatching, rather than passing repoID straight into dispatchExecutor.
 type ResolvePrBase struct {
 	scm          SCMClient
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewResolvePrBase(scm SCMClient, reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *ResolvePrBase {
+func NewResolvePrBase(scm SCMClient, reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *ResolvePrBase {
 	return &ResolvePrBase{scm: scm, reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

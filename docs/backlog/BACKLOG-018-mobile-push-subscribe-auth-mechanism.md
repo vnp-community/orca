@@ -1,5 +1,13 @@
 # BACKLOG-018: `POST /api/mobile/push-subscribe` route — needs a mobile SSO CR before it can be built
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — hạ ưu tiên (mobile sau GA, D-01)** · Backlog ship: SHIP-CLI-02 (P2)
+>
+> `/api/push-subscribe` (Web Push, xác thực cookie) có ở `httpgateway/notification_routes.go`; route dành cho mobile `/api/mobile/push-subscribe` (bearer) chưa có và CR mobile SSO chưa được viết.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/backend-go/crs/v4/mobile-companion/tasks/TASK-BE-MOBILE-010-mobile-push-subscribe-route.md`, `specs/backend-go/crs/v4/mobile-companion/solutions/BE-MOBILE-SOL-002-mobile-subscribe-auth-endpoint.md` §1.2/§1.3/§1.4/§2
 **Priority:** Medium — blocks the only remaining piece of F03 Mobile Companion's backend-go work
 **Blocked on:** **A new CR for mobile SSO infrastructure** (backend-go `auth-service` + `frontend`), not engineering time on this task itself

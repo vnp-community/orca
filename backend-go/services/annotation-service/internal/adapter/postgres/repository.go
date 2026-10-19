@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -121,7 +122,7 @@ func (r *Repository) GetAnnotation(ctx context.Context, tenantID, id string) (do
 	`, tenantID, id)
 
 	a, err := scanAnnotation(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Annotation{}, domain.ErrAnnotationNotFound
 	}
 	if err != nil {
@@ -140,7 +141,7 @@ func (r *Repository) UpdateAnnotation(ctx context.Context, tenantID, id, content
 	`, content, resolved, tenantID, id)
 
 	a, err := scanAnnotation(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Annotation{}, domain.ErrAnnotationNotFound
 	}
 	if err != nil {
@@ -153,6 +154,9 @@ func (r *Repository) DeleteAnnotation(ctx context.Context, tenantID, id string) 
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM annotation.annotations WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
+	if isMalformedUUID(err) {
+		return domain.ErrAnnotationNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete annotation: %w", err)
 	}
@@ -169,6 +173,17 @@ func (r *Repository) DeleteAnnotation(ctx context.Context, tenantID, id string) 
 // concurrently-deleted annotation) must not turn a successful send into an
 // error response.
 func (r *Repository) MarkSent(ctx context.Context, tenantID string, ids []string, sentAt time.Time) ([]domain.Annotation, error) {
+	// An id that cannot be a uuid matches nothing; drop it instead of failing the whole batch.
+	valid := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if _, err := uuid.Parse(id); err == nil {
+			valid = append(valid, id)
+		}
+	}
+	if len(valid) == 0 {
+		return nil, nil
+	}
+	ids = valid
 	rows, err := r.pool.Query(ctx, `
 		UPDATE annotation.annotations
 		SET sent_to_agent = true, sent_at = $1

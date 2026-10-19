@@ -18,7 +18,7 @@ func TestImportNested_CreatesOneGroupAndProjectPerCandidate(t *testing.T) {
 		{ID: "proj-a", TenantID: "tenant-1", Name: "repo-a"},
 		{ID: "proj-b", TenantID: "tenant-1", Name: "repo-b"},
 	}
-	uc := NewImportNested(groupRepo)
+	uc := NewImportNested(groupRepo, newFakeRepoRepository(), newFakeProjectRepository(), RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	selected := []domain.NestedRepoCandidate{
@@ -39,7 +39,7 @@ func TestImportNested_CreatesOneGroupAndProjectPerCandidate(t *testing.T) {
 
 func TestImportNested_RejectsNonexistentParentGroup(t *testing.T) {
 	groupRepo := newFakeProjectGroupRepository()
-	uc := NewImportNested(groupRepo)
+	uc := NewImportNested(groupRepo, newFakeRepoRepository(), newFakeProjectRepository(), RepoHostPolicy{AllowLocalRepos: true})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, _, err := uc.Execute(ctx, ImportNestedInput{ParentGroupID: "missing", Selected: []domain.NestedRepoCandidate{{Path: "/home/dev/repo-a"}}})
@@ -48,7 +48,7 @@ func TestImportNested_RejectsNonexistentParentGroup(t *testing.T) {
 
 func TestImportNested_NoTenantIsUnauthenticated(t *testing.T) {
 	groupRepo := newFakeProjectGroupRepository()
-	uc := NewImportNested(groupRepo)
+	uc := NewImportNested(groupRepo, newFakeRepoRepository(), newFakeProjectRepository(), RepoHostPolicy{AllowLocalRepos: true})
 
 	_, _, err := uc.Execute(context.Background(), ImportNestedInput{Selected: []domain.NestedRepoCandidate{{Path: "/home/dev/repo-a"}}})
 	assertAppError(t, err, apperrors.KindUnauthenticated, "PROJECT_NO_TENANT")

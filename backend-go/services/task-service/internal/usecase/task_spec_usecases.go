@@ -75,7 +75,7 @@ func (uc *SetTaskSpec) Execute(ctx context.Context, in SetTaskSpecInput) (domain
 		return domain.TaskSpec{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_MISSING_ID", "task_id is required", nil)
 	}
 	if _, err := uc.tasks.Get(ctx, tenantID, in.TaskID); err != nil {
-		return domain.TaskSpec{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		return domain.TaskSpec{}, taskRepoError(err, "task not found", "TASK_FETCH_FAILED", "failed to fetch task")
 	}
 	if err := requireGrantWhenUser(ctx, uc.perm, in.TaskID, "write"); err != nil {
 		return domain.TaskSpec{}, err
@@ -169,7 +169,7 @@ func (uc *LockTaskSpecs) Execute(ctx context.Context, planTaskID string) (int, e
 	}
 	nodes, _, err := uc.tasks.GetSubtree(ctx, tenantID, planTaskID, maxSpecSubtreeDepth)
 	if err != nil {
-		return 0, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found while resolving subtree", err)
+		return 0, taskRepoError(err, "task not found while resolving subtree", "TASK_SUBTREE_FAILED", "failed to resolve subtree")
 	}
 	ids := make([]string, 0, len(nodes))
 	for _, n := range nodes {

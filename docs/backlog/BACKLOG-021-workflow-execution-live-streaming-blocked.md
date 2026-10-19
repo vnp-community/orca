@@ -1,5 +1,13 @@
 # BACKLOG-021: Workflow execution live streaming — blocked 2 layers deep on an unbuilt event catalog
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🟡 PARTIAL** · Backlog ship: SHIP-WF-04
+>
+> Có stream `task.activity.subscribe` (`channels_task_activity.go`). Không tìm thấy kênh `workflow.activity` cho workflow execution. Việc này trùng với CR-WFD-008 (Workflow Engine v2, stream sự kiện) — xử lý chung với SHIP-WF-04.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/frontend/crs/v4/workflow/tasks/FE-TASK-005-execution-live-streaming-subscription.md` (FE-SOL-002, CR-WF-007)
 **Priority:** Medium — polling already works as a functioning fallback; this is a UX upgrade, not a broken feature
 **Blocked on:** `CR-FLOW-TASK-003` (unified task-activity event catalog, backend-go, **📋 Proposed**) → `BE-SOL-006` (execution-live-streaming, backend-go, **📋 Proposed**) — a 2-layer backend dependency chain, neither layer started

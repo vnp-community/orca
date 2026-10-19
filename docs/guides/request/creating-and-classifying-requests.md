@@ -1,6 +1,6 @@
 # Tạo và phân loại Request
 
-**Cập nhật:** 2026-10-08 · Đối chiếu với: `internal/domain/request_source.go`, `internal/usecase/create_request.go`,
+**Cập nhật:** 2026-10-09 · Đối chiếu với: `internal/domain/request_source.go`, `internal/usecase/create_request.go`,
 `internal/usecase/propose_request_classification.go`, `internal/domain/request_confirmation_rules.go`.
 Điều kiện: cờ luồng Request phải bật cho tenant, nếu không các lệnh dưới trả `REQUEST_FLOW_DISABLED`
 ([Bật luồng Request](./admin-enable-request-flow.md)).
@@ -47,7 +47,7 @@ Người xác nhận loại qua `ConfirmRequestType` hoặc duyệt Approval `re
 | `hotfix` và `security` bắt buộc **người** xác nhận | người yêu cầu không tự duyệt được (xem chính sách mặc định) |
 
 Sau xác nhận: Request vào `analyzing`, trừ `task` và `docs` vào `planning`. `ChangeRequestType` đổi loại sau đó và ghi lịch sử;
-`ListRequestTypeHistory` xem lại. Từ bước này trở đi các giai đoạn tiếp theo **chưa có** (xem [README](./README.md)).
+`ListRequestTypeHistory` xem lại. Các giai đoạn tiếp theo (Solution, Plan, Phase, thực thi) và phần nào đã được e2e kiểm xem ở bảng trạng thái của [README](./README.md).
 
 ## Thoát khỏi luồng
 

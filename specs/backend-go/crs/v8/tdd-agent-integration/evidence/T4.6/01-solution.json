@@ -1,0 +1,357 @@
+{
+  "nextPageToken": "",
+  "runs": [
+    {
+      "engine": "native",
+      "finishedAt": "2026-10-15T01:10:49Z",
+      "id": "4d0fc2d9-7f76-46e1-ba1a-293246c40474",
+      "kind": "solution",
+      "startedAt": "2026-10-15T01:02:54Z",
+      "stats": {
+        "cacheCreationTokens": 123458,
+        "cacheReadTokens": 2379499,
+        "costUsd": 3.2464645000000005,
+        "durationMs": 472910,
+        "inputTokens": 62,
+        "knowledgeToolCalls": 19,
+        "outputTokens": 32873,
+        "toolCalls": {
+          "Glob": 9,
+          "Grep": 17,
+          "Read": 16,
+          "mcp__tdd-agent__kg_get_element": 11,
+          "mcp__tdd-agent__kg_neighbors": 1,
+          "mcp__tdd-agent__kg_search": 5,
+          "mcp__tdd-agent__kg_snapshots": 1,
+          "mcp__tdd-agent__run_list": 1
+        },
+        "turns": 62
+      },
+      "status": "succeeded"
+    }
+  ],
+  "solutions": [
+    {
+      "chosenOption": -1,
+      "createdAt": "2026-10-15T01:02:54Z",
+      "generationRunId": "4d0fc2d9-7f76-46e1-ba1a-293246c40474",
+      "id": "fa655eb5-80a8-4c1b-b3ed-54e537900224",
+      "kind": "solution",
+      "options": {
+        "assumptions": [
+          {
+            "id": "A-1",
+            "needs_confirmation": true,
+            "text": "CR-H01 sẽ cung cấp `shared/pkg/aiclient` và `AIService` (ResolveModel, ListMessages, AppendTurn); hôm nay chúng không tồn tại (grep `aiclient` trong `backend/shared` = 0), nên H02 code theo interface và test bằng fake, nhánh thật bật khi H01 vào."
+          },
+          {
+            "id": "A-2",
+            "needs_confirmation": true,
+            "text": "Hợp đồng UI trong SOL-P3c-E §3.3 (Đính chính D-9) là hợp đồng hiện hành: chat trả chuỗi markdown có marker, batch/save nhận `prompt` nối các khối, config có hình dạng `CaseAiChatConfig`."
+          },
+          {
+            "id": "A-3",
+            "text": "\"Có bản ghi audit\" (AC-2) được thoả bằng một dòng `operation_log` do middleware `internal/middleware/audit_log.go` ghi (module FUNCTIONAL_CASE, INSERT-only, NFR-AU-01), cộng chi tiết thay đổi qua `audit.RecordAdded`."
+          },
+          {
+            "id": "A-4",
+            "text": "Gateway không cần sửa cho lời gọi LLM 60 s: `upstream.response_header_timeout` mặc định 300 s (`gateway/internal/config/config.go:201`) và server không đặt read/write timeout."
+          },
+          {
+            "id": "A-5",
+            "text": "Đo chất lượng prompt trên LLM thật (ENV B10) ngoài phạm vi; mọi nghiệm thu trong CR này chạy với mock-ext OpenAI và fake client."
+          },
+          {
+            "id": "A-6",
+            "text": "Số thứ tự `num` của cả lô được cấp bằng một lần `AllocNums(projectID, n)` trong chính giao dịch lưu, nên không có lỗ số và không trùng khi hai người lưu đồng thời."
+          }
+        ],
+        "design_references": {
+          "available": true,
+          "conflicts": [
+            "FR-SYS-07 còn phát biểu \"các hành động chat và chuyển văn bản chưa nối AI phải trả 501 trung thực\": mọi phương án đều thay hành vi đó, nên yêu cầu phải được nâng revision (tiêu chí nghiệm thu của chính nó đã dự liệu \"khi nối AI (T-F3-18) ca kiểm thử đổi sang đường thật\").",
+            "ADR-12 + NFR-CO-02 + BRL-64 cấm route 501/200 giả và buộc tính năng hoãn trả 404 + `X-Route-Missing: 1`; ADR-12 chỉ ghi nhận ngoại lệ 501 cho AI (OI-02). Hành vi 503 khi `AI_ENABLED=false` mà SOL/WP-F3 chọn chưa được quy tắc nào cho phép rõ ràng (Q-3).",
+            "INT-03 và NFR-DA-04 buộc cấp `num` từ `functional_case_num_seq` trong cùng giao dịch tạo case: `BatchSave` hiện tại (`usecase/ai/ai.go:31-50`, gọi `caseUC.Add` từng case) vi phạm tinh thần này và là nguyên nhân lưu một phần; mọi phương án phải bỏ vòng lặp đó.",
+            "ADR-06 (một MySQL, mỗi bảng thuộc đúng một service, migration `V###__*.sql` kiểm bằng `dbown`) buộc khai báo `case_ai_config` trong `backend/db/ownership.yaml`; opt-3 còn thêm trao đổi chéo service trong khi quyết định chỉ cho ratchet giảm đọc chéo."
+          ],
+          "gaps": [
+            "KG không có phần tử nào cho `case_ai_config` (ENT-17 chỉ phủ `ai_model_source`/`ai_conversation`) nên không nói được ba trường bắt buộc là gì, ai sở hữu bảng, hay giá trị mặc định.",
+            "Không có yêu cầu hay QualityTarget nào về giới hạn 20 khối / 100 case, về định dạng marker `featureCaseStart/caseExpand/featureCaseEnd`, về retry JSON một lần, hay về độ trễ/chi phí của một lượt gọi LLM; các con số này chỉ có trong backlog và SOL-P3c-E.",
+            "UC-16, UC-38 và T-F3-18/T-F3-19 chỉ xuất hiện dưới dạng văn bản trong provenance, không phải phần tử để truy vết; `clarification:89367a45-…` không đọc được qua các tool chỉ-đọc (run_list chỉ trả run `gen-1`)."
+          ],
+          "read": [
+            "FR-SYS-07",
+            "BRL-64",
+            "ENT-17",
+            "ADR-12",
+            "ADR-06",
+            "NFR-CO-02",
+            "NFR-AU-01",
+            "NFR-DA-04",
+            "INT-03",
+            "FR-CAS-02",
+            "FR-CAS-13"
+          ],
+          "snapshot": "snap-000001"
+        },
+        "open_questions": [
+          {
+            "id": "Q-1",
+            "text": "Ba trường bắt buộc của `case_ai_config` là ba trường nào? SOL-P3c-E §3.3 ghi `templateConfig.caseName`, `caseSteps`, `expectedResult` phải = true (checkbox disabled ở `caseConfigModal.vue`), còn CR chỉ nói \"đủ ba trường\"; KG không có phần tử nào định nghĩa bảng này."
+          },
+          {
+            "id": "Q-2",
+            "text": "Nội dung của `clarification:89367a45-dfdd-434e-a568-6c594526bbcf` không đọc được bằng các tool chỉ-đọc hiện có (`run_list` chỉ có run `gen-1`); nếu nó thay đổi phạm vi thì các phương án trên phải xem lại."
+          },
+          {
+            "id": "Q-3",
+            "text": "Khi `AI_ENABLED=false`, route AI trả 503 (theo SOL/WP-F3) hay 404 + `X-Route-Missing: 1` (theo ADR-12, NFR-CO-02, BRL-64)? Cần chốt vì cả ba phương án đều chạm quy tắc này."
+          },
+          {
+            "id": "Q-4",
+            "text": "AC-1 \"≥ 10 test case hợp lệ\" được nghiệm thu bằng mock-ext (cấu hình trả đủ 10 khối) hay phải chứng minh trên LLM thật? Nếu là LLM thật thì AC-1 phụ thuộc ENV B10 vốn ngoài phạm vi."
+          },
+          {
+            "id": "Q-5",
+            "text": "Khi lưu hàng loạt, chấp nhận server transform lại các khối đã chọn (opt-1, nội dung lưu có thể khác bản người dùng vừa xem) hay phải lưu đúng bản đã duyệt (opt-2, đổi hợp đồng UI)?"
+          },
+          {
+            "id": "Q-6",
+            "text": "FR-SYS-07 sẽ được nâng revision trong SRS/URD (bỏ câu \"trả 501 trung thực\") trước hay sau khi code vào? Và `case_ai_config` cần một mục ENT mới trong SRS §7 cùng dòng trong `backend/db/ownership.yaml` (ADR-06) do ai mở?"
+          },
+          {
+            "id": "Q-7",
+            "text": "CR-H01 có hợp nhất trước H02 không? Nếu không, H02 vào với fake client + cờ tắt có được coi là \"xong\" theo tiêu chí không-stub (`grep NotImplemented` = 0) hay bị coi là chưa chạy thật?"
+          }
+        ],
+        "options": [
+          {
+            "affected_areas": [
+              { "kind": "module", "name": "backend/shared/pkg/aiprompt (mới)" },
+              {
+                "kind": "service",
+                "name": "case-management: internal/usecase/ai, internal/handler/ai.go, internal/usecase/case (AddMany)"
+              },
+              {
+                "kind": "api",
+                "name": "FR-SYS-07 (KG): POST /functional/case/ai/{chat,transform,batch/save}, GET/PUT /functional/case/ai/{get,save}/config"
+              },
+              {
+                "kind": "schema",
+                "name": "case_ai_config (bảng mới, migration V025 + backend/db/ownership.yaml — ADR-06); INT-03 / NFR-DA-04 (functional_case_num_seq)"
+              },
+              {
+                "kind": "schema",
+                "name": "ENT-17 AiModelSource/AiConversation (đường đọc model và lịch sử hội thoại)"
+              },
+              {
+                "kind": "infra",
+                "name": "NFR-AU-01 operation_log qua middleware audit; cờ AI_ENABLED"
+              },
+              { "kind": "ui", "name": "ui/tms ms-ai-panel (chỉ kiểm chứng, không sửa)" }
+            ],
+            "approach": "**Nơi sửa**: `backend/shared/pkg/aiprompt` (mới); `backend/services/qa-core/case-management/internal/{usecase/ai/ai.go, handler/ai.go, domain/ai.go, usecase/case/case.go}`; `migrations/V025__case_ai_config.sql`; `backend/db/ownership.yaml`.\n\n1. **`aiprompt`** (thuần, test bảng): `CaseChatSystemPrompt(lang, cfg, projectCtx)` buộc định dạng marker `featureCaseStart/caseExpand/featureCaseEnd` mà UI đang tách (`ui/tms/src/components/business/ms-ai-panel/**`), `ParseCaseBlocks(s) []Block{Title,Body}`, `CaseTransformSchema`, `ValidateTransform` (tên ≤ 255, ≥ 1 bước khi `STEP`, loại chuỗi rỗng).\n2. **Cổng AI**: khai báo interface nhỏ trong CM (`Chat(ctx,req)(string,error)`, `ResolveModel`, `AppendTurn/ListMessages`) — bản thật là `shared/pkg/aiclient` + `AIService` của CR-H01, bản `fake` dùng cho test. Nhờ vậy slice biên dịch và xanh trước khi H01 xong, và không còn `httpx.NotImplemented` trong `usecase/ai` (tiêu chí không-stub).\n3. **Transform**: gọi JSON mode theo `CaseTransformSchema` ⇒ `json.Unmarshal` + `ValidateTransform`; lỗi ⇒ **đúng một** lần thử lại kèm chỉ dẫn \"chỉ trả JSON\" ⇒ vẫn lỗi ⇒ 502 với thông điệp thật, **không ghi gì** (AC-3). Không lưu: UI mở form.\n4. **BatchSave**: `ParseCaseBlocks(prompt)`; \u003e20 khối hoặc \u003e100 case ⇒ 400 **trước** khi gọi LLM và trước mọi ghi (AC-4); transform các khối (song song ≤ 4) **ngoài** giao dịch; sau đó một hàm `AddMany` trong CM chạy trong **một** `uc.ev.Do` (`internal/events/bus.go:42`), cấp số bằng một `repo.AllocNums(projectID, n)` (INT-03, NFR-DA-04) và `CreateInBatches` cho case + blob + custom values, theo đúng mẫu `repository/mysql/case_batch.go:129 CopyCases`; `casehistory.Recorder` ghi trong cùng tx; phát một `case.imported` (`ev.Imported` + `caseev.Silent`) thay 100 `case.created`. Lỗi bất kỳ ⇒ rollback toàn bộ (AC-2, AC-6).\n5. **Audit**: route POST này đã khớp `routeTable` ở `internal/middleware/audit_log.go:45` (module `FUNCTIONAL_CASE`) nên mỗi lần lưu có một dòng `operation_log` INSERT-only (NFR-AU-01); thêm `audit.RecordAdded` cho từng case để có chi tiết thay đổi.\n6. **Config**: bảng `case_ai_config(user_id, project_id, config JSON, update_time, PK(user_id,project_id))`, migration `V025__…` (dbown: CREATE IF NOT EXISTS, không gap) + khai báo bảng trong `backend/db/ownership.yaml` (ADR-06); `GET` trả mặc định tài liệu hoá khi chưa lưu; lưu/dùng mà thiếu một trong ba trường bắt buộc ⇒ từ chối kèm lỗi cấu hình theo trường (AC-5); xoá nhánh Redis và `domain.AIConfig` cũ.\n7. **Cờ \u0026 kiểm chứng**: `AI_ENABLED` tắt ⇒ route từ chối rõ ràng. Go test với fake client + `internal/testutil` (MySQL tạm): JSON hỏng ⇒ retry ⇒ 502; 21 khối ⇒ 400 và `SELECT count(*)` không đổi; lỗi ở case thứ 5 ⇒ 0 dòng. Python `test_f3_case_ai.py` với mock-ext OpenAI (mock trả ≥ 10 khối) ⇒ `batch/save` ⇒ case có trong `/functional/case/page`; e2e: drawer → Transform → lưu vào module.",
+            "breaking_change": true,
+            "cons": [
+              "Mâu thuẫn FR-SYS-07 (snap-000001): câu yêu cầu vẫn ghi chat/transform \"chưa nối AI phải trả 501 trung thực\" ⇒ phải nâng revision của FR-SYS-07 (tiêu chí nghiệm thu của nó đã dự liệu việc đổi sang đường thật khi T-F3-18 xong)",
+              "Hành vi khi `AI_ENABLED=false` (503 theo SOL) lệch với ADR-12 / NFR-CO-02 / BRL-64 (\"ẩn hẳn: 404 + `X-Route-Missing: 1`, không route 501/200 giả\"); ADR-12 chỉ ghi nhận ngoại lệ 501 cho AI (OI-02) mà CR này đóng lại",
+              "Bảng `case_ai_config` chưa có phần tử ENT nào trong KG (ENT-17 chỉ phủ `ai_model_source`/`ai_conversation`) ⇒ phải thêm mục ENT + dòng trong `ownership.yaml` (ADR-06) rồi mới coi là truy vết đủ",
+              "Khi lưu, server transform lại các khối đã chọn ⇒ nội dung lưu có thể khác bản người dùng vừa xem, và tốn thêm một lượt gọi LLM",
+              "Đổi hình dạng request/response của 5 route AI và bỏ cấu hình Redis cũ (dữ liệu khoá `ai:config:case-gen:*` bị bỏ)"
+            ],
+            "effort": { "hours_estimate": 72, "size": "L" },
+            "id": "opt-1",
+            "pros": [
+              "Khớp hợp đồng UI đã rà (SOL-P3c-E §3.3, Đính chính D-9): không phải sửa `ui/tms`, route giữ nguyên",
+              "Dùng lại hạ tầng có sẵn: `ev.Do` (uow + outbox), `AllocNums(n)`, mẫu `CopyCases`, `casehistory`, middleware audit đã phủ route",
+              "Giải quyết đúng gốc AC-6: hôm nay `BatchSave` gọi `caseUC.Add` mỗi case một giao dịch nên lưu dở dang (`usecase/ai/ai.go:31-50`)",
+              "Interface + fake cho phép hoàn thành và kiểm chứng trước khi CR-H01 kịp xong, giảm rủi ro chặn lịch",
+              "LLM nằm ngoài giao dịch DB ⇒ giao dịch ngắn, không giữ khoá trong lúc chờ mạng"
+            ],
+            "recommended": true,
+            "risks": [
+              {
+                "description": "CR-H01 chưa có: `shared/pkg/aiclient`, `AIService.ResolveModel/AppendTurn` hôm nay không tồn tại trong repo (grep `aiclient` trong `backend/shared` = 0) ⇒ nhánh thật chỉ chạy được khi H01 hợp nhất",
+                "severity": "high"
+              },
+              {
+                "description": "Mức tuân thủ marker/JSON của LLM thật chưa đo (ENV B10 ngoài phạm vi) ⇒ tỉ lệ \"≥ 10 case hợp lệ\" chỉ được chứng minh bằng mock",
+                "severity": "medium"
+              },
+              {
+                "description": "Transform 20 khối cho một lần lưu có thể vượt thời gian chờ của UI; `upstream.response_header_timeout` mặc định 300 s (gateway `config.go:201`) nên gateway không phải sửa, nhưng cần giới hạn song song và huỷ theo context",
+                "severity": "medium"
+              },
+              {
+                "description": "Giao dịch 100 case + blob + history + outbox có thể gây khoá/timeout nếu không dùng `CreateInBatches` và không cấp số một lần",
+                "severity": "low"
+              }
+            ],
+            "rollback": "`AI_ENABLED=false` ⇒ route AI từ chối ngay (không gọi provider); migration chỉ thêm bảng mới nên vô hại khi tắt; muốn lùi hẳn thì revert commit handler/usecase — các route trở lại hành vi cũ, dữ liệu case đã lưu không bị ảnh hưởng.",
+            "summary": "Thêm `shared/pkg/aiprompt` (prompt marker, ParseCaseBlocks, CaseTransformSchema, ValidateTransform); viết lại `usecase/ai` của case-management theo hợp đồng UI D-9: Chat trả chuỗi markdown, Transform retry JSON 1 lần rồi 502, BatchSave tách khối từ `prompt`, chặn \u003e20 khối/\u003e100 case trước mọi ghi, rồi tạo case trong MỘT giao dịch qua `ev.Do` + `AllocNums(n)`; `case_ai_config` chuyển từ Redis sang MySQL với 3 trường bắt buộc. LLM gọi qua một interface, có fake để xanh trước khi CR-H01 xong.",
+            "title": "Thực thi đúng hợp đồng đã tài liệu hoá (SOL-P3c-E §3.3) trong case-management, qua cổng AI có fake"
+          },
+          {
+            "affected_areas": [
+              { "kind": "module", "name": "backend/shared/pkg/aiprompt (mới)" },
+              {
+                "kind": "service",
+                "name": "case-management: internal/usecase/ai, internal/handler/ai.go, internal/usecase/case (AddMany)"
+              },
+              {
+                "kind": "api",
+                "name": "FR-SYS-07 (KG): POST /functional/case/ai/{chat,transform,batch/save} — thân batch/save đổi sang blocks[].cases[]"
+              },
+              {
+                "kind": "ui",
+                "name": "ui/tms ms-ai-panel (conversation.vue, caseModuleSelect.vue), api/modules/case-management/featureCase.ts"
+              },
+              {
+                "kind": "schema",
+                "name": "case_ai_config (migration V025 + ownership.yaml — ADR-06); INT-03 / NFR-DA-04"
+              },
+              { "kind": "infra", "name": "NFR-AU-01 operation_log; cờ AI_ENABLED" }
+            ],
+            "approach": "**Khác biệt cốt lõi so với opt-1**: biên giới AI nằm trọn ở `transform`, đường ghi thuần dữ liệu.\n\n1. `shared/pkg/aiprompt`, `Chat`, `Transform`, `case_ai_config` (bảng + 3 trường bắt buộc) làm như opt-1 — dùng lại nguyên mẫu đã mô tả ở đó.\n2. **Hợp đồng mới cho ghi**: `POST /functional/case/ai/batch/save` nhận `{projectId, moduleId, templateId, blocks:[{title, cases:[CaseTransformResult]}]}`. Server: kiểm `moduleId`/`templateId` thuộc `projectId`; `len(blocks) \u003e 20` hoặc `tổng cases \u003e 100` ⇒ 400 trước mọi ghi (AC-4); `ValidateTransform` lại từng case (không tin client, AC-1 vẫn được kiểm bằng schema); rồi một `AddMany` trong một `ev.Do` với `AllocNums(projectID, n)` và `CreateInBatches` (AC-2, AC-6) — cùng mẫu `repository/mysql/case_batch.go:129`.\n3. **UI**: `ui/tms/src/components/business/ms-ai-panel/**` (`conversation.vue`, `caseModuleSelect.vue`) gọi `transform` cho từng khối được tích, giữ kết quả trong state, rồi gửi mảng case đã duyệt; `ui/tms/src/api/modules/case-management/featureCase.ts` đổi kiểu tham số. Người dùng sửa nội dung trước khi lưu cũng được tôn trọng.\n4. **Audit** và cờ `AI_ENABLED` như opt-1 (route đã thuộc `routeTable` ở `internal/middleware/audit_log.go:45`, NFR-AU-01).\n5. **Kiểm chứng**: Go test không cần fake LLM cho đường ghi (xác định): 21 khối ⇒ 400; 101 case ⇒ 400; case thứ 5 vi phạm ⇒ 0 dòng; `AllocNums` liên tục khi hai lần lưu song song (NFR-DA-04). Fake client chỉ dùng cho `Chat`/`Transform`. Python mock-ext: chat ⇒ ≥ 10 khối ⇒ transform từng khối ⇒ save ⇒ có trong `/functional/case/page`; e2e như opt-1.",
+            "breaking_change": true,
+            "cons": [
+              "Lệch hợp đồng UI đã rà (SOL-P3c-E §3.3 / Đính chính D-9: UI gửi `prompt` nối các khối bằng `join('')`) ⇒ phải sửa `ui/tms` và đồng bộ hai nhánh FE/BE",
+              "Mâu thuẫn FR-SYS-07 như opt-1 (câu yêu cầu còn ghi 501) ⇒ cần nâng revision",
+              "Vẫn giữ tranh chấp ADR-12 / NFR-CO-02 / BRL-64 về hành vi khi tắt cờ (503 thay vì 404 + `X-Route-Missing: 1`)",
+              "Bảng `case_ai_config` vẫn chưa có ENT trong KG và phải thêm vào `ownership.yaml` (ADR-06)",
+              "\"20 khối\" trở thành khái niệm do client dựng ⇒ phải định nghĩa lại trong tài liệu để AC-4 kiểm được ở server",
+              "Nhiều round trip transform (một lần mỗi khối) ⇒ chi phí/độ trễ dồn về bước xem trước"
+            ],
+            "effort": { "hours_estimate": 88, "size": "L" },
+            "id": "opt-2",
+            "pros": [
+              "Lưu đúng nội dung người dùng đã xem và chọn (sát AC-2 \"chọn một số case\"), kể cả khi họ sửa tay",
+              "Đường ghi không phụ thuộc LLM: nhanh, xác định, không tốn thêm token, không có timeout mạng trong request lưu",
+              "Test đường ghi (AC-2, AC-4, AC-6) hoàn toàn không cần mock LLM ⇒ ít nhiễu, chạy trong CI hiện có",
+              "Ít phụ thuộc CR-H01 hơn: phần lưu hàng loạt có thể hợp nhất và nghiệm thu độc lập"
+            ],
+            "recommended": false,
+            "risks": [
+              {
+                "description": "Hai nhánh (BE đổi hợp đồng, FE đổi theo) phải lên cùng lúc; lệch phiên bản ⇒ nút Lưu lỗi 400 trên môi trường pilot",
+                "severity": "high"
+              },
+              {
+                "description": "Client gửi dữ liệu không do AI sinh (bỏ qua transform) ⇒ phải coi mọi trường là đầu vào không tin cậy; `ValidateTransform` ở server là bắt buộc, không chỉ để báo lỗi",
+                "severity": "medium"
+              },
+              {
+                "description": "Phụ thuộc CR-H01 vẫn chặn AC-1/AC-3 (Chat/Transform) dù đường lưu đã xong",
+                "severity": "medium"
+              }
+            ],
+            "rollback": "Tắt `AI_ENABLED` ⇒ route AI từ chối; vì FE/BE đổi cùng nhau, lùi phải revert cả hai commit (BE + bundle UI). Bảng mới là phần thêm, không cần lùi schema.",
+            "summary": "Giữ `aiprompt` và Chat/Transform như opt-1, nhưng `batch/save` nhận `blocks[{title, cases[]}]` đã transform và được người dùng chọn, server chỉ `ValidateTransform` lại, chặn \u003e20 khối/\u003e100 case rồi lưu trong một giao dịch. Không có lời gọi LLM nào trong đường lưu: xác định, rẻ, lưu đúng bản người dùng thấy. Đổi lại phải sửa UI để gửi case thay vì chuỗi `prompt`.",
+            "title": "Lưu đúng những case người dùng đã duyệt: batch/save nhận case đã transform, không gọi LLM khi lưu"
+          },
+          {
+            "affected_areas": [
+              {
+                "kind": "service",
+                "name": "ai-orchestrator (proto + handler + prompt/schema), case-management internal/usecase/ai"
+              },
+              { "kind": "module", "name": "backend/shared/pkg/aiprompt (dùng chung hai service)" },
+              {
+                "kind": "api",
+                "name": "FR-SYS-07 (KG): POST /functional/case/ai/{chat,transform,batch/save}; RPC mới GenerateCases/TransformBlock"
+              },
+              {
+                "kind": "schema",
+                "name": "case_ai_config do case-management sở hữu (ADR-06, ownership.yaml); INT-03 / NFR-DA-04"
+              },
+              {
+                "kind": "infra",
+                "name": "kết nối gRPC CM → orchestrator (service-key/mTLS), readiness; NFR-AU-01 operation_log; cờ AI_ENABLED"
+              }
+            ],
+            "approach": "1. **Orchestrator**: thêm RPC `GenerateCases`/`TransformBlock` vào `backend/services/ai/ai-orchestrator/proto/ai_orchestrator/v1`, dùng `shared/pkg/aiprompt` (vẫn đặt ở shared để cả hai bên dùng) và `aiclient` của CR-H01; retry JSON một lần nằm tại đây, trả lỗi phân biệt được (`invalid_json_after_retry`) để CM map ra 502.\n2. **case-management**: `usecase/ai` giữ `Chat`/`Transform` làm lớp mỏng gọi gRPC (có timeout, huỷ theo context), **không** gọi provider trực tiếp; `BatchSave`, `Get/SaveConfig` và bảng `case_ai_config` vẫn ở CM (bảng do CM sở hữu — ADR-06), lưu trong một `ev.Do` + `AllocNums(n)` như opt-1.\n3. **Ngữ cảnh dự án**: orchestrator không được đọc bảng của CM; CM phải đóng gói ngữ cảnh (tên dự án, module, ≤ 10 case gần nhất) vào request gRPC.\n4. **Gateway/triển khai**: `platform_routes.go:50` đã dispatch `/ai/conversation*` sang aiAgent; route `/functional/case/ai/*` vẫn về CM nên không đổi bảng route, nhưng phải mở kết nối gRPC CM → orchestrator (service-key/mTLS) và thêm readiness.\n5. **Kiểm chứng**: test gRPC đôi (fake server) cho CM; test đơn vị prompt/schema ở orchestrator; python mock-ext chạy xuyên hai service; đường lưu test như opt-1.",
+            "breaking_change": true,
+            "cons": [
+              "Đi ngược giải pháp đã rà cho T-F3-19 (SOL-P3c-E §3.3: CM gọi `aiclient` trực tiếp, đọc ngữ cảnh từ DB của chính nó) ⇒ phải xin đổi quyết định trước khi làm",
+              "Chạm ADR-06: thêm trao đổi chéo service cho dữ liệu nghiệp vụ, trong khi quyết định chỉ cho ratchet giảm đọc chéo",
+              "Mâu thuẫn FR-SYS-07 (còn ghi 501) và vẫn giữ tranh chấp ADR-12 / NFR-CO-02 / BRL-64 về hành vi tắt cờ",
+              "ai-orchestrator theo bằng chứng R4 gần như không có test Go và phụ thuộc Temporal ⇒ phải dựng lại nền tảng kiểm thử cho nó trong phạm vi một CR cỡ M",
+              "Một chặng mạng nữa trước mỗi lượt LLM: nhiều điểm lỗi hơn cho AC-3 (phân biệt lỗi JSON với lỗi gRPC)"
+            ],
+            "effort": { "hours_estimate": 120, "size": "L" },
+            "id": "opt-3",
+            "pros": [
+              "Độ trễ, chi phí và hạn mức LLM tập trung ở một service, dễ đặt metric/hạn mức chung cho mọi tính năng AI (F24.5–F24.7 sau này dùng lại)",
+              "case-management không giữ phụ thuộc HTTP ra ngoài internet ⇒ biên giới bảo mật/SSRF gọn hơn",
+              "Mở đường cho sinh case dài hơi (hàng đợi/Temporal) nếu sau này cần chạy nền"
+            ],
+            "recommended": false,
+            "risks": [
+              {
+                "description": "Khối lượng thực tế vượt xa cỡ M của backlog (hai service, proto mới, nền test mới) ⇒ nguy cơ trượt mốc pilot",
+                "severity": "high"
+              },
+              {
+                "description": "Phụ thuộc kép: cả CR-H01 (`aiclient`) và tình trạng vận hành của ai-orchestrator/Temporal",
+                "severity": "high"
+              },
+              {
+                "description": "Lỗi gRPC/timeout có thể bị map thành 502 \"JSON hỏng\" sai sự thật, làm AC-3 khó kiểm",
+                "severity": "medium"
+              }
+            ],
+            "rollback": "Tắt `AI_ENABLED` ⇒ CM không gọi orchestrator; có thể lùi riêng orchestrator (CM trả lỗi cấu hình rõ ràng) hoặc revert cả hai. Bảng `case_ai_config` là phần thêm, giữ được.",
+            "summary": "Đặt prompt, lời gọi LLM và `ValidateTransform` trong `backend/services/ai/ai-orchestrator` (đã có proto gRPC và luồng Temporal), case-management gọi sang để chat/transform rồi chỉ giữ phần lưu hàng loạt trong một giao dịch và `case_ai_config`. Tách độ trễ/chi phí AI khỏi service nghiệp vụ, nhưng thêm một chặng mạng và đi ngược giải pháp đã chốt cho T-F3-19.",
+            "title": "Giao việc sinh case cho ai-orchestrator, case-management chỉ xác thực và lưu"
+          }
+        ],
+        "recommendation": {
+          "option_id": "opt-1",
+          "reason": "Là phương án duy nhất khớp hợp đồng UI đã được rà soát (SOL-P3c-E §3.3, Đính chính D-9) nên không phải sửa `ui/tms`, và nó dùng lại đúng hạ tầng đã có trong case-management (`ev.Do` cho một giao dịch + outbox, `AllocNums(n)` theo INT-03/NFR-DA-04, mẫu `CopyCases`, middleware audit đã phủ route) để chữa đúng khuyết điểm hôm nay: `BatchSave` gọi `caseUC.Add` từng case nên lưu dở dang. Cổng AI dạng interface + fake cho phép hoàn thành và nghiệm thu AC-2..AC-06 trước khi CR-H01 kịp hợp nhất. opt-2 kỹ thuật sạch hơn ở điểm \"lưu đúng bản đã duyệt\" nhưng đổi hợp đồng FE/BE cùng lúc; nếu nhóm chấp nhận sửa UI thì nên lấy ý số 2 của opt-2 (gửi case đã duyệt) như một thay đổi tiếp theo trên nền opt-1."
+        },
+        "requirement_coverage": [
+          {
+            "ac_id": "AC-1",
+            "note": "Chat + Transform theo `CaseTransformSchema` và `ValidateTransform` kiểm được tính hợp lệ và số lượng ≥ 10 bằng mock-ext; phần \"LLM thật sinh đủ 10 case tốt\" phụ thuộc chất lượng prompt (ENV B10) mà CR đặt ngoài phạm vi.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "partial"
+          },
+          {
+            "ac_id": "AC-2",
+            "note": "Một `ev.Do` duy nhất cho cả lô (case + blob + custom values + history + outbox) và một dòng `operation_log` do middleware audit ghi (NFR-AU-01); opt-2 lưu đúng case người dùng đã chọn/sửa.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-3",
+            "note": "Parse JSON thất bại ⇒ đúng một lần retry \"chỉ trả JSON\" ⇒ vẫn lỗi thì 502 với thông điệp thật; Transform không ghi gì nên không case nào được lưu. opt-3 phải phân biệt lỗi gRPC với lỗi JSON.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-4",
+            "note": "Kiểm \u003e 20 khối / \u003e 100 case ở đầu handler, trước mọi lời gọi LLM và trước khi mở giao dịch ⇒ 400 và không ghi gì; test khẳng định số dòng không đổi.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-5",
+            "note": "`case_ai_config` đọc từ MySQL; thiếu một trong ba trường bắt buộc ⇒ từ chối kèm lỗi cấu hình theo trường, cả ở `save/config` và ở đường dùng AI. Tên ba trường còn chờ Q-1.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-6",
+            "note": "Lưu đi qua một giao dịch duy nhất với `AllocNums(projectID, n)` trong cùng giao dịch (INT-03, NFR-DA-04); lỗi giữa chừng ⇒ rollback toàn bộ, test chèn lỗi ở case thứ 5 và kiểm 0 dòng.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          }
+        ],
+        "schema_version": 1
+      },
+      "requestId": "7ef3c8e7-e066-44cc-83b2-0742b14f054f",
+      "status": "proposed",
+      "version": 2
+    }
+  ]
+}

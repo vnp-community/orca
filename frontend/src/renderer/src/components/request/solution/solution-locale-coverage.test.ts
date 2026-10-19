@@ -11,9 +11,32 @@ const P = 'auto.components.request.'
 // Keys built dynamically (criterion rows, banner suffixes) are listed explicitly.
 const DYNAMIC = [
   ...['summary', 'pros', 'cons', 'effort', 'risk'].map((c) => `SolutionComparisonTable.row.${c}`),
-  ...['readOnly', 'generating', 'awaitingApproval', 'ready', 'chosen', 'rejected', 'superseded', 'unknown'].map(
-    (b) => `SolutionPanel.banner.${b}`
-  )
+  ...[
+    'ask',
+    'title',
+    'description',
+    'reasonDefault',
+    'notAllowed',
+    'invalid',
+    'reasonLabel',
+    'pickOne',
+    'reasonRequired',
+    'cancel',
+    'submit'
+  ].map((k) => `SolutionAskBackDialog.${k}`),
+  ...['title', 'notice', 'refused', 'blocking', 'nonBlocking'].map(
+    (k) => `SolutionOpenQuestions.${k}`
+  ),
+  ...[
+    'readOnly',
+    'generating',
+    'awaitingApproval',
+    'ready',
+    'chosen',
+    'rejected',
+    'superseded',
+    'unknown'
+  ].map((b) => `SolutionPanel.banner.${b}`)
 ].map((k) => P + k)
 
 function lookup(node: unknown, key: string): unknown {
@@ -27,10 +50,20 @@ function lookup(node: unknown, key: string): unknown {
 }
 
 const SOURCES = [
-  'RejectReasonDialog.tsx', 'SolutionDecisionBar.tsx', 'SolutionPanel.tsx', 'SolutionOptionCard.tsx',
-  'SolutionOptionCompare.tsx', 'SolutionComparisonTable.tsx', 'SolutionStatusBanner.tsx', 'DiagnosisView.tsx',
-  'FindingsView.tsx', 'AnswerView.tsx', 'SolutionGenerationState.tsx', 'SolutionVersionSwitcher.tsx',
-  'RequestMarkdownContent.tsx'
+  'RejectReasonDialog.tsx',
+  'SolutionDecisionBar.tsx',
+  'SolutionPanel.tsx',
+  'SolutionOptionCard.tsx',
+  'SolutionOptionCompare.tsx',
+  'SolutionComparisonTable.tsx',
+  'SolutionStatusBanner.tsx',
+  'DiagnosisView.tsx',
+  'FindingsView.tsx',
+  'AnswerView.tsx',
+  'SolutionGenerationState.tsx',
+  'SolutionVersionSwitcher.tsx',
+  'RequestMarkdownContent.tsx',
+  'SolutionOpenQuestions.tsx'
 ]
 
 describe('solution locale coverage', () => {
@@ -45,7 +78,9 @@ describe('solution locale coverage', () => {
   }
   for (const [name, catalog] of Object.entries({ en, es, ja, ko, zh })) {
     it(`${name} has all solution keys`, () => {
-      const missing = [...keys].filter((k) => typeof lookup(catalog, k) !== 'string' || lookup(catalog, k) === '')
+      const missing = [...keys].filter(
+        (k) => typeof lookup(catalog, k) !== 'string' || lookup(catalog, k) === ''
+      )
       expect(missing).toEqual([])
     })
   }

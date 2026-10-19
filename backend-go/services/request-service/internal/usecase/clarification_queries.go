@@ -71,7 +71,10 @@ func (q *ClarificationQueries) Get(ctx context.Context, id string) (Clarificatio
 	}
 	r, err := q.repo.Get(ctx, c.RequestID)
 	if err != nil {
-		return ClarificationView{}, domain.ErrClarificationNotFound(id)
+		if isNotFoundKind(err) {
+			return ClarificationView{}, domain.ErrClarificationNotFound(id)
+		}
+		return ClarificationView{}, err
 	}
 	return q.view(ctx, r, c), nil
 }

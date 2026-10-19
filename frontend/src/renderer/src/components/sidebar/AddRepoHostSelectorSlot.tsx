@@ -18,8 +18,9 @@ export function AddRepoHostSelectorSlot({
   // In web mode: "Add remote host" opens Settings > Dev Servers pane
   // instead of showing the SSH/Orca-server sub-menu — web clients connect
   // via Dev Servers (daemon agents), not SSH or paired Orca sessions.
+  // 'dev-servers', not 'servers': the latter is the Remote Orca Servers pane.
   const handleAddRemoteInWeb = () => {
-    openSettingsTarget({ pane: 'servers', repoId: null })
+    openSettingsTarget({ pane: 'dev-servers', repoId: null })
     openSettingsPage()
   }
 

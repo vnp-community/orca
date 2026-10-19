@@ -5,6 +5,7 @@ package orca.request.v1;
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
 
 import "google/protobuf/timestamp.proto";
+import "orca/request/v1/activity.proto";
 import "orca/request/v1/artifact.proto";
 import "orca/request/v1/clarification.proto";
 import "orca/request/v1/compliance.proto";
@@ -49,6 +50,10 @@ message Request {
   int32 content_revision = 29;
   int32 content_schema_version = 30;
   string content_digest = 31;
+  // 32, 33: CR-REQ-038. The engine the Request runs on (native or openspec) and the execution mode pinned when it entered
+  // executing (step_by_step or continuous; empty before that).
+  string engine = 32;
+  string execution_mode = 33;
 }
 
 message RequestSource {
@@ -246,6 +251,8 @@ message GetRequestFlowResponse {
   bool completes_after_analysis = 9;
   // Canonical happy path only: no backlog return, type change or cancel branches.
   repeated string status_path = 10;
+  // full, light or none: whether this type can run on the OpenSpec engine at all (CR-REQ-038).
+  string open_spec_profile = 11;
 }
 
 // Internal (issue-status-sync): never returns title or body.
@@ -310,6 +317,9 @@ service RequestService {
   rpc ListRequestLinks(ListRequestLinksRequest) returns (ListRequestLinksResponse);
   rpc GetRequestFlow(GetRequestFlowRequest) returns (GetRequestFlowResponse);
   rpc LookupRequestBySource(LookupRequestBySourceRequest) returns (LookupRequestBySourceResponse);
+  // CR-REQ-038: read models for the Request detail screen.
+  rpc ListRequestActivity(ListRequestActivityRequest) returns (ListRequestActivityResponse);
+  rpc GetExecutionSummary(GetExecutionSummaryRequest) returns (GetExecutionSummaryResponse);
   rpc GetRequestFlowSettings(GetRequestFlowSettingsRequest) returns (GetRequestFlowSettingsResponse);
   rpc SetRequestFlowSettings(SetRequestFlowSettingsRequest) returns (SetRequestFlowSettingsResponse);
 
@@ -323,6 +333,9 @@ service RequestService {
   // Plan, Phase and execution (CR-REQ-012 to 014). GeneratePlan is the asynchronous PROPOSE step.
   rpc GeneratePlan(GeneratePlanRequest) returns (GeneratePlanResponse);
   rpc GetPlanProposal(GetPlanProposalRequest) returns (GetPlanProposalResponse);
+  // Reads one file of the authored OpenSpec change behind a Plan (the proposal, design, specs or tasks).
+  rpc GetPlanBundleFile(GetPlanBundleFileRequest) returns (GetPlanBundleFileResponse);
+  rpc CleanupRequestProposal(CleanupRequestProposalRequest) returns (CleanupRequestProposalResponse);
   rpc CommitPlan(CommitPlanRequest) returns (CommitPlanResponse);
   rpc StartPhase(StartPhaseRequest) returns (StartPhaseResponse);
   rpc ReportTaskOutcome(ReportTaskOutcomeRequest) returns (ReportTaskOutcomeResponse);

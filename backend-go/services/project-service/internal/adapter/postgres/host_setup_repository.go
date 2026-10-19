@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -42,7 +40,7 @@ func (r *HostSetupRepository) Get(ctx context.Context, tenantID, id string) (dom
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 	out, err := scanHostSetup(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.HostSetup{}, domain.ErrHostSetupNotFound
 	}
 	if err != nil {
@@ -85,7 +83,7 @@ func (r *HostSetupRepository) Update(ctx context.Context, tenantID, id string, p
 		tenantID, id, patch.FolderPath, patch.DisplayName,
 	)
 	out, err := scanHostSetup(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.HostSetup{}, domain.ErrHostSetupNotFound
 	}
 	if err != nil {
@@ -98,6 +96,9 @@ func (r *HostSetupRepository) Delete(ctx context.Context, tenantID, id string) e
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM project.project_host_setups WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
+	if isMalformedUUID(err) {
+		return domain.ErrHostSetupNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete host setup: %w", err)
 	}
@@ -127,7 +128,7 @@ func (r *HostSetupRepository) Complete(ctx context.Context, tenantID, id, projec
 		tenantID, id, string(domain.HostSetupCompleted), projectID,
 	)
 	out, err := scanHostSetup(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.HostSetup{}, domain.ErrHostSetupNotFound
 	}
 	if err != nil {

@@ -134,7 +134,7 @@ func (s *AgentTokenStore) Revoke(ctx context.Context, tenantID, id string) (doma
 		return domain.AgentToken{}, fmt.Errorf("mysql: rows affected: %w", err)
 	}
 	if n == 0 {
-		return domain.AgentToken{}, fmt.Errorf("mysql: agent token %s not found or already revoked", id)
+		return domain.AgentToken{}, fmt.Errorf("mysql: agent token %s missing or already revoked: %w", id, domain.ErrAgentTokenNotFound)
 	}
 	t, err := scanAgentToken(s.db.QueryRowContext(ctx, `SELECT `+agentTokenColumns+` FROM agent_tokens WHERE tenant_id = ? AND id = ?`, tenantID, id))
 	if err != nil {

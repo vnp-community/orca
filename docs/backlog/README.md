@@ -23,7 +23,20 @@ manually-maintained list of larger initiatives (surveyed/planned but not
 yet built, or reverted) that predates this directory and uses its own
 format; the two are complementary, not duplicates.
 
-## Index
+## Trạng thái rà soát 2026-10-11
+
+Đối chiếu với code ở nhánh `feat/e2e-acceptance-fixes` (tra CodeGraph, đọc file; **chưa chạy test** — xem [`SHIP-BACKLOG.md`](./SHIP-BACKLOG.md) §14). Danh sách việc cần làm để giao khách nằm ở [`SHIP-BACKLOG.md`](./SHIP-BACKLOG.md); backlog tuần 2026-10-12 nằm ở [`SPRINT-2026-10-12.md`](./SPRINT-2026-10-12.md) (mục `BACKLOG-XXX` cũ được ánh xạ ở §13 của file đó).
+
+| Trạng thái | Mục |
+|---|---|
+| 🟢 **Resolved** (code đã có, chờ xác nhận hành vi rồi xoá file) | 009, 012 (còn rebind dữ liệu cũ), 015 (còn `task.removeEdge`) |
+| 🟡 **Unblocked / Narrowed** (blocker đã gỡ, việc còn lại nhỏ hơn mô tả) | 002, 013, 017, 020, 025 |
+| 🟡 **Partial** | 021, 026 |
+| 🔴 **Open** (chờ quyết định hoặc chưa xây) | 001, 004, 005, 014, 018, 019, 022, 023, 024 (**High**), 027, 028, 029 |
+
+Thay đổi đáng chú ý so với mốc 2026-09-08: coordinator loop của `orchestration-service` đã được xây và wiring (`TickDispatch`, ticker 2 giây), nên các tiền đề "chưa implement" trong BACKLOG-009/013/017 không còn đúng; host-binding (2026-10-11) chặn nguyên nhân hiển thị của BACKLOG-012; cơ chế webhook của `scm-integration-service` đã có (BACKLOG-020). Mục nên làm sớm nhất vì ảnh hưởng luồng chính: **BACKLOG-024**.
+
+## Index (bản gốc, mốc 2026-09-08 — xem khối trạng thái ở đầu từng file)
 
 | ID | Title | Blocked on | Priority |
 |----|-------|-----------|----------|

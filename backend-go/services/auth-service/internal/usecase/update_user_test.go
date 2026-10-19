@@ -2,9 +2,11 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 )
 
@@ -85,5 +87,20 @@ func TestUpdateUser_DeniedForNonAdminActor(t *testing.T) {
 	_, err := uc.Execute(ctx, UpdateUserInput{UserID: "u1", Name: &newName})
 	if err == nil {
 		t.Fatal("expected an error for a non-admin actor")
+	}
+}
+
+// An unknown user id is a client mistake (404), not an "update failed" 500.
+func TestUpdateUser_UnknownUser_ReturnsNotFound(t *testing.T) {
+	users := newFakeUserRepository()
+	seedActiveUser(t, users, fakeHasher{}, "admin1", "t1", "admin@example.com", "pw", domain.RoleAdmin)
+	uc := NewUpdateUser(users, &fakeAuditRepository{}, &fakeClock{now: time.Now()}, &fakeOPAClient{allow: true})
+	ctx := withActor(context.Background(), "t1", "admin1")
+
+	name := "x"
+	_, err := uc.Execute(ctx, UpdateUserInput{UserID: "does-not-exist", Name: &name})
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Kind != apperrors.KindNotFound || ae.Code != "AUTH_USER_NOT_FOUND" {
+		t.Fatalf("expected NotFound AUTH_USER_NOT_FOUND, got %v", err)
 	}
 }

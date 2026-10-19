@@ -685,3 +685,36 @@ func TestInboundHandshake_ToolsOmittedNil(t *testing.T) {
 		t.Fatal("AttachInboundSession was never called")
 	}
 }
+
+func TestServer_OnAttached_RunsAfterAttach(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-hook", "ds-hook", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version"}, nil)
+	go func() { <-attacher.attached }()
+	notified := make(chan string, 1)
+	srv.OnAttached = func(id string) { notified <- id }
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{"agentToken": "tok-hook"})
+	defer conn.CloseNow()
+	readCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, _, err := conn.Read(readCtx); err != nil {
+		t.Fatalf("reading handshake response: %v", err)
+	}
+	// The fake attacher closes the socket; keep reading so the close handshake completes.
+	go func() { _, _, _ = conn.Read(readCtx) }()
+
+	select {
+	case id := <-notified:
+		if id != "ds-hook" {
+			t.Fatalf("OnAttached id = %q, want ds-hook", id)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("OnAttached was never called")
+	}
+}

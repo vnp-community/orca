@@ -126,6 +126,8 @@ type Client struct {
 	// onSessionAttached runs (in its own goroutine) after any session
 	// attaches a transport — see WithOnSessionAttached.
 	onSessionAttached func(devServerID string)
+	// onActivity runs when a session connects, drops, or starts or ends an agent run — see WithOnActivity.
+	onActivity func(devServerID string)
 }
 
 var _ usecase.LiveSessionCloser = (*Client)(nil)
@@ -174,6 +176,14 @@ func WithAgentTokens(tokens AgentTokenSource) Option {
 func WithOnSessionAttached(fn func(devServerID string)) Option {
 	return func(c *Client) {
 		c.onSessionAttached = fn
+	}
+}
+
+// WithOnActivity registers a callback for every change of a dev server's connection or of its agent runs in
+// flight. It runs on the session's own goroutines, so it must only mark work for later, never block.
+func WithOnActivity(fn func(devServerID string)) Option {
+	return func(c *Client) {
+		c.onActivity = fn
 	}
 }
 
@@ -435,7 +445,7 @@ func (c *Client) Exec(ctx context.Context, devServer domain.DevServer, method st
 	if err != nil {
 		var rpcErr *JSONRPCError
 		if errors.As(err, &rpcErr) {
-			if IsCodeIntelMethod(method) {
+			if IsStructuredErrorMethod(method) || isMissingPathOfFileMethod(method, rpcErr) {
 				return nil, &domain.AgentRPCError{
 					Code:    rpcErr.Code,
 					Message: rpcErr.Message,
@@ -527,6 +537,19 @@ func (c *Client) IsConnected(devServerID string) bool {
 	sess, ok := c.sessions[devServerID]
 	c.mu.Unlock()
 	return ok && sess.isHandshaked()
+}
+
+// ActiveExecutions counts the agent runs (agent.execPrompt, ai.complete) in flight on devServerID's live session. It is
+// the dev server's own record of what it is doing: a run that dies with the session leaves no count behind, and a
+// replica only knows the sessions it holds, which is also where the work runs.
+func (c *Client) ActiveExecutions(devServerID string) int {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	if !ok {
+		return 0
+	}
+	return sess.activeRunCount()
 }
 
 // Note: relay-ssh's liveness check is NOT a separate dial-and-probe path —
@@ -1161,7 +1184,7 @@ func (c *Client) Close() {
 	c.sessions = make(map[string]*session)
 	c.mu.Unlock()
 	for _, sess := range sessions {
-		sess.close()
+		sess.shutdown()
 	}
 
 	c.codeIntelMu.Lock()
@@ -1178,6 +1201,7 @@ func (c *Client) Close() {
 func (c *Client) initSession(sess *session, devServerID string) {
 	sess.devServerID = devServerID
 	sess.onCodeIntel = c.routeCodeIntelNotification
+	sess.onActivity = c.onActivity
 	sess.onAttached = func(id string) {
 		c.emitResync(id)
 		if fn := c.onSessionAttached; fn != nil {

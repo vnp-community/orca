@@ -29,6 +29,9 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
   const connectionId = typeof modalData.connectionId === 'string' ? modalData.connectionId : ''
   const runtimeEnvironmentId =
     typeof modalData.runtimeEnvironmentId === 'string' ? modalData.runtimeEnvironmentId : ''
+  const devServerId = typeof modalData.devServerId === 'string' ? modalData.devServerId : ''
+  // Set when Add Project asked for its own project; the confirmation must keep that choice.
+  const projectName = typeof modalData.projectName === 'string' ? modalData.projectName : null
   const runtimeEnvironmentName =
     runtimeEnvironmentId &&
     (runtimeEnvironments.find((environment) => environment.id === runtimeEnvironmentId)?.name ||
@@ -105,12 +108,23 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
         }
       })()
     } else if (folderPath) {
+      // Why devServerId travels in the modal data: the host picked in Add Project is gone by now.
       void addNonGitFolder(folderPath, {
-        runtimeEnvironmentId: runtimeEnvironmentId || null
+        runtimeEnvironmentId: runtimeEnvironmentId || null,
+        ...(devServerId ? { devServerId } : {}),
+        ...(devServerId && projectName !== null ? { ownProject: { name: projectName } } : {})
       })
     }
     closeModal()
-  }, [addNonGitFolder, closeModal, folderPath, connectionId, runtimeEnvironmentId])
+  }, [
+    addNonGitFolder,
+    closeModal,
+    folderPath,
+    connectionId,
+    runtimeEnvironmentId,
+    devServerId,
+    projectName
+  ])
 
   const handleOpenChange = useCallback(
     (open: boolean) => {

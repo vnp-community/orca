@@ -211,7 +211,7 @@ func run() error {
 	// a local-dev/scaffold convenience only; production deploys terminate
 	// mTLS via the service mesh sidecar, per
 	// architecture/07-security-architecture.md.
-	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	brokerConn, err := grpcmw.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}

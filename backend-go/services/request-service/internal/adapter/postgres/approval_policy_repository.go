@@ -190,6 +190,10 @@ func (r *PolicyRepository) Upsert(ctx context.Context, p domain.ApprovalPolicy, 
 				return domain.ErrApprovalVersionConflict
 			}
 		} else {
+			// The update id comes from the client; a non-uuid names no policy.
+			if notUUID(p.ID) {
+				return domain.ErrApprovalPolicyNotFound
+			}
 			tag, err := db.Exec(ctx, `UPDATE request.approval_policies SET project_id = $1, subject_type = $2, request_type = $3, size = $4,
 					urgency = $5, approvers = $6::jsonb, allow_requester_approve = $7, due_after_seconds = $8, priority = $9, enabled = $10,
 					version = version + 1, updated_at = now()
@@ -291,7 +295,7 @@ func (r *ApproverRepository) InsertSnapshot(ctx context.Context, approvalID, ten
 func (r *ApproverRepository) ListForApproval(ctx context.Context, tenantID, approvalID string) ([]domain.Principal, error) {
 	var list []domain.Principal
 	err := r.scoped(ctx, func(ctx context.Context, ctxTenant string, db dbExecer) error {
-		if ctxTenant != tenantID {
+		if ctxTenant != tenantID || notUUID(approvalID) {
 			return nil
 		}
 		rows, err := db.Query(ctx, `SELECT principal_kind, principal_id FROM request.approval_approvers

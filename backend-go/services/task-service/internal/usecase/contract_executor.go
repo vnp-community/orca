@@ -18,6 +18,7 @@ type ContractExecuteInput struct {
 	ExecutionLinkID                                                string
 	Attempt                                                        int
 	SpecDigest, PacketDigest, TemplateVersion                      string
+	UseKnowledgeHub, RequirePassingCheck                           bool
 }
 
 type ContractExecuteOutput struct {
@@ -48,10 +49,10 @@ func (e *ExecutionFailure) Error() string {
 
 func (e *ExecutionFailure) Unwrap() error { return e.Cause }
 
-// WithContract enables the contract path: a task with a spec runs on Engine 1 and, when the
-// caller sent a result nonce, through ExecuteWithContract. nil arguments keep the old behavior.
-func (uc *ExecuteTask) WithContract(c ContractAgentExecutor, specs TaskSpecLookup) *ExecuteTask {
-	uc.contract, uc.specs = c, specs
+// WithContract enables the contract path: when the caller sent a result nonce, a run on Engine 1 goes through
+// ExecuteWithContract. nil keeps the old behavior.
+func (uc *ExecuteTask) WithContract(c ContractAgentExecutor) *ExecuteTask {
+	uc.contract = c
 	return uc
 }
 
@@ -75,6 +76,7 @@ func (uc *ExecuteTask) runContractAgent(ctx context.Context, tenantID string, in
 	out, err := uc.contract.ExecuteWithContract(ctx, ContractExecuteInput{
 		TenantID: tenantID, TaskID: in.TaskID, RequestID: in.RequestID, WorktreePath: worktreePath, Prompt: in.Prompt,
 		ResultNonce: in.ResultNonce, ExecutionLinkID: linkID, Attempt: in.Attempt,
+		UseKnowledgeHub: in.UseKnowledgeHub, RequirePassingCheck: in.RequirePassingCheck,
 	})
 	if err != nil {
 		_ = uc.links.Complete(ctx, tenantID, linkID, "failed")

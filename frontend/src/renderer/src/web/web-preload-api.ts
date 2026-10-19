@@ -78,6 +78,10 @@ import { EMPTY_PTY_MAIN_DELIVERY_DIAGNOSTICS } from '../../../shared/pty-deliver
 import { createE2EConfig } from '../../../shared/e2e-config'
 import { relativePathInsideRoot } from '../../../shared/cross-platform-path'
 import {
+  collectWorktreeListsIgnoringFailures,
+  findWorktreeOwningPath
+} from './runtime-worktree-path-owner'
+import {
   applyPRBotAuthorOverride,
   normalizePRBotAuthorOverrides
 } from '../../../shared/pr-bot-author-overrides'
@@ -151,6 +155,8 @@ import {
 } from '../../../shared/feature-interactions'
 import { normalizeContextualTourIds, type ContextualTourId } from '../../../shared/contextual-tours'
 import { translate } from '@/i18n/i18n'
+import { requireRepoDevServerId, resolveProjectIdForDevServer } from '@/lib/repo-host-binding'
+import { registerRepoInOwnProject } from '@/lib/own-project-registration'
 import { getDefaultCreateProjectParent } from '@/components/sidebar/create-project-defaults'
 
 const SETTINGS_STORAGE_KEY = 'orca.web.settings.v1'
@@ -174,6 +180,7 @@ let activeClient: WebRuntimeClient | WebSessionClient | null = null
 let activeClientEnvironmentId: string | null = null
 let cachedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
 let cachedDetectedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
+let cachedBookkeptWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
 const runtimeCallQueuePool = new RuntimeRpcCallQueuePool()
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -250,6 +257,7 @@ async function readClipboardImagePngBase64(): Promise<string | null> {
 function invalidateRuntimeWorktreeCaches(): void {
   cachedWorktrees = null
   cachedDetectedWorktrees = null
+  cachedBookkeptWorktrees = null
 }
 
 type WebSettingsApi = NonNullable<PreloadApi['settings']>
@@ -1461,25 +1469,62 @@ async function fetchAllRemoteRepoViews(): Promise<RemoteRepoView[]> {
   return perProject.flat()
 }
 
-let cachedDefaultProjectId: string | null = null
-const DEFAULT_PROJECT_NAME = 'My Repos'
+type CallerProjectRow = { id: string; createdAt: number; devServerId?: string | null }
 
-async function getOrCreateDefaultProjectId(): Promise<string> {
-  if (cachedDefaultProjectId) {
-    return cachedDefaultProjectId
+// One implicit project per dev server: a repo's host is its project's host, so repos added from
+// different hosts must not share a project (see SOL-FE-E2E-004).
+const cachedDefaultProjectIdByHost = new Map<string, string>()
+
+async function resolveDevServerDisplayName(devServerId: string): Promise<string> {
+  try {
+    const servers = await callRuntimeResult<{ id: string; name: string }[]>('devServer.list')
+    return servers?.find((server) => server.id === devServerId)?.name || devServerId
+  } catch {
+    return devServerId
   }
-  const projects = await listCallerProjectIds()
-  const earliest = projects.slice().sort((a, b) => a.createdAt - b.createdAt)[0]
-  if (earliest) {
-    cachedDefaultProjectId = earliest.id
-    return earliest.id
+}
+
+async function getOrCreateDefaultProjectId(devServerId: string): Promise<string> {
+  const cached = cachedDefaultProjectIdByHost.get(devServerId)
+  if (cached) {
+    return cached
   }
-  const created = await callRuntimeResult<{ id: string }>('project.create', {
-    name: DEFAULT_PROJECT_NAME,
-    visibility: 'private'
+  const projectId = await resolveProjectIdForDevServer({
+    devServerId,
+    listProjects: () => callRuntimeResult<CallerProjectRow[]>('project.list'),
+    createProject: async (id) =>
+      callRuntimeResult<{ id: string }>('project.create', {
+        name: await resolveDevServerDisplayName(id),
+        devServerId: id,
+        visibility: 'private'
+      })
   })
-  cachedDefaultProjectId = created.id
-  return created.id
+  cachedDefaultProjectIdByHost.set(devServerId, projectId)
+  return projectId
+}
+
+// Why projectName selects the path: Add Project gives every repo its own project (Requests run on a
+// project's first repo); callers without a name keep the host's shared default project.
+async function registerRepoOnDevServer(args: {
+  devServerId: string
+  url: string
+  displayName: string
+  projectName?: string
+}): Promise<RemoteRepoView> {
+  if (args.projectName !== undefined) {
+    return registerRepoInOwnProject(callRuntimeResult, {
+      devServerId: args.devServerId,
+      path: args.url,
+      projectName: args.projectName
+    })
+  }
+  const projectId = await getOrCreateDefaultProjectId(args.devServerId)
+  return callRuntimeResult<RemoteRepoView>('repo.add', {
+    projectId,
+    url: args.url,
+    displayName: args.displayName,
+    devServerId: args.devServerId
+  })
 }
 
 function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
@@ -1488,20 +1533,21 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
       const views = await fetchAllRemoteRepoViews()
       return views.map((view) => mergeRepoViewIntoRepo(view))
     },
-    add: async ({ path }) => {
+    add: async ({ path, kind, devServerId, projectName }) => {
+      // Why before any RPC: a missing host must not leave an orphan project behind.
+      const hostId = requireRepoDevServerId(devServerId)
       invalidateRuntimeWorktreeCaches()
-      const projectId = await getOrCreateDefaultProjectId()
-      const displayName = repoDisplayNameFromUrl(path)
       // Why a bare RemoteRepoView, not {repo: ...}: channels_repo_ssh_
       // status_workspace.go's repo.add handler returns toRepoView(...)
       // directly — confirmed live (an earlier version of this fix wrapped
       // it and crashed on `result.repo` being undefined).
-      const view = await callRuntimeResult<RemoteRepoView>('repo.add', {
-        projectId,
+      const view = await registerRepoOnDevServer({
+        devServerId: hostId,
         url: path,
-        displayName
+        displayName: repoDisplayNameFromUrl(path),
+        projectName
       })
-      return { repo: mergeRepoViewIntoRepo(view) }
+      return { repo: { ...mergeRepoViewIntoRepo(view), ...(kind ? { kind } : {}) } }
     },
     remove: async ({ repoId }) => {
       await callRuntimeResult('repo.rm', { repoId })
@@ -1546,11 +1592,23 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
     pickFolder: () => Promise.resolve(null),
     pickFolders: () => Promise.resolve([]),
     pickDirectory: () => Promise.resolve(null),
-    clone: async ({ url, destination }) => {
+    clone: async ({ url, destination, devServerId, projectName }) => {
+      const hostId = requireRepoDevServerId(devServerId)
       invalidateRuntimeWorktreeCaches()
-      return (
-        await callRuntimeResult<{ repo: Repo }>('repo.clone', { url, destination }, 10 * 60_000)
-      ).repo
+      // Why two calls: repo.clone only puts the checkout on the host (fields devServerId/destPath);
+      // repo.add is what registers it, and it must carry the same host.
+      const cloned = await callRuntimeResult<{ worktreePath?: string }>(
+        'repo.clone',
+        { devServerId: hostId, url, destPath: destination },
+        10 * 60_000
+      )
+      const view = await registerRepoOnDevServer({
+        devServerId: hostId,
+        url: cloned?.worktreePath || destination,
+        displayName: repoDisplayNameFromUrl(url),
+        projectName
+      })
+      return mergeRepoViewIntoRepo(view)
     },
     cloneRemote: async () => {
       // Why: SSH relay cloning is owned by the desktop main process; paired web
@@ -1563,20 +1621,41 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
       throw new Error('Creating projects on SSH hosts is unavailable in paired web clients.')
     },
     cloneAbort: () => Promise.resolve(),
-    addRemote: async ({ remotePath, displayName }) => {
+    addRemote: async ({ remotePath, displayName, kind, devServerId }) => {
+      const hostId = requireRepoDevServerId(devServerId)
       invalidateRuntimeWorktreeCaches()
-      const projectId = await getOrCreateDefaultProjectId()
       // Bare RemoteRepoView — see add()'s doc comment above.
-      const view = await callRuntimeResult<RemoteRepoView>('repo.add', {
-        projectId,
+      const view = await registerRepoOnDevServer({
+        devServerId: hostId,
         url: remotePath,
         displayName: displayName || repoDisplayNameFromUrl(remotePath)
       })
-      return { repo: mergeRepoViewIntoRepo(view) }
+      return { repo: { ...mergeRepoViewIntoRepo(view), ...(kind ? { kind } : {}) } }
     },
-    create: async ({ parentPath, name, kind }) => {
+    create: async ({ parentPath, name, kind, devServerId, projectName }) => {
+      const hostId = requireRepoDevServerId(devServerId)
       invalidateRuntimeWorktreeCaches()
-      return callRuntimeResult('repo.create', { parentPath, name, kind })
+      const destPath = `${parentPath.replace(/[/\\]+$/, '')}/${name}`
+      // Why gateway field names (destPath/devServerId): the old {parentPath,name,kind} shape was
+      // ignored, and repo.create only initialises the repo, so repo.add registers it afterwards.
+      let createdPath = destPath
+      if (kind === 'folder') {
+        await callRuntimeResult('devServer.mkdir', { id: hostId, path: destPath })
+      } else {
+        const created = await callRuntimeResult<{ path?: string }>('repo.create', {
+          devServerId: hostId,
+          destPath,
+          defaultBranch: ''
+        })
+        createdPath = created?.path || destPath
+      }
+      const view = await registerRepoOnDevServer({
+        devServerId: hostId,
+        url: createdPath,
+        displayName: name,
+        projectName
+      })
+      return { repo: { ...mergeRepoViewIntoRepo(view), kind } }
     },
     isGitAvailable: async () =>
       (await callRuntimeResult<{ available: boolean }>('repo.gitAvailable')).available,
@@ -2565,11 +2644,18 @@ function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
     onAgentToken: () => noopUnsubscribe,
     offAgentToken: () => {},
 
-    browseDir: async ({ id, path }) => {
+    browseDir: async ({ id, path, limit, query }) => {
       return callRuntimeResult<{
         resolvedPath: string
         entries: { name: string; isDirectory: boolean; isSymlink: boolean }[]
-      }>('devServer.browseDir', { id, path })
+        truncated?: boolean
+        totalEntries?: number
+      }>('devServer.browseDir', {
+        id,
+        path,
+        ...(limit ? { limit } : {}),
+        ...(query ? { query } : {})
+      })
     },
     mkdir: async ({ id, path }) => {
       return callRuntimeResult<{ path: string }>('devServer.mkdir', { id, path })
@@ -4223,10 +4309,12 @@ async function listAllRuntimeDetectedWorktrees(): Promise<Worktree[]> {
   // match found" as an expected outcome, not a crash-worthy one.
   try {
     const views = await fetchAllRemoteRepoViews()
-    const detectedLists = await Promise.all(
-      views.map((view) => callRuntimeDetectedWorktrees(view.id, view.projectId))
+    const { worktrees } = await collectWorktreeListsIgnoringFailures(
+      views,
+      async (view) => (await callRuntimeDetectedWorktrees(view.id, view.projectId)).worktrees,
+      (view, error) =>
+        console.warn(`[web-preload-api] worktree.detectedList failed for repo ${view.id}:`, error)
     )
-    const worktrees = detectedLists.flatMap((result) => result.worktrees)
     cachedDetectedWorktrees = { loadedAt: Date.now(), worktrees }
     return worktrees
   } catch (err) {
@@ -4314,21 +4402,44 @@ function isMissingPathError(error: unknown): boolean {
   return /\bENOENT\b|not found|no such file/i.test(error.message)
 }
 
+// Why per project: the gateway's worktree.list requires a projectId.
+async function listAllBookkeptRuntimeWorktrees(): Promise<Worktree[]> {
+  if (cachedBookkeptWorktrees && Date.now() - cachedBookkeptWorktrees.loadedAt < 5_000) {
+    return cachedBookkeptWorktrees.worktrees
+  }
+  const projects = await listCallerProjectIds()
+  const { worktrees } = await collectWorktreeListsIgnoringFailures(
+    projects,
+    async (project) =>
+      (
+        await callRuntimeResult<{ worktrees: Worktree[] }>(
+          'worktree.list',
+          { projectId: project.id, limit: WEB_RUNTIME_WORKTREE_LIST_LIMIT },
+          15_000
+        )
+      ).worktrees ?? [],
+    (project, error) =>
+      console.warn(`[web-preload-api] worktree.list failed for project ${project.id}:`, error)
+  )
+  cachedBookkeptWorktrees = { loadedAt: Date.now(), worktrees }
+  return worktrees
+}
+
 async function resolveRuntimeWorktreeByPath(worktreePath: string): Promise<Worktree> {
   // Why: hidden-but-open worktrees must still resolve for git/file operations.
   // `worktree.list` is sidebar-visible only, so path resolution uses detected rows.
-  const worktrees = await listAllRuntimeDetectedWorktrees()
-  const match = worktrees
-    .map((worktree) => ({
-      worktree,
-      relativePath: relativePathInsideRoot(worktree.path, worktreePath)
-    }))
-    .filter((entry) => entry.relativePath !== null)
-    .sort((a, b) => b.worktree.path.length - a.worktree.path.length)[0]
-  if (!match) {
-    throw new Error(`No runtime worktree owns ${worktreePath}`)
+  const detected = findWorktreeOwningPath(await listAllRuntimeDetectedWorktrees(), worktreePath)
+  if (detected) {
+    return detected
   }
-  return match.worktree
+  // Why: the UI path comes from a bookkept row (e.g. the worktree a task created), so when
+  // git's own listing cannot claim it (repo host offline, or git printing a symlink-resolved
+  // path such as macOS /private/var for a repo registered under /var) the row itself still owns it.
+  const bookkept = findWorktreeOwningPath(await listAllBookkeptRuntimeWorktrees(), worktreePath)
+  if (bookkept) {
+    return bookkept
+  }
+  throw new Error(`No runtime worktree owns ${worktreePath}`)
 }
 
 async function resolveRuntimeFilePath(

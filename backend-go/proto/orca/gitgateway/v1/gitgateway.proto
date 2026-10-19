@@ -185,12 +185,39 @@ message GetStatusRequest {
 
 message FileStatus {
   string path = 1;
-  string state = 2; // modified/added/deleted/untracked/conflicted
+  string state = 2; // modified/added/deleted/untracked/conflicted/renamed/copied
+  // Fields 3-8 mirror the Dev Server Agent's git.status entry
+  // (agent/src/shared/git-status-types.ts GitUncommittedEntry) so Source
+  // Control can group staged/unstaged/untracked rows. Empty/unset means the
+  // executor did not report it.
+  string area = 3; // staged | unstaged | untracked
+  string old_path = 4;
+  string conflict_kind = 5;
+  string conflict_status = 6;
+  optional int32 added = 7;   // unset for binary files / unavailable diff
+  optional int32 removed = 8;
+}
+
+// StatusUpstream is the upstream summary porcelain v2 already reports with the
+// working-tree status (GitUpstreamStatus subset); has_upstream=false makes
+// ahead/behind placeholder zeros.
+message StatusUpstream {
+  bool has_upstream = 1;
+  string upstream_name = 2;
+  int32 ahead = 3;
+  int32 behind = 4;
 }
 
 message GetStatusResponse {
   repeated FileStatus files = 1;
   string branch = 2;
+  // Fields 3-7 carry the rest of the agent's GitStatusResult; unset when the
+  // executor (host-local `git status --porcelain=v1`) cannot report them.
+  string conflict_operation = 3; // merge | rebase | cherry-pick | unknown
+  string head = 4;
+  StatusUpstream upstream = 5;
+  bool did_hit_limit = 6;
+  int32 status_length = 7;
 }
 
 message GetDiffRequest {

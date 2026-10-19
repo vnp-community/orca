@@ -1,0 +1,373 @@
+{
+  "schema_version": 1,
+  "options": [
+    {
+      "id": "opt-1",
+      "title": "shared/pkg/aiclient + AIService in ms-system-setting (the repo's own T-F3-18 path)",
+      "summary": "Build the AI foundation where the project's decom ledger already says it belongs: a new provider-agnostic `shared/pkg/aiclient` (OpenAI-compatible, netguard-guarded, retry + key redaction) plus an `AIService` in ms-system-setting that resolves the model per org/project, stores conversations as header + turns, enforces a per-organization budget, and serves `/ai/conversation/*` behind `AI_ENABLED`. Keys stay sealed in system-setting and only leave over svcauth-signed internal gRPC, so BL-H02 reuses the same contract.",
+      "approach": "**Shape**: exactly the path the repository's own solution names — `backend/specs/crs/v4/solutions/SOL-P3c-E_files-ai-f18-f24.md:46-96` (T-F3-18) and `tools/conformance/retired_services.yaml:220` (`replaced_by: F24 … qua shared/pkg/aiclient`). `backend/shared/pkg/aiclient` does not exist yet (verified by glob), so this is new code, not a refactor.\n\n1. **`backend/shared/pkg/aiclient` (new)**: `Client.Chat/Stream`, `New(Provider{Name,BaseURL,APIKey,Model,Params})`, one OpenAI-compatible transport (`POST <api_url>/chat/completions`, `Authorization: Bearer`) serving the three providers the SPA can actually create (`Open AI`, `DeepSeek`, `ZhiPu AI` — `ui/tms/src/enums/modelEnum.ts`); `Claude`/`Bedrock` return `ErrProviderUnsupported` → HTTP 422 and stay a documented deferred line, never a stub. Transport = `netguard.NewClient(netguard.FromEnv(netguard.AdminTarget), 60s)` — the four profiles already exist (`backend/shared/pkg/netguard/netguard.go:41-57`) and `AdminTarget` is the profile NFR-SE-05/ADR-15 assign to admin-configured destinations. 2 retries on 429/5xx/408 honouring `Retry-After`; input/output caps (`AI_MAX_INPUT_CHARS`, `AI_MAX_OUTPUT_TOKENS`); `ai_requests_total{provider,model,status}`, `ai_latency_seconds`, `ai_tokens_total`; every error string and log line scrubbed of the key (NFR-SE-04).\n2. **`AIService` in ms-system-setting**: `ResolveModel` / `ListMessages` / `AppendTurn`. Model pick: project → organization → system default, only `status=enabled`; `PERSONAL` ⇒ owner, `SYSTEM`+`PUBLIC` ⇒ any signed-in user, `PRIVATE` ⇒ owner/admin, comparing `owner_type` after `TrimSpace` (the UI enum ships `\"SYSTEM \"` with a trailing space). Keys are opened with the existing `internal/secret` (`Seal/Open/Show/Resolve`, `internal/secret/secret.go:21-50`, already used by `internal/usecase/ai/ai.go:36,134`) and leave the service only over an `svcauth`-signed internal gRPC `AIService` (`backend/shared/pkg/svcauth`) with `RequireCaller(\"case-management\",\"api-test\")`, so BL-H02 never reads `ai_model_source` cross-service (ADR-06).\n3. **Data — `migrations/V037__ss_ai_conversation_v2.sql`** (V036 is the current head): extend `ai_conversation` (`title`, `scene`, `organization_id`, `project_id`, `model_id`, `update_time`, index on `(user_id, update_time)`), add `ai_conversation_message` (`conversation_id`, `role`, `content`, `tokens_in/out`), add `ai_org_usage` (`organization_id`, `period`, `requests`, `tokens_in/out`, `cost`). Register the new tables under system-setting in `backend/db/ownership.yaml:33` so `dbown` stays green (ADR-06).\n4. **Routes** in `internal/handler/ai/conversation.go`, mounted from `internal/handler/router.go` (today only `/system/ai-config/*`, `/system/ai-conversation/*`, `/ai/config/*` exist — lines 342-361): `/ai/conversation/{add,chat,update,list,delete/:id,chat/list/:id}`, shaped to `ui/tms/src/api/modules/ai.ts`. `add` must be idempotent on the client-sent `conversationId` and `chat` must upsert, because the SPA fires `addChat` without awaiting it. Status contract: `AI_ENABLED=false` ⇒ 503, no model configured ⇒ 422, provider failure ⇒ 502 with the real scrubbed message, org over budget ⇒ 429 + `Retry-After`; the budget read and `AppendTurn` run in one transaction. `AI_ENABLED` follows the `NOTIFICATION_SSE_ENABLED` precedent (`internal/config/config.go:19-20,109`). Legacy `/system/ai-conversation/*` is left in place.\n5. **Gateway**: `/ai/conversation/*` is proxied today to the retired ai-agent-service (`backend/services/gateway/internal/router/platform_routes.go:19,33,50-53`) while the approved table marks the prefix `gone` (`testdata/route_decisions.approved.yaml:21`, `routes_golden_test.go:138-146`). Re-point the subtree to system-setting and update both fixtures; read timeout ≥ 90 s for the chat route.\n6. **Tests**: aiclient against `tests/local-stack/mock-ext` `/llm/v1/chat/completions` with `__fail` (`mock_e",
+      "pros": [
+        "Matches the project's own recorded replacement for the retired AI services, so the decom ratchet and conformance tests stay green without amending a baseline",
+        "One SSRF/retry/redaction implementation reused by BL-H02 (case-management) and api-test; keys never leave system-setting in clear except over svcauth gRPC",
+        "Adds no new runtime component and no new datastore: one MySQL, tables owned by one service (ADR-06)",
+        "Uses what already exists: netguard profiles, internal/secret, svcauth, the mock-ext OpenAI endpoint with failure injection",
+        "Honest status codes (503/422/502/429) keep ADR-12's \"no fake success\" intent while retiring the 501"
+      ],
+      "cons": [
+        "Conflicts with FR-SYS-07 as written (\"các hành động chat và chuyển văn bản chưa nối AI phải trả 501 trung thực\"): the SRS/URD row must be revised in the same change, which needs the doc owner's approval",
+        "Partially conflicts with BRL-64 and ADR-12: a mounted route answering 503 when AI_ENABLED=false is not the \"hide entirely, 404 + X-Route-Missing\" shape the rule demands; it is a narrow, deliberate exception replacing the existing OI-02 one",
+        "Largest option: a new shared package, a new gRPC contract, a migration, gateway fixtures and the FR/ENT doc revision",
+        "ENT-17 marks conversation as deferred (\"hội thoại (hoãn)\") and has no attributes for messages, project scope or usage counters — the entity must gain them",
+        "The per-organization cost limit has no number, period or admin surface anywhere in the KG, so this option ships the enforcement point with a configured limit, not a UI"
+      ],
+      "risks": [
+        {
+          "description": "The per-org cost limit is invented in the absence of any requirement (unit, period, who sets it, what happens on breach), so it may be reworked once the business answers",
+          "severity": "medium"
+        },
+        {
+          "description": "Returning the decrypted key over internal gRPC widens the key's blast radius; a misconfigured svcauth caller list or a log of a request body would leak it (NFR-SE-04)",
+          "severity": "medium"
+        },
+        {
+          "description": "netguard.AdminTarget refuses loopback/private ranges, so the local stack's mock-ext and any on-prem model host need explicit SSRF allow-lists per environment (ADR-15's recorded consequence)",
+          "severity": "medium"
+        },
+        {
+          "description": "Re-pointing /ai/conversation/* touches gateway golden fixtures and the decom route ledger; a stale fixture fails the conformance gate rather than the feature",
+          "severity": "low"
+        },
+        {
+          "description": "DeepSeek/ZhiPu parameter differences from OpenAI are only exercised against a mock; no real provider has been verified in this environment",
+          "severity": "low"
+        }
+      ],
+      "effort": { "size": "L", "hours_estimate": 90 },
+      "affected_areas": [
+        { "kind": "module", "name": "backend/shared/pkg/aiclient (new)" },
+        {
+          "kind": "service",
+          "name": "ms-system-setting (backend/services/platform/system-setting: usecase/ai, handler/ai, config, repository/mysql)"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/{add,chat,update,list,delete/:id,chat/list/:id} + internal gRPC AIService (ResolveModel/ListMessages/AppendTurn)"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_conversation, ai_conversation_message, ai_org_usage (V037) + backend/db/ownership.yaml"
+        },
+        {
+          "kind": "infra",
+          "name": "gateway route table: platform_routes.go, testdata/route_decisions.approved.yaml, routes_golden_test.go"
+        },
+        {
+          "kind": "module",
+          "name": "KG elements: FR-SYS-07 (text revised), ENT-17 (gains messages/scope/usage), BRL-64 + ADR-12 (narrow exception), ADR-15 + NFR-SE-05 (AdminTarget), NFR-SE-04 (sealed key), ADR-06 (table ownership)"
+        },
+        {
+          "kind": "ui",
+          "name": "ui/tms (no change required: api/modules/ai.ts and ms-ai-drawer already call these URLs)"
+        }
+      ],
+      "breaking_change": false,
+      "rollback": "Set AI_ENABLED=false (every /ai/conversation/* route answers 503, nothing calls a provider). Full revert: restore the gateway subtree to its `gone` decision, unmount the new routes, drop ai_conversation_message/ai_org_usage and the added ai_conversation columns (V038 down-migration); the legacy /system/ai-conversation/* routes and ai_model_source are untouched throughout.",
+      "recommended": true
+    },
+    {
+      "id": "opt-2",
+      "title": "Route every model call through the already-deployed LiteLLM proxy and use its budgets",
+      "summary": "Make `ms-llm-proxy` (LiteLLM, already in the dev/dev-remote/production compose files with conf/litellm_config.yaml) the single egress for all model traffic. ms-system-setting keeps declaring sources but issues one LiteLLM virtual key per organization with a `max_budget`, so cost limits and spend accounting come from the proxy; the Go side is a thin OpenAI call to a fixed internal host, netguard FixedHost. Conversation storage, `/ai/conversation/*` and `AI_ENABLED` are still built in system-setting.",
+      "approach": "**Shape**: keep the Go code minimal and push provider handling, retries, fan-out and budgets into infrastructure that is already declared in `deploy/dev/docker-compose.override.yml:273-286`, `deploy/dev-remote/...` and `deploy/production/conf/litellm_config.yaml` (Anthropic/OpenAI/Gemini model list, `router_settings` with `num_retries: 2`, `timeout: 60`).\n\n1. **Egress**: a small `internal/llm` client in ms-system-setting posts `/v1/chat/completions` to `LLM_PROXY_URL` using `netguard.FromEnv(netguard.FixedHost)` with the proxy host allow-listed — the `FixedHost` profile exists for exactly \"a third-party endpoint with a known name\" (`netguard.go:55-57`). No per-provider code, no provider SDK.\n2. **Model sources**: `ai_model_source` rows become a *selection* of proxy-side `model_name` values (`gpt-4o`, `claude-3-5-sonnet`, …). The admin-entered `api_url`/`app_key` are either ignored (the proxy holds provider keys from env) or, in the \"BYO key\" variant, forwarded to LiteLLM as a passthrough deployment — an ops change in `litellm_config.yaml` plus a redeploy, not a UI action.\n3. **Cost limit per organization**: one LiteLLM virtual key per organization, created/rotated by system-setting through LiteLLM's key-management API with `max_budget` + `budget_duration`; the key (not a provider key) is sealed with the existing `internal/secret`. Over-budget is the proxy's 429/400, mapped to a 429 + `Retry-After` for the SPA. Spend reporting comes from LiteLLM, not from a counter we maintain.\n4. **Conversations / routes / flag**: same as opt-1 — `V037` migration for `ai_conversation` header + `ai_conversation_message`, `/ai/conversation/*` mounted in system-setting shaped to `ui/tms/src/api/modules/ai.ts`, `AI_ENABLED` gate following `NOTIFICATION_SSE_ENABLED` (`internal/config/config.go:19-20`), and the gateway subtree re-pointed from the retired ai-agent-service proxy to system-setting with its goldens updated.\n5. **Ops hardening required before this is production-grade**: `LLM_MASTER_KEY` currently defaults to `sk-dev-local` in the compose override, `deploy/production/conf/litellm_config.yaml` is a copy of the dev file (header still says \"Dev\"), and LiteLLM needs its own Postgres for keys/budgets/spend — none of which exists in the deploy matrix today.\n6. **Tests**: the same mock-ext `/llm/v1/chat/completions` + `__fail` fixtures stand in for the proxy in CI; add a contract test that the Go side never dials a provider host directly (FixedHost refuses anything but the proxy).",
+      "pros": [
+        "Real token and cost accounting plus hard budgets out of the box — the one part of the request the documents do not specify and that opt-1/opt-3 must build by hand",
+        "Least Go code: no provider-specific client, no retry/backoff logic of our own, no second secret path for provider keys (they live in the proxy's env)",
+        "Single, fixed egress host simplifies SSRF (FixedHost) and any firewall/network policy",
+        "Claude and Gemini become reachable without the ErrProviderUnsupported/422 deferral",
+        "Provider failover and model aliasing are configuration, not code"
+      ],
+      "cons": [
+        "Contradicts the project's recorded direction: SOL-P3c-E §3.2 rollout states \"Không còn phụ thuộc llm-proxy/Bifrost\", and tools/conformance/retired_services.yaml names shared/pkg/aiclient as the replacement for the retired AI services",
+        "Hollows out FR-SYS-07 and ENT-17: `api_url`/`app_key` are declared per source by an admin, but with a central proxy an admin can no longer point a source at an arbitrary OpenAI-compatible endpoint without an ops change and redeploy",
+        "Conflicts with ADR-06's rationale and shape: LiteLLM needs its own Postgres for virtual keys, budgets and spend, i.e. a second datastore and a table set no service owns in backend/db/ownership.yaml",
+        "Secrets split across two stores (internal/secret + LiteLLM master/virtual keys in env and the proxy DB) against NFR-SE-04's single \"credential sealed AES-256-GCM, never returned\" model",
+        "Conflicts with FR-SYS-07's 501 clause and BRL-64/ADR-12 for the AI_ENABLED=false path exactly as opt-1 does, so the doc revision is still needed",
+        "Adds a third-party container to the supported production topology, with the dev-shaped config and default master key that implies"
+      ],
+      "risks": [
+        {
+          "description": "The production LiteLLM configuration and its datastore do not exist in a reviewed form today (dev file copied, default master key); shipping this makes an unhardened component part of the request path",
+          "severity": "high"
+        },
+        {
+          "description": "Reintroducing a dependency the decom ledger retired will be caught by the conformance/port-exposure baselines and needs an explicit amendment by the architecture owner",
+          "severity": "medium"
+        },
+        {
+          "description": "Per-organization virtual-key lifecycle (create, rotate, revoke, drift between LiteLLM and ai_model_source) is new stateful integration logic with no requirement behind it",
+          "severity": "medium"
+        },
+        {
+          "description": "Provider-key custody moves to a third-party process, so key redaction and audit guarantees depend on LiteLLM's logging settings rather than our code",
+          "severity": "medium"
+        }
+      ],
+      "effort": { "size": "M", "hours_estimate": 56 },
+      "affected_areas": [
+        {
+          "kind": "service",
+          "name": "ms-system-setting (internal/llm client, usecase/ai, handler/ai, config)"
+        },
+        {
+          "kind": "infra",
+          "name": "ms-llm-proxy: deploy/{dev,dev-remote,production}/conf/litellm_config.yaml, docker-compose.override.yml, a new Postgres for LiteLLM keys/budgets"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/* in system-setting + LiteLLM key-management API (virtual keys with max_budget)"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_conversation, ai_conversation_message (V037), org→virtual-key mapping; backend/db/ownership.yaml"
+        },
+        {
+          "kind": "infra",
+          "name": "gateway route table (platform_routes.go, route_decisions.approved.yaml, routes_golden_test.go) and the conformance port-exposure baseline"
+        },
+        {
+          "kind": "module",
+          "name": "KG elements: FR-SYS-07 + ENT-17 (api_url/app_key semantics weakened), ADR-06 (extra datastore), NFR-SE-04 (second secret store), NFR-SE-05/ADR-15 (FixedHost profile), BRL-64/ADR-12"
+        }
+      ],
+      "breaking_change": false,
+      "rollback": "AI_ENABLED=false stops all traffic; because the proxy is the only egress, stopping ms-llm-proxy also disables AI without touching the platform. Full revert: unmount /ai/conversation/*, restore the gateway `gone` decision, drop the new tables and the org→virtual-key mapping, delete the virtual keys in LiteLLM, and restore the conformance baselines.",
+      "recommended": false
+    },
+    {
+      "id": "opt-3",
+      "title": "Thin slice inside ms-system-setting only: no shared package, no gRPC contract",
+      "summary": "Deliver a working project-scoped AI chat with the smallest possible surface: an `internal/aiclient` private to ms-system-setting, conversations as header + turns, a per-organization counter, `/ai/conversation/*` behind `AI_ENABLED`, and nothing exported for other services. `/functional/case/ai/*` keeps its honest 501 until BL-H02, which is then responsible for lifting the client into `shared/pkg` and adding the internal contract.",
+      "approach": "**Shape**: identical behaviour to opt-1 at the HTTP boundary, but everything lives inside one service, so there is no new shared package, no `.proto`, no `svcauth` caller list and no cross-service key handling in this change.\n\n1. **`internal/aiclient`** in `backend/services/platform/system-setting`: one OpenAI-compatible `Chat(ctx, req)` for `Open AI`/`DeepSeek`/`ZhiPu AI`; `Claude`/`Bedrock` ⇒ 422 unsupported. Transport from `netguard.NewClient(netguard.FromEnv(netguard.AdminTarget), 60s)` (`backend/shared/pkg/netguard/netguard.go:41-57`), 2 retries honouring `Retry-After`, key scrubbed from errors/logs (NFR-SE-04), `ai_*` metrics.\n2. **Model resolution and keys** stay package-private: reuse `internal/secret.Open` (`internal/secret/secret.go:31`) at call time and the existing `AIConfigUsecase` repository (`internal/usecase/ai/ai.go`) to read `ai_model_source` with the current permission rules (TrimSpace on `owner_type` for the UI's `\"SYSTEM \"`). The decrypted key never crosses a process boundary in this change.\n3. **Project-scoped conversation**: `V037` adds `title`, `scene`, `organization_id`, `project_id`, `model_id`, `update_time` to `ai_conversation` plus `ai_conversation_message`; model choice is per request (`chatModelId` from the SPA) with an optional per-project default column rather than a separate scope-config table. New tables added to `backend/db/ownership.yaml:33` (ADR-06).\n4. **Cost limit**: `ai_org_usage(organization_id, period, requests, tokens_in, tokens_out, cost)` incremented in the same transaction as the turn, with the limit read from config (`AI_ORG_MONTHLY_TOKENS`, `AI_ORG_MONTHLY_COST`) until the business defines an admin surface. Over limit ⇒ 429 + `Retry-After`, checked before the provider call.\n5. **Routes and flag**: `/ai/conversation/{add,chat,update,list,delete/:id,chat/list/:id}` in `internal/handler/ai/conversation.go`, mounted in `internal/handler/router.go` next to the existing `/ai/config/*` group (lines 354-361), with the idempotent-`add`/upsert-`chat` behaviour the SPA's non-awaited `addChat` requires; `AI_ENABLED` per `internal/config/config.go:19-20`; 503/422/502/429 and never a fake 200.\n6. **Gateway**: same single change as opt-1 — move `/ai/conversation/*` off the retired ai-agent-service proxy to system-setting and update `route_decisions.approved.yaml` + `routes_golden_test.go`.\n7. **Explicit follow-up written into the change**: BL-H02 must lift `internal/aiclient` to `backend/shared/pkg/aiclient` and add the `AIService` gRPC contract before case-management calls a provider; case-management must not read `ai_model_source` directly (ADR-06).",
+      "pros": [
+        "Smallest blast radius and fastest path to a working, honest AI chat for the SPA that already calls these URLs",
+        "No cross-process exposure of a decrypted provider key in this change (the key never leaves the service)",
+        "No new shared package or proto to review, so the change is easy to review and to revert",
+        "Keeps /functional/case/ai/* at its honest 501, leaving ADR-12's exception untouched for that surface until BL-H02"
+      ],
+      "cons": [
+        "Diverges from the recorded replacement for the retired AI services (tools/conformance/retired_services.yaml names shared/pkg/aiclient; SOL-P3c-E T-F3-18 specifies the shared package plus the AIService gRPC contract), so BL-H02 pays the refactor",
+        "Real risk that BL-H02 shortcuts by reading ai_model_source from case-management, which ADR-06 forbids (one table, one owning service)",
+        "Same FR-SYS-07 (501 clause) and BRL-64/ADR-12 (503 on a mounted route) conflicts as opt-1, with the same doc revision needed",
+        "Retry/SSRF/redaction logic will have to be duplicated or moved later — the second caller is already planned",
+        "Per-org limit is env-configured only; no admin UI, and the limit's semantics remain unspecified by the documents"
+      ],
+      "risks": [
+        {
+          "description": "Known rework: the client and the model-resolution contract must be lifted into shared/pkg + gRPC when BL-H02 lands, touching the same files twice",
+          "severity": "medium"
+        },
+        {
+          "description": "Without the internal contract, a future caller may copy the provider-key read path and weaken the single sealed-secret boundary (NFR-SE-04)",
+          "severity": "medium"
+        },
+        {
+          "description": "The per-org cost limit is invented against no requirement and may be reworked once the business specifies unit/period/owner",
+          "severity": "medium"
+        },
+        {
+          "description": "netguard.AdminTarget blocks loopback/private hosts, so local mock-ext and on-prem models need per-environment allow-lists",
+          "severity": "low"
+        }
+      ],
+      "effort": { "size": "M", "hours_estimate": 48 },
+      "affected_areas": [
+        {
+          "kind": "service",
+          "name": "ms-system-setting (internal/aiclient, internal/usecase/ai, internal/handler/ai, internal/config, internal/repository/mysql)"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/{add,chat,update,list,delete/:id,chat/list/:id} (no internal gRPC in this change)"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_conversation (extended), ai_conversation_message, ai_org_usage (V037) + backend/db/ownership.yaml"
+        },
+        {
+          "kind": "infra",
+          "name": "gateway route table: platform_routes.go, testdata/route_decisions.approved.yaml, routes_golden_test.go"
+        },
+        {
+          "kind": "module",
+          "name": "KG elements: FR-SYS-07 (text revised), ENT-17 (messages + project scope), BRL-64/ADR-12 (AI_ENABLED exception), NFR-SE-04, NFR-SE-05 + ADR-15, ADR-06"
+        },
+        {
+          "kind": "ui",
+          "name": "ui/tms (unchanged; ms-ai-drawer/conversation.vue already drives these routes)"
+        }
+      ],
+      "breaking_change": false,
+      "rollback": "AI_ENABLED=false for an immediate kill switch. Full revert: unmount the six routes, restore the gateway `gone` decision for /ai/conversation/*, and drop ai_conversation_message/ai_org_usage plus the added ai_conversation columns; ai_model_source, /ai/config/* and /system/ai-conversation/* are never touched.",
+      "recommended": false
+    },
+    {
+      "id": "opt-4",
+      "title": "Revive the existing ai-agent-service as the AI backend behind /ai/conversation/*",
+      "summary": "ai-agent-service already contains a gRPC chat/transform implementation with an OpenAI client, Redis session store and an agent dispatcher, and the gateway still proxies `/ai/conversation/*` to it. Un-retire the service, harden it (netguard, sealed keys from system-setting, per-org budget, MySQL-persisted conversations) and keep the existing routing. Fastest to a streaming chat, but it reopens a service the project's decommission ledger closed.",
+      "approach": "**Shape**: use the code that exists instead of writing a new client. `backend/services/ai/ai-agent-service` has `usecases/chat/chat.go` (`StreamChat`, history trimming, GraphRAG context), `usecases/transform/transform.go`, `client/llmproxy/client.go` (go-openai with `LLM_PROXY_URL`/`LLM_MODEL` overrides), `repository/redis/session_store.go` and a generated `proto/ai_agent/v1`. The gateway already has the upstream wired (`internal/router/platform_routes.go:19,33,50-53`).\n\nWork needed to make it acceptable:\n1. **Governance first**: remove the `ai-agent-service` entry from `tools/conformance/retired_services.yaml:223-236` and re-approve the `/ai/conversation/*` row in `gateway/internal/router/testdata/route_decisions.approved.yaml:21` (currently `→ gone`), plus the `retiredGone` rows in `routes_golden_test.go:138-146` and the conformance rule that forbids pointing at a retired upstream (`conformance_test.go:1302`), and restore the frozen port-exposure baseline entries.\n2. **Delete the fake-success path**: `client/llmproxy/client.go:41-46` falls back to a `noopClient` with \"placeholder responses\" when `OPENAI_API_KEY` is unset — precisely what ADR-12/BRL-64 forbid and what the non-stub gate greps for. Replace with an honest 503/422.\n3. **Real configuration instead of env**: today the model, base URL and key come from process env and the session is hardcoded to `\"default_ws\"/\"default_proj\"` (`chat.go:41`). Add a `ResolveModel` call into ms-system-setting over `svcauth` so the admin-declared source, its sealed key (`internal/secret.Open`) and the org/project scope actually drive the call.\n4. **SSRF and redaction**: wrap the go-openai transport in `netguard` (`AdminTarget`), scrub keys from errors/logs, add `ai_*` metrics — none of this exists in the service today.\n5. **Persistence and budget**: conversations currently live only in Redis (`agent:session:*`); add the MySQL header/turn tables for `GET /ai/conversation/{list,chat/list/:id}` — but those tables belong to system-setting in `backend/db/ownership.yaml:33`, so either the service owns new tables of its own or it calls system-setting (ADR-06). Add the per-organization counter and the pre-call budget check in the same place.\n6. **Deploy**: ms-ai-agent-service must be built, released and health-checked in the dev/production compose sets again, and `AI_ENABLED` has to gate both the gateway decision and the service.",
+      "pros": [
+        "Reuses a working gRPC chat/transform implementation, a session store and generated protobufs instead of writing a client from scratch",
+        "Streaming chat is already implemented, which the other options defer",
+        "The gateway upstream hook for /ai/conversation/* still exists in code, so routing is a config change"
+      ],
+      "cons": [
+        "Directly against the project's decommission ledger: tools/conformance/retired_services.yaml:223-236 retires ai-agent-service with `replaced_by: F24 chat ở /functional/case/ai/*` and lists /ai/conversation among its retired prefixes; several conformance/golden tests encode that decision",
+        "Its current LLM client silently degrades to a placeholder-response noopClient — the fake success ADR-12/BRL-64 and the no-stub gate explicitly forbid",
+        "Conflicts with ADR-06: conversation/message tables are owned by system-setting, so either ownership moves or the service needs a cross-service read path",
+        "Keeps an extra deployable (plus Redis prefixes and Kafka topics) in the topology for one feature, against ADR-06's \"fewer operational components\" rationale",
+        "Same FR-SYS-07 (501 clause) and BRL-64/ADR-12 AI_ENABLED conflicts as every other option, on top of the un-retirement",
+        "Hardening (netguard, sealed keys, scope resolution, redaction, budget, persistence) is most of opt-1's work anyway, so the reuse saving is smaller than it looks"
+      ],
+      "risks": [
+        {
+          "description": "Reversing an approved decommission requires amending frozen baselines and golden fixtures; the architecture owner may simply refuse, wasting the work",
+          "severity": "high"
+        },
+        {
+          "description": "The service's code quality is demo-level (hardcoded default_ws/default_proj, naive GraphRAG serialisation, env-only config, noopClient fallback) and needs review-grade rework before it faces users",
+          "severity": "high"
+        },
+        {
+          "description": "Conversation state split between Redis sessions and MySQL history risks two sources of truth for the same thread",
+          "severity": "medium"
+        },
+        {
+          "description": "Its GraphRAG/knowledge/case-management clients pull in dependencies on other retired or unrelated AI-track components",
+          "severity": "medium"
+        }
+      ],
+      "effort": { "size": "M", "hours_estimate": 64 },
+      "affected_areas": [
+        {
+          "kind": "service",
+          "name": "backend/services/ai/ai-agent-service (usecases/chat, usecases/transform, client/llmproxy, repository/redis, config)"
+        },
+        {
+          "kind": "service",
+          "name": "ms-system-setting (ResolveModel over svcauth, sealed-key access, org budget)"
+        },
+        {
+          "kind": "infra",
+          "name": "tools/conformance/retired_services.yaml, conformance baselines (port_exposure, gateway_config), gateway route_decisions.approved.yaml + routes_golden_test.go, deploy compose sets"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/* served by ms-ai-agent-service + internal gRPC ResolveModel"
+        },
+        {
+          "kind": "schema",
+          "name": "conversation header/turn tables and the org usage counter vs backend/db/ownership.yaml (system-setting owns ai_conversation)"
+        },
+        {
+          "kind": "module",
+          "name": "KG elements: FR-SYS-07, ENT-17, BRL-64 + ADR-12 (noopClient placeholder is the forbidden fake success), ADR-06 (table ownership, extra component), NFR-SE-04, NFR-SE-05 + ADR-15"
+        }
+      ],
+      "breaking_change": true,
+      "rollback": "AI_ENABLED=false, or unset the gateway's AIAgentService upstream so the subtree returns to its `gone` 404. Full revert: restore the retired_services.yaml entry, the gateway decision row, the golden fixtures and the port-exposure baseline, stop the service in the compose sets, and drop any tables it added.",
+      "recommended": false
+    }
+  ],
+  "recommendation": {
+    "option_id": "opt-1",
+    "reason": "It is the only option that satisfies the request without fighting the project's own records: the decom ledger (tools/conformance/retired_services.yaml:220) and the solution doc SOL-P3c-E §3.2 (T-F3-18) already name shared/pkg/aiclient + an AIService in ms-system-setting as the replacement for the 501, it keeps keys sealed in one service (NFR-SE-04) behind the netguard AdminTarget profile the documents assign to admin-configured URLs (NFR-SE-05/ADR-15), it adds no datastore or runtime component (ADR-06), and it gives BL-H02 a contract instead of a refactor. Opt-3 is the right fallback if the team wants a smaller first slice and accepts the later lift; opt-2 and opt-4 both require reversing a recorded decommission decision."
+  },
+  "assumptions": [
+    {
+      "id": "A-1",
+      "text": "\"Nguồn mô hình tương thích OpenAI\" means the three providers the SPA can create (Open AI, DeepSeek, ZhiPu AI per ui/tms/src/enums/modelEnum.ts); Claude/Bedrock stay deferred and answer 422 unsupported rather than being stubbed.",
+      "needs_confirmation": false
+    },
+    {
+      "id": "A-2",
+      "text": "\"Hội thoại AI theo dự án\" means a conversation row carries organization_id/project_id and model resolution may be overridden per project; the SPA today sends only organizationId, so the project level is stored and resolvable but no UI change ships in this request.",
+      "needs_confirmation": true
+    },
+    {
+      "id": "A-3",
+      "text": "AI_ENABLED is an application-level kill switch on mounted routes (503 when off), following the existing NOTIFICATION_SSE_ENABLED precedent, not a route-mount switch returning 404 + X-Route-Missing.",
+      "needs_confirmation": true
+    },
+    {
+      "id": "A-4",
+      "text": "The per-organization cost limit is enforced in-platform from the token usage the provider reports, counted per organization per calendar period, with the limit supplied by configuration until an admin surface is specified.",
+      "needs_confirmation": true
+    },
+    {
+      "id": "A-5",
+      "text": "services/infrastructure/integration-hub is not touched (protected per CLAUDE.md), and /functional/case/ai/{chat,transform} keeps its honest 501 in this request (BL-H02 owns it).",
+      "needs_confirmation": false
+    },
+    {
+      "id": "A-6",
+      "text": "The FR-SYS-07 / ENT-17 revision and the BRL-64 exception are published as part of this change via the normal document-change path, not assumed silently.",
+      "needs_confirmation": true
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-1",
+      "text": "What exactly is the per-organization cost limit: unit (tokens, requests or currency), period (daily/monthly), who sets it (super-admin, org admin, env) and what the API returns on breach? Nothing in the knowledge graph states it; NFR-PE-07 covers HTTP rate limits only.",
+      "blocking": false
+    },
+    {
+      "id": "Q-2",
+      "text": "Does AI_ENABLED=false answering 503 on a mounted route get an explicit, recorded exception to BRL-64/ADR-12 (which demand 404 + X-Route-Missing for a feature that is off), or must the routes be unmounted when the flag is off?",
+      "blocking": false
+    },
+    {
+      "id": "Q-3",
+      "text": "What marks one ai_model_source as \"the system default\" that project/organization resolution falls back to (a dedicated flag, or the oldest enabled PUBLIC source)? ENT-17's attributes do not include one.",
+      "blocking": false
+    },
+    {
+      "id": "Q-4",
+      "text": "Is sending project data (case text, prompts) to an externally hosted model permitted, and are there data-residency or logging restrictions? No Decision, Constraint or QualityTarget in the graph covers outbound prompt content.",
+      "blocking": false
+    },
+    {
+      "id": "Q-5",
+      "text": "Is streaming (/ai/conversation/stream/...) in scope? The SPA declares it but the current chat call is non-streaming, and no element in the graph requires streaming.",
+      "blocking": false
+    },
+    {
+      "id": "Q-6",
+      "text": "Which environments get AI enabled by default, and may the local stack point a model source at the mock-ext loopback endpoint (which requires an explicit netguard allow-host, ADR-15's recorded consequence)?",
+      "blocking": false
+    }
+  ],
+  "design_references": {
+    "available": true,
+    "snapshot": "snap-000001",
+    "read": [
+      "FR-SYS-07",
+      "ENT-17",
+      "BRL-64",
+      "ADR-12",
+      "ADR-15",
+      "ADR-06",
+      "NFR-SE-04",
+      "NFR-SE-05",
+      "NFR-PE-07",
+      "Q5 (gap, 0 rows)",
+      "Q6 (drift, 0 rows)"
+    ],
+    "gaps": [
+      "No element specifies the per-organization AI cost limit (unit, period, owner, breach response), the AI_ENABLED flag, a system-default model source, or whether streaming is required. ENT-17 still marks conversation as deferred (\"hội thoại (hoãn)\") and has no message, project-scope or usage-counter attributes; the typed gap and drift queries returned no rows, so these are my findings, not a recorded gap list."
+    ],
+    "conflicts": [
+      "FR-SYS-07 requires that chat/transform answer an honest 501 while AI is unwired, so every option contradicts its current text (SRS line:432, URD line:1357) and needs the requirement revised with the change.",
+      "BRL-64 and ADR-12 require a feature that is off to be hidden entirely (404 + X-Route-Missing, \"không được có route 501 hoặc 200 giả\"); a mounted route answering 503 when AI_ENABLED=false is a narrow exception replacing the existing AI 501 exception (OI-02). Opt-2 additionally conflicts with ADR-06 (LiteLLM needs its own datastore outside the single owned-table MySQL) and opt-4 ships ADR-12's forbidden fake success (noopClient placeholder replies)."
+    ]
+  }
+}

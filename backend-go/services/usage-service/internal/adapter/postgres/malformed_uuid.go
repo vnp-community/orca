@@ -1,0 +1,14 @@
+package postgres
+
+import (
+	"errors"
+
+	"github.com/jackc/pgx/v5/pgconn"
+)
+
+// isMalformedUUID reports Postgres rejecting a caller-supplied id at bind time (22P02). An id that
+// cannot be a uuid owns no usage, so reads answer empty instead of Internal.
+func isMalformedUUID(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
+}

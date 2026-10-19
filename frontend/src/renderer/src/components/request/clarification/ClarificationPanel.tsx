@@ -13,13 +13,17 @@ import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useClarifications } from '../../../hooks/useClarifications'
+import { useRequestCooldown } from '../../../hooks/useRequestCooldown'
 import { requestErrorMessage } from '../request-error-message'
 import { ClarificationDeadlineNote } from './ClarificationDeadlineNote'
+import { ClarificationLoadFailureNotice } from './ClarificationLoadFailureNotice'
 import { ClarificationQuestionList } from './ClarificationQuestionList'
 import {
   canSubmit,
   dueState,
   missingRequired,
+  questionIdFromServerMessage,
+  serverReasonText,
   toAnswerPayload
 } from './clarification-answer-validation'
 import type { OrcaRequest } from '../../../../../shared/request-types'
@@ -44,22 +48,20 @@ type Props = {
   isAdmin: boolean
   /** Lets the host show the header "Answer" button and the resume step on the timeline. */
   onStateChange?: (state: ClarificationPanelState) => void
-}
-
-/** Server messages may name the offending question: `... question_id=q1 ...`. */
-function questionIdFromMessage(message: string, known: readonly string[]): string | null {
-  const m = /question[_ ]?id[=: ]+([\w-]+)/i.exec(message)
-  return m && known.includes(m[1]) ? m[1] : null
+  /** Called after an answer was accepted, so the host re-reads the Request that just moved on. */
+  onAnswered?: () => void
 }
 
 export function ClarificationPanel({
   request,
   currentUserId,
   isAdmin,
-  onStateChange
+  onStateChange,
+  onAnswered
 }: Props): React.JSX.Element | null {
   const awaiting = request.status === 'awaiting_information'
   const c = useClarifications(awaiting ? request.id : null)
+  const writeCooldown = useRequestCooldown('write')
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set())
   const [showErrors, setShowErrors] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -123,7 +125,7 @@ export function ClarificationPanel({
   )
 
   const submit = useCallback(async () => {
-    if (!open || readOnly || overdue || c.submitting) {
+    if (!open || readOnly || overdue || c.submitting || writeCooldown.coolingDown) {
       return
     }
     if (!canSubmit(open, c.draft, accepted)) {
@@ -143,6 +145,7 @@ export function ClarificationPanel({
       setSubmitted(true)
       setStillMissing(res.value.stillMissing)
       c.clearDraft()
+      onAnswered?.()
       return
     }
     const { kind, message } = res.error
@@ -157,26 +160,34 @@ export function ClarificationPanel({
         retry: false
       })
     } else if (kind === 'validation') {
-      const qid = questionIdFromMessage(
-        message,
-        open.questions.map((q) => q.id)
-      )
+      const qid = questionIdFromServerMessage(message, open.questions)
       if (qid) {
-        setFieldErrors({ [qid]: message })
+        setFieldErrors({ [qid]: serverReasonText(message) })
       } else {
         setBanner({ text: requestErrorMessage('validation'), retry: false })
       }
     } else {
       setBanner({ text: requestErrorMessage(kind), retry: true })
     }
-  }, [open, readOnly, overdue, c, accepted])
+  }, [open, readOnly, overdue, c, accepted, writeCooldown.coolingDown, onAnswered])
 
   if (!awaiting) {
     return null
   }
 
   if (!open) {
-    if (c.loading || !showWaitNote) {
+    if (c.loading) {
+      return (
+        <div data-testid="clarification-skeleton">
+          <Skeleton className="h-16 w-full" />
+        </div>
+      )
+    }
+    // Why: a Request waiting on a person with no loadable question is a dead end; name it.
+    if (c.loadFailure) {
+      return <ClarificationLoadFailureNotice failure={c.loadFailure} onRetry={c.refetch} />
+    }
+    if (!showWaitNote) {
       return (
         <div data-testid="clarification-skeleton">
           <Skeleton className="h-16 w-full" />
@@ -184,12 +195,15 @@ export function ClarificationPanel({
       )
     }
     return (
-      <p
-        className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground"
+      <div
+        className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground"
         data-testid="clarification-waiting"
       >
-        {translate(`${T}waitingForInfo`, 'Waiting for the information to be provided')}
-      </p>
+        <span>{translate(`${T}waitingForInfo`, 'Waiting for the information to be provided')}</span>
+        <Button size="xs" variant="outline" onClick={c.refetch}>
+          {translate(`${T}refresh`, 'Refresh')}
+        </Button>
+      </div>
     )
   }
 
@@ -270,7 +284,7 @@ export function ClarificationPanel({
         <div className="flex justify-end">
           <Button
             size="sm"
-            disabled={!ready || overdue || c.submitting}
+            disabled={!ready || overdue || c.submitting || writeCooldown.coolingDown}
             onClick={() => void submit()}
           >
             {translate(`${T}submit`, 'Submit answers')}

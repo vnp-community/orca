@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -42,6 +43,9 @@ func (uc *UpdateUser) Execute(ctx context.Context, in UpdateUserInput) (domain.U
 		return domain.User{}, apperrors.New(apperrors.KindInvalidArgument, "AUTH_INVALID_ROLE", "invalid role", nil)
 	}
 	user, err := uc.users.UpdateUser(ctx, in.UserID, in.Email, in.Name, in.Role)
+	if errors.Is(err, ErrUserNotFound) {
+		return domain.User{}, apperrors.New(apperrors.KindNotFound, "AUTH_USER_NOT_FOUND", "user not found", err)
+	}
 	if err != nil {
 		return domain.User{}, apperrors.New(apperrors.KindInternal, "AUTH_UPDATE_USER_FAILED", "failed to update user", err)
 	}

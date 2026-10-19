@@ -1,0 +1,123 @@
+{
+  "bug": {
+    "analysisKind": "diagnosis",
+    "analysisGate": "solution",
+    "planKind": "plan",
+    "phaseRule": "when_size_L",
+    "startGate": "plan",
+    "executionGates": [],
+    "completesAfterAnalysis": false,
+    "humanConfirmRequired": false,
+    "openSpecProfile": "light"
+  },
+  "change_request": {
+    "analysisKind": "solution",
+    "analysisGate": "solution",
+    "planKind": "plan",
+    "phaseRule": "always",
+    "startGate": "plan",
+    "executionGates": ["phase"],
+    "completesAfterAnalysis": false,
+    "humanConfirmRequired": false,
+    "openSpecProfile": "full"
+  },
+  "docs": {
+    "analysisKind": "none",
+    "analysisGate": "",
+    "planKind": "task_list",
+    "phaseRule": "never",
+    "startGate": "task_list",
+    "executionGates": [],
+    "completesAfterAnalysis": false,
+    "humanConfirmRequired": false,
+    "openSpecProfile": "none"
+  },
+  "hotfix": {
+    "analysisKind": "diagnosis",
+    "analysisGate": "",
+    "planKind": "single_task",
+    "phaseRule": "never",
+    "startGate": "pre_deploy",
+    "executionGates": [],
+    "completesAfterAnalysis": false,
+    "humanConfirmRequired": true,
+    "openSpecProfile": "none"
+  },
+  "ops_request": {
+    "analysisKind": "none",
+    "analysisGate": "",
+    "planKind": "plan",
+    "phaseRule": "never",
+    "startGate": "plan",
+    "executionGates": ["pre_deploy"],
+    "completesAfterAnalysis": false,
+    "humanConfirmRequired": false,
+    "openSpecProfile": "none"
+  },
+  "performance": {
+    "analysisKind": "diagnosis",
+    "analysisGate": "solution",
+    "planKind": "plan",
+    "phaseRule": "never",
+    "startGate": "plan",
+    "executionGates": [],
+    "completesAfterAnalysis": false,
+    "humanConfirmRequired": false,
+    "openSpecProfile": "light"
+  },
+  "question": {
+    "analysisKind": "answer",
+    "analysisGate": "answer",
+    "planKind": "none",
+    "phaseRule": "never",
+    "startGate": "",
+    "executionGates": [],
+    "completesAfterAnalysis": true,
+    "humanConfirmRequired": false,
+    "openSpecProfile": "none"
+  },
+  "refactor": {
+    "analysisKind": "solution",
+    "analysisGate": "solution",
+    "planKind": "plan",
+    "phaseRule": "when_size_L",
+    "startGate": "plan",
+    "executionGates": [],
+    "completesAfterAnalysis": false,
+    "humanConfirmRequired": false,
+    "openSpecProfile": "full"
+  },
+  "security": {
+    "analysisKind": "diagnosis",
+    "analysisGate": "solution",
+    "planKind": "plan",
+    "phaseRule": "never",
+    "startGate": "pre_deploy",
+    "executionGates": [],
+    "completesAfterAnalysis": false,
+    "humanConfirmRequired": true,
+    "openSpecProfile": "light"
+  },
+  "spike": {
+    "analysisKind": "findings",
+    "analysisGate": "findings",
+    "planKind": "none",
+    "phaseRule": "never",
+    "startGate": "",
+    "executionGates": [],
+    "completesAfterAnalysis": true,
+    "humanConfirmRequired": false,
+    "openSpecProfile": "none"
+  },
+  "task": {
+    "analysisKind": "none",
+    "analysisGate": "",
+    "planKind": "task_list",
+    "phaseRule": "never",
+    "startGate": "task_list",
+    "executionGates": [],
+    "completesAfterAnalysis": false,
+    "humanConfirmRequired": false,
+    "openSpecProfile": "none"
+  }
+}

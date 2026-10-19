@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/stablyai/orca-go/common/grpcmw"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -26,7 +27,7 @@ type DeviceSecretResolver struct {
 // client in this workspace (see e.g. ai-provider-service's
 // InfraFleetClient dial).
 func New(addr string) (*DeviceSecretResolver, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpcmw.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("authclient: dial auth-service at %q: %w", addr, err)
 	}

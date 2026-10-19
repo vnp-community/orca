@@ -148,16 +148,16 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 	// input values available — see domain.WorkflowExecution.InputsJSON's
 	// doc comment and RecoverExecutions.resumeToCompletion.
 	exec.InputsJSON = in.InputsJSON
+	exec.StartedBy = userID
 
 	if err := uc.executions.CreateExecution(ctx, exec); err != nil {
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_EXECUTION_SAVE_FAILED", "failed to persist workflow execution", err)
 	}
 
-	// Detach from ctx (cancelled the instant this RPC handler returns) but
-	// carry the resolved tenant id forward explicitly, since
-	// StepExecutionRepository/ExecutionRepository calls made from the
-	// background goroutine still need it — see this type's doc comment.
-	dispatchCtx := tenant.WithTenantID(context.Background(), tenantID)
+	// The dispatch outlives this RPC, whose ctx is cancelled the instant the handler returns. Detach keeps tenant,
+	// user and trace values (steps that target a project call a membership-gated service as this user) and drops
+	// only the cancellation.
+	dispatchCtx := tenant.Detach(ctx)
 	execCtx := newExecutionContext(domain.ExecutionContext{
 		Inputs:    inputs,
 		ProjectID: in.ProjectID,

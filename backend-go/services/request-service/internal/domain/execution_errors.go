@@ -27,6 +27,13 @@ func ErrExecuteForbidden() error {
 	return apperrors.New(apperrors.KindPermissionDenied, "REQUEST_EXECUTE_FORBIDDEN", "the approving user may not execute this task", nil)
 }
 
+// ErrExecutionActorNotAllowed refuses a plan approval before it is recorded: in a continuous run nobody presses Start for each
+// Phase, so the person who approves is the one whose permissions run the whole plan, and task-service could not give them any.
+func ErrExecutionActorNotAllowed() error {
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_EXECUTION_ACTOR_NOT_ALLOWED",
+		"approving this plan starts a run under your permissions, and you may not execute its tasks; ask the plan's owner for execute access first", nil)
+}
+
 func ErrPhaseRequired() error {
 	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_PHASE_REQUIRED", "this request is split into phases: phase_task_id is required", nil)
 }

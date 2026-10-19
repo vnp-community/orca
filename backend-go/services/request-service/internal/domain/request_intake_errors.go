@@ -14,6 +14,10 @@ func ErrRequestProjectInvalid() error {
 	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_PROJECT_INVALID", "project id must be a UUID", nil)
 }
 
+func ErrRequestProjectNotFound(projectID string) error {
+	return apperrors.New(apperrors.KindNotFound, "REQUEST_PROJECT_NOT_FOUND", "project "+projectID+" does not exist", nil)
+}
+
 func ErrRequestSourceProviderInvalid(p string) error {
 	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_SOURCE_PROVIDER_INVALID", fmt.Sprintf("invalid source provider: %s", p), nil)
 }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertTriangle, FolderGit2, GitBranch, Loader2, RotateCcw, X } from 'lucide-react'
+import { AlertTriangle, FolderGit2, GitBranch, Loader2, RotateCcw, Server, X } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { retryBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import { getCreationProgressLabel } from '@/lib/pending-worktree-creation'
@@ -148,6 +148,24 @@ export default function WorktreeCreationPanel({
                 {translate(
                   'auto.components.worktree.creation.WorktreeCreationPanel.initAsGitRepo',
                   'Initialize as Git repo'
+                )}
+              </button>
+            )}
+            {entry.errorKind === 'host-unbound' && (
+              <button
+                type="button"
+                data-testid="worktree-creation-choose-host"
+                onClick={() =>
+                  useAppStore
+                    .getState()
+                    .openModal('repo-host-picker', { creationId, repoId: entry.request.repoId })
+                }
+                className="inline-flex items-center gap-1 text-foreground hover:underline"
+              >
+                <Server className="size-3" />
+                {translate(
+                  'auto.components.worktree.creation.WorktreeCreationPanel.chooseHost',
+                  'Choose dev server'
                 )}
               </button>
             )}

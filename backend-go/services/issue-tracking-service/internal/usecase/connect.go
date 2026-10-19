@@ -57,7 +57,7 @@ func (uc *Connect) Execute(ctx context.Context, in ConnectInput) (domain.Connect
 	cred := Credential{BaseURL: in.SiteURL, Email: in.Email, Token: in.Token}
 	viewer, err := provider.Whoami(ctx, cred)
 	if err != nil {
-		return domain.ConnectionStatus{}, apperrors.New(apperrors.KindInvalidArgument, "ISSUETRACKING_AUTH_FAILED", "could not authenticate with the provided credential", err)
+		return domain.ConnectionStatus{}, apperrors.New(apperrors.KindInvalidArgument, "ISSUETRACKING_AUTH_FAILED", "could not authenticate with the provided credential: "+authFailureReason(err), err)
 	}
 
 	credID, err := uc.credentials.Write(ctx, tenantID, userID, in.Provider, cred)
@@ -90,4 +90,14 @@ func workspaceIDFor(provider domain.Provider, siteURL, viewerID string) string {
 		return siteURL
 	}
 	return fmt.Sprintf("%s:%s", provider, viewerID)
+}
+
+// authFailureReason is the part of a provider error that is safe and useful to show: what the site answered. Adapters never put
+// the token in their errors.
+func authFailureReason(err error) string {
+	reason := err.Error()
+	if len(reason) > 300 {
+		reason = reason[:300] + "…"
+	}
+	return reason
 }

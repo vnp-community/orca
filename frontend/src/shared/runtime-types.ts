@@ -517,6 +517,10 @@ export type RuntimeTerminalCreate = {
   title: string | null
   surface?: 'background' | 'visible'
   warning?: string
+  /** The directory the PTY really started in, and whether it is the home directory that replaced an unusable one. */
+  cwd?: string
+  cwdFellBack?: boolean
+  cwdRequested?: string
 }
 
 export type RuntimeTerminalSplit = {

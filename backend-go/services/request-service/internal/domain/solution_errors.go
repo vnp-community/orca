@@ -50,7 +50,7 @@ func ErrSolutionFeedbackTooLong() error {
 }
 
 func ErrSolutionModeNotAllowed() error {
-	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_SOLUTION_MODE_NOT_ALLOWED", "a solution with options is only generated in complete mode", nil)
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_SOLUTION_MODE_NOT_ALLOWED", "a solution with options is generated in complete mode unless the project turned on solution_agent", nil)
 }
 
 func ErrAnalysisNoConnection() error {
@@ -58,7 +58,7 @@ func ErrAnalysisNoConnection() error {
 }
 
 func ErrAnalysisNoRepoPath() error {
-	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ANALYSIS_NO_REPO_PATH", "the project connection has no repository path", nil)
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_ANALYSIS_NO_REPO_PATH", "the project's default repository has no folder path on its dev server (its URL is not an absolute path), so the agent has no directory to read", nil)
 }
 
 func ErrAnalysisBusy() error {
@@ -81,4 +81,13 @@ const (
 	RunErrNoRepoPath        = "REQUEST_ANALYSIS_NO_REPO_PATH"
 	RunErrAnalysisNoConn    = "REQUEST_ANALYSIS_NO_CONNECTION"
 	RunErrInternal          = "REQUEST_SOLUTION_INTERNAL_ERROR"
+	// Plan runs of the openspec engine.
+	RunErrSpecOutOfScope    = "REQUEST_SPEC_RUN_OUT_OF_SCOPE"
+	RunErrSpecAgentOld      = "REQUEST_ENGINE_AGENT_UNSUPPORTED"
+	RunErrSpecAgentFailed   = "REQUEST_OPENSPEC_AGENT_FAILED"
+	RunErrSpecTimeout       = "REQUEST_OPENSPEC_TIMEOUT"
+	RunErrSpecInvalidOutput = "REQUEST_OPENSPEC_INVALID_OUTPUT"
+	// Hotfix only: the fix task or its pre_deploy approval could not be created when the diagnosis finished.
+	RunErrHotfixFixTask  = "REQUEST_HOTFIX_FIX_TASK_FAILED"
+	RunErrHotfixApproval = "REQUEST_HOTFIX_APPROVAL_FAILED"
 )

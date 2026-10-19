@@ -8,6 +8,10 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
@@ -101,6 +105,11 @@ func (r *RelayExecutor) relay(ctx context.Context, connectionID, method string, 
 			ParamsJson:  string(paramsJSON),
 		})
 		if err != nil {
+			// Fleet-health samples lag up to 30s, so the agent can drop after
+			// dispatch; surface that as retryable instead of a git failure.
+			if status.Code(err) == codes.FailedPrecondition && strings.Contains(status.Convert(err).Message(), "INFRA_DEV_SERVER_NOT_CONNECTED") {
+				return usecase.ErrDevServerUnreachable(devServerID)
+			}
 			return fmt.Errorf("grpcclient: relayByDevServer %s: %w", method, err)
 		}
 		resultJSON = resp.GetResultJson()
@@ -251,11 +260,11 @@ func (r *RelayExecutor) PullStream(ctx context.Context, repoPath string, sink fu
 // ── usecase.GitExecutor ───────────────────────────────────────────────────
 
 func (r *RelayExecutor) GetStatus(ctx context.Context, repoPath string) (domain.GitStatus, error) {
-	var result domain.GitStatus
+	var result gitStatusWire
 	err := r.relay(ctx, repoPath, "git.status", map[string]any{
 		"worktreePath": repoPath, // was "repoPath" — real agent contract, see BUG-036/TASK-228
 	}, &result)
-	return result, err
+	return result.toDomain(), err
 }
 
 func (r *RelayExecutor) GetDiff(ctx context.Context, repoPath, filePath string, staged bool) (domain.DiffResult, error) {
@@ -267,15 +276,39 @@ func (r *RelayExecutor) GetDiff(ctx context.Context, repoPath, filePath string, 
 }
 
 func (r *RelayExecutor) Commit(ctx context.Context, repoPath, message string, paths []string) (domain.CommitResult, error) {
-	var result domain.CommitResult
 	// NOTE: "paths" is sent but the real agent ignores it — commit assumes
 	// pre-staged content (via a prior git.stage/git.bulkStage call, see
 	// TASK-208). Left in the wire payload for now rather than silently
 	// dropping the Go signature's paths param — harmless either way.
-	err := r.relay(ctx, repoPath, "git.commit", map[string]any{
+	// The agent answers {success, error?} and no sha, and reports a failed commit (nothing staged, a hook) as success=false:
+	// both were lost when the answer was read straight into CommitResult, so a commit looked done and had no sha.
+	var wire struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+	}
+	if err := r.relay(ctx, repoPath, "git.commit", map[string]any{
 		"worktreePath": repoPath, "message": message,
-	}, &result)
-	return result, err
+	}, &wire); err != nil {
+		return domain.CommitResult{}, err
+	}
+	if !wire.Success {
+		return domain.CommitResult{}, fmt.Errorf("relay: git commit failed: %s", firstNonEmpty(wire.Error, "no reason given"))
+	}
+	var head gitExecResult
+	if err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": []string{"rev-parse", "HEAD"}, "cwd": repoPath}, &head); err != nil {
+		return domain.CommitResult{}, err
+	}
+	if err := head.failed("git rev-parse HEAD"); err != nil {
+		return domain.CommitResult{}, err
+	}
+	return domain.CommitResult{CommitSHA: strings.TrimSpace(head.Stdout)}, nil
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
 
 func (r *RelayExecutor) Push(ctx context.Context, repoPath, remote, branch string) (domain.PushResult, error) {
@@ -351,8 +384,12 @@ func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, ba
 	if baseRef != "" {
 		params["baseRef"] = baseRef
 	}
-	if err := r.relay(ctx, repoPath, "git.worktree.add", params, nil); err != nil {
+	var added gitExecResult
+	if err := r.relay(ctx, repoPath, "git.worktree.add", params, &added); err != nil {
 		return domain.WorktreeCreateResult{}, err
+	}
+	if err := added.failed("git worktree add"); err != nil {
+		return domain.WorktreeCreateResult{}, err // not followed by rev-parse in a directory that was never made
 	}
 
 	// The agent's git.worktree.add has no structured result to unmarshal
@@ -368,22 +405,28 @@ func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, ba
 	if err != nil {
 		return domain.WorktreeCreateResult{}, err
 	}
+	if err := execResult.failed("git rev-parse HEAD"); err != nil {
+		return domain.WorktreeCreateResult{}, err
+	}
 	return domain.WorktreeCreateResult{Path: targetPath, HeadSHA: strings.TrimSpace(execResult.Stdout)}, nil
 }
 
 // branchExistsLocally reports whether branch already exists as a local ref
-// (`git show-ref --verify --quiet refs/heads/<branch>`, exit 0 = exists).
+// (`git rev-parse --verify --quiet refs/heads/<branch>`, exit 0 = exists).
 // Any error (missing ref, or an unexpected relay/git failure) is treated as
 // "does not exist" — CreateWorktree then falls back to its original
 // createBranch=true behavior, the same outcome as before this check
-// existed. show-ref is confirmed whitelisted on the relay's git.exec
-// surface — see ListLocalBranches' doc comment above.
+// existed. rev-parse, not show-ref: the agent's git.exec allowlist
+// (ALLOWED_GIT_SUBCOMMANDS in agent-git-handler.ts) refuses show-ref, so with it
+// the answer was always "does not exist" and a worktree for an existing branch
+// (a removed proposal worktree being recreated) failed on `-b`.
 func (r *RelayExecutor) branchExistsLocally(ctx context.Context, repoPath, branch string) bool {
+	var res gitExecResult
 	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
-		"args": []string{"show-ref", "--verify", "--quiet", "refs/heads/" + branch},
+		"args": []string{"rev-parse", "--verify", "--quiet", "refs/heads/" + branch},
 		"cwd":  repoPath,
-	}, nil)
-	return err == nil
+	}, &res)
+	return err == nil && res.ExitCode == 0 // a missing ref is exit 1, which the agent still answers as a success
 }
 
 // sanitizeBranchForRelayPath mirrors localgit.Executor's own
@@ -644,9 +687,9 @@ func (r *RelayExecutor) SubmoduleStatus(ctx context.Context, repoPath, submodule
 	if area != "" {
 		params["area"] = area
 	}
-	var result domain.GitStatus
+	var result gitStatusWire
 	err := r.relay(ctx, repoPath, "git.submoduleStatus", params, &result)
-	return result, err
+	return result.toDomain(), err
 }
 
 func (r *RelayExecutor) RemoteCommitURL(ctx context.Context, repoPath, sha string) (string, error) {
@@ -876,6 +919,17 @@ func (r *RelayExecutor) Checkout(ctx context.Context, repoPath, branch string) (
 type gitExecResult struct {
 	Stdout string `json:"stdout"`
 	Stderr string `json:"stderr"`
+	// ExitCode is git's own exit status. The agent answers a git command that failed (exit 1, 128...) as a successful RPC with
+	// this code, so a caller that only looks at the RPC error cannot tell a failed command from a good one.
+	ExitCode int `json:"exitCode"`
+}
+
+// failed is the error for a git command that ran and did not succeed, nil when it succeeded.
+func (g gitExecResult) failed(what string) error {
+	if g.ExitCode == 0 {
+		return nil
+	}
+	return fmt.Errorf("relay: %s exited with %d: %s", what, g.ExitCode, strings.TrimSpace(g.Stderr))
 }
 
 // ListLocalBranches composes a richer per-branch listing (upstream/ahead/
@@ -1245,12 +1299,29 @@ func (r *RelayExecutor) Delete(ctx context.Context, repoPath, relPath string, re
 	}, nil)
 }
 
+// Stat reads the agent's fs.stat answer, which is {path, size, mtime, isDir, isFile, isLink, mode} and has no "exists": a
+// successful answer means the path is there, an agent "path not found" (NotFound once infra-fleet types it) means it is not.
+// Decoding it into domain.FileStat directly read every field as zero, so every path looked missing.
 func (r *RelayExecutor) Stat(ctx context.Context, repoPath, relPath string) (domain.FileStat, error) {
-	var result domain.FileStat
+	var result struct {
+		Size  int64  `json:"size"`
+		MTime string `json:"mtime"`
+		IsDir bool   `json:"isDir"`
+	}
 	err := r.relay(ctx, repoPath, "fs.stat", map[string]any{
 		"path": filepath.Join(repoPath, relPath),
 	}, &result)
-	return result, err
+	if status.Code(err) == codes.NotFound {
+		return domain.FileStat{Exists: false}, nil // the same answer the local executor gives for a missing path
+	}
+	if err != nil {
+		return domain.FileStat{}, err
+	}
+	out := domain.FileStat{Exists: true, IsDirectory: result.IsDir, SizeBytes: result.Size}
+	if t, perr := time.Parse(time.RFC3339Nano, result.MTime); perr == nil {
+		out.ModifiedAtUnixMs = t.UnixMilli()
+	}
+	return out, nil
 }
 
 func (r *RelayExecutor) Search(ctx context.Context, repoPath string, opts domain.SearchOptions) ([]domain.SearchMatch, error) {

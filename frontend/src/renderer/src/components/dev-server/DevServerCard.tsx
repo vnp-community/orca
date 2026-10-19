@@ -5,6 +5,7 @@ import { DevServerStatusBadge } from './DevServerStatusBadge'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '../../store'
 import { latestAgentWsStatusForDevServer } from '@/lib/agent-ws-trace-status'
+import { translate } from '@/i18n/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,14 +18,24 @@ type Props = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTimestamp(ts: number | null): string {
-  if (!ts) {return '—'}
+  if (!ts) {
+    return '—'
+  }
   return new Date(ts).toLocaleString()
+}
+
+const PLATFORM_LABEL: Record<string, string> = {
+  darwin: 'macOS',
+  win32: 'Windows',
+  linux: 'Linux',
+  freebsd: 'FreeBSD',
+  openbsd: 'OpenBSD'
 }
 
 const CONNECTION_TYPE_LABEL: Record<string, string> = {
   'direct-websocket': 'Direct WebSocket (daemon)',
   'relay-websocket': 'Relay WebSocket',
-  'relay-ssh': 'Relay SSH',
+  'relay-ssh': 'Relay SSH'
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -39,7 +50,9 @@ export function DevServerCard({ server, showActions = true }: Props) {
   const removeDevServer = useAppStore((s) => s.removeDevServer)
   // Read-only: consumes agentWs:*/agentToken:* trace events already fed by
   // the SSE bridge (initBrowserTrace) — does not subscribe or emit spans.
-  const agentWsStatus = useAppStore((s) => latestAgentWsStatusForDevServer(s.traceEvents, server.id))
+  const agentWsStatus = useAppStore((s) =>
+    latestAgentWsStatusForDevServer(s.traceEvents, server.id)
+  )
 
   const handleConnect = async () => {
     setConnecting(true)
@@ -71,7 +84,12 @@ export function DevServerCard({ server, showActions = true }: Props) {
   const isDaemonManaged = server.connectionType === 'direct-websocket'
 
   return (
-    <div className="dev-server-card" data-server-id={server.id}>
+    <div
+      className="dev-server-card"
+      data-server-id={server.id}
+      data-testid="dev-server-card"
+      data-dev-server-id={server.id}
+    >
       {/* ── Clickable header row ── */}
       <div
         className="dev-server-card__header"
@@ -95,6 +113,28 @@ export function DevServerCard({ server, showActions = true }: Props) {
           <span className="dev-server-card__name">{server.name}</span>
           {/* Always show status badge — shows 'connected', 'connecting', etc. */}
           <DevServerStatusBadge status={server.status} platform={server.platform} />
+          {/* Busy state: only when the backend reports it (older ones leave `busy` undefined = unknown) */}
+          {server.status === 'connected' && typeof server.busy === 'boolean' && (
+            <span
+              className={`text-xs ${server.busy ? 'font-medium text-foreground' : 'text-muted-foreground'}`}
+              data-testid="dev-server-busy"
+              data-busy={server.busy}
+              data-active-executions={server.activeExecutions ?? 0}
+            >
+              {server.busy
+                ? translate('auto.components.devServer.card.busy', 'Busy ({{count}} running)', {
+                    count: server.activeExecutions ?? 1
+                  })
+                : translate('auto.components.devServer.card.idle', 'Idle')}
+            </span>
+          )}
+          {server.platform && (
+            <span className="text-xs text-muted-foreground" data-testid="dev-server-platform">
+              {[PLATFORM_LABEL[server.platform] ?? server.platform, server.arch]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          )}
           {/* Read-only Agent WS trace badge — only when a matching trace event exists */}
           {agentWsStatus && (
             <span
@@ -114,12 +154,9 @@ export function DevServerCard({ server, showActions = true }: Props) {
         </div>
 
         {showActions && (
-          <div
-            className="dev-server-card__actions"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {!isDaemonManaged && (
-              server.status === 'connected' ? (
+          <div className="dev-server-card__actions" onClick={(e) => e.stopPropagation()}>
+            {!isDaemonManaged &&
+              (server.status === 'connected' ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -128,7 +165,11 @@ export function DevServerCard({ server, showActions = true }: Props) {
                   disabled={connecting}
                   title="Disconnect"
                 >
-                  {connecting ? <Loader2 className="size-4 animate-spin" /> : <PlugZap className="size-4" />}
+                  {connecting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <PlugZap className="size-4" />
+                  )}
                 </Button>
               ) : (
                 <Button
@@ -139,10 +180,13 @@ export function DevServerCard({ server, showActions = true }: Props) {
                   disabled={connecting || server.status === 'connecting'}
                   title="Connect"
                 >
-                  {connecting ? <Loader2 className="size-4 animate-spin" /> : <Plug className="size-4" />}
+                  {connecting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Plug className="size-4" />
+                  )}
                 </Button>
-              )
-            )}
+              ))}
             {isDaemonManaged && (
               <span
                 className="dev-server-card__daemon-badge text-xs text-muted-foreground px-2"
@@ -230,9 +274,7 @@ export function DevServerCard({ server, showActions = true }: Props) {
               </tr>
               <tr>
                 <td className="dev-server-card__detail-key">Added</td>
-                <td className="dev-server-card__detail-val">
-                  {formatTimestamp(server.addedAt)}
-                </td>
+                <td className="dev-server-card__detail-val">{formatTimestamp(server.addedAt)}</td>
               </tr>
             </tbody>
           </table>

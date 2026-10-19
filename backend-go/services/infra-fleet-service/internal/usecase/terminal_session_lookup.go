@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
@@ -52,8 +53,11 @@ func resolveTerminalSession(ctx context.Context, tenantID, ptyID string, session
 	}
 	if !connected {
 		devServerByID, devErr := devServers.Get(ctx, tenantID, session.ConnectionID)
-		if devErr != nil {
+		if errors.Is(devErr, domain.ErrDevServerNotFound) {
 			return domain.TerminalSession{}, domain.DevServer{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "terminal session's connection is no longer bound to a dev server", nil)
+		}
+		if devErr != nil {
+			return domain.TerminalSession{}, domain.DevServer{}, devServerLookupError(devErr)
 		}
 		devServer = devServerByID
 	}

@@ -56,7 +56,8 @@ func wireClassification(ctx context.Context, wg *sync.WaitGroup, cfg config.Conf
 			providers = aiproviderv1.NewAiProviderServiceClient(aiConn)
 		}
 		resolver := grpcclient.NewAIConnectionResolver(infra, projectv1.NewProjectServiceClient(projectConn))
-		classifier = grpcclient.NewRelayClassifier(infra, resolver, providers)
+		classifier = grpcclient.NewRelayClassifier(infra, resolver, providers).
+			WithCapabilities(grpcclient.NewInfraCapabilityClient(infra, 10*time.Second))
 	} else {
 		log.Warn("INFRA_FLEET_SERVICE_ADDR or PROJECT_SERVICE_ADDR unset: AI classification will always fall back to manual type confirmation")
 	}

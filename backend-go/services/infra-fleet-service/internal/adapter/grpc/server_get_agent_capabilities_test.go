@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -65,7 +64,7 @@ func TestServer_GetAgentCapabilities_TenantContextRequired(t *testing.T) {
 }
 
 func TestServer_GetAgentCapabilities_NotFound(t *testing.T) {
-	repo := &capsFakeRepo{getErr: errors.New("not found")}
+	repo := &capsFakeRepo{getErr: domain.ErrDevServerNotFound}
 	agent := &capsFakeAgentClient{}
 	uc := usecase.NewGetAgentCapabilities(repo, agent)
 

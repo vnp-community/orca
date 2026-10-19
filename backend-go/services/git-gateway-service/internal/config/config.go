@@ -14,6 +14,10 @@
 package config
 
 import (
+	"fmt"
+	"os"
+	"strconv"
+
 	commonconfig "github.com/stablyai/orca-go/common/config"
 )
 
@@ -48,10 +52,20 @@ type Config struct {
 	// outbound dependency edge (git --> issue) this service didn't have
 	// before this batch.
 	IssueTrackingServiceAddr string
+
+	// AllowLocalRepos (ORCA_ALLOW_LOCAL_REPOS, default false) declares that
+	// this process shares a filesystem with the users' repos, so a repo with
+	// no dev server may run git here. Off in Docker: the container cannot see
+	// the user's disk and "local" would only yield chdir errors.
+	AllowLocalRepos bool
 }
 
 func Load() (Config, error) {
 	base, err := commonconfig.LoadBase("git-gateway-service")
+	if err != nil {
+		return Config{}, err
+	}
+	allowLocal, err := boolEnv("ORCA_ALLOW_LOCAL_REPOS", false)
 	if err != nil {
 		return Config{}, err
 	}
@@ -62,5 +76,18 @@ func Load() (Config, error) {
 		AIProviderServiceAddr:     commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 		SCMIntegrationServiceAddr: commonconfig.StringEnv("SCM_INTEGRATION_SERVICE_ADDR", "scm-integration-service:9090"),
 		IssueTrackingServiceAddr:  commonconfig.StringEnv("ISSUE_TRACKING_SERVICE_ADDR", "issue-tracking-service:9090"),
+		AllowLocalRepos:           allowLocal,
 	}, nil
+}
+
+func boolEnv(key string, def bool) (bool, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return def, nil
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("config: invalid bool for %s=%q: %w", key, v, err)
+	}
+	return b, nil
 }

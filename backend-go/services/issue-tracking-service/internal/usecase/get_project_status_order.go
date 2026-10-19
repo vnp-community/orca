@@ -39,7 +39,7 @@ func (uc *GetProjectStatusOrder) Execute(ctx context.Context, in GetProjectStatu
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, domain.ProviderJira, in.WorkspaceID)
 	if err != nil {
-		return domain.ProjectStatusOrder{}, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no jira credential available", err)
+		return domain.ProjectStatusOrder{}, credentialResolveError(err, "no jira credential available")
 	}
 	order, err := provider.GetProjectStatusOrder(ctx, cred, in.ProjectIDOrKey)
 	if err != nil {

@@ -1,7 +1,6 @@
 package devserveragent
 
 // Agent methods always self-expire before Go-side timeouts.
-// ai.complete = 120s will be added by BE-CV-SOL-093.
 
 import (
 	"strings"
@@ -9,12 +8,18 @@ import (
 )
 
 const (
-	execPromptTimeout    = 15 * time.Minute
+	// The agent kills a prompt run at its own 30 minute ceiling and then reports it; the Go side waits one minute longer so that
+	// report is read instead of racing a simultaneous deadline.
+	execPromptTimeout = 31 * time.Minute
+	// ai.complete may run a model for a minute or more (a Solution or Plan is a long structured answer). The agent bounds
+	// its own call at 120s, so this must be longer or the Go side gives up on a call that was about to succeed.
+	aiCompleteTimeout    = 150 * time.Second
 	codeIntelReadTimeout = 90 * time.Second
 )
 
 var execTimeoutOverrides = map[string]time.Duration{
 	"agent.execPrompt":     execPromptTimeout,
+	"ai.complete":          aiCompleteTimeout,
 	"quality.listProfiles": 45 * time.Second,
 }
 
@@ -32,4 +37,10 @@ func execTimeoutForMethod(method string) time.Duration {
 		return codeIntelReadTimeout
 	}
 	return 0
+}
+
+// isAgentRunMethod marks the calls where the agent is working for a caller for minutes: a task run and a model call.
+// They are what makes a dev server "busy"; short probes (ports.scan, fs.*) are not.
+func isAgentRunMethod(method string) bool {
+	return method == "agent.execPrompt" || method == "ai.complete"
 }

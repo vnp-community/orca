@@ -35,7 +35,7 @@ import (
 // infrafleetclient.Dial. Insecure transport credentials — local-dev only,
 // see that function's doc comment for the production mTLS gap this shares.
 func Dial(addr string) (*grpc.ClientConn, error) {
-	return grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return grpcmw.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
 // withTenantMetadata stamps the caller's already-validated tenant ID onto

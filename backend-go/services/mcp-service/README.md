@@ -69,7 +69,7 @@ Any engine, database or bus failure is a deny.
 | `MCP_RATE_EXEC_PER_MIN` / `_WRITE_` / `_READ_` | `30` / `120` / `300` | per (tenant,user,client) |
 | `MCP_RATE_TOTAL_PER_MIN` / `MCP_RATE_DAILY_PER_USER` | `300` / `5000` | |
 | `MCP_MAX_PENDING_APPROVALS` / `MCP_MAX_APPROVALS_PER_HOUR` | `10` / `30` | per (user, client) anti-spam |
-| `MCP_INTERNAL_CALLER_TOKEN` | empty (WARN) | shared secret required on gateway-only RPCs (`AuthorizeToolCall`, `CompleteToolCall`, `WaitApproval`, `DecideApproval`, `EvaluateToolCall`, `FilterTools`, `GetKillState`); the gateway sends the same variable |
+| `MCP_INTERNAL_CALLER_TOKEN` | empty (ERROR, every guarded RPC is refused) | shared secret required on gateway-only RPCs (`AuthorizeToolCall`, `CompleteToolCall`, `WaitApproval`, `DecideApproval`, `EvaluateToolCall`, `FilterTools`, `GetKillState`); the gateway sends the same variable |
 
 `MCP_TENANT_DEFAULT_ENABLED` only sets `enabled` of a newly created settings
 row; it can never change risk defaults, the hard-deny list, scopes or the kill
@@ -122,7 +122,7 @@ The edge half of this runbook is in [`api-gateway/README.md`](../api-gateway/REA
 ### Order of enabling
 
 1. Create the database (existing environments, see below) and run `deploy/dev/scripts/migrate.sh mcp`; deploy `mcp-service` (it is inert until the gateway calls it).
-2. auth-service: set `OAUTH_RESOURCE_URL=<public base>/mcp`, `OAUTH_INTERNAL_CALLER_TOKEN` (also guards `SetMcpPatSuspension`, called by mcp-service), optionally `AUTH_MCP_PRINCIPAL_CALLER_TOKEN` (shared with api-gateway); mcp-service: same `OAUTH_INTERNAL_CALLER_TOKEN`, `MCP_PUBLIC_BASE_URL`, `AUTH_SERVICE_ADDR`; keep `MCP_TENANT_DEFAULT_ENABLED=true` for dev/dogfood.
+2. auth-service: set `OAUTH_RESOURCE_URL=<public base>/mcp`, `OAUTH_INTERNAL_CALLER_TOKEN` (also guards `SetMcpPatSuspension`, called by mcp-service), `AUTH_MCP_PRINCIPAL_CALLER_TOKEN` (shared with api-gateway; required, an empty value refuses `ResolveMcpPrincipal`); mcp-service: same `OAUTH_INTERNAL_CALLER_TOKEN`, `MCP_PUBLIC_BASE_URL`, `AUTH_SERVICE_ADDR`; keep `MCP_TENANT_DEFAULT_ENABLED=true` for dev/dogfood.
 3. Set `MCP_INTERNAL_CALLER_TOKEN` on mcp-service AND api-gateway (same value) before exposing the gateway.
 4. api-gateway: `MCP_SERVICE_ADDR`, `MCP_PUBLIC_BASE_URL`, `WS_ALLOWED_ORIGINS` (or `MCP_ALLOWED_ORIGINS`), `NATS_URL`, then `MCP_ENABLED=true` last.
 5. Scrape `/metrics` of both services and load the alert rules before onboarding anyone beyond the dev team.
@@ -135,9 +135,9 @@ Fastest first: tenant kill switch (`mcp.admin.killswitch.set`, effect within `MC
 
 - [ ] `OAUTH_RESOURCE_URL` (auth-service) equals `<MCP_PUBLIC_BASE_URL>/mcp` exactly (https; `http` only for loopback). A mismatch makes every token fail the `aud` check.
 - [ ] `MCP_PUBLIC_BASE_URL` set on api-gateway and mcp-service (same origin; used for metadata and the RFC 9207 `iss`; never derived from the request Host).
-- [ ] `OAUTH_INTERNAL_CALLER_TOKEN` identical on auth-service and mcp-service; `MCP_INTERNAL_CALLER_TOKEN` identical on mcp-service and api-gateway. An empty value only logs a WARN and leaves those RPCs protected by the network alone.
+- [ ] `OAUTH_INTERNAL_CALLER_TOKEN` identical on auth-service and mcp-service; `MCP_INTERNAL_CALLER_TOKEN` identical on mcp-service and api-gateway. An empty value logs an ERROR and makes those RPCs refuse every call (fail closed).
 - [ ] `WS_ALLOWED_ORIGINS` set (otherwise `/ws` keeps the legacy no-Origin-check behaviour and `/mcp` rejects every request that carries an Origin).
-- [ ] NetworkPolicy: only api-gateway (and infra-fleet for `ResolveAgentMcpConfig`) may reach mcp-service gRPC; only api-gateway and mcp-service may reach auth-service OAuth/MCP RPCs. `StreamEvents` (mcp-service) is behind the same `MCP_INTERNAL_CALLER_TOKEN` guard as the other gateway-only RPCs, and `ResolveMcpPrincipal` (auth-service) is behind `AUTH_MCP_PRINCIPAL_CALLER_TOKEN` (set the SAME value on auth-service and api-gateway; the gateway sends it only on that call). Both guards switch on only when their variable is set, so set them on both sides before relying on them: while a variable is empty the RPC is protected by the network alone (a WARN is logged).
+- [ ] NetworkPolicy: only api-gateway (and infra-fleet for `ResolveAgentMcpConfig`) may reach mcp-service gRPC; only api-gateway and mcp-service may reach auth-service OAuth/MCP RPCs. `StreamEvents` (mcp-service) is behind the same `MCP_INTERNAL_CALLER_TOKEN` guard as the other gateway-only RPCs, and `ResolveMcpPrincipal` (auth-service) is behind `AUTH_MCP_PRINCIPAL_CALLER_TOKEN` (set the SAME value on auth-service and api-gateway; the gateway sends it only on that call). Both guards always apply and fail closed: while a variable is empty the RPC refuses every call (an ERROR is logged), so set them on both sides (`deploy/dev/scripts/ensure-mcp-env.sh` generates them).
 - [ ] Vault Transit key `credential-broker-mcp_external_secret` exists (`vault write -f transit/keys/credential-broker-mcp_external_secret`) and the broker's policy may use it; broker migration for category `mcp_external_secret` applied. Without it `mcp.externalServer.setSecret` fails.
 - [ ] Database `mcp` exists: `deploy/postgres-init-databases.sh` and the dev docker init script only run on a fresh volume. On an existing environment: `CREATE DATABASE mcp OWNER orca;` then `deploy/dev/scripts/migrate.sh mcp`.
 - [ ] Ingress equivalent of the dev nginx (`deploy/dev/docker/nginx/orca.conf`): `/mcp` proxied to api-gateway with buffering off and long read timeout (SSE, `ci/check-nginx-mcp-routing.sh` is the reference); `/.well-known/oauth-protected-resource*` and `/.well-known/oauth-authorization-server` public; `/oauth/authorize|token|register|revoke` to the gateway; `/oauth/consent` served by the SPA, NOT proxied to the gateway.

@@ -4,7 +4,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callRequestRpc = vi.fn()
-vi.mock('../../../runtime/request-rpc-client', () => ({ callRequestRpc: (...a: unknown[]) => callRequestRpc(...a) }))
+vi.mock('../../../runtime/request-rpc-client', () => ({
+  callRequestRpc: (...a: unknown[]) => callRequestRpc(...a)
+}))
 
 import { ClarificationPanel } from './ClarificationPanel'
 import type { OrcaRequest } from '../../../../../shared/request-types'
@@ -12,16 +14,33 @@ import type { OrcaRequest } from '../../../../../shared/request-types'
 const request = { id: 'r1', status: 'awaiting_information' } as unknown as OrcaRequest
 const ok = (value: unknown) => ({ ok: true, value })
 const clar = (over: Record<string, unknown> = {}) => ({
-  id: 'c1', display_id: 'CL-1', request_id: 'r1', status: 'open', version: 5, round: 1, source: 'readiness', resume_status: 'planning',
+  id: 'c1',
+  display_id: 'CL-1',
+  request_id: 'r1',
+  status: 'open',
+  version: 5,
+  round: 1,
+  source: 'readiness',
+  resume_status: 'planning',
   questions: [
     { id: 'q1', seq: 1, kind: 'text', prompt: 'What is the target?', required: true },
-    { id: 'q2', seq: 2, kind: 'single_choice', prompt: 'Which env?', options: ['dev', 'prod'], suggested_default_json: '"dev"', required: true }
+    {
+      id: 'q2',
+      seq: 2,
+      kind: 'single_choice',
+      prompt: 'Which env?',
+      options: ['dev', 'prod'],
+      suggested_default_json: '"dev"',
+      required: true
+    }
   ],
   ...over
 })
 
 function serve(list: unknown, answer: unknown = ok({})) {
-  callRequestRpc.mockImplementation(async (method: string) => (method === 'clarification.answer' ? answer : ok({ clarifications: [list] })))
+  callRequestRpc.mockImplementation(async (method: string) =>
+    method === 'clarification.answer' ? answer : ok({ clarifications: [list] })
+  )
 }
 
 beforeEach(() => {
@@ -36,7 +55,13 @@ async function openPanel(props: Partial<Parameters<typeof ClarificationPanel>[0]
 
 describe('ClarificationPanel', () => {
   it('renders nothing unless the request is awaiting information', () => {
-    const { container } = render(<ClarificationPanel request={{ ...request, status: 'planning' } as OrcaRequest} currentUserId="u1" isAdmin={false} />)
+    const { container } = render(
+      <ClarificationPanel
+        request={{ ...request, status: 'planning' } as OrcaRequest}
+        currentUserId="u1"
+        isAdmin={false}
+      />
+    )
     expect(container).toBeEmptyDOMElement()
     expect(callRequestRpc).not.toHaveBeenCalled()
   })
@@ -61,10 +86,38 @@ describe('ClarificationPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit answers' }))
     await waitFor(() => expect(screen.getByTestId('clarification-submitted')).toBeInTheDocument())
     expect(callRequestRpc).toHaveBeenCalledWith('clarification.answer', {
-      clarificationId: 'c1', complete: true, expectedVersion: 5,
-      answers: [{ questionId: 'q1', valueJson: '"staging"', acceptDefault: false }, { questionId: 'q2', valueJson: '', acceptDefault: true }]
+      clarificationId: 'c1',
+      complete: true,
+      expectedVersion: 5,
+      answers: [
+        { questionId: 'q1', valueJson: '"staging"', acceptDefault: false },
+        { questionId: 'q2', valueJson: '', acceptDefault: true }
+      ]
     })
     expect(screen.getByTestId('clarification-submitted').textContent).toContain('Plan')
+  })
+
+  it('tells the host once an answer was accepted, and not when it failed', async () => {
+    serve(clar(), ok({ still_missing: false }))
+    const onAnswered = vi.fn()
+    await openPanel({ onAnswered })
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'staging' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Use suggestion' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Submit answers' }))
+    await waitFor(() => expect(onAnswered).toHaveBeenCalledTimes(1))
+    cleanup()
+    serve(clar(), { ok: false, error: { kind: 'unavailable', code: 'x', message: 'x' } })
+    const failed = vi.fn()
+    await openPanel({ onAnswered: failed })
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'staging' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Use suggestion' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Submit answers' }))
+    await waitFor(() =>
+      expect(callRequestRpc.mock.calls.filter((c) => c[0] === 'clarification.answer')).toHaveLength(
+        2
+      )
+    )
+    expect(failed).not.toHaveBeenCalled()
   })
 
   it('Mod+Enter in the text area submits when valid', async () => {
@@ -75,7 +128,9 @@ describe('ClarificationPanel', () => {
     fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true, metaKey: true })
     fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
     fireEvent.keyDown(box, { key: 'Enter', metaKey: true })
-    await waitFor(() => expect(callRequestRpc).toHaveBeenCalledWith('clarification.answer', expect.anything()))
+    await waitFor(() =>
+      expect(callRequestRpc).toHaveBeenCalledWith('clarification.answer', expect.anything())
+    )
   })
 
   it('is read-only for people who are not assigned (admins are exempt)', async () => {
@@ -97,14 +152,23 @@ describe('ClarificationPanel', () => {
   })
 
   it('a version conflict reloads and keeps the draft; network errors offer retry', async () => {
-    serve(clar({ questions: [{ id: 'q1', seq: 1, kind: 'text', prompt: 'Why?', required: true }] }), { ok: false, error: { kind: 'conflict', code: 'x', message: 'REQUEST_CLARIFICATION_VERSION_CONFLICT' } })
+    serve(
+      clar({ questions: [{ id: 'q1', seq: 1, kind: 'text', prompt: 'Why?', required: true }] }),
+      {
+        ok: false,
+        error: { kind: 'conflict', code: 'x', message: 'REQUEST_CLARIFICATION_VERSION_CONFLICT' }
+      }
+    )
     await openPanel()
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'keep me' } })
     fireEvent.click(screen.getByRole('button', { name: 'Submit answers' }))
     await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull())
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('keep me')
     cleanup()
-    serve(clar({ questions: [{ id: 'q1', seq: 1, kind: 'text', prompt: 'Why?', required: true }] }), { ok: false, error: { kind: 'network', code: 'N', message: 'offline' } })
+    serve(
+      clar({ questions: [{ id: 'q1', seq: 1, kind: 'text', prompt: 'Why?', required: true }] }),
+      { ok: false, error: { kind: 'network', code: 'N', message: 'offline' } }
+    )
     await openPanel()
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'x' } })
     fireEvent.click(screen.getByRole('button', { name: 'Submit answers' }))
@@ -112,7 +176,17 @@ describe('ClarificationPanel', () => {
   })
 
   it('maps INVALID_ANSWER with a question id to a field error', async () => {
-    serve(clar({ questions: [{ id: 'q1', seq: 1, kind: 'text', prompt: 'Why?', required: true }] }), { ok: false, error: { kind: 'validation', code: 'x', message: 'REQUEST_CLARIFICATION_INVALID_ANSWER: question_id=q1 too vague' } })
+    serve(
+      clar({ questions: [{ id: 'q1', seq: 1, kind: 'text', prompt: 'Why?', required: true }] }),
+      {
+        ok: false,
+        error: {
+          kind: 'validation',
+          code: 'x',
+          message: 'REQUEST_CLARIFICATION_INVALID_ANSWER: question_id=q1 too vague'
+        }
+      }
+    )
     await openPanel()
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'meh' } })
     fireEvent.click(screen.getByRole('button', { name: 'Submit answers' }))
@@ -126,8 +200,158 @@ describe('ClarificationPanel', () => {
     callRequestRpc.mockResolvedValue(ok({ clarifications: [] }))
     render(<ClarificationPanel request={request} currentUserId="u1" isAdmin={false} />)
     expect(screen.getByTestId('clarification-skeleton')).toBeInTheDocument()
-    await act(async () => { await vi.advanceTimersByTimeAsync(3100) })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3100)
+    })
     expect(screen.getByTestId('clarification-waiting')).toBeInTheDocument()
     vi.useRealTimers()
+  })
+
+  it('names the dead end when the questions cannot be loaded and retries on demand', async () => {
+    callRequestRpc.mockResolvedValue({
+      ok: false,
+      error: { kind: 'unsupported', code: 'method_not_found', message: 'no such method' }
+    })
+    render(<ClarificationPanel request={request} currentUserId="u1" isAdmin={false} />)
+    const failed = await screen.findByTestId('clarification-load-failed')
+    expect(failed).toHaveAttribute('data-error-kind', 'unsupported')
+    expect(failed.textContent).toContain('Could not load the questions')
+    expect(screen.getByTestId('clarification-load-failed-code').textContent).toContain(
+      'method_not_found'
+    )
+    expect(screen.queryByTestId('clarification-waiting')).toBeNull()
+    serve(clar())
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByTestId('clarification-panel')).toBeInTheDocument()
+    expect(screen.queryByTestId('clarification-load-failed')).toBeNull()
+  })
+
+  it('shows a network cause with retry rather than the waiting line', async () => {
+    callRequestRpc.mockResolvedValue({
+      ok: false,
+      error: { kind: 'network', code: 'NETWORK_ERROR', message: 'offline' }
+    })
+    render(<ClarificationPanel request={request} currentUserId="u1" isAdmin={false} />)
+    const failed = await screen.findByTestId('clarification-load-failed')
+    expect(failed.textContent).toContain('Network error')
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+  })
+
+  it('stays silent for a request that is not waiting on a person even if the channel is unsupported', () => {
+    callRequestRpc.mockResolvedValue({
+      ok: false,
+      error: { kind: 'unsupported', code: 'method_not_found', message: 'x' }
+    })
+    const { container } = render(
+      <ClarificationPanel
+        request={{ ...request, status: 'completed' } as OrcaRequest}
+        currentUserId="u1"
+        isAdmin={false}
+      />
+    )
+    expect(container).toBeEmptyDOMElement()
+    expect(callRequestRpc).not.toHaveBeenCalled()
+  })
+
+  it('offers a refresh on the waiting line when the list is empty', async () => {
+    vi.useFakeTimers()
+    callRequestRpc.mockResolvedValue(ok({ clarifications: [] }))
+    render(<ClarificationPanel request={request} currentUserId="u1" isAdmin={false} />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3100)
+    })
+    expect(screen.getByTestId('clarification-waiting')).toBeInTheDocument()
+    const before = callRequestRpc.mock.calls.length
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+      await vi.advanceTimersByTimeAsync(10)
+    })
+    expect(callRequestRpc.mock.calls.length).toBeGreaterThan(before)
+    vi.useRealTimers()
+  })
+
+  it('renders a numeric input for valueType number, blocks letters early and submits the number as a string', async () => {
+    serve(
+      clar({
+        questions: [
+          {
+            id: 'q1',
+            seq: 1,
+            kind: 'text',
+            prompt: 'Time box (hours)?',
+            required: true,
+            value_type: 'number'
+          }
+        ]
+      }),
+      ok({})
+    )
+    await openPanel()
+    const box = screen.getByRole('textbox') as HTMLInputElement
+    expect(box.tagName).toBe('INPUT')
+    expect(box).toHaveAttribute('inputmode', 'decimal')
+    expect(box).toHaveAttribute('data-value-type', 'number')
+    fireEvent.change(box, { target: { value: 'MTX-13' } })
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('not a number')
+    expect(screen.getByRole('button', { name: 'Submit answers' })).toBeDisabled()
+    expect(callRequestRpc).not.toHaveBeenCalledWith('clarification.answer', expect.anything())
+    fireEvent.change(box, { target: { value: '8' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit answers' }))
+    await waitFor(() =>
+      expect(callRequestRpc).toHaveBeenCalledWith(
+        'clarification.answer',
+        expect.objectContaining({
+          answers: [{ questionId: 'q1', valueJson: '"8"', acceptDefault: false }]
+        })
+      )
+    )
+  })
+
+  it('keeps a multi-line textarea for string and list questions (older servers send no valueType)', async () => {
+    serve(
+      clar({
+        questions: [
+          { id: 'q1', seq: 1, kind: 'text', prompt: 'Free text', required: true },
+          { id: 'q2', seq: 2, kind: 'text', prompt: 'Steps', required: true, valueType: 'list' }
+        ]
+      })
+    )
+    await openPanel()
+    const boxes = screen.getAllByRole('textbox')
+    expect(boxes.map((b) => b.tagName)).toEqual(['TEXTAREA', 'TEXTAREA'])
+    expect(screen.getByText('One item per line')).toBeInTheDocument()
+  })
+
+  it('shows the service validation reason next to the question it names', async () => {
+    serve(
+      clar({
+        questions: [
+          {
+            id: 'q1',
+            seq: 1,
+            question_key: 'type_fields.time_box_hours',
+            kind: 'text',
+            prompt: 'Hours?',
+            required: true
+          }
+        ]
+      }),
+      {
+        ok: false,
+        error: {
+          kind: 'validation',
+          code: 'runtime_error',
+          message:
+            'REQUEST_CLARIFICATION_INVALID_ANSWER: question "type_fields.time_box_hours": the answer does not fit time_box_hours (number)'
+        }
+      }
+    )
+    await openPanel()
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'soon' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit answers' }))
+    await waitFor(() => expect(screen.getByRole('textbox')).toHaveAttribute('aria-invalid', 'true'))
+    expect(document.querySelector('[data-question-id="q1"] [role="alert"]')?.textContent).toBe(
+      'the answer does not fit time_box_hours (number)'
+    )
   })
 })

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -84,10 +85,16 @@ func (uc *RebindDevServer) Execute(ctx context.Context, in RebindDevServerInput)
 	}
 
 	before, err := uc.repo.Get(ctx, tenantID, in.ProjectID) // NEW — for the old dev server id in the notify payload
+	if errors.Is(err, domain.ErrProjectNotFound) {
+		return domain.Project{}, apperrors.New(apperrors.KindNotFound, "PROJECT_NOT_FOUND", "project not found", err)
+	}
 	if err != nil {
 		return domain.Project{}, apperrors.New(apperrors.KindInternal, "PROJECT_LOOKUP_FAILED", "failed to look up project before rebind", err)
 	}
 	updated, err := uc.repo.UpdateDevServerID(ctx, tenantID, in.ProjectID, in.NewDevServerID)
+	if errors.Is(err, domain.ErrProjectNotFound) {
+		return domain.Project{}, apperrors.New(apperrors.KindNotFound, "PROJECT_NOT_FOUND", "project not found", err)
+	}
 	if err != nil {
 		return domain.Project{}, apperrors.New(apperrors.KindInternal, "PROJECT_REBIND_FAILED", "failed to update dev server binding", err)
 	}

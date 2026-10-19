@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -44,6 +46,9 @@ type fakeTaskServiceClient struct {
 
 	hasActiveExecutionsResp *taskv1.HasActiveExecutionsResponse
 	hasActiveExecutionsErr  error
+
+	executionRecords    []*taskv1.ExecutionRecord
+	executionRecordsErr error
 
 	getSubtreeResp *taskv1.GetSubtreeResponse
 	getSubtreeErr  error
@@ -392,5 +397,65 @@ func TestTaskRoutes_ListComments(t *testing.T) {
 	}
 	if len(got.GetComments()) != 1 || got.GetNextPageToken() != "next" {
 		t.Fatalf("unexpected response: %+v", &got)
+	}
+}
+
+func (f *fakeTaskServiceClient) ListExecutionRecords(context.Context, *taskv1.ListExecutionRecordsRequest, ...grpc.CallOption) (*taskv1.ListExecutionRecordsResponse, error) {
+	return &taskv1.ListExecutionRecordsResponse{Records: f.executionRecords}, f.executionRecordsErr
+}
+
+func (f *fakeTaskServiceClient) GetTaskExecutionOutput(context.Context, *taskv1.GetTaskExecutionOutputRequest, ...grpc.CallOption) (*taskv1.GetTaskExecutionOutputResponse, error) {
+	return &taskv1.GetTaskExecutionOutputResponse{}, nil
+}
+
+func TestHandleGetTaskExecution_AnswersWithTheResultViewOrAMappedError(t *testing.T) {
+	fake := &fakeTaskServiceClient{executionRecords: []*taskv1.ExecutionRecord{{
+		TaskId: "t1", Attempt: 1, ParseStatus: "ok", CreatedAt: timestamppb.Now(),
+		ResultJson: `{"schema_version":1,"status":"done","summary":"s","knowledge":{"available":true,"snapshot":"snap-1"}}`,
+	}}}
+	router := taskTestRouter(fake)
+	req := withTestIdentity(httptest.NewRequest(http.MethodGet, "/v1/tasks/t1/execution", nil), usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"snapshot":"snap-1"`) || !strings.Contains(rec.Body.String(), `"parseStatus":"ok"`) {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+
+	for name, tc := range map[string]struct {
+		err  error
+		want int
+	}{
+		"denied":      {status.Error(codes.PermissionDenied, "no"), http.StatusForbidden},
+		"not found":   {status.Error(codes.NotFound, "no"), http.StatusNotFound},
+		"bad request": {status.Error(codes.InvalidArgument, "no"), http.StatusBadRequest},
+		"outage":      {status.Error(codes.Unavailable, "down"), http.StatusBadGateway},
+	} {
+		fake := &fakeTaskServiceClient{executionRecordsErr: tc.err}
+		rec := httptest.NewRecorder()
+		taskTestRouter(fake).ServeHTTP(rec, withTestIdentity(httptest.NewRequest(http.MethodGet, "/v1/tasks/t1/execution", nil), usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}))
+		if rec.Code != tc.want {
+			t.Errorf("%s: %d, want %d: %s", name, rec.Code, tc.want, rec.Body.String())
+		}
+	}
+}
+
+func TestHandleGetPlanWritebacks_AnswersWithTheSummaryOrAMappedError(t *testing.T) {
+	fake := &fakeTaskServiceClient{
+		getSubtreeResp: &taskv1.GetSubtreeResponse{Tasks: []*taskv1.Task{{Id: "plan", TaskType: "plan"}, {Id: "t1", TaskType: "task", Title: "Add"}}},
+		executionRecords: []*taskv1.ExecutionRecord{{
+			TaskId: "t1", Attempt: 1, ParseStatus: "ok", CreatedAt: timestamppb.Now(),
+			ResultJson: `{"writeback":{"documents":["docs/tdd/a.md"],"proposal_id":"cs-1","proposal_ok":true,"touched":["FR-1"]}}`,
+		}},
+	}
+	rec := httptest.NewRecorder()
+	taskTestRouter(fake).ServeHTTP(rec, withTestIdentity(httptest.NewRequest(http.MethodGet, "/v1/tasks/plan/writebacks", nil), usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"proposalId":"cs-1"`) || !strings.Contains(rec.Body.String(), `"proposals":1`) {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	broken := &fakeTaskServiceClient{getSubtreeErr: status.Error(codes.PermissionDenied, "no")}
+	rec = httptest.NewRecorder()
+	taskTestRouter(broken).ServeHTTP(rec, withTestIdentity(httptest.NewRequest(http.MethodGet, "/v1/tasks/plan/writebacks", nil), usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("denied: %d %s", rec.Code, rec.Body.String())
 	}
 }

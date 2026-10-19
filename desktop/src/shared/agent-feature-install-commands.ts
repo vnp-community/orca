@@ -69,3 +69,18 @@ export const LINEAR_TICKETS_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstal
 
 export const LINEAR_TICKETS_SKILL_UPDATE_COMMAND =
   buildAgentFeatureSkillUpdateCommand(LINEAR_TICKETS_SKILL_NAME)
+
+// The knowledge-hub skills Orca's OpenSpec plan engine and agent-written Solution rely on (the repository's skills/ folder).
+export const TDD_KNOWLEDGE_SKILL_NAMES = [
+  'tdd-knowledge',
+  'tdd-openspec-author',
+  'tdd-knowledge-writeback',
+  'tdd-orca-task'
+] as const
+
+export const TDD_KNOWLEDGE_SKILLS_INSTALL_COMMAND =
+  buildAgentFeatureSkillInstallCommand(TDD_KNOWLEDGE_SKILL_NAMES)
+
+export const TDD_KNOWLEDGE_SKILLS_UPDATE_COMMANDS = TDD_KNOWLEDGE_SKILL_NAMES.map((name) =>
+  buildAgentFeatureSkillUpdateCommand(name)
+)

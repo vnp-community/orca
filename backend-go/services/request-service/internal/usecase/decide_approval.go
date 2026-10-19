@@ -38,6 +38,8 @@ type DecideApproval struct {
 	Outbox     OutboxWriter
 	// Expirer persists lazy expiry when a decision arrives after the deadline but before the sweeper ran.
 	Expirer *ExpireApprovals
+	// StartPrecheck refuses a plan approval whose run could not start (CR-REQ-038); nil skips it.
+	StartPrecheck *ExecutionStartPrecheck
 }
 
 func (uc *DecideApproval) Execute(ctx context.Context, in DecideApprovalInput) (DecideApprovalResult, error) {
@@ -66,6 +68,12 @@ func (uc *DecideApproval) Execute(ctx context.Context, in DecideApprovalInput) (
 		Prefetch(context.Context, domain.Approval) (context.Context, error)
 	}); ok && probe.Status == domain.ApprovalStatusPending {
 		if ctx, err = p.Prefetch(ctx, probe); err != nil {
+			return DecideApprovalResult{}, err
+		}
+	}
+
+	if uc.StartPrecheck != nil && in.Decision == DecisionApprove && probe.Status == domain.ApprovalStatusPending {
+		if err := uc.StartPrecheck.Check(ctx, probe, userID); err != nil {
 			return DecideApprovalResult{}, err
 		}
 	}

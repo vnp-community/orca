@@ -38,8 +38,11 @@ func (uc *SwitchAgentAccount) Execute(ctx context.Context, in SwitchAgentAccount
 	}
 
 	found, current, err := uc.sessions.LatestForWorktree(ctx, tenantID, in.WorktreeID)
-	if err != nil || !found {
-		return domain.AgentSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_AGENT_SESSION_NOT_FOUND", "no running agent session for this worktree", err)
+	if err != nil {
+		return domain.AgentSession{}, apperrors.New(apperrors.KindInternal, "INFRA_AGENT_SESSION_LOOKUP_FAILED", "failed to look up agent session", err)
+	}
+	if !found {
+		return domain.AgentSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_AGENT_SESSION_NOT_FOUND", "no running agent session for this worktree", nil)
 	}
 
 	// Force kill — a switch aborts the current run entirely (BL-AG-04 step 4b).

@@ -8,5 +8,22 @@ type PhaseStart struct {
 	PhaseTaskID string
 	RequestID   string
 	StartedBy   string
-	StartedAt   time.Time
+	// Trigger is "auto" for a Phase Orca released itself (continuous mode), else "manual".
+	Trigger   PhaseStartTrigger
+	StartedAt time.Time
+}
+
+type PhaseStartTrigger string
+
+const (
+	PhaseStartManual PhaseStartTrigger = "manual"
+	PhaseStartAuto   PhaseStartTrigger = "auto"
+)
+
+// OrDefault reads an unset trigger as manual, the only kind that existed before continuous mode.
+func (t PhaseStartTrigger) OrDefault() PhaseStartTrigger {
+	if t == "" {
+		return PhaseStartManual
+	}
+	return t
 }

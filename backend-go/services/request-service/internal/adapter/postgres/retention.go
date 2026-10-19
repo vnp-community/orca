@@ -2,9 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
@@ -104,6 +107,9 @@ func (r *RetentionRepository) AnonymizeExpired(ctx context.Context, cutoff time.
 func (r *RetentionRepository) Anonymize(ctx context.Context, requestID string, pseudonym func(string) string, at time.Time, erasedBy string) (bool, error) {
 	changed := false
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(requestID) {
+			return domain.ErrRequestNotFound(requestID)
+		}
 		var erased bool
 		err := db.QueryRow(ctx, `
 			SELECT EXISTS (SELECT 1 FROM request.request_security_flags WHERE tenant_id = $1 AND request_id = $2::uuid AND erased_at IS NOT NULL)`,
@@ -116,7 +122,11 @@ func (r *RetentionRepository) Anonymize(ctx context.Context, requestID string, p
 		}
 		var one int
 		if err := db.QueryRow(ctx, `SELECT 1 FROM request.requests WHERE tenant_id = $1 AND id = $2::uuid FOR UPDATE`, tenantID, requestID).Scan(&one); err != nil {
-			return domain.ErrRequestNotFound(requestID)
+			// Only a missing row is "not found"; a database failure must stay an Internal error.
+			if errors.Is(err, pgx.ErrNoRows) {
+				return domain.ErrRequestNotFound(requestID)
+			}
+			return fmt.Errorf("postgres: lock request for erase: %w", err)
 		}
 		if err := r.anonymizeIDs(ctx, db, tenantID, []string{requestID}, pseudonym, at, erasedBy); err != nil {
 			return err

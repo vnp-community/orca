@@ -48,12 +48,36 @@ describe('usePlanTree', () => {
     const { result } = renderHook(() => usePlanTree(baseReq))
     await waitFor(() => expect(result.current.tree?.plan?.id).toBe('plan1'))
     expect(result.current.tree?.tasksByPhase['ph1'].map((x) => x.id)).toEqual(['w1'])
+    expect(callRuntimeRpc.mock.calls[0][1]).toBe('task.list')
+    expect(callRuntimeRpc.mock.calls[0][2]).toEqual({
+      projectId: 'p1',
+      requestId: 'r1',
+      taskTypes: ['plan', 'phase', 'task', 'bug', 'feature', 'epic'],
+      pageSize: 200
+    })
     expect(callRuntimeRpc.mock.calls[1][2]).toMatchObject({
       projectId: 'p1',
+      requestId: 'r1',
+      taskTypes: ['plan', 'phase', 'task', 'bug', 'feature', 'epic'],
       pageToken: 'n1',
       pageSize: 200
     })
     expect(result.current.truncated).toBe(false)
+  })
+
+  it('still builds the tree when an older server ignores the filters and returns other requests tasks', async () => {
+    callRuntimeRpc.mockResolvedValue({
+      tasks: [
+        { ...t('plan1', 'plan'), requestId: 'r1' },
+        { ...t('ph1', 'phase', 'plan1'), requestId: 'r1' },
+        { ...t('plan2', 'plan'), requestId: 'other' },
+        { ...t('ph2', 'phase', 'plan2'), requestId: 'other' },
+        t('free', 'task')
+      ]
+    })
+    const { result } = renderHook(() => usePlanTree(baseReq))
+    await waitFor(() => expect(result.current.tree?.plan?.id).toBe('plan1'))
+    expect(result.current.tree?.phases.map((p) => p.id)).toEqual(['ph1'])
   })
 
   it('flags truncated after the max page count', async () => {
@@ -122,5 +146,25 @@ describe('usePlanTree', () => {
       await vi.advanceTimersByTimeAsync(PLAN_TREE_POLL_MS * 2)
     })
     expect(callRuntimeRpc.mock.calls.length).toBe(initial + 1)
+  })
+  it('keeps polling after the Request completed while the tree still shows unfinished work, then stops', async () => {
+    vi.useFakeTimers()
+    const work = (status: string) => ({ ...t('w1', 'task', 'plan1'), status })
+    callRuntimeRpc.mockResolvedValueOnce({ tasks: [t('plan1', 'plan'), work('in_progress')] })
+    renderHook(() => usePlanTree({ ...baseReq, status: 'completed' }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(callRuntimeRpc).toHaveBeenCalledTimes(1)
+    // task-service had not derived "done" yet when the status event arrived; the next poll sees it.
+    callRuntimeRpc.mockResolvedValue({ tasks: [t('plan1', 'plan'), work('done')] })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PLAN_TREE_POLL_MS)
+    })
+    expect(callRuntimeRpc).toHaveBeenCalledTimes(2)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PLAN_TREE_POLL_MS * 3)
+    })
+    expect(callRuntimeRpc).toHaveBeenCalledTimes(2)
   })
 })

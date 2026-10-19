@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -21,7 +22,25 @@ type AnalysisResultWriter struct {
 	owner      string
 	now        func() time.Time
 	artifacts  SolutionArtifacts
+	hotfix     HotfixFixTasks
 }
+
+// HotfixFixTasks is what the writer needs to give a hotfix its fix task: EnsureHotfixFixTask satisfies it.
+type HotfixFixTasks interface {
+	AppliesTo(req domain.Request) bool
+	Ensure(ctx context.Context, req domain.Request, diagnosis []byte) (HotfixFixTaskResult, error)
+	Discard(ctx context.Context, taskID string)
+}
+
+// WithHotfixFixTasks makes a finished hotfix diagnosis create the fix task and open its pre_deploy approval. Without
+// it a hotfix still reaches awaiting_plan_approval but has nothing to approve (the pre-CR-REQ-014 behaviour).
+func (w *AnalysisResultWriter) WithHotfixFixTasks(h HotfixFixTasks) *AnalysisResultWriter {
+	w.hotfix = h
+	return w
+}
+
+// runErrRequestMoved fails a run whose Request left analyzing while the model worked.
+const runErrRequestMoved = "REQUEST_SOLUTION_REQUEST_MOVED"
 
 // WithArtifacts stamps provenance on each finished Solution and records its display ids and relations.
 func (w *AnalysisResultWriter) WithArtifacts(a SolutionArtifacts) *AnalysisResultWriter {
@@ -67,14 +86,19 @@ func (w *AnalysisResultWriter) Persist(ctx context.Context, in PersistAnalysisIn
 		return domain.ErrRequestTenantRequired()
 	}
 	run := in.Run
-	return w.tx.InTx(ctx, func(ctx context.Context) error {
+	// task-service is called before the transaction opens: no outbound call may hold a database transaction.
+	fix, err := w.ensureFixTask(ctx, run, in.Doc)
+	if err != nil {
+		return err
+	}
+	err = w.tx.InTx(ctx, func(ctx context.Context) error {
 		req, err := w.requests.Get(ctx, run.RequestID)
 		if err != nil {
 			return err
 		}
 		if req.Status != domain.RequestStatusAnalyzing {
 			// The request moved on (cancelled, retyped) while the model worked; the result no longer applies.
-			return newFailure(run, "REQUEST_SOLUTION_REQUEST_MOVED", "request left analyzing while the analysis ran")
+			return newFailure(run, runErrRequestMoved, "request left analyzing while the analysis ran")
 		}
 		flow, err := domain.FlowFor(req.Type)
 		if err != nil {
@@ -137,7 +161,7 @@ func (w *AnalysisResultWriter) Persist(ctx context.Context, in PersistAnalysisIn
 			return err
 		}
 		if gate == domain.GateNone {
-			return nil
+			return w.openFixTaskApproval(ctx, run, req.ID, fix.TaskID)
 		}
 		// Opened after the transition: an approval records the status it was opened in and is only valid there.
 		subject, _ := domain.SubjectTypeForGate(gate)
@@ -151,6 +175,56 @@ func (w *AnalysisResultWriter) Persist(ctx context.Context, in PersistAnalysisIn
 		}
 		return w.opener.Open(ctx, OpenSolutionApprovalInput{Request: moved, SubjectType: subject, SubjectID: saved.ID, Digest: digest})
 	})
+	// Only a result known to have been rolled back may retire the task; after any other error it may be committed.
+	if f, ok := asFailure(err); ok && f.Code == runErrRequestMoved && fix.Created {
+		w.hotfix.Discard(context.WithoutCancel(ctx), fix.TaskID)
+	}
+	return err
+}
+
+// ensureFixTask creates the fix task of a hotfix; every other type returns the zero result.
+func (w *AnalysisResultWriter) ensureFixTask(ctx context.Context, run domain.AnalysisRun, doc []byte) (HotfixFixTaskResult, error) {
+	if w.hotfix == nil {
+		return HotfixFixTaskResult{}, nil
+	}
+	req, err := w.requests.Get(ctx, run.RequestID)
+	if err != nil {
+		return HotfixFixTaskResult{}, err
+	}
+	if req.Status != domain.RequestStatusAnalyzing || !w.hotfix.AppliesTo(req) {
+		return HotfixFixTaskResult{}, nil
+	}
+	fix, err := w.hotfix.Ensure(ctx, req, doc)
+	if err != nil {
+		slog.WarnContext(ctx, "hotfix fix task could not be created", slog.String("run_id", run.ID), slog.String("request_id", req.ID), slog.Any("error", err))
+		return HotfixFixTaskResult{}, newFailure(run, domain.RunErrHotfixFixTask, "the hotfix fix task could not be created: "+failureText(err))
+	}
+	return fix, nil
+}
+
+// openFixTaskApproval opens the pre_deploy approval over the fix task, after the Request reached awaiting_plan_approval.
+func (w *AnalysisResultWriter) openFixTaskApproval(ctx context.Context, run domain.AnalysisRun, requestID, taskID string) error {
+	if taskID == "" {
+		return nil
+	}
+	moved, err := w.requests.Get(ctx, requestID)
+	if err != nil {
+		return err
+	}
+	err = w.opener.Open(ctx, OpenSolutionApprovalInput{Request: moved, SubjectType: domain.SubjectPreDeploy, SubjectID: taskID})
+	if err != nil {
+		slog.WarnContext(ctx, "hotfix approval could not be opened", slog.String("run_id", run.ID), slog.String("request_id", requestID), slog.Any("error", err))
+		return newFailure(run, domain.RunErrHotfixApproval, "the hotfix approval could not be opened: "+failureText(err))
+	}
+	return nil
+}
+
+// failureText is the stable code of an application error. Other errors may name hosts, so only the log keeps them.
+func failureText(err error) string {
+	if code := errorCode(err); code != "" {
+		return code
+	}
+	return "internal error"
 }
 
 // openSiblings are the proposed or rejected Solutions of the same kind that SupersedeOpen is about to retire.

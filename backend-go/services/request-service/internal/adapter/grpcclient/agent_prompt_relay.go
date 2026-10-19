@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -52,6 +53,16 @@ type agentExecPromptParams struct {
 	WorkspaceKind  string `json:"workspaceKind,omitempty"`
 	ReportChanges  bool   `json:"reportChanges,omitempty"`
 	MaxOutputBytes int    `json:"maxOutputBytes,omitempty"`
+	// Only for agents that advertise agent.execPrompt.knowledgeHub; the agent builds the MCP config itself.
+	KnowledgeRoot     string `json:"knowledgeRoot,omitempty"`
+	ProposeChangesets bool   `json:"proposeChangesets,omitempty"`
+	// Write runs under a named profile: the agent chooses every flag from the name, so no tool rule travels.
+	PermissionProfile string       `json:"permissionProfile,omitempty"`
+	ResultBlock       *resultBlock `json:"resultBlock,omitempty"`
+}
+
+type resultBlock struct {
+	Nonce string `json:"nonce"`
 }
 
 // buildAgentParams fixes trust and env: the env holds two ids and never a token or credential.
@@ -60,12 +71,25 @@ func buildAgentParams(in usecase.AgentPromptInput) agentExecPromptParams {
 		StepID: in.StepID, Prompt: in.Prompt, WorktreePath: in.RepoPath, TimeoutMS: in.TimeoutMS,
 		Env: map[string]string{"ORCA_REQUEST_ID": in.RequestID, "ORCA_PROJECT_ID": in.ProjectID},
 	}
-	if in.ReadOnlyEnforced {
+	// proposeChangesets without a root would be rejected by the agent, so it is only sent together with one.
+	if in.KnowledgeRoot != "" {
+		p.KnowledgeRoot, p.ProposeChangesets = in.KnowledgeRoot, in.ProposeChangesets
+	}
+	if in.ResultNonce != "" {
+		p.ResultBlock = &resultBlock{Nonce: in.ResultNonce}
+	}
+	switch {
+	case in.ReadOnlyEnforced:
 		// With accessMode=readonly the agent drops any trust preset, so none is sent.
 		p.AccessMode, p.WorkspaceKind, p.ReportChanges, p.MaxOutputBytes = "readonly", "repo_root", true, maxOutputBytesAsk
-		return p
+	case in.WriteProfile != "":
+		// The profile is the whole permission story of a write run; the default trust preset is sent only so the agent never
+		// sees an empty one, and it ignores it under a profile.
+		p.AccessMode, p.WorkspaceKind, p.ReportChanges, p.MaxOutputBytes = "write", "worktree", true, maxOutputBytesAsk
+		p.PermissionProfile, p.TrustPreset = in.WriteProfile, trustPresetDefault
+	default:
+		p.TrustPreset = trustPresetDefault
 	}
-	p.TrustPreset = trustPresetDefault
 	return p
 }
 
@@ -83,9 +107,29 @@ type agentExecPromptResult struct {
 		HeadMoved    bool              `json:"headMoved"`
 		ChangedFiles []json.RawMessage `json:"changedFiles"`
 	} `json:"changes"`
+	// Parsed is the agent's reading of the result block: {"ok":true,"value":{...}} or {"ok":false,"code":"..."}.
+	Parsed *struct {
+		OK    bool            `json:"ok"`
+		Value json.RawMessage `json:"value"`
+		Code  string          `json:"code"`
+	} `json:"parsed"`
+	// ToolCalls counts calls per tool name and Usage holds claude's own figures; an older agent sends neither.
+	ToolCalls map[string]int `json:"toolCalls"`
+	Usage     *struct {
+		Turns               int      `json:"turns"`
+		DurationMS          float64  `json:"durationMs"`
+		CostUSD             *float64 `json:"costUsd"`
+		InputTokens         float64  `json:"inputTokens"`
+		OutputTokens        float64  `json:"outputTokens"`
+		CacheReadTokens     float64  `json:"cacheReadTokens"`
+		CacheCreationTokens float64  `json:"cacheCreationTokens"`
+	} `json:"usage"`
 }
 
 func (r *AgentPromptRelay) ExecPrompt(ctx context.Context, conn usecase.AnalysisConnection, in usecase.AgentPromptInput) (usecase.AgentPromptResult, error) {
+	if in.ReadOnlyEnforced && in.WriteProfile != "" {
+		return usecase.AgentPromptResult{}, errors.New("grpcclient: a run cannot be both read-only and a write profile")
+	}
 	tctx, err := withTenantMetadata(ctx)
 	if err != nil {
 		return usecase.AgentPromptResult{}, err
@@ -122,6 +166,9 @@ func classifyAgentRelayError(err error) error {
 	if strings.Contains(err.Error(), "READONLY_MODE_UNSUPPORTED") {
 		return usecase.ErrAgentReadonlyUnsupported
 	}
+	if strings.Contains(err.Error(), "KNOWLEDGE_HUB_UNSUPPORTED") || strings.Contains(err.Error(), "KNOWLEDGE_ROOT_") || strings.Contains(err.Error(), "KNOWLEDGE_CONFIG_MISSING") {
+		return fmt.Errorf("%w: %v", usecase.ErrAgentKnowledgeHubUnavailable, err)
+	}
 	return fmt.Errorf("grpcclient: relay agent.execPrompt: %w", err)
 }
 
@@ -142,6 +189,14 @@ func parseAgentResult(resultJSON string) (usecase.AgentPromptResult, error) {
 	if r.Changes != nil {
 		out.ChangesAvailable, out.HeadMoved, out.ChangedFiles = r.Changes.Available, r.Changes.HeadMoved, len(r.Changes.ChangedFiles)
 	}
+	out.Stats = statsFromAgent(r)
+	if r.Parsed != nil {
+		if r.Parsed.OK {
+			out.ResultBlock = []byte(r.Parsed.Value)
+		} else {
+			out.ResultBlockCode = r.Parsed.Code
+		}
+	}
 	return out, nil
 }
 
@@ -154,4 +209,25 @@ func truncateUTF8(s string, limit int) string {
 		cut--
 	}
 	return s[:cut]
+}
+
+// statsFromAgent keeps what the agent counted. The agent already caps the number of names; the sizes are bounded here too
+// because they come over the wire.
+func statsFromAgent(r agentExecPromptResult) domain.RunStats {
+	var s domain.RunStats
+	if len(r.ToolCalls) > 0 {
+		s.ToolCalls = make(map[string]int, len(r.ToolCalls))
+		for name, n := range r.ToolCalls {
+			if n > 0 && len(s.ToolCalls) < 128 {
+				s.ToolCalls[truncateUTF8(name, 100)] += n
+			}
+		}
+	}
+	if u := r.Usage; u != nil {
+		s.Usage = &domain.RunUsage{
+			Turns: u.Turns, DurationMS: int64(u.DurationMS), CostUSD: u.CostUSD, InputTokens: int64(u.InputTokens),
+			OutputTokens: int64(u.OutputTokens), CacheReadTokens: int64(u.CacheReadTokens), CacheCreationTokens: int64(u.CacheCreationTokens),
+		}
+	}
+	return s
 }

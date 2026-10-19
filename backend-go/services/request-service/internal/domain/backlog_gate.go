@@ -11,13 +11,16 @@ const (
 
 // TaskView is the slice of a task-service Task the backlog views and the execution loop need.
 type TaskView struct {
-	ID             string
-	ParentID       string
-	Type           string
-	Status         string
-	RequestID      string
-	Title          string
-	AssigneeID     string
+	ID          string
+	ParentID    string
+	Type        string
+	Status      string
+	RequestID   string
+	Title       string
+	Description string
+	AssigneeID  string
+	// OwnerID is who created the task; only the owner can write grants on the tree.
+	OwnerID        string
 	WorktreeID     string
 	EstimatedHours *float64
 	Labels         []string
@@ -88,8 +91,8 @@ func gateStatusOf(a *Approval) GateStatus {
 	return GateStatusNone // cancelled and expired leave the subject unapproved
 }
 
-// startGateSubject is the Approval that releases the Plan itself for this flow.
-func startGateSubject(g GateSubject) (SubjectType, bool) {
+// StartGateSubject is the Approval that releases the Plan itself for this flow (plan, task_list or pre_deploy).
+func StartGateSubject(g GateSubject) (SubjectType, bool) {
 	switch g {
 	case GatePlan:
 		return SubjectPlan, true
@@ -109,7 +112,7 @@ func ResolveTaskGate(in TaskGateInput) GateResolution {
 	}
 	var statuses []GateStatus
 	planGate := func(plan *TaskView) {
-		subject, ok := startGateSubject(flow.StartGate)
+		subject, ok := StartGateSubject(flow.StartGate)
 		if !ok || plan == nil {
 			statuses = append(statuses, GateStatusNone)
 			return
@@ -123,7 +126,7 @@ func ResolveTaskGate(in TaskGateInput) GateResolution {
 		}
 		statuses = append(statuses, gateStatusOf(in.Approvals.GetLatest(SubjectPreDeploy, in.Task.ID)))
 	case in.Container.Type == TaskTypePhase:
-		if flow.HasExecutionGate(GatePhase) {
+		if flow.HasExecutionGateFor(GatePhase, in.Request.ExecutionMode) {
 			statuses = append(statuses, gateStatusOf(in.Approvals.GetLatest(SubjectPhase, in.Container.ID)))
 		}
 		planGate(in.Plan)

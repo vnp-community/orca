@@ -2,7 +2,10 @@ package opaclient
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 )
 
 func setupPolicy(t *testing.T) *RequestPolicy {
@@ -49,5 +52,30 @@ func TestRequestPolicy_BundleMissing(t *testing.T) {
 	p := NewRequestPolicy("./nonexistent")
 	if err := p.Warm(context.Background()); err == nil {
 		t.Errorf("expected error for nonexistent bundle during Warm")
+	}
+}
+
+func TestRequestPolicy_ReadyFollowsTheBundle(t *testing.T) {
+	dir := t.TempDir()
+	src, err := os.ReadFile("../../../../../policy/orca-authz/request.rego")
+	if err != nil {
+		entries, _ := filepath.Glob("../../../../../policy/orca-authz/*.rego")
+		t.Fatalf("read the request rules: %v (found %v)", err, entries)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "request.rego"), src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := NewRequestPolicy(dir)
+	p.evaluator.SetCheckPeriod(time.Millisecond)
+	ctx := context.Background()
+	if err := p.Ready(ctx); err != nil {
+		t.Fatalf("a loadable bundle is ready: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "request.rego"), []byte("package orca.authz.request\nthis is not rego"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(5 * time.Millisecond)
+	if err := p.Ready(ctx); err == nil {
+		t.Fatal("a bundle broken after startup must turn readiness red")
 	}
 }

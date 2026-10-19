@@ -29,12 +29,12 @@ type InitRepoResult struct {
 // responsible for then calling ProjectService.AddRepo with the returned
 // path — this usecase only performs the git operation.
 type InitRepo struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewInitRepo(reachability DevServerReachability, local, relay GitExecutor) *InitRepo {
+func NewInitRepo(reachability RepoHostRouting, local, relay GitExecutor) *InitRepo {
 	return &InitRepo{reachability: reachability, local: local, relay: relay}
 }
 
@@ -43,16 +43,13 @@ func (uc *InitRepo) Execute(ctx context.Context, in InitRepoInput) (InitRepoResu
 		return InitRepoResult{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_DEV_SERVER_ID", "dev_server_id is required", nil)
 	}
 
-	reachable, err := uc.reachability.IsReachable(ctx, in.DevServerID)
-	if err != nil {
-		return InitRepoResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve dev server reachability", err)
+	// Never fall back to uc.local when the dev server is unreachable: git
+	// would run in this container, not on the host the caller named.
+	if _, err := RouteRepoHost(ctx, uc.reachability, in.DevServerID); err != nil {
+		return InitRepoResult{}, err
 	}
-
-	executor := uc.local
-	if reachable {
-		ctx = WithDevServerID(ctx, in.DevServerID)
-		executor = uc.relay
-	}
+	ctx = WithDevServerID(ctx, in.DevServerID)
+	executor := uc.relay
 	path, defaultBranch, remoteAdded, err := executor.InitRepo(ctx, in.DestPath, in.DefaultBranch, in.RemoteName, in.RemoteURL)
 	if err != nil {
 		return InitRepoResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_INIT_REPO_FAILED", "failed to init repository", err)

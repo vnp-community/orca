@@ -2,10 +2,12 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
 // ResizeTerminalSessionInput mirrors the gRPC request 1:1 by design, see
@@ -45,6 +47,9 @@ func (uc *ResizeTerminalSession) Execute(ctx context.Context, in ResizeTerminalS
 		return apperrors.New(apperrors.KindInternal, "INFRA_AGENT_RESIZE_PTY_FAILED", "failed to resize pty", err)
 	}
 	if err := uc.sessions.Touch(ctx, tenantID, in.PtyID, time.Now().UTC()); err != nil {
+		if errors.Is(err, domain.ErrTerminalSessionNotFound) {
+			return apperrors.New(apperrors.KindNotFound, "INFRA_TERMINAL_NOT_FOUND", "terminal session not found", err)
+		}
 		return apperrors.New(apperrors.KindInternal, "INFRA_TOUCH_TERMINAL_SESSION_FAILED", "failed to update terminal session activity", err)
 	}
 	return nil

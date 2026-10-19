@@ -31,6 +31,12 @@ type exTasks struct {
 	states map[string]ExecutionStateView
 	// statesCalls counts ListExecutionStates calls.
 	statesCalls int
+	// treeOwner, when set, makes GetSubtree behave like task-service: only that user sees the tree (no user: nothing).
+	treeOwner string
+	// executors, when set, is who task-service lets run the tree: nobody else until GrantExecute adds them.
+	executors map[string]bool
+	// grants logs each GrantExecute as "<grantor>><user>@<task>".
+	grants []string
 }
 
 func newExTasks() *exTasks {
@@ -75,7 +81,7 @@ func (f *exTasks) ListTasks(_ context.Context, q ListTasksQuery) ([]domain.TaskV
 	return out, nil
 }
 
-func (f *exTasks) GetSubtree(_ context.Context, rootID string) (SubtreeView, error) {
+func (f *exTasks) GetSubtree(ctx context.Context, rootID string) (SubtreeView, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, "subtree:"+rootID)
@@ -92,6 +98,9 @@ func (f *exTasks) GetSubtree(_ context.Context, rootID string) (SubtreeView, err
 		}
 	}
 	var out SubtreeView
+	if user, _ := tenant.UserID(ctx); f.treeOwner != "" && user != f.treeOwner {
+		return out, nil
+	}
 	for _, id := range f.order {
 		if in[id] {
 			out.Tasks = append(out.Tasks, f.tasks[id])
@@ -218,6 +227,29 @@ func (f *exTasks) ListExecutionStates(_ context.Context, ids []string) (map[stri
 	return out, nil
 }
 
+func (f *exTasks) CanExecute(_ context.Context, _, userID string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "canexecute:"+userID)
+	return f.executors == nil || f.executors[userID], nil
+}
+
+// GrantExecute follows task-service: only the owner of the task may write the grant.
+func (f *exTasks) GrantExecute(_ context.Context, taskID, grantorID, userID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "grant:"+userID)
+	if f.tasks[taskID].OwnerID != grantorID {
+		return domain.ErrTaskForbidden
+	}
+	f.grants = append(f.grants, grantorID+">"+userID+"@"+taskID)
+	if f.executors == nil {
+		f.executors = map[string]bool{}
+	}
+	f.executors[userID] = true
+	return nil
+}
+
 func (f *exTasks) count(prefix string) int {
 	n := 0
 	for _, c := range f.calls {
@@ -265,6 +297,18 @@ func (f *exOutcomes) LatestFailed(_ context.Context, ids []string) (map[string]d
 	for _, r := range f.rows {
 		if r.Outcome == domain.OutcomeFailed && slices.Contains(ids, r.TaskID) {
 			out[r.TaskID] = r
+		}
+	}
+	return out, nil
+}
+
+func (f *exOutcomes) ListByRequest(_ context.Context, requestID string) ([]domain.TaskRunOutcome, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []domain.TaskRunOutcome
+	for _, r := range f.rows {
+		if r.RequestID == requestID {
+			out = append(out, r)
 		}
 	}
 	return out, nil
@@ -421,13 +465,29 @@ func (f *exGates) ListGateApprovals(_ context.Context, _ string, requestIDs []st
 type exOpener struct {
 	gates *exGates
 	calls []OpenApprovalInput
+	// users is the user on the context of each call, as OpenApproval's handler would see it.
+	users []string
 	err   error
+	// validate, when set, runs the subject's real Describe before opening, with the call's own context.
+	validate SubjectArtifacts
+	requests RequestReader
 }
 
-func (f *exOpener) Execute(_ context.Context, in OpenApprovalInput) (*domain.Approval, error) {
+func (f *exOpener) Execute(ctx context.Context, in OpenApprovalInput) (*domain.Approval, error) {
 	f.calls = append(f.calls, in)
+	user, _ := tenant.UserID(ctx)
+	f.users = append(f.users, user)
 	if f.err != nil {
 		return nil, f.err
+	}
+	if f.validate != nil {
+		req, err := f.requests.Get(ctx, in.RequestID)
+		if err != nil {
+			return nil, err
+		}
+		if _, _, err := f.validate.Describe(ctx, req, in.SubjectType, in.SubjectID); err != nil {
+			return nil, err
+		}
 	}
 	for _, a := range f.gates.approvals {
 		if a.SubjectType == in.SubjectType && a.SubjectID == in.SubjectID && a.Status == domain.ApprovalStatusPending {

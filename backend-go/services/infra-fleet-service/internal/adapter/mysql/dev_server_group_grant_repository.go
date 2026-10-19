@@ -45,7 +45,7 @@ func (s *DevServerGroupGrantStore) Delete(ctx context.Context, tenantID, grantID
 		return fmt.Errorf("mysql: rows affected: %w", err)
 	}
 	if n == 0 {
-		return fmt.Errorf("mysql: grant %q not found for tenant", grantID)
+		return fmt.Errorf("mysql: delete grant %q for tenant: %w", grantID, domain.ErrDevServerGroupGrantNotFound)
 	}
 	return nil
 }

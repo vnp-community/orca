@@ -1,0 +1,255 @@
+package usecase_test
+
+// Compiled into request-service's usecase package only through `go test -overlay` (see verify-against-request-service.sh),
+// so nothing is added to backend-go. It builds prompts with the REAL prompt builders, runs the fake `claude` on them
+// exactly as the agent does (ai.complete: stdin + JSON envelope; read-only analysis: `--print <prompt>` in stream-json mode, answer = the `result` event), and feeds
+// the answer to the REAL parsers and validators. When a prompt or a validator
+// changes in request-service, this fails before the nightly e2e does.
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+
+	"github.com/stablyai/orca-go/services/request-service/internal/adapter/grpcclient"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
+	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
+)
+
+// askFakeClaude mirrors buildCliArgs in agent/src/relay/ai-complete-cli-session.ts.
+func askFakeClaude(t *testing.T, prompt string) string {
+	t.Helper()
+	bin := os.Getenv("FAKE_CLAUDE_BIN")
+	if bin == "" {
+		t.Skip("FAKE_CLAUDE_BIN is not set")
+	}
+	cmd := exec.Command(bin, "-p", "--output-format", "json", "--tools", "", "--no-session-persistence",
+		"--system-prompt", "Respond with valid JSON only.")
+	cmd.Dir = t.TempDir()
+	cmd.Env = append(os.Environ(), "FAKE_CLAUDE_STATE_DIR="+t.TempDir(), "FAKE_CLAUDE_LOGGED_IN=1")
+	cmd.Stdin = bytes.NewBufferString(prompt)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("fake claude failed: %v\n%s", err, out.String())
+	}
+	var res struct {
+		Result  string `json:"result"`
+		IsError bool   `json:"is_error"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil || res.IsError {
+		t.Fatalf("fake claude output is not a success result: %v\n%s", err, out.String())
+	}
+	return res.Result
+}
+
+func TestFakeClaude_Classification(t *testing.T) {
+	cases := []struct {
+		title, body string
+		want        domain.RequestType
+		urgency     domain.Urgency
+	}{
+		{"Add a field", "Created by the orca e2e acceptance suite.", domain.RequestTypeTask, domain.UrgencyNormal},
+		{"Login page crashes", "Clicking sign in gives a blank page; it is broken.", domain.RequestTypeBug, domain.UrgencyNormal},
+		{"Hotfix the checkout", "Production is down for all users.", domain.RequestTypeHotfix, domain.UrgencyUrgent},
+		{"How does billing work?", "A question about invoices.", domain.RequestTypeQuestion, domain.UrgencyNormal},
+		{"Speed up search", "Search is slow, latency doubled.", domain.RequestTypePerformance, domain.UrgencyNormal},
+	}
+	for _, c := range cases {
+		prompt := grpcclient.BuildClassificationPrompt(usecase.ClassificationInput{Title: c.title, Body: c.body})
+		p, err := domain.ParseClassificationProposal([]byte(askFakeClaude(t, prompt)))
+		if err != nil {
+			t.Fatalf("%q: the real parser rejected the answer: %v", c.title, err)
+		}
+		if p.Type != c.want || p.Urgency != c.urgency {
+			t.Errorf("%q: got type=%s urgency=%s, want %s/%s", c.title, p.Type, p.Urgency, c.want, c.urgency)
+		}
+	}
+}
+
+func requestWithACs(typ domain.RequestType, size domain.RequestSize, ids ...string) domain.Request {
+	var items []domain.AcceptanceCriterion
+	for _, id := range ids {
+		items = append(items, domain.AcceptanceCriterion{ID: id, Text: "criterion " + id, Status: domain.ACStatusActive})
+	}
+	raw, _ := json.Marshal(items)
+	return domain.Request{Type: typ, Size: size, Urgency: domain.UrgencyNormal, Title: "Add export", Body: "Let users export data.", AcceptanceCriteriaJSON: raw}
+}
+
+func TestFakeClaude_SolutionPassesTheRealValidators(t *testing.T) {
+	for _, typ := range []domain.RequestType{domain.RequestTypeChangeRequest, domain.RequestTypeRefactor} {
+		for _, acs := range [][]string{nil, {"AC-1"}, {"AC-1", "AC-2", "AC-3"}} {
+			req := requestWithACs(typ, domain.RequestSizeM, acs...)
+			min := domain.MinOptionsFor(typ)
+			text := askFakeClaude(t, usecase.BuildSolutionPrompt(usecase.SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: req, MinOptions: min}))
+			doc, err := usecase.ExtractJSONObject(text)
+			if err != nil {
+				t.Fatalf("%s: %v", typ, err)
+			}
+			opts, err := domain.ParseSolutionOptions(doc)
+			if err == nil {
+				err = opts.Validate(min)
+			}
+			if err != nil {
+				t.Fatalf("%s with %d ACs: the real validator rejected the Solution: %v", typ, len(acs), err)
+			}
+			content, err := domain.ContentFromRequest(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			view, err := domain.ParseSolutionCoverage(doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, o := range opts.Options { // whichever option the reviewer picks must answer every AC
+				if vs := domain.ValidateArtifactSemantics(domain.ArtifactContext{Request: content, Solution: &view, ChosenOptionID: o.ID}); len(vs) > 0 {
+					t.Errorf("%s: option %s leaves ACs uncovered: %v", typ, o.ID, vs)
+				}
+			}
+			if len(opts.RequirementCoverage) != len(acs) {
+				t.Errorf("%s: %d coverage entries for %d ACs", typ, len(opts.RequirementCoverage), len(acs))
+			}
+			signals, _ := domain.RiskSignalsFromOption(mustJSON(t, opts.Options[0]))
+			if lvl := (domain.DecisionRisk{}).Assess(signals, 3); lvl == domain.RiskHigh {
+				t.Errorf("%s: the fake Solution is high risk and would need a Decision confirmation the suite cannot give", typ)
+			}
+		}
+	}
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+func TestFakeClaude_PlanPassesTheRealValidators(t *testing.T) {
+	policies := domain.NewPolicyRegistry(domain.PolicyDeps{})
+	for _, typ := range domain.AllRequestTypes() {
+		flow, err := domain.FlowFor(typ)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, size := range []domain.RequestSize{domain.RequestSizeS, domain.RequestSizeM, domain.RequestSizeL} {
+			shape := domain.PlanShapeFor(flow, size)
+			if shape == domain.ShapeNone {
+				continue
+			}
+			name := fmt.Sprintf("%s/%s", typ, size)
+			req := requestWithACs(typ, size, "AC-1")
+			text := askFakeClaude(t, usecase.BuildPlanPrompt(usecase.PlanPromptInput{Request: req, Shape: shape, Limits: domain.DefaultPlanLimits, ProjectName: "p", RepoURL: "r"}))
+			p, err := usecase.ParsePlanOutput(text)
+			if err != nil {
+				t.Fatalf("%s: the real parser rejected the answer: %v", name, err)
+			}
+			if err := domain.ValidatePlanProposal(typ, shape, domain.DefaultPlanLimits, p); err != nil {
+				t.Fatalf("%s: ValidatePlanProposal rejected the Plan: %v", name, err)
+			}
+			if shape.AllowsPhases() != (len(p.Phases) > 0) {
+				t.Errorf("%s: shape %s but %d phases", name, shape, len(p.Phases))
+			}
+			// The type policies that need no database (performance reads a stored baseline check, so it is skipped).
+			if typ != domain.RequestTypePerformance {
+				if err := policies.PolicyFor(typ).PlanPreconditions(nil, req, p); err != nil { //nolint:staticcheck // these policies ignore ctx
+					t.Errorf("%s: the %s policy rejected the Plan: %v", name, typ, err)
+				}
+			}
+		}
+	}
+}
+
+func TestFakeClaude_FeedbackReachesThePlan(t *testing.T) {
+	flow, _ := domain.FlowFor(domain.RequestTypeTask)
+	req := requestWithACs(domain.RequestTypeTask, domain.RequestSizeS)
+	text := askFakeClaude(t, usecase.BuildPlanPrompt(usecase.PlanPromptInput{Request: req, Shape: domain.PlanShapeFor(flow, domain.RequestSizeS),
+		Limits: domain.DefaultPlanLimits, Feedback: "split it smaller"}))
+	p, err := usecase.ParsePlanOutput(text)
+	if err != nil || p.Notes == "" {
+		t.Fatalf("plan with feedback: %v %+v", err, p)
+	}
+}
+
+// askFakeClaudeReadonly mirrors agent-print-mode-exec.ts for accessMode=readonly: argv `--print <prompt> --output-format stream-json
+// --verbose --permission-mode plan --tools Read,Glob,Grep`; the agent hands the caller the `result` event's text as stdout.
+func askFakeClaudeReadonly(t *testing.T, prompt string) string {
+	t.Helper()
+	bin := os.Getenv("FAKE_CLAUDE_BIN")
+	if bin == "" {
+		t.Skip("FAKE_CLAUDE_BIN is not set")
+	}
+	cmd := exec.Command(bin, "--print", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "plan", "--tools", "Read,Glob,Grep")
+	cmd.Dir = t.TempDir()
+	cmd.Env = append(os.Environ(), "FAKE_CLAUDE_STATE_DIR="+t.TempDir(), "FAKE_CLAUDE_LOGGED_IN=1")
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("fake claude --print failed: %v\n%s%s", err, out.String(), errb.String())
+	}
+	answer, found := "", false
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+		var ev struct {
+			Type    string `json:"type"`
+			IsError bool   `json:"is_error"`
+			Result  string `json:"result"`
+		}
+		if err := json.Unmarshal([]byte(line), &ev); err != nil {
+			t.Fatalf("stream-json line is not JSON: %v\n%s", err, line)
+		}
+		if ev.Type == "result" {
+			if ev.IsError {
+				t.Fatalf("fake claude ended with an error result: %s", ev.Result)
+			}
+			answer, found = ev.Result, true
+		}
+	}
+	if !found {
+		t.Fatalf("no result event in the stream:\n%s", out.String())
+	}
+	return answer + "\n"
+}
+
+func TestFakeClaude_ReadonlyAnalysisPassesTheRealValidators(t *testing.T) {
+	seen := map[domain.SolutionKind]bool{}
+	for _, typ := range domain.AllRequestTypes() {
+		flow, err := domain.FlowFor(typ)
+		if err != nil {
+			t.Fatal(err)
+		}
+		kind, ok := domain.KindForAnalysis(flow.AnalysisKind)
+		if !ok || kind == domain.SolutionKindSolution {
+			continue // no analysis, or kind=solution (ai.complete, covered above)
+		}
+		for _, acs := range [][]string{nil, {"AC-1", "AC-2"}} {
+			req := requestWithACs(typ, domain.RequestSizeM, acs...)
+			prompt := usecase.BuildSolutionPrompt(usecase.SolutionPromptInput{Kind: kind, Request: req, MinOptions: domain.MinOptionsFor(typ)})
+			text := askFakeClaudeReadonly(t, prompt)
+			obj, err := usecase.ExtractJSONObject(text)
+			if err != nil {
+				t.Fatalf("%s/%s: %v", typ, kind, err)
+			}
+			doc, err := usecase.ValidateByKind(kind, obj, domain.MinOptionsFor(typ))
+			if err != nil {
+				t.Fatalf("%s/%s: the real validator rejected the document: %v", typ, kind, err)
+			}
+			if _, _, err := usecase.RedactDocument(doc); err != nil {
+				t.Fatalf("%s/%s: redaction: %v", typ, kind, err)
+			}
+			if !strings.Contains(string(doc), `"kind":"`+string(kind)+`"`) {
+				t.Errorf("%s: the stored document does not say kind=%s", typ, kind)
+			}
+			seen[kind] = true
+		}
+	}
+	for _, k := range []domain.SolutionKind{domain.SolutionKindDiagnosis, domain.SolutionKindFindings, domain.SolutionKindAnswer} {
+		if !seen[k] {
+			t.Errorf("no request type exercised kind %s", k)
+		}
+	}
+}

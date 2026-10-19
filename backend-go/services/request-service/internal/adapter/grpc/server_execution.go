@@ -20,6 +20,9 @@ type ExecutionUseCases struct {
 	RecordCheck   *usecase.RecordRequestCheck
 	ListChecks    *usecase.ListRequestChecks
 	Backlog       *usecase.ListBacklog
+	// Activity and Summary are the read models of the Request detail screen (CR-REQ-038).
+	Activity *usecase.ListRequestActivity
+	Summary  *usecase.GetExecutionSummary
 }
 
 // WithExecution attaches the execution handlers; without it those RPCs stay Unimplemented.

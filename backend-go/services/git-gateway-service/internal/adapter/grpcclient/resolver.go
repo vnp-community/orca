@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/stablyai/orca-go/common/grpcmw"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -41,7 +42,7 @@ const repoDispatchPrefix = "repo:"
 type ConnectionResolver struct {
 	client       infrafleetv1.InfraFleetServiceClient
 	projects     usecase.ProjectClient
-	reachability usecase.DevServerReachability
+	reachability usecase.RepoHostRouting
 }
 
 // Dial opens a gRPC client connection to infra-fleet-service at addr — the
@@ -54,7 +55,7 @@ type ConnectionResolver struct {
 // Insecure transport credentials — acceptable for local dev only; see
 // api-gateway's Dial doc comment for the production mTLS gap this mirrors.
 func Dial(addr string) (*grpc.ClientConn, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	conn, err := grpcmw.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return nil, fmt.Errorf("grpcclient: dial infra-fleet-service at %q: %w", addr, err)
 	}
@@ -66,7 +67,7 @@ func Dial(addr string) (*grpc.ClientConn, error) {
 // in tests. projects backs the !Connected path-resolution fallback (SOL-013);
 // reachability backs the !Connected relay-via-dev-server fallback (SOL-014)
 // — see ResolveConnection's doc comment.
-func NewConnectionResolver(client infrafleetv1.InfraFleetServiceClient, projects usecase.ProjectClient, reachability usecase.DevServerReachability) *ConnectionResolver {
+func NewConnectionResolver(client infrafleetv1.InfraFleetServiceClient, projects usecase.ProjectClient, reachability usecase.RepoHostRouting) *ConnectionResolver {
 	return &ConnectionResolver{client: client, projects: projects, reachability: reachability}
 }
 
@@ -135,13 +136,21 @@ func (r *ConnectionResolver) ResolveConnection(ctx context.Context, worktreeID s
 		if err != nil {
 			return ctx, usecase.ResolvedConnection{}, fmt.Errorf("grpcclient: resolving local path for %q: %w", worktreeID, err)
 		}
-		if local.DevServerID != "" {
-			reachable, err := r.reachability.IsReachable(ctx, local.DevServerID)
-			if err != nil {
-				return ctx, usecase.ResolvedConnection{}, fmt.Errorf("grpcclient: checking dev server reachability for %q: %w", worktreeID, err)
+		// Why no silent local fallback: in Docker this process cannot see the
+		// user's disk, so "local" for an unbound/unreachable repo only yields
+		// chdir errors that hide the real cause.
+		devServerID := local.DevServerID
+		if local.HostLookupErr != nil {
+			if !r.reachability.LocalReposAllowed() {
+				return ctx, usecase.ResolvedConnection{}, usecase.ErrHostCheckFailed(local.HostLookupErr)
 			}
-			if reachable {
-				relayCtx := usecase.WithDevServerID(ctx, local.DevServerID)
+		} else {
+			useRelay, err := usecase.RouteRepoHost(ctx, r.reachability, devServerID)
+			if err != nil {
+				return ctx, usecase.ResolvedConnection{}, err
+			}
+			if useRelay {
+				relayCtx := usecase.WithDevServerID(ctx, devServerID)
 				if local.HiddenTargetID != "" {
 					relayCtx = usecase.WithHiddenTargetID(relayCtx, local.HiddenTargetID)
 				}
@@ -174,6 +183,9 @@ type localResolution struct {
 	Path           string
 	DevServerID    string
 	HiddenTargetID string
+	// HostLookupErr is set when the repo's dev server binding could not be
+	// read (GetRepo failed) — the host is unknown, not "unbound".
+	HostLookupErr error
 }
 
 // resolveLocal resolves dispatchID into a real filesystem path (SOL-013)
@@ -208,7 +220,7 @@ func (r *ConnectionResolver) resolveLocal(ctx context.Context, dispatchID string
 	if repoID, path, ok := strings.Cut(dispatchID, "::"); ok {
 		repo, err := r.projects.GetRepo(ctx, repoID)
 		if err != nil {
-			return localResolution{Path: path}, nil
+			return localResolution{Path: path, HostLookupErr: err}, nil
 		}
 		return localResolution{Path: path, DevServerID: repo.DevServerID, HiddenTargetID: repo.HiddenTargetID}, nil
 	}
@@ -225,7 +237,7 @@ func (r *ConnectionResolver) resolveLocal(ctx context.Context, dispatchID string
 	}
 	repo, err := r.projects.GetRepo(ctx, wt.RepoID)
 	if err != nil {
-		return localResolution{Path: wt.Path}, nil
+		return localResolution{Path: wt.Path, HostLookupErr: err}, nil
 	}
 	return localResolution{Path: wt.Path, DevServerID: repo.DevServerID, HiddenTargetID: repo.HiddenTargetID}, nil
 }

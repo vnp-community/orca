@@ -136,6 +136,9 @@ func (r *ApprovalRepository) execAffected(ctx context.Context, sql string, args 
 
 // UpdateDecision writes the new state of the passed approval; a is the post-transition value, so a.Version-1 is not assumed.
 func (r *ApprovalRepository) UpdateDecision(ctx context.Context, a domain.Approval, expectedVersion int64) (bool, error) {
+	if notUUID(a.ID) {
+		return false, nil
+	}
 	ok, err := r.execAffected(ctx, `UPDATE request.approvals
 		SET status = $1, decided_by = $2, decided_at = $3, comment = $4, version = version + 1, updated_at = $5
 		WHERE id = $6 AND tenant_id = $7 AND status = 'pending' AND version = $8`,
@@ -147,6 +150,9 @@ func (r *ApprovalRepository) UpdateDecision(ctx context.Context, a domain.Approv
 }
 
 func (r *ApprovalRepository) UpdateDue(ctx context.Context, a domain.Approval, expectedVersion int64) (bool, error) {
+	if notUUID(a.ID) {
+		return false, nil
+	}
 	ok, err := r.execAffected(ctx, `UPDATE request.approvals
 		SET due_at = $1, reminded_at = NULL, version = version + 1, updated_at = $2
 		WHERE id = $3 AND tenant_id = $4 AND status = 'pending' AND version = $5`,
@@ -158,6 +164,9 @@ func (r *ApprovalRepository) UpdateDue(ctx context.Context, a domain.Approval, e
 }
 
 func (r *ApprovalRepository) MarkReminded(ctx context.Context, tenantID, id string, at time.Time) (bool, error) {
+	if notUUID(id) {
+		return false, nil
+	}
 	ok, err := r.execAffected(ctx, `UPDATE request.approvals SET reminded_at = $1, updated_at = $1
 		WHERE id = $2 AND tenant_id = $3 AND status = 'pending' AND reminded_at IS NULL`, at, id, tenantID)
 	if err != nil {
@@ -180,6 +189,9 @@ func (r *ApprovalRepository) CancelPendingForRequest(ctx context.Context, tenant
 	err := r.scoped(ctx, func(ctx context.Context, ctxTenant string, db dbExecer) error {
 		if ctxTenant != tenantID {
 			return usecase.ErrApprovalNotFound
+		}
+		if notUUID(requestID) {
+			return nil
 		}
 		rows, err := db.Query(ctx, `UPDATE request.approvals
 			SET status = 'cancelled', comment = $1, decided_at = $2, version = version + 1, updated_at = $2

@@ -34,6 +34,8 @@ type fakeTemplateRepository struct {
 	listErr    error
 	resolveErr error
 	updateErr  error
+	// shareTokenErr makes GetByShareToken fail with an arbitrary (e.g. infrastructure) error.
+	shareTokenErr error
 
 	// updateCalls counts Update invocations — update_template_test.go
 	// asserts on this to confirm the cycle check short-circuits before any
@@ -201,6 +203,9 @@ func (f *fakeTemplateRepository) Update(ctx context.Context, tmpl domain.Workflo
 // GetByShareToken scans f.templates for a matching ShareToken — a linear
 // scan is fine for a fake with a handful of fixture rows.
 func (f *fakeTemplateRepository) GetByShareToken(ctx context.Context, shareToken string) (domain.WorkflowTemplate, error) {
+	if f.shareTokenErr != nil {
+		return domain.WorkflowTemplate{}, f.shareTokenErr
+	}
 	for _, t := range f.templates {
 		if t.ShareToken != "" && t.ShareToken == shareToken {
 			return t, nil

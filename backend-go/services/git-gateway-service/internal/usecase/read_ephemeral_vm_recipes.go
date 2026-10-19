@@ -32,13 +32,13 @@ type ReadEphemeralVmRecipesResult struct {
 // desktop's loadHooks' own tolerant parsing (a broken environmentRecipes
 // block must not block reading repo/worktree state elsewhere).
 type ReadEphemeralVmRecipes struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        FilesystemExecutor
 	relay        FilesystemExecutor
 }
 
-func NewReadEphemeralVmRecipes(reachability DevServerReachability, projects ProjectClient, local, relay FilesystemExecutor) *ReadEphemeralVmRecipes {
+func NewReadEphemeralVmRecipes(reachability RepoHostRouting, projects ProjectClient, local, relay FilesystemExecutor) *ReadEphemeralVmRecipes {
 	return &ReadEphemeralVmRecipes{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 var (
 	// ErrEmptyRepoURL is returned by NewRepo when URL is empty — a repo
@@ -45,6 +48,11 @@ type Repo struct {
 	// RepoHookSettings type) — project-service stores/returns it verbatim,
 	// never parses it. Empty = never set. See migrations/0018_repo_hook_settings.
 	HookSettings string
+	// RegistrationKey is the one-location-per-repo guard (see
+	// RepoRegistrationKey and migrations/0032): set by usecases on every new
+	// registration, empty for rows that predate it (stored NULL, never
+	// conflicting) so existing duplicates stay untouched.
+	RegistrationKey string
 }
 
 // NewRepo constructs a Repo, enforcing the invariants a catalog entry must
@@ -55,7 +63,7 @@ func NewRepo(id, projectID, url, displayName, devServerID string) (Repo, error) 
 	if projectID == "" {
 		return Repo{}, ErrEmptyProjectID
 	}
-	if url == "" {
+	if strings.TrimSpace(url) == "" {
 		return Repo{}, ErrEmptyRepoURL
 	}
 	return Repo{ID: id, ProjectID: projectID, URL: url, DisplayName: displayName, DevServerID: devServerID}, nil

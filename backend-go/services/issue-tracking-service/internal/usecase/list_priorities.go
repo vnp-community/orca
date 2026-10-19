@@ -38,7 +38,7 @@ func (uc *ListPriorities) Execute(ctx context.Context, in ListPrioritiesInput) (
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, domain.ProviderJira, in.WorkspaceID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no jira credential available", err)
+		return nil, credentialResolveError(err, "no jira credential available")
 	}
 	priorities, err := provider.ListPriorities(ctx, cred)
 	if err != nil {

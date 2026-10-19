@@ -1,6 +1,6 @@
 # Runbook vận hành luồng Request
 
-**Cập nhật:** 2026-10-08 · Đối chiếu với: [CR-REQ-025 mục 2.8](../../crs/v6/request-quality-rollout/CR-REQ-025-e2e-tests-feature-flag-rollout.md),
+**Cập nhật:** 2026-10-09 · Đối chiếu với: [CR-REQ-025 mục 2.8](../../crs/v6/request-quality-rollout/CR-REQ-025-e2e-tests-feature-flag-rollout.md),
 `backend-go/services/request-service/internal/adapter/metrics/`, `backend-go/deploy/alerts/request.rules.yaml`,
 [CR-REQ-024](../../crs/v6/request-quality-rollout/CR-REQ-024-jira-status-sync-audit-observability.md).
 
@@ -18,10 +18,15 @@
 
 `orca_request_created_total`, `orca_request_transitions_total`, `orca_request_classification_total`, `orca_request_classification_confidence`,
 `orca_request_approvals_total`, `orca_request_approval_wait_seconds`, `orca_request_approvals_pending`, `orca_request_stuck`,
-`orca_request_returned_total`, `orca_request_ai_generation_seconds`, `orca_request_task_outcome_total`, `orca_request_outbox_pending`.
+`orca_request_returned_total`, `orca_request_ai_generation_seconds`, `orca_request_task_outcome_total`, `orca_request_outbox_pending`,
+`orca_request_orphan_total{action}`.
 
 - Ngưỡng `stuck` mặc định: `classifying` 10 phút, `analyzing` 30, `planning` 30. Đổi bằng `REQUEST_STUCK_THRESHOLD_<TRẠNG_THÁI>` (ví dụ
   `REQUEST_STUCK_THRESHOLD_CLASSIFYING=15m`). Chu kỳ lấy mẫu gauge: `REQUEST_METRICS_SAMPLE_INTERVAL` (mặc định 30s).
+- `orca_request_orphan_total{action}` đếm số lần một thao tác nhắm vào Request đang có mà project của nó không còn (`action` là nhóm RPC, không có
+  tenant hay id). Nó đếm lượt chạm, không phải số Request khác nhau: giao diện poll một Request mồ côi sẽ làm số tăng đều, nên cảnh báo theo tốc độ
+  tăng khác 0 chứ không theo giá trị tuyệt đối. Chỉ nhìn Request của tenant người gọi, không quét xuyên tenant, và chỉ chạy khi có
+  `PROJECT_INTERNAL_CALLER_TOKEN` (không có token thì không đếm).
 - **Chưa có** số liệu `orca_request_ai_generation_seconds` cho solution/plan và `orca_request_task_outcome_total` cho tới khi các CR đó gọi bộ quan sát
   (CR-REQ-007/008/012/013). Hiện chỉ phân loại có số liệu AI; `task_outcome` luôn rỗng.
 
@@ -46,15 +51,18 @@ Trạng thái Jira đã chuyển không tự lùi.
 | Triệu chứng | Kiểm | Lệnh / nơi xem | Xử lý |
 |---|---|---|---|
 | Request kẹt `classifying` | `orca_request_stuck{status="classifying"}`, `orca_request_ai_generation_seconds`, `orca_request_classification_total` | `/metrics`; log `request-service` tìm "request classification failed" (có lý do: no dev server connected, classifier timeout, invalid classifier output) | kiểm `ai-provider-service` và dev server agent đang kết nối (đường `ai.complete` qua `infra-fleet-service`); gọi lại `ClassifyRequest` (kênh `request.classify`); tối đa 5 lần mỗi Request, quá thì dùng `ChangeRequestType` để người chọn loại hoặc `ReturnToBacklog` |
-| Request kẹt `analyzing` / `planning` | `orca_request_stuck{status=...}` | `/metrics`, `GetRequestFlow` | **Hiện là bình thường**: các giai đoạn Solution/Plan chưa có (CR-REQ-007/008/012). Dùng `ReturnToBacklog` hoặc `CancelRequest` nếu cần dọn |
+| Request kẹt `analyzing` / `planning` | `orca_request_stuck{status=...}` | `/metrics`, `GetRequestFlow`; kênh `solution.list` (các run của Solution, có `status` và `errorCode`) hoặc `request.planProposal {id, runId}` | Bình thường nếu đang chờ người gọi `GenerateSolution` / `GeneratePlan`, chọn option hoặc duyệt. Run `failed` kèm `REQUEST_AI_*`: sửa AI trên dev server (đăng nhập Claude Code hoặc đặt khoá API) rồi tạo run mới; Request không đổi trạng thái khi run hỏng. Dọn bằng `ReturnToBacklog` hoặc `CancelRequest` |
 | Sự kiện không tới `issue-status-sync` | `orca_request_outbox_pending`, consumer JetStream, `orca_issuesync_request_events_total{result}` | `/metrics` của cả hai service; log `issue-status-sync` | kiểm NATS; `result=skipped_*` cho biết lý do (`skipped_no_actor`, `skipped_transition_unavailable`, `skipped_request_owned`, `skipped_stale`, `skipped_not_jira`, `skipped_category`) |
 | Jira không chuyển | `result=skipped_no_actor`, `skipped_transition_unavailable`, `skipped_request_owned` | `/metrics` của `issue-status-sync`; log | kết nối Jira của người dùng; workflow Jira có đúng tên trạng thái cấu hình (`ISSUE_SYNC_JIRA_STATUS_IN_PROGRESS` / `_DONE`) không. `skipped_request_owned` là đúng thiết kế khi issue có Request chưa kết thúc |
 | Lookup Request từ `issue-status-sync` lỗi | `result=failed` | log `issue-status-sync`; kiểm `REQUEST_SERVICE_ADDR`, `REQUEST_SERVICE_INTERNAL_TOKEN` khớp `SERVICE_INTERNAL_TOKEN` của `request-service` | sự kiện được giao lại tối đa 3 lần rồi bỏ; sửa cấu hình rồi đồng bộ lại bằng tay (Jira đổi tay) |
 | Approval chất đống | `orca_request_approvals_pending` theo `subject_type`, `orca_request_approval_wait_seconds` | `/metrics`; hộp duyệt (`approval.listPending`) | báo người duyệt; kiểm `REQUEST_APPROVAL_ENABLED` (compose dev mặc định `false`); Approval quá hạn do bộ quét (`REQUEST_APPROVAL_SWEEP_INTERVAL`) tự hết hạn và đưa Request về backlog; có thể `ExtendApproval` |
 | Duyệt bị từ chối (`REQUEST_APPROVAL_NOT_APPROVER`, `..._SELF_APPROVAL_FORBIDDEN`) | audit `approval.approve` với `outcome=denied` | audit log | xem chính sách người duyệt ([Phê duyệt](./approving-requests.md)); admin sửa bằng `UpsertApprovalPolicy` |
-| Mở Approval báo `REQUEST_APPROVAL_SUBJECT_UNAVAILABLE` | log khởi động "approval subject has no backing service bound" | log `request-service` | **Hiện là bình thường** cho mọi cổng trừ `request_type` (chưa có handler) |
+| Mở Approval báo `REQUEST_APPROVAL_SUBJECT_UNAVAILABLE` | log khởi động "approval subject has no backing service bound" | log `request-service` | Không mong đợi trên cấu hình chuẩn (cả 8 cổng có handler). Gặp thì kiểm `TASK_SERVICE_ADDR` và log khởi động |
+| Request mồ côi (project đã bị xoá) | `orca_request_orphan_total` tăng | `python3 tests/stages/e2e/orca-flows/report_orphan_requests.py` (chỉ đọc, qua gateway) | Request mồ côi vẫn tính vào hạn mức tenant. Người có thẩm quyền duyệt danh sách rồi chạy lại với `--cancel`: huỷ có lý do `orphan_project`, không xoá dữ liệu |
+| Thông báo duyệt không tới, log lặp "approval notification enrichment failed" | log `request-service`; `/readyz` | `AUTH_DIRECTORY_CALLER_TOKEN` phải giống nhau ở `auth-service` và `request-service` (`deploy/dev/scripts/ensure-request-env.sh` sinh khi thiếu) | Lỗi cấu hình vĩnh viễn chỉ giữ dòng lỗi (log ERROR tối đa 1 lần/phút), các sự kiện khác vẫn đi; dòng được giao khi cấu hình sửa xong. Lỗi tạm thời (auth-service sập) giữ nguyên thứ tự và tự thử lại |
+| Request kẹt `classifying` sau khi AI đề xuất `hotfix` / `security` | — | — | Đã sửa: khi không có người duyệt hợp lệ (ví dụ tenant một người dùng), phân loại vẫn chuyển sang `awaiting_type_confirmation` mà không mở Approval `request_type`; người báo xác nhận loại trực tiếp (`ConfirmRequestType`). Request kẹt từ bản cũ: `ClassifyRequest` lại hoặc `ChangeRequestType` |
 | Lệnh báo `REQUEST_FLOW_DISABLED` | `GetRequestFlowSettings` | kênh `request.flowStatus` | cần cả `REQUEST_FLOW_ENABLED=true` và cài đặt tenant bật ([Bật luồng](./admin-enable-request-flow.md)) |
-| Phase / task không chạy | `orca_request_task_outcome_total`, lease của `task-service` | `/metrics`; log `task-service` | **Chưa có** đường thực thi từ Request (CR-REQ-013); chưa áp dụng được |
+| Phase / task không chạy | `orca_request_task_outcome_total`, lease của `task-service` | `/metrics`; log `task-service`; kênh `backlog.execute` | Đường thực thi (`StartPhase`, `ReportTaskOutcome`) đã nối nhưng **chưa được e2e chạy trên stack thật**; kiểm Approval cổng `plan`/`phase` đã được duyệt và dev server còn kết nối |
 | Outbox đầy | `orca_request_outbox_pending` tăng liên tục | `/metrics`; log relay outbox của `request-service`; NATS | kiểm NATS còn sống và stream tồn tại; Jira sync, thông báo, audit trễ tới khi relay hồi phục |
 
 ## Diễn tập rollback

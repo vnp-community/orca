@@ -23,8 +23,8 @@ type OAuthConfig struct {
 	DCRMaxClients   int
 	// InternalCallerToken guards the mcp-service-only RPCs.
 	InternalCallerToken string
-	// McpPrincipalCallerToken (optional) guards ResolveMcpPrincipal, which only
-	// api-gateway calls. Empty keeps the RPC open (rollout-safe default).
+	// McpPrincipalCallerToken guards ResolveMcpPrincipal, which only api-gateway
+	// calls. Empty refuses every call (the guard fails closed).
 	McpPrincipalCallerToken string
 }
 

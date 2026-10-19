@@ -1,5 +1,13 @@
 # BACKLOG-022: Automation/VM-lifecycle "agent finished" trigger — needs a product decision, not more code
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — chờ quyết định** · Backlog ship: SHIP-WF-03
+>
+> Không đổi; cần quyết định giữa lọc `AgentDetector` hay dùng PTY-exit/RPC-response.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/frontend/crs/v4/automation/tasks/FE-TASK-AUTO-007-agent-session-signal-investigation.md` (FE-AUTO-SOL-005, CR-AUTO-005)
 **Priority:** Medium — no current feature is broken; this blocks a *future* automation/ephemeral-VM trigger type from being built correctly
 **Blocked on:** **A product decision** between two mitigation designs (see below) — this is explicitly an investigation-only task; the AI executing it was instructed not to write code

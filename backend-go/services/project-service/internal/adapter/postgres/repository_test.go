@@ -9,6 +9,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -274,5 +275,19 @@ func TestRepository_List_ValidCursor_ReturnsNextPage(t *testing.T) {
 	}
 	if len(secondPage) != 1 {
 		t.Errorf("expected 1 remaining project on the second page, got %d", len(secondPage))
+	}
+}
+
+// A malformed id names nothing: it must read as "not found", not as a Postgres bind failure (Internal).
+func TestRepository_MalformedIDIsNotFound(t *testing.T) {
+	repo := New(setupPool(t))
+	ctx := context.Background()
+	for _, bad := range []string{"", "not-a-uuid", "p1"} {
+		if _, err := repo.Get(ctx, uuid.NewString(), bad); !errors.Is(err, domain.ErrProjectNotFound) {
+			t.Errorf("Get(%q) = %v, want ErrProjectNotFound", bad, err)
+		}
+		if _, err := repo.GetMembership(ctx, bad, uuid.NewString()); !errors.Is(err, domain.ErrMembershipNotFound) {
+			t.Errorf("GetMembership(%q) = %v, want ErrMembershipNotFound", bad, err)
+		}
 	}
 }

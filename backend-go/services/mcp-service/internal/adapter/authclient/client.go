@@ -33,7 +33,7 @@ const DefaultTimeout = 5 * time.Second
 // Dial opens the connection to auth-service. Insecure transport matches every
 // other internal dialer in this repo (mesh mTLS is a known cross-cutting gap).
 func Dial(addr, internalToken string) (*grpc.ClientConn, error) {
-	return grpc.NewClient(addr,
+	return grpcmw.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithChainUnaryInterceptor(internalcaller.ClientInterceptor(internalToken)))
 }

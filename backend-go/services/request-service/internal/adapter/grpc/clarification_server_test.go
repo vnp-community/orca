@@ -345,3 +345,17 @@ func TestClarificationMapper_RoundTrip_AllKinds(t *testing.T) {
 		}
 	}
 }
+
+func TestToProtoClarification_ValueTypeFollowsTheTargetField(t *testing.T) {
+	v := usecase.ClarificationView{Clarification: domain.Clarification{Questions: []domain.ClarificationQuestion{
+		{QuestionKey: "type_fields.time_box_hours", Kind: domain.QuestionKindText, TargetPath: "type_fields.time_box_hours"},
+		{QuestionKey: "type_fields.data_exposed", Kind: domain.QuestionKindBoolean, TargetPath: "type_fields.data_exposed"},
+		{QuestionKey: "free", Kind: domain.QuestionKindText},
+	}}}
+	got := toProtoClarification(v).GetQuestions()
+	for i, want := range []string{"number", "boolean", "string"} {
+		if got[i].GetValueType() != want {
+			t.Errorf("question %d value_type = %q, want %q", i, got[i].GetValueType(), want)
+		}
+	}
+}

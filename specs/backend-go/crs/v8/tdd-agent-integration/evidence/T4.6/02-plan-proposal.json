@@ -1,0 +1,373 @@
+{
+  "bundle": {
+    "branch": "request/1235-proposal",
+    "changeId": "req-1235-bl-h02-ai-sinh-test-case",
+    "commit": "17db42965f3a8924c571e972488c3aefea7570c8",
+    "files": [
+      { "omitted": false, "path": ".openspec.yaml", "size": "40" },
+      { "omitted": false, "path": "design.md", "size": "11778" },
+      { "omitted": false, "path": "proposal.md", "size": "7006" },
+      { "omitted": false, "path": "specs/case-ai-config/spec.md", "size": "2580" },
+      { "omitted": false, "path": "specs/case-ai-generation/spec.md", "size": "6348" },
+      { "omitted": false, "path": "tasks.md", "size": "19863" }
+    ],
+    "status": "ready",
+    "syncAttempts": 0,
+    "syncError": "",
+    "syncState": "in_sync",
+    "tasksMdDigest": "62ca3811526d7ca0f9555efad787bd73688fbf562ea1e96c9f2f12e478429aaa"
+  },
+  "checks": [
+    {
+      "code": "STRUCTURE_OK",
+      "message": "the change passed the structure checks and openspec validate --strict",
+      "severity": "info",
+      "where": ""
+    },
+    {
+      "code": "KNOWLEDGE_CONFLICT",
+      "message": "FR-SYS-07 requires 501 for chat/transform while ADR-12, BRL-64 and NFR-CO-02 forbid 501 routes (ADR-12 records it as exception OI-02); this change removes the exception for the case AI routes",
+      "severity": "warning",
+      "where": "design.md"
+    }
+  ],
+  "elapsedMs": 981591,
+  "engine": "openspec",
+  "knowledge": {
+    "available": true,
+    "conflicts": [
+      "FR-SYS-07 requires 501 for chat/transform while ADR-12, BRL-64 and NFR-CO-02 forbid 501 routes (ADR-12 records it as exception OI-02); this change removes the exception for the case AI routes"
+    ],
+    "gaps": [
+      "OQ-1 FR-SYS-07 row revision needs an approver",
+      "OQ-2 case_ai_config and its three mandatory fields are undocumented in SRS/URD",
+      "OQ-3 no performance target for LLM-calling routes",
+      "OQ-4 case_ai_config outside the data stores SVC-03 lists",
+      "OQ-5 no entity owns the case-level AI config (ENT-17 is system-setting)",
+      "OQ-6 AC-1 measured on mock-ext, not a real LLM (ENV B10)",
+      "OQ-7 behaviour when one block of a batch fails to transform"
+    ],
+    "read": [
+      "FR-SYS-07",
+      "FR-CAS-01",
+      "FR-CAS-02",
+      "FR-CAS-03",
+      "FR-CAS-07",
+      "FR-CAS-12",
+      "FR-SYS-04",
+      "BO-02",
+      "BRL-20",
+      "BRL-21",
+      "BRL-63",
+      "BRL-64",
+      "ADR-06",
+      "ADR-12",
+      "INT-01",
+      "INT-03",
+      "INT-07",
+      "NFR-AU-01",
+      "NFR-CO-01",
+      "NFR-CO-02",
+      "NFR-DA-04",
+      "NFR-PE-01",
+      "ENT-17",
+      "SVC-03"
+    ],
+    "skillHash": "tdd-knowledge=73479f58b433845b,tdd-knowledge-writeback=e15c01cffeca2a36,tdd-openspec-author=64886850ab424106,tdd-orca-task=48e7b440903300b8",
+    "snapshot": "snap-000001"
+  },
+  "proposal": {
+    "phases": [
+      {
+        "description": "Giao một package thuần, không phụ thuộc service nào: system prompt bắt buộc marker, bộ tách khối, JSON schema và bộ kiểm tra. Xong khi `go test` của package xanh và không package nào khác phải sửa.",
+        "tasks": [
+          {
+            "description": "Serves: FR-SYS-07, BO-02, NFR-CO-01\nCode: create `backend/shared/pkg/aiprompt/prompt.go::CaseChatSystemPrompt`\nVerify: AC-1 mô tả tính năng qua chat rồi chuyển đổi nhận ít nhất 10 test case hợp lệ via `go test -C backend/shared/pkg ./aiprompt/...`\nDone when: prompt sinh ra nêu rõ marker, số case tối thiểu và áp `designConfig`/`templateConfig` được truyền vào; không import package nào của service.",
+            "estimatedHours": 3,
+            "labels": ["spec:t1.1"],
+            "promptTemplate": "You are implementing task T1.1 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Thêm package `aiprompt` với hằng marker và `CaseChatSystemPrompt(lang, cfg, projectCtx)` bắt buộc định dạng `featureCaseStart/caseExpand/featureCaseEnd`"
+          },
+          {
+            "description": "Serves: FR-SYS-07, BO-02\nCode: create `backend/shared/pkg/aiprompt/blocks.go::ParseCaseBlocks`\nVerify: Phản hồi không có marker được giữ nguyên via `go test -C backend/shared/pkg ./aiprompt/...`\nDone when: chuỗi không có marker trả về 0 khối (không lỗi, không đoán); khối thiếu `featureCaseEnd` bị bỏ qua có lý do rõ ràng trong test.",
+            "estimatedHours": 2.5,
+            "labels": ["spec:t1.2"],
+            "promptTemplate": "You are implementing task T1.2 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Thêm `ParseCaseBlocks(s) []Block{Title,Body}` chịu được khoảng trắng, `##` và khối thiếu `featureCaseEnd`"
+          },
+          {
+            "description": "Serves: FR-CAS-02, FR-SYS-07\nCode: create `backend/shared/pkg/aiprompt/transform.go::ValidateTransform`\nVerify: AC-3 JSON sai định dạng thì thử lại một lần rồi trả lỗi và không lưu case nào via `go test -C backend/shared/pkg ./aiprompt/...`\nDone when: `ValidateTransform` trả lỗi nêu tên trường sai cho từng trường hợp (tên quá dài, 0 bước với `STEP`, trường rỗng) và `CaseTransformSchema` là JSON schema dùng được cho JSON mode.",
+            "estimatedHours": 3,
+            "labels": ["spec:t1.3"],
+            "promptTemplate": "You are implementing task T1.3 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-3; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Thêm `CaseTransformSchema` và `ValidateTransform` (tên ≤ 255, ≥ 1 bước khi `STEP`, loại chuỗi rỗng)"
+          },
+          {
+            "dependsOnIndices": [0, 1, 2],
+            "description": "Serves: FR-SYS-07, FR-CAS-02\nCode: create `backend/shared/pkg/aiprompt/aiprompt_test.go::TestParseCaseBlocks`\nVerify: AC-1 mô tả tính năng qua chat rồi chuyển đổi nhận ít nhất 10 test case hợp lệ via `go test -C backend/shared/pkg ./aiprompt/...`\nDone when: test bao phủ 10 khối hợp lệ, không marker, thiếu `featureCaseEnd`, JSON hỏng và JSON hợp lệ; `go test` xanh.",
+            "estimatedHours": 2.5,
+            "labels": ["test:regression", "spec:t1.4"],
+            "promptTemplate": "You are implementing task T1.4 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-3; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Viết test bảng cho `aiprompt` (prompt, tách khối, kiểm tra schema)"
+          }
+        ],
+        "title": "Thư viện prompt, marker và schema trong `shared/pkg/aiprompt`"
+      },
+      {
+        "dependsOnPhaseIndices": [0],
+        "description": "Giao cấu hình đúng hình dạng UI (`CaseAiChatConfig`), lưu trong bảng của case-management, có mặc định tài liệu hoá và lỗi theo trường. Xong khi `GET`/`POST …/config` chạy không cần Redis và `dbown` xanh.",
+        "tasks": [
+          {
+            "description": "Serves: ADR-06, INT-01\nCode: create `backend/services/qa-core/case-management/migrations/V025__case_ai_config.sql::case_ai_config`\nVerify: Chưa lưu cấu hình thì trả mặc định tài liệu hoá via `go test -C backend/services/qa-core/case-management ./migrations/...`\nDone when: bảng `case_ai_config(user_id, project_id, config JSON, update_time, PRIMARY KEY(user_id,project_id))` tạo bằng `CREATE TABLE IF NOT EXISTS`, số phiên bản không gap, và `go test -C backend/tools/dbown ./...` xanh.",
+            "estimatedHours": 1.5,
+            "labels": ["spec:t2.1"],
+            "promptTemplate": "You are implementing task T2.1 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Thêm migration `V025__case_ai_config.sql` và khai báo bảng `case_ai_config` trong `backend/db/ownership.yaml`"
+          },
+          {
+            "description": "Serves: NFR-CO-01, FR-SYS-07\nCode: modify `backend/services/qa-core/case-management/internal/domain/ai.go::CaseAiChatConfig`\nVerify: Chưa lưu cấu hình thì trả mặc định tài liệu hoá via `go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: `DefaultCaseAiChatConfig()` trả `caseEditType='STEP'` với `caseName/caseSteps/expectedResult` bật, các tuỳ chọn còn lại tắt; `domain.AIConfig` và `domain.AIGenerateRequest` cũ không còn được tham chiếu.",
+            "estimatedHours": 2,
+            "labels": ["spec:t2.2"],
+            "promptTemplate": "You are implementing task T2.2 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Thay `domain.AIConfig` bằng `CaseAiChatConfig{designConfig, templateConfig}` kèm hàm mặc định tài liệu hoá"
+          },
+          {
+            "dependsOnIndices": [0, 1],
+            "description": "Serves: ADR-06, INT-01\nCode: create `backend/services/qa-core/case-management/internal/repository/mysql/case_ai_config.go::CaseAIConfigRepository`\nVerify: Cấu hình đã lưu được đọc lại nguyên trạng via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/repository/mysql/... -run TestCaseAIConfig`\nDone when: upsert ghi đúng một dòng cho mỗi `(user_id, project_id)`; đọc dự án khác hoặc người dùng khác không thấy cấu hình của nhau.",
+            "estimatedHours": 2.5,
+            "labels": ["spec:t2.3"],
+            "promptTemplate": "You are implementing task T2.3 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Thêm repository MySQL đọc/ghi `case_ai_config` theo khoá `(user_id, project_id)`"
+          },
+          {
+            "dependsOnIndices": [2],
+            "description": "Serves: FR-SYS-07, NFR-CO-01\nCode: modify `backend/services/qa-core/case-management/internal/usecase/ai/ai.go::SaveConfig`\nVerify: AC-5 thiếu một trong ba trường bắt buộc thì từ chối kèm lỗi cấu hình rõ ràng via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: `repository.RedisClient` không còn xuất hiện trong `internal/usecase/ai`; lỗi trả về nêu tên trường còn thiếu; `GET` trả mặc định khi chưa có dòng nào.",
+            "estimatedHours": 3,
+            "labels": ["spec:t2.4"],
+            "promptTemplate": "You are implementing task T2.4 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Viết lại `GetConfig`/`SaveConfig` và handler theo hợp đồng UI, từ chối theo trường khi thiếu ba trường bắt buộc, bỏ nhánh Redis"
+          },
+          {
+            "dependsOnIndices": [3],
+            "description": "Serves: FR-SYS-07\nCode: create `backend/services/qa-core/case-management/internal/usecase/ai/config_test.go::TestCaseAIConfigRequiredFields`\nVerify: Lưu cấu hình thiếu trường bắt buộc bị chặn ngay khi lưu via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: ba ca thiếu `caseName`, thiếu `caseSteps`, thiếu `expectedResult` đều bị chặn và bảng không có thay đổi; `go test` xanh.",
+            "estimatedHours": 2.5,
+            "labels": ["test:regression", "spec:t2.5"],
+            "promptTemplate": "You are implementing task T2.5 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Viết test cấu hình: mặc định, lưu/đọc lại, từ chối theo từng trường bắt buộc"
+          }
+        ],
+        "title": "`case_ai_config` sang MySQL với ba trường bắt buộc"
+      },
+      {
+        "dependsOnPhaseIndices": [1],
+        "description": "Giao đường chat thật qua một interface có `fake`, cùng cờ `AI_ENABLED`. Xong khi `POST /functional/case/ai/chat` trả chuỗi markdown có marker trong test và không còn `NotImplemented` cho chat.",
+        "tasks": [
+          {
+            "description": "Serves: FR-SYS-07, ADR-12\nCode: create `backend/services/qa-core/case-management/internal/usecase/ai/gate.go::Gate`\nVerify: Cờ AI tắt thì route từ chối rõ ràng via `go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: interface không import `shared/pkg/aiclient` (chưa tồn tại) và `usecase/ai` biên dịch chỉ với interface.",
+            "estimatedHours": 2,
+            "labels": ["spec:t3.1"],
+            "promptTemplate": "You are implementing task T3.1 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Khai báo interface `Gate` (`Chat`, `ResolveModel`, `AppendTurn`, `ListMessages`) làm điểm nối duy nhất tới `aiclient` của CR-H01"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: FR-SYS-07\nCode: create `backend/services/qa-core/case-management/internal/usecase/ai/fake.go::FakeGate`\nVerify: Phản hồi không có marker được giữ nguyên via `go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: `FakeGate` đếm số lần gọi (để test retry) và chọn được kịch bản trả về theo từng ca test.",
+            "estimatedHours": 2,
+            "labels": ["spec:t3.2"],
+            "promptTemplate": "You are implementing task T3.2 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Thêm `FakeGate` trả chuỗi/JSON dựng sẵn (marker đúng, thiếu `featureCaseEnd`, JSON hỏng) cho test"
+          },
+          {
+            "description": "Serves: ADR-12, BRL-64, NFR-CO-02\nCode: modify `backend/services/qa-core/case-management/internal/config/config.go::LoadConfig`\nVerify: Cờ AI tắt thì route từ chối rõ ràng via `go test -C backend/services/qa-core/case-management ./internal/handler/... -run TestAIRoutes`\nDone when: `AI_ENABLED=false` ⇒ cả năm route AI trả 503 có thông điệp và không gọi `Gate`; route vẫn được mount (UI-frozen).",
+            "estimatedHours": 2.5,
+            "labels": ["spec:t3.3"],
+            "promptTemplate": "You are implementing task T3.3 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Thêm cờ `AI_ENABLED` vào config và cổng 503 cho nhóm route `/functional/case/ai`"
+          },
+          {
+            "dependsOnIndices": [0, 2],
+            "description": "Serves: FR-SYS-07, BO-02, NFR-CO-01\nCode: modify `backend/services/qa-core/case-management/internal/usecase/ai/ai.go::Chat`\nVerify: AC-1 mô tả tính năng qua chat rồi chuyển đổi nhận ít nhất 10 test case hợp lệ via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: `Chat` dùng `aiprompt.CaseChatSystemPrompt` với cấu hình đã kiểm, trả `data` là chuỗi (không `text/event-stream`), và `httpx.NotImplemented` không còn trong `Chat`.",
+            "estimatedHours": 4,
+            "labels": ["spec:t3.4"],
+            "promptTemplate": "You are implementing task T3.4 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Viết lại `Chat` trả chuỗi markdown theo hợp đồng UI (bind `{prompt, chatModelId, conversationId, organizationId}`, bỏ SSE)"
+          },
+          {
+            "dependsOnIndices": [3],
+            "description": "Serves: FR-SYS-07, NFR-CO-01\nCode: create `backend/services/qa-core/case-management/internal/usecase/ai/chat_test.go::TestChatReturnsMarkdownBlocks`\nVerify: AC-1 mô tả tính năng qua chat rồi chuyển đổi nhận ít nhất 10 test case hợp lệ via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: test chứng minh `Chat` gọi `Gate` đúng một lần, trả ≥ 10 khối với `FakeGate` chuẩn, và bị chặn khi cấu hình thiếu trường; `go test` xanh.",
+            "estimatedHours": 3,
+            "labels": ["test:regression", "spec:t3.5"],
+            "promptTemplate": "You are implementing task T3.5 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-5; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Viết test chat: marker đúng, không marker, cờ tắt, cấu hình thiếu trường bắt buộc"
+          }
+        ],
+        "title": "Cổng AI có bản fake và chat trả chuỗi markdown"
+      },
+      {
+        "dependsOnPhaseIndices": [2],
+        "description": "Giao đường chuyển đổi một khối thành `AiCaseTransformResult`, thử lại một lần rồi 502, không ghi gì. Xong khi test chứng minh đúng hai lần gọi mô hình và không có case nào được tạo.",
+        "tasks": [
+          {
+            "description": "Serves: FR-CAS-02, FR-SYS-07, NFR-CO-01\nCode: modify `backend/services/qa-core/case-management/internal/usecase/ai/ai.go::Transform`\nVerify: JSON hỏng ở lần đầu nhưng đúng ở lần thử lại via `go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: `num` của bước bắt đầu từ 1, `id` là UUID cục bộ, `caseEditType` lấy từ `templateConfig`, và kết quả đi qua `aiprompt.ValidateTransform`.",
+            "estimatedHours": 4,
+            "labels": ["spec:t4.1"],
+            "promptTemplate": "You are implementing task T4.1 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Gọi JSON mode theo `CaseTransformSchema` và map sang `AiCaseTransformResult` với `stepDescription[{id,num,desc,result}]`"
+          },
+          {
+            "dependsOnIndices": [0],
+            "description": "Serves: FR-SYS-07, ADR-12\nCode: modify `backend/services/qa-core/case-management/internal/usecase/ai/ai.go::transformOnce`\nVerify: AC-3 JSON sai định dạng thì thử lại một lần rồi trả lỗi và không lưu case nào via `go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: số lần gọi `Gate` đúng bằng 2 khi cả hai lần sai; lỗi trả về 502 mang thông điệp của provider (đã che khoá); không có lệnh ghi nào trong đường mã này.",
+            "estimatedHours": 2.5,
+            "labels": ["spec:t4.2"],
+            "promptTemplate": "You are implementing task T4.2 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-3; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Thử lại đúng một lần kèm chỉ dẫn \"chỉ trả JSON\", vẫn sai thì 502 với thông điệp thật và không ghi gì"
+          },
+          {
+            "dependsOnIndices": [1],
+            "description": "Serves: FR-SYS-07, FR-CAS-02\nCode: create `backend/services/qa-core/case-management/internal/usecase/ai/transform_test.go::TestTransformRetriesOnce`\nVerify: AC-3 JSON sai định dạng thì thử lại một lần rồi trả lỗi và không lưu case nào via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: ba ca trên xanh và ca \"hỏng cả hai lần\" khẳng định `SELECT count(*)` của `functional_cases` không đổi.",
+            "estimatedHours": 3,
+            "labels": ["test:regression", "spec:t4.3"],
+            "promptTemplate": "You are implementing task T4.3 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-3; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Viết test transform: JSON hợp lệ, hỏng rồi đúng, hỏng cả hai lần (đếm số lần gọi và số case)"
+          }
+        ],
+        "title": "`Transform` theo JSON schema với đúng một lần thử lại"
+      },
+      {
+        "dependsOnPhaseIndices": [3],
+        "description": "Giao `batch/save` thật: chặn giới hạn trước mọi lời gọi LLM, tạo toàn bộ case trong một giao dịch với một lần cấp số, ghi audit. Xong khi test rollback và test giới hạn chứng minh không có case nào sót lại.",
+        "tasks": [
+          {
+            "description": "Serves: FR-CAS-07, FR-SYS-07\nCode: modify `backend/services/qa-core/case-management/internal/usecase/ai/ai.go::BatchSave`\nVerify: AC-4 yêu cầu vượt giới hạn bị từ chối và không có case nào được lưu via `go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: 21 khối ⇒ 400 nêu rõ giới hạn, `FakeGate` đếm 0 lần gọi; đúng 20 khối/100 case vẫn được chấp nhận.",
+            "estimatedHours": 3,
+            "labels": ["spec:t5.1"],
+            "promptTemplate": "You are implementing task T5.1 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-4; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Chặn \u003e 20 khối hoặc \u003e 100 case bằng 400 ngay sau `ParseCaseBlocks`, trước mọi lời gọi mô hình và mọi lệnh ghi"
+          },
+          {
+            "description": "Serves: INT-03, NFR-DA-04, FR-CAS-02\nCode: create `backend/services/qa-core/case-management/internal/repository/mysql/case_ai_batch.go::CreateManyWithValues`\nVerify: AC-6 lỗi giữa chừng thì không có case nào của lần lưu đó tồn tại via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/repository/mysql/... -run TestCreateManyWithValues`\nDone when: toàn bộ lệnh ghi dùng handle giao dịch được truyền vào; lỗi ở phần tử thứ k làm rollback toàn bộ lô.",
+            "estimatedHours": 4,
+            "labels": ["spec:t5.2"],
+            "promptTemplate": "You are implementing task T5.2 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-2, AC-6; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Thêm hàm repository tạo lô case + blob + custom values bằng `CreateInBatches` trong một giao dịch, theo mẫu `CopyCases`"
+          },
+          {
+            "dependsOnIndices": [1],
+            "description": "Serves: INT-03, NFR-DA-04, FR-CAS-03, BRL-21, BRL-63\nCode: create `backend/services/qa-core/case-management/internal/usecase/case/batch_add.go::AddMany`\nVerify: Một sự kiện nhập thay cho nhiều sự kiện tạo via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/usecase/case/... -run TestAddMany`\nDone when: `AllocNums` được gọi đúng một lần cho cả lô, `num` liên tục không trùng, outbox có đúng một `case.imported` với `count = n` và không có `case.created`.",
+            "estimatedHours": 4,
+            "labels": ["spec:t5.3"],
+            "promptTemplate": "You are implementing task T5.3 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-2, AC-6; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Thêm `AddMany`: một `ev.Do`, một `AllocNums(projectID, n)`, lịch sử trong cùng tx, một `case.imported` thay N `case.created`"
+          },
+          {
+            "dependsOnIndices": [0, 2],
+            "description": "Serves: FR-SYS-07, FR-CAS-02, NFR-CO-01\nCode: modify `backend/services/qa-core/case-management/internal/usecase/ai/ai.go::BatchSave`\nVerify: AC-2 lưu hàng loạt các case đã chọn thành công trong một giao dịch và có audit via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/usecase/ai/...`\nDone when: một khối transform lỗi ⇒ cả lô bị từ chối và không ghi gì (OQ-7 của design.md); `grep -rn \"NotImplemented\" internal/usecase/ai` không còn kết quả.",
+            "estimatedHours": 3.5,
+            "labels": ["spec:t5.4"],
+            "promptTemplate": "You are implementing task T5.4 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-2, AC-4, AC-6; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Viết lại `BatchSave`: transform các khối (song song ≤ 4) ngoài giao dịch rồi gọi `AddMany` một lần"
+          },
+          {
+            "dependsOnIndices": [2],
+            "description": "Serves: NFR-AU-01, INT-07, FR-SYS-04\nCode: modify `backend/services/qa-core/case-management/internal/usecase/case/batch_add.go::AddMany`\nVerify: AC-2 lưu hàng loạt các case đã chọn thành công trong một giao dịch và có audit via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/usecase/case/... -run TestAudit`\nDone when: một lần `batch/save` sinh đúng một dòng `operation_log` (INSERT-only) kèm chi tiết thay đổi của từng case; lô bị rollback không để lại dòng chi tiết nào.",
+            "estimatedHours": 2,
+            "labels": ["spec:t5.5"],
+            "promptTemplate": "You are implementing task T5.5 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-2; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "feature",
+            "title": "Ghi chi tiết thay đổi cho từng case bằng `audit.RecordAdded` và khẳng định route khớp `routeTable` module `FUNCTIONAL_CASE`"
+          },
+          {
+            "dependsOnIndices": [3, 4],
+            "description": "Serves: FR-SYS-07, NFR-AU-01, NFR-DA-04\nCode: create `backend/services/qa-core/case-management/internal/usecase/ai/batch_save_test.go::TestBatchSaveIsAllOrNothing`\nVerify: AC-6 lỗi giữa chừng thì không có case nào của lần lưu đó tồn tại via `TEST_MYSQL_DSN=$TEST_MYSQL_DSN go test -C backend/services/qa-core/case-management ./internal/usecase/...`\nDone when: cả ba ca xanh với `REQUIRE_DB=1` (không skip) và `go test` của service xanh.",
+            "estimatedHours": 4,
+            "labels": ["test:regression", "spec:t5.6"],
+            "promptTemplate": "You are implementing task T5.6 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-2, AC-4, AC-6; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Viết test lưu hàng loạt: 21 khối ⇒ 400 và số case không đổi, lỗi ở case thứ 5 ⇒ 0 dòng, lô thành công ⇒ audit và `num` liên tục"
+          }
+        ],
+        "title": "Lưu hàng loạt: giới hạn vào cổng, một giao dịch, audit"
+      },
+      {
+        "dependsOnPhaseIndices": [4],
+        "description": "Giao bằng chứng ở mức API và giao diện trên stack local (mock-ext OpenAI), cùng bản sửa tài liệu cho yêu cầu đã đổi. Xong khi suite tích hợp và e2e của tính năng này xanh và dòng FR-SYS-07 đã được cập nhật.",
+        "tasks": [
+          {
+            "description": "Serves: FR-SYS-07, FR-CAS-02, NFR-AU-01\nCode: create `tests/integrated/api/v4_f3/test_f3_case_ai.py::test_case_ai_chat_transform_batch_save`\nVerify: AC-2 lưu hàng loạt các case đã chọn thành công trong một giao dịch và có audit via `pytest tests/integrated/api/v4_f3/test_f3_case_ai.py -q`\nDone when: sáu ca tương ứng AC-1…AC-6 đều có trong tệp và xanh trên stack local với `mock-ext` OpenAI (không gọi LLM thật).",
+            "estimatedHours": 4,
+            "labels": ["spec:t6.1"],
+            "promptTemplate": "You are implementing task T6.1 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-2, AC-3, AC-4, AC-5, AC-6; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Thêm test tích hợp `test_f3_case_ai.py` với mock-ext: chat ≥ 10 khối, transform, batch/save, case có trong `/functional/case/page`"
+          },
+          {
+            "description": "Serves: FR-SYS-07, ADR-12, NFR-CO-02\nCode: modify `docs/features/08-ai-advanced/F24_ai-integration.md::F24.1-F24.4`\nVerify: Cờ AI tắt thì route từ chối rõ ràng via `pytest tests/integrated/api/v4_f3/test_f3_case_ai.py -q -k flag_off`\nDone when: F24 tả đúng hợp đồng chat/transform/batch-save mới; dòng FR-SYS-07 trong `docs/SRS.md` của nhánh làm việc (câu yêu cầu + cột Nghiệm thu) không còn nói \"trả 501\" và OQ-1 của design.md đã có người duyệt; SAD không bị sửa.",
+            "estimatedHours": 2,
+            "labels": ["spec:t6.2"],
+            "promptTemplate": "You are implementing task T6.2 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Cập nhật tài liệu tính năng F24 và dòng FR-SYS-07 của SRS cho đường AI thật, nêu `AI_ENABLED=false ⇒ 503`"
+          },
+          {
+            "dependsOnIndices": [0, 1],
+            "description": "Serves: FR-SYS-07, BO-02, NFR-CO-01\nCode: modify `tests/e2e/tms/features/test_09_ai_advanced.py::test_ai_case_generation_drawer_to_module`\nVerify: AC-1 mô tả tính năng qua chat rồi chuyển đổi nhận ít nhất 10 test case hợp lệ via `pytest tests/e2e/tms/features/test_09_ai_advanced.py -q -k ai_case_generation`\nDone when: ca e2e mở drawer, chuyển đổi một khối, lưu vào module và thấy case trong danh sách; suite PH-1…PH-5 chạy lại xanh.",
+            "estimatedHours": 3.5,
+            "labels": ["test:regression", "spec:t6.3"],
+            "promptTemplate": "You are implementing task T6.3 of the OpenSpec change req-1235-bl-h02-ai-sinh-test-case (Request REQ-1235). The task's own contract is under \"Description\" below: where to change code, how it is verified and when it is done.\n\nThe whole change is on the local branch request/1235-proposal under openspec/changes/req-1235-bl-h02-ai-sinh-test-case/ and is NOT checked out in this worktree. Read what you need with one `git show request/1235-proposal:\u003cpath\u003e` per command (tasks.md, design.md, specs/\u003ccapability\u003e/spec.md) and never copy it into this worktree.\nThis task serves the acceptance criteria AC-1, AC-2; the scenarios whose names start with those ids in the specs say what must hold.\n\nRules:\n- Change only what the Code line names, plus the tests it needs. Do not edit openspec/, docs/tdd/ or .tdd-agent/ unless the task says so.\n- Before you edit a symbol, check what depends on it with the project's own tools, and follow the project's rules.\n- If the MCP server tdd-agent is available, use the skills tdd-orca-task and tdd-knowledge to read the requirements, rules and decisions named on the Serves line, and cite what you read. If it is not available, say so and continue from the spec and the code.\n- Run the Verify command and report its real output. A task is done only when that command succeeds.\n- If your change alters behaviour, an interface or a documented rule, list the design knowledge it affects (skill tdd-knowledge-writeback).",
+            "taskType": "task",
+            "title": "Thêm ca e2e drawer AI đến Transform đến lưu vào module, rồi chạy lại toàn bộ test của sáu tiêu chí"
+          }
+        ],
+        "title": "Nghiệm thu đầu-cuối với mock-ext và cập nhật tài liệu"
+      }
+    ],
+    "summary": "OpenSpec change req-1235-bl-h02-ai-sinh-test-case",
+    "title": "BL-H02 AI sinh test case"
+  },
+  "rawAiResponse": "",
+  "runId": "505348b8-8a8b-4195-bde7-5f1555ba7644",
+  "stats": {
+    "cacheCreationTokens": 210676,
+    "cacheReadTokens": 12760439,
+    "costUsd": 10.366279500000003,
+    "durationMs": 973160,
+    "inputTokens": 200,
+    "knowledgeToolCalls": 39,
+    "outputTokens": 75132,
+    "toolCalls": {
+      "Bash": 64,
+      "Edit": 3,
+      "Grep": 23,
+      "Read": 12,
+      "Write": 7,
+      "mcp__tdd-agent__kg_get_element": 24,
+      "mcp__tdd-agent__kg_query": 4,
+      "mcp__tdd-agent__kg_search": 9,
+      "mcp__tdd-agent__kg_snapshots": 1,
+      "mcp__tdd-agent__source_get": 1
+    },
+    "turns": 149
+  },
+  "status": "succeeded"
+}

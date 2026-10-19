@@ -59,3 +59,6 @@ func NewTeamMember(teamID, userID string, priority int32) (TeamMember, error) {
 	}
 	return TeamMember{TeamID: teamID, UserID: userID, Priority: priority}, nil
 }
+
+// ErrMalformedUserID reports a user id the store cannot represent (not a uuid); callers map it to InvalidArgument.
+var ErrMalformedUserID = errors.New("domain: user_id is not a valid uuid")

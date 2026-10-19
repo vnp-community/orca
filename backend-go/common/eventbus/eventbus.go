@@ -212,8 +212,17 @@ func (c *Consumer) SubscribeEphemeral(ctx context.Context, streamName, subject s
 // consumeUntilDone runs the shared consume loop both Subscribe and
 // SubscribeEphemeral use: decode, hand off to fn, Ack/Nak accordingly, until
 // ctx is cancelled.
+//
+// It stops the consume loop before returning: otherwise the pull loop (and fn)
+// outlives the caller, which then tears down state fn writes to (e.g. closes a
+// channel) and fn panics. Stop does not wait for a callback already running, so
+// fn must still tolerate a call racing the caller's teardown.
 func consumeUntilDone(ctx context.Context, cons jetstream.Consumer, fn Handler) error {
-	_, err := cons.Consume(func(msg jetstream.Msg) {
+	cc, err := cons.Consume(func(msg jetstream.Msg) {
+		if ctx.Err() != nil {
+			_ = msg.Nak() // cancelled while buffered: leave it for redelivery
+			return
+		}
 		var event Event
 		if err := json.Unmarshal(msg.Data(), &event); err != nil {
 			_ = msg.Nak() // malformed payload; NAK for visibility rather than silently dropping
@@ -229,5 +238,14 @@ func consumeUntilDone(ctx context.Context, cons jetstream.Consumer, fn Handler) 
 		return fmt.Errorf("eventbus: starting consume loop: %w", err)
 	}
 	<-ctx.Done()
+	cc.Stop()
+	select {
+	case <-cc.Closed():
+	case <-time.After(consumeStopWait):
+	}
 	return nil
 }
+
+// consumeStopWait bounds how long a cancelled subscription waits for the consume
+// loop to confirm it stopped, so a wedged connection cannot hold teardown.
+const consumeStopWait = 2 * time.Second

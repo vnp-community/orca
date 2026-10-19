@@ -47,6 +47,8 @@ type kit struct {
 	tenantID string
 	project  string
 	admin    string
+	// admin2 decides the gates that the first admin opened, because a gate never lets its own requester approve.
+	admin2   string
 	reporter string
 	approver string
 	outsider string
@@ -57,11 +59,13 @@ type kit struct {
 
 func newKit(t *testing.T) *kit {
 	t.Helper()
-	k := &kit{t: t, tenantID: uuid.NewString(), project: uuid.NewString(), admin: uuid.NewString(), reporter: uuid.NewString(),
+	k := &kit{t: t, tenantID: uuid.NewString(), project: uuid.NewString(), admin: uuid.NewString(), admin2: uuid.NewString(), reporter: uuid.NewString(),
 		approver: uuid.NewString(), outsider: uuid.NewString()}
 	c := conn(t)
 	k.req, k.appr = requestv1.NewRequestServiceClient(c), requestv1.NewApprovalServiceClient(c)
-	theStack.stubs.Auth.SetAdmins(k.tenantID, k.admin)
+	theStack.stubs.Auth.SetAdmins(k.tenantID, k.admin, k.admin2)
+	// task-service shows a Plan tree only to its owner (the person who committed it) or a grantee. Nobody is pre-granted
+	// here: request-service must give the admins who approve and start Phases the access they need, as it does in production.
 	theStack.stubs.Project.SetMember(k.tenantID, k.project, k.reporter, projectv1.ProjectRole_PROJECT_ROLE_OWNER)
 	theStack.stubs.Project.SetMember(k.tenantID, k.project, k.approver, projectv1.ProjectRole_PROJECT_ROLE_MEMBER)
 	return k
@@ -76,6 +80,7 @@ func (k *kit) as(user, role string) context.Context {
 
 func (k *kit) asReporter() context.Context { return k.as(k.reporter, "user") }
 func (k *kit) asAdmin() context.Context    { return k.as(k.admin, "admin") }
+func (k *kit) asAdmin2() context.Context   { return k.as(k.admin2, "admin") }
 
 func (k *kit) enableFlow() {
 	k.t.Helper()
@@ -123,10 +128,16 @@ func (k *kit) get(id string) *requestv1.Request {
 
 // waitStatus polls until the Request reaches want; the transitions it waits for are driven by the outbox
 // relay, NATS and the classification runner, so they are asynchronous by design.
-func (k *kit) waitStatus(id, want string) *requestv1.Request {
+func (k *kit) waitStatus(id, want string) *requestv1.Request { return k.waitStatusWithin(id, want, 0) }
+
+// waitStatusWithin is waitStatus with a longer budget for stages that run a whole execution (zero means 30 seconds).
+func (k *kit) waitStatusWithin(id, want string, budget time.Duration) *requestv1.Request {
 	k.t.Helper()
+	if budget <= 0 {
+		budget = 30 * time.Second
+	}
 	var last *requestv1.Request
-	eventually(k.t, 30*time.Second, fmt.Sprintf("request %s to reach %s", id, want), func() (bool, string) {
+	eventually(k.t, budget, fmt.Sprintf("request %s to reach %s", id, want), func() (bool, string) {
 		last = k.get(id)
 		return last.GetStatus() == want, "status is " + last.GetStatus()
 	})
@@ -151,7 +162,45 @@ func (k *kit) confirm(r *requestv1.Request, typ, size string) *requestv1.Request
 	if err != nil {
 		k.t.Fatalf("ConfirmRequestType: %v", err)
 	}
-	return resp.GetRequest()
+	return k.answerReadiness(resp.GetRequest())
+}
+
+// answerReadiness completes the readiness Clarification (CR-REQ-028) that confirming a type opens when required
+// fields such as acceptance criteria are missing, so scenarios continue from the stage they actually test.
+func (k *kit) answerReadiness(r *requestv1.Request) *requestv1.Request {
+	k.t.Helper()
+	if r.GetStatus() != "awaiting_information" {
+		return r
+	}
+	list, err := k.req.ListClarifications(k.asReporter(), &requestv1.ListClarificationsRequest{RequestId: r.GetId(), Status: requestv1.ClarificationStatus_CLARIFICATION_STATUS_OPEN})
+	if err != nil || len(list.GetClarifications()) == 0 {
+		k.t.Fatalf("Request is awaiting_information but ListClarifications gave %v, %v", list, err)
+	}
+	c := list.GetClarifications()[0]
+	items := make([]*requestv1.AnswerItem, 0, len(c.GetQuestions()))
+	for _, q := range c.GetQuestions() {
+		item := &requestv1.AnswerItem{QuestionId: q.GetId()}
+		switch {
+		case q.GetSuggestedDefaultJson() != "":
+			item.ValueJson, item.AcceptDefault = q.GetSuggestedDefaultJson(), true
+		case q.GetKind() == requestv1.QuestionKind_QUESTION_KIND_BOOLEAN:
+			item.ValueJson = "true"
+		case strings.Contains(q.GetQuestionKey(), "hours"):
+			item.ValueJson = `"8"` // text kind, numeric content
+		default:
+			item.ValueJson = `"answered by the e2e scenario"`
+		}
+		items = append(items, item)
+	}
+	if _, err := k.req.AnswerClarification(k.asReporter(), &requestv1.AnswerClarificationRequest{
+		ClarificationId: c.GetId(), Answers: items, Complete: true, ExpectedVersion: c.GetVersion()}); err != nil {
+		k.t.Fatalf("AnswerClarification: %v", err)
+	}
+	got, err := k.req.GetRequest(k.asReporter(), &requestv1.GetRequestRequest{Id: r.GetId()})
+	if err != nil {
+		k.t.Fatalf("GetRequest after the Clarification: %v", err)
+	}
+	return got.GetRequest()
 }
 
 func (k *kit) outbox(subject string) []string {

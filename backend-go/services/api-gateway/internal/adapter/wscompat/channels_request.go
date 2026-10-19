@@ -20,6 +20,10 @@ func registerRequestChannels(r *Registry, req requestv1.RequestServiceClient, ap
 	c.registerApproval(r)
 	c.registerBacklog(r)
 	c.registerExtras(r)
+	c.registerActivity(r)
+	c.registerClarification(r)
+	c.registerClarificationAsk(r)
+	c.registerDecisions(r)
 	if streamEnabled {
 		registerRequestStreamChannel(r, bus, req)
 	}

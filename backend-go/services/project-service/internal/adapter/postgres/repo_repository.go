@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -15,7 +16,19 @@ import (
 // nullable-column pattern projectColumns uses (repository.go's comment
 // explains why: COALESCE(uuid_col, ”) fails at parse time otherwise —
 // jsonb has the identical NULL-vs-empty-string parse issue).
-const repoColumns = `id, project_id, url, display_name, position, COALESCE(dev_server_id::text, ''), COALESCE(hook_settings::text, '')`
+const repoColumns = `id, project_id, url, display_name, position, COALESCE(dev_server_id::text, ''), COALESCE(hook_settings::text, ''), COALESCE(registration_key, '')`
+
+// repoRegistrationKeyIndex is the unique index that makes "one registration
+// per (tenant, dev server, path)" race-proof (migrations/0032).
+const repoRegistrationKeyIndex = "uq_repos_registration_key"
+
+// isRepoRegistrationConflict reports the registration-key index rejecting a
+// second claim on the same location (SQLSTATE 23505 on that index only, so an
+// unrelated unique violation is never mislabelled as a duplicate repo).
+func isRepoRegistrationConflict(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == repoRegistrationKeyIndex
+}
 
 // RepoRepository implements usecase.RepoRepository against project.repos.
 // Kept as its own struct (not folded into Repository) — one struct per
@@ -38,14 +51,17 @@ func NewRepoRepository(pool *pgxpool.Pool) *RepoRepository {
 // are added.
 func (r *RepoRepository) AddRepo(ctx context.Context, repo domain.Repo) (domain.Repo, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO project.repos (id, project_id, url, display_name, position, dev_server_id)
-		SELECT $1, $2, $3, $4, COALESCE(MAX(position) + 1, 0), $5
+		INSERT INTO project.repos (id, project_id, url, display_name, position, dev_server_id, registration_key)
+		SELECT $1, $2, $3, $4, COALESCE(MAX(position) + 1, 0), $5, $6
 		FROM project.repos WHERE project_id = $2
 		RETURNING `+repoColumns,
-		repo.ID, repo.ProjectID, repo.URL, repo.DisplayName, nullableString(repo.DevServerID),
+		repo.ID, repo.ProjectID, repo.URL, repo.DisplayName, nullableString(repo.DevServerID), nullableString(repo.RegistrationKey),
 	)
 
 	out, err := scanRepo(row)
+	if isRepoRegistrationConflict(err) {
+		return domain.Repo{}, fmt.Errorf("postgres: insert repo: %w", domain.ErrRepoAlreadyRegistered)
+	}
 	if err != nil {
 		return domain.Repo{}, fmt.Errorf("postgres: insert repo: %w", err)
 	}
@@ -122,6 +138,9 @@ func (r *RepoRepository) ReorderRepos(ctx context.Context, projectID string, ids
 		tag, err := tx.Exec(ctx, `
 			UPDATE project.repos SET position = $1 WHERE id = $2 AND project_id = $3
 		`, i, id, projectID)
+		if isMalformedUUID(err) {
+			return domain.ErrRepoNotFound
+		}
 		if err != nil {
 			return fmt.Errorf("postgres: update repo position: %w", err)
 		}
@@ -147,7 +166,7 @@ func (r *RepoRepository) GetRepo(ctx context.Context, repoID string) (domain.Rep
 	`, repoID)
 
 	out, err := scanRepo(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
 	if err != nil {
@@ -165,14 +184,17 @@ func (r *RepoRepository) GetRepo(ctx context.Context, repoID string) (domain.Rep
 func (r *RepoRepository) Update(ctx context.Context, repo domain.Repo) (domain.Repo, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE project.repos
-		SET url = $2, display_name = $3, hook_settings = $4::jsonb
+		SET url = $2, display_name = $3, hook_settings = $4::jsonb, registration_key = $5
 		WHERE id = $1
 		RETURNING `+repoColumns,
-		repo.ID, repo.URL, repo.DisplayName, nullableString(repo.HookSettings),
+		repo.ID, repo.URL, repo.DisplayName, nullableString(repo.HookSettings), nullableString(repo.RegistrationKey),
 	)
 
 	out, err := scanRepo(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isRepoRegistrationConflict(err) {
+		return domain.Repo{}, fmt.Errorf("postgres: update repo: %w", domain.ErrRepoAlreadyRegistered)
+	}
+	if isNoRows(err) {
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
 	if err != nil {
@@ -185,17 +207,20 @@ func (r *RepoRepository) Update(ctx context.Context, repo domain.Repo) (domain.R
 // called after usecase.RebindRepoDevServer's active-execution guard has
 // already passed. Mirrors Repository.UpdateDevServerID (project-scoped) one
 // tier down.
-func (r *RepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error) {
+func (r *RepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServerID, registrationKey string) (domain.Repo, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE project.repos
-		SET dev_server_id = $2
+		SET dev_server_id = $2, registration_key = $3
 		WHERE id = $1
 		RETURNING `+repoColumns,
-		repoID, nullableString(devServerID),
+		repoID, nullableString(devServerID), nullableString(registrationKey),
 	)
 
 	out, err := scanRepo(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isRepoRegistrationConflict(err) {
+		return domain.Repo{}, fmt.Errorf("postgres: update repo dev_server_id: %w", domain.ErrRepoAlreadyRegistered)
+	}
+	if isNoRows(err) {
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
 	if err != nil {
@@ -240,6 +265,9 @@ func (r *RepoRepository) ReassignProject(ctx context.Context, repoID, fromProjec
 		    position = COALESCE((SELECT MAX(position) + 1 FROM project.repos WHERE project_id = $2), 0)
 		WHERE id = $1 AND project_id = $3
 	`, repoID, targetProjectID, fromProjectID)
+	if isMalformedUUID(err) {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
 	if err != nil {
 		return domain.Repo{}, fmt.Errorf("postgres: reassign repo project: %w", err)
 	}
@@ -270,8 +298,47 @@ func (r *RepoRepository) ReassignProject(ctx context.Context, repoID, fromProjec
 	return out, nil
 }
 
+// FindRepoAtLocation scans the tenant's repos on one dev server and compares
+// normalised urls in Go: the Windows/POSIX rules of domain.NormalizeRepoLocation
+// cannot be expressed in SQL shared by both dialects, and one host holds few
+// repos (idx_repos_dev_server narrows it). Tenant comes from the owning
+// project row because repos carries no tenant column. Oldest project first, so
+// the repo reported for legacy duplicates is stable.
+func (r *RepoRepository) FindRepoAtLocation(ctx context.Context, tenantID, devServerID, normalizedURL, excludeRepoID string) (domain.RepoConflict, bool, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT r.id, r.project_id, r.url, p.name, p.visibility, COALESCE(r.dev_server_id::text, '')
+		FROM project.repos r
+		JOIN project.projects p ON p.id = r.project_id
+		WHERE p.tenant_id::text = $1
+		  AND COALESCE(r.dev_server_id::text, '') = $2
+		  AND r.id::text <> $3
+		ORDER BY p.created_at, r.position, r.id
+	`, tenantID, strings.ToLower(devServerID), excludeRepoID)
+	if err != nil {
+		return domain.RepoConflict{}, false, fmt.Errorf("postgres: query repos at location: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var c domain.RepoConflict
+		if err := rows.Scan(&c.RepoID, &c.ProjectID, &c.URL, &c.ProjectName, &c.ProjectVisibility, &c.DevServerID); err != nil {
+			return domain.RepoConflict{}, false, fmt.Errorf("postgres: scan repo at location: %w", err)
+		}
+		if domain.NormalizeRepoLocation(c.URL) == normalizedURL {
+			return c, true, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return domain.RepoConflict{}, false, fmt.Errorf("postgres: iterate repos at location: %w", err)
+	}
+	return domain.RepoConflict{}, false, nil
+}
+
 func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM project.repos WHERE id = $1`, repoID)
+	if isMalformedUUID(err) {
+		return domain.ErrRepoNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete repo: %w", err)
 	}
@@ -287,7 +354,7 @@ func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 func scanRepo(row rowScanner) (domain.Repo, error) {
 	var r domain.Repo
 	if err := row.Scan(
-		&r.ID, &r.ProjectID, &r.URL, &r.DisplayName, &r.Position, &r.DevServerID, &r.HookSettings,
+		&r.ID, &r.ProjectID, &r.URL, &r.DisplayName, &r.Position, &r.DevServerID, &r.HookSettings, &r.RegistrationKey,
 	); err != nil {
 		return domain.Repo{}, err
 	}
@@ -320,7 +387,7 @@ func (r *RepoRepository) GetRepoMembership(ctx context.Context, repoID, userID s
 	var m domain.RepoMember
 	var role string
 	if err := row.Scan(&m.RepoID, &m.UserID, &role); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if isNoRows(err) {
 			return domain.RepoMember{}, domain.ErrRepoMembershipNotFound
 		}
 		return domain.RepoMember{}, fmt.Errorf("postgres: query repo membership: %w", err)
@@ -361,6 +428,9 @@ func (r *RepoRepository) RemoveRepoMember(ctx context.Context, repoID, userID st
 	tag, err := r.pool.Exec(ctx, `
 		DELETE FROM project.repo_members WHERE repo_id = $1 AND user_id = $2
 	`, repoID, userID)
+	if isMalformedUUID(err) {
+		return domain.ErrRepoMembershipNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete repo member: %w", err)
 	}
@@ -375,6 +445,9 @@ func (r *RepoRepository) UpdateRepoMemberRole(ctx context.Context, repoID, userI
 		UPDATE project.repo_members SET functional_role = $3
 		WHERE repo_id = $1 AND user_id = $2
 	`, repoID, userID, string(role))
+	if isMalformedUUID(err) {
+		return domain.RepoMember{}, domain.ErrRepoMembershipNotFound
+	}
 	if err != nil {
 		return domain.RepoMember{}, fmt.Errorf("postgres: update repo member role: %w", err)
 	}

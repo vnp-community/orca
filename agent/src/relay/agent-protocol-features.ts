@@ -5,7 +5,9 @@
 // ai.complete.usage promises usage/provider/latencyMs, maxTokens AND error.data
 // (one name for three changes per CR spec). agent.execPrompt.readonly promises
 // the applied echo field (task 04). agent.execPrompt.resultBlock promises parsed.
-// agent.execPrompt.changes promises the changes report.
+// agent.execPrompt.changes promises the changes report. agent.execPrompt.knowledgeHub promises
+// knowledgeRoot/proposeChangesets and the skills list of agent.capabilities.
+// agent.execPrompt.permissionProfile promises permissionProfile (a named write profile that never needs full trust).
 
 export const AGENT_PROTOCOL_VERSION = 2
 
@@ -15,6 +17,8 @@ export const AGENT_FEATURES = [
   'agent.execPrompt.workspaceKind',
   'agent.execPrompt.changes',
   'agent.execPrompt.resultBlock',
+  'agent.execPrompt.knowledgeHub',
+  'agent.execPrompt.permissionProfile',
   'agent.capabilities',
   'ai.complete',
   'ai.complete.usage'

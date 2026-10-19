@@ -84,8 +84,13 @@ func (f *fakeInfra) RelayByDevServer(ctx context.Context, in *infrafleetv1.Relay
 
 type fakeProjects struct {
 	projectv1.ProjectServiceClient
-	repos    []*projectv1.Repo
-	metadata metadata.MD
+	repos     []*projectv1.Repo
+	worktrees []*projectv1.Worktree
+	metadata  metadata.MD
+}
+
+func (f *fakeProjects) ListWorktrees(_ context.Context, _ *projectv1.ListWorktreesRequest, _ ...grpc.CallOption) (*projectv1.ListWorktreesResponse, error) {
+	return &projectv1.ListWorktreesResponse{Worktrees: f.worktrees}, nil
 }
 
 func (f *fakeProjects) ListRepos(ctx context.Context, _ *projectv1.ListReposRequest, _ ...grpc.CallOption) (*projectv1.ListReposResponse, error) {

@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -95,7 +96,10 @@ type fakeDevServerReachability struct {
 	reachable       bool
 	err             error
 	gotDevServerIDs []string
+	allowLocal      bool
 }
+
+func (f *fakeDevServerReachability) LocalReposAllowed() bool { return f.allowLocal }
 
 func (f *fakeDevServerReachability) IsReachable(ctx context.Context, devServerID string) (bool, error) {
 	f.gotDevServerIDs = append(f.gotDevServerIDs, devServerID)
@@ -147,7 +151,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ResolvesRealWorktreeP
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", Path: "/opt/repos/aiops-v3"}}
-	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{allowLocal: true})
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
 	if err != nil {
@@ -181,7 +185,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ExternalWorktree_Uses
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getWorktreeErr: errors.New("should not be called for an external worktree id")}
-	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{allowLocal: true})
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "45f573e8-be1a-4b1a-894b-a7c261fb7331::/opt/repos/aiops-v3")
 	if err != nil {
@@ -205,7 +209,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_RepoScoped_UsesGetRep
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getRepoResp: domain.RepoInfo{ID: "repo-1", URL: "/opt/repos/repo-1"}}
-	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{allowLocal: true})
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "repo:repo-1")
 	if err != nil {
@@ -283,32 +287,57 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ReachableDevServer_Re
 	}
 }
 
-// TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FallsBackToLocal
-// covers the fallback: a bound but unreachable dev server must not relay —
-// same SOL-013 local-path behavior as if no dev server were bound at all.
-func TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FallsBackToLocal(t *testing.T) {
+// TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FailsWithRetryableCode
+// guards the removal of the silent local fallback: a bound but unreachable
+// dev server must surface DEV_SERVER_UNREACHABLE, even when local repos are
+// allowed (the repo is bound to a host, so local is never the right place).
+func TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FailsWithRetryableCode(t *testing.T) {
+	for _, allowLocal := range []bool{false, true} {
+		infraFleet := &fakeInfraFleetServiceClient{
+			resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+		}
+		projects := &fakeProjectClient{
+			getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/aiops-v3"},
+			getRepoResp:     domain.RepoInfo{ID: "repo-1", DevServerID: "ds-1"},
+		}
+		r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: false, allowLocal: allowLocal})
+
+		_, _, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
+		ae := usecase.HostDispatchError(err)
+		if ae == nil || ae.Code != usecase.CodeDevServerUnreachable || ae.Kind != apperrors.KindUnavailable {
+			t.Fatalf("allowLocal=%v: expected %s (Unavailable), got %v", allowLocal, usecase.CodeDevServerUnreachable, err)
+		}
+	}
+}
+
+// An unbound repo is only valid when the deployment allows local repos.
+func TestConnectionResolver_ResolveConnection_NotConnected_NoDevServer_LocalNotAllowed_Rejected(t *testing.T) {
 	infraFleet := &fakeInfraFleetServiceClient{
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
-	projects := &fakeProjectClient{
-		getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/aiops-v3"},
-		getRepoResp:     domain.RepoInfo{ID: "repo-1", DevServerID: "ds-1"},
-	}
-	reachability := &fakeDevServerReachability{reachable: false}
-	r := NewConnectionResolver(infraFleet, projects, reachability)
+	projects := &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/Users/x/repo"}}
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: true})
 
-	ctx, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	_, _, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
+	ae := usecase.HostDispatchError(err)
+	if ae == nil || ae.Code != usecase.CodeRepoHostUnbound || ae.Kind != apperrors.KindFailedPrecondition {
+		t.Fatalf("expected %s (FailedPrecondition), got %v", usecase.CodeRepoHostUnbound, err)
 	}
-	if conn.Connected {
-		t.Error("expected Connected=false when the dev server is unreachable")
+}
+
+// When the repo's binding cannot be read, the host is unknown: fail rather
+// than guess local, unless local repos are allowed.
+func TestConnectionResolver_ResolveConnection_NotConnected_RepoLookupFails_LocalNotAllowed_HostCheckFailed(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
-	if conn.RepoPath != "/opt/repos/aiops-v3" {
-		t.Errorf("expected the real resolved path even on the local fallback, got %q", conn.RepoPath)
-	}
-	if _, ok := usecase.DevServerIDFromContext(ctx); ok {
-		t.Error("expected returned ctx NOT to carry DevServerID when the dev server is unreachable")
+	projects := &fakeProjectClient{getRepoErr: errors.New("project-service down")}
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: true})
+
+	_, _, err := r.ResolveConnection(ctxWithTenant(t), "45f573e8-be1a-4b1a-894b-a7c261fb7331::/opt/repos/aiops-v3")
+	ae := usecase.HostDispatchError(err)
+	if ae == nil || ae.Code != usecase.CodeHostCheckFailed || ae.Kind != apperrors.KindUnavailable {
+		t.Fatalf("expected %s (Unavailable), got %v", usecase.CodeHostCheckFailed, err)
 	}
 }
 
@@ -320,7 +349,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_NoDevServerBound_Unch
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/local-only"}}
-	reachability := &fakeDevServerReachability{reachable: true} // would relay if ever consulted
+	reachability := &fakeDevServerReachability{reachable: true, allowLocal: true} // would relay if ever consulted
 	r := NewConnectionResolver(infraFleet, projects, reachability)
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
@@ -364,7 +393,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ExternalWorktree_DevS
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
 	projects := &fakeProjectClient{getRepoErr: errors.New("repo not found")}
-	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: true})
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: true, allowLocal: true})
 
 	ctx, conn, err := r.ResolveConnection(ctxWithTenant(t), "45f573e8-be1a-4b1a-894b-a7c261fb7331::/opt/repos/aiops-v3")
 	if err != nil {
@@ -438,7 +467,7 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ModeLeftAtZeroValue(t
 	fake := &fakeInfraFleetServiceClient{
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
-	r := NewConnectionResolver(fake, &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{Path: "/opt/repos/wt-3"}}, &fakeDevServerReachability{})
+	r := NewConnectionResolver(fake, &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{Path: "/opt/repos/wt-3"}}, &fakeDevServerReachability{allowLocal: true})
 
 	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-3")
 	if err != nil {
@@ -465,10 +494,11 @@ func TestConnectionResolver_ResolveConnection_NoTenantInContext(t *testing.T) {
 }
 
 func TestRelayExecutor_GetStatus_Success(t *testing.T) {
+	// Agent wire shape (GitStatusResult): rows under "entries", not "files".
 	resultJSON, err := json.Marshal(map[string]any{
 		"branch": "main",
-		"files": []map[string]any{
-			{"path": "a.txt", "state": "modified"},
+		"entries": []map[string]any{
+			{"path": "a.txt", "status": "modified", "area": "unstaged"},
 		},
 	})
 	if err != nil {
@@ -574,14 +604,20 @@ func TestRelayExecutor_Stat_AgentErrorEnvelope_NumericCode(t *testing.T) {
 	}
 }
 
+// commitFake answers like the real agent: git.commit says {success, error?} and nothing else, and the sha comes from git.exec.
+func commitFake(commitReply string) *fakeInfraFleetServiceClient {
+	fake := &fakeInfraFleetServiceClient{}
+	fake.relayRespFunc = func(in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+		if in.GetMethod() == "git.commit" {
+			return &infrafleetv1.RelayResponse{ResultJson: commitReply}, nil
+		}
+		return &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"abc123\n","stderr":"","exitCode":0}`}, nil
+	}
+	return fake
+}
+
 func TestRelayExecutor_Commit_Success(t *testing.T) {
-	resultJSON, err := json.Marshal(map[string]any{"commitSha": "abc123"})
-	if err != nil {
-		t.Fatalf("marshal fixture: %v", err)
-	}
-	fake := &fakeInfraFleetServiceClient{
-		relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)},
-	}
+	fake := commitFake(`{"success":true}`)
 	r := NewRelayExecutor(fake)
 
 	result, err := r.Commit(ctxWithTenant(t), "/repo", "my message", []string{"a.txt"})
@@ -589,18 +625,30 @@ func TestRelayExecutor_Commit_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result.CommitSHA != "abc123" {
-		t.Errorf("expected commitSha=abc123, got %q", result.CommitSHA)
+		t.Errorf("the sha must come from rev-parse HEAD after the commit, got %q", result.CommitSHA)
 	}
-	if fake.gotRelay.GetMethod() != "git.commit" {
-		t.Errorf("expected method=git.commit, got %q", fake.gotRelay.GetMethod())
+	if len(fake.gotRelayRequests) != 2 || fake.gotRelayRequests[0].GetMethod() != "git.commit" || fake.gotRelayRequests[1].GetMethod() != "git.exec" {
+		t.Fatalf("calls %v", fake.gotRelayRequests)
 	}
-
 	var params map[string]any
-	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+	if err := json.Unmarshal([]byte(fake.gotRelayRequests[0].GetParamsJson()), &params); err != nil {
 		t.Fatalf("unmarshal params: %v", err)
 	}
 	if params["message"] != "my message" {
 		t.Errorf("expected message param, got %+v", params)
+	}
+}
+
+// The agent reports a commit that did not happen (nothing staged, a hook) as success=false; that is not a commit.
+func TestRelayExecutor_Commit_AFailedCommitIsAnError(t *testing.T) {
+	fake := commitFake(`{"success":false,"error":"nothing to commit"}`)
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.Commit(ctxWithTenant(t), "/repo", "m", nil); err == nil || !strings.Contains(err.Error(), "nothing to commit") {
+		t.Fatalf("err = %v", err)
+	}
+	if len(fake.gotRelayRequests) != 1 {
+		t.Fatalf("no sha is read for a commit that did not happen: %d calls", len(fake.gotRelayRequests))
 	}
 }
 
@@ -1470,8 +1518,8 @@ func TestRelayExecutor_ListWorktreePaths_SendsCwdAndParsesWorktreesShape(t *test
 // rev-parse HEAD follow-up for HeadSHA. ──
 
 // newCreateWorktreeFake builds a fake whose git.exec calls are distinguished
-// by their args (branchExistsLocally's "show-ref" precheck vs the HeadSHA
-// "rev-parse" follow-up), since both share the method name "git.exec" —
+// by their args (branchExistsLocally's "rev-parse --verify" precheck vs the HeadSHA
+// "rev-parse HEAD" follow-up), since both share the method name "git.exec" —
 // relayRespByMethod alone can't tell them apart. branchExists controls the
 // precheck's outcome: true = relay succeeds (branch found, createBranch
 // should end up false), false = relay errors (not found, createBranch
@@ -1485,11 +1533,12 @@ func newCreateWorktreeFake(branchExists bool, revParseStdout string) *fakeInfraF
 		switch {
 		case in.GetMethod() == "git.worktree.add":
 			return &infrafleetv1.RelayResponse{ResultJson: string(worktreeAddResp)}, nil
-		case strings.Contains(in.GetParamsJson(), "show-ref"):
+		case strings.Contains(in.GetParamsJson(), "--verify"): // branchExistsLocally: rev-parse --verify
 			if branchExists {
-				return &infrafleetv1.RelayResponse{ResultJson: "{}"}, nil
+				return &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":0}`}, nil
 			}
-			return nil, errors.New("git exit 1: ref not found")
+			// The real agent answers a missing ref as a successful RPC carrying git's exit code 1.
+			return &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":1}`}, nil
 		default: // the rev-parse HEAD follow-up
 			return &infrafleetv1.RelayResponse{ResultJson: string(revParseResp)}, nil
 		}
@@ -1506,7 +1555,7 @@ func TestRelayExecutor_CreateWorktree_SendsCorrectMethodAndParams(t *testing.T) 
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(fake.gotRelayRequests) != 3 {
-		t.Fatalf("want 3 relay calls (show-ref precheck + git.worktree.add + git.exec rev-parse), got %d", len(fake.gotRelayRequests))
+		t.Fatalf("want 3 relay calls (rev-parse --verify precheck + git.worktree.add + git.exec rev-parse), got %d", len(fake.gotRelayRequests))
 	}
 
 	addReq := fake.gotRelayRequests[1]
@@ -1749,6 +1798,13 @@ type fakeProjectServiceClient struct {
 
 	getRepoResp *projectv1.GetRepoResponse
 	getRepoErr  error
+
+	recordedWorktree *projectv1.RecordWorktreeCreatedRequest
+}
+
+func (f *fakeProjectServiceClient) RecordWorktreeCreated(ctx context.Context, in *projectv1.RecordWorktreeCreatedRequest, _ ...grpc.CallOption) (*projectv1.RecordWorktreeCreatedResponse, error) {
+	f.recordedWorktree = in
+	return &projectv1.RecordWorktreeCreatedResponse{Worktree: &projectv1.Worktree{Id: "wt-1", Path: in.GetPath()}}, nil
 }
 
 func (f *fakeProjectServiceClient) GetRepo(ctx context.Context, in *projectv1.GetRepoRequest, _ ...grpc.CallOption) (*projectv1.GetRepoResponse, error) {
@@ -1806,5 +1862,26 @@ func TestGitGatewayRelay_NoHiddenTargetID_UnchangedBehavior(t *testing.T) {
 	}
 	if info.HiddenTargetID != "" {
 		t.Errorf("expected empty HiddenTargetID for an ordinary repo, got %q", info.HiddenTargetID)
+	}
+}
+
+// BR-CLI-01: the caller's idempotency key must reach project-service with the record; before, it was dropped and the lookup by key
+// never matched.
+func TestProjectClient_RecordWorktreeCreatedSendsTheIdempotencyKey(t *testing.T) {
+	fake := &fakeProjectServiceClient{}
+	client := NewProjectClient(fake)
+
+	_, err := client.RecordWorktreeCreated(ctxWithTenant(t), "proj-1", "repo-1", "/repo-x", "x", "main", domain.WorktreeLineageCapture{IdempotencyKey: "request-proposal:r1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.recordedWorktree.GetIdempotencyKey() != "request-proposal:r1" {
+		t.Errorf("idempotency key = %q", fake.recordedWorktree.GetIdempotencyKey())
+	}
+	if _, err := client.RecordWorktreeCreated(ctxWithTenant(t), "proj-1", "repo-1", "/repo-y", "y", "main", domain.WorktreeLineageCapture{}); err != nil {
+		t.Fatal(err)
+	}
+	if fake.recordedWorktree.IdempotencyKey != nil {
+		t.Errorf("no key must stay unset on the wire, got %q", fake.recordedWorktree.GetIdempotencyKey())
 	}
 }

@@ -45,6 +45,9 @@ func (s StepType) Valid() bool {
 }
 
 var (
+	// ErrAutomationNotFound is what repositories return when no automation
+	// matches (tenant, id); usecases map it to KindNotFound.
+	ErrAutomationNotFound = errors.New("domain: automation not found")
 	// ErrEmptyTenant is returned when TenantID is empty — an automation with
 	// no owning tenant is never a valid domain state.
 	ErrEmptyTenant = errors.New("domain: tenant_id is required")

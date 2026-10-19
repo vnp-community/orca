@@ -49,10 +49,10 @@ func (e *Executor) run(ctx context.Context, repoPath string, args ...string) (st
 	return stdout.String(), nil
 }
 
-// GetStatus runs `git status --porcelain=v1 -b` and parses its stable,
+// GetStatus runs `git status --porcelain=v1 -b --untracked-files=all` and parses its stable,
 // script-friendly output into domain.GitStatus.
 func (e *Executor) GetStatus(ctx context.Context, repoPath string) (domain.GitStatus, error) {
-	out, err := e.run(ctx, repoPath, "status", "--porcelain=v1", "-b")
+	out, err := e.run(ctx, repoPath, porcelainStatusArgs...)
 	if err != nil {
 		return domain.GitStatus{}, err
 	}
@@ -972,69 +972,6 @@ func parseAheadBehind(track string) (ahead, behind int) {
 	return ahead, behind
 }
 
-// parsePorcelainStatus parses `git status --porcelain=v1 -b` output. The
-// first line is "## <branch>[...tracking info]"; subsequent lines are two
-// status-code characters (index, worktree), a space, and the path.
-func parsePorcelainStatus(out string) domain.GitStatus {
-	var status domain.GitStatus
-	lines := strings.Split(out, "\n")
-	for i, line := range lines {
-		if line == "" {
-			continue
-		}
-		if i == 0 && strings.HasPrefix(line, "## ") {
-			status.Branch = parseBranchLine(strings.TrimPrefix(line, "## "))
-			continue
-		}
-		if len(line) < 4 {
-			continue
-		}
-		code := line[:2]
-		path := strings.TrimSpace(line[2:])
-		status.Files = append(status.Files, domain.FileStatus{
-			Path:  path,
-			State: fileStateFromPorcelainCode(code),
-		})
-	}
-	return status
-}
-
-// parseBranchLine extracts the branch name from porcelain -b's header line,
-// stripping tracking info (e.g. "main...origin/main [ahead 1]" -> "main")
-// and the "no branch" / detached-HEAD case's own formatting.
-func parseBranchLine(header string) string {
-	if idx := strings.Index(header, "..."); idx >= 0 {
-		header = header[:idx]
-	}
-	if idx := strings.Index(header, " "); idx >= 0 {
-		header = header[:idx]
-	}
-	return header
-}
-
-// fileStateFromPorcelainCode maps a porcelain v1 two-character XY code to
-// domain.FileState. Conflict codes (both sides changed) take priority since
-// they need surfacing distinctly from an ordinary modification.
-func fileStateFromPorcelainCode(code string) domain.FileState {
-	switch code {
-	case "??":
-		return domain.FileStateUntracked
-	case "UU", "AA", "DD", "AU", "UA", "UD", "DU":
-		return domain.FileStateConflicted
-	case "R ", " R", "RM", "MR":
-		return domain.FileStateRenamed
-	}
-	x, y := code[0], code[1]
-	switch {
-	case x == 'A' || y == 'A':
-		return domain.FileStateAdded
-	case x == 'D' || y == 'D':
-		return domain.FileStateDeleted
-	default:
-		return domain.FileStateModified
-	}
-}
-
 // ── Group C — real compare/diff/submodule shapes (TASK-209's Contract
 // correction section, resolved against specs/agent/api/agent-rpc-catalog-git-fs.md
 // and the real handler source cited on each method below) ─────────────────
@@ -1388,7 +1325,7 @@ func (e *Executor) BranchDiff(ctx context.Context, repoPath, baseRef, filePath, 
 // precedent (see domain.GitStatus's doc comment).
 func (e *Executor) SubmoduleStatus(ctx context.Context, repoPath, submodulePath, area string) (domain.GitStatus, error) {
 	submoduleDir := filepath.Join(repoPath, submodulePath)
-	out, err := e.run(ctx, submoduleDir, "status", "--porcelain=v1", "-b")
+	out, err := e.run(ctx, submoduleDir, porcelainStatusArgs...)
 	if err != nil {
 		return domain.GitStatus{}, err
 	}

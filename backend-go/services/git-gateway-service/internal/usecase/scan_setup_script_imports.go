@@ -13,13 +13,13 @@ type ScanSetupScriptImportsInput struct {
 // ScanSetupScriptImports resolves repoID's owning host and scans its setup
 // script imports. Repo-scoped — see CheckHooks' doc comment for why.
 type ScanSetupScriptImports struct {
-	reachability DevServerReachability
+	reachability RepoHostRouting
 	projects     ProjectClient
 	local        GitExecutor
 	relay        GitExecutor
 }
 
-func NewScanSetupScriptImports(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *ScanSetupScriptImports {
+func NewScanSetupScriptImports(reachability RepoHostRouting, projects ProjectClient, local, relay GitExecutor) *ScanSetupScriptImports {
 	return &ScanSetupScriptImports{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 

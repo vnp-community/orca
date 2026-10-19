@@ -3,9 +3,11 @@ package stubs
 import (
 	"context"
 	"net"
+	"slices"
 	"sync"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
+	"github.com/stablyai/orca-go/common/internalcaller"
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -54,12 +56,23 @@ func (f *InfraFleet) RelayByDevServer(_ context.Context, in *infrafleetv1.RelayB
 // project-role check (CR-REQ-035) from what the scenarios register with SetMember.
 type Project struct {
 	projectv1.UnimplementedProjectServiceServer
-	mu      sync.Mutex
-	members map[[3]string]projectv1.ProjectRole
+	mu       sync.Mutex
+	members  map[[3]string]projectv1.ProjectRole
+	repoURLs map[string]string
 }
 
 func NewProject() *Project {
-	return &Project{members: map[[3]string]projectv1.ProjectRole{}}
+	return &Project{members: map[[3]string]projectv1.ProjectRole{}, repoURLs: map[string]string{}}
+}
+
+// DefaultRepoURL is the folder every project's repo has on the stub dev server unless a test overrides it.
+const DefaultRepoURL = "/srv/orca-e2e/repo"
+
+// SetRepoURL replaces the default repo's URL of one project, for example with a remote address that names no folder.
+func (p *Project) SetRepoURL(projectID, url string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.repoURLs[projectID] = url
 }
 
 // SetMember makes userID an owner or member of the project; unregistered users are not members.
@@ -87,8 +100,15 @@ func (p *Project) ListMembers(ctx context.Context, in *projectv1.ListMembersRequ
 	return &projectv1.ListMembersResponse{Members: []*projectv1.Member{{UserId: userID, Role: role}}}, nil
 }
 
-func (*Project) ListRepos(context.Context, *projectv1.ListReposRequest) (*projectv1.ListReposResponse, error) {
-	return &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "stub-repo", DevServerId: DevServerID}}}, nil
+// ListRepos binds the project's default repo to the stub dev server; its URL is the folder path there.
+func (p *Project) ListRepos(_ context.Context, in *projectv1.ListReposRequest) (*projectv1.ListReposResponse, error) {
+	p.mu.Lock()
+	url, ok := p.repoURLs[in.GetProjectId()]
+	p.mu.Unlock()
+	if !ok {
+		url = DefaultRepoURL
+	}
+	return &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "stub-repo", Url: url, DevServerId: DevServerID}}}, nil
 }
 
 // AuditEntry is one AppendAuditEntry call as received.
@@ -103,6 +123,8 @@ type Auth struct {
 	entries []AuditEntry
 	// Admins maps tenant id to its admin user ids (approval recipients).
 	Admins map[string][]string
+	// DirectoryToken, when set, is the internal-caller token ListActiveTenantAdmins demands.
+	DirectoryToken string
 }
 
 func NewAuth() *Auth { return &Auth{Admins: map[string][]string{}} }
@@ -134,14 +156,23 @@ func (a *Auth) SetAdmins(tenantID string, ids ...string) {
 	a.mu.Unlock()
 }
 
-func (a *Auth) ListUsers(_ context.Context, in *authv1.ListUsersRequest) (*authv1.ListUsersResponse, error) {
+// ListActiveTenantAdmins mirrors the real RPC's contract: tenant only from metadata, no acting user, and (when
+// DirectoryToken is set) the internal-caller token is required.
+func (a *Auth) ListActiveTenantAdmins(ctx context.Context, _ *authv1.ListActiveTenantAdminsRequest) (*authv1.ListActiveTenantAdminsResponse, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	if a.DirectoryToken != "" && !slices.Contains(md.Get(internalcaller.MetadataKey), a.DirectoryToken) {
+		return nil, status.Error(codes.PermissionDenied, "INTERNAL_CALLER_REQUIRED")
+	}
+	tenantID := ""
+	if v := md.Get(grpcmw.MetadataTenantID); len(v) > 0 {
+		tenantID = v[0]
+	}
+	if tenantID == "" {
+		return nil, status.Error(codes.Unauthenticated, "AUTH_NO_TENANT")
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	var users []*authv1.User
-	for _, id := range a.Admins[in.GetTenantId()] {
-		users = append(users, &authv1.User{Id: id, TenantId: in.GetTenantId(), Role: authv1.Role_ROLE_ADMIN, IsActive: true})
-	}
-	return &authv1.ListUsersResponse{Users: users}, nil
+	return &authv1.ListActiveTenantAdminsResponse{UserIds: append([]string(nil), a.Admins[tenantID]...)}, nil
 }
 
 // Servers hosts the three stubs on one gRPC listener, which is how both the in-test stack and the T2 container use them.

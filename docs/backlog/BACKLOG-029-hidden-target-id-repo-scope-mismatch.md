@@ -1,5 +1,13 @@
 # BACKLOG-029: `hidden_target_id` never populated at repo-scope — likely a scope mismatch, not a missing field
 
+<!-- status-2026-10-11 -->
+> **Trạng thái (Rà soát 2026-10-11): 🔴 OPEN — chờ quyết định** · Backlog ship: (không chặn GA)
+>
+> Không đổi; hành vi hiện tại (rỗng → định tuyến theo `DevServerID`) vẫn an toàn.
+>
+> *Cơ sở: tra CodeGraph và đọc file, chưa chạy test; xem `SHIP-BACKLOG.md` §14.*
+<!-- /status-2026-10-11 -->
+
 **Origin:** `specs/backend-go/crs/v3/ephemeral-vm/tasks/TASK-BE-EVM-015-git-gateway-hidden-target-routing.md` ("Đính chính 2026-09-09" section), CR-EVM-005
 **Priority:** Low — current behavior (empty `hidden_target_id` at repo-scope) is safe: it just falls back to normal `DevServerID`-only routing, no incorrect routing occurs
 **Blocked on:** **A product/architecture decision** — the field may not apply at this call site at all, not an engineering gap

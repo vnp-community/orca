@@ -4,6 +4,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -43,7 +44,7 @@ func (uc *FailCoordinatorRun) Execute(ctx context.Context, in FailCoordinatorRun
 		return nil
 	})
 	if err != nil {
-		if err == ErrRunNotFound {
+		if errors.Is(err, ErrRunNotFound) {
 			return domain.CoordinatorRun{}, apperrors.New(apperrors.KindNotFound, "ORCH_RUN_NOT_FOUND", "coordinator run not found", err)
 		}
 		return domain.CoordinatorRun{}, apperrors.New(apperrors.KindInternal, "ORCH_FAIL_COORDINATOR_RUN_FAILED", "failed to fail coordinator run", err)

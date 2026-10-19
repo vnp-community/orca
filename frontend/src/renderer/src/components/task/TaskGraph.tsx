@@ -3,6 +3,7 @@ import { useTasks } from '../../hooks/useTasks'
 import { useTaskDependencyEdges } from '../../hooks/useTaskDependencyEdges'
 import { useTaskBatchExecution } from '../../hooks/useTaskBatchExecution'
 import { useTaskBatchMerge } from '../../hooks/useTaskBatchMerge'
+import { TaskLoadStates } from './TaskLoadStates'
 import { TaskTreeView } from './TaskTreeView'
 import { TaskCreateDialog } from './TaskCreateDialog'
 import { TaskMergeDialog } from './TaskMergeDialog'
@@ -42,7 +43,12 @@ export function TaskGraph({ projectId }: { projectId: string }) {
     createTask,
     selectedIds,
     toggleSelected,
-    clearSelection
+    clearSelection,
+    isLoading: tasksLoading,
+    loaded: tasksLoaded,
+    loadError: tasksLoadError,
+    totalTaskCount,
+    refetch: refetchTasks
   } = useTasks(projectId)
   const [viewMode, setViewMode] = useState<'tree' | 'dag' | 'board'>('tree')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -260,6 +266,16 @@ export function TaskGraph({ projectId }: { projectId: string }) {
         </div>
       </div>
       <div className="flex-1 overflow-auto">
+        <TaskLoadStates
+          loaded={tasksLoaded}
+          isLoading={tasksLoading}
+          loadError={tasksLoadError}
+          visibleCount={filteredTasks.length}
+          totalCount={totalTaskCount}
+          filtersActive={filterStatus !== 'all' || searchQuery.trim() !== ''}
+          planningHidden={hasPlanningTasks && !showPlanningTasks}
+          onRetry={refetchTasks}
+        />
         {viewMode === 'board' ? (
           <Suspense fallback={<div className="p-4 text-sm">Loading Board...</div>}>
             <TaskBoardView

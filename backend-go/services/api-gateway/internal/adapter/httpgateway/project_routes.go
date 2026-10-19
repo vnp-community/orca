@@ -70,6 +70,10 @@ type createProjectRequestBody struct {
 	Description   string `json:"description"`
 	DefaultBranch string `json:"default_branch"`
 	Visibility    string `json:"visibility"`
+	// DevServerID and RepoPath create the project's first repo on that host,
+	// atomically with the project (both or neither).
+	DevServerID string `json:"dev_server_id"`
+	RepoPath    string `json:"repo_path"`
 }
 
 func handleCreateProject(client projectv1.ProjectServiceClient) http.HandlerFunc {
@@ -88,12 +92,18 @@ func handleCreateProject(client projectv1.ProjectServiceClient) http.HandlerFunc
 			Description:   body.Description,
 			DefaultBranch: body.DefaultBranch,
 			Visibility:    body.Visibility,
+			DevServerId:   body.DevServerID,
+			RepoPath:      body.RepoPath,
 		})
 		if err != nil {
 			writeGRPCError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusCreated, resp.GetProject())
+		// Same body as before (the project's own fields) plus the repo created with it.
+		writeJSON(w, http.StatusCreated, struct {
+			*projectv1.Project
+			Repo *projectv1.Repo `json:"repo,omitempty"`
+		}{resp.GetProject(), resp.GetRepo()})
 	}
 }
 
@@ -242,6 +252,9 @@ func handleRebindDevServer(client projectv1.ProjectServiceClient) http.HandlerFu
 type addRepoRequestBody struct {
 	URL         string `json:"url"`
 	DisplayName string `json:"display_name"`
+	// DevServerID is optional: empty falls back to the project's dev server,
+	// else project-service answers PROJECT_REPO_HOST_REQUIRED.
+	DevServerID string `json:"dev_server_id"`
 }
 
 func handleAddRepo(client projectv1.ProjectServiceClient) http.HandlerFunc {
@@ -258,6 +271,7 @@ func handleAddRepo(client projectv1.ProjectServiceClient) http.HandlerFunc {
 			ProjectId:   chi.URLParam(r, "id"),
 			Url:         body.URL,
 			DisplayName: body.DisplayName,
+			DevServerId: body.DevServerID,
 		})
 		if err != nil {
 			writeGRPCError(w, err)

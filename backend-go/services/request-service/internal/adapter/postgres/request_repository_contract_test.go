@@ -12,3 +12,13 @@ func TestPostgres_RequestRepositoryContract(t *testing.T) {
 	f := newMigratedPostgres(t)
 	contracttest.RunRequestRepositoryContract(t, func(*testing.T) contracttest.Env { return f.contractEnv() })
 }
+
+func TestPostgres_EngineSettingsContract(t *testing.T) {
+	f := newMigratedPostgres(t)
+	contracttest.RunEngineSettingsContract(t, NewProjectEngineSettingsRepository(New(f.app)))
+}
+
+func TestPostgres_OpenSpecChangeContract(t *testing.T) {
+	f := newMigratedPostgres(t)
+	contracttest.RunOpenSpecChangeContract(t, f.contractEnv(), NewOpenSpecChangeRepository(New(f.app)))
+}

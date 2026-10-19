@@ -1,0 +1,1180 @@
+{
+  "nextPageToken": "",
+  "runs": [
+    {
+      "engine": "native",
+      "finishedAt": "2026-10-14T18:59:20Z",
+      "id": "bbf195d9-dd91-43d4-94ae-b9295a43c756",
+      "kind": "solution",
+      "startedAt": "2026-10-14T18:53:11Z",
+      "stats": {
+        "cacheCreationTokens": 119970,
+        "cacheReadTokens": 1352009,
+        "costUsd": 2.5669195,
+        "durationMs": 366243,
+        "inputTokens": 38,
+        "knowledgeToolCalls": 21,
+        "outputTokens": 27641,
+        "toolCalls": {
+          "Bash": 1,
+          "Glob": 3,
+          "Grep": 14,
+          "Read": 9,
+          "mcp__tdd-agent__kg_get_element": 13,
+          "mcp__tdd-agent__kg_neighbors": 1,
+          "mcp__tdd-agent__kg_search": 6,
+          "mcp__tdd-agent__kg_snapshots": 1
+        },
+        "turns": 49
+      },
+      "status": "succeeded"
+    },
+    {
+      "engine": "native",
+      "finishedAt": "2026-10-14T16:32:30Z",
+      "id": "b5abf8a9-8f78-496b-8371-b29305ee3423",
+      "kind": "solution",
+      "startedAt": "2026-10-14T16:25:36Z",
+      "stats": {
+        "cacheCreationTokens": 111723,
+        "cacheReadTokens": 2083971,
+        "costUsd": 2.8949705000000003,
+        "durationMs": 412268,
+        "inputTokens": 56,
+        "knowledgeToolCalls": 23,
+        "outputTokens": 29419,
+        "toolCalls": {
+          "Bash": 1,
+          "Glob": 8,
+          "Grep": 18,
+          "Read": 8,
+          "mcp__tdd-agent__kg_get_element": 12,
+          "mcp__tdd-agent__kg_neighbors": 1,
+          "mcp__tdd-agent__kg_search": 9,
+          "mcp__tdd-agent__kg_snapshots": 1
+        },
+        "turns": 59
+      },
+      "status": "succeeded"
+    },
+    {
+      "engine": "native",
+      "finishedAt": "2026-10-14T16:23:40Z",
+      "id": "5f7ca2fc-2b10-4d18-a6f9-459c8d685c7b",
+      "kind": "solution",
+      "startedAt": "2026-10-14T16:16:32Z",
+      "stats": {
+        "cacheCreationTokens": 150698,
+        "cacheReadTokens": 4465845,
+        "costUsd": 4.449517500000001,
+        "durationMs": 426015,
+        "inputTokens": 108,
+        "knowledgeToolCalls": 21,
+        "outputTokens": 28363,
+        "toolCalls": {
+          "Bash": 1,
+          "Glob": 18,
+          "Grep": 25,
+          "Read": 13,
+          "mcp__tdd-agent__kg_get_element": 10,
+          "mcp__tdd-agent__kg_neighbors": 1,
+          "mcp__tdd-agent__kg_resolve_scope": 1,
+          "mcp__tdd-agent__kg_search": 8,
+          "mcp__tdd-agent__kg_snapshots": 1
+        },
+        "turns": 79
+      },
+      "status": "succeeded"
+    },
+    {
+      "engine": "native",
+      "errorCode": "REQUEST_SOLUTION_INTERNAL_ERROR",
+      "errorMessage": "internal error while running the analysis",
+      "finishedAt": "2026-10-14T16:11:13Z",
+      "id": "1f132c10-9341-4168-b84a-9a96b80ac794",
+      "kind": "solution",
+      "startedAt": "2026-10-14T16:03:20Z",
+      "status": "failed"
+    }
+  ],
+  "solutions": [
+    {
+      "chosenOption": 0,
+      "chosenOptionId": "opt-1",
+      "createdAt": "2026-10-14T16:16:32Z",
+      "generationRunId": "5f7ca2fc-2b10-4d18-a6f9-459c8d685c7b",
+      "id": "7773288f-8358-4a88-b671-1cfb451b7846",
+      "kind": "solution",
+      "options": {
+        "assumptions": [
+          {
+            "id": "A-1",
+            "needs_confirmation": true,
+            "text": "`AI_ENABLED` off is treated as \"a configured service is switched off\" (503), not as a deferred feature under NFR-CO-02/BRL-64 (which would demand 404 + `X-Route-Missing: 1`); the deferred manifest keeps rows only for Claude/Bedrock and anything genuinely unimplemented."
+          },
+          {
+            "id": "A-2",
+            "needs_confirmation": true,
+            "text": "ADR-09 (ms-integration as sole credential holder and egress point) is scoped to Jira and Google; system-setting may make guarded outbound calls itself, as it already does for SMTP, LDAP and resource-pool probes via netguard."
+          },
+          {
+            "id": "A-3",
+            "needs_confirmation": true,
+            "text": "The provider endpoint is admin-configured, so the netguard profile is `AdminTarget` (same class as LDAP/SMTP/Jira in NFR-SE-05), not `UserTarget`."
+          },
+          {
+            "id": "A-4",
+            "text": "The SPA (`ui/tms`, UI-frozen) is not changed by this CR; the backend must match `ui/tms/src/api/modules/ai.ts` exactly, including `chat` returning a plain string and `delete`/`chat/list` being GET."
+          },
+          {
+            "id": "A-5",
+            "needs_confirmation": true,
+            "text": "BL-J01 (decisions) is closed or its open decisions do not block H01; the backlog lists it as a hard dependency."
+          },
+          {
+            "id": "A-6",
+            "text": "Acceptance for AC-AI-01/03/04/05/06/07 runs against `tests/local-stack/mock-ext` (`/llm/v1/chat/completions` + `__fail`), and AC-AI-02 is verified separately once a real approved provider credential exists."
+          }
+        ],
+        "design_references": {
+          "available": true,
+          "conflicts": [
+            "NFR-CO-02 and BRL-64 require a feature without a real implementation to be hidden (404 + `X-Route-Missing: 1`, no 501/fake-200 route); ADR-12 repeats this and treats the existing AI 501 as a tolerated exception (OI-02). AC-AI-05's 503 for `AI_ENABLED=false` conflicts with all three, as does today's `gone(\"UF-P1a-03\", …, \"/ai/conversation\")` in `backend/services/gateway/internal/routing/default_table.go:161` and the B2 rows in `tools/decom/route_classes_dec.yaml`.",
+            "ADR-09 concentrates credentials and outbound calls in ms-integration (rationale: one place for secrets and egress). opt-1 and opt-3 put LLM egress and the decrypted key in ms-system-setting, which is in tension with that rationale even though the decision's text names only Jira and Google.",
+            "FR-SYS-07 (revision 1) states that un-wired chat and transform must honestly return 501; this CR replaces that behaviour, so the requirement itself has to be revised rather than merely extended."
+          ],
+          "gaps": [
+            "The graph has no element for an AI cost limit, an organisation AI quota, or a usage ledger — the CR's quota requirement is unbacked by any Requirement, BusinessRule or Entity.",
+            "No element describes an `AI_ENABLED` feature flag or a flag-off response code; the only governance on unimplemented behaviour is the deferred-feature rule (NFR-CO-02/BRL-64/ADR-12).",
+            "ENT-17 records `ai_model_source` and `ai_conversation` only, and marks conversation as deferred (`hội thoại (hoãn)`); there is no `ai_conversation_message` entity and no project-scoped model-config attribute.",
+            "No element names the approved provider set (OpenAI/DeepSeek/ZhiPu) or `ErrProviderUnsupported` for Claude/Bedrock, and none states the 60 s timeout or 2-retry budget — those come only from the in-repo solution document.",
+            "No QualityTarget specifies AI-specific metrics, latency or token-cost targets; NFR-SE-04 only forbids secrets in metric labels."
+          ],
+          "read": [
+            "FR-SYS-07",
+            "ENT-17",
+            "ENT-17:attribute:app_key",
+            "ENT-17:attribute:api_url",
+            "ENT-17:attribute:provider_name",
+            "ENT-17:attribute:adv_settings",
+            "ENT-17:attribute:status",
+            "ENT-17:attribute:type",
+            "ENT-17:attribute:name",
+            "ADR-09",
+            "ADR-12",
+            "ADR-15",
+            "BRL-64",
+            "NFR-SE-04",
+            "NFR-SE-05",
+            "NFR-CO-02",
+            "SVC-01",
+            "FR-JIR-12",
+            "FR-SYS-03",
+            "BO-02",
+            "BO-08"
+          ],
+          "snapshot": "snap-000001"
+        },
+        "open_questions": [
+          {
+            "blocking": true,
+            "id": "Q-1",
+            "text": "Does ADR-09's \"ms-integration is the only service holding credentials and calling out\" extend to LLM providers? The answer decides between opt-1 (call from system-setting, as the repo's approved solution says) and opt-2 (call from ms-integration)."
+          },
+          {
+            "id": "Q-2",
+            "text": "AC-AI-05 asks for 503 when `AI_ENABLED` is off, while NFR-CO-02, BRL-64 and ADR-12 forbid non-404 answers for anything without a real implementation and require a `deferred_features.yaml` row. Who grants the exception, and is it recorded as a revision of those elements or as an `out_of_scope`/exception entry?"
+          },
+          {
+            "id": "Q-3",
+            "text": "FR-SYS-07 (URD/SRS, revision 1) still mandates the honest 501 for chat/transform. Is it revised in this CR, or does the CR ship against a requirement it contradicts?"
+          },
+          {
+            "id": "Q-4",
+            "text": "What are the quota semantics? Tokens, requests or money; period (calendar month, rolling); who sets the limit (platform admin vs org admin) and through which screen or parameter; what HTTP status the exhausted case uses (429 vs 422). The knowledge graph has no element for AI quota or cost at all."
+          },
+          {
+            "id": "Q-5",
+            "text": "Per-project model config: is it a `project_id` scope added to `ai_model_source` (alongside the existing SYSTEM/PERSONAL `ownerType`), or a separate mapping table? And what is the resolution order when project, org, personal and system sources all exist?"
+          },
+          {
+            "id": "Q-6",
+            "text": "Will the gateway owner sign off flipping `/ai/conversation/*` from `gone` back to system-setting in `route_decisions.approved.yaml`, and does UF-P1a-03 get closed in the same change?"
+          },
+          {
+            "id": "Q-7",
+            "text": "Which real provider and credential are approved for AC-AI-02? The repo marks this `⏸ ENV B10` (no real LLM reachable), so the AC cannot be closed locally."
+          },
+          {
+            "id": "Q-8",
+            "text": "Is `ResolveModel` returning the decrypted key over internal gRPC acceptable (the in-repo solution specifies it), or must the key stay inside the process that performs the call?"
+          },
+          {
+            "id": "Q-9",
+            "text": "Should the per-organisation metric and quota labels carry `organization_id`? NFR-SE-04 forbids secrets in metric labels but says nothing about tenant cardinality limits."
+          }
+        ],
+        "options": [
+          {
+            "affected_areas": [
+              { "kind": "module", "name": "backend/shared/pkg/aiclient (new)" },
+              { "kind": "service", "name": "SVC-01 ms-system-setting" },
+              {
+                "kind": "schema",
+                "name": "ENT-17 AiModelSource/AiConversation (+ ai_conversation_message, ai_org_quota, ai_usage_ledger)"
+              },
+              { "kind": "api", "name": "/ai/conversation/{add,chat,update,list,delete,chat/list}" },
+              {
+                "kind": "api",
+                "name": "tms/identity/v1/ai.proto AIService{ResolveModel,ListMessages,AppendTurn}"
+              },
+              {
+                "kind": "infra",
+                "name": "gateway routing default_table.go + route_decisions.approved.yaml (ADR-15 netguard profile AdminTarget)"
+              },
+              {
+                "kind": "infra",
+                "name": "tools/conformance/deferred_features.yaml, table_owners.yaml, tools/decom/route_classes_dec.yaml"
+              },
+              {
+                "kind": "module",
+                "name": "FR-SYS-07 / NFR-SE-04 / NFR-SE-05 / NFR-CO-02 / BRL-64 / ADR-12 (requirement + quality targets to revise)"
+              },
+              {
+                "kind": "ui",
+                "name": "ui/tms ms-ai-drawer + api/modules/ai.ts (contract consumer, not edited)"
+              }
+            ],
+            "approach": "**Mirror the approved in-repo design (`backend/specs/crs/v4/solutions/SOL-P3c-E_files-ai-f18-f24.md` §3.2, `TASKS-P3c.md` T-F3-18), extended with the org quota the CR adds.**\n\n1. **`backend/shared/pkg/aiclient`** — `Client{Chat,Stream}`, `Provider{Name,BaseURL,APIKey,Model,Params}`; one OpenAI Chat Completions implementation covering Open AI / DeepSeek / ZhiPu AI (the three the SPA offers, `enums/modelEnum.ts`); Claude/Bedrock ⇒ `ErrProviderUnsupported` (422) plus a `tools/conformance/deferred_features.yaml` row. Build the HTTP client the way `backend/services/qa-core/api-test/pkg/safehttp/safehttp.go:39` already does it: `netguard.FromEnv(netguard.AdminTarget)` + `telemetry.WrapTransport(target, …, WithUntrustedTarget())` (ADR-15, NFR-SE-05) — 60 s timeout, ≤2 retries honouring `Retry-After` (with a cap), key only in the `Authorization` header, never in errors, spans or metric labels (NFR-SE-04).\n2. **Data (ENT-17, owner SVC-01)** — migration `V037__ss_ai_conversation_v2.sql`: add `title/scene/organization_id/model_id/update_time` to `ai_conversation`, create `ai_conversation_message(id, conversation_id, role, content, create_time, tokens_in, tokens_out, model_id)`; register new tables in `tools/conformance/table_owners.yaml`.\n3. **Service layer** — extend `internal/usecase/ai/ai.go` with `ResolveModel` (model id → provider, base URL, key via `internal/secret.Open`), `ListMessages`, `AppendTurn`; expose them as `tms/identity/v1/ai.proto AIService` so CR-H02/BL-H03 consume them without a second egress path. The existing CRUD already satisfies AC-3 (`secret.Seal/Show/Resolve`, `audit.Track` + `audit.Redact`) — keep it untouched.\n4. **Routes** — new `internal/handler/ai/conversation.go`: `POST /ai/conversation/{add,chat,update}`, `GET /ai/conversation/{list,delete/:id,chat/list/:id}`; own conversations only (404 otherwise); idempotent on the client-generated `conversationId` because the SPA fires `add` without awaiting it; `chat` returns a plain string in the envelope; `[]` never nil.\n5. **Quota (new — absent from both graph and code)** — `ai_org_quota(organization_id, period, token_limit, cost_limit_micro, tokens_used, cost_used_micro)` + append-only `ai_usage_ledger`, updated in the same transaction as `AppendTurn`; checked *before* `ResolveModel`, so an exhausted org gets a clear 429 and no provider call (AC-4). Per-project model config = `ai_model_source` gains `project_id` with resolution order project → org → system.\n6. **Flag \u0026 gateway** — `AI_ENABLED` (default off) in SS config; drop `gone(\"UF-P1a-03\", …, \"/ai/conversation\")` at `backend/services/gateway/internal/routing/default_table.go:161`, add the prefix to the system-setting subtree (`:106`), read timeout ≥90 s; update `route_decisions.approved.yaml` (gone → system-setting, needs a gateway-owner sign-off), `routes_golden_test.go` `retiredGone`, `tools/decom/route_classes_dec.yaml` (B2 → B1) and close UF-P1a-03.\n7. **Tests** — aiclient unit tests for retry/`Retry-After`/blocked target (`netguard.AllowLoopbackForTests`); handler tests against `tests/local-stack/mock-ext` `/llm/v1/chat/completions` and `__fail`; extend `tests/integrated/api/security/test_sec07_secrets.py` for the AI key.",
+            "breaking_change": false,
+            "cons": [
+              "AC-AI-05 (503 when the flag is off) contradicts NFR-CO-02, BRL-64 and ADR-12, which require an unimplemented/hidden feature to answer 404 + `X-Route-Missing: 1` and forbid 501/fake-200 routes; the exception must be argued as \"configured-off service\", not \"deferred feature\".",
+              "FR-SYS-07 as it stands in URD/SRS mandates the honest 501 for chat/transform; the requirement needs a revision alongside this CR.",
+              "`ResolveModel` returns the decrypted key over internal gRPC (as the solution document specifies) — safe for AC-3 (UI/API/log) but it widens where plaintext keys travel; needs an interceptor-level redaction test.",
+              "Reopening `/ai/conversation/*` touches four governance artefacts (gateway decision ledger, golden test, decom classes, deferred manifest) and needs a gateway-owner sign-off that is outside the engineering change.",
+              "Quota/cost semantics (tokens vs money, period, who sets the limit) are not specified anywhere and have to be designed inside this CR."
+            ],
+            "effort": { "hours_estimate": 180, "size": "L" },
+            "id": "opt-1",
+            "pros": [
+              "Follows a solution document that is already `Ready for implementation` in the repo, including the SPA call-order race, envelope shapes and gateway requirements — little design left to invent.",
+              "Reuses what exists: `shared/pkg/netguard`, `shared/pkg/secretbox`, `internal/secret` (mask + seal), `audit.Track/Redact`, the `safehttp` client pattern and the `ai_model_source` CRUD.",
+              "Keeps model config, keys, conversation and quota in one owner (SVC-01 already owns `ai_model_source`/`ai_conversation`), so no cross-service transaction for the usage ledger.",
+              "`AIService` over gRPC gives CR-H02 and BL-H03 a single AI entry point instead of each service holding provider keys."
+            ],
+            "recommended": true,
+            "risks": [
+              {
+                "description": "AC-AI-02 (a real approved LLM) cannot be verified locally — the repo marks it `⏸ ENV B10`; only mock-ext proves the path.",
+                "severity": "medium"
+              },
+              {
+                "description": "The gateway route-decision change is rejected or delayed by the gateway owner, leaving the feature unreachable behind a 404 despite working code.",
+                "severity": "medium"
+              },
+              {
+                "description": "DeepSeek/ZhiPu deviate from OpenAI on parameters or error bodies, so one implementation silently misbehaves for two of three providers.",
+                "severity": "medium"
+              },
+              {
+                "description": "Token accounting from provider `usage` fields is unreliable or absent on errors, so the quota ledger drifts and either over- or under-blocks an org.",
+                "severity": "medium"
+              },
+              {
+                "description": "A 60 s provider call plus a 90 s gateway read timeout holds SS worker slots; a burst of chats degrades unrelated system-setting routes.",
+                "severity": "low"
+              }
+            ],
+            "rollback": "`AI_ENABLED=false` disables the chat path; full rollback = restore `gone(\"UF-P1a-03\", …, \"/ai/conversation\")` in default_table.go and the B2 rows, so the SPA sees today's 404 + `X-Route-Missing: 1`. Migrations are additive (no DROP), so data can stay.",
+            "summary": "Implement T-F3-18 exactly as the repo's own solution document already specifies: a new `backend/shared/pkg/aiclient` (OpenAI-compatible, netguard-guarded, retry/Retry-After, masked key), conversation persistence and `ResolveModel/ListMessages/AppendTurn` in ms-system-setting, the six `/ai/conversation/*` routes, `AI_ENABLED`, and a new per-organisation quota/cost ledger. Gateway flips `/ai/conversation/*` from `gone` back to system-setting.",
+            "title": "Build the approved in-repo design: shared aiclient + conversation \u0026 quota in ms-system-setting"
+          },
+          {
+            "affected_areas": [
+              { "kind": "module", "name": "backend/shared/pkg/aiclient (new)" },
+              {
+                "kind": "service",
+                "name": "SVC-01 ms-system-setting (config, conversation, quota, routes)"
+              },
+              { "kind": "service", "name": "SVC-08 ms-integration (provider egress + credential)" },
+              {
+                "kind": "schema",
+                "name": "ENT-17 AiModelSource/AiConversation (+ ai_conversation_message, ai_org_quota) and the integration credential store"
+              },
+              { "kind": "api", "name": "/ai/conversation/* plus a new internal AICompletion RPC" },
+              {
+                "kind": "infra",
+                "name": "ADR-09 (single credential/egress holder), ADR-15 netguard AdminTarget, gateway route decision ledger"
+              },
+              {
+                "kind": "module",
+                "name": "FR-SYS-07, FR-JIR-12, NFR-SE-04, NFR-SE-05, NFR-CO-02, BRL-64, ADR-12"
+              }
+            ],
+            "approach": "Same aiclient package, same schema, same routes and flag as opt-1 — the difference is **where the provider call happens**.\n\n1. `backend/shared/pkg/aiclient` is built as in opt-1, but only **ms-integration** instantiates it. Its outbound client uses `netguard.AdminTarget` (ADR-15) and ms-integration's existing egress conventions (`internal/client/jira/client.go`, `internal/ssrf`).\n2. ms-integration gains `AICompletionService.Complete(provider_ref, messages, params)`. It resolves the credential **itself**: either the AI key column is migrated into ms-integration's credential store (`cmd/migrate-secrets` already exists as a precedent) or SS passes an opaque `model_source_id` and ms-integration reads the sealed key through the existing credential path. No plaintext key crosses a service boundary in either variant.\n3. ms-system-setting keeps ENT-17 ownership, the conversation tables, the `/ai/conversation/*` handlers, `AI_ENABLED`, the per-org quota check and the usage ledger — i.e. steps 2, 4, 5, 6 of opt-1 unchanged — and calls ms-integration instead of a provider. `ListMessages`/`AppendTurn` stay in SS; `ResolveModel` becomes internal to ms-integration.\n4. Metrics and the \"masked key\" guarantee land in one place (ms-integration is already the sensitive component with an automated boundary test, T-JS-22), and the AI provider joins Jira/Google under the same egress audit.\n5. Gateway/conformance changes are identical to opt-1. Tests: aiclient unit tests in shared; an ms-integration contract test against mock-ext `/llm/v1/chat/completions`; an SS handler test with a faked completion client; a boundary test asserting SS holds no provider URL/key in memory on the chat path.",
+            "breaking_change": false,
+            "cons": [
+              "ADR-09 names Jira and Google only; stretching it to LLMs is an interpretation that the architecture owner has to confirm — and the repo's own approved solution (SOL-P3c-E §3.2) puts the call in system-setting, so this option deliberately diverges from it.",
+              "Same AC-AI-05 vs NFR-CO-02 / BRL-64 / ADR-12 conflict as opt-1 (503 vs 404 + `X-Route-Missing: 1`).",
+              "An extra hop on a 60 s call: two timeout budgets, two retry layers to reconcile, and a new failure mode (ms-integration down ⇒ AI down) for a feature that otherwise has no integration dependency.",
+              "Quota/ledger lives in SS while the call lives in ms-integration, so usage accounting is no longer transactional with the provider response.",
+              "Either a key migration out of `ai_model_source` (data movement, rollback story) or a cross-service credential read — both more work than opt-1.",
+              "ms-integration is a protected-adjacent, high-risk service; `services/infrastructure/integration-hub/` is off limits per project rules, so the boundary must be checked before touching anything under `infrastructure/`."
+            ],
+            "effort": { "hours_estimate": 240, "size": "L" },
+            "id": "opt-2",
+            "pros": [
+              "Consistent with ADR-09: credentials and egress concentrated in one sensitive, boundary-tested service, with one place to audit AI spend and destinations.",
+              "Plaintext provider keys never travel over internal gRPC, which is the weakest point of opt-1's `ResolveModel`.",
+              "Adding Claude/Bedrock or an internal gateway later changes one service, not every AI consumer.",
+              "ms-integration already has the credential encryption, SSRF and outbound-observability plumbing, so less new infrastructure code."
+            ],
+            "recommended": false,
+            "risks": [
+              {
+                "description": "Architecture owner rules that ADR-09 does not cover LLM egress, making this rework; or rules the opposite after opt-1 is built.",
+                "severity": "high"
+              },
+              {
+                "description": "Moving AI keys between credential stores risks an unreadable key (wrong `CREDENTIAL_ENCRYPTION_KEY` scope) and a user-visible outage of AI config.",
+                "severity": "medium"
+              },
+              {
+                "description": "Nested retry layers multiply worst-case latency well past the 90 s gateway read timeout.",
+                "severity": "medium"
+              },
+              {
+                "description": "AC-AI-02 still unverifiable locally (`⏸ ENV B10`).",
+                "severity": "medium"
+              }
+            ],
+            "rollback": "`AI_ENABLED=false`; revert the gateway decision to `gone`. If keys were migrated, the reverse migration must be run — keep the `--reverse` style helper that `cmd/migrate-secrets` already uses, and do not delete the original column in the same release.",
+            "summary": "Honour ADR-09's \"one service holds credentials and makes outbound calls\" by putting the aiclient call site in ms-integration. ms-system-setting keeps `ai_model_source`, conversations, quota and the `/ai/conversation/*` routes, and asks ms-integration to perform the completion over an internal gRPC/HTTP call; the plaintext key never leaves ms-integration's process boundary differently than Jira credentials do today.",
+            "title": "Keep LLM egress and credentials in ms-integration; system-setting only stores config and conversations"
+          },
+          {
+            "affected_areas": [
+              { "kind": "module", "name": "backend/shared/pkg/aiclient (new)" },
+              { "kind": "service", "name": "SVC-01 ms-system-setting" },
+              {
+                "kind": "schema",
+                "name": "ENT-17 AiConversation (+ ai_conversation_message); ai_model_source unchanged"
+              },
+              { "kind": "api", "name": "/ai/conversation/{add,chat,update,list,delete,chat/list}" },
+              {
+                "kind": "infra",
+                "name": "Redis (quota counter), gateway routing default_table.go + route_decisions.approved.yaml"
+              },
+              {
+                "kind": "infra",
+                "name": "tools/conformance/deferred_features.yaml (Claude/Bedrock, per-project config), tools/decom/route_classes_dec.yaml"
+              },
+              {
+                "kind": "module",
+                "name": "FR-SYS-07, NFR-SE-04, NFR-SE-05, NFR-CO-02, BRL-64, ADR-12, ADR-15"
+              }
+            ],
+            "approach": "1. **`backend/shared/pkg/aiclient`** — identical to opt-1 step 1 (OpenAI-compatible, `netguard.AdminTarget`, 60 s, ≤2 retries honouring `Retry-After`, masked key, `telemetry.WrapTransport` metrics, `ErrProviderUnsupported` for Claude/Bedrock). This part is not reducible: AC-6 and AC-7 live here.\n2. **Schema** — one migration `V037__ss_ai_conversation_message.sql` creating `ai_conversation_message` plus `title`/`update_time` on `ai_conversation`. No `organization_id`/`model_id`/`scene` columns yet; no `project_id` on `ai_model_source`.\n3. **Service** — `ResolveModel/ListMessages/AppendTurn` as plain Go methods on the existing `AIConfigUsecase` (`internal/usecase/ai/ai.go`), called in-process by the handler. No `tms/identity/v1/ai.proto` — CR-H02 is the first external consumer, so the proto is written when it is actually needed, against a method set that has already run in production.\n4. **Routes \u0026 flag** — `/ai/conversation/{add,chat,update,list,delete,chat/list}` with the same idempotency and envelope rules as opt-1; `AI_ENABLED` gating in one middleware on the group.\n5. **Quota** — a Redis counter per `organization_id` + month (`ai:quota:\u003corg\u003e:\u003cYYYYMM\u003e`), limits from a system parameter, checked before resolving the model so no provider call happens when exhausted (AC-4). Tokens are added from the provider `usage` block after a successful turn. No money, no ledger table, no per-org override UI in this slice.\n6. **Gateway \u0026 conformance** — identical to opt-1 step 6 (this cannot be reduced; the routes are `gone` today).\n7. **Tests** — aiclient unit tests (retry/`Retry-After`/blocked target), handler tests against mock-ext, a quota-exhausted test asserting the provider transport is never dialled, and the SEC-07 secrets assertion.",
+            "breaking_change": false,
+            "cons": [
+              "Deviates from the repo's approved solution for T-F3-18, which explicitly requires the proto and the `V{NNN}__ss_ai_conversation_v2.sql` column set — a reviewer tracking that document will see missing scope.",
+              "The CR explicitly asks for per-organisation **and per-project** model config; this option delivers only system/personal scope, so part of the stated scope is postponed and must be approved as such.",
+              "A Redis counter is not durable: a Redis flush or failover resets quotas, and there is no audit trail of AI spend — weak for a cost-control feature.",
+              "Same AC-AI-05 vs NFR-CO-02 / BRL-64 / ADR-12 conflict (503 vs 404 + `X-Route-Missing: 1`).",
+              "Adding `organization_id`/`scene`/`project_id` later means a second migration over a table that already has production rows."
+            ],
+            "effort": { "hours_estimate": 100, "size": "M" },
+            "id": "opt-3",
+            "pros": [
+              "Smallest surface that still covers all seven ACs, so it can land before CR-H02 instead of alongside it; the heavy parts (per-project resolution, cost ledger) are deferred rather than guessed.",
+              "No new gRPC contract to freeze while the method shapes are still unproven; CR-H02 can be served in-process or by a proto designed against working code.",
+              "Fewest new tables, so the `table_owners.yaml` / audit / migration-review surface stays small."
+            ],
+            "recommended": false,
+            "risks": [
+              {
+                "description": "The deferred per-project config is the part BL-H02/BL-H03 actually need, so the follow-up becomes urgent and the \"thin slice\" saving is only apparent.",
+                "severity": "medium"
+              },
+              {
+                "description": "Redis-based quota loses state and lets an org exceed its budget unnoticed; no reconciliation data exists afterwards.",
+                "severity": "medium"
+              },
+              {
+                "description": "In-process coupling means CR-H02 in case-management either duplicates aiclient wiring or waits for the proto after all.",
+                "severity": "medium"
+              },
+              {
+                "description": "AC-AI-02 still unverifiable locally (`⏸ ENV B10`).",
+                "severity": "medium"
+              }
+            ],
+            "rollback": "`AI_ENABLED=false`; revert the gateway entry to `gone`. The single migration is additive; the Redis keys can simply be dropped.",
+            "summary": "Ship the smallest honest AI path that satisfies the ACs: `shared/pkg/aiclient`, the six routes in ms-system-setting calling the usecase in-process (no new proto), messages in one new table, model resolution limited to the existing system/personal `ai_model_source`, and an org quota as a counted Redis budget with a monthly reset. Per-project model config, the gRPC `AIService` and a persistent cost ledger land in a follow-up before CR-H02 needs them.",
+            "title": "Thin first slice: aiclient + chat on existing tables and a Redis org counter, proto and per-project config deferred"
+          }
+        ],
+        "recommendation": {
+          "option_id": "opt-1",
+          "reason": "The repository already carries a signed-off, implementation-ready design for exactly this work (SOL-P3c-E §3.2 / TASKS-P3c T-F3-18) that resolves the hard parts — SPA call-order idempotency, envelope shapes, gateway timeouts, provider set — and opt-1 follows it while adding only the genuinely new piece (per-org quota and per-project config). It also keeps ENT-17's owner (SVC-01) in charge of config, conversation and usage in one transaction. opt-2's extra hop is only justified if ADR-09's single-egress rule is ruled to cover LLMs (Q-1), and opt-3 drops per-project config and durable cost accounting that the CR asks for."
+        },
+        "requirement_coverage": [
+          {
+            "ac_id": "AC-1",
+            "note": "Chat via `/ai/conversation/chat` against mock-ext, turn persisted in `ai_conversation_message`, read back through `/ai/conversation/chat/list/:id`. Requires the gateway route flip (default_table.go:161) in every option.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-2",
+            "note": "The code path is provider-agnostic OpenAI-compatible, so a real approved LLM needs only configuration; but the repo marks the real-LLM call `⏸ ENV B10` and no approved credential exists, so this AC cannot be demonstrated locally (Q-7).",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "partial"
+          },
+          {
+            "ac_id": "AC-3",
+            "note": "Already largely in place: `internal/secret.Seal/Show/Resolve` (AES-256-GCM via `shared/pkg/secretbox`) plus `audit.Redact`; new work is keeping the key out of aiclient errors, spans and metric labels and extending `tests/integrated/api/security/test_sec07_secrets.py`. opt-2 additionally keeps the plaintext key out of internal gRPC.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-4",
+            "note": "Quota checked before model resolution so no provider dial happens. Durable table + ledger in opt-1/opt-2; Redis counter only in opt-3. Semantics unspecified anywhere — see Q-4.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-5",
+            "note": "One middleware on the `/ai/conversation` group returns 503 when the flag is off. Conflicts with NFR-CO-02 / BRL-64 / ADR-12, which require 404 + `X-Route-Missing: 1` for anything not really implemented — needs the exception in Q-2.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-6",
+            "note": "Implemented in `shared/pkg/aiclient` and provable with mock-ext `__fail`, which already returns a `Retry-After` header (`tests/local-stack/mock-ext/mock_ext.py:533`).",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-7",
+            "note": "`shared/pkg/netguard` with the `AdminTarget` profile (ADR-15, NFR-SE-05), wired like `api-test/pkg/safehttp`; blocked targets surface as `netguard.ErrBlocked` with no host leaked. Note `SSRF_MODE=report` would only log, not block.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          }
+        ],
+        "schema_version": 1
+      },
+      "requestId": "0220d370-6f65-4842-9e55-d9d94f07f2b3",
+      "status": "superseded",
+      "version": 4
+    },
+    {
+      "chosenOption": 0,
+      "chosenOptionId": "opt-1",
+      "createdAt": "2026-10-14T16:25:36Z",
+      "generationRunId": "b5abf8a9-8f78-496b-8371-b29305ee3423",
+      "id": "f411437e-b709-496c-bd5d-5393410a1f21",
+      "kind": "solution",
+      "options": {
+        "assumptions": [
+          {
+            "id": "A-1",
+            "text": "ADR-09's \"only ms-integration holds credentials and calls out\" is read as naming Jira and Google only; LLM egress runs from ms-system-setting behind the netguard AdminTarget profile, as the reviewer settled and as SOL-P3c-E §3.2 specifies."
+          },
+          {
+            "id": "A-2",
+            "needs_confirmation": true,
+            "text": "AC-AI-05's 503 is accepted as \"a service that is configured off\", not as a deferred feature, so FR-SYS-07, ENT-17's \"hội thoại (hoãn)\", the UF-P1a-03 route decision and the BRL-64/ADR-12/NFR-CO-02 texts are revised in this change; only Claude/Bedrock keep a `deferred_features.yaml` row."
+          },
+          {
+            "id": "A-3",
+            "needs_confirmation": true,
+            "text": "An AI quota is counted in provider-reported tokens per calendar month per organisation, with an optional cost ceiling derived from a static price table; the organisation is the one the SPA already sends as `organizationId` on the chat request, validated against membership."
+          },
+          {
+            "id": "A-4",
+            "text": "Acceptance for AC-AI-01/06/07 runs against `tests/local-stack/mock-ext` (`/llm/v1/chat/completions` and the `__fail` control plane, which already emits `Retry-After`), with private targets allowed only in the local stack; AC-AI-02 waits for an approved real provider in an egress-enabled environment."
+          },
+          {
+            "id": "A-5",
+            "text": "The SPA is not edited: with AI off the user sees the real error from the 503 (hiding the navbar button is BL-J02), so NFR-CO-01's UI-frozen gates must accept the new status code for these six routes."
+          }
+        ],
+        "design_references": {
+          "available": true,
+          "conflicts": [
+            "BRL-64 and ADR-12 (with NFR-CO-02) require a feature without a real implementation to answer 404 + `X-Route-Missing: 1` and forbid 501 or fake-200 routes; every option implements AC-AI-05's 503 instead, so the flag-off state must be classified as a configured-off service and the UF-P1a-03 decision retired.",
+            "FR-SYS-07 still states that chat and transform must return an honest 501 and ENT-17 records conversation as deferred (`hội thoại (hoãn)`); this change replaces both and needs a requirement revision.",
+            "NFR-CO-01 freezes the contract the SPA calls: reopening these six routes and (in opt-3) adding settings-screen keys needs a registered UI exception.",
+            "opt-2 moves a per-organisation business quota into ms-gateway, whose responsibilities under CT-02 are auth, CSRF, rate-limit, routing, WebSocket, MCP and trace — not organisation-level AI budgets owned by SVC-01."
+          ],
+          "gaps": [
+            "The graph has no element for an AI quota or cost limit, no `AI_ENABLED` style feature flag, and no organisation or project scope on ENT-17, so quota semantics and model scoping are designed here with no upstream anchor.",
+            "It also fixes no latency, timeout or concurrency target for AI calls (NFR-PE-07 covers rate limits only) and says nothing about who approves a real LLM provider, which is what AC-AI-02 depends on."
+          ],
+          "read": [
+            "FR-SYS-07",
+            "ENT-17",
+            "ENT-17:attribute:app_key",
+            "ENT-17:attribute:api_url",
+            "ENT-17:attribute:provider_name",
+            "BRL-64",
+            "ADR-12",
+            "ADR-15",
+            "ADR-09",
+            "INT-14",
+            "NFR-SE-04",
+            "NFR-SE-05",
+            "NFR-CO-01",
+            "NFR-CO-02",
+            "SVC-01",
+            "CT-02"
+          ],
+          "snapshot": "snap-000001"
+        },
+        "open_questions": [
+          {
+            "id": "Q-1",
+            "text": "What exactly is an \"AI quota\": tokens, requests or money; what period and reset rule; who sets it (system admin only, or an organisation admin); and which organisation counts for a user who belongs to several? The graph has no Requirement, Entity or Constraint about AI quota or cost at snap-000001."
+          },
+          {
+            "id": "Q-2",
+            "text": "Which real provider is the \"approved LLM\" for AC-AI-02, and is there an environment with egress, a key and a budget for it? The repo marks this `⏸ ENV B10`, and the graph says nothing about who approves a provider."
+          },
+          {
+            "id": "Q-3",
+            "text": "Does the gateway owner approve moving `/ai/conversation/*` from `gone` (UF-P1a-03, `default_table.go:161`) to system-setting, together with the updates to `route_decisions.approved.yaml`, `routes_golden_test.go`, `tools/decom/*` and `tests/golden/ui-neutral/route_classes.json`?"
+          },
+          {
+            "id": "Q-4",
+            "text": "How are per-organisation and per-project model sources created, given that the SPA's `ownerType` enum offers only `SYSTEM `/`PERSONAL`: an admin-only API, a seed, or a separate UI change? The graph's ENT-17 lists no organisation or project attribute."
+          },
+          {
+            "id": "Q-5",
+            "text": "What message and status does an exhausted organisation get (429 vs 403, and the exact Vietnamese wording), and should the same refusal apply to CR-H02's generation routes later? Nothing in the graph fixes the error contract for quota."
+          },
+          {
+            "id": "Q-6",
+            "text": "Is the 60 s provider timeout plus a ≥90 s gateway read timeout acceptable for system-setting's worker budget, or does AI chat need its own pool or instance? The graph has NFR-PE-07 for rate limits but no latency or concurrency target for AI calls."
+          }
+        ],
+        "options": [
+          {
+            "affected_areas": [
+              { "kind": "module", "name": "backend/shared/pkg/aiclient (new)" },
+              { "kind": "service", "name": "SVC-01 ms-system-setting" },
+              {
+                "kind": "schema",
+                "name": "ENT-17 AiModelSource/AiConversation (+ai_conversation_message, ai_org_quota, ai_usage_ledger, scope columns)"
+              },
+              { "kind": "api", "name": "/ai/conversation/{add,chat,update,list,delete,chat/list}" },
+              {
+                "kind": "api",
+                "name": "tms/identity/v1/ai.proto AIService{ResolveModel,ListMessages,AppendTurn}"
+              },
+              {
+                "kind": "infra",
+                "name": "CT-02 ms-gateway route table (default_table.go:161 UF-P1a-03), read timeout, route_decisions.approved.yaml"
+              },
+              {
+                "kind": "infra",
+                "name": "ADR-15 netguard AdminTarget profile + SSRF_* env; tools/conformance + tools/decom manifests"
+              },
+              {
+                "kind": "module",
+                "name": "FR-SYS-07, BRL-64, ADR-12, NFR-CO-02, NFR-SE-04, NFR-SE-05 (requirement/quality texts to revise)"
+              },
+              {
+                "kind": "ui",
+                "name": "ui/tms ms-ai-drawer + api/modules/ai.ts (contract consumer, not edited)"
+              }
+            ],
+            "approach": "**One owner (SVC-01), one egress path, quota enforced in SQL.**\n\n1. **`backend/shared/pkg/aiclient`** — `Client{Chat,Stream}`, `Provider{Name,BaseURL,APIKey,Model,Params}`; a single OpenAI Chat Completions implementation serving `Open AI`/`DeepSeek`/`ZhiPu AI` (the only three `ui/tms/src/enums/modelEnum.ts` can create); Claude/Bedrock ⇒ `ErrProviderUnsupported` ⇒ 422 plus an `AI-PROVIDER-CLAUDE-BEDROCK` row in `tools/conformance/deferred_features.yaml`. Build the client exactly as the existing guarded clients do — `netguard.NewClientFrom(netguard.FromEnv(netguard.AdminTarget), base, 60s)` + `telemetry.WrapTransport(target, …, WithUntrustedTarget())` (`backend/services/qa-core/api-test/pkg/safehttp/safehttp.go:39`, `system-setting/pkg/smtp/smtp.go:17`) — ≤2 retries on 429/5xx/timeout honouring `Retry-After` (capped + jitter); key only in `Authorization`; blocked targets keep netguard's fixed \"target not allowed\" text; metrics `ai_requests_total{provider,model,status}`, `ai_latency_seconds`, `ai_tokens_total{direction}`.\n2. **Data** — `migrations/V037__ss_ai_conversation_v2.sql`: `ai_conversation` + `title/scene/organization_id/model_id/update_time`; new `ai_conversation_message(id, conversation_id, role, content, create_time, tokens_in, tokens_out, model_id)`; `ai_model_source` + nullable `organization_id`, `project_id`; `ai_org_quota(organization_id, period, token_limit, cost_limit_micro)` and append-only `ai_usage_ledger`. Additive only; register tables in `tools/conformance/table_owners.yaml` and grants in `deploy/*/mysql-init/10-users.sql`.\n3. **Service layer** — extend `internal/usecase/ai/ai.go` with `ResolveModel` (`status=enabled`, `secret.Open`, ownerType compared after `TrimSpace`, resolution personal → project → org → system), `ListMessages`, `AppendTurn`; publish `tms/identity/v1/ai.proto AIService` on gRPC 50057 behind `svcauth.RequireCaller(\"case-management\",\"api-test\")` so CR-H02/BL-H03 never hold provider keys. Existing CRUD already masks (`secret.Show/Seal/Resolve`, `audit.Track`+`Redact`) ⇒ AC-3 holds unchanged.\n4. **Routes** — `internal/handler/ai/conversation.go`: `POST /ai/conversation/{add,chat,update}`, `GET /ai/conversation/{list,delete/:id,chat/list/:id}`; idempotent on the client-generated `conversationId` (the SPA fires `add` without awaiting it); `chat` returns a plain string in the envelope; `httpx` never-nil lists; other users' ids ⇒ 404.\n5. **Quota** — `QuotaCheck(orgID, estimate)` runs *before* `ResolveModel`: exhausted ⇒ 429 with a plain Vietnamese message and no provider call (AC-4); after a successful turn, `AppendTurn` + ledger insert + counter update in one transaction (`shared/pkg/uow`). Period = calendar month; `organizationId` arrives on the chat request and is checked against membership.\n6. **Flag \u0026 gateway** — `AI_ENABLED` (default off) gates a subtree middleware returning 503; replace `gone(\"UF-P1a-03\", …, \"/ai/conversation\")` at `backend/services/gateway/internal/routing/default_table.go:161` with `sub(ss, \"/ai/conversation\")`, read timeout ≥90 s, and update `route_decisions.approved.yaml`, `routes_golden_test.go:146`, `tools/decom/{route_classes_dec,ui_route_decisions}.yaml`, `tests/golden/ui-neutral/route_classes.json`.\n7. **Tests** — aiclient units (two `Retry-After` retries then a real error; private target blocked with `netguard.AllowLoopbackForTests`); handler tests against `tests/local-stack/mock-ext` `/llm/v1/chat/completions` and `__fail`; extend the SEC-07 secret test to the AI key.",
+            "breaking_change": false,
+            "cons": [
+              "AC-5's 503 contradicts BRL-64, ADR-12 and NFR-CO-02, which require an unimplemented feature to answer 404 + `X-Route-Missing: 1` and forbid 501/fake-200 routes; the exception has to be argued as \"service configured off\", not \"deferred feature\", and the UF-P1a-03 entries retired.",
+              "FR-SYS-07 as written still mandates the honest 501 for chat/transform and ENT-17 marks conversation as deferred (`hội thoại (hoãn)`); both need a revision together with this CR.",
+              "`ResolveModel` hands the decrypted key to callers over internal gRPC — safe for AC-3's UI/API/log surfaces but it widens where plaintext travels; needs an interceptor-level redaction test (NFR-SE-04).",
+              "Quota and cost semantics (tokens vs money, period, who sets the limit, multi-org users) exist nowhere in the graph or the code and must be designed inside this CR.",
+              "Per-org/project model binding has no UI: the SPA's `ownerType` enum is only `SYSTEM `/`PERSONAL`, so the new scopes are reachable only through an admin API until a UI CR lands.",
+              "A 60 s provider call plus a ≥90 s gateway read timeout holds system-setting worker slots; a chat burst can degrade unrelated SS routes."
+            ],
+            "effort": { "hours_estimate": 180, "size": "L" },
+            "id": "opt-1",
+            "pros": [
+              "Follows the design already written and reviewed in-repo (SOL-P3c-E §3.2), including the SPA call-order race, envelope shapes and gateway requirements — little is left to invent.",
+              "Reuses existing building blocks: `netguard` (ADR-15 AdminTarget), `secretbox`/`internal/secret`, `audit.Track/Redact`, `telemetry.WrapTransport`, `uow`, the `safehttp`/`pkg/smtp` client pattern and the live `ai_model_source` CRUD.",
+              "Quota, usage, conversation and key all sit in SVC-01's own schema (ENT-17 already names system-setting as owner), so the pre-check and the ledger are one transaction with no cross-service consistency problem.",
+              "`AIService` over gRPC gives CR-H02 and BL-H03 one AI entry point instead of each service holding provider keys (keeps NFR-SE-04's blast radius small).",
+              "`AI_ENABLED=false` is a complete, instant kill switch; migrations are additive so rollback needs no data work."
+            ],
+            "recommended": true,
+            "risks": [
+              {
+                "description": "AC-AI-02 (a real approved LLM) cannot be proven locally — the repo marks it `⏸ ENV B10`; only mock-ext exercises the path, so the AC stays open until an egress-enabled environment and a budget are approved.",
+                "severity": "medium"
+              },
+              {
+                "description": "The gateway owner rejects or delays flipping `/ai/conversation/*` from `gone` (UF-P1a-03) to system-setting, leaving working code unreachable behind today's 404.",
+                "severity": "medium"
+              },
+              {
+                "description": "DeepSeek/ZhiPu deviate from OpenAI on parameters or error bodies, so one implementation silently misbehaves for two of three providers.",
+                "severity": "medium"
+              },
+              {
+                "description": "Provider `usage` fields are missing or wrong (especially on errors and retries), so the ledger drifts and an org is over- or under-blocked.",
+                "severity": "medium"
+              },
+              {
+                "description": "Writing the ledger inside the chat transaction lengthens the write while an LLM response is being stored; hot organisations contend on the quota row.",
+                "severity": "low"
+              }
+            ],
+            "rollback": "`AI_ENABLED=false` turns the chat path off immediately (routes answer 503). Full revert = restore `gone(\"UF-P1a-03\", …, \"/ai/conversation\")` in `default_table.go` and the B2 rows, so the SPA sees today's 404 + `X-Route-Missing: 1`; migrations are additive (no DROP) so data can stay in place.",
+            "summary": "Implement the repo's approved design (SOL-P3c-E §3.2, T-F3-18) as one owner: new `backend/shared/pkg/aiclient` (OpenAI-compatible, netguard AdminTarget, 60 s, ≤2 retries honouring `Retry-After`, masked key, metrics), conversation + message tables and `ResolveModel/ListMessages/AppendTurn` in ms-system-setting, the six `/ai/conversation/*` routes behind `AI_ENABLED`, per-org/project model binding, and a per-organisation token/cost ledger checked in the same DB transaction before any provider call.",
+            "title": "SS-owned AI stack: shared aiclient + conversation + synchronous SQL quota ledger in ms-system-setting"
+          },
+          {
+            "affected_areas": [
+              { "kind": "module", "name": "backend/shared/pkg/aiclient (new)" },
+              {
+                "kind": "service",
+                "name": "SVC-01 ms-system-setting (conversation store, ResolveModel, outbox producer + consumer)"
+              },
+              {
+                "kind": "infra",
+                "name": "CT-02 ms-gateway: routing table flag entry, Redis quota counters (internal/ratelimit, rediskeys)"
+              },
+              {
+                "kind": "schema",
+                "name": "ENT-17 (+ai_conversation_message, ai_usage_ledger) and Kafka topic ai.usage.v1"
+              },
+              {
+                "kind": "api",
+                "name": "/ai/conversation/* (gateway-enforced 503/429) and a new budget RPC on tms/identity/v1"
+              },
+              {
+                "kind": "module",
+                "name": "FR-SYS-07, BRL-64, ADR-12, NFR-CO-02 (texts to revise), ADR-15 netguard profile"
+              }
+            ],
+            "approach": "**Same egress owner, different enforcement point and consistency model.**\n\n1. **`shared/pkg/aiclient`** — identical to opt-1 (OpenAI-compatible provider, netguard `AdminTarget`, 60 s, ≤2 retries on `Retry-After`, masked key, metrics); AC-6/AC-7 are proven by the package's own tests either way.\n2. **Edge flag** — `/ai/conversation` stays one entry in `backend/services/gateway/internal/routing/default_table.go`, but as a flag-aware entry: `AI_ENABLED=true` ⇒ `sub(ss, \"/ai/conversation\")` with a ≥90 s read timeout; `AI_ENABLED=false` ⇒ a `Disabled` mode that answers 503 for the whole subtree without touching an upstream (AC-5 in one place, for CR-H02's AI routes too). `routes_golden_test.go` gets both tables.\n3. **Edge quota** — the gateway asks SS once per (org, period) for the budget over gRPC, caches it, and keeps the consumed counters in Redis (`rediskeys` namespace, same store CT-02 already uses for revocation and rate-limit); an exhausted org is refused with 429 and a clear message before the request ever reaches SS, so no provider call happens. SS re-checks the cached budget cheaply as a second line of defence.\n4. **SS stays thin** — `ai_conversation` + `ai_conversation_message` migration, `ResolveModel/ListMessages/AppendTurn`, the six handlers (idempotent `add`, string-returning `chat`), and after each turn an `ai.usage.v1` outbox event (`shared/pkg/kafkax/outbox`, the mechanism BRL-64 already names) carrying tokens and estimated cost. A consumer in SS folds events into the append-only `ai_usage_ledger` and refreshes the Redis counters; a nightly job reconciles counters against the ledger.\n5. **Model config** — per-org/project binding as in opt-1 (nullable `organization_id`/`project_id` on `ai_model_source`, resolution personal → project → org → system), keys unchanged (`secret.Seal/Show/Open`), so AC-3 is untouched.\n6. **Tests** — gateway table tests for the flag-off 503 and the Redis refusal; SS handler tests against mock-ext; a consumer test proving the ledger converges; a reconciliation test showing drift is corrected.",
+            "breaking_change": false,
+            "cons": [
+              "Splits AI policy between two owners: CT-02 gives the gateway auth, CSRF, rate-limit, route table and MCP — a per-organisation business quota at the edge stretches that responsibility and leaves SVC-01 no longer the single owner of ENT-17's rules.",
+              "Eventual consistency: between the provider call and the ledger fold an organisation can overshoot its limit, and a Redis loss either frees or falsely blocks quota — weaker than AC-4's \"system does not call the provider\" read in the worst case.",
+              "The same BRL-64/ADR-12/NFR-CO-02 conflict as opt-1 (503 instead of 404 + `X-Route-Missing: 1`) plus the UF-P1a-03 decision ledger, and the gateway now answers a status code for a feature it does not own.",
+              "Quota semantics still undesigned, and the budget now has to be exposed over a new gRPC call and cached coherently — more contract surface than opt-1 for the same AC.",
+              "More moving parts to stand up in the local stack and in CI (Redis counters, Kafka consumer, reconciliation job), so AC-4 regressions are harder to pin down."
+            ],
+            "effort": { "hours_estimate": 200, "size": "L" },
+            "id": "opt-2",
+            "pros": [
+              "One switch disables every AI route (including CR-H02/BL-H03 later) without deploying a service change, and the refusal never consumes a system-setting worker.",
+              "An exhausted organisation is refused at the edge, so a quota storm cannot fill SS's slots or its DB connections.",
+              "Reuses the gateway's existing Redis rate-limit machinery (`internal/ratelimit`, `rediskeys`) and the outbox pattern BRL-64 names as the enforcement mechanism, instead of a new synchronous ledger path.",
+              "Usage accounting is append-only and off the request path, so a slow ledger write never slows or fails a chat turn."
+            ],
+            "recommended": false,
+            "risks": [
+              {
+                "description": "Counter and ledger diverge (lost events, consumer lag, Redis eviction) and an organisation keeps spending past its limit until reconciliation runs.",
+                "severity": "high"
+              },
+              {
+                "description": "Gateway-side quota logic drifts from SS's resolution rules (which org a user acts in, membership checks), producing refusals the service would have allowed.",
+                "severity": "medium"
+              },
+              {
+                "description": "Two tables behind one flag (enabled/disabled) make the golden route test and the decom manifests ambiguous, inviting a conformance gate failure.",
+                "severity": "medium"
+              },
+              {
+                "description": "AC-AI-02 still unverifiable locally (`⏸ ENV B10`), as in every option.",
+                "severity": "medium"
+              }
+            ],
+            "rollback": "Set `AI_ENABLED=false`: the gateway serves 503 and nothing reaches SS. Full revert = restore the `gone(\"UF-P1a-03\", …)` entry and stop the usage consumer; the ledger table and Kafka topic are additive and can be left in place.",
+            "summary": "Keep LLM egress in ms-system-setting, but move the two refusal decisions to the edge: the gateway serves the whole `/ai/conversation/*` subtree with 503 when `AI_ENABLED` is off and pre-checks the organisation's AI budget against Redis counters (reusing `internal/ratelimit` and `rediskeys`) before proxying. ms-system-setting keeps the conversation store, `ResolveModel` and the `aiclient` call, and emits usage events through the outbox that a consumer folds into an append-only ledger.",
+            "title": "Thin AI layer in SS with the flag and quota enforced at the gateway edge (Redis) and an async usage ledger"
+          },
+          {
+            "affected_areas": [
+              {
+                "kind": "module",
+                "name": "backend/shared/pkg/aiclient (new) and backend/shared/pkg/policy (new AI key group)"
+              },
+              { "kind": "service", "name": "SVC-01 ms-system-setting" },
+              {
+                "kind": "schema",
+                "name": "ENT-17 (+ai_conversation_message, ai_model_scope, ai_org_limit, ai_org_usage) and system_parameter rows"
+              },
+              {
+                "kind": "api",
+                "name": "/ai/conversation/{add,chat,update,list,delete,chat/list} + AIService gRPC"
+              },
+              {
+                "kind": "infra",
+                "name": "CT-02 ms-gateway default_table.go:161 (UF-P1a-03) and read timeout; ADR-15 netguard AdminTarget"
+              },
+              {
+                "kind": "ui",
+                "name": "NFR-CO-01 settings screen (policy group rendering) — must stay unchanged or be excluded"
+              }
+            ],
+            "approach": "**Ship the working AI path first; keep accounting as data already written.**\n\n1. **`shared/pkg/aiclient`** — as in opt-1 (OpenAI-compatible, `netguard.AdminTarget`, 60 s, ≤2 retries on `Retry-After`, masked key, metrics, Claude/Bedrock ⇒ `ErrProviderUnsupported` + deferred row). This is the part both ACs 6 and 7 rest on, so it is built in full.\n2. **Flag and limits as settings** — add a group to `backend/shared/pkg/policy/keys.go`: `policy.ai.enabled` (env `AI_ENABLED`, default `false`), `policy.ai.monthly_token_limit`, `policy.ai.monthly_cost_limit_micro`, read through the existing `policy.Reader` (DB wins over env, cached, last-good on failure). An organisation-level override lives in one narrow table `ai_org_limit(organization_id, token_limit, cost_limit_micro)`; no ledger, no counters.\n3. **Usage** — `ai_conversation_message` already stores `tokens_in/tokens_out` per turn (migration `V037`), so consumption is `SUM(tokens)` for the organisation in the current month, maintained as one `ai_org_usage(organization_id, period, tokens, cost_micro)` rollup row updated in the same transaction as the turn and rebuildable from the messages at any time. The pre-check reads the rollup before `ResolveModel`, so an exhausted organisation gets 429 and no provider call (AC-4).\n4. **Model scoping** — `ai_model_scope(model_id, scope_type ENUM('SYSTEM','ORG','PROJECT','PERSONAL'), scope_id)` keeps `ai_model_source` untouched; resolution personal → project → org → system. Keys keep flowing through `secret.Seal/Show/Open` and `audit.Redact` (AC-3).\n5. **Routes, service, gateway** — identical to opt-1: `internal/handler/ai/conversation.go` with the six routes (idempotent `add`, string `chat`, never-nil lists, 404 for other users), `ResolveModel/ListMessages/AppendTurn` exposed over gRPC for CR-H02, and the `default_table.go:161` flip plus the governance files.\n6. **Deferred to a follow-up** — provider-billing-accurate cost, per-project limits (only per-org limits ship), a separate append-only ledger, and the settings-screen UI for the new keys.",
+            "breaking_change": false,
+            "cons": [
+              "Delivers less than the CR's scope asks: cost limits are estimates from a static price table and per-project limits are deferred, so part of \"giới hạn chi phí và hạn mức theo tổ chức\" ships in a reduced form that the requester must accept.",
+              "`policy.Defs()` drives the settings screen, so new keys appear as new rows in the UI without a registered UI exception — a direct tension with NFR-CO-01 (UI-frozen) unless the group is hidden from that screen.",
+              "No append-only usage ledger means a weaker audit trail than BRL-64's INSERT-only logging habit, and disputes about an organisation's consumption can only be resolved by re-aggregating the messages.",
+              "Same BRL-64/ADR-12/NFR-CO-02 conflict for the 503 behaviour, and FR-SYS-07/ENT-17 still need the same revision.",
+              "Rebuilding the rollup gets expensive once conversations grow, so a rollup/retention job becomes necessary sooner than in opt-1."
+            ],
+            "effort": { "hours_estimate": 130, "size": "M" },
+            "id": "opt-3",
+            "pros": [
+              "Smallest new schema: one rollup row and one scope table instead of a ledger plus counters, and the usage figure is always rebuildable from the stored messages — nothing can silently drift.",
+              "Limits and the kill switch become admin-editable at runtime through the mechanism the platform already has (`system_parameter` + `shared/pkg/policy`), with environment defaults for a fresh install, instead of a redeploy per change.",
+              "Fastest path to a demonstrable AC-1/AC-3/AC-5/AC-6/AC-7 with mock-ext, which is what the local stack can actually verify today.",
+              "Leaves per-project limits and money-accurate cost to a follow-up once real provider billing is available, instead of guessing both now."
+            ],
+            "recommended": false,
+            "risks": [
+              {
+                "description": "Static price table drifts from provider pricing, so the cost ceiling blocks too early or too late and gives an organisation a misleading figure.",
+                "severity": "medium"
+              },
+              {
+                "description": "New policy keys surface on the settings screen and trip the UI-frozen gates (golden route / Playwright) unless the group is explicitly excluded.",
+                "severity": "medium"
+              },
+              {
+                "description": "A reduced quota feature is read as the whole CR delivered, and the deferred part (per-project limits, real cost) never gets scheduled.",
+                "severity": "medium"
+              },
+              {
+                "description": "AC-AI-02 unverifiable locally (`⏸ ENV B10`), as in every option.",
+                "severity": "medium"
+              }
+            ],
+            "rollback": "Set `policy.ai.enabled` to `false` (or unset `AI_ENABLED`) — the routes answer 503 at once, no deploy needed. Full revert = restore the `gone(\"UF-P1a-03\", …)` gateway entry; the additive tables and the new `system_parameter` rows are inert once the flag is off.",
+            "summary": "Same placement as opt-1 but with the smallest new surface: `AI_ENABLED` and the AI limits become `system_parameter` policy keys read through `shared/pkg/policy` (database over environment, admin-editable, cached), consumption is derived from `tokens_in/tokens_out` already stored on `ai_conversation_message` plus a monthly rollup row, cost is estimated from a static price table, and model scoping uses a small `ai_model_scope` join table instead of new columns. Per-project overrides and money-accurate cost are a follow-up.",
+            "title": "Config-driven minimal slice: policy-group flag and quotas, no new quota tables, usage read from the message table"
+          }
+        ],
+        "recommendation": {
+          "option_id": "opt-1",
+          "reason": "It is the design the repository has already reviewed for T-F3-18 (SOL-P3c-E §3.2) and it respects the settled placement of LLM egress in ms-system-setting, so almost nothing has to be invented. Keeping the quota pre-check and the usage ledger in SVC-01's own transaction gives AC-AI-04 the strict reading the CR asks for (\"the system does not call the provider\"), which opt-2's edge counters can only approximate, and it delivers the per-org and per-project configuration plus cost limits in full, which opt-3 deliberately reduces. The extra cost over opt-3 is one migration and a quota module, both additive and switched off by `AI_ENABLED` until accepted."
+        },
+        "requirement_coverage": [
+          {
+            "ac_id": "AC-1",
+            "note": "All three mount the six routes in ms-system-setting, store the user and assistant turns in `ai_conversation_message` and list them via `/ai/conversation/chat/list/:id`, verified against mock-ext's OpenAI endpoint.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-2",
+            "note": "The code path is provider-agnostic (OpenAI-compatible), but the repo marks a real LLM as `⏸ ENV B10`: the AC can only be closed once an approved provider, egress and budget exist (Q-2).",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "partial"
+          },
+          {
+            "ac_id": "AC-3",
+            "note": "Keys stay `enc:v1:` AES-256-GCM (INT-14) via `internal/secret`; API returns `secret.Show`, audit uses `audit.Redact`, aiclient puts the key only in the Authorization header and never in logs, spans or metric labels (NFR-SE-04). The plaintext key still travels on the internal gRPC `ResolveModel` reply and needs its own redaction test.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-4",
+            "note": "opt-1 and opt-3 pre-check the organisation's budget inside the request transaction before `ResolveModel`, so no provider call happens; opt-2 refuses at the edge from Redis counters, which is faster but eventually consistent, so it can overshoot the limit in the worst case.",
+            "option_ids": ["opt-1", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-5",
+            "note": "opt-1/opt-3 use a subtree middleware in system-setting (flag from env, or from `system_parameter` in opt-3); opt-2 answers 503 at the gateway. All three conflict with BRL-64/ADR-12/NFR-CO-02's 404 + `X-Route-Missing: 1` rule and need the exception recorded (A-2).",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-6",
+            "note": "Identical `shared/pkg/aiclient` behaviour in every option: ≤2 retries on 429/5xx/timeout honouring `Retry-After` (capped), then the real error; proven by unit tests and mock-ext `__fail`, which sets `Retry-After`.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-7",
+            "note": "The aiclient HTTP client is built from `netguard.FromEnv(netguard.AdminTarget)` per ADR-15/NFR-SE-05, so loopback, link-local, metadata and platform CIDRs are refused with netguard's fixed \"target not allowed\"; the local stack opens private targets only for mock-ext.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          }
+        ],
+        "schema_version": 1
+      },
+      "requestId": "0220d370-6f65-4842-9e55-d9d94f07f2b3",
+      "status": "approved",
+      "version": 4
+    },
+    {
+      "chosenOption": -1,
+      "createdAt": "2026-10-14T18:53:11Z",
+      "generationRunId": "bbf195d9-dd91-43d4-94ae-b9295a43c756",
+      "id": "f8ed6098-f4e2-4591-88c9-f1c130d1fefc",
+      "kind": "solution",
+      "options": {
+        "assumptions": [
+          {
+            "id": "A-1",
+            "text": "Pilot assumption carried over from the reviewer's answer: ADR-09 names only Jira and Google, so LLM egress may live in ms-system-setting behind the netguard AdminTarget profile."
+          },
+          {
+            "id": "A-2",
+            "needs_confirmation": true,
+            "text": "AC-5's 503 is read as \"a service that is configured off\", not as a deferred feature, so it is an explicit documented exception to ADR-12 / BRL-64 / NFR-CO-02 rather than a violation; FR-SYS-07 is revised in the same change."
+          },
+          {
+            "id": "A-3",
+            "needs_confirmation": true,
+            "text": "\"Hạn mức\" is enforced per organisation and per calendar month, counted on provider-reported prompt/completion tokens with an optional cost ceiling in micro-units; the cap is set by a system administrator."
+          },
+          {
+            "id": "A-4",
+            "text": "The SPA is frozen (NFR-CO-01), so the request/response shapes of `/ai/conversation/*` are those of `ui/tms/src/api/modules/ai.ts` and the chat answer is a bare string in the envelope."
+          },
+          {
+            "id": "A-5",
+            "text": "AC-1 is proven against tests/local-stack mock-ext `POST /llm/v1/chat/completions` with `MOCK_EXT_STRICT_KEYS=1`, and AC-6 with its `__script {rate_limit, retry_after}` scenario."
+          },
+          {
+            "id": "A-6",
+            "needs_confirmation": true,
+            "text": "Reopening `/ai/conversation/*` at the gateway is in scope for this CR (it is the only way the SPA reaches the routes), including the four governance files that record the current `gone` decision."
+          }
+        ],
+        "design_references": {
+          "available": true,
+          "conflicts": [
+            "AC-5 (503 when AI_ENABLED is off) conflicts with BRL-64, NFR-CO-02 and ADR-12, which require a feature without a real implementation to be fully hidden (404 + `X-Route-Missing: 1`) and explicitly reject 501 or fake-200 routes; ADR-12 notes the existing AI 501 exception (OI-02) that this CR removes.",
+            "FR-SYS-07, as stated in URD and SRS revision 1, requires chat and transform to answer an honest 501 while AI is not connected, so every option contradicts the current requirement text and needs it revised to revision 2 together with the golden-route and conformance artefacts (NFR-CO-01, NFR-MA-04)."
+          ],
+          "gaps": [
+            "Nothing in the graph defines an AI quota or cost limit: no entity, attribute, rule or quality target for tokens, money, period or who sets the cap, and docs/features/08-ai-advanced mentions none either.",
+            "ENT-17 records conversations as deferred (\"hội thoại (hoãn)\") with only ai_model_source attributes, so there is no element for ai_conversation_message, for per-organisation/per-project model config (no organization_id/project_id attribute), for the AI_ENABLED flag, for the supported provider list, or for streaming."
+          ],
+          "read": [
+            "FR-SYS-07",
+            "ENT-17",
+            "ENT-17:attribute:app_key",
+            "ENT-17:attribute:api_url",
+            "ENT-17:attribute:provider_name",
+            "BRL-64",
+            "ADR-12",
+            "ADR-09",
+            "ADR-06",
+            "NFR-CO-01",
+            "NFR-CO-02",
+            "NFR-SE-04",
+            "NFR-SE-05",
+            "NFR-PE-07",
+            "NFR-MA-04",
+            "INT-14"
+          ],
+          "snapshot": "snap-000001"
+        },
+        "open_questions": [
+          {
+            "id": "Q-1",
+            "text": "Quota semantics are absent from the knowledge graph and from docs/features/08-ai-advanced: is the limit counted in tokens, in money, or both; per month or rolling; shared by all projects of an organisation; and does an exhausted cap block only chat or every AI feature (CR-H02 generation too)?"
+          },
+          {
+            "id": "Q-2",
+            "text": "Which status code does an exhausted quota return (429 with Retry-After, as NFR-PE-07 does for rate limits, or 402/422), given the SPA only shows the message?"
+          },
+          {
+            "id": "Q-3",
+            "text": "Who signs the amendment that lets a configured-off AI answer 503 instead of the 404 + `X-Route-Missing: 1` that ADR-12 / BRL-64 / NFR-CO-02 require, and does FR-SYS-07 revision 2 ship in this CR or in a documentation change?"
+          },
+          {
+            "id": "Q-4",
+            "text": "Does CR-H02 need token streaming to the browser and provider-specific parameters? If yes, opt-1 must add a server-streaming `AIService.Chat` and opt-2's direct egress becomes cheaper."
+          },
+          {
+            "id": "Q-5",
+            "text": "Which real provider is approved for AC-2, who supplies the credential, and in which environment is that test run (the repo marks the real-LLM check as environment-blocked)?"
+          },
+          {
+            "id": "Q-6",
+            "text": "Per-project model configuration is not in ENT-17 (no project_id/organization_id attribute): is the resolution order project → organisation → system, and may a project override an organisation's provider while still being charged to that organisation's cap?"
+          },
+          {
+            "id": "Q-7",
+            "text": "Does `AI_ENABLED` also gate the already-live `/ai/config/*` and `/personal/model/*` configuration routes, or only `/ai/conversation/*` as AC-5 states?"
+          }
+        ],
+        "options": [
+          {
+            "affected_areas": [
+              { "kind": "module", "name": "backend/shared/pkg/aiclient (new)" },
+              { "kind": "service", "name": "ms-system-setting (ENT-17 owner, SVC-01)" },
+              {
+                "kind": "schema",
+                "name": "ENT-17 AiModelSource/AiConversation + ai_conversation_message, ai_org_budget, ai_usage_ledger"
+              },
+              {
+                "kind": "api",
+                "name": "/ai/conversation/{add,chat,update,list,delete,chat/list} (FR-SYS-07)"
+              },
+              {
+                "kind": "api",
+                "name": "gRPC AIService{Chat,ResolveModel,ListMessages,AppendTurn}"
+              },
+              {
+                "kind": "infra",
+                "name": "gateway routing default_table.go + route_decisions.approved.yaml (NFR-CO-01 golden, NFR-MA-04 gates)"
+              },
+              {
+                "kind": "infra",
+                "name": "netguard AdminTarget egress profile (NFR-SE-05), secretbox/INT-14 sealed keys (NFR-SE-04)"
+              },
+              {
+                "kind": "module",
+                "name": "BRL-64 / NFR-CO-02 / ADR-12 deferred-feature registry (AI_ENABLED 503 exception)"
+              },
+              {
+                "kind": "ui",
+                "name": "ui/tms api/modules/ai.ts + ms-ai-drawer (contract consumer, not edited)"
+              }
+            ],
+            "approach": "**Settled (clarification):** LLM egress lives in ms-system-setting (SVC-01) behind the `netguard` `AdminTarget` profile, not in ms-integration.\n\n1. **`backend/shared/pkg/aiclient`** — `Client{Chat,Stream}`, `Provider{Name,BaseURL,APIKey,Model,Params}`; a single OpenAI Chat Completions implementation serving the three providers the SPA can create (`ui/tms/src/enums/modelEnum.ts`: Open AI, DeepSeek, ZhiPu AI); Claude/Bedrock ⇒ `ErrProviderUnsupported` ⇒ 422 plus a row in `tools/conformance/deferred_features.yaml` (ADR-12 registry, NFR-MA-04 gate). Build the transport the way `backend/services/qa-core/api-test/pkg/safehttp` does: `netguard.NewClient(netguard.FromEnv(netguard.AdminTarget), 60*time.Second)` (`backend/shared/pkg/netguard/netguard.go:170,564`) ⇒ AC-7 by construction (NFR-SE-05); ≤2 retries on 429/5xx/timeout honouring `Retry-After` with a cap ⇒ AC-6; key only in the `Authorization` header, never in error text, spans or metric labels (NFR-SE-04).\n2. **Service layer** — extend `backend/services/platform/system-setting/internal/usecase/ai/` with `ResolveModel` (enabled sources only, `OwnerType` compared after `TrimSpace`, key opened with `internal/secret.Open`, `secret.go:31`), `ListMessages`, `AppendTurn`, and the chat orchestration. **The provider call happens inside SS**; the gRPC surface for CR-H02/H03 is `AIService.Chat` (plus `ResolveModel` that returns provider metadata with the key **masked**), so plaintext keys stay inside SVC-01 and quota is enforced in exactly one place ⇒ AC-3 even for internal callers.\n3. **Data (ENT-17, owner system-setting, ADR-06)** — `V0NN__ss_ai_conversation_v2.sql`: `ai_conversation` gains `title/scene/organization_id/model_id/update_time`; new `ai_conversation_message(id, conversation_id, role, content, create_time, tokens_in, tokens_out, model_id)`; new `ai_org_budget(organization_id, period, token_limit, cost_limit_micro)` and INSERT-only `ai_usage_ledger`. Register every new table in `backend/db/ownership.yaml` and `tools/conformance/table_owners.yaml`. Per-project config = `ai_model_source` gains `project_id`, resolution order project → org → system.\n4. **Routes** — `internal/handler/ai/conversation.go`: `POST /ai/conversation/{add,chat,update}`, `GET /ai/conversation/{list,delete/:id,chat/list/:id}`; own conversations only (404 otherwise); idempotent on the client-supplied `conversationId` because `conversation.vue` fires `add` without awaiting it; `chat` answers a bare string in the envelope; `[]` never nil (NFR-CO-01). Flag off ⇒ 503 with a message ⇒ AC-5.\n5. **Quota** — budget checked **before** `ResolveModel`; exhausted ⇒ 429 + clear message and no outbound call ⇒ AC-4; the ledger row is written in the same transaction as `AppendTurn`, so accounting cannot drift from stored turns.\n6. **Gateway** — replace `gone(\"UF-P1a-03\", …, Subtree, \"/ai/conversation\")` (`backend/services/gateway/internal/routing/default_table.go:161`) with the system-setting subtree, read timeout ≥90 s; update `internal/router/testdata/route_decisions.approved.yaml:21`, `routes_golden_test.go`, `tools/decom/route_classes_dec.yaml`, `tools/decom/ui_route_decisions.yaml`.\n7. **Tests** — aiclient unit tests for Retry-After and a blocked private target (`netguard.AllowLoopbackForTests`); handler tests against `tests/local-stack/mock-ext` `POST /llm/v1/chat/completions` with `__script {rate_limit}`; extend the SEC-07 secret test; revise FR-SYS-07 to revision 2.",
+            "breaking_change": false,
+            "cons": [
+              "AC-5 (503 when `AI_ENABLED` is off) contradicts BRL-64, NFR-CO-02 and ADR-12, which require an unimplemented feature to answer 404 + `X-Route-Missing: 1` and explicitly reject 501/fake-200 routes; it must be argued as \"configured-off service\", not \"deferred feature\", and ADR-12 already carries an AI 501 exception (OI-02) that this CR removes.",
+              "FR-SYS-07 as it stands in URD/SRS mandates the honest 501 for chat/transform, so the requirement needs a revision shipped with this CR (its own acceptance text already anticipates T-F3-18).",
+              "Deviates from the repo's approved `SOL-P3c-E §3.2`, where `ResolveModel` returns `api_key(PLAIN)` to case-management/api-test; that solution document must be amended or CR-H02 will be written against a contract that no longer exists.",
+              "ms-system-setting becomes a synchronous fan-in for every AI call: a 60 s provider call plus ≥90 s gateway read timeout occupies SS workers and can degrade unrelated settings routes (NFR-PE-07 limits are per request, not per in-flight second).",
+              "Streaming for CR-H02 needs a server-streaming RPC that this CR does not build.",
+              "Quota semantics (tokens vs money, period, who sets the cap) exist nowhere in the knowledge graph or `docs/features/08-ai-advanced` and must be designed inside this CR."
+            ],
+            "effort": { "hours_estimate": 170, "size": "L" },
+            "id": "opt-1",
+            "pros": [
+              "The decrypted key never leaves ms-system-setting, so AC-3 holds for UI, API, logs **and** internal gRPC without relying on interceptor redaction.",
+              "One chokepoint for quota, metrics and provider errors: CR-H02/H03 cannot bypass the budget or the SSRF profile.",
+              "Reuses what exists: `netguard`, `secretbox`, `internal/secret` (Seal/Show/Open/Resolve), `audit.Track`+`audit.Redact`, the `safehttp` transport pattern, and the whole `ai_model_source` CRUD stays untouched.",
+              "Keeps model config, conversation, messages and the usage ledger in one owner (ENT-17 names system-setting), so no cross-service transaction and no new table owner."
+            ],
+            "recommended": true,
+            "risks": [
+              {
+                "description": "AC-2 (a real approved LLM) cannot be proven in the local stack; the repo marks the real-provider check as env-blocked, so only mock-ext exercises the path.",
+                "severity": "medium"
+              },
+              {
+                "description": "Reopening `/ai/conversation/*` needs sign-off on four governance artefacts (gateway decision ledger, golden route test, decom route classes, deferred manifest); without it the feature works but stays unreachable behind the 404.",
+                "severity": "medium"
+              },
+              {
+                "description": "Token/cost accounting depends on the provider `usage` field, which is absent on errors and partial responses, so the ledger can under-count and let an org overrun its cap.",
+                "severity": "medium"
+              },
+              {
+                "description": "DeepSeek/ZhiPu deviate from OpenAI on parameter names and error bodies; one implementation may silently misbehave for two of three providers.",
+                "severity": "medium"
+              },
+              {
+                "description": "The new gRPC `Chat` method widens the SS gRPC surface; a missing `RequireCaller` ACL would let any internal service spend an org's AI budget.",
+                "severity": "low"
+              }
+            ],
+            "rollback": "`AI_ENABLED=false` turns the chat path off (503). Full rollback = restore `gone(\"UF-P1a-03\", …, \"/ai/conversation\")` in default_table.go and the B2 rows, so the SPA sees today's 404 + `X-Route-Missing: 1`; migrations are additive (no DROP), so stored conversations and budgets can stay.",
+            "summary": "Build `backend/shared/pkg/aiclient` (OpenAI-compatible, netguard AdminTarget, 60 s, ≤2 retries honouring Retry-After, masked key, metrics) and let only ms-system-setting import it. SS owns conversation tables, an org budget + INSERT-only usage ledger, the six `/ai/conversation/*` routes behind `AI_ENABLED`, and exposes `AIService.Chat/ListMessages/AppendTurn` over gRPC for CR-H02/H03 — the decrypted API key never crosses a service boundary.",
+            "title": "SS-owned AI edge: shared `aiclient`, egress only in ms-system-setting, gRPC `AIService.Chat` so no key leaves SVC-01"
+          },
+          {
+            "affected_areas": [
+              {
+                "kind": "module",
+                "name": "backend/shared/pkg/aiclient (new, imported by three services)"
+              },
+              { "kind": "service", "name": "ms-system-setting (ENT-17 owner, SVC-01)" },
+              {
+                "kind": "api",
+                "name": "gRPC AIService{ResolveModel(api_key PLAIN),ListMessages,AppendTurn,CheckBudget,RecordUsage}"
+              },
+              {
+                "kind": "schema",
+                "name": "ENT-17 + ai_conversation_message, ai_org_budget, ai_usage_ledger"
+              },
+              { "kind": "api", "name": "/ai/conversation/* (FR-SYS-07)" },
+              {
+                "kind": "infra",
+                "name": "gateway routing + route decision ledger (NFR-CO-01, NFR-MA-04)"
+              },
+              {
+                "kind": "infra",
+                "name": "grpcx interceptor redaction (NFR-SE-04), netguard AdminTarget in three services (NFR-SE-05)"
+              },
+              {
+                "kind": "module",
+                "name": "BRL-64 / NFR-CO-02 / ADR-12 (503-when-off exception), ADR-09 (secret centralisation rationale)"
+              }
+            ],
+            "approach": "Same `aiclient` package, same migrations, same routes and the same gateway flip as opt-1, but a different **trust boundary**.\n\n1. **gRPC contract exactly as approved** — `tms/identity/v1/ai.proto`: `ResolveModel{model_id,user_id,org_id} → {provider_name, base_url, model, api_key(PLAIN), params}`, `ListMessages`, `AppendTurn`, guarded by the existing `grpcx` ACL (`RequireCaller(\"case-management\",\"api-test\")`, `backend/shared/pkg/grpcx/acl.go`). Each caller constructs `aiclient.New(Provider{...})` itself and performs the egress with its own `netguard.FromEnv(netguard.AdminTarget)` client.\n2. **Budget as its own contract** — `CheckBudget{org_id, estimated_tokens}` before the call and `RecordUsage{org_id, tokens_in, tokens_out, cost_micro}` after it, writing the INSERT-only `ai_usage_ledger` in ms-system-setting; `/ai/conversation/chat` in SS uses the same pair so there is one code path for the rule, two for the transport.\n3. **Key hygiene becomes a test obligation, not a structural property** — client/server gRPC interceptors must redact `api_key` from logs, spans and metric labels (NFR-SE-04); add a dedicated test that greps the span/log sink for the mock key (`tests/local-stack/mock-ext` exposes it at `GET /__keys`), plus a never-return assertion on every HTTP DTO (`secret.Show` already masks `app_key`).\n4. **Routes, data, flag, gateway, tests** — identical to opt-1: `ai_conversation` v2 + `ai_conversation_message`, per-project `ai_model_source`, `AI_ENABLED` (off ⇒ 503), `default_table.go:161` gone → system-setting subtree with ≥90 s read timeout, mock-ext `__script {rate_limit}` for AC-6 and `netguard.AllowLoopbackForTests` for AC-7.\n5. **Why one would pick this** — CR-H02 (case generation with `JSONMode`, marker parsing, transform retry) and CR-H03 (api-test) call the provider with service-specific prompts, parameters and streaming; having them own the HTTP call avoids a second hop and a server-streaming proxy, and keeps ms-system-setting out of the latency path of long generations.",
+            "breaking_change": false,
+            "cons": [
+              "The decrypted API key crosses an internal gRPC boundary and is held in two more process memories; AC-3 then depends on interceptor redaction and discipline rather than structure, and NFR-SE-04 (\"secrets never in log, span, metric label\") becomes a per-service obligation.",
+              "Spreads egress over three services, so the `netguard` AdminTarget profile and the SSRF/retry policy of NFR-SE-05 must be configured and tested three times; a future consumer can skip the guard.",
+              "Check-then-use quota is racy: concurrent chats can each pass `CheckBudget` and overshoot the cap, so AC-4 is only approximately enforced under load.",
+              "Centralising credentials and egress is the stated rationale of ADR-09 (named for Jira/Google); handing LLM keys to case-management/api-test moves in the opposite direction even though the decision does not formally cover LLMs.",
+              "Carries the same AC-5 conflict with BRL-64 / NFR-CO-02 / ADR-12 and the same FR-SYS-07 revision need as opt-1, plus the same undefined quota semantics (not in the knowledge graph)."
+            ],
+            "effort": { "hours_estimate": 150, "size": "L" },
+            "id": "opt-2",
+            "pros": [
+              "Matches a solution document that is already marked ready in the repo, including the SPA call-order race, envelope shapes and the gateway requirements — the least design left to invent and no amendment to that document.",
+              "No extra hop and no streaming proxy for CR-H02/H03: each service shapes its own prompt, parameters and SSE handling directly against the provider.",
+              "ms-system-setting stays a config/metadata service and does not hold long-lived outbound calls for other services' features.",
+              "`CheckBudget`/`RecordUsage` is explicit, so a consumer that forgets it is visible in review and can be caught by a conformance check."
+            ],
+            "recommended": false,
+            "risks": [
+              {
+                "description": "A plaintext key ends up in a trace, error body or audit diff from one of the three services; the leak is invisible until a security test is written for each of them.",
+                "severity": "high"
+              },
+              {
+                "description": "AC-2 cannot be verified locally (real provider is env-blocked); with three egress paths, only the SS one is exercised in this CR.",
+                "severity": "medium"
+              },
+              {
+                "description": "Budget overshoot under concurrency produces a cost incident that the ledger records but cannot prevent.",
+                "severity": "medium"
+              },
+              {
+                "description": "Gateway route-decision sign-off is refused or delayed, leaving the SPA on the 404.",
+                "severity": "medium"
+              }
+            ],
+            "rollback": "`AI_ENABLED=false` ⇒ 503; restore the `gone(\"UF-P1a-03\", …)` entry and the B2 rows for the previous 404 behaviour. The proto is additive, so removing it later is a breaking change for CR-H02 consumers once they ship — rollback of the contract must happen before H02 merges.",
+            "summary": "Implement `backend/specs/crs/v4/solutions/SOL-P3c-E_files-ai-f18-f24.md` §3.2 literally: `AIService.ResolveModel` returns provider, base URL and the decrypted `api_key` over svcauth gRPC, and every consumer (ms-system-setting now, case-management/api-test in CR-H02/H03) builds its own `aiclient` and calls the provider directly. Budget enforcement is a separate `CheckBudget`/`RecordUsage` RPC pair.",
+            "title": "Ship the approved SOL-P3c-E contract: `ResolveModel` hands the plaintext key out, each service does its own egress"
+          },
+          {
+            "affected_areas": [
+              { "kind": "module", "name": "backend/shared/pkg/aiclient (new, single importer)" },
+              { "kind": "service", "name": "ms-system-setting (ENT-17 owner, SVC-01)" },
+              {
+                "kind": "schema",
+                "name": "ENT-17 + ai_conversation_message, ai_model_source.project_id (no ledger table)"
+              },
+              { "kind": "api", "name": "/ai/conversation/* (FR-SYS-07)" },
+              {
+                "kind": "infra",
+                "name": "Redis usage counters + settings-based caps (BRL-64 INSERT-only journal not used)"
+              },
+              {
+                "kind": "infra",
+                "name": "gateway routing + decision ledger, deferred_features.yaml (NFR-CO-01, NFR-MA-04, ADR-12)"
+              },
+              { "kind": "ui", "name": "ui/tms api/modules/ai.ts (contract consumer, not edited)" }
+            ],
+            "approach": "1. **`backend/shared/pkg/aiclient`** — identical to opt-1 (OpenAI-compatible, `netguard` AdminTarget, 60 s, ≤2 retries honouring `Retry-After`, masked key, `ai_requests_total`/`ai_latency_seconds`), because AC-6 and AC-7 are package-level behaviour in every option.\n2. **No new gRPC surface** — `ResolveModel/ListMessages/AppendTurn` stay unexported Go functions in `internal/usecase/ai`; nothing outside ms-system-setting can resolve a model, so the key cannot leak by contract (AC-3) and no proto has to be frozen before CR-H02 clarifies what it needs.\n3. **Data** — the migration the CR names and nothing more: `ai_conversation` gains `title/scene/organization_id/model_id/update_time`, `ai_conversation_message` is created, `ai_model_source` gains `project_id` (project → org → system resolution). No ledger table, no budget table.\n4. **Budget** — limits live in the existing system/organisation settings (`/setting`-family params already served by SS), usage in Redis: `INCRBY ai:usage:\u003corg\u003e:\u003cYYYYMM\u003e` for tokens and cost-micro, checked **before** resolving the model, so an exhausted org gets a 429 with a clear message and no provider call (AC-4). Metrics expose current usage per org for operators.\n5. **Routes \u0026 flag** — the six `/ai/conversation/*` handlers exactly as the SPA calls them (idempotent on the client `conversationId`, bare string from `chat`, never-nil lists), `AI_ENABLED` off ⇒ 503.\n6. **Gateway \u0026 governance** — the same unavoidable flip of `default_table.go:161` from `gone` to the system-setting subtree with a ≥90 s read timeout, plus `route_decisions.approved.yaml`, `routes_golden_test.go`, `route_classes_dec.yaml`, `ui_route_decisions.yaml` and a `deferred_features.yaml` row for Claude/Bedrock.\n7. **Tests** — aiclient unit tests (Retry-After, blocked private target), handler tests against mock-ext `/llm/v1/chat/completions`, a quota test that asserts mock-ext recorded **no** request after the cap, SEC-07 extension for the AI key.\n8. **Follow-up (explicitly out of this slice)** — CR-H02 chooses between an internal signed HTTP route (`/internal/ai/chat`) and the full `AIService` proto once its prompt/streaming needs are known.",
+            "breaking_change": false,
+            "cons": [
+              "A Redis counter is not an INSERT-only journal; BRL-64's enforcement mechanism for this requirement family names exactly that (`nhật ký INSERT-only`), and an operator cannot audit or bill AI usage afterwards.",
+              "Losing or flushing Redis silently resets an org's consumption, so the cap in AC-4 is best-effort rather than durable.",
+              "CR-H02/H03 will either duplicate model resolution and egress or trigger a second refactor of this layer; the repo's approved SOL-P3c-E §3.2 expects the gRPC contract now.",
+              "Carries the same unavoidable conflicts as the other options: AC-5's 503 against BRL-64 / NFR-CO-02 / ADR-12, and the FR-SYS-07 (501) revision.",
+              "Per-organisation cost limits stored in generic settings params have no schema validation and no history of who changed a cap."
+            ],
+            "effort": { "hours_estimate": 95, "size": "M" },
+            "id": "opt-3",
+            "pros": [
+              "Smallest blast radius and the fastest path to a working AI chat: no proto, no new owned tables beyond the two the CR names, no cross-service trust decision.",
+              "Keeps the plaintext key inside one process for free, so AC-3 needs no interceptor work.",
+              "Postpones the one design decision nobody can settle today (what CR-H02 needs from the AI layer) instead of freezing a contract that will be rewritten.",
+              "Cheapest to roll back: the flag, four governance rows and two additive tables."
+            ],
+            "recommended": false,
+            "risks": [
+              {
+                "description": "Quota enforcement is not auditable; a cost overrun cannot be reconstructed from the data (no ledger), which is the one AI risk the backlog calls out as business-visible.",
+                "severity": "high"
+              },
+              {
+                "description": "CR-H02 arrives before the contract exists and bypasses the budget by calling the provider itself, re-creating the key-spreading problem opt-2 was criticised for.",
+                "severity": "medium"
+              },
+              {
+                "description": "AC-2 remains unverified locally (real provider env-blocked).",
+                "severity": "medium"
+              },
+              {
+                "description": "Gateway route-decision sign-off refused, leaving the slice unreachable.",
+                "severity": "low"
+              }
+            ],
+            "rollback": "`AI_ENABLED=false`, then restore `gone(\"UF-P1a-03\", …)` plus the B2 governance rows; drop nothing — the two added tables and the Redis keys are inert when the flag is off.",
+            "summary": "Deliver the user-visible AI foundation with the smallest surface: `aiclient` plus conversation storage, routes and `AI_ENABLED` inside ms-system-setting, the org cap as an atomic Redis counter with limits in existing settings, and no new proto. CR-H02/H03 get their contract in a follow-up once the real shape of case generation is known.",
+            "title": "Pilot slice: conversation + chat inside ms-system-setting only, Redis org budget, no gRPC contract yet"
+          }
+        ],
+        "recommendation": {
+          "option_id": "opt-1",
+          "reason": "AC-3 and AC-4 are the two criteria a reviewer cannot retest by hand later; opt-1 makes both structural (the decrypted key never leaves ms-system-setting, and every AI call — including CR-H02's — passes one budget check with the ledger written in the same transaction as the stored turn), while opt-2 reduces them to redaction discipline across three services plus a racy check-then-use, and opt-3 trades the auditable usage journal that BRL-64 names for speed. It keeps the clarified egress boundary and all the reusable pieces of the approved design, and the only thing it gives up is the `api_key(PLAIN)` detail of SOL-P3c-E §3.2, which is cheaper to amend now than a leaked key later."
+        },
+        "requirement_coverage": [
+          {
+            "ac_id": "AC-1",
+            "note": "Chat against mock-ext plus `ai_conversation_message` persistence and `/ai/conversation/chat/list/:id`; needs the gateway subtree flip in every option.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-2",
+            "note": "The OpenAI-compatible client works for Open AI/DeepSeek/ZhiPu, but a real approved provider and credential are environment-blocked in this repo, so the criterion cannot be demonstrated locally (Q-5).",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "partial"
+          },
+          {
+            "ac_id": "AC-3",
+            "note": "Key sealed with secretbox (INT-14), masked by secret.Show and audit.Redact, never in logs/spans/metric labels (NFR-SE-04); opt-1 and opt-3 keep the plaintext inside system-setting. opt-2 also targets this AC but relies on gRPC interceptor redaction.",
+            "option_ids": ["opt-1", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-4",
+            "note": "Budget checked before model resolution with a test asserting mock-ext recorded no request; durability differs (opt-1 transactional ledger, opt-2 racy check-then-use RPC, opt-3 Redis counter).",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-5",
+            "note": "Routes mounted with an `AI_ENABLED` guard returning 503; requires the documented exception to ADR-12 / BRL-64 / NFR-CO-02 (Q-3, A-2).",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-6",
+            "note": "aiclient retry policy (≤2, Retry-After honoured with a cap) unit-tested against mock-ext `__script {rate_limit}`.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          },
+          {
+            "ac_id": "AC-7",
+            "note": "netguard AdminTarget transport blocks loopback/link-local/metadata/internal ranges (NFR-SE-05); opt-2 must configure and test it in each of the three calling services.",
+            "option_ids": ["opt-1", "opt-2", "opt-3"],
+            "status": "covered"
+          }
+        ],
+        "schema_version": 1
+      },
+      "requestId": "0220d370-6f65-4842-9e55-d9d94f07f2b3",
+      "status": "proposed",
+      "version": 2
+    }
+  ]
+}

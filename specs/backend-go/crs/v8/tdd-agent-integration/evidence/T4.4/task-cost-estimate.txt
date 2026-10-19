@@ -1,0 +1,35 @@
+prices fitted on 10 reported run(s), per million tokens: input 5.00, output 25.00, cache read 0.50, cache write 10.00; worst error 0.0%
+
+/Users/datbeohbbh/Desktop/work/vnpay/agentic-app/vnp-qa-platform/.claude/worktrees/tdd-agent-bl-h01-h02-task-479292be-f639-4e44-9982-061f8d7b7217: 24 session(s)
+  18676c54     0 replies  ~$  0.00
+  2b44f45a    27 replies  ~$  2.72
+  3676c25f    35 replies  ~$  4.05
+  3caf8226    43 replies  ~$  6.04
+  41330328    30 replies  ~$  3.22
+  5632d81e    28 replies  ~$  4.32
+  57ab0185    20 replies  ~$  1.63
+  59d062da    25 replies  ~$  2.65
+  5ce5cf66    19 replies  ~$  2.25
+  5db3ed6a    56 replies  ~$  7.13
+  6f0bd094    73 replies  ~$  7.01
+  712fc205    24 replies  ~$  2.67
+  72a18eb4    25 replies  ~$  2.56
+  8df9561a    74 replies  ~$  8.31
+  8f3eead2    45 replies  ~$  5.19
+  92a4d2c3    66 replies  ~$  6.67
+  959db01a     8 replies  ~$  0.94
+  aaf40679    44 replies  ~$  5.63
+  bee9f756    39 replies  ~$  5.58
+  ddd789a8    49 replies  ~$  6.05
+  ddf9cf68    40 replies  ~$  3.58
+  ed9d8baa    30 replies  ~$  3.41
+  ef560e03    27 replies  ~$  3.11
+  f715c585    61 replies  ~$  6.47
+
+/Users/datbeohbbh/Desktop/work/vnpay/agentic-app/vnp-qa-platform/.claude/worktrees/tdd-agent-bl-h01-h02-task-34b11ce9-893e-4107-979e-ba98488a67f9: 4 session(s)
+  4dd67f97    18 replies  ~$  2.13
+  52fe76f2    12 replies  ~$  1.19
+  6ffafdcf    21 replies  ~$  2.25
+  d86537c5    17 replies  ~$  2.17
+
+estimated total: ~$108.94

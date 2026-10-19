@@ -41,15 +41,17 @@ export type AgentConfig = {
  * Build colon-separated tool PATH — expands ~/.local/bin and other common
  * bin dirs that may not be in process.env.PATH when running under systemd.
  */
-function buildToolPath(home: string): string {
+export function buildToolPath(home: string, platform: NodeJS.Platform = process.platform): string {
   return [
     `${home}/.local/bin`,
     `${home}/bin`,
+    // Why: Apple Silicon Homebrew keeps `node` here; without it `claude` hooks that run `node` are skipped silently.
+    ...(platform === 'darwin' ? ['/opt/homebrew/bin', '/opt/homebrew/sbin'] : []),
     '/usr/local/bin',
     '/usr/bin',
     '/bin',
     '/usr/sbin',
-    '/snap/bin',
+    '/snap/bin'
   ].join(':')
 }
 
@@ -63,7 +65,7 @@ function deriveHttpUrl(wsUrl: string): string {
     const u = new URL(wsUrl)
     u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:'
     u.pathname = '/'
-    u.search   = ''
+    u.search = ''
     return u.origin
   } catch {
     return 'http://localhost:6769'
@@ -80,15 +82,15 @@ export function loadAgentConfig(opts?: { stdio?: boolean }): AgentConfig {
   const toolPath = buildToolPath(home)
   const toolEnv: NodeJS.ProcessEnv = {
     ...process.env,
-    PATH:              toolPath,
-    HOME:              home,
+    PATH: toolPath,
+    HOME: home,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '',
-    GITHUB_TOKEN:      process.env.GITHUB_TOKEN      ?? '',
-    GH_TOKEN:          process.env.GH_TOKEN          ?? '',
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN ?? '',
+    GH_TOKEN: process.env.GH_TOKEN ?? ''
   }
   const devServerId = process.env.DEV_SERVER_ID || 'dev-local'
-  const logLevel     = (process.env.LOG_LEVEL || 'info') as AgentLogLevel
-  const workDir      = process.env.AGENT_WORK_DIR || process.cwd()
+  const logLevel = (process.env.LOG_LEVEL || 'info') as AgentLogLevel
+  const workDir = process.env.AGENT_WORK_DIR || process.cwd()
   const credentialDir = join(home, '.orca', 'credentials')
 
   // stdio mode: the Go backend (infra-fleet-service) SSH-deploys this same
@@ -112,16 +114,14 @@ export function loadAgentConfig(opts?: { stdio?: boolean }): AgentConfig {
       toolPath,
       toolEnv,
       credentialDir,
-      tlsRejectUnauthorized: true,
+      tlsRejectUnauthorized: true
     }
   }
 
   // Use || instead of ?? so that empty string env vars also fall back to defaults.
   const rawMode = process.env.MODE || 'direct-websocket'
   if (rawMode !== 'direct-websocket' && rawMode !== 'relay-websocket') {
-    throw new Error(
-      `Invalid MODE="${rawMode}". Must be "direct-websocket" or "relay-websocket".`
-    )
+    throw new Error(`Invalid MODE="${rawMode}". Must be "direct-websocket" or "relay-websocket".`)
   }
   const mode = rawMode as AgentConnectionMode
 
@@ -134,15 +134,15 @@ export function loadAgentConfig(opts?: { stdio?: boolean }): AgentConfig {
     mode,
     orcaUrl,
     orcaHttpUrl,
-    agentToken:  process.env.AGENT_TOKEN        ?? '',
-    apiSecret:   process.env.ORCA_AGENT_API_SECRET ?? '',
-    agentPort:   Number.parseInt(process.env.AGENT_PORT || '6799', 10),
+    agentToken: process.env.AGENT_TOKEN ?? '',
+    apiSecret: process.env.ORCA_AGENT_API_SECRET ?? '',
+    agentPort: Number.parseInt(process.env.AGENT_PORT || '6799', 10),
     devServerId,
     logLevel,
     workDir,
     toolPath,
     toolEnv,
     credentialDir,
-    tlsRejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
+    tlsRejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0'
   }
 }

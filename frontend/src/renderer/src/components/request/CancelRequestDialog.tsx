@@ -18,17 +18,30 @@ type Props = {
   reasonRequired?: boolean
 }
 
-export function CancelRequestDialog({ open, onOpenChange, onConfirm, reasonRequired = false }: Props): React.JSX.Element {
+export function CancelRequestDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  reasonRequired = false
+}: Props): React.JSX.Element {
   return (
     <RequestReasonDialog
       open={open}
       onOpenChange={onOpenChange}
       title={translate(`${T}title`, 'Cancel this request?')}
-      description={translate(`${T}description`, 'Work in progress stops. You can still read the request afterwards.')}
-      reasonLabel={reasonRequired ? translate(`${T}reasonRequired`, 'Reason (required)') : translate(`${T}reason`, 'Reason (optional)')}
+      description={translate(
+        `${T}description`,
+        'Work in progress stops. You can still read the request afterwards.'
+      )}
+      reasonLabel={
+        reasonRequired
+          ? translate(`${T}reasonRequired`, 'Reason (required)')
+          : translate(`${T}reason`, 'Reason (optional)')
+      }
       submitLabel={translate(`${T}confirm`, 'Cancel request')}
       reasonRequired={reasonRequired}
       destructive
+      submitTestId="request-cancel-confirm"
       onSubmit={onConfirm}
     />
   )

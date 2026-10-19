@@ -27,6 +27,7 @@ type fakeAccountRepository struct {
 	// test_connection_test.go (TASK-030) use this to seed a Get result
 	// without needing a full Create round-trip first.
 	getReturns *domain.ProviderAccount
+	getErr     error
 
 	// updateErr/lastUpdateInput back update_account_test.go (TASK-030).
 	updateErr       error
@@ -63,6 +64,9 @@ func (f *fakeAccountRepository) Create(ctx context.Context, account domain.Provi
 }
 
 func (f *fakeAccountRepository) Get(ctx context.Context, tenantID, id string) (domain.ProviderAccount, error) {
+	if f.getErr != nil {
+		return domain.ProviderAccount{}, f.getErr
+	}
 	if f.getReturns != nil {
 		return *f.getReturns, nil
 	}

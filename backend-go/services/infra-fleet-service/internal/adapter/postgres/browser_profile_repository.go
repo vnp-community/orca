@@ -77,11 +77,14 @@ func (s *BrowserProfileStore) Create(ctx context.Context, profile domain.Browser
 func (s *BrowserProfileStore) Delete(ctx context.Context, tenantID, id string) error {
 	const q = `DELETE FROM infra.browser_profiles WHERE tenant_id = $1 AND id = $2`
 	tag, err := s.pool.Exec(ctx, q, tenantID, id)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: deleting browser profile %s: %w", id, domain.ErrBrowserProfileNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: deleting browser profile: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: browser profile %s not found", id)
+		return fmt.Errorf("postgres: deleting browser profile %s: %w", id, domain.ErrBrowserProfileNotFound)
 	}
 	return nil
 }

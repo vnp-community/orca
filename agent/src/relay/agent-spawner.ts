@@ -40,6 +40,7 @@ import { extractResume, spawnerTracer } from './agent-spawn-types'
 import type { AgentLifecycleState, AgentSpawnRequest } from './agent-spawn-types'
 import { resolveAgentSpec, buildAgentArgs } from './agent-binary-specs'
 import { buildAgentEnv } from './agent-spawn-env'
+import { ensureNodePtySpawnHelperExecutable } from './node-pty-spawn-helper-permissions'
 import {
   PTY_REGISTRY,
   rebindAgentSpawnConnection,
@@ -265,6 +266,7 @@ export async function handleAgentSpawn(
     let nodePty: typeof nodePtyTypes
     try {
       nodePty = await import('node-pty')
+      ensureNodePtySpawnHelperExecutable()
     } catch {
       throw new Error(
         `node-pty is not installed on this dev server. ` +

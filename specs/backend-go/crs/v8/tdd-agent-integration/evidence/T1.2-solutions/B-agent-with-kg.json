@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "design_references": {
+    "snapshot": "snap-000001",
+    "read": [
+      "FR-SYS-07",
+      "BRL-64",
+      "ADR-12",
+      "ADR-15",
+      "NFR-SE-05",
+      "BRL-46",
+      "NFR-SE-04",
+      "ENT-17",
+      "FR-SYS-09",
+      "FR-SYS-03",
+      "NFR-MA-05",
+      "ADR-16"
+    ],
+    "gaps": [
+      "ENT-17 (`ai_model_source`, `ai_conversation`, owner system-setting) has no org/project scoping, no cost-cap/quota fields, and no `ai_conversation_message` table — CR-H01's turn-level storage and per-org/per-project model config are not yet modeled in the KG.",
+      "No KG element for BL-J02 (hide AI nav button when AI off) exists yet — referenced in the request but unverifiable in this snapshot.",
+      "No business rule or entity defines AI cost-cap/quota semantics (reset period, hard-stop vs warn) needed for AC-AI-04.",
+      "No AI-specific retry/backoff rule exists; closest precedents (ADR-10 retry-3-with-backoff, FR-JIR-07 RETRYABLE/BLOCKED/FAILED classification) are for Jira/queue sync, not outbound LLM calls."
+    ],
+    "conflicts": [
+      "CR-H01's proposed routes (`/ai/conversation/{add,chat,update,list,delete,chat/list}`) do not match FR-SYS-07's currently traced API surface (`POST /system/ai-config/save`, `GET /system/ai-config/list`, `POST /personal/model/edit-source`, `POST /functional/case/ai/chat`, `POST /functional/case/ai/transform`) — the spec's API field and traceability need reconciling or FR-SYS-07 needs a revision.",
+      "BRL-64 (shared by FR-SYS-07, FR-SYS-09, FR-AUT-09, FR-CAS-13, FR-REV-05, FR-PLN-12, FR-API-14, FR-MCP-02, FR-UI-04) and ADR-12 mandate deferred features be fully hidden (404 + `X-Route-Missing: 1`), never 501/200-fake; ADR-12 itself records the AI 501 as a tracked exception (OI-02). AC-AI-05's 503-when-`AI_ENABLED=false` is a third status code pattern not covered by BRL-64/ADR-12 or by the staged-rollout flag convention in NFR-MA-05 (`report`→`on`), so it should be confirmed as an intentional, distinct convention for 'built but administratively off' features."
+    ]
+  },
+  "options": [
+    {
+      "id": "opt-1",
+      "title": "Phased AI platform: add aiclient + chat routes under AI_ENABLED, leave transform/legacy ai-config endpoints untouched",
+      "summary": "Build shared/pkg/aiclient and the AIService (ResolveModel/ListMessages/AppendTurn) with new ai_conversation_message table and new /ai/conversation/* routes, gated by AI_ENABLED (503 when off). Extend ENT-17's AiModelSource with org/project scoping, encrypted API key, and cost/quota fields, but explicitly keep `/system/ai-config/*`, `/personal/model/edit-source`, and `/functional/case/ai/transform` as-is (still 501 per original FR-SYS-07) until CR-H02.",
+      "approach": "- Add `shared/pkg/aiclient`: OpenAI-compatible HTTP client, 60s timeout, 2 retries honoring `Retry-After`, reuse `shared/pkg/netguard` (ADR-15/NFR-SE-05) under the `AdminTarget` profile for outbound SSRF protection, OTel metrics per ADR-13/NFR-OB-02, secret masking in logs/metrics per NFR-SE-04.\n- Extend ENT-17's `ai_model_source` with org/project foreign keys, cost-limit/quota fields, and encrypted `app_key` using the existing AES-256-GCM/`secretbox` pattern from BRL-46/BRL-46-style constraint (never return plaintext, mask on read — same as FR-SYS-03's LDAP secret pattern).\n- Add `ai_conversation_message` table; implement `AIService.ResolveModel/ListMessages/AppendTurn`.\n- Mount `/ai/conversation/{add,chat,update,list,delete,chat/list}` behind `AI_ENABLED`; return 503 on all of them when the flag is off (distinct, documented exception to the BRL-64/ADR-12 404 deferred-feature pattern since AI is now implemented, just togglable).\n- Leave `/functional/case/ai/transform`, `/system/ai-config/*`, `/personal/model/edit-source` untouched (still 501 under current FR-SYS-07 wording) — scoped explicitly out, to be revisited with CR-H02.\n- Enforce org quota check before any provider call (reject with clear message, no outbound call) for AC-AI-04.",
+      "pros": [
+        "Reuses the centralized SSRF guard mandated by ADR-15/NFR-SE-05 instead of inventing a second blocking mechanism, satisfying AC-AI-07 with an already-reviewed control.",
+        "Follows the established secret-masking convention from BRL-46/NFR-SE-04/FR-SYS-03 for API keys, directly satisfying AC-AI-03 with precedent the review has already accepted.",
+        "Resolves the long-tracked 501 exception noted in ADR-12 (OI-02) without touching the other FRs that share BRL-64 (FR-SYS-09, FR-AUT-09, FR-CAS-13, FR-REV-05, FR-PLN-12, FR-API-14, FR-MCP-02, FR-UI-04), keeping their deferred-feature guarantees intact.",
+        "Smaller, additive diff: no existing route is retired, lowering regression risk against FR-SYS-07's currently documented API/UC-16/UC-38 traceability."
+      ],
+      "cons": [
+        "Leaves FR-SYS-07 partially inconsistent: the FR still documents `/functional/case/ai/transform` and `/system/ai-config/*` as part of its API, but this option doesn't implement or formally re-scope them, so the SRS/traceability (FR-SYS-07) will read as half-done until a follow-up revision.",
+        "Introduces a 503-on-disabled convention that has no precedent entity/rule (gap vs. BRL-64/ADR-12's 404 pattern and NFR-MA-05's report→on flag model) and needs an explicit decision record.",
+        "Org/project cost-cap and quota fields are new schema on ENT-17 with no existing entity/rule to model against, so the quota semantics for AC-AI-04 must be designed from scratch."
+      ],
+      "risks": [
+        {
+          "description": "Spec drift: FR-SYS-07's API/acceptance text becomes inaccurate without a companion SRS revision",
+          "severity": "medium"
+        },
+        {
+          "description": "Quota/cost-cap enforcement logic (AC-AI-04) has no existing pattern to copy and could under- or over-block legitimate calls if designed late",
+          "severity": "medium"
+        },
+        {
+          "description": "Provider key handling bugs could leak secrets through logs/metrics despite NFR-SE-04 intent if masking isn't applied at every boundary (API, log, span)",
+          "severity": "high"
+        }
+      ],
+      "effort": {
+        "size": "L",
+        "hours_estimate": 120
+      },
+      "affected_areas": [
+        {
+          "kind": "service",
+          "name": "system-setting (AIService)"
+        },
+        {
+          "kind": "module",
+          "name": "shared/pkg/aiclient"
+        },
+        {
+          "kind": "module",
+          "name": "shared/pkg/netguard"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_model_source, ai_conversation, ai_conversation_message"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/*"
+        },
+        {
+          "kind": "infra",
+          "name": "AI_ENABLED flag, metrics"
+        }
+      ],
+      "breaking_change": false,
+      "rollback": "Set AI_ENABLED=false (routes return 503); revert the migration adding ai_conversation_message and the org/project/cost columns on ai_model_source since no other code path depends on them yet.",
+      "recommended": true
+    },
+    {
+      "id": "opt-2",
+      "title": "Full replacement: retire legacy ai-config/transform endpoints and rewrite FR-SYS-07's API surface in one release",
+      "summary": "Replace FR-SYS-07's entire documented API (`/system/ai-config/*`, `/personal/model/edit-source`, `/functional/case/ai/transform`) with the new `/ai/conversation/*` routes plus new org/project model-config endpoints in a single CR, retiring the old ones and updating the SRS/FR-SYS-07 definition to match immediately.",
+      "approach": "- Implement aiclient and AIService as in Option 1.\n- Additionally design and ship new `/system/ai-config/*`-equivalent org/project configuration endpoints, then remove/redirect the old `/system/ai-config/save`, `/system/ai-config/list`, `/personal/model/edit-source`, `/functional/case/ai/transform` routes.\n- Update FR-SYS-07's statement, API, and acceptance fields in the same change so the SRS stays consistent with shipped behavior (closing the conflict noted above instead of deferring it).\n- Migrate any existing `ai_model_source`/`ai_conversation` rows to the new org/project-scoped schema.",
+      "pros": [
+        "Closes the FR-SYS-07 API/route conflict immediately instead of leaving it for a later revision — SRS and shipped behavior stay in sync.",
+        "Single coherent API surface for AI configuration (no legacy `/system/ai-config/*` vs new `/ai/conversation/*` split) simplifies future CR-H02 work on test-case generation.",
+        "Still reuses ADR-15/NFR-SE-05 (netguard) and BRL-46/NFR-SE-04 (secret masking) exactly as in Option 1 for AC-AI-07/AC-AI-03."
+      ],
+      "cons": [
+        "Retiring `/functional/case/ai/transform` and `/system/ai-config/*` is explicitly broader than the CR-H01 body's route list, risking scope creep beyond what's described (CR says transform/ai-config generation is out of scope via CR-H02).",
+        "Breaking change for any existing caller/UI wired to `/system/ai-config/*` or `/personal/model/edit-source`, requiring coordinated UI/MCP updates beyond what CR-H01 lists.",
+        "Larger migration surface increases the chance of violating ADR-16-style caution ('tránh xoá dữ liệu') if old `ai_model_source` rows aren't carefully preserved during schema change."
+      ],
+      "risks": [
+        {
+          "description": "Retiring endpoints not explicitly scoped in the CR could break untracked internal/UI callers",
+          "severity": "high"
+        },
+        {
+          "description": "Combined schema migration + route cutover increases blast radius and rollback complexity versus an additive approach",
+          "severity": "high"
+        }
+      ],
+      "effort": {
+        "size": "L",
+        "hours_estimate": 170
+      },
+      "affected_areas": [
+        {
+          "kind": "service",
+          "name": "system-setting (AIService)"
+        },
+        {
+          "kind": "module",
+          "name": "shared/pkg/aiclient"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_model_source, ai_conversation, ai_conversation_message"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/*, retired /system/ai-config/*, /personal/model/edit-source, /functional/case/ai/transform"
+        },
+        {
+          "kind": "ui",
+          "name": "AI configuration screens depending on legacy endpoints"
+        }
+      ],
+      "breaking_change": true,
+      "rollback": "Requires redeploying the prior release with legacy routes restored and reversing the schema migration; harder than Option 1 because old endpoints are removed, not just left dormant.",
+      "recommended": false
+    },
+    {
+      "id": "opt-3",
+      "title": "Minimal spike: ship aiclient + mock-ext/one real provider chat path, defer org/project cost-cap and quota enforcement",
+      "summary": "Deliver the smallest slice that satisfies most ACs fast — aiclient, AIService, chat routes, AI_ENABLED flag, SSRF guard, secret masking — but skip per-org/project cost-limit and quota tracking, deferring AC-AI-04 to a quick follow-up once usage data exists.",
+      "approach": "- Same aiclient/AIService/chat-route work as Option 1, minus org/project cost-cap and quota fields on ENT-17.\n- `AI_ENABLED` flag and 503 behavior still implemented for AC-AI-05.\n- netguard (ADR-15) and secret masking (BRL-46/NFR-SE-04) still included since they're required by AC-AI-03/AC-AI-07 and cheap to reuse.\n- AC-AI-04 is explicitly left unimplemented in this slice; a follow-up CR adds quota/cost-cap once real usage/cost data from mock-ext and the first approved provider is available.",
+      "pros": [
+        "Fastest path to a working chat loop (AC-AI-01/AC-AI-02/AC-AI-05/AC-AI-06/AC-AI-07/AC-AI-03 all achievable) without needing to invent quota semantics upfront.",
+        "Still reuses ADR-15/NFR-SE-05 and BRL-46/NFR-SE-04 patterns, so no security shortcuts are taken even though scope is trimmed.",
+        "Reduces the risk called out for Option 1/2 around designing cost-cap logic without data — ships it later with real usage numbers."
+      ],
+      "cons": [
+        "Does not satisfy AC-AI-04 at release — an explicit acceptance criterion in the CR is left unmet, which the CR as written does not allow as 'ngoài phạm vi'.",
+        "Risk of unbounded provider spend between this release and the deferred quota follow-up, since no cap mechanism exists yet.",
+        "Still leaves the FR-SYS-07 API-surface conflict and the BRL-64/503 convention question open, same as Option 1."
+      ],
+      "risks": [
+        {
+          "description": "Shipping AI chat without any cost cap exposes the org to unbounded provider billing before the follow-up CR lands",
+          "severity": "high"
+        },
+        {
+          "description": "CR explicitly lists AC-AI-04 as acceptance; descoping it may not be acceptable to stakeholders without an explicit amendment",
+          "severity": "medium"
+        }
+      ],
+      "effort": {
+        "size": "M",
+        "hours_estimate": 70
+      },
+      "affected_areas": [
+        {
+          "kind": "service",
+          "name": "system-setting (AIService)"
+        },
+        {
+          "kind": "module",
+          "name": "shared/pkg/aiclient"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_model_source, ai_conversation, ai_conversation_message"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/*"
+        }
+      ],
+      "breaking_change": false,
+      "rollback": "Set AI_ENABLED=false; revert the ai_conversation_message migration since nothing else depends on it.",
+      "recommended": false
+    },
+    {
+      "id": "opt-4",
+      "title": "Model org/project AI config as an instance of the existing generic service-config entity (ENT-18) instead of a bespoke schema",
+      "summary": "Reuse ENT-18's existing per-organization service-configuration pattern (organization_id, global, config_schema — already used for plugin/integration config under FR-SYS-09) to carry AI model-source, API key, and cost/quota data per org/project, rather than growing ENT-17 with ad-hoc columns.",
+      "approach": "- Implement aiclient/AIService/routes as in Option 1.\n- Instead of adding org/project/cost columns directly onto `ai_model_source`, store org/project-scoped overrides and cost/quota settings as a `config_schema` JSON payload under ENT-18's generic organization-service-config table, with `ai_model_source` holding only the provider-agnostic defaults.\n- Encrypt the API key field inside the JSON payload using the same AES-256-GCM/secretbox mechanism as BRL-46, masked on read.\n- Netguard (ADR-15) and AI_ENABLED/503 behavior unchanged from Option 1.",
+      "pros": [
+        "Avoids introducing a second org/project-scoping mechanism alongside the one ENT-18 already provides for FR-SYS-09-style per-org service configuration — one less new pattern for reviewers to validate.",
+        "Keeps `ai_model_source` (ENT-17) stable and close to its current shape, reducing migration risk on an existing table.",
+        "Still satisfies AC-AI-01/02/03/05/06/07 the same way as Option 1 via the same aiclient/netguard/secret-masking reuse."
+      ],
+      "cons": [
+        "ENT-18's `config_schema` is JSON/schema-less by design (used for deferred plugin config per FR-SYS-09), which makes querying/enforcing structured cost-cap and quota rules (AC-AI-04) harder than first-class typed columns — likely needs an additional typed usage/quota table regardless.",
+        "Conflates a currently 'always-off, deferred' entity (ENT-18 is tied to FR-SYS-09, which is explicitly hidden per BRL-64/v4 'chưa có runtime plugin') with a now-active AI feature, which may confuse ownership and the deferred-feature guarantees FR-SYS-09 relies on.",
+        "Less direct mapping to the CR's explicit `ai_model_source`/org/project wording, requiring more design negotiation before implementation starts."
+      ],
+      "risks": [
+        {
+          "description": "Reusing a deferred-feature entity (ENT-18/FR-SYS-09) for an active feature could blur the BRL-64 'fully hidden' guarantee if not carefully isolated",
+          "severity": "medium"
+        },
+        {
+          "description": "JSON config_schema makes atomic quota decrement / enforcement under AC-AI-04 more error-prone than typed columns",
+          "severity": "medium"
+        }
+      ],
+      "effort": {
+        "size": "L",
+        "hours_estimate": 130
+      },
+      "affected_areas": [
+        {
+          "kind": "service",
+          "name": "system-setting (AIService)"
+        },
+        {
+          "kind": "module",
+          "name": "shared/pkg/aiclient"
+        },
+        {
+          "kind": "schema",
+          "name": "ai_model_source, ai_conversation_message, organization service-config (ENT-18)"
+        },
+        {
+          "kind": "api",
+          "name": "/ai/conversation/*"
+        }
+      ],
+      "breaking_change": false,
+      "rollback": "Set AI_ENABLED=false; drop the new ai_conversation_message table and the AI-specific ENT-18 config rows, leaving FR-SYS-09's existing (deferred) use of ENT-18 untouched.",
+      "recommended": false
+    }
+  ],
+  "recommendation": {
+    "option_id": "opt-1",
+    "reason": "It satisfies all seven ACs with the smallest, additive diff, reuses the two security patterns the KG already mandates (netguard SSRF profiles per ADR-15/NFR-SE-05, and AES-256-GCM secret masking per BRL-46/NFR-SE-04) instead of inventing new ones, and avoids retiring or rewriting the parts of FR-SYS-07's API surface (transform, legacy ai-config) that the CR explicitly places out of scope — leaving that reconciliation for a deliberate follow-up rather than bundling it into a risky single release."
+  },
+  "assumptions": [
+    {
+      "id": "A-1",
+      "text": "`/functional/case/ai/transform`, `/system/ai-config/*`, and `/personal/model/edit-source` remain untouched (still 501 under FR-SYS-07) after CR-H01 ships, pending CR-H02.",
+      "needs_confirmation": true
+    },
+    {
+      "id": "A-2",
+      "text": "AI_ENABLED's 503-when-off behavior is an intentional, documented exception to the BRL-64/ADR-12 404 deferred-feature convention, since the feature is implemented but administratively toggled off.",
+      "needs_confirmation": true
+    },
+    {
+      "id": "A-3",
+      "text": "The mock-ext OpenAI-compatible provider referenced in AC-AI-01 is a test double already available in the environment, not something this CR must build from scratch.",
+      "needs_confirmation": false
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-1",
+      "text": "Which existing FR-SYS-07 API endpoints (`/system/ai-config/*`, `/personal/model/edit-source`, `/functional/case/ai/transform`) are retired, kept as-is, or re-scoped by CR-H01, and does FR-SYS-07's SRS/URD text get revised in this change or a follow-up?",
+      "blocking": true
+    },
+    {
+      "id": "Q-2",
+      "text": "Should org/project AI model configuration live on a dedicated extension of ENT-17 (`ai_model_source`) or reuse the generic per-org service-config entity ENT-18 already used for FR-SYS-09?",
+      "blocking": true
+    },
+    {
+      "id": "Q-3",
+      "text": "What are the exact cost-cap/quota semantics for AC-AI-04 (hard stop vs. soft warning, reset period, per-org vs per-project granularity), since no existing entity or business rule defines this today?",
+      "blocking": true
+    },
+    {
+      "id": "Q-4",
+      "text": "Is BL-J02 (hide AI nav button when AI is off) tracked anywhere reviewable, since it has no corresponding element in the current knowledge-graph snapshot?",
+      "blocking": false
+    }
+  ],
+  "requirement_coverage": [
+    {
+      "ac_id": "AC-AI-01",
+      "option_ids": ["opt-1", "opt-2", "opt-3", "opt-4"],
+      "status": "covered",
+      "note": "Core chat+list flow via new AIService/routes in all options."
+    },
+    {
+      "ac_id": "AC-AI-02",
+      "option_ids": ["opt-1", "opt-2", "opt-3", "opt-4"],
+      "status": "covered",
+      "note": "Depends on at least one approved real provider being configured; aiclient design is provider-agnostic across options."
+    },
+    {
+      "ac_id": "AC-AI-03",
+      "option_ids": ["opt-1", "opt-2", "opt-3", "opt-4"],
+      "status": "covered",
+      "note": "All options reuse BRL-46/NFR-SE-04 masking pattern for API keys."
+    },
+    {
+      "ac_id": "AC-AI-04",
+      "option_ids": ["opt-1", "opt-2", "opt-4"],
+      "status": "covered",
+      "note": "Org/project cost-cap and quota enforcement implemented before shipping; opt-3 explicitly defers this."
+    },
+    {
+      "ac_id": "AC-AI-04",
+      "option_ids": ["opt-3"],
+      "status": "partial",
+      "note": "Minimal spike ships without quota/cost-cap; deferred to a follow-up CR."
+    },
+    {
+      "ac_id": "AC-AI-05",
+      "option_ids": ["opt-1", "opt-2", "opt-3", "opt-4"],
+      "status": "covered",
+      "note": "AI_ENABLED flag gates all /ai/conversation/* routes with 503 in every option."
+    },
+    {
+      "ac_id": "AC-AI-06",
+      "option_ids": ["opt-1", "opt-2", "opt-3", "opt-4"],
+      "status": "covered",
+      "note": "aiclient retry/Retry-After logic is shared across all options."
+    },
+    {
+      "ac_id": "AC-AI-07",
+      "option_ids": ["opt-1", "opt-2", "opt-3", "opt-4"],
+      "status": "covered",
+      "note": "All options route outbound calls through shared/pkg/netguard per ADR-15/NFR-SE-05."
+    }
+  ]
+}

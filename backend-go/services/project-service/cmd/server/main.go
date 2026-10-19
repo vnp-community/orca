@@ -228,7 +228,7 @@ func run() error {
 	// already-constructed client rather than dialing their own connection
 	// (unlike DevServerRelay/InfraFleetDevServerLister above), so one shared
 	// *grpc.ClientConn backs all three.
-	infraFleetConn, err := grpc.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	infraFleetConn, err := grpcmw.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing infra-fleet-service (health/hostname/tags): %w", err)
 	}
@@ -237,7 +237,7 @@ func run() error {
 
 	// NEW — tenant-service dial for ProfileResolver's GetResolvedProfile
 	// call (ListProjects's fleet.allowedServerTags visibility filter).
-	tenantConn, err := grpc.NewClient(cfg.TenantServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	tenantConn, err := grpcmw.NewClient(cfg.TenantServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dialing tenant-service: %w", err)
 	}
@@ -275,7 +275,7 @@ func run() error {
 	// every OPA allow/deny decision to auth-service's audit_log. Lazy dial
 	// (grpc.NewClient doesn't block on connect), same convention as every
 	// other outbound client above.
-	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	authConn, err := grpcmw.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing auth-service: %w", err)
 	}
@@ -292,7 +292,12 @@ func run() error {
 	}
 	opa := projectopaclient.New(evaluator)
 
-	createProjectUC := usecase.NewCreateProject(repo, repoRepo, devServerLister, healthChecker, devServerRelay)
+	// Same flag as git-gateway-service: a repo with no dev server is only
+	// valid where git-gateway can reach the user's filesystem.
+	repoHostPolicy := usecase.RepoHostPolicy{AllowLocalRepos: cfg.AllowLocalRepos}
+	slog.Info("project-service repo host policy", "allow_local_repos", cfg.AllowLocalRepos)
+
+	createProjectUC := usecase.NewCreateProject(repo, repoRepo, devServerLister, healthChecker, devServerRelay, repoHostPolicy)
 	getProjectUC := usecase.NewGetProject(repo, opa)
 	listProjectsUC := usecase.NewListProjects(repo, profileResolver)
 	addMemberUC := usecase.NewAddMember(repo, opa)
@@ -300,7 +305,7 @@ func run() error {
 	removeMemberUC := usecase.NewRemoveMember(repo, opa)
 	updateMemberRoleUC := usecase.NewUpdateMemberRole(repo, opa)
 	rebindDevServerUC := usecase.NewRebindDevServer(repo, workflowChecker, taskChecker, opa, devServerLister, healthChecker, auditPublisher, memberNotifier)
-	rebindRepoDevServerUC := usecase.NewRebindRepoDevServer(repoRepo, repo, opa, workflowChecker, taskChecker, devServerLister)
+	rebindRepoDevServerUC := usecase.NewRebindRepoDevServer(repoRepo, repo, opa, workflowChecker, taskChecker, devServerLister, repoHostPolicy)
 	updateProjectUC := usecase.NewUpdateProject(repo, opa)
 	deleteProjectUC := usecase.NewDeleteProject(repo, workflowChecker, taskChecker, opa)
 	getProjectContextUC := usecase.NewGetProjectContext(repo, repoRepo, hostnameResolver, opa)
@@ -309,7 +314,7 @@ func run() error {
 	// structurally — passed as the membership-lookup port to usecases whose
 	// primary repository dependency is RepoRepository/WorktreeRepository
 	// instead. See usecase.MembershipRepository's doc comment.
-	addRepoUC := usecase.NewAddRepo(repoRepo, repo, opa, devServerLister)
+	addRepoUC := usecase.NewAddRepo(repoRepo, repo, opa, devServerLister, repoHostPolicy)
 	listReposUC := usecase.NewListRepos(repoRepo, repo, opa)
 	reorderReposUC := usecase.NewReorderRepos(repoRepo, repo, opa)
 	removeRepoUC := usecase.NewRemoveRepo(repoRepo, repo, opa)
@@ -339,7 +344,7 @@ func run() error {
 	listProjectGroupsUC := usecase.NewListProjectGroups(projectGroupRepo)
 	moveProjectUC := usecase.NewMoveProject(repo, projectGroupRepo, opa)
 	scanNestedUC := usecase.NewScanNested(devServerRelay)
-	importNestedUC := usecase.NewImportNested(projectGroupRepo)
+	importNestedUC := usecase.NewImportNested(projectGroupRepo, repoRepo, repo, repoHostPolicy)
 
 	createHostSetupUC := usecase.NewCreateHostSetup(hostSetupRepo, devServerLister)
 	listHostSetupsUC := usecase.NewListHostSetups(hostSetupRepo)
@@ -368,7 +373,14 @@ func run() error {
 	saveSparsePresetUC := usecase.NewSaveSparsePreset(sparsePresetRepo, repoRepo, repo, opa)
 	removeSparsePresetUC := usecase.NewRemoveSparsePreset(sparsePresetRepo, repoRepo, repo, opa)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
+	if cfg.InternalCallerToken == "" {
+		logger.Warn("PROJECT_INTERNAL_CALLER_TOKEN is empty: internal-only RPCs (ResolveProjectAccess) refuse every call")
+	}
+	grpcServer := grpc.NewServer(
+		grpcmw.ChainUnary(logger),
+		grpc.ChainUnaryInterceptor(internalCallerGuard(cfg.InternalCallerToken)),
+		grpcmw.StatsHandler(),
+	)
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
 		CreateProject:       createProjectUC,
 		GetProject:          getProjectUC,
@@ -424,6 +436,7 @@ func run() error {
 		SetupExistingFolder: setupExistingFolderUC,
 
 		GetProjectContext:       getProjectContextUC,
+		ResolveProjectAccess:    usecase.NewResolveProjectAccess(repo),
 		GetMobileWorktreeStatus: getMobileWorktreeStatusUC,
 
 		LinkSourceProject:    linkSourceProjectUC,

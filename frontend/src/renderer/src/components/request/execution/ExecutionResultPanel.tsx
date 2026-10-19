@@ -13,12 +13,24 @@ import { FileWarning } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle
+} from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useExecutionResult, type ExecutionResultStatus } from '../../../hooks/useExecutionResult'
 import { openRequestPage } from '../request-page-navigation'
+import { prepareAgentOutputTail } from './execution-agent-output-text'
 import { ExecutionChecksTable } from './ExecutionChecksTable'
-import { classifyFiles, compareChecks, describeFailureRoute, secretScanState } from './execution-result-comparison'
+import {
+  classifyFiles,
+  compareChecks,
+  describeFailureRoute,
+  secretScanState
+} from './execution-result-comparison'
 import type { ExecutionResult } from '../../../../../shared/request-artifact-types'
 
 const T = 'auto.components.request.execution.'
@@ -26,7 +38,12 @@ export const OUTPUT_PREVIEW_MAX = 16 * 1024
 const SKELETON_DELAY_MS = 200
 
 type Execution = { result: ExecutionResult | null; status: ExecutionResultStatus }
-type Props = { taskId: string; requestId?: string | null; execution?: Execution; legacyOutput?: string }
+type Props = {
+  taskId: string
+  requestId?: string | null
+  execution?: Execution
+  legacyOutput?: string
+}
 
 const STATUS_TONE: Record<string, string> = {
   done: 'text-status-success border-status-success-border',
@@ -35,7 +52,47 @@ const STATUS_TONE: Record<string, string> = {
   needs_info: 'text-muted-foreground border-border'
 }
 
-export function ExecutionResultPanel({ taskId, requestId = null, execution, legacyOutput }: Props): React.JSX.Element | null {
+// Tasks of a Request report no structured block: the tail of the last run is all there is, so a neutral
+// view, not the red "unexpected format" warning that belongs to a contract run that failed to parse.
+function AgentOutputView({ result }: { result: ExecutionResult }): React.JSX.Element {
+  const prepared = prepareAgentOutputTail(result.stdoutTail ?? '')
+  return (
+    <div className="flex flex-col gap-1 p-2" data-testid="execution-agent-output">
+      <h4 className="text-xs font-medium">{translate(`${T}agentOutput.title`, 'Agent output')}</h4>
+      <p className="text-xs text-muted-foreground">
+        {translate(
+          `${T}agentOutput.note`,
+          'This run did not report a structured result. The end of what the agent printed is shown.'
+        )}
+        {result.truncated || prepared.cut
+          ? ` ${translate(`${T}agentOutput.cut`, 'Only the last part is shown.')}`
+          : ''}
+        {result.redacted ? ` ${translate(`${T}agentOutput.redacted`, 'Secrets were hidden.')}` : ''}
+      </p>
+      {prepared.text ? (
+        <pre
+          tabIndex={0}
+          aria-label={translate(`${T}agentOutput.title`, 'Agent output')}
+          className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted p-2 font-mono text-xs scrollbar-sleek"
+          data-testid="execution-agent-output-text"
+        >
+          {prepared.text}
+        </pre>
+      ) : (
+        <p className="text-xs text-muted-foreground" data-testid="execution-agent-output-empty">
+          {translate(`${T}noOutput`, 'No output')}
+        </p>
+      )}
+    </div>
+  )
+}
+
+export function ExecutionResultPanel({
+  taskId,
+  requestId = null,
+  execution,
+  legacyOutput
+}: Props): React.JSX.Element | null {
   const own = useExecutionResult(execution ? null : taskId, requestId)
   const { result, status } = execution ?? own
   const [showSkeleton, setShowSkeleton] = useState(false)
@@ -50,28 +107,47 @@ export function ExecutionResultPanel({ taskId, requestId = null, execution, lega
     return () => clearTimeout(t)
   }, [status])
 
-  if (status === 'unsupported') {return null}
+  if (status === 'unsupported') {
+    return null
+  }
   if (status === 'idle' || status === 'loading') {
     return showSkeleton ? <Skeleton className="h-24 w-full" /> : null
   }
   if (status === 'error') {
-    return <p role="alert" className="p-2 text-xs text-destructive">{translate(`${T}error`, 'Could not load the result')}</p>
+    return (
+      <p role="alert" className="p-2 text-xs text-destructive">
+        {translate(`${T}error`, 'Could not load the result')}
+      </p>
+    )
   }
   if (status === 'legacy' || !result) {
     return (
       <div className="flex flex-col gap-1 p-2" data-testid="execution-legacy">
-        <p className="text-xs text-muted-foreground">{translate(`${T}legacy`, 'This result has no structure')}</p>
+        <p className="text-xs text-muted-foreground">
+          {translate(`${T}legacy`, 'This result has no structure')}
+        </p>
         <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted p-2 text-xs scrollbar-sleek">
           {legacyOutput ?? translate(`${T}noOutput`, 'No output')}
         </pre>
       </div>
     )
   }
+  // A contract run that printed no result block at all ("missing") has nothing malformed to report:
+  // only a block that was found but failed the schema ("invalid") is the red "wrong format" case.
+  if (result.source === 'last_execution_output' || result.parseStatus === 'missing') {
+    return <AgentOutputView result={result} />
+  }
   if (result.parseStatus !== 'ok') {
     return (
       <div className="flex flex-col gap-1 p-2" data-testid="execution-malformed">
-        <p role="alert" className="text-xs text-destructive">{translate(`${T}malformed`, 'The result is not in the expected format')}</p>
-        {result.stdoutTail ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted p-2 text-xs scrollbar-sleek">{result.stdoutTail}</pre> : null}
+        <p role="alert" className="text-xs text-destructive">
+          {translate(`${T}malformed`, 'The result is not in the expected format')}
+        </p>
+        {result.stdoutTail ? (
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted p-2 text-xs scrollbar-sleek">
+            {result.stdoutTail}
+          </pre>
+        ) : null}
       </div>
     )
   }
@@ -79,28 +155,49 @@ export function ExecutionResultPanel({ taskId, requestId = null, execution, lega
   const files = classifyFiles(result.filesChanged, result.verdict)
   const checks = compareChecks(result.checksRun, result.verdict)
   const scan = secretScanState(result.verdict)
-  const route = result.failureClass && result.failureClass !== 'unknown' ? describeFailureRoute(result.failureClass) : null
+  const route =
+    result.failureClass && result.failureClass !== 'unknown'
+      ? describeFailureRoute(result.failureClass)
+      : null
   const outputs = Object.entries(result.outputs ?? {})
-  const preview = outputKey ? JSON.stringify(result.outputs?.[outputKey], null, 2) ?? '' : ''
+  const preview = outputKey ? (JSON.stringify(result.outputs?.[outputKey], null, 2) ?? '') : ''
 
   return (
     <div className="flex flex-col gap-3 p-2" data-testid="execution-result-panel">
       <div className="flex flex-wrap items-center gap-2">
-        {result.status ? <Badge variant="outline" className={STATUS_TONE[result.status]}>{translate(`${T}status.${result.status}`, result.status)}</Badge> : null}
-        <span className="text-xs text-muted-foreground">{translate(`${T}attempt`, 'Attempt {{n}}', { n: result.attempt })}</span>
+        {result.status ? (
+          <Badge variant="outline" className={STATUS_TONE[result.status]}>
+            {translate(`${T}status.${result.status}`, result.status)}
+          </Badge>
+        ) : null}
+        <span className="text-xs text-muted-foreground">
+          {translate(`${T}attempt`, 'Attempt {{n}}', { n: result.attempt })}
+        </span>
       </div>
       {result.summary ? <p className="whitespace-pre-wrap text-sm">{result.summary}</p> : null}
 
       <section aria-label={translate(`${T}files.title`, 'Changed files')}>
         <h4 className="text-xs font-medium">{translate(`${T}files.title`, 'Changed files')}</h4>
-        {files.length === 0 ? <p className="text-xs text-muted-foreground">{translate(`${T}files.none`, 'No files changed')}</p> : (
+        {files.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {translate(`${T}files.none`, 'No files changed')}
+          </p>
+        ) : (
           <ul className="mt-1 flex flex-col gap-0.5">
             {files.map((f) => (
-              <li key={f.path} className="flex items-center gap-1 text-xs" data-in-scope={f.inScope}>
+              <li
+                key={f.path}
+                className="flex items-center gap-1 text-xs"
+                data-in-scope={f.inScope}
+              >
                 {!f.inScope ? <FileWarning className="size-3 text-risk-high" aria-hidden /> : null}
                 <span className="break-all font-mono">{f.path}</span>
-                <span className={f.inScope ? 'text-muted-foreground' : 'font-medium text-risk-high'}>
-                  {f.inScope ? translate(`${T}files.inScope`, 'In scope') : translate(`${T}files.outOfScope`, 'Out of scope')}
+                <span
+                  className={f.inScope ? 'text-muted-foreground' : 'font-medium text-risk-high'}
+                >
+                  {f.inScope
+                    ? translate(`${T}files.inScope`, 'In scope')
+                    : translate(`${T}files.outOfScope`, 'Out of scope')}
                 </span>
               </li>
             ))}
@@ -121,28 +218,52 @@ export function ExecutionResultPanel({ taskId, requestId = null, execution, lega
             {outputs.map(([name, value]) => (
               <li key={name} className="flex items-center gap-2 text-xs">
                 <span className="font-mono">{name}</span>
-                <span className="text-muted-foreground">{Array.isArray(value) ? 'array' : typeof value}</span>
-                <Button size="xs" variant="ghost" onClick={() => setOutputKey(name)}>{translate(`${T}outputs.view`, 'View')}</Button>
+                <span className="text-muted-foreground">
+                  {Array.isArray(value) ? 'array' : typeof value}
+                </span>
+                <Button size="xs" variant="ghost" onClick={() => setOutputKey(name)}>
+                  {translate(`${T}outputs.view`, 'View')}
+                </Button>
               </li>
             ))}
           </ul>
         </section>
       ) : null}
 
-      {route ? <p className="text-xs text-muted-foreground" data-testid="execution-failure-route">{translate(route.messageKey, route.fallback, route.params)}</p> : null}
+      {route ? (
+        <p className="text-xs text-muted-foreground" data-testid="execution-failure-route">
+          {translate(route.messageKey, route.fallback, route.params)}
+        </p>
+      ) : null}
       {result.status === 'needs_info' && requestId ? (
-        <Button size="sm" variant="outline" className="self-start" onClick={() => openRequestPage({ section: 'requests', requestId })}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="self-start"
+          onClick={() => openRequestPage({ section: 'requests', requestId })}
+        >
           {translate(`${T}toQuestion`, 'Answer the question')}
         </Button>
       ) : null}
 
-      <Sheet open={outputKey !== null} onOpenChange={(o) => { if (!o) {setOutputKey(null)} }}>
+      <Sheet
+        open={outputKey !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setOutputKey(null)
+          }
+        }}
+      >
         <SheetContent side="right" className="gap-3 p-4 sm:max-w-xl">
           <SheetHeader className="p-0">
             <SheetTitle>{outputKey}</SheetTitle>
-            <SheetDescription>{translate(`${T}outputs.preview`, 'Shown as plain text, cut at 16 KB')}</SheetDescription>
+            <SheetDescription>
+              {translate(`${T}outputs.preview`, 'Shown as plain text, cut at 16 KB')}
+            </SheetDescription>
           </SheetHeader>
-          <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted p-2 text-xs scrollbar-sleek">{preview.slice(0, OUTPUT_PREVIEW_MAX)}</pre>
+          <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted p-2 text-xs scrollbar-sleek">
+            {preview.slice(0, OUTPUT_PREVIEW_MAX)}
+          </pre>
         </SheetContent>
       </Sheet>
     </div>

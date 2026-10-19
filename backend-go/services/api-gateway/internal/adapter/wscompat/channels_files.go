@@ -26,6 +26,7 @@ import (
 type filesBrowseServerDirArgs struct {
 	EnvironmentID string `json:"environmentId"`
 	Path          string `json:"path"`
+	browseDirOptions
 }
 
 // registerFilesBrowseServerDirChannel wires files.browseServerDir —
@@ -82,31 +83,18 @@ func registerFilesBrowseServerDirChannel(r *Registry, client infrafleetv1.InfraF
 		}
 
 		var relayResult struct {
-			Path    string `json:"path"`
-			Entries []struct {
-				Name string `json:"name"`
-				Type string `json:"type"`
-			} `json:"entries"`
+			Path    string                `json:"path"`
+			Entries []browseDirRelayEntry `json:"entries"`
 		}
 		if raw := resp.GetResultJson(); raw != "" {
 			if err := json.Unmarshal([]byte(raw), &relayResult); err != nil {
 				return nil, fmt.Errorf("files.browseServerDir: decoding relay result: %w", err)
 			}
 		}
-		entries := make([]devServerBrowseDirEntryView, 0, len(relayResult.Entries))
-		for _, e := range relayResult.Entries {
-			entries = append(entries, devServerBrowseDirEntryView{
-				Name:        e.Name,
-				IsDirectory: e.Type == "directory",
-				// fs.readDir does not report symlink-ness — see
-				// devServer.browseDir's doc comment (channels.go).
-				IsSymlink: false,
-			})
-		}
 		resolvedPath := relayResult.Path
 		if resolvedPath == "" {
 			resolvedPath = path
 		}
-		return devServerBrowseDirResultView{ResolvedPath: resolvedPath, Entries: entries}, nil
+		return buildBrowseDirView(resolvedPath, relayResult.Entries, in.browseDirOptions), nil
 	})
 }

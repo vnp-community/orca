@@ -144,8 +144,8 @@ func (r *AutomationRepository) Get(ctx context.Context, tenantID, id string) (do
 	`, tenantID, id)
 
 	a, err := scanAutomation(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Automation{}, fmt.Errorf("postgres: automation %s not found: %w", id, err)
+	if errors.Is(err, pgx.ErrNoRows) || isMalformedUUID(err) {
+		return domain.Automation{}, fmt.Errorf("postgres: automation %s: %w", id, domain.ErrAutomationNotFound)
 	}
 	if err != nil {
 		return domain.Automation{}, fmt.Errorf("postgres: query automation: %w", err)
@@ -211,11 +211,14 @@ func (r *AutomationRepository) Update(ctx context.Context, tenantID string, a do
 	`, tenantID, a.ID, a.Name, a.RRule, string(a.StepType), a.StepConfigJSON, a.Enabled, a.Timezone, a.DTStart,
 		nullableString(a.ProjectID), actionsJSON, string(a.TriggerType), nullableString(string(a.TriggerEvent)), filterJSON,
 		a.MaxRunHistory, a.RunTimeoutSeconds)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: update automation %s for tenant %s: %w", a.ID, tenantID, domain.ErrAutomationNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: update automation: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: automation %s not found for tenant %s", a.ID, tenantID)
+		return fmt.Errorf("postgres: update automation %s for tenant %s: %w", a.ID, tenantID, domain.ErrAutomationNotFound)
 	}
 	return nil
 }
@@ -225,11 +228,14 @@ func (r *AutomationRepository) Update(ctx context.Context, tenantID string, a do
 // this automation are removed by Postgres itself — no separate cleanup step.
 func (r *AutomationRepository) Delete(ctx context.Context, tenantID, id string) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM automation.automations WHERE tenant_id = $1 AND id = $2`, tenantID, id)
+	if isMalformedUUID(err) {
+		return fmt.Errorf("postgres: delete automation %s for tenant %s: %w", id, tenantID, domain.ErrAutomationNotFound)
+	}
 	if err != nil {
 		return fmt.Errorf("postgres: delete automation: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: automation %s not found for tenant %s", id, tenantID)
+		return fmt.Errorf("postgres: delete automation %s for tenant %s: %w", id, tenantID, domain.ErrAutomationNotFound)
 	}
 	return nil
 }
@@ -578,10 +584,13 @@ func (r *AutomationRunRepository) UpdateStatus(ctx context.Context, run domain.A
 		if isUniqueViolation(err, "idx_automation_runs_one_running") {
 			return usecase.ErrConcurrentRunActive
 		}
+		if isMalformedUUID(err) {
+			return fmt.Errorf("postgres: update status of run %s for tenant %s: %w", run.ID, run.TenantID, domain.ErrAutomationRunNotFound)
+		}
 		return fmt.Errorf("postgres: update automation run status: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: automation run %s not found for tenant %s", run.ID, run.TenantID)
+		return fmt.Errorf("postgres: update status of run %s for tenant %s: %w", run.ID, run.TenantID, domain.ErrAutomationRunNotFound)
 	}
 
 	if run.Status.Terminal() && r.publisher != nil {
@@ -820,4 +829,11 @@ func isUniqueViolation(err error, constraintName string) bool {
 		return false
 	}
 	return constraintName == "" || pgErr.ConstraintName == constraintName
+}
+
+// isMalformedUUID reports Postgres rejecting a client-supplied id at bind time (SQLSTATE 22P02).
+// An id that cannot be a uuid names nothing, so lookups answer "not found" instead of Internal.
+func isMalformedUUID(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
 }

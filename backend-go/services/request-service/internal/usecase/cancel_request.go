@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -30,6 +31,19 @@ type CancelRequest struct {
 	guard      ExecutionGuard
 	tx         TxRunner
 	clarifs    ClarificationCanceller
+	proposals  ProposalReleaser
+}
+
+// ProposalReleaser removes the worktree of a cancelled Request's OpenSpec proposal.
+type ProposalReleaser interface {
+	ReleaseOnCancel(ctx context.Context, requestID string) error
+}
+
+// WithProposalCleanup releases the proposal worktree once the cancellation is committed. A failure is logged and left to the
+// periodic sweep: the Request is cancelled either way.
+func (uc *CancelRequest) WithProposalCleanup(p ProposalReleaser) *CancelRequest {
+	uc.proposals = p
+	return uc
 }
 
 // WithClarifications closes the open Clarification when a request in awaiting_information is cancelled.
@@ -102,6 +116,11 @@ func (uc *CancelRequest) Execute(ctx context.Context, in CancelInput) (CancelRes
 	})
 	if err != nil {
 		return CancelResult{}, err
+	}
+	if out.Applied && uc.proposals != nil {
+		if err := uc.proposals.ReleaseOnCancel(ctx, in.RequestID); err != nil {
+			slog.WarnContext(ctx, "proposal worktree not released on cancel; the sweep will retry", slog.String("request_id", in.RequestID), slog.Any("error", err))
+		}
 	}
 	return out, nil
 }

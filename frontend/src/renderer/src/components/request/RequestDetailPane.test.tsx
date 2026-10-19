@@ -183,7 +183,8 @@ describe('RequestDetailPane', () => {
     useAppStore.setState({ currentUser: { id: 'u1', role: 'developer' } as never })
     useRequestMock.mockReturnValue(state({ request: request({ status: 'awaiting_information' }) }))
     render(<RequestDetailPane requestId="r1" />)
-    const answer = await screen.findByRole('button', { name: 'Answer' })
+    // The header and the next-action bar both offer Answer; either scrolls to the panel.
+    const answer = (await screen.findAllByRole('button', { name: 'Answer' }))[0]
     const panel = screen.getByTestId('clarification-panel')
     const scrolled = vi.fn()
     panel.scrollIntoView = scrolled

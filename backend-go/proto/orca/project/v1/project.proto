@@ -150,6 +150,9 @@ service ProjectService {
   // here, then call the execution-owning service), not a synchronous
   // cross-service execution call.
   rpc GetProjectContext(GetProjectContextRequest) returns (ProjectContext);
+  // Internal (guarded by the service-to-service token): answers "does this project exist in the tenant, and what role
+  // does this user have" in one call, so callers stop inferring a missing project from a refusal.
+  rpc ResolveProjectAccess(ResolveProjectAccessRequest) returns (ResolveProjectAccessResponse);
   // GetMobileWorktreeStatus is the ONE composed-read call BL-MB-04 reduces
   // to — project-service already depends on infra-fleet-service (dev-server
   // binding validation), so this extends that existing edge rather than
@@ -212,6 +215,9 @@ message CreateProjectRequest {
 
 message CreateProjectResponse {
   Project project = 1;
+  // repo is the project's first repo, written in the same transaction as the
+  // project; unset when the request had no repo_path.
+  Repo repo = 2;
 }
 
 message GetProjectRequest {
@@ -883,6 +889,17 @@ message SetupExistingFolderRequest {
 message SetupExistingFolderResponse {
   HostSetup setup = 1;  // status now "completed" or "failed"
   Project project = 2;  // set only on success
+}
+
+message ResolveProjectAccessRequest {
+  string project_id = 1;
+  string user_id = 2;
+}
+
+message ResolveProjectAccessResponse {
+  bool exists = 1;
+  // owner | member, or empty when the user is not a member (or the project does not exist).
+  string role = 2;
 }
 
 message GetProjectContextRequest {

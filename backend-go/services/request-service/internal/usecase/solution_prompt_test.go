@@ -103,6 +103,9 @@ func TestBuildSolutionPrompt_Golden(t *testing.T) {
 		"solution":  {Kind: domain.SolutionKindSolution, Request: req, MinOptions: 2, ProjectName: "orca", RepoURL: "https://example.com/orca.git"},
 		"diagnosis": {Kind: domain.SolutionKindDiagnosis, Request: req, MinOptions: 2},
 		"retry":     {Kind: domain.SolutionKindSolution, Request: req, MinOptions: 2, RetryNote: "number of options must be between 2 and 4, got 1"},
+		// The agent variants of kind=solution: with the knowledge graph, and without it.
+		"agent_solution_knowledge":    {Kind: domain.SolutionKindSolution, Request: req, MinOptions: 2, ProjectName: "orca", AgentSolution: true, UseKnowledge: true},
+		"agent_solution_no_knowledge": {Kind: domain.SolutionKindSolution, Request: req, MinOptions: 2, ProjectName: "orca", AgentSolution: true},
 	}
 	for name, in := range cases {
 		t.Run(name, func(t *testing.T) {

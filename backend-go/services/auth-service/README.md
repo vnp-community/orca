@@ -108,9 +108,17 @@ go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (t
   `mcp_pat_suspensions` (migration `0014`, both dialects); while a tenant has a
   row, `ResolveMcpPrincipal` answers `inactive_reason="suspended"` for all of
   its PATs. Nothing is revoked, deleting the row restores them.
-  `ResolveMcpPrincipal` itself can be guarded with
-  `AUTH_MCP_PRINCIPAL_CALLER_TOKEN` (same value as api-gateway); unset keeps it
-  open and logs a warning (rollout-safe default).
+  `ResolveMcpPrincipal` itself is guarded by
+  `AUTH_MCP_PRINCIPAL_CALLER_TOKEN` (same value as api-gateway); unset refuses
+  every call and logs an error (fail closed, like every `internalcaller.Guard`).
+
+- **Internal tenant-admin directory (TASK-V2-018).** `ListActiveTenantAdmins`
+  returns the ids of the active admins of the tenant in gRPC metadata. It
+  needs no acting user (request-service calls it from its outbox relay, where
+  `ListUsers` fails with `AUTH_NO_ACTOR`), takes no tenant field, and is
+  guarded by its own `AUTH_DIRECTORY_CALLER_TOKEN` (request-service holds the
+  same value); unset refuses every call and logs a warning (fail closed). It is
+  read separately from the OAuth config because it must work with OAuth off.
 
 - **JWT signing via Vault Transit is now real, for `IssueServiceToken` +
   `GetJWKS` only (Epic D).** `internal/adapter/vault/token_signer.go` wraps

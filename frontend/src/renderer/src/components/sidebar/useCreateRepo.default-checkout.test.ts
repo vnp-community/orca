@@ -107,6 +107,41 @@ function makeRepo(overrides: Partial<Repo> = {}): Repo {
   }
 }
 
+// Add Project registers a created repo in its OWN project (SOL-FE-E2E-005): project.create carries
+// the path and host, and repo.list reads the repo back.
+function ownProjectRpc(
+  repoId: string
+): (target: unknown, method: string, params?: unknown) => Promise<unknown> {
+  return async (_target, method, params) => {
+    if (method === 'project.list') {
+      return [{ id: 'default-project', name: 'My Repos', devServerId: 'ds-1' }]
+    }
+    if (method === 'repo.create') {
+      return { path: '/projects/created', defaultBranch: 'main' }
+    }
+    if (method === 'project.create') {
+      return { id: 'own-project' }
+    }
+    if (method === 'repo.list') {
+      return (params as { projectId: string }).projectId === 'own-project'
+        ? {
+            repos: [
+              {
+                id: repoId,
+                projectId: 'own-project',
+                url: '/projects/created',
+                displayName: 'created',
+                position: 0,
+                devServerId: 'ds-1'
+              }
+            ]
+          }
+        : { repos: [] }
+    }
+    throw new Error(`Unexpected runtime method ${method}`)
+  }
+}
+
 describe('useCreateRepo default-checkout handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -268,34 +303,7 @@ describe('useCreateRepo default-checkout handoff', () => {
     // implicit default project (project.list) and calls repo.add to register
     // it. All three calls share this one mocked callRuntimeRpc, so branch on
     // method.
-    mocks.callRuntimeRpc.mockImplementation(async (_target: unknown, method: string) => {
-      if (method === 'project.list') {
-        return [
-          {
-            id: 'default-project',
-            name: 'My Repos',
-            defaultBranch: 'main',
-            devServerId: '',
-            visibility: 'private',
-            createdAt: 1,
-            updatedAt: 1
-          }
-        ]
-      }
-      if (method === 'repo.create') {
-        return { path: '/projects/created', defaultBranch: 'main' }
-      }
-      if (method === 'repo.add') {
-        return {
-          id: repo.id,
-          projectId: 'default-project',
-          url: '/projects/created',
-          displayName: 'created',
-          position: 0
-        }
-      }
-      throw new Error(`Unexpected runtime method ${method}`)
-    })
+    mocks.callRuntimeRpc.mockImplementation(ownProjectRpc(repo.id))
     mocks.fetchWorktrees.mockResolvedValue(true)
     const { useCreateRepo } = await import('./useCreateRepo')
 
@@ -320,11 +328,23 @@ describe('useCreateRepo default-checkout handoff', () => {
       },
       { timeoutMs: 60_000 }
     )
+    // Own project named after the repo, bound to the picked host, carrying the repo path.
     expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'env-1' },
+      'project.create',
+      {
+        name: 'created',
+        devServerId: 'ds-1',
+        repoPath: '/projects/created',
+        visibility: 'private'
+      },
+      { timeoutMs: 30_000 }
+    )
+    expect(mocks.callRuntimeRpc).not.toHaveBeenCalledWith(
+      expect.anything(),
       'repo.add',
-      { projectId: 'default-project', url: '/projects/created', displayName: 'created' },
-      { timeoutMs: 15_000 }
+      expect.anything(),
+      expect.anything()
     )
     expect(mocks.createRepo).not.toHaveBeenCalled()
     expect(mocks.createRemoteRepo).not.toHaveBeenCalled()
@@ -353,34 +373,7 @@ describe('useCreateRepo default-checkout handoff', () => {
       path: '/projects/created'
     })
     mocks.storeState.settings.activeRuntimeEnvironmentId = 'session-auth'
-    mocks.callRuntimeRpc.mockImplementation(async (_target: unknown, method: string) => {
-      if (method === 'project.list') {
-        return [
-          {
-            id: 'default-project',
-            name: 'My Repos',
-            defaultBranch: 'main',
-            devServerId: '',
-            visibility: 'private',
-            createdAt: 1,
-            updatedAt: 1
-          }
-        ]
-      }
-      if (method === 'repo.create') {
-        return { path: '/projects/created', defaultBranch: 'main' }
-      }
-      if (method === 'repo.add') {
-        return {
-          id: repo.id,
-          projectId: 'default-project',
-          url: '/projects/created',
-          displayName: 'created',
-          position: 0
-        }
-      }
-      throw new Error(`Unexpected runtime method ${method}`)
-    })
+    mocks.callRuntimeRpc.mockImplementation(ownProjectRpc(repo.id))
     mocks.fetchWorktrees.mockResolvedValue(true)
     const { useCreateRepo } = await import('./useCreateRepo')
 

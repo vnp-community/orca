@@ -186,6 +186,44 @@ func (f *fakeRequestClient) GetPlanProposal(ctx context.Context, in *requestv1.G
 	return &requestv1.GetPlanProposalResponse{RunId: in.GetRunId(), Status: "succeeded", Proposal: &requestv1.PlanProposal{Title: "P", Phases: []*requestv1.PhaseProposal{{Title: "ph", Tasks: []*requestv1.TaskProposal{{Title: "t", TaskType: "task", EstimatedHours: wrapperspb.Double(2)}}}}}}, nil
 }
 
+func (f *fakeRequestClient) CleanupRequestProposal(ctx context.Context, in *requestv1.CleanupRequestProposalRequest, _ ...grpc.CallOption) (*requestv1.CleanupRequestProposalResponse, error) {
+	f.rec(ctx, "CleanupRequestProposal", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.CleanupRequestProposalResponse{Removed: true, Branch: "request/1-proposal"}, nil
+}
+
+func (f *fakeRequestClient) GetProjectEngineSettings(ctx context.Context, in *requestv1.GetProjectEngineSettingsRequest, _ ...grpc.CallOption) (*requestv1.GetProjectEngineSettingsResponse, error) {
+	f.rec(ctx, "GetProjectEngineSettings", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	resp := &requestv1.GetProjectEngineSettingsResponse{Settings: &requestv1.ProjectEngineSettings{ProjectId: in.GetProjectId(), SolutionEngine: "native"}}
+	if in.GetCheck() {
+		resp.Preflight = &requestv1.EnginePreflight{Ran: true, Ok: true, Gaps: []*requestv1.EnginePreflightNote{{Code: "REQUEST_KNOWLEDGE_NOT_INITIALIZED", Message: "m", FixHint: "h"}}}
+	}
+	return resp, nil
+}
+
+func (f *fakeRequestClient) SetProjectEngineSettings(ctx context.Context, in *requestv1.SetProjectEngineSettingsRequest, _ ...grpc.CallOption) (*requestv1.SetProjectEngineSettingsResponse, error) {
+	f.rec(ctx, "SetProjectEngineSettings", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.SetProjectEngineSettingsResponse{Settings: &requestv1.ProjectEngineSettings{
+		ProjectId: in.GetProjectId(), SolutionEngine: in.GetSolutionEngine(), SolutionAgent: in.GetSolutionAgent(), Version: in.GetExpectedVersion() + 1,
+	}}, nil
+}
+
+func (f *fakeRequestClient) GetPlanBundleFile(ctx context.Context, in *requestv1.GetPlanBundleFileRequest, _ ...grpc.CallOption) (*requestv1.GetPlanBundleFileResponse, error) {
+	f.rec(ctx, "GetPlanBundleFile", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetPlanBundleFileResponse{Path: in.GetPath(), Content: "# tasks\n"}, nil
+}
+
 func (f *fakeRequestClient) CommitPlan(ctx context.Context, in *requestv1.CommitPlanRequest, _ ...grpc.CallOption) (*requestv1.CommitPlanResponse, error) {
 	f.rec(ctx, "CommitPlan", in)
 	if f.err != nil {
@@ -272,6 +310,37 @@ func (f *fakeRequestClient) ListRequestLinks(ctx context.Context, in *requestv1.
 		return nil, f.err
 	}
 	return &requestv1.ListRequestLinksResponse{Children: []*requestv1.RequestLink{{ParentRequestId: "r1", ChildRequestId: "c1", Reason: "escalation"}}}, nil
+}
+
+func (f *fakeRequestClient) ListRequestActivity(ctx context.Context, in *requestv1.ListRequestActivityRequest, _ ...grpc.CallOption) (*requestv1.ListRequestActivityResponse, error) {
+	f.rec(ctx, "ListRequestActivity", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.empty {
+		return &requestv1.ListRequestActivityResponse{}, nil
+	}
+	return &requestv1.ListRequestActivityResponse{
+		NextPageToken: "tok2",
+		Entries: []*requestv1.ActivityEntry{{
+			Id: "o1", Kind: "task.failed", OccurredAt: timestamppb.New(time.Date(2026, 10, 15, 10, 56, 29, 0, time.UTC)), ActorKind: "agent",
+			SubjectType: "task", SubjectId: "t1", Summary: "Run the e2e acceptance failed (timed_out)", Attempt: 2, Severity: "error",
+			DetailsJson: `{"cause":"timed_out","attempt":2}`,
+		}, {Id: "o2", Kind: "request.created", OccurredAt: timestamppb.New(time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)), ActorKind: "user", Severity: "info", DetailsJson: "not json"}},
+	}, nil
+}
+
+func (f *fakeRequestClient) GetExecutionSummary(ctx context.Context, in *requestv1.GetExecutionSummaryRequest, _ ...grpc.CallOption) (*requestv1.GetExecutionSummaryResponse, error) {
+	f.rec(ctx, "GetExecutionSummary", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetExecutionSummaryResponse{Summary: &requestv1.ExecutionSummary{
+		RequestId: in.GetRequestId(), Status: "request_backlog", Engine: "openspec", ExecutionMode: "continuous", MaxAttempts: 2,
+		Progress: &requestv1.ExecutionProgress{PhasesTotal: 7, PhasesDone: 6, TasksTotal: 28, TasksDone: 27, TasksFailed: 1},
+		Failed: []*requestv1.ExecutionFailedTask{{TaskId: "t1", Title: "Run the e2e acceptance", Attempts: 2, MaxAttempts: 2, LastCause: "timed_out"}},
+		NeedsYou: []*requestv1.ExecutionNeedsYou{{Kind: "failed_task", RefId: "t1", Title: "Run the e2e acceptance", Since: timestamppb.New(time.Date(2026, 10, 15, 10, 56, 29, 0, time.UTC))}},
+	}}, nil
 }
 
 func (f *fakeRequestClient) GetRequestFlow(ctx context.Context, in *requestv1.GetRequestFlowRequest, _ ...grpc.CallOption) (*requestv1.GetRequestFlowResponse, error) {

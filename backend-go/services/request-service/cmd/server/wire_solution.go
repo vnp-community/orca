@@ -29,8 +29,33 @@ type solutionWiring struct {
 	handlers map[domain.SubjectType]usecase.SubjectHandler
 
 	opener  *lateApprovalOpener
+	writer  *usecase.AnalysisResultWriter
 	stores  *requestStores
 	closers []func()
+
+	// Kept for wirePlan, which runs Plan generation on the same runner, connections and AI relay.
+	conns     usecase.AnalysisConnectionResolver
+	completer usecase.ProjectAICompleter
+	projects  usecase.ProjectContextReader
+	settings  usecase.AnalysisSettings
+	owner     string
+	// Clients the openspec engine needs on top of the above; nil when the service addresses are not configured.
+	agent usecase.AgentPromptRunner
+	caps  usecase.DevServerCapabilityReader
+	infra infrafleetv1.InfraFleetServiceClient
+	// gate is the readiness check shared by the openspec engine and the settings RPC; nil when the dev server stack is not configured.
+	gate *usecase.EngineReadinessGate
+	// readonly is the agent worker of the read-only kinds and of the Solution; observer receives the engine metrics.
+	readonly *usecase.RunAgentReadonlyAnalysis
+	observer usecase.EngineObserver
+	// executor runs short commands on the dev server; tasksSync keeps tasks.md and the archive of OpenSpec changes up to date.
+	executor  usecase.DevServerExecutor
+	tasksSync *usecase.TasksMdSyncer
+	// workspace and janitor exist only when the openspec engine is configured: the janitor removes the proposal worktrees.
+	workspace *grpcclient.ProposalWorkspace
+	janitor   *usecase.ProposalJanitor
+	proj      projectv1.ProjectServiceClient
+	git       gitgatewayv1.GitGatewayServiceClient
 }
 
 // wireSolution builds solution generation and read-only analysis (CR-REQ-007/008) and starts the lease-recovery sweeper.
@@ -49,6 +74,9 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		projects  usecase.ProjectContextReader
 		caps      usecase.DevServerCapabilityReader
 		probe     usecase.RepoStateProbe
+		infraC    infrafleetv1.InfraFleetServiceClient
+		projectC  projectv1.ProjectServiceClient
+		gitC      gitgatewayv1.GitGatewayServiceClient
 	)
 	if cfg.InfraFleetServiceAddr != "" && cfg.ProjectServiceAddr != "" {
 		infraConn, err := grpcclient.Dial(cfg.InfraFleetServiceAddr)
@@ -74,10 +102,12 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		}
 		resolver := grpcclient.NewAIConnectionResolver(infra, projectClient)
 		conns = grpcclient.NewAnalysisConnections(resolver)
-		completer = grpcclient.NewAICompletionRelay(infra, resolver, providers, settings.AICompleteTimeout)
+		completer = grpcclient.NewAICompletionRelay(infra, resolver, providers, settings.AICompleteTimeout).
+			WithCapabilities(grpcclient.NewInfraCapabilityClient(infra, 10*time.Second))
 		agent = grpcclient.NewAgentPromptRelay(infra)
 		projects = grpcclient.NewProjectContextResolver(projectClient)
 		caps = grpcclient.NewInfraCapabilityClient(infra, 10*time.Second)
+		infraC, projectC = infra, projectClient
 	} else {
 		log.Warn("INFRA_FLEET_SERVICE_ADDR or PROJECT_SERVICE_ADDR unset: GenerateSolution will fail with a no-connection error")
 	}
@@ -87,7 +117,8 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 			return nil, err
 		}
 		w.closers = append(w.closers, func() { _ = gitConn.Close() })
-		probe = grpcclient.NewRepoStateProbe(gitgatewayv1.NewGitGatewayServiceClient(gitConn))
+		gitC = gitgatewayv1.NewGitGatewayServiceClient(gitConn)
+		probe = grpcclient.NewRepoStateProbe(gitC)
 	} else {
 		log.Warn("GIT_GATEWAY_SERVICE_ADDR unset: read-only analyses record repo_check=skipped")
 	}
@@ -99,12 +130,17 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	gates := usecase.NewApprovalGates(stores.artifact.decisions, stores.artifact.clarifications)
 
 	writer := usecase.NewAnalysisResultWriter(stores.requests, stores.solutions, stores.analysisRuns, w.opener, transition, stores.tx, stores.outboxWriter, owner).WithArtifacts(artifacts)
-	generation := usecase.NewRunSolutionGeneration(stores.requests, stores.solutions, completer, projects, writer, settings).WithCoverage(artifacts)
+	generation := usecase.NewRunSolutionGeneration(stores.requests, stores.solutions, completer, projects, writer, settings).WithCoverage(artifacts).
+		WithClarifications(stores.artifact.clarifications)
 	readonly := usecase.NewRunAgentReadonlyAnalysis(usecase.AgentReadonlyDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Conns: conns, Agent: agent, Probe: probe, Caps: caps,
-		Projects: projects, Writer: writer, Settings: settings,
+		Projects: projects, Writer: writer, Settings: settings, Clarifications: stores.artifact.clarifications,
 	})
+	w.writer = writer
+	w.readonly = readonly
 	w.runner = usecase.NewAnalysisRunner(stores.analysisRuns, stores.solutions, stores.tx, generation, readonly, settings, owner)
+	w.conns, w.completer, w.projects, w.settings, w.owner = conns, completer, projects, settings, owner
+	w.agent, w.caps, w.infra, w.proj, w.git = agent, caps, infraC, projectC, gitC
 
 	// Reporter and admins steer analysis; whoever the pending approval's snapshot lets decide may also choose the option.
 	auth := usecase.ApproverAwareAuthorizer{
@@ -113,7 +149,8 @@ func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 	w.generate = usecase.NewGenerateSolution(usecase.GenerateSolutionDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Runs: stores.analysisRuns, Conns: conns, Auth: auth, Approvals: lifecycle.Canceller,
 		Transition: transition, Tx: stores.tx, Spawner: w.runner, Settings: settings, LeaseOwner: owner,
-	}).WithDecisions(artifacts)
+	}).WithDecisions(artifacts).WithEnginePin(usecase.NewPinSolutionEngine(stores.requests, stores.engineSettings)).
+		WithSolutionAgent(stores.engineSettings, caps)
 	w.list = usecase.NewListSolutions(stores.requests, stores.solutions, stores.analysisRuns)
 	w.choose = usecase.NewChooseSolutionOption(stores.requests, stores.solutions, stores.approvals, auth, stores.tx).
 		WithDecisions(recordDecision, selfChoicePolicy(stores))
@@ -160,6 +197,12 @@ func analysisSettings(cfg config.Config) usecase.AnalysisSettings {
 	}
 	if cfg.AgentReadonlyTimeoutMS > 0 {
 		s.AgentTimeoutMS = cfg.AgentReadonlyTimeoutMS
+	}
+	if cfg.SpecTimeoutMS > 0 {
+		s.SpecTimeoutMS = cfg.SpecTimeoutMS
+	}
+	if cfg.SpecTotalTimeoutMS > 0 {
+		s.SpecTotalTimeoutMS = cfg.SpecTotalTimeoutMS
 	}
 	if cfg.AgentReadonlyMaxPerProject > 0 {
 		s.MaxAgentRunsPerProject = cfg.AgentReadonlyMaxPerProject
@@ -221,4 +264,12 @@ type unavailableAgent struct{}
 
 func (unavailableAgent) ExecPrompt(context.Context, usecase.AnalysisConnection, usecase.AgentPromptInput) (usecase.AgentPromptResult, error) {
 	return usecase.AgentPromptResult{}, usecase.ErrNoDevServer
+}
+
+// observe sends the engine metrics (runs, knowledge tool calls, preflight failures, spec violations) to o. Call it before
+// wirePlan, which hands the observer to the engine and the readiness check.
+func (w *solutionWiring) observe(o usecase.EngineObserver) {
+	w.observer = o
+	w.runner.WithObserver(o)
+	w.readonly.WithObserver(o)
 }

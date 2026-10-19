@@ -3,8 +3,10 @@ package eventbus
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
@@ -48,7 +50,34 @@ func (c *RequestStatusConsumer) Handle(ctx context.Context, ev commoneventbus.Ev
 		return nil
 	}
 	_, err := c.starter.Execute(tenant.WithTenantID(ctx, ev.TenantID), p.RequestID)
+	return handlerOutcome(ctx, "start execution", ev, p.RequestID, err)
+}
+
+// handlerOutcome logs a failure and decides whether the bus should redeliver. The bus NAKs without delay and without
+// logging, so a permanent failure (a Phase gate that cannot open, a missing permission) would spin hot and stay invisible;
+// the reconcile loop re-evaluates every executing Request, so acknowledging it loses nothing.
+func handlerOutcome(ctx context.Context, what string, ev commoneventbus.Event, requestID string, err error) error {
+	if err == nil {
+		return nil
+	}
+	permanent := isPermanentFailure(err)
+	slog.WarnContext(ctx, what+" failed", slog.String("event_id", ev.ID), slog.String("request_id", requestID), slog.Bool("redelivered", !permanent), slog.Any("error", err))
+	if permanent {
+		return nil
+	}
 	return err
+}
+
+func isPermanentFailure(err error) bool {
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) {
+		return false
+	}
+	switch ae.Kind {
+	case apperrors.KindPermissionDenied, apperrors.KindFailedPrecondition, apperrors.KindInvalidArgument, apperrors.KindNotFound:
+		return true
+	}
+	return false
 }
 
 // GateResumer is *usecase.ResumeAfterGate.
@@ -80,5 +109,6 @@ func (c *ApprovalDecidedConsumer) Handle(ctx context.Context, ev commoneventbus.
 	if p.Decision != string(domain.ApprovalStatusApproved) || p.SubjectType != string(domain.SubjectPreDeploy) || ev.TenantID == "" {
 		return nil
 	}
-	return c.resumer.Execute(tenant.WithTenantID(ctx, ev.TenantID), p.RequestID, domain.SubjectType(p.SubjectType))
+	err := c.resumer.Execute(tenant.WithTenantID(ctx, ev.TenantID), p.RequestID, domain.SubjectType(p.SubjectType))
+	return handlerOutcome(ctx, "resume after gate", ev, p.RequestID, err)
 }

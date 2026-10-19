@@ -11,19 +11,33 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { translate } from '@/i18n/i18n'
 import { getScreenSubmitShortcutLabel, isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import { useAppStore } from '@/store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { callRequestRpc } from '../../runtime/request-rpc-client'
+import { useRequestCooldown } from '../../hooks/useRequestCooldown'
 import { parseRequest } from '../../../../shared/request-wire-parsers'
 import { REQUEST_RPC_METHODS } from '../../../../shared/request-rpc-methods'
-import { requestErrorMessage } from './request-error-message'
+import { requestErrorMessageForError } from './request-error-message'
+import { CreateRequestProjectRepoNote } from './CreateRequestProjectRepoNote'
 import { FILTERABLE_TYPES } from './request-list-filters'
 import { REQUEST_BODY_MAX, REQUEST_TITLE_MAX } from './create-request-from-issue'
 import type { CreateRequestParams } from './create-request-from-issue'
@@ -42,7 +56,12 @@ type Props = {
   pickProjectId?: (projects: OrcaProject[]) => string | null
 }
 
-export function CreateRequestDialog({ open, onOpenChange, initial, pickProjectId }: Props): React.JSX.Element {
+export function CreateRequestDialog({
+  open,
+  onOpenChange,
+  initial,
+  pickProjectId
+}: Props): React.JSX.Element {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [body, setBody] = useState(initial?.body ?? '')
   const [projects, setProjects] = useState<OrcaProject[] | null>(null)
@@ -57,15 +76,21 @@ export function CreateRequestDialog({ open, onOpenChange, initial, pickProjectId
   const clientRequestId = useRef(crypto.randomUUID())
 
   useEffect(() => {
-    if (!open) {return}
+    if (!open) {
+      return
+    }
     let cancelled = false
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
     void callRuntimeRpc<OrcaProject[]>(target, 'project.list', {})
       .then((list) => {
-        if (cancelled) {return}
+        if (cancelled) {
+          return
+        }
         const safe = Array.isArray(list) ? list : []
         setProjects(safe)
-        setProjectId((current) => current || pickProjectId?.(safe) || (safe.length === 1 ? safe[0].id : ''))
+        setProjectId(
+          (current) => current || pickProjectId?.(safe) || (safe.length === 1 ? safe[0].id : '')
+        )
       })
       .catch(() => !cancelled && setProjects([]))
     return () => {
@@ -73,26 +98,41 @@ export function CreateRequestDialog({ open, onOpenChange, initial, pickProjectId
     }
   }, [open, pickProjectId])
 
-  const blocked = submitting || title.trim().length === 0 || projectId === ''
+  const writeCooldown = useRequestCooldown('write')
+  const blocked =
+    submitting || writeCooldown.coolingDown || title.trim().length === 0 || projectId === ''
 
   const submit = async (): Promise<void> => {
-    if (blocked) {return}
+    if (blocked) {
+      return
+    }
     setSubmitting(true)
     setErrorText(null)
-    const result = await callRequestRpc<{ request?: unknown; created?: boolean }>(REQUEST_RPC_METHODS.CREATE, {
-      projectId,
-      title: title.trim(),
-      ...(body.trim() ? { body: body.trim() } : {}),
-      ...(initial?.source ? { source: initial.source } : {}),
-      hints: { priority: urgency === 'urgent' ? 'high' : undefined, ...(typeHint !== LET_AI_CLASSIFY ? { issueType: typeHint } : {}) },
-      clientRequestId: clientRequestId.current
-    })
+    const result = await callRequestRpc<{ request?: unknown; created?: boolean }>(
+      REQUEST_RPC_METHODS.CREATE,
+      {
+        projectId,
+        title: title.trim(),
+        ...(body.trim() ? { body: body.trim() } : {}),
+        ...(initial?.source ? { source: initial.source } : {}),
+        hints: {
+          priority: urgency === 'urgent' ? 'high' : undefined,
+          ...(typeHint !== LET_AI_CLASSIFY ? { issueType: typeHint } : {})
+        },
+        clientRequestId: clientRequestId.current
+        // Why: the same clientRequestId makes a repeat answer `created: false`, so a throttled create may be retried once.
+      },
+      { idempotent: true }
+    )
     setSubmitting(false)
     if (!result.ok) {
       setErrorText(
-        result.error.code === 'REQUEST_PENDING_LIMIT'
-          ? translate(`${T}pendingLimit`, 'Too many requests are waiting for classification. Try again later.')
-          : requestErrorMessage(result.error.kind)
+        (result.error.backendCode ?? result.error.code) === 'REQUEST_PENDING_LIMIT'
+          ? translate(
+              `${T}pendingLimit`,
+              'Too many requests are waiting for classification. Try again later.'
+            )
+          : requestErrorMessageForError(result.error)
       )
       return
     }
@@ -119,14 +159,20 @@ export function CreateRequestDialog({ open, onOpenChange, initial, pickProjectId
 
   return (
     <Dialog open={open} onOpenChange={(next) => !submitting && onOpenChange(next)}>
-      <DialogContent>
+      {/* Why: the form is self-explanatory; without this Radix warns "Missing Description" on every open. */}
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{translate(`${T}title`, 'Create request')}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="create-request-title">{translate(`${T}titleLabel`, 'Title')}</Label>
-            <Input id="create-request-title" value={title} maxLength={REQUEST_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} />
+            <Input
+              id="create-request-title"
+              value={title}
+              maxLength={REQUEST_TITLE_MAX}
+              onChange={(e) => setTitle(e.target.value)}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="create-request-body">{translate(`${T}body`, 'Description')}</Label>
@@ -147,8 +193,13 @@ export function CreateRequestDialog({ open, onOpenChange, initial, pickProjectId
           <div className="flex flex-col gap-1.5">
             <Label>{translate(`${T}project`, 'Project')}</Label>
             <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger aria-label={translate(`${T}project`, 'Project')} aria-invalid={projectId === ''}>
-                <SelectValue placeholder={translate(`${T}projectPlaceholder`, 'Choose a project')} />
+              <SelectTrigger
+                aria-label={translate(`${T}project`, 'Project')}
+                aria-invalid={projectId === ''}
+              >
+                <SelectValue
+                  placeholder={translate(`${T}projectPlaceholder`, 'Choose a project')}
+                />
               </SelectTrigger>
               <SelectContent>
                 {(projects ?? []).map((p) => (
@@ -159,8 +210,11 @@ export function CreateRequestDialog({ open, onOpenChange, initial, pickProjectId
               </SelectContent>
             </Select>
             {projectId === '' && projects !== null && (
-              <p className="text-xs text-muted-foreground">{translate(`${T}projectRequired`, 'Choose the project this request belongs to.')}</p>
+              <p className="text-xs text-muted-foreground">
+                {translate(`${T}projectRequired`, 'Choose the project this request belongs to.')}
+              </p>
             )}
+            <CreateRequestProjectRepoNote projectId={projectId} />
           </div>
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-1.5">
@@ -170,8 +224,18 @@ export function CreateRequestDialog({ open, onOpenChange, initial, pickProjectId
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="normal">{translate('auto.components.request.RequestOverviewTab.urgency.normal', 'Normal')}</SelectItem>
-                  <SelectItem value="urgent">{translate('auto.components.request.RequestOverviewTab.urgency.urgent', 'Urgent')}</SelectItem>
+                  <SelectItem value="normal">
+                    {translate(
+                      'auto.components.request.RequestOverviewTab.urgency.normal',
+                      'Normal'
+                    )}
+                  </SelectItem>
+                  <SelectItem value="urgent">
+                    {translate(
+                      'auto.components.request.RequestOverviewTab.urgency.urgent',
+                      'Urgent'
+                    )}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -182,7 +246,9 @@ export function CreateRequestDialog({ open, onOpenChange, initial, pickProjectId
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={LET_AI_CLASSIFY}>{translate(`${T}letAi`, 'Let the AI classify')}</SelectItem>
+                  <SelectItem value={LET_AI_CLASSIFY}>
+                    {translate(`${T}letAi`, 'Let the AI classify')}
+                  </SelectItem>
                   {FILTERABLE_TYPES.map((t: RequestType) => (
                     <SelectItem key={t} value={t}>
                       {translate(`auto.components.request.RequestType.${t}.label`, t)}
@@ -202,7 +268,11 @@ export function CreateRequestDialog({ open, onOpenChange, initial, pickProjectId
           <Button variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
             {translate('auto.components.request.RequestReasonDialog.cancel', 'Cancel')}
           </Button>
-          <Button disabled={blocked} onClick={() => void submit()} title={getScreenSubmitShortcutLabel()}>
+          <Button
+            disabled={blocked}
+            onClick={() => void submit()}
+            title={getScreenSubmitShortcutLabel()}
+          >
             {translate(`${T}submit`, 'Create')}
           </Button>
         </DialogFooter>

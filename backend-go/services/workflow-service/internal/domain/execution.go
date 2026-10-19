@@ -81,6 +81,9 @@ type WorkflowExecution struct {
 	// has the original inputs available (closing the gap this field's
 	// absence used to leave — see that function's doc comment).
 	InputsJSON string
+	// StartedBy is the user who started the execution (empty for system-started runs and rows from before the
+	// column existed). RecoverExecutions restores it so a resumed run keeps the acting user.
+	StartedBy string
 }
 
 // NewWorkflowExecution constructs a WorkflowExecution in StatusRunning —

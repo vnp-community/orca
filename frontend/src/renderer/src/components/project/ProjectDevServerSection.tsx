@@ -11,25 +11,13 @@ import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import {
-  callRuntimeRpc,
-  getActiveRuntimeTarget,
-  RuntimeRpcCallError
-} from '../../runtime/runtime-rpc-client'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { useAppStore } from '../../store'
 import type { Repo } from '../../types/workspace-types'
 import { translate } from '@/i18n/i18n'
+import { rebindRepoToDevServer } from '@/lib/repo-host-rebind'
 
 type DevServerOption = { id: string; name: string; status: string }
-
-// Same FORBIDDEN/UNAUTHENTICATED-message pattern as MemberManager.tsx/CreateProjectDialog.tsx.
-function describeError(err: unknown, fallback: string): string {
-  const message = err instanceof RuntimeRpcCallError || err instanceof Error ? err.message : ''
-  if (/^FORBIDDEN/i.test(message) || message === 'UNAUTHENTICATED') {
-    return 'You do not have permission to do that.'
-  }
-  return message || fallback
-}
 
 export function ProjectDevServerSection({ projectId }: { projectId: string }) {
   const [devServers, setDevServers] = useState<DevServerOption[]>([])
@@ -77,15 +65,14 @@ export function ProjectDevServerSection({ projectId }: { projectId: string }) {
     }
     setRepoSavingId(repo.id)
     try {
-      const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-      await callRuntimeRpc(target, 'repo.rebindDevServer', {
-        repoId: repo.id,
-        newDevServerId
-      })
-      toast.success('Dev server updated')
-      fetchRepos()
-    } catch (err) {
-      toast.error(describeError(err, 'Failed to update the dev server.'))
+      // Shared with the host picker so error mapping and the post-rebind refresh stay identical.
+      const result = await rebindRepoToDevServer(repo.id, newDevServerId)
+      if (result.ok) {
+        toast.success('Dev server updated')
+        fetchRepos()
+      } else {
+        toast.error(result.message)
+      }
     } finally {
       setRepoSavingId(null)
     }

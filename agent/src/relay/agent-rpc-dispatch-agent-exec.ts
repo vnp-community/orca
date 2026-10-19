@@ -198,7 +198,7 @@ export async function dispatchAgentExecRpc(
     // git.execStream/agent.spawn already use in this dispatcher.
     case 'agent.execPromptStream': {
       try {
-        const { handleAgentExecPromptStream } = await import('./agent-print-mode-exec')
+        const { handleAgentExecPromptStream } = await import('./agent-exec-prompt-stream')
         // Streaming: fire-and-forget, sends multiple frames asynchronously
         void handleAgentExecPromptStream(ws, state, rpc.id, rpc.params ?? {}, config, log)
         return { jsonrpc: '2.0', id: rpc.id, result: { type: 'stream.started' } }

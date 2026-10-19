@@ -26,6 +26,7 @@ import { getRepositoryIconSectionId } from './repository-settings-targets'
 import { RepositoryIconPicker } from './RepositoryIconPicker'
 import { getRepositoryPaneSearchEntries } from './repository-search'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
+import { RepositoryDevServerHostSection } from './RepositoryDevServerHostSection'
 import { RepositoryGitInitSection } from './RepositoryGitInitSection'
 import { RepoSettingsDraftInput } from './RepositorySettingsDraftInput'
 import { RepositoryForkSyncSection } from './RepositoryForkSyncSection'
@@ -321,6 +322,8 @@ export function RepositoryPane({
               searchQuery={searchQuery}
               searchEntries={[]}
             />
+
+            <RepositoryDevServerHostSection repo={repo} forceVisible={forceFullPaneForRepoMatch} />
 
             <RepositoryHostSetupsSection
               repo={repo}

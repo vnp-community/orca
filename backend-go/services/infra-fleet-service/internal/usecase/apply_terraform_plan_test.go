@@ -32,7 +32,7 @@ func TestApplyTerraformPlan_RequiresTenantContext(t *testing.T) {
 }
 
 func TestApplyTerraformPlan_UnknownControlDevServer_ReturnsInvalidArgument(t *testing.T) {
-	devRepo := &fakeDevServerRepository{getErr: errors.New("not found")}
+	devRepo := &fakeDevServerRepository{getErr: domain.ErrDevServerNotFound}
 	uc := NewApplyTerraformPlan(devRepo, &fakeTerraformRunner{})
 
 	ctx := withTenant(context.Background(), "tenant-1")

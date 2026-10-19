@@ -1,8 +1,9 @@
 /**
  * useExecutionResult — FE-REQ-TASK-036-02
  *
- * `execution.get` is a proposed channel. `legacy` = task has no record (older
- * than CR-REQ-029); `unsupported` = runtime lacks the channel.
+ * `execution.get` (CONTRACT 2.8): a structured record, or for tasks without one the tail of the
+ * last run's output. `legacy` = nothing to show (TASK_NOT_FOUND); `unsupported` = runtime
+ * lacks the channel.
  *
  * @module hooks/useExecutionResult
  */
@@ -14,7 +15,13 @@ import { REQUEST_RPC_METHODS } from '../../../shared/request-rpc-methods'
 import { parseExecutionResult } from '../../../shared/request-artifact-parsers'
 import type { ExecutionResult } from '../../../shared/request-artifact-types'
 
-export type ExecutionResultStatus = 'idle' | 'loading' | 'ready' | 'legacy' | 'unsupported' | 'error'
+export type ExecutionResultStatus =
+  | 'idle'
+  | 'loading'
+  | 'ready'
+  | 'legacy'
+  | 'unsupported'
+  | 'error'
 
 export function useExecutionResult(taskId: string | null, requestId: string | null = null) {
   const [result, setResult] = useState<ExecutionResult | null>(null)
@@ -32,18 +39,31 @@ export function useExecutionResult(taskId: string | null, requestId: string | nu
     }
     let cancelled = false
     setStatus('loading')
-    void callRequestRpc<{ result?: unknown }>(REQUEST_RPC_METHODS.EXECUTION_GET, { taskId, latestOnly: true }).then((res) => {
-      if (cancelled) {return}
+    void callRequestRpc<{ result?: unknown }>(REQUEST_RPC_METHODS.EXECUTION_GET, {
+      taskId,
+      latestOnly: true
+    }).then((res) => {
+      if (cancelled) {
+        return
+      }
       if (!res.ok) {
         setResult(null)
-        setStatus(res.error.kind === 'unsupported' ? 'unsupported' : res.error.kind === 'not_found' ? 'legacy' : 'error')
+        setStatus(
+          res.error.kind === 'unsupported'
+            ? 'unsupported'
+            : res.error.kind === 'not_found'
+              ? 'legacy'
+              : 'error'
+        )
         return
       }
       const parsed = parseExecutionResult(res.value?.result ?? res.value)
       setResult(parsed)
       setStatus(parsed ? 'ready' : 'legacy')
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [taskId, tick])
 
   return { result, status, refetch }

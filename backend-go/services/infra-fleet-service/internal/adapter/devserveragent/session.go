@@ -123,7 +123,9 @@ type session struct {
 	nextRequestID  uint32
 	highestPeerSeq uint32
 	pending        map[uint32]*pendingCall
-	closed         bool
+	// activeRuns counts agent runs (see isAgentRunMethod) awaiting their response on this session.
+	activeRuns int
+	closed     bool
 
 	// managedMode marks a session this package doesn't reconnect the plain
 	// relay-websocket way — direct-websocket's inbound accept (the agent
@@ -200,6 +202,8 @@ type session struct {
 	devServerID string
 	onCodeIntel func(devServerID string, n JSONRPCNotification)
 	onAttached  func(devServerID string)
+	// onActivity fires when connection state or the number of agent runs changes; it must not block.
+	onActivity func(devServerID string)
 }
 
 // wsURL builds ws://host:port/orca-relay — the fixed path
@@ -239,6 +243,8 @@ func (s *session) connect(ctx context.Context, token string) error {
 		return fmt.Errorf("devserveragent: dial %s: %w", s.wsURL(), err)
 	}
 
+	// Before the handshake: its reply can already exceed the 32 KiB default.
+	conn.SetReadLimit(MaxWebSocketReadBytes)
 	info, err := s.runInitiatorHandshake(ctx, conn)
 	if err != nil {
 		conn.Close(websocket.StatusProtocolError, "handshake failed")
@@ -270,6 +276,7 @@ func (s *session) attachTransport(t Transport, info HandshakeInfo) {
 	if s.onAttached != nil {
 		s.onAttached(s.devServerID)
 	}
+	s.notifyActivity()
 }
 
 // runInitiatorHandshake sends agent.handshake (frame id=1, ack=0, exactly
@@ -991,6 +998,7 @@ func (s *session) handleDisconnect(t Transport, cause error) {
 		call.resultCh <- lostErr
 	}
 
+	s.notifyActivity()
 	go s.backgroundReconnect()
 }
 
@@ -1195,7 +1203,14 @@ func (s *session) callWithTimeout(ctx context.Context, method string, params any
 	ack := s.highestPeerSeq
 	call := &pendingCall{resultCh: make(chan JSONRPCResponse, 1)}
 	s.pending[reqID] = call
+	if isAgentRunMethod(method) {
+		s.activeRuns++
+		defer s.finishRun()
+	}
 	s.mu.Unlock()
+	if isAgentRunMethod(method) {
+		s.notifyActivity()
+	}
 
 	var paramsRaw json.RawMessage
 	if params != nil {
@@ -1231,6 +1246,26 @@ func (s *session) callWithTimeout(ctx context.Context, method string, params any
 		s.dropPending(reqID)
 		return nil, fmt.Errorf("devserveragent: request %q timed out: %w", method, callCtx.Err())
 	}
+}
+
+func (s *session) finishRun() {
+	s.mu.Lock()
+	s.activeRuns--
+	s.mu.Unlock()
+	s.notifyActivity()
+}
+
+func (s *session) notifyActivity() {
+	if s.onActivity != nil {
+		s.onActivity(s.devServerID)
+	}
+}
+
+// activeRunCount is how many agent runs are in flight on this session right now.
+func (s *session) activeRunCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeRuns
 }
 
 // callStream sends one JSON-RPC request the same way call() does, but
@@ -1419,9 +1454,15 @@ func (s *session) handshakeInfoSnapshot() (HandshakeInfo, bool) {
 	return s.handshakeInfo, true
 }
 
-// close tears down the session — used when a devServer is removed or the
-// service shuts down.
-func (s *session) close() {
+// close tears down the session — used when a devServer is removed or its token revoked.
+func (s *session) close() { s.closeWith(false) }
+
+// shutdown closes the session because this service is stopping. The agent exits on a normal
+// close (1000), so a redeploy would otherwise take every connected agent down with it; 1001
+// tells it to reconnect.
+func (s *session) shutdown() { s.closeWith(true) }
+
+func (s *session) closeWith(goingAway bool) {
 	s.closeMu.Lock()
 	defer s.closeMu.Unlock()
 	s.mu.Lock()
@@ -1436,6 +1477,10 @@ func (s *session) close() {
 		close(s.closeCh)
 	}
 	if t != nil {
+		if g, ok := t.(goingAwayCloser); ok && goingAway {
+			_ = g.CloseGoingAway("service shutting down")
+			return
+		}
 		_ = t.Close("session closed")
 	}
 }

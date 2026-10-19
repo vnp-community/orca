@@ -24,6 +24,7 @@ import (
 	eventbusadapter "github.com/stablyai/orca-go/services/request-service/internal/adapter/eventbus"
 	requestgrpc "github.com/stablyai/orca-go/services/request-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/request-service/internal/config"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 	"google.golang.org/grpc"
 	grpchealth "google.golang.org/grpc/health"
@@ -36,6 +37,9 @@ func main() {
 	defer cancel()
 
 	cfg := config.Load()
+	if len(os.Args) > 1 && os.Args[1] == healthcheckArg {
+		os.Exit(runHealthcheck(cfg.HTTPPort, os.Stderr))
+	}
 
 	if err := run(ctx, cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -74,11 +78,18 @@ func run(ctx context.Context, cfg config.Config) error {
 	}
 
 	healthSrv := health.New()
+	registerInternalTokenReadiness(healthSrv, cfg)
 	stores, err := openStores(ctx, dsn, dialect.Dialect, healthSrv)
 	if err != nil {
 		return err
 	}
 	defer stores.close()
+	engineDefaults, defaultWarnings := domain.EngineDefaultsFromEnv(os.Getenv)
+	for _, w := range defaultWarnings {
+		log.Warn(w)
+	}
+	stores.engineSettings = usecase.NewDefaultedEngineSettings(stores.engineSettings, engineDefaults)
+	stores.engineDefaults = engineDefaults
 	outboxStore := stores.outbox
 	rollout, err := wireRollout(cfg, log, stores) // wraps stores.tx and stores.outboxWriter: keep before any use case is built
 	if err != nil {
@@ -145,7 +156,8 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 	defer solution.close()
-	approval, err := wireApproval(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, approvalRegistry, dirs, solution.handlers, execTasks.subjectArtifacts())
+	solution.observe(rollout.Metrics)
+	approval, err := wireApproval(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, approvalRegistry, dirs, solution.handlers, execTasks.subjectArtifacts(stores.openspecChanges))
 	if err != nil {
 		return err
 	}
@@ -164,11 +176,22 @@ func run(ctx context.Context, cfg config.Config) error {
 	defer classification.close()
 	rollout.StartSampler(lifecycleCtx, &lifecycleWG)
 	approval.BindConfirm(classification.confirm)
-	execution, err := wireExecution(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, approval, execTasks, busConsumer)
+	execution, err := wireExecution(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, approval, execTasks, busConsumer, wireContractRuns(solution))
 	if err != nil {
 		return err
 	}
 	defer execution.close()
+	plan, err := wirePlan(log, stores, lifecycle, solution, approval, execution, execTasks, dirs)
+	if err != nil {
+		return err
+	}
+	if solution.janitor != nil {
+		lifecycle.Cancel.WithProposalCleanup(solution.janitor)
+		startProposalJanitor(lifecycleCtx, &lifecycleWG, log, solution.janitor)
+	}
+	if solution.tasksSync != nil {
+		startTasksMdSync(lifecycleCtx, &lifecycleWG, solution.tasksSync)
+	}
 	artifact, err := wireArtifact(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, intake, classification, busConsumer, dirs, solution)
 	if err != nil {
 		return err
@@ -179,6 +202,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 	defer security.close()
+	registerPolicyBundleReadiness(healthSrv, security.policy)
 	registerEntityResolvers(security.authorize, stores.artifact)
 	httpHandler, err := intake.webhookHandler(cfg, log, healthSrv.Handler(), security.replay)
 	if err != nil {
@@ -190,12 +214,14 @@ func run(ctx context.Context, cfg config.Config) error {
 	// ChainUnary (recovery, tenant extraction, logging) stays first; the security chain (with the flow gate and RPC audit hooks) runs after it.
 	grpcServer := grpc.NewServer(append(append([]grpc.ServerOption{grpcmw.ChainUnary(log), grpcmw.StatsHandler()}, security.options...), rollout.ServerOptions()...)...)
 	requestv1.RegisterRequestServiceServer(grpcServer, artifact.attach(rollout.WithRPCs(requestgrpc.NewServer(
-		usecase.NewGetRequest(stores.requests),
-		usecase.NewListRequests(stores.requests),
+		usecase.NewGetRequest(stores.requests).WithEngine(&usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}),
+		usecase.NewListRequests(stores.requests).WithEngine(&usecase.RequestEngineResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults, Log: log}),
 	).WithExecution(execution.Server))).WithIntake(requestgrpc.IntakeUseCases{Create: intake.createRequest, Lookup: intake.lookup}).
 		WithClassification(requestgrpc.ClassificationUseCases{Runner: classification.runner, Confirm: classification.confirm, Change: classification.change, History: classification.history}).
 		WithLifecycle(requestgrpc.LifecycleUseCases{Flow: lifecycle.GetFlow, Return: lifecycle.Return, Reopen: lifecycle.Reopen, Cancel: lifecycle.Cancel, SpawnChild: lifecycle.SpawnChild, Links: lifecycle.ListLinks}).
 		WithSolution(solution.useCases()).
+		WithPlan(plan).
+		WithEngineSettings(usecase.NewManageProjectEngineSettings(stores.engineSettings).WithReadiness(solution.gate).WithAudit(security.audit, stores.tx)).
 		WithCompliance(security.compliance))
 	if approval.Enabled {
 		requestv1.RegisterApprovalServiceServer(grpcServer, requestgrpc.NewApprovalServer(approval.Server))

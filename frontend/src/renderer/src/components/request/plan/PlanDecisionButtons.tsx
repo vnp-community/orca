@@ -46,7 +46,7 @@ export function PlanDecisionButtons({
   const [dialogOpen, setDialogOpen] = useState(false)
   const approving = decision.isBusy(`approve:${approval.id}`)
   const rejecting = decision.isBusy(`reject:${approval.id}`)
-  const locked = approving || rejecting || decision.isDenied(approval.id)
+  const locked = approving || rejecting || decision.isDenied(approval.id) || decision.coolingDown
 
   return (
     <div className="flex items-center gap-2">

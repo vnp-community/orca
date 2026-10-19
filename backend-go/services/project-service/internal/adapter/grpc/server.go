@@ -78,6 +78,7 @@ type Server struct {
 	setupExistingFolder *usecase.SetupExistingFolder
 
 	getProjectContext       *usecase.GetProjectContext
+	resolveProjectAccess    *usecase.ResolveProjectAccess
 	getMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 
 	linkSourceProject    *usecase.LinkSourceProject
@@ -148,6 +149,7 @@ type Deps struct {
 	SetupExistingFolder *usecase.SetupExistingFolder
 
 	GetProjectContext       *usecase.GetProjectContext
+	ResolveProjectAccess    *usecase.ResolveProjectAccess
 	GetMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 
 	LinkSourceProject    *usecase.LinkSourceProject
@@ -216,6 +218,7 @@ func New(deps Deps) *Server {
 		setupExistingFolder: deps.SetupExistingFolder,
 
 		getProjectContext:       deps.GetProjectContext,
+		resolveProjectAccess:    deps.ResolveProjectAccess,
 		getMobileWorktreeStatus: deps.GetMobileWorktreeStatus,
 
 		linkSourceProject:    deps.LinkSourceProject,
@@ -235,7 +238,7 @@ func New(deps Deps) *Server {
 // rule. The wire field exists for forward compatibility with a future
 // admin/cross-tenant path, not used here.
 func (s *Server) CreateProject(ctx context.Context, req *projectv1.CreateProjectRequest) (*projectv1.CreateProjectResponse, error) {
-	project, err := s.createProject.Execute(ctx, usecase.CreateProjectInput{
+	project, repo, err := s.createProject.Execute(ctx, usecase.CreateProjectInput{
 		Name:          req.GetName(),
 		Description:   req.GetDescription(),
 		DefaultBranch: req.GetDefaultBranch(),
@@ -246,7 +249,11 @@ func (s *Server) CreateProject(ctx context.Context, req *projectv1.CreateProject
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &projectv1.CreateProjectResponse{Project: toProtoProject(project)}, nil
+	resp := &projectv1.CreateProjectResponse{Project: toProtoProject(project)}
+	if repo != nil {
+		resp.Repo = toProtoRepo(*repo)
+	}
+	return resp, nil
 }
 
 func (s *Server) GetProject(ctx context.Context, req *projectv1.GetProjectRequest) (*projectv1.GetProjectResponse, error) {
@@ -1126,6 +1133,15 @@ func (s *Server) GetProjectContext(ctx context.Context, req *projectv1.GetProjec
 		ProjectId: pc.ProjectID, ProjectName: pc.ProjectName, Description: pc.Description,
 		RepoUrl: pc.RepoURL, DevServerId: pc.DevServerID, DevServerHostname: pc.DevServerHostname,
 	}, nil
+}
+
+// ResolveProjectAccess is an internal RPC (guarded by the service token in cmd/server).
+func (s *Server) ResolveProjectAccess(ctx context.Context, req *projectv1.ResolveProjectAccessRequest) (*projectv1.ResolveProjectAccessResponse, error) {
+	access, err := s.resolveProjectAccess.Execute(ctx, req.GetProjectId(), req.GetUserId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.ResolveProjectAccessResponse{Exists: access.Exists, Role: access.Role}, nil
 }
 
 // GetMobileWorktreeStatus is BL-MB-04's ONE composed-read call — tenant_id/

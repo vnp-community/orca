@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/NNNN_solution_engines.{up,down}.sql`, `migrations/mysql/NNNN_solution_engines.{up,down}.sql`, `internal/usecase/ports.go` (sửa), `internal/adapter/postgres/{project_engine_settings_repository,openspec_change_repository}.go`, `internal/adapter/mysql/{project_engine_settings_repository,openspec_change_repository}.go` và test (tất cả mới trừ `ports.go`)
 **Depends on:** TASK-REQ-026-01, TASK-REQ-007-01 (bảng `analysis_runs`), TASK-REQ-002-01 (bảng `requests`), TASK-REQ-001-04 (`TxRunner`, executor trong ctx)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-14): migration 0007/0094/0095/0096, repository Postgres + MySQL, contract test hai dialect (SOL-TDD-002 T2.2, T2.6, T2.9, T2.14)
 
 ---
 

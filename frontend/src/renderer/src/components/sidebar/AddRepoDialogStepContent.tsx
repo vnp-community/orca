@@ -23,6 +23,9 @@ type AddRepoDialogStepContentProps = {
   nestedScanId: string | null
   serverPath: string
   isAddingServerPath: boolean
+  serverProjectName?: string
+  onServerProjectNameChange?: (name: string) => void
+  serverPathDuplicate?: { projectName: string; onOpen: () => void } | null
   cloneUrl: string
   cloneDestination: string
   cloneError: string | null
@@ -45,6 +48,8 @@ type AddRepoDialogStepContentProps = {
   createError: string | null
   isCreating: boolean
   hostSelector?: ReactNode
+  // Web: no dev server chosen/connected; start-step actions stay disabled until the gate is ready.
+  hostGateBlocking?: boolean
   showRemoteAction?: boolean
   canCreateProject?: boolean
   manualCreateParentEntry?: boolean
@@ -93,6 +98,9 @@ export function AddRepoDialogStepContent({
   nestedScanId,
   serverPath,
   isAddingServerPath,
+  serverProjectName,
+  onServerProjectNameChange,
+  serverPathDuplicate = null,
   cloneUrl,
   cloneDestination,
   cloneError,
@@ -115,6 +123,7 @@ export function AddRepoDialogStepContent({
   createError,
   isCreating,
   hostSelector,
+  hostGateBlocking = false,
   showRemoteAction = true,
   canCreateProject = true,
   manualCreateParentEntry = isRuntimeEnvironmentActive,
@@ -154,7 +163,7 @@ export function AddRepoDialogStepContent({
       <AddRepoLocalStartStep
         repoCount={repoCount}
         isSshLikely={isSshLikely}
-        isAdding={isAdding}
+        isAdding={isAdding || hostGateBlocking}
         addProjectBusyLabel={addProjectBusyLabel}
         nestedScanInProgress={nestedScanInProgress}
         nestedScanId={nestedScanId}
@@ -178,9 +187,13 @@ export function AddRepoDialogStepContent({
         runtimeEnvironmentId={activeRuntimeEnvironmentId}
         devServerId={activeDevServerId}
         isAddingServerPath={isAddingServerPath}
+        hostBlocked={hostGateBlocking}
         addProjectBusyLabel={addProjectBusyLabel}
         hostSelector={hostSelector}
         initialBrowsing
+        projectName={serverProjectName}
+        onProjectNameChange={onServerProjectNameChange}
+        duplicate={serverPathDuplicate}
         onServerPathChange={onServerPathChange}
         onAddServerPath={onAddServerPath}
         onOpenCloneStep={onOpenCloneStep}

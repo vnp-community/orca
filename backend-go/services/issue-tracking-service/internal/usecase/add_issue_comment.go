@@ -39,7 +39,7 @@ func (uc *AddIssueComment) Execute(ctx context.Context, in AddIssueCommentInput)
 	}
 	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, in.Provider, in.WorkspaceID)
 	if err != nil {
-		return domain.IssueComment{}, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no credential available for provider", err)
+		return domain.IssueComment{}, credentialResolveError(err, "no credential available for provider")
 	}
 	comment, err := provider.AddIssueComment(ctx, cred, in.IssueID, in.BodyMarkdown)
 	if err != nil {

@@ -198,6 +198,8 @@ func (fakeExecutor) ScanSetupScriptImports(context.Context, string) ([]string, e
 // Clone/InitRepo's wire<->usecase translation.
 type fakeReachability struct{ reachable bool }
 
+func (f fakeReachability) LocalReposAllowed() bool { return false }
+
 func (f fakeReachability) IsReachable(context.Context, string) (bool, error) {
 	return f.reachable, nil
 }

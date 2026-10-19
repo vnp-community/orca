@@ -2,9 +2,11 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
 // RevokeDevServerGroupAccess admin-gated.
@@ -26,6 +28,9 @@ func (uc *RevokeDevServerGroupAccess) Execute(ctx context.Context, grantID strin
 	}
 
 	if err := uc.repo.Delete(ctx, tenantID, grantID); err != nil {
+		if errors.Is(err, domain.ErrDevServerGroupGrantNotFound) {
+			return apperrors.New(apperrors.KindNotFound, "INFRA_GRANT_NOT_FOUND", "grant not found", err)
+		}
 		return apperrors.New(apperrors.KindInternal, "INFRA_REVOKE_GRANT_FAILED", "failed to revoke grant", err)
 	}
 	return nil

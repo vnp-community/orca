@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // TeamMembershipResolver answers team questions from tenant-service. ListTeamsForUser and ListTeamMembers take
@@ -70,11 +73,24 @@ func (r *TeamMembershipResolver) MembersOfTeam(ctx context.Context, teamID strin
 	return ids, nil
 }
 
-// directoryUnavailable keeps the stable code for callers and the cause for logs.
+// directoryUnavailable keeps the stable code for callers and the cause for logs. A cause that retrying cannot fix
+// (the directory refuses our credentials, does not know the RPC, or the team is gone) is marked so the notification
+// relay does not block other events behind it.
 func directoryUnavailable(op string, cause error) error {
+	if refusedForGood(cause) {
+		cause = usecase.MarkNotRetryable(cause)
+	}
 	e := *domain.ErrApprovalDirectoryUnavailable
 	e.Err = fmt.Errorf("%s: %w", op, cause)
 	return &e
+}
+
+func refusedForGood(cause error) bool {
+	switch status.Code(cause) {
+	case codes.Unauthenticated, codes.PermissionDenied, codes.Unimplemented, codes.InvalidArgument, codes.NotFound:
+		return true
+	}
+	return false
 }
 
 // UnavailableDirectory is bound when the directory address is not configured: every lookup fails closed.
@@ -86,13 +102,20 @@ var (
 )
 
 func (UnavailableDirectory) TeamsForUser(context.Context, string) ([]string, error) {
-	return nil, domain.ErrApprovalDirectoryUnavailable
+	return nil, notConfigured()
 }
 
 func (UnavailableDirectory) MembersOfTeam(context.Context, string) ([]string, error) {
-	return nil, domain.ErrApprovalDirectoryUnavailable
+	return nil, notConfigured()
 }
 
 func (UnavailableDirectory) ListAdmins(context.Context, string) ([]string, error) {
-	return nil, domain.ErrApprovalDirectoryUnavailable
+	return nil, notConfigured()
+}
+
+// notConfigured is not retryable: no amount of waiting binds a missing address or token.
+func notConfigured() error {
+	e := *domain.ErrApprovalDirectoryUnavailable
+	e.Err = usecase.MarkNotRetryable(errors.New("directory is not configured"))
+	return &e
 }

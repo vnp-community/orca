@@ -73,7 +73,8 @@ func (r *Repository) Register(ctx context.Context, ds domain.DevServer) (domain.
 // specs/backend-go/services/infra-fleet-service.md §9.
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevServer, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status,
+		       COALESCE(platform, ''), COALESCE(arch, ''), COALESCE(node_version, ''), COALESCE(agent_version, '')
 		FROM dev_servers
 		WHERE tenant_id = ? AND id = ?
 	`, tenantID, id)
@@ -82,9 +83,10 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 	var mode, status, kind, healthStatus string
 	var sshTargetID, groupID sql.NullString
 	var tagsJSON []byte
-	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &tagsJSON, &status, &groupID, &kind, &healthStatus)
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &tagsJSON, &status, &groupID, &kind, &healthStatus,
+		&ds.Platform, &ds.Arch, &ds.NodeVersion, &ds.AgentVersion)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.DevServer{}, fmt.Errorf("mysql: dev server %q not found for tenant: %w", id, err)
+		return domain.DevServer{}, fmt.Errorf("mysql: dev server %q for tenant: %w", id, domain.ErrDevServerNotFound)
 	}
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("mysql: query dev server: %w", err)
@@ -108,7 +110,8 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 // List returns every dev server registered for tenantID.
 func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevServer, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status,
+		       COALESCE(platform, ''), COALESCE(arch, ''), COALESCE(node_version, ''), COALESCE(agent_version, '')
 		FROM dev_servers
 		WHERE tenant_id = ?
 		ORDER BY created_at DESC
@@ -124,7 +127,8 @@ func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevSer
 		var mode, status, kind, healthStatus string
 		var sshTargetID, groupID sql.NullString
 		var tagsJSON []byte
-		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &tagsJSON, &status, &groupID, &kind, &healthStatus); err != nil {
+		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &tagsJSON, &status, &groupID, &kind, &healthStatus,
+			&ds.Platform, &ds.Arch, &ds.NodeVersion, &ds.AgentVersion); err != nil {
 			return nil, fmt.Errorf("mysql: scan dev server row: %w", err)
 		}
 		if err := unmarshalTags(tagsJSON, &ds.Tags); err != nil {
@@ -264,15 +268,17 @@ func (r *Repository) AssignGroup(ctx context.Context, tenantID, devServerID, gro
 // return — shared here the same way scanDevServerRow was shared there.
 func (r *Repository) selectDevServerRow(ctx context.Context, tenantID, devServerID string) (domain.DevServer, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind, status
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind, status,
+		       COALESCE(platform, ''), COALESCE(arch, ''), COALESCE(node_version, ''), COALESCE(agent_version, '')
 		FROM dev_servers WHERE tenant_id = ? AND id = ?
 	`, tenantID, devServerID)
 	var ds domain.DevServer
 	var mode, status, kind, healthStatus string
 	var sshTargetID, groupID sql.NullString
-	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status, &groupID, &kind, &healthStatus)
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status, &groupID, &kind, &healthStatus,
+		&ds.Platform, &ds.Arch, &ds.NodeVersion, &ds.AgentVersion)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.DevServer{}, fmt.Errorf("mysql: dev server not found for tenant: %w", err)
+		return domain.DevServer{}, fmt.Errorf("mysql: update dev server for tenant: %w", domain.ErrDevServerNotFound)
 	}
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("mysql: reading back updated dev server: %w", err)
@@ -372,7 +378,7 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 	`, tenantID, id)
 	target, err := scanSshTarget(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.SshTarget{}, fmt.Errorf("mysql: ssh target %q not found for tenant: %w", id, err)
+		return domain.SshTarget{}, fmt.Errorf("mysql: ssh target %q for tenant: %w", id, domain.ErrSshTargetNotFound)
 	}
 	if err != nil {
 		return domain.SshTarget{}, fmt.Errorf("mysql: query ssh target: %w", err)
@@ -605,7 +611,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, tenantID string, conn dom
 	var exists int
 	err = r.db.QueryRowContext(ctx, `SELECT 1 FROM connections WHERE id = ? AND tenant_id = ?`, conn.ID, tenantID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("mysql: update connection status: no connection %s for tenant %s", conn.ID, tenantID)
+		return fmt.Errorf("mysql: update connection status %s for tenant %s: %w", conn.ID, tenantID, domain.ErrConnectionNotFound)
 	}
 	if err != nil {
 		return fmt.Errorf("mysql: confirming connection status update: %w", err)
