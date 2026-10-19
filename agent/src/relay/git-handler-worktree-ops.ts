@@ -1,6 +1,8 @@
 import * as path from 'node:path'
-import { resolveWorktreeAddBaseRef } from '../shared/worktree-base-ref'
+import { resolveWorktreeStartPoint } from '../shared/worktree-base-ref'
 import type { GitExec } from './git-handler-ops'
+import { assertWorktreeOnBranch } from './worktree-add-branch-guard'
+import { createWorktreeStartPointProbe } from './worktree-start-point-git-probe'
 export { removeWorktreeOp } from './git-handler-worktree-remove'
 export { readRelayWorktreeList } from './git-handler-worktree-list'
 
@@ -52,14 +54,12 @@ export async function addWorktreeOp(git: GitExec, params: Record<string, unknown
   // identically here.
   const effectiveBase =
     base && !checkoutExistingBranch
-      ? await resolveWorktreeAddBaseRef(base, async (qualifiedRef) => {
-          try {
-            await git(['rev-parse', '--verify', '--quiet', `${qualifiedRef}^{commit}`], repoPath)
-            return true
-          } catch {
-            return false
-          }
-        })
+      ? await resolveWorktreeStartPoint(
+          base,
+          createWorktreeStartPointProbe(
+            async (probeArgs) => (await git(probeArgs, repoPath)).stdout
+          )
+        )
       : undefined
 
   const args = checkoutExistingBranch
@@ -73,6 +73,12 @@ export async function addWorktreeOp(git: GitExec, params: Record<string, unknown
   }
 
   await git(args, repoPath)
+  await assertWorktreeOnBranch(
+    async (guardArgs, cwd) => (await git(guardArgs, cwd)).stdout,
+    repoPath,
+    targetDir,
+    branchName
+  )
 
   if (checkoutExistingBranch) {
     return

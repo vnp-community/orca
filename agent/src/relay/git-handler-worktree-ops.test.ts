@@ -27,9 +27,37 @@ function resolvedRepoPath(): string {
   return path.posix.resolve('/repo-feature', '/repo/.git', '..')
 }
 
+const BASE_SHA = 'b'.repeat(40)
+
+// Answers like git for the probes addWorktreeOp issues: `existingRefs` resolve
+// to a commit, every other rev-parse exits 1, and a new worktree sits on `branch`.
+function addWorktreeGit(
+  branch: string,
+  existingRefs: string[] = [],
+  onOther?: (args: string[]) => void
+) {
+  return vi.fn<GitExec>(async (args) => {
+    if (args[0] === 'rev-parse') {
+      const revision = args[3]?.replace(/\^\{commit\}$/, '') ?? ''
+      if (existingRefs.includes(revision)) {
+        return { stdout: `${BASE_SHA}\n`, stderr: '' }
+      }
+      throw Object.assign(new Error('exit 1'), { code: 1 })
+    }
+    if (args[0] === 'remote') {
+      return { stdout: 'origin\n', stderr: '' }
+    }
+    if (args[0] === 'symbolic-ref') {
+      return { stdout: `${branch}\n`, stderr: '' }
+    }
+    onOther?.(args)
+    return { stdout: '', stderr: '' }
+  })
+}
+
 describe('addWorktreeOp', () => {
   it('writes durable branch base config after creating an SSH new-branch worktree', async () => {
-    const git = vi.fn<GitExec>(async () => ({ stdout: '', stderr: '' }))
+    const git = addWorktreeGit('feature/test', ['refs/remotes/origin/main'])
 
     await addWorktreeOp(git, {
       repoPath: '/repo',
@@ -39,6 +67,8 @@ describe('addWorktreeOp', () => {
     })
 
     expect(git.mock.calls.map((call) => call[0])).toEqual([
+      ['rev-parse', '--verify', '--quiet', 'refs/heads/origin/main^{commit}'],
+      ['remote'],
       ['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main^{commit}'],
       [
         'worktree',
@@ -49,6 +79,7 @@ describe('addWorktreeOp', () => {
         '/repo-feature',
         'refs/remotes/origin/main'
       ],
+      ['symbolic-ref', '--short', 'HEAD'],
       [
         'config',
         '--local',
@@ -73,7 +104,7 @@ describe('addWorktreeOp', () => {
   })
 
   it('does not write branch base config when checking out an existing SSH branch', async () => {
-    const git = vi.fn<GitExec>(async () => ({ stdout: '', stderr: '' }))
+    const git = addWorktreeGit('feature/test')
 
     await addWorktreeOp(git, {
       repoPath: '/repo',
@@ -84,12 +115,13 @@ describe('addWorktreeOp', () => {
     })
 
     expect(git.mock.calls.map((call) => call[0])).toEqual([
-      ['worktree', 'add', '/repo-feature', 'feature/test']
+      ['worktree', 'add', '/repo-feature', 'feature/test'],
+      ['symbolic-ref', '--short', 'HEAD']
     ])
   })
 
   it('does not write branch base config when SSH creation has no base', async () => {
-    const git = vi.fn<GitExec>(async () => ({ stdout: '', stderr: '' }))
+    const git = addWorktreeGit('feature/no-base')
 
     await addWorktreeOp(git, {
       repoPath: '/repo',
@@ -99,17 +131,17 @@ describe('addWorktreeOp', () => {
 
     expect(git.mock.calls.map((call) => call[0])).toEqual([
       ['worktree', 'add', '--no-track', '-b', 'feature/no-base', '/repo-feature'],
+      ['symbolic-ref', '--short', 'HEAD'],
       ['config', '--get', 'push.autoSetupRemote']
     ])
   })
 
   it('warns and unsets stale branch base config when SSH base persistence fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const git = vi.fn<GitExec>(async (args) => {
+    const git = addWorktreeGit('feature/test', ['refs/remotes/origin/main'], (args) => {
       if (args[0] === 'config' && args[2] === '--replace-all') {
         throw new Error('config locked')
       }
-      return { stdout: '', stderr: '' }
     })
 
     await expect(

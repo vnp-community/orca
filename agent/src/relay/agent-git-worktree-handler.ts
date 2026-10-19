@@ -5,11 +5,35 @@
 // add/remove to agent-git-handler.ts's handleGitExec for the actual git
 // invocation, and reuses its resumeFrom/SHELL_METACHARACTERS helpers.
 
+import * as path from 'node:path'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
+import { resolveWorktreeStartPoint, WorktreeBaseRefError } from '../shared/worktree-base-ref'
 import { Tracers } from '../shared/trace/tracers'
 import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 import { handleGitExec, resumeFrom, SHELL_METACHARACTERS } from './agent-git-handler'
+import { assertWorktreeOnBranch } from './worktree-add-branch-guard'
+import { createWorktreeStartPointProbe } from './worktree-start-point-git-probe'
+
+// Why: handleGitExec's allowlist has no symbolic-ref, and probes need the exit
+// code on the thrown error to tell "ref missing" (1) from a broken git.
+async function runGitForStdout(config: AgentConfig, args: string[], cwd: string): Promise<string> {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const { stdout } = await promisify(execFile)('git', args, {
+    cwd,
+    env: { ...config.toolEnv },
+    timeout: 10_000
+  })
+  return stdout
+}
+
+function gitExecSucceeded(result: object): boolean {
+  if ('error' in result) {
+    return false
+  }
+  return (result as { result?: { exitCode?: number } }).result?.exitCode === 0
+}
 
 // ─── git.worktree.list ────────────────────────────────────────────────────────
 
@@ -82,6 +106,16 @@ export async function handleGitWorktreeAdd(
     }
   }
 
+  // Why: `-b -x` / `-b --detach` would make git read the branch as a flag.
+  if (branch.startsWith('-')) {
+    span.fail('branch starts with "-"', { branch })
+    return {
+      jsonrpc: '2.0',
+      id,
+      error: { code: AgentErrorCode.InvalidParams, message: 'Branch name must not start with "-"' }
+    }
+  }
+
   // WT-Issue-1: Security validation — prevent path traversal
   try {
     const { validateWorktreePath } = await import('./git-handler')
@@ -96,9 +130,38 @@ export async function handleGitWorktreeAdd(
   // baseRef is an optional start-point for the new branch (git-gateway-
   // service's CreateWorktreeInput.BaseRef) — only meaningful when creating a
   // branch; omitted, `git worktree add -b` defaults to cwd's HEAD.
+  const gitCwd = typeof params.cwd === 'string' && params.cwd ? params.cwd : config.workDir
+  let startPoint = ''
+  if (createBranch && baseRef) {
+    try {
+      span.step('resolve-start-point', { baseRef })
+      startPoint = await resolveWorktreeStartPoint(
+        baseRef,
+        createWorktreeStartPointProbe((probeArgs) => runGitForStdout(config, probeArgs, gitCwd))
+      )
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      span.fail(msg, { baseRef })
+      if (err instanceof WorktreeBaseRefError && err.code === 'NOT_FOUND') {
+        // Why: same shape as git's own failure, which git-gateway-service classifies
+        // (isBaseRefNotFoundErr) into WORKTREE_BASE_REF_NOT_FOUND.
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: { stdout: '', stderr: `fatal: ${msg}`, exitCode: 128 }
+        }
+      }
+      const code =
+        err instanceof WorktreeBaseRefError
+          ? AgentErrorCode.InvalidParams
+          : AgentErrorCode.ServerError
+      return { jsonrpc: '2.0', id, error: { code, message: msg } }
+    }
+  }
+
   const args = createBranch
-    ? baseRef
-      ? ['worktree', 'add', '-b', branch, worktreePath, baseRef]
+    ? startPoint
+      ? ['worktree', 'add', '-b', branch, worktreePath, startPoint]
       : ['worktree', 'add', '-b', branch, worktreePath]
     : ['worktree', 'add', worktreePath, branch]
 
@@ -109,11 +172,28 @@ export async function handleGitWorktreeAdd(
     config,
     log
   )
-  if (result && typeof result === 'object' && 'error' in result) {
-    span.fail((result as { error: { message: string } }).error.message, { path: worktreePath })
-  } else {
-    span.ok({ path: worktreePath, branch })
+  if (!gitExecSucceeded(result)) {
+    const message =
+      'error' in result
+        ? (result as { error: { message: string } }).error.message
+        : 'git exit non-zero'
+    span.fail(message, { path: worktreePath })
+    return result
   }
+
+  try {
+    await assertWorktreeOnBranch(
+      (guardArgs, guardCwd) => runGitForStdout(config, guardArgs, guardCwd),
+      gitCwd,
+      path.resolve(gitCwd, worktreePath),
+      branch
+    )
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    span.fail(msg, { path: worktreePath, branch })
+    return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
+  }
+  span.ok({ path: worktreePath, branch })
   return result
 }
 

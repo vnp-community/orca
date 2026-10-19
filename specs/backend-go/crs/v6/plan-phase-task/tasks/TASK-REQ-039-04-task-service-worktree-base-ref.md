@@ -97,3 +97,31 @@
 - Chưa chạy với task-service, git-gateway và agent thật (không chạy e2e theo quy tắc phiên); đường `relay` của git-gateway cho `BaseRefDefault`/`CreateWorktree` chỉ được kiểm gián tiếp qua fake.
 - `golangci-lint` không chạy được; chỉ `gofmt` và `go vet`.
 - api-gateway không biên dịch trên cây hiện tại (việc của người khác) nên không build lại; trường proto mới là tùy chọn nên không ảnh hưởng.
+
+## Bổ sung 2026-10-19: phân giải ref ở agent
+
+### Lỗi
+
+Với git 2.54.0 (Apple Git-157), trong bản clone mà `release/y` chỉ tồn tại dưới dạng `origin/release/y`, lệnh `git worktree add -b task/1 ../wt1 release/y` tạo nhánh cục bộ `release/y` (theo dõi origin) và checkout nhánh đó; nhánh `task/1` không bao giờ được tạo. Worktree của task thế là nằm trên (và sẽ commit vào) nhánh release của người dùng. Nguyên nhân: `agent/src/shared/worktree-base-ref.ts` coi đoạn đầu của tên có dấu `/` là tên remote (`refs/remotes/<name>`, `refs/heads/<name>`), nên `release/y` không bao giờ thành `refs/remotes/origin/release/y` và đi vào git ở dạng trần. Thêm nữa, `handleGitWorktreeAdd` (`git.worktree.add`) truyền `baseRef` thô cho git, không qua bộ phân giải nào.
+
+### Sửa
+
+- `agent/src/shared/worktree-base-ref.ts`: `resolveWorktreeStartPoint(baseRef, probe)` thay `resolveWorktreeAddBaseRef`. Thứ tự: bắt đầu bằng `refs/` thì giữ; nhánh cục bộ `refs/heads/<n>`; `refs/remotes/<n>` khi `<n>` bắt đầu bằng tên remote có thật + `/`; `refs/remotes/origin/<n>`; đúng một remote khác có `refs/remotes/<remote>/<n>` (nhiều hơn một là lỗi `AMBIGUOUS`, không đoán); `refs/tags/<n>`; cuối cùng commit-ish được xác thực bằng `rev-parse --verify --quiet <x>^{commit}` (trả về SHA đầy đủ). Tên rỗng hoặc bắt đầu bằng `-` bị từ chối (`INVALID`) trước mọi lệnh git. Không tìm thấy là `NOT_FOUND` với thông điệp chứa `invalid reference`.
+- `agent/src/relay/worktree-start-point-git-probe.ts`: probe dùng `rev-parse --verify --quiet` và `git remote` (chạy được trên git 2.25). Exit 1 là "không có ref"; lỗi khác (không phải repo, thiếu git, timeout) được ném lại chứ không bị báo là ref không tồn tại.
+- `agent/src/relay/agent-git-worktree-handler.ts`: `handleGitWorktreeAdd` phân giải điểm bắt đầu trước khi gọi `git worktree add -b`, từ chối `branch` bắt đầu bằng `-`, và sau khi thêm worktree kiểm `git symbolic-ref --short HEAD` bằng `worktree-add-branch-guard.ts`; sai nhánh thì `git worktree remove --force` rồi trả lỗi `ServerError`. `NOT_FOUND` được trả dưới dạng kết quả kiểu git (`exitCode` 128, `stderr` = `fatal: invalid reference: ...`) nên `isBaseRefNotFoundErr` của git-gateway-service (chứa `invalid reference`) vẫn phân loại ra `WORKTREE_BASE_REF_NOT_FOUND`; `AMBIGUOUS`/`INVALID` là lỗi `InvalidParams`.
+- `agent/src/relay/git-handler-worktree-ops.ts` (`addWorktreeOp`, đường SSH relay `git.addWorktree`) dùng cùng bộ phân giải và cùng bước kiểm nhánh.
+
+### Kiểm thử
+
+- `agent/src/relay/__tests__/agent-git-worktree-start-point.test.ts` (git thật, kho dựng trong test bởi `worktree-start-point-repo-fixture.ts`): nhánh cục bộ `release/x`; `release/y` chỉ có trên origin (tên trần và `origin/release/y`); tag `v1`; nhánh cục bộ trùng tên nhánh remote (`release/dup`); `feature/z` trên hai remote (lỗi mơ hồ, không tạo thư mục; `upstream/feature/z` chạy được); checkout hiện tại ở nhánh thứ ba `other` (không ảnh hưởng điểm bắt đầu); `--detach` bị từ chối; SHA đầy đủ/ngắn; ref đã qualified; ref không tồn tại. Ở mỗi ca worktree nằm trên nhánh MỚI và `HEAD` == SHA của ref dự định.
+- Hồi quy: test chạy đúng lệnh cũ bằng git trần (`git worktree add -b task/plain <path> release/y`) và khẳng định worktree KHÔNG nằm trên `task/plain` (tạo ra nhánh `release/y` cục bộ), rồi chứng minh handler cho `task/<n>` đúng SHA của `origin/release/y` và không tạo nhánh `release/y`. Đột biến thử: đổi handler về truyền `baseRef` thô thì test hồi quy và test SSH đỏ (bước kiểm nhánh cũng bắt được: "worktree was created on branch "release/y" instead of..."); đã hoàn nguyên.
+- Test đơn vị thuần cho thứ tự ưu tiên: `agent/src/shared/worktree-base-ref.test.ts`. Test mock cũ của `addWorktreeOp` cập nhật theo lời gọi mới (`git-handler-worktree-ops.test.ts`, khối `addWorktree` trong `git-handler.test.ts`), có thêm ca "không nằm trên nhánh yêu cầu thì gỡ worktree".
+- Lệnh đã chạy trong `agent/`: `npx vitest run src/shared src/relay/__tests__/agent-git src/relay/__tests__/agent-rpc src/relay/git-handler src/relay/agent-git` (xanh, trừ lỗi có sẵn `agent-rpc-dispatch.test.ts > notification.send ... delivered:false`); `src/relay/codeintel/security-repo-resolution.test.ts` xanh; `npx oxlint -c ../.oxlintrc.json <tệp đã đổi>` sạch; `node build.mjs` thành công.
+
+### Blast radius
+
+`resolveWorktreeAddBaseRef` chỉ có một bên gọi trong `agent/` (`addWorktreeOp`); `handleGitWorktreeAdd` chỉ được `agent-rpc-dispatch-git.ts` (`git.worktree.add`) gọi. Bản sao `worktree-base-ref.ts` trong `desktop/`, `backend/`, `frontend/` là gói khác, không đổi ở đây (nên áp cùng sửa nếu chúng chạm vào đường tạo worktree).
+
+### Chưa kiểm chứng
+
+Chưa chạy với agent và git-gateway thật (không chạy e2e theo quy tắc phiên). Chưa chạy trên git 2.25 thật; các lệnh dùng (`rev-parse --verify --quiet`, `remote`, `symbolic-ref --short`, `worktree remove --force`) đều có từ trước 2.25.

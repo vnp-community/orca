@@ -1,64 +1,97 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resolveWorktreeAddBaseRef } from './worktree-base-ref'
+import {
+  resolveWorktreeStartPoint,
+  WorktreeBaseRefError,
+  type WorktreeStartPointProbe
+} from './worktree-base-ref'
 
-describe('resolveWorktreeAddBaseRef', () => {
-  it('leaves fully qualified refs unchanged', async () => {
-    const refExists = vi.fn()
+const SHA = 'a'.repeat(40)
 
-    await expect(resolveWorktreeAddBaseRef('refs/heads/main', refExists)).resolves.toBe(
-      'refs/heads/main'
-    )
+// Pure precedence logic; the real-git behaviour is covered in
+// relay/__tests__/agent-git-worktree-start-point.test.ts.
+function probeWith(refs: string[], remotes: string[] = ['origin']): WorktreeStartPointProbe {
+  return {
+    resolveCommit: vi.fn(async (revision: string) => (refs.includes(revision) ? SHA : null)),
+    listRemotes: vi.fn(async () => remotes)
+  }
+}
 
-    expect(refExists).not.toHaveBeenCalled()
-  })
-
-  it('leaves provider review refs unchanged', async () => {
-    const refExists = vi.fn()
-
-    await expect(resolveWorktreeAddBaseRef('refs/pull/123/head', refExists)).resolves.toBe(
+describe('resolveWorktreeStartPoint', () => {
+  it('keeps fully qualified refs without touching git', async () => {
+    const probe = probeWith([])
+    await expect(resolveWorktreeStartPoint('refs/pull/123/head', probe)).resolves.toBe(
       'refs/pull/123/head'
     )
-    await expect(
-      resolveWorktreeAddBaseRef('refs/merge-requests/456/head', refExists)
-    ).resolves.toBe('refs/merge-requests/456/head')
-
-    expect(refExists).not.toHaveBeenCalled()
+    expect(probe.resolveCommit).not.toHaveBeenCalled()
+    expect(probe.listRemotes).not.toHaveBeenCalled()
   })
 
-  it('qualifies a bare local branch name', async () => {
-    const refExists = vi.fn(async (ref: string) => ref === 'refs/heads/main')
-
-    await expect(resolveWorktreeAddBaseRef('main', refExists)).resolves.toBe('refs/heads/main')
-
-    expect(refExists).toHaveBeenCalledWith('refs/heads/main')
+  it('rejects empty and dash-prefixed names before any git call', async () => {
+    const probe = probeWith([])
+    for (const bad of ['', '-b', '--detach']) {
+      await expect(resolveWorktreeStartPoint(bad, probe)).rejects.toMatchObject({ code: 'INVALID' })
+    }
+    expect(probe.resolveCommit).not.toHaveBeenCalled()
+    expect(probe.listRemotes).not.toHaveBeenCalled()
   })
 
-  it('prefers a remote-tracking ref for remote-display names', async () => {
-    const refExists = vi.fn(async (ref: string) => ref === 'refs/remotes/origin/main')
+  it('prefers a local branch over remote-tracking, tag and commit', async () => {
+    const probe = probeWith(['refs/heads/main', 'refs/remotes/origin/main', 'refs/tags/main'])
+    await expect(resolveWorktreeStartPoint('main', probe)).resolves.toBe('refs/heads/main')
+  })
 
-    await expect(resolveWorktreeAddBaseRef('origin/main', refExists)).resolves.toBe(
+  it('qualifies remote-display names as remote-tracking refs', async () => {
+    const probe = probeWith(['refs/remotes/origin/main'])
+    await expect(resolveWorktreeStartPoint('origin/main', probe)).resolves.toBe(
       'refs/remotes/origin/main'
     )
-
-    expect(refExists).toHaveBeenCalledWith('refs/remotes/origin/main')
   })
 
-  it('qualifies a slash-containing local branch when no matching remote ref exists', async () => {
-    const refExists = vi.fn(async (ref: string) => ref === 'refs/heads/release/main')
-
-    await expect(resolveWorktreeAddBaseRef('release/main', refExists)).resolves.toBe(
-      'refs/heads/release/main'
+  it('qualifies a slash-containing name that only exists on origin (the DWIM bug)', async () => {
+    const probe = probeWith(['refs/remotes/origin/release/y'])
+    await expect(resolveWorktreeStartPoint('release/y', probe)).resolves.toBe(
+      'refs/remotes/origin/release/y'
     )
-
-    expect(refExists.mock.calls.map((call) => call[0])).toEqual([
-      'refs/remotes/release/main',
-      'refs/heads/release/main'
-    ])
   })
 
-  it('keeps unresolvable revisions untouched', async () => {
-    const refExists = vi.fn(async () => false)
+  it('falls back to the single other remote carrying the name', async () => {
+    const probe = probeWith(['refs/remotes/fork/feature/z'], ['origin', 'upstream', 'fork'])
+    await expect(resolveWorktreeStartPoint('feature/z', probe)).resolves.toBe(
+      'refs/remotes/fork/feature/z'
+    )
+  })
 
-    await expect(resolveWorktreeAddBaseRef('abc1234', refExists)).resolves.toBe('abc1234')
+  it('treats several matching non-origin remotes as an explicit error', async () => {
+    const probe = probeWith(
+      ['refs/remotes/upstream/feature/z', 'refs/remotes/fork/feature/z'],
+      ['origin', 'upstream', 'fork']
+    )
+    const error = await resolveWorktreeStartPoint('feature/z', probe).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(WorktreeBaseRefError)
+    expect(error).toMatchObject({ code: 'AMBIGUOUS' })
+    expect((error as Error).message).toContain('upstream, fork')
+  })
+
+  it('prefers origin over other remotes without calling it ambiguous', async () => {
+    const probe = probeWith(
+      ['refs/remotes/origin/feature/z', 'refs/remotes/fork/feature/z'],
+      ['origin', 'fork']
+    )
+    await expect(resolveWorktreeStartPoint('feature/z', probe)).resolves.toBe(
+      'refs/remotes/origin/feature/z'
+    )
+  })
+
+  it('resolves tags, then commit-ish to a verified sha', async () => {
+    await expect(resolveWorktreeStartPoint('v1', probeWith(['refs/tags/v1']))).resolves.toBe(
+      'refs/tags/v1'
+    )
+    await expect(resolveWorktreeStartPoint('abc1234', probeWith(['abc1234']))).resolves.toBe(SHA)
+  })
+
+  it('reports an unknown name with git-gateway-service compatible wording', async () => {
+    const error = await resolveWorktreeStartPoint('nope', probeWith([])).catch((e: unknown) => e)
+    expect(error).toMatchObject({ code: 'NOT_FOUND' })
+    expect((error as Error).message).toContain('invalid reference')
   })
 })
