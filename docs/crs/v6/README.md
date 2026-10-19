@@ -178,6 +178,9 @@ Thuộc tính phụ: `size` ∈ {`S`,`M`,`L`}; `urgency` ∈ {`normal`,`urgent`}
 | [`request-frontend`](./request-frontend/README.md) | CR-REQ-036 | Giao diện hỏi lại, quyết định, sẵn sàng, tác động | 🟠 P1 | Large |
 | [`request-frontend`](./request-frontend/README.md) | CR-REQ-037 | Chi tiết Request: nhãn Requests ở sidebar, thang tiến độ theo luồng, Plan duyệt một lần, tab Execution, tab History đầy đủ | 🟠 P1 | Large |
 | [`plan-phase-task`](./plan-phase-task/README.md) | CR-REQ-038 | Chế độ thực thi `continuous` (duyệt Plan một lần), API nhật ký hoạt động, API tóm tắt thực thi, `engine` và `execution_mode` trên Request | 🟠 P1 | Large |
+| [`plan-phase-task`](./plan-phase-task/README.md) | CR-REQ-039 | Chỉ định nhánh gốc để tạo worktree cho Request (`base_ref`), mặc định là nhánh mặc định của repo | 🟠 P1 | Medium |
+| [`request-frontend`](./request-frontend/README.md) | CR-REQ-040 | Chọn nhánh gốc của worktree khi tạo và xem Request (giao diện) | 🟠 P1 | Small đến Medium |
+| [`solution-analysis`](./solution-analysis/README.md) | CR-REQ-041 | Chỉnh phương án phân tích bằng prompt tại cổng duyệt Analysis, danh sách phiên bản | 🟠 P1 | Medium |
 
 ## 5. Thứ tự thực thi
 

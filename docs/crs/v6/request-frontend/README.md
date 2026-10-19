@@ -17,6 +17,7 @@ Phạm vi: `frontend/src/renderer/src` và `frontend/src/shared`. Backend thuộ
 | [CR-REQ-032](./CR-REQ-032-graph-canvas-and-lenses.md) | Canvas đồ thị và các lens (Luồng, Kiến trúc, Hợp đồng, Dữ liệu, Phạm vi ảnh hưởng, Kế hoạch, Thực thi) | 🟠 P1 | Large | 018, CR-REQ-030 |
 | [CR-REQ-036](./CR-REQ-036-clarification-decision-readiness-impact-ui.md) | Giao diện hỏi lại, quyết định, sẵn sàng, tác động rủi ro, kết quả thực thi | 🟠 P1 | Large | 018 đến 021, CR-REQ-028, 029, 030 |
 | [CR-REQ-037](./CR-REQ-037-request-detail-redesign-execution-tab-and-activity.md) | Chi tiết Request: nhãn Requests ở sidebar, thang tiến độ theo luồng, Plan duyệt một lần, tab Execution, tab History đầy đủ | 🟠 P1 | Large | 018 đến 021, 036, backend CR-REQ-038 |
+| [CR-REQ-040](./CR-REQ-040-request-base-branch-picker.md) | Ô "Start from" trong Create request (cả từ issue Jira/GitHub), dòng nhánh gốc ở Overview, lỗi và trạng thái khoá | 🟠 P1 | Small đến Medium | 018 đến 021, backend CR-REQ-039 |
 
 ## Thứ tự thực thi
 

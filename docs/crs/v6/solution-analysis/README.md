@@ -6,6 +6,7 @@
 |----|--------|----------|--------|------------|
 | [CR-REQ-007](./CR-REQ-007-solution-generation-options-and-selection.md) | Chưa có Solution; `AIDecompose` chỉ chia task, chạy đồng bộ, không bền khi restart; cần so sánh nhiều phương án, chọn và duyệt | 🔴 P0 | Large | 📝 Đề xuất, chưa triển khai |
 | [CR-REQ-008](./CR-REQ-008-diagnosis-findings-answer-analysis.md) | Code không chạy được agent khi không có worktree và vứt `stdout`; `spike`/`question`/chẩn đoán cần agent đọc repo và lưu kết quả có cấu trúc | 🟠 P1 | Large | 📝 Đề xuất, chưa triển khai |
+| [CR-REQ-041](./CR-REQ-041-analysis-revision-by-prompt.md) | Ở cổng duyệt Analysis chỉ có thể từ chối; không chỉnh nhẹ bằng prompt, không xem được các phiên bản trước | 🟠 P1 | Medium | 📝 Đề xuất |
 
 ## Thứ tự thực thi
 
