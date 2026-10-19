@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `services/request-service/internal/adapter/grpcclient/{agent_prompt_relay,ai_completion_relay,request_classifier}.go` (sửa), `cmd/server/wire_*.go`, test hiện có
 **Depends on:** TASK-REQ-042-01
-**Status:** [ ] PARTIAL (code and unit tests done 2026-10-19; acceptance `request`/`matrix`/`qa` and the UI flow were not run)
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -32,7 +32,7 @@
 
 - [x] Không còn struct/tham số `execPrompt` riêng trong request-service.
 - [x] Hành vi lỗi và timeout không đổi.
-- [ ] Acceptance và UI xanh.
+- [x] Acceptance và UI xanh. (Xem "Kiểm chứng của người điều phối" bên dưới.)
 
 ## Rủi ro và lưu ý
 
@@ -83,3 +83,13 @@ Không có test hợp đồng nào khác dùng ba relay này (`adapter/contractt
 - Acceptance `request`, `matrix`, `qa` và UI `qa-bug-task-native-flow --ai-stub` (rule của lượt này cấm chạy e2e).
 - Test `-tags=integration` Postgres/MySQL: không liên quan thay đổi này, không chạy.
 - `golangci-lint` không chạy được trên máy này.
+
+### Kiểm chứng của người điều phối (2026-10-19/20)
+
+Stack local đã được redeploy với `request-service`, `task-service`, `git-gateway-service`, `api-gateway` (build bằng `GOFLAGS=-overlay` để bỏ qua hai file workflow không biên dịch của người khác) và `infra-fleet-service`. Agent local chạy bản `agent/out/agent.js` có stdin.
+
+- `run_acceptance.py --ai-stub platform devserver request matrix exits ai plan analysis task notfound qa aistub`: các ca của luồng gửi prompt (RAN-01..03, AIS-02, AIS-04, PLN-08, AST-02/03/06) **xanh**. Còn đỏ chỉ có `QA-GH-01`, `QA-GH-03` (GitHub, hoãn theo yêu cầu) và `QA-TERM-01..03` (agent giả không spawn được PTY; chạy lại không stub thì xanh: `run_acceptance.py devserver qa` → 17 pass, 2 fail GitHub, 1 skip).
+- `RQL-13` đỏ một lần vì `REQUEST_VERSION_CONFLICT` (phân loại nền chạy đua với bước xác nhận); chạy lại suite `request` hai lần liên tiếp: 30 pass, 0 fail.
+- `run_ui_flow.py --ai-stub -- qa-bug-task-native-flow`: 3 passed.
+- Để suite stub chạy được cần ba chỉnh sửa hạ tầng test (đã commit): fake `claude` đọc prompt từ stdin; AST-02/06 kiểm hợp đồng mới; dự án thử dưới `--ai-stub` đặt engine `native` và Solution thường vì fake claude không nạp được knowledge hub MCP.
+- Lỗi có sẵn được phát hiện và sửa trong lúc chạy: `TruncatedForMobile` (infra-fleet) cắt xem trước đầu ra terminal theo byte, làm `ListTerminalSessions` lỗi `string field contains invalid UTF-8` và làm đỏ spec UI vì kiểm console.

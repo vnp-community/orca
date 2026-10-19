@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+	"unicode/utf8"
+)
 
 // TerminalSession is the domain view of one PTY/terminal session spawned on
 // a dev server's agent — mirrors orca.infrafleet.v1.TerminalSession and
@@ -57,9 +61,15 @@ func (t TerminalSession) IsZero() bool {
 // retroactively capped by this rule. Tail-truncated: keeps the MOST RECENT
 // bytes, not the head.
 func TruncatedForMobile(lastOutput []byte) string {
-	s := string(lastOutput)
-	if len(s) <= 500 {
-		return s
+	tail := lastOutput
+	if len(tail) > 500 {
+		tail = tail[len(tail)-500:]
+		// The cut can land inside a multi-byte rune; drop its orphaned continuation bytes.
+		for len(tail) > 0 && !utf8.RuneStart(tail[0]) {
+			tail = tail[1:]
+		}
 	}
-	return s[len(s)-500:]
+	// Raw terminal output may hold invalid bytes, and a proto string must be valid UTF-8 or the whole
+	// ListTerminalSessions response fails to encode.
+	return strings.ToValidUTF8(string(tail), "\uFFFD")
 }

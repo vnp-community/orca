@@ -3,6 +3,7 @@ package domain
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestTruncatedForMobile(t *testing.T) {
@@ -49,4 +50,30 @@ func TestTruncatedForMobile(t *testing.T) {
 			t.Errorf("expected empty string for nil input, got %q", got)
 		}
 	})
+}
+
+func TestTruncatedForMobile_AlwaysValidUTF8(t *testing.T) {
+	tail := strings.Repeat("a", 497) + "\xe1\xbb\x87" // 500 bytes plus a 3-byte rune: the cut lands inside nothing
+	cases := map[string][]byte{
+		"short":                    []byte("hello"),
+		"cut inside a rune":        append([]byte(strings.Repeat("a", 300)), []byte(strings.Repeat("\xe1\xbb\x87", 200))...), // 900 bytes of 3-byte runes
+		"invalid bytes in the end": append([]byte("ok "), 0xff, 0xfe, 'x'),
+		"exactly the limit":        []byte(strings.Repeat("b", 500)),
+		"tail with a rune":         []byte(tail),
+	}
+	for name, in := range cases {
+		got := TruncatedForMobile(in)
+		if !utf8.ValidString(got) {
+			t.Errorf("%s: preview is not valid UTF-8: %q", name, got)
+		}
+		if len(got) > 500+3 {
+			t.Errorf("%s: preview is %d bytes", name, len(got))
+		}
+	}
+	if got := TruncatedForMobile([]byte("hello")); got != "hello" {
+		t.Errorf("a short preview must be unchanged, got %q", got)
+	}
+	if got := TruncatedForMobile(append([]byte("ok "), 0xff, 'x')); got != "ok �x" {
+		t.Errorf("an invalid byte must become U+FFFD, got %q", got)
+	}
 }
