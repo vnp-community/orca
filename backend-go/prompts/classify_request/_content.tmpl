@@ -1,0 +1,5 @@
+title: {{.Title}}
+issue_type: {{.IssueType}}
+labels: {{join .Labels ", "}}
+body:
+{{truncate .Body bodyRunes -}}

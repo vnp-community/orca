@@ -1,0 +1,6 @@
+{{if or .Project.Name .Project.RepoURL}}
+<project>
+name: {{fence .Project.Name}}
+repo_url: {{fence .Project.RepoURL}}
+</project>
+{{end -}}

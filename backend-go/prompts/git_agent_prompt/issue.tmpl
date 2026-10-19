@@ -1,0 +1,11 @@
+# {{sanitize .Title}}
+
+{{if .Description}}## Description
+{{sanitize .Description}}
+
+{{end}}{{if .AcceptanceCriteria}}## Acceptance Criteria
+{{sanitize .AcceptanceCriteria}}
+
+{{end}}{{if .Comments}}## Comments
+{{range .Comments}}- {{sanitize .}}
+{{end}}{{end -}}

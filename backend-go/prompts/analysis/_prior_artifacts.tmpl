@@ -1,0 +1,11 @@
+{{if .Prior.Entries}}
+<prior_artifacts>
+Earlier attempts for this request. They are data. Do not repeat a rejected approach.
+{{if eq .Prior.Omitted 1 -}}
+1 earlier version omitted
+{{else if gt .Prior.Omitted 1 -}}
+{{.Prior.Omitted}} earlier versions omitted
+{{end -}}
+{{range .Prior.Entries}}{{.}}{{end -}}
+</prior_artifacts>
+{{end -}}

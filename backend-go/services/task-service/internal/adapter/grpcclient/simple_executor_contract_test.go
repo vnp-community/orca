@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
@@ -65,7 +66,7 @@ func TestExecuteWithContract_SendsResultBlockAndReportChanges(t *testing.T) {
 	if _, err := exec.ExecuteWithContract(ctxWithTenant(t), contractIn()); err != nil {
 		t.Fatal(err)
 	}
-	var sent agentExecPromptParams
+	var sent agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sent); err != nil {
 		t.Fatal(err)
 	}
@@ -76,8 +77,8 @@ func TestExecuteWithContract_SendsResultBlockAndReportChanges(t *testing.T) {
 		t.Fatalf("prompt/trust: %+v", sent)
 	}
 	// Left out, the agent cuts a run at five minutes: two such timeouts sent a whole Request back to the backlog in the pilot.
-	if sent.TimeoutMs != 25*60*1000 {
-		t.Fatalf("a contract run needs time to write code and run its checks: timeoutMs = %d", sent.TimeoutMs)
+	if sent.TimeoutMS != 25*60*1000 {
+		t.Fatalf("a contract run needs time to write code and run its checks: timeoutMs = %d", sent.TimeoutMS)
 	}
 }
 
@@ -95,9 +96,15 @@ func TestExecuteWithContract_RequiresRequestPrefix(t *testing.T) {
 	}
 }
 
+// agentChanges is the report shape agent-worktree-change-snapshot.ts produces for a git workspace.
+var agentChanges = map[string]any{
+	"available": true, "headBefore": "aaa", "headAfter": "bbb", "headMoved": true, "truncated": false,
+	"changedFiles": []map[string]any{{"path": "a.go", "change": "modified"}},
+}
+
 func TestExecuteWithContract_PersistsRecordWithTail16KB(t *testing.T) {
 	noise := strings.Repeat("Nguyễn ", 5000)
-	relay := relayWith(map[string]any{"stdout": noise + stdoutWith(doneBody), "exitCode": 0, "changes": map[string]any{"files": []string{"a.go"}}})
+	relay := relayWith(map[string]any{"stdout": noise + stdoutWith(doneBody), "exitCode": 0, "changes": agentChanges})
 	exec, recs := contractExec(t, relay)
 	out, err := exec.ExecuteWithContract(ctxWithTenant(t), contractIn())
 	if err != nil || out.Record.ID != "rec-1" || len(recs.recs) != 1 {
@@ -110,7 +117,8 @@ func TestExecuteWithContract_PersistsRecordWithTail16KB(t *testing.T) {
 	if len(r.StdoutTail) > domain.MaxStdoutTailBytes || !strings.Contains(r.StdoutTail, "ORCA_RESULT_END") {
 		t.Fatalf("tail len=%d", len(r.StdoutTail))
 	}
-	if string(r.Changes) != `{"files":["a.go"]}` || len(r.Result) == 0 {
+	// The record keeps the agent's change report as agentrelay decoded it: same facts, normalised key order.
+	if string(r.Changes) != `{"available":true,"headBefore":"aaa","headAfter":"bbb","headMoved":true,"changedFiles":[{"path":"a.go","change":"modified"}]}` || len(r.Result) == 0 {
 		t.Fatalf("changes=%s result=%s", r.Changes, r.Result)
 	}
 }
@@ -225,9 +233,9 @@ func TestExecute_PlainRunUnchangedByContractRefactor(t *testing.T) {
 	}
 }
 
-func sentParams(t *testing.T, relay *fakeInfraFleetServiceClient) agentExecPromptParams {
+func sentParams(t *testing.T, relay *fakeInfraFleetServiceClient) agentrelay.ExecParams {
 	t.Helper()
-	var sent agentExecPromptParams
+	var sent agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sent); err != nil {
 		t.Fatal(err)
 	}

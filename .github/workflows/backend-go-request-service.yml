@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - "backend-go/common/**"
+      - "backend-go/prompts/**"
       - "backend-go/proto/orca/request/**"
       - "backend-go/proto/gen/go/orca/request/**"
       - "backend-go/services/request-service/**"

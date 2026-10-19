@@ -1,0 +1,3 @@
+Write one ready-to-use agent prompt for completing this task, given its description and context.
+
+Task: Just a title

@@ -1,0 +1,5 @@
+--- artifact {{.N}} (kind={{.Kind}}, status={{.Status}}) ---
+{{fence (truncate .Content artifactRunes)}}
+{{if .Feedback -}}
+reviewer feedback this version was written under: {{fence (truncate .Feedback artifactRunes)}}
+{{end -}}

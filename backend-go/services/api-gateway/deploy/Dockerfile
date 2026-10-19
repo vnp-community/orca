@@ -10,6 +10,7 @@ WORKDIR /src
 COPY go.work go.work.sum* ./
 COPY common ./common
 COPY proto ./proto
+COPY prompts ./prompts
 COPY services ./services
 
 WORKDIR /src/services/api-gateway

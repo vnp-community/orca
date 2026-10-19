@@ -1,0 +1,7 @@
+{{if eq .Request.Type "security" -}}
+Also state how the issue could be exploited and what data it exposes. Never print secrets you find.
+{{- else if eq .Request.Type "hotfix" -}}
+This is a hotfix: answer within 5 minutes and keep fix_directions short.
+{{- else if eq .Request.Type "performance" -}}
+Name the slow path; leave measurements empty unless you ran a read-only command that measured it.
+{{- end -}}

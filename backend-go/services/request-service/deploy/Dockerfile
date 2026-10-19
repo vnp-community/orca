@@ -7,6 +7,7 @@ COPY go.work go.work.sum* ./
 COPY cmd ./cmd
 COPY common ./common
 COPY proto ./proto
+COPY prompts ./prompts
 COPY policy ./policy
 COPY services ./services
 

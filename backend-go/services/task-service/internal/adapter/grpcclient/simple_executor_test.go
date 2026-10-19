@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -102,7 +103,7 @@ func (f *fakeTaskRepository) Get(ctx context.Context, tenantID, id string) (doma
 }
 
 // GetAncestors returns a not-found error rather than panicking — TASK-TG-04-06's
-// buildExecutePrompt context preamble calls this unconditionally
+// renderExecutePrompt context preamble calls this unconditionally
 // (best-effort: an error just means no parent context, never a failed
 // dispatch), so every existing test in this file (none of which cares
 // about parent context) needs this to degrade gracefully, not crash.
@@ -359,7 +360,7 @@ func TestSimpleExecutor_Execute_RelaysAgentExecPrompt(t *testing.T) {
 	if relay.gotRelay.GetConnectionId() != "conn-1" {
 		t.Errorf("expected resolved connectionId to be used, got %q", relay.gotRelay.GetConnectionId())
 	}
-	var sentParams agentExecPromptParams
+	var sentParams agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
 		t.Fatalf("params_json didn't decode: %v", err)
 	}
@@ -379,7 +380,7 @@ func TestSimpleExecutor_Execute_RelaysAgentExecPrompt(t *testing.T) {
 // confirmed as TASK_EXECUTE_FAILED on every task.execute dispatch even
 // after BUG-026's connection/worktree gates were fixed.
 func TestSimpleExecutor_Execute_ForwardsTenantIDToRelay(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
@@ -403,7 +404,7 @@ func TestSimpleExecutor_Execute_ForwardsTenantIDToRelay(t *testing.T) {
 // extracts tenantID from ctx before calling this far), Execute must return
 // an error rather than silently calling Relay with no tenant metadata.
 func TestSimpleExecutor_Execute_NoTenantInContext_FailsClosed(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
@@ -425,7 +426,7 @@ func TestSimpleExecutor_Execute_NoTenantInContext_FailsClosed(t *testing.T) {
 // resolved that way, live-confirmed as TASK_EXECUTE_FAILED on every
 // first-time task execution even after fixes #1-4.
 func TestSimpleExecutor_Execute_DevServerIDSet_UsesRelayByDevServer(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "", worktreePath: "/srv/worktrees/p1", devServerID: "ds-1", connected: true}
 	relay := &fakeInfraFleetServiceClient{relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
@@ -461,7 +462,7 @@ func TestSimpleExecutor_Execute_DevServerIDSet_UsesRelayByDevServer(t *testing.T
 // worktree had zero new commits and no spec file, matching the agent's own
 // stored last_execution_output explaining why.
 func TestSimpleExecutor_Execute_SendsFullTrustPreset(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
@@ -470,7 +471,7 @@ func TestSimpleExecutor_Execute_SendsFullTrustPreset(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var sentParams agentExecPromptParams
+	var sentParams agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
 		t.Fatalf("params_json didn't decode: %v", err)
 	}
@@ -489,7 +490,7 @@ func TestSimpleExecutor_Execute_SendsFullTrustPreset(t *testing.T) {
 // configured with a DIFFERENT (wrong-looking) path than the explicit
 // parameter, so this test only passes if the parameter genuinely wins.
 func TestSimpleExecutor_Execute_UsesPassedWorktreePath_NotResolverGuess(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/opt/repos/proj-1-shared-repo-root", connected: true}
 	relay := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
@@ -499,7 +500,7 @@ func TestSimpleExecutor_Execute_UsesPassedWorktreePath_NotResolverGuess(t *testi
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var sentParams agentExecPromptParams
+	var sentParams agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
 		t.Fatalf("params_json didn't decode: %v", err)
 	}
@@ -511,7 +512,7 @@ func TestSimpleExecutor_Execute_UsesPassedWorktreePath_NotResolverGuess(t *testi
 // TestSimpleExecutor_NotConnected_ReturnsTypedError locks in that the stub
 // behavior (a synthesized placeholder ref, no error) is actually gone.
 func TestSimpleExecutor_NotConnected_ReturnsTypedError(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connected: false}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, &fakeInfraFleetServiceClient{})
 
@@ -529,7 +530,7 @@ func TestSimpleExecutor_NotConnected_ReturnsTypedError(t *testing.T) {
 // agent.execPrompt's required worktreePath field having nothing to resolve
 // it from — a distinct failure mode from "not connected at all".
 func TestSimpleExecutor_ConnectedButNoWorktreePath_ReturnsTypedError(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true, worktreePath: ""}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, &fakeInfraFleetServiceClient{})
 
@@ -551,7 +552,7 @@ func TestSimpleExecutor_TaskNotFound(t *testing.T) {
 }
 
 func TestSimpleExecutor_RelayErrorPropagates(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{relayErr: errors.New("boom")}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
@@ -567,7 +568,7 @@ func TestSimpleExecutor_RelayErrorPropagates(t *testing.T) {
 // catch this later (see simple_executor.go's doc comment's honest-limits
 // note).
 func TestSimpleExecutor_NonZeroExitCode_ReturnsError(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"boom","exitCode":1,"timedOut":false}`},
@@ -582,7 +583,7 @@ func TestSimpleExecutor_NonZeroExitCode_ReturnsError(t *testing.T) {
 // TestSimpleExecutor_TimedOut_ReturnsError mirrors the non-zero-exit case
 // for agent.execPrompt's other failure signal.
 func TestSimpleExecutor_TimedOut_ReturnsError(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":null,"timedOut":true}`},
@@ -594,10 +595,10 @@ func TestSimpleExecutor_TimedOut_ReturnsError(t *testing.T) {
 	}
 }
 
-// TASK-TG-04-06: buildExecutePrompt golden-output tests.
+// TASK-TG-04-06: renderExecutePrompt golden-output tests.
 
 func TestBuildExecutePrompt_TitleOnly_NoOptionalLines(t *testing.T) {
-	got := buildExecutePrompt(domain.Task{Title: "Write tests"}, nil, nil)
+	got := mustExecutePrompt(t, domain.Task{Title: "Write tests"}, nil, nil)
 	want := "Complete the following task.\n\nTask: Write tests\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -605,7 +606,7 @@ func TestBuildExecutePrompt_TitleOnly_NoOptionalLines(t *testing.T) {
 }
 
 func TestBuildExecutePrompt_PromptTemplate_ReplacesGenericOpener(t *testing.T) {
-	got := buildExecutePrompt(domain.Task{Title: "Write tests", PromptTemplate: "Custom instructions here."}, nil, nil)
+	got := mustExecutePrompt(t, domain.Task{Title: "Write tests", PromptTemplate: "Custom instructions here."}, nil, nil)
 	if strings.Contains(got, "Complete the following task.") {
 		t.Errorf("expected the generic opener to be replaced by PromptTemplate, got %q", got)
 	}
@@ -615,7 +616,7 @@ func TestBuildExecutePrompt_PromptTemplate_ReplacesGenericOpener(t *testing.T) {
 }
 
 func TestBuildExecutePrompt_DescriptionAndAIContext_AppearWhenSet(t *testing.T) {
-	got := buildExecutePrompt(domain.Task{Title: "Write tests", Description: "cover the edge cases", AIContext: "prior attempt failed on nil input"}, nil, nil)
+	got := mustExecutePrompt(t, domain.Task{Title: "Write tests", Description: "cover the edge cases", AIContext: "prior attempt failed on nil input"}, nil, nil)
 	if !strings.Contains(got, "Description: cover the edge cases\n") {
 		t.Errorf("expected a Description line, got %q", got)
 	}
@@ -625,7 +626,7 @@ func TestBuildExecutePrompt_DescriptionAndAIContext_AppearWhenSet(t *testing.T) 
 }
 
 func TestBuildExecutePrompt_EmptyDescriptionAndAIContext_OmittedCleanly(t *testing.T) {
-	got := buildExecutePrompt(domain.Task{Title: "Write tests"}, nil, nil)
+	got := mustExecutePrompt(t, domain.Task{Title: "Write tests"}, nil, nil)
 	if strings.Contains(got, "Description:") {
 		t.Errorf("expected no Description line when empty, got %q", got)
 	}
@@ -636,14 +637,14 @@ func TestBuildExecutePrompt_EmptyDescriptionAndAIContext_OmittedCleanly(t *testi
 
 func TestBuildExecutePrompt_Parent_AppearsWhenSet(t *testing.T) {
 	parent := domain.Task{Title: "Parent epic", Description: "the umbrella feature"}
-	got := buildExecutePrompt(domain.Task{Title: "Subtask"}, &parent, nil)
+	got := mustExecutePrompt(t, domain.Task{Title: "Subtask"}, &parent, nil)
 	if !strings.Contains(got, "Parent task: Parent epic\nthe umbrella feature\n") {
 		t.Errorf("expected parent context, got %q", got)
 	}
 }
 
 func TestBuildExecutePrompt_NilParent_OmittedCleanly(t *testing.T) {
-	got := buildExecutePrompt(domain.Task{Title: "Root task"}, nil, nil)
+	got := mustExecutePrompt(t, domain.Task{Title: "Root task"}, nil, nil)
 	if strings.Contains(got, "Parent task:") {
 		t.Errorf("expected no Parent task line for a nil parent, got %q", got)
 	}
@@ -654,14 +655,14 @@ func TestBuildExecutePrompt_CompletedDeps_AppearWhenPresent(t *testing.T) {
 		{Title: "Dep A", Description: "first dependency"},
 		{Title: "Dep B", Description: "second dependency"},
 	}
-	got := buildExecutePrompt(domain.Task{Title: "Task"}, nil, deps)
+	got := mustExecutePrompt(t, domain.Task{Title: "Task"}, nil, deps)
 	if !strings.Contains(got, "Completed dependencies:\n- Dep A: first dependency\n- Dep B: second dependency\n") {
 		t.Errorf("expected both completed deps listed, got %q", got)
 	}
 }
 
 func TestBuildExecutePrompt_NoCompletedDeps_OmittedCleanly(t *testing.T) {
-	got := buildExecutePrompt(domain.Task{Title: "Task"}, nil, nil)
+	got := mustExecutePrompt(t, domain.Task{Title: "Task"}, nil, nil)
 	if strings.Contains(got, "Completed dependencies:") {
 		t.Errorf("expected no Completed dependencies section when empty, got %q", got)
 	}
@@ -706,7 +707,7 @@ func TestSimpleExecutor_ResolvableUserID_PopulatesEnvAndModel(t *testing.T) {
 	if len(profiles.calls) != 1 || profiles.calls[0] != "user-1" {
 		t.Errorf("expected ProfileResolver called with user-1, got %v", profiles.calls)
 	}
-	var sentParams agentExecPromptParams
+	var sentParams agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
 		t.Fatalf("params_json didn't decode: %v", err)
 	}
@@ -734,7 +735,7 @@ func TestSimpleExecutor_ProfileResolverError_DegradesToLegacyPassthrough(t *test
 	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("expected profile-resolve failure to degrade to legacy passthrough, got error: %v", err)
 	}
-	var sentParams agentExecPromptParams
+	var sentParams agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
 		t.Fatalf("params_json didn't decode: %v", err)
 	}
@@ -762,7 +763,7 @@ func TestSimpleExecutor_ProjectContextResolverError_SpawnStillProceeds(t *testin
 	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	var sentParams agentExecPromptParams
+	var sentParams agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
 		t.Fatalf("params_json didn't decode: %v", err)
 	}
@@ -786,7 +787,7 @@ func TestSimpleExecutor_Execute_EnvAlwaysContainsTaskAndProjectID(t *testing.T) 
 	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	var sentParams agentExecPromptParams
+	var sentParams agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
 		t.Fatalf("params_json didn't decode: %v", err)
 	}
@@ -801,7 +802,7 @@ func TestSimpleExecutor_Execute_EnvAlwaysContainsTaskAndProjectID(t *testing.T) 
 // TestSimpleExecutor_Execute_CompletedDepsThreadIntoPrompt is an
 // integration-level check that Execute actually resolves completed
 // dependencies (via edges.ListFrom + tasks.Get) and threads them into the
-// prompt, not just that buildExecutePrompt itself formats them correctly.
+// prompt, not just that renderExecutePrompt itself formats them correctly.
 func TestSimpleExecutor_Execute_CompletedDepsThreadIntoPrompt(t *testing.T) {
 	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{
 		"t1":  {ID: "t1", ProjectID: "p1", Title: "Do the thing"},
@@ -819,7 +820,7 @@ func TestSimpleExecutor_Execute_CompletedDepsThreadIntoPrompt(t *testing.T) {
 	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	var sentParams agentExecPromptParams
+	var sentParams agentrelay.ExecParams
 	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
 		t.Fatalf("params_json didn't decode: %v", err)
 	}
@@ -905,7 +906,7 @@ func TestSimpleExecutor_Execute_PublishesThrottledPartialOutputToOutbox(t *testi
 // CR-FLOW-TASK-003 explicitly scoped itself to discrete events, not a byte
 // stream (SOL-AG-FLOWTASK-001 §2.3).
 func TestSimpleExecutor_Execute_BatchesManyChunksIntoAtMostOneEvent(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
@@ -943,7 +944,7 @@ func TestSimpleExecutor_Execute_BatchesManyChunksIntoAtMostOneEvent(t *testing.T
 // Execute — its own unary Relay call remains the sole source of truth for
 // success/failure, per usecase.AgentExecOutputStreamer's doc comment.
 func TestSimpleExecutor_Execute_StreamingFailureDoesNotFailExecute(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
@@ -970,7 +971,7 @@ func TestSimpleExecutor_Execute_StreamingFailureDoesNotFailExecute(t *testing.T)
 // requested by dev server id, the same target the agent.execPrompt Relay call uses. Passing "" was why no frame
 // ever reached the UI.
 func TestSimpleExecutor_Execute_StreamsOutputByDevServerWhenThereIsNoConnection(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "", worktreePath: "/srv/worktrees/p1", devServerID: "ds-1", connected: true}
 	relay := &fakeInfraFleetServiceClient{
 		relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
@@ -992,7 +993,7 @@ func TestSimpleExecutor_Execute_StreamsOutputByDevServerWhenThereIsNoConnection(
 
 // The connection path is unchanged: connectionId is forwarded and no dev server id is added.
 func TestSimpleExecutor_Execute_StreamsOutputByConnectionWhenThereIsOne(t *testing.T) {
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
@@ -1016,7 +1017,7 @@ func TestSimpleExecutor_Execute_LogsStreamFailureAndKeepsRunning(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(previous) })
 
-	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "", worktreePath: "/srv/worktrees/p1", devServerID: "ds-1", connected: true}
 	relay := &fakeInfraFleetServiceClient{
 		relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"SECRET-OUTPUT","stderr":"","exitCode":0,"timedOut":false}`},

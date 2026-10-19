@@ -1,0 +1,6 @@
+Write one ready-to-use agent prompt for completing this task, given its description and context.
+
+Task: Add the cache layer
+Description: Cache the landing page.
+AI Context: The service is written in Go.
+Provider context: Provider: linear, issue ORCA-12

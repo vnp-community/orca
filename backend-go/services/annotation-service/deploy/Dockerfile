@@ -9,6 +9,7 @@ WORKDIR /src
 COPY go.work go.work.sum* ./
 COPY common ./common
 COPY proto ./proto
+COPY prompts ./prompts
 COPY policy ./policy
 COPY services ./services
 

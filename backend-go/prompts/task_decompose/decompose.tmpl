@@ -1,0 +1,12 @@
+Break the following task down into subtasks. Respond with JSON matching:
+{"subtasks":[{"title","description","type","estimated_hours","depends_on":[<indices>],"prompt_template"}],"notes":"<string>"}
+
+Task: {{.Title}}
+{{if .Description}}Description: {{.Description}}
+{{end}}{{if .AIContext}}AI Context: {{.AIContext}}
+{{end}}{{if .ProjectName}}Project: {{.ProjectName}} ({{.RepoURL}})
+{{end}}{{if .Languages}}Tech stack: {{join .Languages ", "}}; {{join .Frameworks ", "}}
+{{end}}{{if .ExistingTitles}}Existing subtasks (do not duplicate): {{join .ExistingTitles "; "}}
+{{end}}{{if .VelocityTitles}}Recent team velocity: {{join .VelocityTitles "; "}}
+{{end}}{{if .ProviderContext}}Provider context: {{.ProviderContext}}
+{{end -}}

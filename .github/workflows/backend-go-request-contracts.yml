@@ -5,12 +5,16 @@ name: backend-go / request contracts
 #  - check-grpc-dials: service-to-service gRPC goes through grpcmw.NewClient so tenant and user travel with the call;
 #  - api-gateway contract tests: every RequestService RPC has a WS channel (clarification.* were missing) and the channel
 #    inventory still matches the golden file the frontend reads;
-#  - agent capability golden and the fake claude fixture used by orca-flows-e2e.
+#  - agent capability golden and the fake claude fixture used by orca-flows-e2e;
+#  - prompt catalog: backend-go/prompts tests (including the per-flow size budget), every prompt a service sends renders byte for
+#    byte like its golden file, agent.execPrompt / ai.complete are relayed only by common/agentrelay, and no prompt fence tag
+#    is built outside backend-go/prompts (make check-prompts).
 on:
   pull_request:
     paths:
       - "agent/src/relay/**"
       - "backend-go/common/**"
+      - "backend-go/prompts/**"
       - "backend-go/services/**"
       - "backend-go/proto/**"
       - "backend-go/ci/**"
@@ -38,6 +42,21 @@ jobs:
       - name: Agent capability golden copies match
         working-directory: backend-go
         run: make check-agent-capability-golden
+
+  prompt-catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Prompt module tests
+        working-directory: backend-go/prompts
+        run: go vet ./... && test -z "$(gofmt -l .)" && go test ./... -race -count=1
+      - name: Single relay, no prompt outside the catalog, golden files, and the guards' self-test
+        working-directory: backend-go
+        run: make check-prompts
 
   gateway-contracts:
     runs-on: ubuntu-latest

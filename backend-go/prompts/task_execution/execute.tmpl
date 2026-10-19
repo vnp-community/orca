@@ -1,0 +1,14 @@
+{{if .Task.PromptTemplate}}{{.Task.PromptTemplate}}
+
+{{else}}Complete the following task.
+
+{{end}}Task: {{.Task.Title}}
+{{if .Task.Description}}Description: {{.Task.Description}}
+{{end}}{{if .Task.AIContext}}Context: {{.Task.AIContext}}
+{{end}}{{with .Parent}}
+Parent task: {{.Title}}
+{{.Description}}
+{{end}}{{if .CompletedDeps}}
+Completed dependencies:
+{{range .CompletedDeps}}- {{.Title}}: {{.Description}}
+{{end}}{{end -}}

@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -102,7 +101,10 @@ func (uc *AIDecompose) Execute(ctx context.Context, in AIDecomposeInput) (AIDeco
 	stack, _ := uc.techStack.Detect(ctx, tenantID, task.ProjectID)
 	velocityTasks, _ := uc.velocity.RecentCompletedTasks(ctx, tenantID, task.ProjectID, 10)
 
-	prompt := buildDecomposePrompt(task, providerCtx, projectName, repoURL, stack, existingTitles, velocityTasks)
+	prompt, err := renderDecomposePrompt(task, providerCtx, projectName, repoURL, stack, existingTitles, velocityTasks)
+	if err != nil {
+		return AIDecomposeResult{}, apperrors.New(apperrors.KindInternal, "TASK_AI_DECOMPOSE_PROMPT_BUILD_FAILED", "failed to build the decompose prompt", err)
+	}
 	content, err := uc.relay.Complete(ctx, connectionID, prompt)
 	if err != nil {
 		return AIDecomposeResult{}, apperrors.New(apperrors.KindInternal, "TASK_AI_DECOMPOSE_FAILED", "failed to generate subtask proposals via AI relay", err)
@@ -112,43 +114,6 @@ func (uc *AIDecompose) Execute(ctx context.Context, in AIDecomposeInput) (AIDeco
 		return AIDecomposeResult{}, apperrors.New(apperrors.KindInternal, "TASK_AI_DECOMPOSE_INVALID_JSON", "AI response was not valid JSON", err)
 	}
 	return AIDecomposeResult{Proposals: proposals, RawResponse: content}, nil
-}
-
-// buildDecomposePrompt assembles the ai.complete prompt from the five
-// context sources SOL-TG-02 names: task detail (title/description/
-// ai_context), project (name/repo), tech stack, existing subtasks (avoid
-// duplicates), and recent team velocity (a sense of real pace).
-func buildDecomposePrompt(task domain.Task, providerCtx, projectName, repoURL string, stack domain.TechStack, existingTitles []string, velocity []domain.Task) string {
-	var b strings.Builder
-	b.WriteString("Break the following task down into subtasks. Respond with JSON matching:\n")
-	b.WriteString(`{"subtasks":[{"title","description","type","estimated_hours","depends_on":[<indices>],"prompt_template"}],"notes":"<string>"}` + "\n\n")
-	b.WriteString("Task: " + task.Title + "\n")
-	if task.Description != "" {
-		b.WriteString("Description: " + task.Description + "\n")
-	}
-	if task.AIContext != "" {
-		b.WriteString("AI Context: " + task.AIContext + "\n")
-	}
-	if projectName != "" {
-		b.WriteString("Project: " + projectName + " (" + repoURL + ")\n")
-	}
-	if len(stack.Languages) > 0 {
-		b.WriteString("Tech stack: " + strings.Join(stack.Languages, ", ") + "; " + strings.Join(stack.Frameworks, ", ") + "\n")
-	}
-	if len(existingTitles) > 0 {
-		b.WriteString("Existing subtasks (do not duplicate): " + strings.Join(existingTitles, "; ") + "\n")
-	}
-	if len(velocity) > 0 {
-		var items []string
-		for _, v := range velocity {
-			items = append(items, v.Title)
-		}
-		b.WriteString("Recent team velocity: " + strings.Join(items, "; ") + "\n")
-	}
-	if providerCtx != "" {
-		b.WriteString("Provider context: " + providerCtx + "\n")
-	}
-	return b.String()
 }
 
 // subtaskProposalsWire mirrors the prompt's requested JSON shape 1:1.

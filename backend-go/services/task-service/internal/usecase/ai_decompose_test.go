@@ -93,7 +93,7 @@ func TestAIDecompose_RequiresTenantContext(t *testing.T) {
 // return an empty proposal list.
 func TestAIDecompose_NotConnected_ReturnsFailedPrecondition(t *testing.T) {
 	tasks := newFakeTaskRepository()
-	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1"}
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
 	uc := newAIDecomposeForTest(tasks, &fakeEdgeRepository{}, &fakeAIProviderContextResolver{}, &fakeProjectExecutionResolver{connected: false}, &fakeAICompleter{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -144,7 +144,7 @@ func TestAIDecompose_TaskNotFound(t *testing.T) {
 
 func TestAIDecompose_ProviderResolveFailurePropagates(t *testing.T) {
 	tasks := newFakeTaskRepository()
-	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1"}
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
 	uc := newAIDecomposeForTest(tasks, &fakeEdgeRepository{}, &fakeAIProviderContextResolver{err: errors.New("boom")}, &fakeProjectExecutionResolver{connected: true}, &fakeAICompleter{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -155,7 +155,7 @@ func TestAIDecompose_ProviderResolveFailurePropagates(t *testing.T) {
 
 func TestAIDecompose_RelayFailurePropagates(t *testing.T) {
 	tasks := newFakeTaskRepository()
-	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1"}
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
 	uc := newAIDecomposeForTest(tasks, &fakeEdgeRepository{}, &fakeAIProviderContextResolver{}, &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, &fakeAICompleter{err: errors.New("boom")})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -169,7 +169,7 @@ func TestAIDecompose_RelayFailurePropagates(t *testing.T) {
 // not a generic internal error.
 func TestAIDecompose_MalformedJSON_ReturnsInvalidJSONCode(t *testing.T) {
 	tasks := newFakeTaskRepository()
-	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1"}
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
 	uc := newAIDecomposeForTest(tasks, &fakeEdgeRepository{}, &fakeAIProviderContextResolver{}, &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, &fakeAICompleter{content: "not json at all"})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 

@@ -201,6 +201,13 @@ Từ bản này agent chạy `claude --print` và ghi prompt (`initFile` + `\n` 
 - Prompt không hiện trong danh sách tiến trình (`ps`, Task Manager); prompt bắt đầu bằng `-` không bị hiểu thành cờ.
 - Giao thức dây và backend không đổi; không thêm tên vào `AGENT_FEATURES`.
 - Chỉ áp dụng cho `agent.execPrompt`. `agent.execPromptStream` (không có caller backend) vẫn truyền prompt qua đối số.
+- Nội dung prompt do backend dựng từ catalog `backend-go/prompts` (xem `backend-go/prompts/README.md`); agent chỉ chuyển nguyên văn qua stdin, không sửa.
+
+### Đã kiểm chứng ở đâu
+
+- **macOS**: kiểm với `claude` 2.1.266 thật, mọi tổ hợp cờ agent dùng (thường, `stream-json`, chỉ-đọc `--permission-mode plan`, hồ sơ ghi, YOLO, chỉ-đọc kèm `--mcp-config`), prompt 400 KB; test spawn thật 21 ca.
+- **Linux**: **chưa chạy** (macOS/Darwin là máy duy nhất đã thử). Cơ chế stdin là hành vi cơ bản của `claude --print` nên không có lý do dự kiến khác, nhưng cần chạy test `agent-print-mode-exec-stdin` và một lượt `agent.execPrompt` thật trên Linux trước khi bỏ công tắc quay lui.
+- **Windows**: **chưa chạy**; test spawn thật bị bỏ qua trên Windows (script giả dùng shebang và `ps`). Với `claude.cmd` chạy qua shell cần kiểm tay rằng stdin được chuyển tiếp; nếu không, đặt `ORCA_AGENT_PROMPT_VIA_ARGV=1` (chịu trần 32 KB cả dòng lệnh).
 
 ### Công tắc quay lui
 

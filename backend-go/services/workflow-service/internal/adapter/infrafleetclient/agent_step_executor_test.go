@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serverresolver"
@@ -118,8 +119,8 @@ func TestAgentExecutor_SuccessfulRelayProducesCompletedStepResult(t *testing.T) 
 	if gotRequest.ConnectionId != "conn-1" {
 		t.Errorf("expected connectionId conn-1, got %q", gotRequest.ConnectionId)
 	}
-	if gotRequest.Method != agentExecPromptMethod {
-		t.Errorf("expected method %q, got %q", agentExecPromptMethod, gotRequest.Method)
+	if gotRequest.Method != agentrelay.MethodExecPrompt {
+		t.Errorf("expected method %q, got %q", agentrelay.MethodExecPrompt, gotRequest.Method)
 	}
 }
 
@@ -146,8 +147,8 @@ func TestAgentExecutor_MethodIsAlwaysAgentExecPrompt(t *testing.T) {
 		if _, err := exec.Execute(ctx, string(cfgJSON)); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if gotMethod != agentExecPromptMethod {
-			t.Errorf("expected method %q, got %q", agentExecPromptMethod, gotMethod)
+		if gotMethod != agentrelay.MethodExecPrompt {
+			t.Errorf("expected method %q, got %q", agentrelay.MethodExecPrompt, gotMethod)
 		}
 	}
 }
@@ -225,7 +226,7 @@ func TestAgentExecutor_NoTenantInContextErrorsWithoutCallingRelay(t *testing.T) 
 // cfg.UserID is empty, the profile-aware path is skipped entirely — no
 // ProfileResolver call, params.Env/Model stay unset.
 func TestAgentExecutor_EmptyUserID_LegacyPassthrough(t *testing.T) {
-	var gotParams agentExecPromptParams
+	var gotParams agentrelay.ExecParams
 	fake := &fakeInfraFleetClient{
 		relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
 			_ = json.Unmarshal([]byte(in.ParamsJson), &gotParams)
@@ -257,7 +258,7 @@ func TestAgentExecutor_EmptyUserID_LegacyPassthrough(t *testing.T) {
 // populated, params.Model equals the raw resolved model string (not a
 // binary name).
 func TestAgentExecutor_UserIDSet_ResolvesProfileAndPopulatesEnv(t *testing.T) {
-	var gotParams agentExecPromptParams
+	var gotParams agentrelay.ExecParams
 	fake := &fakeInfraFleetClient{
 		relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
 			_ = json.Unmarshal([]byte(in.ParamsJson), &gotParams)
@@ -290,7 +291,7 @@ func TestAgentExecutor_UserIDSet_ResolvesProfileAndPopulatesEnv(t *testing.T) {
 // ProjectContextResolver failure never blocks the agent spawn — the relay
 // call still happens, with InitFile empty.
 func TestAgentExecutor_ProjectContextResolverFailure_BestEffort(t *testing.T) {
-	var gotParams agentExecPromptParams
+	var gotParams agentrelay.ExecParams
 	var relayCalled bool
 	fake := &fakeInfraFleetClient{
 		relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {

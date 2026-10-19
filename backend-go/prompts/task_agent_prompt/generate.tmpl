@@ -1,0 +1,7 @@
+Write one ready-to-use agent prompt for completing this task, given its description and context.
+
+Task: {{.Title}}
+{{if .Description}}Description: {{.Description}}
+{{end}}{{if .AIContext}}AI Context: {{.AIContext}}
+{{end}}{{if .ProviderContext}}Provider context: {{.ProviderContext}}
+{{end -}}

@@ -2,11 +2,9 @@ package usecase
 
 import (
 	"context"
-	"strings"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
-	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
 
 type GenerateAgentPromptInput struct {
@@ -71,7 +69,10 @@ func (uc *GenerateAgentPrompt) Execute(ctx context.Context, in GenerateAgentProm
 		return "", apperrors.New(apperrors.KindFailedPrecondition, "TASK_GENERATE_PROMPT_NO_CONNECTION", "task's project has no connected dev server for AI relay", err)
 	}
 
-	prompt := buildPromptGenerationPrompt(task, providerCtx)
+	prompt, err := renderPromptGenerationPrompt(task, providerCtx)
+	if err != nil {
+		return "", apperrors.New(apperrors.KindInternal, "TASK_GENERATE_PROMPT_BUILD_FAILED", "failed to build the agent prompt request", err)
+	}
 	generated, err := uc.relay.Complete(ctx, connectionID, prompt)
 	if err != nil {
 		return "", apperrors.New(apperrors.KindInternal, "TASK_GENERATE_PROMPT_FAILED", "failed to generate agent prompt via AI relay", err)
@@ -82,20 +83,4 @@ func (uc *GenerateAgentPrompt) Execute(ctx context.Context, in GenerateAgentProm
 		}
 	}
 	return generated, nil
-}
-
-func buildPromptGenerationPrompt(task domain.Task, providerCtx string) string {
-	var b strings.Builder
-	b.WriteString("Write one ready-to-use agent prompt for completing this task, given its description and context.\n\n")
-	b.WriteString("Task: " + task.Title + "\n")
-	if task.Description != "" {
-		b.WriteString("Description: " + task.Description + "\n")
-	}
-	if task.AIContext != "" {
-		b.WriteString("AI Context: " + task.AIContext + "\n")
-	}
-	if providerCtx != "" {
-		b.WriteString("Provider context: " + providerCtx + "\n")
-	}
-	return b.String()
 }

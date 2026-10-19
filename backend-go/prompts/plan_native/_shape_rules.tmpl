@@ -1,0 +1,7 @@
+{{if .Phases -}}
+Split the work into phases that can each be reviewed and released on their own, and put every task inside a phase; the top-level "tasks" list stays empty.
+Schema: {"title":"","summary":"","phases":[{"title":"","description":"scope and done criteria of the phase","depends_on_phase_indices":[],"tasks":[{{template "_task_schema.tmpl"}}]}],"notes":""}
+{{else -}}
+Do not use phases: put the tasks directly in the top-level "tasks" list and leave "phases" empty.
+Schema: {"title":"","summary":"","tasks":[{{template "_task_schema.tmpl"}}],"notes":""}
+{{end -}}

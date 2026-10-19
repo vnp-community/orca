@@ -5,40 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 )
 
-// agentExecPromptMethod replaces the prior, wrong "agent.exec" — see this
-// file's Context. Regression-tested directly: agent_step_executor_test.go
-// asserts the relay call's method string unconditionally.
-const agentExecPromptMethod = "agent.execPrompt"
-
-// agentExecPromptParams is the params_json payload AgentExecutor sends —
-// see agentExecPromptMethod's doc comment for the shape caveat. AccountID
-// (TASK-WF-02-05) is passthrough: this executor resolves WHICH account to
-// use (via ProviderResolver) but never touches credential material itself —
-// that stays entirely on infra-fleet-service's/the Dev Server Agent's side
-// of the Relay hop.
-type agentExecPromptParams struct {
-	Prompt       string            `json:"prompt"`
-	WorktreePath string            `json:"worktreePath"`
-	TrustPreset  string            `json:"trustPreset,omitempty"`
-	AccountID    string            `json:"accountId,omitempty"`
-	Model        string            `json:"model,omitempty"`
-	Env          map[string]string `json:"env,omitempty"`
-	InitFile     string            `json:"initFile,omitempty"` // project-context preamble — field name UNVERIFIED against the real agent handler, see this task's Verify section
-}
-
 // AgentExecutor is the real Agent step executor — relays a prompt-driven
 // agent invocation to infra-fleet-service's Relay RPC, method
 // "agent.execPrompt". Profile-aware: when the step config carries a
 // UserID, resolves the caller's ResolvedProfile and injects it into the
 // spawned process's env — see domain/agent_environment.go's BuildAgentEnv.
+//
+// The agent.execPrompt params and result are built and decoded by common/agentrelay. accountId is passthrough: this
+// executor resolves WHICH account to use (via ProviderResolver) but never touches credential material; that stays on
+// infra-fleet-service's/the Dev Server Agent's side of the Relay hop.
 type AgentExecutor struct {
-	client   infrafleetv1.InfraFleetServiceClient
+	agent    *agentrelay.Relayer
 	resolver usecase.ServerResolver
 	provider usecase.ProviderResolver
 	profiles usecase.ProfileResolver
@@ -54,7 +38,7 @@ type AgentExecutor struct {
 // internal/adapter/infrafleetclient's own profile/project resolvers) and by
 // tests (fakes).
 func NewAgentExecutor(client infrafleetv1.InfraFleetServiceClient, resolver usecase.ServerResolver, provider usecase.ProviderResolver, profiles usecase.ProfileResolver, projects usecase.ProjectContextResolver) *AgentExecutor {
-	return &AgentExecutor{client: client, resolver: resolver, provider: provider, profiles: profiles, projects: projects}
+	return &AgentExecutor{agent: agentrelay.New(client, agentrelay.WithMetadata(withTenantMetadata)), resolver: resolver, provider: provider, profiles: profiles, projects: projects}
 }
 
 var _ domain.StepExecutor = (*AgentExecutor)(nil)
@@ -93,7 +77,7 @@ func (e *AgentExecutor) Execute(ctx context.Context, stepConfigJSON string) (dom
 		return domain.StepResult{}, fmt.Errorf("infrafleetclient: agent: resolve provider: %w", err)
 	}
 
-	params := agentExecPromptParams{Prompt: cfg.Prompt, WorktreePath: cfg.WorktreePath, TrustPreset: cfg.TrustPreset, AccountID: accountID, Model: cfg.Model}
+	run := agentrelay.Run{Prompt: cfg.Prompt, WorktreePath: cfg.WorktreePath, TrustPreset: cfg.TrustPreset, AccountID: accountID, Model: cfg.Model}
 
 	// Profile-aware path only when UserID is present — a step authored
 	// before this migration (no UserID in its config JSON) degrades to a
@@ -120,7 +104,7 @@ func (e *AgentExecutor) Execute(ctx context.Context, stepConfigJSON string) (dom
 		// pre-existing profile-aware path used.
 		if agent, ok := resolved["agent"].(map[string]any); ok {
 			if model, ok := agent["preferredModel"].(string); ok {
-				params.Model = model
+				run.Model = model
 			}
 		}
 
@@ -131,18 +115,31 @@ func (e *AgentExecutor) Execute(ctx context.Context, stepConfigJSON string) (dom
 			pctx, err := e.projects.GetProjectContext(userCtx, cfg.ProjectID)
 			if err == nil { // best-effort — a preamble-build failure must never block the agent spawn itself
 				env["ORCA_PROJECT_NAME"] = pctx.ProjectName
-				params.InitFile = domain.BuildProjectContext(domain.PreambleInput{
+				run.InitFile = domain.BuildProjectContext(domain.PreambleInput{
 					ProjectName: pctx.ProjectName, Description: pctx.Description, RepoURL: pctx.RepoURL,
 					WorktreePath: cfg.WorktreePath, DevServerHostname: pctx.DevServerHostname,
 				})
 			}
 		}
-		params.Env = env
+		run.Env = env
 	}
 
-	var result execResult
-	if err := relay(ctx, e.client, connectionID, agentExecPromptMethod, params, &result); err != nil {
+	if connectionID == "" {
+		return domain.StepResult{}, fmt.Errorf("infrafleetclient: agent: %s: connectionId is required in step config", agentrelay.MethodExecPrompt)
+	}
+	res, err := e.agent.ExecPrompt(ctx, agentrelay.Target{ConnectionID: connectionID}, agentrelay.Plain(run))
+	if err != nil {
 		return domain.StepResult{}, fmt.Errorf("infrafleetclient: agent: %w", err)
 	}
-	return toStepResult(result)
+	return toStepResult(agentRunOutcome(res))
+}
+
+// agentRunOutcome maps the agent's answer to the shape toStepResult shares with the shell step. A run the agent killed
+// at its timeout has no exit code, which toStepResult reads as success, so the timeout is reported as the failure it is.
+func agentRunOutcome(res agentrelay.ExecResult) execResult {
+	out := execResult{ExitCode: res.ExitCode, Stdout: res.Stdout, Stderr: res.Stderr}
+	if res.TimedOut {
+		out.Error = agentrelay.MethodExecPrompt + " timed out before the agent finished"
+	}
+	return out
 }

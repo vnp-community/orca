@@ -134,7 +134,7 @@ type Task struct {
 	// LastExecutionOutput is this task's most recent successful run's
 	// stdout, truncated to 8KB at the application layer before persisting
 	// (SOL-TG-04's product-tradeoff decision, see migration 0007's doc
-	// comment) — read by a LATER batch wave's buildExecutePrompt
+	// comment) — read by a LATER batch wave's renderExecutePrompt
 	// (TASK-TG-04-06/07) to resolve `{{outputs.<taskId>.*}}` interpolation
 	// against an EARLIER wave's completed dependency.
 	LastExecutionOutput string

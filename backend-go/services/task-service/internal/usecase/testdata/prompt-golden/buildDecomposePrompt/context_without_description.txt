@@ -1,0 +1,5 @@
+Break the following task down into subtasks. Respond with JSON matching:
+{"subtasks":[{"title","description","type","estimated_hours","depends_on":[<indices>],"prompt_template"}],"notes":"<string>"}
+
+Task: T
+AI Context: C

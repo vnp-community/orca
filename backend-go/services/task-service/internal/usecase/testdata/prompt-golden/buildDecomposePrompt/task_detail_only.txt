@@ -1,0 +1,6 @@
+Break the following task down into subtasks. Respond with JSON matching:
+{"subtasks":[{"title","description","type","estimated_hours","depends_on":[<indices>],"prompt_template"}],"notes":"<string>"}
+
+Task: Add the cache layer
+Description: Cache the landing page for five minutes.
+AI Context: The service is written in Go.

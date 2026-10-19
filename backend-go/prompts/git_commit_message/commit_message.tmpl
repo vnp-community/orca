@@ -1,0 +1,10 @@
+Write a concise, conventional-commits-style commit message for the following staged diff. Reply with only the commit message text.
+
+{{if .Lines}}
+Recent commits on this project, for style/convention matching:
+{{range .Lines}}{{.SHA}} {{.Summary}}
+{{end}}{{end}}{{if .Branch}}
+Current branch: {{.Branch}}
+{{end}}{{if .IssueRef}}Issue/ticket reference to include (as a trailing "Refs: {{.IssueRef}}" line): {{.IssueRef}}
+{{end}}
+{{.Diff -}}

@@ -1,0 +1,12 @@
+Complete the following task.
+
+Task: Add the cache layer
+Description: Use baseline: 4012 ms as the target.
+Context: The service is written in Go.
+
+Parent task: Speed up the landing page
+Epic: the page must load in under 200 ms.
+
+Completed dependencies:
+- Measure the baseline: Record the current load time.
+- Choose the cache: Pick a cache store.

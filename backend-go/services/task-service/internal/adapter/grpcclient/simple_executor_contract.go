@@ -11,43 +11,38 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 )
 
 const (
-	// contractRunTimeoutMs is how long a task of a Request may run on the agent: it writes code and runs the task's own checks,
-	// which the agent's five minute default for a plain prompt cut off twice in a row and sent the whole Request back to the backlog.
-	contractRunTimeoutMs   = 25 * 60 * 1000
-	contractMaxOutputBytes = 1 << 20
 	// stdoutScanLimit bounds what the parser sees; the block is printed last so only the tail matters.
 	stdoutScanLimit = 2 << 20
 	// contractRequestPrefix marks a run started by request-service; only those may run with full trust.
 	contractRequestPrefix = "req:"
 )
 
-type resultBlockParam struct {
-	Nonce string `json:"nonce"`
-}
-
-type agentParsedResult struct {
-	OK     bool            `json:"ok"`
-	Value  json.RawMessage `json:"value,omitempty"`
-	Code   string          `json:"code,omitempty"`
-	Detail string          `json:"detail,omitempty"`
-}
-
 type contractRunOptions struct {
 	nonce                                string
 	useKnowledgeHub, requirePassingCheck bool
 }
 
-func (o *contractRunOptions) apply(p *agentExecPromptParams) {
-	p.ResultBlock = &resultBlockParam{Nonce: o.nonce}
-	p.ReportChanges = true
-	p.MaxOutputBytes = contractMaxOutputBytes
-	p.TimeoutMs = contractRunTimeoutMs
+// execParams builds the agent.execPrompt params: a nil receiver is a plain run, otherwise a contract run (result block,
+// change report, and the long timeout a task that writes code and runs its checks needs; the agent's five minute
+// default cut those off twice in a row and sent the whole Request back to the backlog).
+func (o *contractRunOptions) execParams(run agentrelay.Run, repoRoot string) agentrelay.ExecParams {
+	if o == nil {
+		return agentrelay.Plain(run)
+	}
+	run.ResultNonce = o.nonce
+	// The repository root, not the task's worktree: the graph is built for the project's checkout, and the root comes
+	// from the project's connection, never from the caller.
+	if o.useKnowledgeHub && repoRoot != "" {
+		run.KnowledgeRoot = repoRoot
+	}
+	return agentrelay.Contract(run)
 }
 
 // relayError marks failures of the relay call itself, as opposed to preparation errors, so the
@@ -64,6 +59,19 @@ func (e *relayError) Transient() bool {
 		return true
 	}
 	return errors.Is(e.err, context.DeadlineExceeded)
+}
+
+// execPromptError marks what agentrelay reports as a relay failure. A result the agent sent but we cannot read, and a
+// parameter combination agentrelay refuses before sending, are not relay failures: the first is a protocol fault and the
+// second a bug here, and neither is worth a retry.
+func execPromptError(err error) error {
+	switch {
+	case errors.Is(err, agentrelay.ErrMalformedResult):
+		return fmt.Errorf("simple_executor: decode agent.execPrompt result: %w", err)
+	case errors.Is(err, agentrelay.ErrConflictingAccess), errors.Is(err, agentrelay.ErrProfileRequired), errors.Is(err, agentrelay.ErrProposeWithoutRoot):
+		return fmt.Errorf("simple_executor: build agent.execPrompt params: %w", err)
+	}
+	return &relayError{fmt.Errorf("simple_executor: relay agent.execPrompt: %w", err)}
 }
 
 // WithExecutionRecords enables persisting contract-run records; without it ExecuteWithContract refuses to run.
@@ -107,7 +115,7 @@ func (s *SimpleExecutor) ExecuteWithContract(ctx context.Context, in usecase.Con
 		TenantID: in.TenantID, TaskID: in.TaskID, ExecutionLinkID: in.ExecutionLinkID, Attempt: max(in.Attempt, 1),
 		SpecDigest: in.SpecDigest, PacketDigest: in.PacketDigest, TemplateVersion: in.TemplateVersion,
 		ParseStatus: parsed.Status, FailureClass: class,
-		Result: domain.StorableJSON(parsed.Raw), Changes: domain.StorableJSON(result.Changes),
+		Result: domain.StorableJSON(parsed.Raw), Changes: domain.StorableJSON(changesJSON(ctx, in.TaskID, result.Changes)),
 		StdoutTail: domain.TailUTF8(stdout, domain.MaxStdoutTailBytes),
 	})
 	if insertErr != nil {
@@ -119,6 +127,20 @@ func (s *SimpleExecutor) ExecuteWithContract(ctx context.Context, in usecase.Con
 		return usecase.ContractExecuteOutput{Record: rec}, &usecase.ExecutionFailure{Class: class, Code: code, RecordID: rec.ID, Cause: runErr}
 	}
 	return usecase.ContractExecuteOutput{ExecutionRef: fmt.Sprintf("task-exec:%s:%s", in.TaskID, in.RequestID), Record: rec}, nil
+}
+
+// changesJSON stores the agent's before/after report as the typed value agentrelay decoded. Marshalling that struct
+// cannot fail; the log line keeps it from ever being a silent gap in the record if it did.
+func changesJSON(ctx context.Context, taskID string, c *agentrelay.Changes) []byte {
+	if c == nil {
+		return nil
+	}
+	raw, err := json.Marshal(c)
+	if err != nil {
+		slog.WarnContext(ctx, "task: agent change report not encoded", slog.String("task_id", taskID), slog.Any("error", err))
+		return nil
+	}
+	return raw
 }
 
 var _ usecase.ContractAgentExecutor = (*SimpleExecutor)(nil)

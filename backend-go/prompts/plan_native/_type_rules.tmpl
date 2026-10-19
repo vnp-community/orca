@@ -1,0 +1,9 @@
+{{if or (eq .Request.Type "bug") (eq .Request.Type "security") -}}
+One task must add a regression test that fails before the fix and passes after it; give it the label "{{.Labels.TestRegression}}".
+{{else if eq .Request.Type "performance" -}}
+The first task measures the baseline and carries the label "{{.Labels.CheckBaseline}}"; the last task measures again and carries the label "{{.Labels.CheckAfter}}".
+{{else if eq .Request.Type "refactor" -}}
+The first task runs the existing tests and carries the label "{{.Labels.CheckTestsPre}}"; the last task runs them again and carries the label "{{.Labels.CheckTestsAfter}}". Do not change test expectations.
+{{else if eq .Request.Type "ops_request" -}}
+Write the runbook as ordered steps. Mark a step that cannot be undone with "irreversible": true. Include at least one task labelled "{{.Labels.Rollback}}" that restores the previous state, ordered after the irreversible steps; an irreversible step may instead state "rollback_note: <how to recover>" in its description.
+{{end -}}

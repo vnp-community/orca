@@ -1,0 +1,6 @@
+Do not modify any files outside openspec/changes/{{.ChangeID}}/.
+<request>
+Title: {{fence .RequestTitle}}
+Body:
+{{fence (stripControl (truncate .RequestBody bodyRunes))}}
+</request>

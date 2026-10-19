@@ -3,6 +3,7 @@ go 1.26.0
 use (
 	./cmd/orca-cli
 	./common
+	./prompts
 	./proto
 	./services/ai-provider-service
 	./services/annotation-service

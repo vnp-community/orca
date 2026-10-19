@@ -1,0 +1,11 @@
+Break the following task down into subtasks. Respond with JSON matching:
+{"subtasks":[{"title","description","type","estimated_hours","depends_on":[<indices>],"prompt_template"}],"notes":"<string>"}
+
+Task: Add the cache layer
+Description: Cache the landing page for five minutes.
+AI Context: The service is written in Go.
+Project: orca (https://example.com/orca.git)
+Tech stack: Go, TypeScript; gRPC, React
+Existing subtasks (do not duplicate): Write the cache
+Recent team velocity: Add rate limiting; Fix the login redirect
+Provider context: Provider: linear, issue ORCA-12

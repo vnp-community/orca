@@ -1,0 +1,5 @@
+
+When you are done, end your answer with this block and nothing after it (one JSON object, the nonce exactly as given):
+ORCA_RESULT_BEGIN {{.ResultNonce}}
+{"changeId":{{quote .ChangeID}},"phases":0,"tasks":0,"validation":"passed","openQuestions":0,"knowledge":{"available":{{.KnowledgeAvailable}},"snapshot":"","read":[],"gaps":[],"conflicts":[]}}
+ORCA_RESULT_END {{.ResultNonce}}

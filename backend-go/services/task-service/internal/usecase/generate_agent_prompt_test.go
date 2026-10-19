@@ -27,7 +27,7 @@ func TestGenerateAgentPrompt_TaskNotFound(t *testing.T) {
 
 func TestGenerateAgentPrompt_NotConnected_ReturnsFailedPrecondition(t *testing.T) {
 	tasks := newFakeTaskRepository()
-	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1"}
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
 	uc := NewGenerateAgentPrompt(tasks, &fakeAIProviderContextResolver{}, &fakeProjectExecutionResolver{connected: false}, &fakeAICompleter{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -81,7 +81,7 @@ func TestGenerateAgentPrompt_SaveTrue_PersistsToPromptTemplate(t *testing.T) {
 
 func TestGenerateAgentPrompt_RelayFailurePropagates(t *testing.T) {
 	tasks := newFakeTaskRepository()
-	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1"}
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
 	uc := NewGenerateAgentPrompt(tasks, &fakeAIProviderContextResolver{}, &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, &fakeAICompleter{err: errors.New("boom")})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -92,7 +92,7 @@ func TestGenerateAgentPrompt_RelayFailurePropagates(t *testing.T) {
 
 func TestGenerateAgentPrompt_SaveFailurePropagates(t *testing.T) {
 	tasks := newFakeTaskRepository()
-	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1"}
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
 	tasks.updatePromptTemplateErr = errors.New("db unavailable")
 	uc := NewGenerateAgentPrompt(tasks, &fakeAIProviderContextResolver{}, &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, &fakeAICompleter{content: "prompt"})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")

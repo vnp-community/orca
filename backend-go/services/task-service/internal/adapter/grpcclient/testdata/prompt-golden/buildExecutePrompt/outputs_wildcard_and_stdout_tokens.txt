@@ -1,0 +1,10 @@
+Baseline was baseline: 4012 ms.
+Chosen store: chose: in-process LRU.
+
+Task: Add the cache layer
+Description: Cache the landing page for five minutes.
+Context: The service is written in Go.
+
+Completed dependencies:
+- Measure the baseline: Record the current load time.
+- Choose the cache: Pick a cache store.

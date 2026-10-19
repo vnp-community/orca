@@ -8,3 +8,4 @@
 /config/scripts/verify-release-required-assets.mjs text eol=lf
 /agent/src/relay/__fixtures__/agent-capabilities-golden.json text eol=lf
 /backend-go/services/**/testdata/agent_capabilities_v1.golden.json text eol=lf
+/backend-go/services/**/testdata/prompt-golden/**/*.txt text eol=lf

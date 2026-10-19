@@ -1,0 +1,6 @@
+You are implementing a cache.
+Follow the project rules.
+
+Task: Add the cache layer
+Description: Cache the landing page for five minutes.
+Context: The service is written in Go.

@@ -15,7 +15,7 @@ type ExecuteTaskInput struct {
 	RequestID string
 	// Prompt overrides the executor's own default prompt (built from the
 	// task's Title) when non-empty — see docs/backlog/BACKLOG-016 and
-	// SimpleExecutor.buildExecutePrompt's doc comment for the default it
+	// SimpleExecutor's renderExecutePrompt doc comment for the default it
 	// replaces. Not persisted onto the task.
 	Prompt string
 	// ResultNonce, when set, selects the contract path for a task that has a spec: the agent must

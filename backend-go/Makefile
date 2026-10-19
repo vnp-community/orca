@@ -11,12 +11,12 @@ SERVICES := ai-provider-service annotation-service api-gateway auth-service \
             task-service tenant-service usage-service workflow-service
 
 .PHONY: dev-up dev-down build vet test test-integration lint fmt fmt-check \
-        proto-gen proto-lint check-agent-capability-golden check-agent-methods-called check-grpc-dials migrate-all tidy-all opa-test help
+        proto-gen proto-lint check-agent-capability-golden check-agent-methods-called check-grpc-dials check-prompt-golden check-agent-relay-single-source check-prompt-outside-catalog check-prompt-guards-selftest check-prompts migrate-all tidy-all opa-test help
 
 help:
 	@echo "make dev-up            - start postgres/vault/nats via docker compose"
 	@echo "make dev-down          - stop the local dev stack"
-	@echo "make build             - go build every module (common, proto, all services)"
+	@echo "make build             - go build every module (common, proto, prompts, all services)"
 	@echo "make vet               - go vet every module"
 	@echo "make test              - go test every module (unit tests only)"
 	@echo "make test-integration  - go test -tags=integration every module (needs Docker)"
@@ -43,17 +43,17 @@ dev-down:
 # (revisit the toolchain version at that point, this may just be fixed in a
 # later Go release).
 build:
-	@for m in common proto $(addprefix services/,$(SERVICES)); do \
+	@for m in common proto prompts $(addprefix services/,$(SERVICES)); do \
 		echo "==> build $$m"; (cd $$m && go build ./...) || exit 1; \
 	done
 
 vet:
-	@for m in common proto $(addprefix services/,$(SERVICES)); do \
+	@for m in common proto prompts $(addprefix services/,$(SERVICES)); do \
 		echo "==> vet $$m"; (cd $$m && go vet ./...) || exit 1; \
 	done
 
 test:
-	@for m in common proto $(addprefix services/,$(SERVICES)); do \
+	@for m in common proto prompts $(addprefix services/,$(SERVICES)); do \
 		echo "==> test $$m"; (cd $$m && go test ./...) || exit 1; \
 	done
 
@@ -63,7 +63,7 @@ test-integration:
 	done
 
 lint:
-	@for m in common proto $(addprefix services/,$(SERVICES)); do \
+	@for m in common proto prompts $(addprefix services/,$(SERVICES)); do \
 		echo "==> lint $$m"; (cd $$m && golangci-lint run ./...) || exit 1; \
 	done
 
@@ -92,8 +92,27 @@ check-agent-methods-called:
 check-grpc-dials:
 	bash ci/check-grpc-dials.sh
 
+# Every prompt the services send to the agent renders byte for byte like its golden file (CR-REQ-042).
+check-prompt-golden:
+	bash ci/check-prompt-golden.sh
+
+# agent.execPrompt / ai.complete are relayed only by common/agentrelay (CR-REQ-042).
+check-agent-relay-single-source:
+	bash ci/check-agent-relay-single-source.sh
+
+# No prompt fence tag is built in Go outside backend-go/prompts (heuristic; limits in the script header).
+check-prompt-outside-catalog:
+	bash ci/check-prompt-outside-catalog.sh
+
+# Both guards above fail on a deliberate violation planted in a temp copy.
+check-prompt-guards-selftest:
+	bash ci/check-prompt-guards_test.sh
+
+# Everything that keeps the prompt catalog and the single relay honest. The size budget runs with `go test` in backend-go/prompts.
+check-prompts: check-agent-relay-single-source check-prompt-outside-catalog check-prompt-golden check-prompt-guards-selftest
+
 tidy-all:
-	@for m in common proto $(addprefix services/,$(SERVICES)); do \
+	@for m in common proto prompts $(addprefix services/,$(SERVICES)); do \
 		echo "==> tidy $$m"; (cd $$m && go mod tidy) || exit 1; \
 	done
 	go work sync

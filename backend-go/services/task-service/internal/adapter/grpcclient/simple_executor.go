@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc/status"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -79,6 +80,11 @@ import (
 //     path never calls AIProviderContextResolver), so accountId/model are
 //     left out of the params entirely rather than guessed at.
 //
+// The agent.execPrompt params and result are built and decoded by common/agentrelay (golden wire files in
+// agentrelay/testdata/wire; simple_executor_wire_test.go proves this executor sends the same JSON as before). What stays
+// here: the `{{outputs.*}}` prompt interpolation, the profile/project env and init file, the full-trust policy, the
+// contract-run options and the absence of an RPC deadline (agentrelay.WithoutCallDeadline).
+//
 // worktreePath resolution: infra-fleet-service's ResolveConnectionResponse
 // already carries a repo_path field for exactly this purpose (see
 // usecase.ProjectExecutionResolver's doc comment and
@@ -87,12 +93,10 @@ import (
 // ConnectionResolver reads for its own GitExecutor's cwd equivalent,
 // internal/usecase/ports.go:26-37 in that service).
 //
-// prompt construction: this codebase's one existing AI-task-execution
-// prompt-building convention is AIDecompose's buildDecomposePrompt
-// (ai_decompose.go) — plain text naming the task's title, no structured
-// (JSON) request format, because there is no live agent contract yet to
-// confirm one against. buildExecutePrompt below follows that same
-// plain-text convention for consistency, not a new one invented here.
+// prompt construction: the default prompt is plain text naming the task's
+// title (backend-go/prompts/task_execution), the same convention as the
+// decompose prompt, with no structured (JSON) request format. The mapping
+// from a task to that prompt is execute_prompt_mapping.go.
 //
 // Honest limit carried over unchanged, not solved by this task:
 // task-service still has no execution-completion callback. Unlike
@@ -108,7 +112,9 @@ type SimpleExecutor struct {
 	tasks    usecase.TaskRepository
 	edges    usecase.EdgeRepository
 	resolver usecase.ProjectExecutionResolver
-	relay    infrafleetv1.InfraFleetServiceClient
+	// agent builds and sends agent.execPrompt; the tenant metadata is stamped by runAgentPrompt because the same
+	// context also feeds the live-output stream.
+	agent    *agentrelay.Relayer
 	profiles usecase.ProfileResolver        // NEW
 	projects usecase.ProjectContextResolver // NEW
 	// records stores contract-run outcomes; nil disables ExecuteWithContract (see WithExecutionRecords).
@@ -130,7 +136,9 @@ type SimpleExecutor struct {
 
 func NewSimpleExecutor(tasks usecase.TaskRepository, edges usecase.EdgeRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient, profiles usecase.ProfileResolver, projects usecase.ProjectContextResolver, outbox usecase.OutboxWriter, streamer usecase.AgentExecOutputStreamer) *SimpleExecutor {
 	return &SimpleExecutor{
-		tasks: tasks, edges: edges, resolver: resolver, relay: relay, profiles: profiles, projects: projects,
+		tasks: tasks, edges: edges, resolver: resolver, profiles: profiles, projects: projects,
+		// The run is bounded by the agent's own timeout and the caller's context, as before; no RPC deadline of ours.
+		agent:  agentrelay.New(relay, agentrelay.WithoutCallDeadline()),
 		outbox: outbox, streamer: streamer, throttleInterval: execOutputThrottleInterval,
 	}
 }
@@ -258,49 +266,6 @@ func (s *SimpleExecutor) publishAgentOutputPartial(tenantID, taskID, requestID, 
 	}
 }
 
-// agentExecPromptParams mirrors agent-print-mode-exec.ts's handled fields —
-// see this file's doc comment for the exact source citation. stepId/
-// trustPreset/model/accountId are `omitempty`: SimpleExecutor has no value
-// to put in the latter two (see the doc comment's "omit when unresolved"
-// note), and an empty stepId/trustPreset should vanish from the JSON the
-// same way StepExecutors.ts's spread omits accountId/model, not be sent as
-// an explicit empty string.
-//
-// TrustPreset/Model/Env/InitFile are NEW (TASK-PRF-04-08) — same
-// profile-aware env injection as workflow-service's AgentExecutor; see
-// domain/agent_environment.go's BuildAgentEnv/BuildProjectContext.
-type agentExecPromptParams struct {
-	Prompt       string            `json:"prompt"`
-	WorktreePath string            `json:"worktreePath"`
-	StepID       string            `json:"stepId,omitempty"`
-	TrustPreset  string            `json:"trustPreset,omitempty"` // NEW
-	Model        string            `json:"model,omitempty"`       // NEW
-	Env          map[string]string `json:"env,omitempty"`         // NEW / TASK-TG-04-06 — already-supported field, simply never populated before
-	InitFile     string            `json:"initFile,omitempty"`    // NEW — see workflow-service's agent_step_executor.go for the same field-name caveat
-	// Contract-run fields (CR-REQ-029); all omitempty so a plain run sends the same JSON as before.
-	ResultBlock    *resultBlockParam `json:"resultBlock,omitempty"`
-	ReportChanges  bool              `json:"reportChanges,omitempty"`
-	MaxOutputBytes int               `json:"maxOutputBytes,omitempty"`
-	// TimeoutMs bounds the run on the agent (it clamps to its own ceiling); left out, the agent gives a run five minutes.
-	TimeoutMs int `json:"timeoutMs,omitempty"`
-	// KnowledgeRoot is the project's repository root, where .tdd-agent/ lives; the agent builds the MCP config itself.
-	KnowledgeRoot string `json:"knowledgeRoot,omitempty"`
-}
-
-// agentExecPromptResult mirrors agent-print-mode-exec.ts's real
-// PrintModeExecResult shape (agent-print-mode-exec.ts:25-31,177) — no
-// executionRef field exists on the real RPC; see this file's doc comment.
-type agentExecPromptResult struct {
-	Stdout   string `json:"stdout"`
-	Stderr   string `json:"stderr"`
-	ExitCode *int   `json:"exitCode"`
-	TimedOut bool   `json:"timedOut"`
-	// Contract-run fields from a protocol-2 agent; absent from older agents.
-	Changes   json.RawMessage    `json:"changes,omitempty"`
-	Parsed    *agentParsedResult `json:"parsed,omitempty"`
-	Truncated bool               `json:"truncated,omitempty"`
-}
-
 func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (string, error) {
 	result, err := s.runAgentPrompt(ctx, tenantID, taskID, requestID, worktreePath, prompt, nil)
 	if err != nil {
@@ -313,7 +278,7 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 		return "", apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", fmt.Sprintf("agent.execPrompt exited non-zero: %s", result.Stderr), nil)
 	}
 	// TASK-TG-04-07: persist this run's stdout so a LATER run
-	// wave's buildExecutePrompt can resolve `{{outputs.<taskId>.*}}`
+	// wave's renderExecutePrompt can resolve `{{outputs.<taskId>.*}}`
 	// against this task once it's a completed dependency — best-effort,
 	// a write failure here must not fail an otherwise-successful run.
 	_ = s.tasks.UpdateLastExecutionOutput(ctx, tenantID, taskID, result.Stdout)
@@ -322,10 +287,10 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 
 // runAgentPrompt prepares and relays one agent.execPrompt call and returns the raw result;
 // Execute and ExecuteWithContract differ only in what they do with it. opts is nil for a plain run.
-func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string, opts *contractRunOptions) (agentExecPromptResult, error) {
+func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string, opts *contractRunOptions) (agentrelay.ExecResult, error) {
 	task, err := s.tasks.Get(ctx, tenantID, taskID)
 	if err != nil {
-		return agentExecPromptResult{}, fmt.Errorf("simple_executor: load task: %w", err)
+		return agentrelay.ExecResult{}, fmt.Errorf("simple_executor: load task: %w", err)
 	}
 
 	// Context preamble inputs (TASK-TG-04-06): parent is ancestors[1] (the
@@ -358,7 +323,7 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 	// unchanged from BUG-026's fix.
 	connectionID, repoRoot, _, devServerID, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil {
-		return agentExecPromptResult{}, fmt.Errorf("simple_executor: resolve connection: %w", err)
+		return agentrelay.ExecResult{}, fmt.Errorf("simple_executor: resolve connection: %w", err)
 	}
 	if !connected {
 		// Per git-gateway-service.md §8's precedent: a resolve failure or
@@ -366,14 +331,14 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 		// fallback — task-service has no local agent.execPrompt equivalent
 		// of its own (unlike git-gateway-service's §2 step 3, there is no
 		// "this service's own host" case for task execution).
-		return agentExecPromptResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_CONNECTION", "task's project has no connected dev server", nil)
+		return agentrelay.ExecResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_CONNECTION", "task's project has no connected dev server", nil)
 	}
 	if worktreePath == "" {
 		// agent.execPrompt requires worktreePath (agent-print-mode-exec.ts:62-73
 		// rejects a missing one with InvalidParams) — a connected connection
 		// with no repo_path recorded is a distinct, real error, not a
 		// silent no-op dispatch.
-		return agentExecPromptResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_WORKTREE_PATH", "task's connected dev server has no worktree path recorded", nil)
+		return agentrelay.ExecResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_WORKTREE_PATH", "task's connected dev server has no worktree path recorded", nil)
 	}
 
 	// TASK-TG-04-06's context preamble (parent/completedDeps) and
@@ -386,13 +351,13 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 	// overrides the built default entirely when non-empty.
 	effectivePrompt := prompt
 	if effectivePrompt == "" {
-		effectivePrompt = buildExecutePrompt(task, parent, completedDeps)
-		if opts != nil {
-			// A contract run without a caller-built prompt gets the default one plus the way to report back.
-			effectivePrompt += domain.ContractPromptSuffix(opts.nonce, opts.requirePassingCheck, opts.useKnowledgeHub && repoRoot != "")
+		built, err := renderDefaultExecutePrompt(task, parent, completedDeps, opts, repoRoot)
+		if err != nil {
+			return agentrelay.ExecResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_PROMPT_BUILD_FAILED", "failed to build the task execution prompt", err)
 		}
+		effectivePrompt = built
 	}
-	params := agentExecPromptParams{
+	run := agentrelay.Run{
 		Prompt:       effectivePrompt,
 		WorktreePath: worktreePath,
 		StepID:       requestID,
@@ -412,7 +377,7 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 		// task.execute dispatch now runs with full, unattended write/git
 		// trust, confirmed with the user given the security-posture
 		// implication.
-		TrustPreset: "full",
+		TrustPreset: agentrelay.TrustFull,
 	}
 
 	// userID: task-service's domain.Task carries no per-task assignee field
@@ -425,7 +390,7 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 		if err == nil { // best-effort — a profile-resolve failure degrades to the legacy bare passthrough (still carrying TG-04-06's base env above), never blocks task execution
 			if agent, ok := resolved["agent"].(map[string]any); ok {
 				if model, ok := agent["preferredModel"].(string); ok {
-					params.Model = model
+					run.Model = model
 				}
 			}
 			env := domain.BuildAgentEnv(resolved, userID, task.ProjectID, "", "")
@@ -433,28 +398,17 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 			if task.ProjectID != "" {
 				if pctx, err := s.projects.GetProjectContext(userCtx, task.ProjectID); err == nil {
 					env["ORCA_PROJECT_NAME"] = pctx.ProjectName
-					params.InitFile = domain.BuildProjectContext(domain.PreambleInput{
+					run.InitFile = domain.BuildProjectContext(domain.PreambleInput{
 						ProjectName: pctx.ProjectName, Description: pctx.Description, RepoURL: pctx.RepoURL,
 						WorktreePath: worktreePath, DevServerHostname: pctx.DevServerHostname,
 					})
 				}
 			}
-			params.Env = env
+			run.Env = env
 		}
 	}
 
-	if opts != nil {
-		opts.apply(&params)
-		// The repository root, not the task's worktree: the graph is built for the project's checkout, and the root comes
-		// from the project's connection, never from the caller.
-		if opts.useKnowledgeHub && repoRoot != "" {
-			params.KnowledgeRoot = repoRoot
-		}
-	}
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		return agentExecPromptResult{}, fmt.Errorf("simple_executor: marshal params: %w", err)
-	}
+	params := opts.execParams(run, repoRoot)
 
 	// relayCtx carries tenant id on the OUTGOING metadata for both
 	// infra-fleet-service calls below — infra-fleet-service's own RPCs
@@ -468,7 +422,7 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 	// earlier fixes were all in project-service call sites, not this one).
 	relayCtx, err := withTenantMetadata(ctx)
 	if err != nil {
-		return agentExecPromptResult{}, fmt.Errorf("simple_executor: tenant metadata: %w", err)
+		return agentrelay.ExecResult{}, fmt.Errorf("simple_executor: tenant metadata: %w", err)
 	}
 
 	// TASK-AG-FLOWTASK-003: subscribe to this run's mid-run output
@@ -507,93 +461,11 @@ func (s *SimpleExecutor) runAgentPrompt(ctx context.Context, tenantID, taskID, r
 	defer cancelStream()
 
 	// devServerID is only set when ResolveConnection resolved via its
-	// no-infra.connections-row fallback (resolveViaDefaultRepo) — that path
-	// has no real connectionID for infra-fleet-service's connectionId-keyed
-	// Relay RPC to key on. Mirrors git-gateway-service's RelayExecutor.relay
-	// branching on DevServerIDFromContext(ctx) before falling through to
-	// plain Relay — same fallback shape, checked as a direct return value
-	// here instead of threaded through ctx (see
-	// usecase.ProjectExecutionResolver's doc comment for why). Live-
-	// confirmed as INFRA_RELAY_NO_CONNECTION ("connectionId is required")
-	// on every task.execute dispatch reaching this fallback until this
-	// branch was added.
-	var resultJSON string
-	if devServerID != "" {
-		resp, err := s.relay.RelayByDevServer(relayCtx, &infrafleetv1.RelayByDevServerRequest{
-			DevServerId: devServerID, Method: "agent.execPrompt", ParamsJson: string(paramsJSON),
-		})
-		if err != nil {
-			return agentExecPromptResult{}, &relayError{fmt.Errorf("simple_executor: relayByDevServer agent.execPrompt: %w", err)}
-		}
-		resultJSON = resp.GetResultJson()
-	} else {
-		resp, err := s.relay.Relay(relayCtx, &infrafleetv1.RelayRequest{
-			ConnectionId: connectionID, Method: "agent.execPrompt", ParamsJson: string(paramsJSON),
-		})
-		if err != nil {
-			return agentExecPromptResult{}, &relayError{fmt.Errorf("simple_executor: relay agent.execPrompt: %w", err)}
-		}
-		resultJSON = resp.GetResultJson()
-	}
-	var result agentExecPromptResult
-	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
-		return agentExecPromptResult{}, fmt.Errorf("simple_executor: unmarshal agent.execPrompt result: %w", err)
+	// no-infra.connections-row fallback (resolveViaDefaultRepo): that path has no
+	// real connectionID, so agentrelay sends it through RelayByDevServer.
+	result, err := s.agent.ExecPrompt(relayCtx, agentrelay.Target{DevServerID: devServerID, ConnectionID: connectionID}, params)
+	if err != nil {
+		return agentrelay.ExecResult{}, execPromptError(err)
 	}
 	return result, nil
-}
-
-// buildExecutePrompt assembles the agent.execPrompt prompt from task,
-// parent (nil if task is a root task), and completedDeps (this task's
-// depends_on targets currently Status == StatusDone) — see this file's doc
-// comment for why this follows ai_decompose.go's buildDecomposePrompt
-// plain-text convention rather than a new one. Uses task.PromptTemplate
-// verbatim when set — a task with an AI-generated or user-edited prompt
-// template should use it as-is (SOL-TG-01/SOL-TG-02) — falling back to the
-// generic "Complete the following task" opener only when empty.
-func buildExecutePrompt(task domain.Task, parent *domain.Task, completedDeps []domain.Task) string {
-	var b strings.Builder
-	if task.PromptTemplate != "" {
-		b.WriteString(task.PromptTemplate)
-		b.WriteString("\n\n")
-	} else {
-		b.WriteString("Complete the following task.\n\n")
-	}
-	fmt.Fprintf(&b, "Task: %s\n", task.Title)
-	if task.Description != "" {
-		fmt.Fprintf(&b, "Description: %s\n", task.Description)
-	}
-	if task.AIContext != "" {
-		fmt.Fprintf(&b, "Context: %s\n", task.AIContext)
-	}
-	if parent != nil {
-		fmt.Fprintf(&b, "\nParent task: %s\n%s\n", parent.Title, parent.Description)
-	}
-	if len(completedDeps) > 0 {
-		b.WriteString("\nCompleted dependencies:\n")
-		for _, d := range completedDeps {
-			fmt.Fprintf(&b, "- %s: %s\n", d.Title, d.Description)
-		}
-	}
-	return interpolateOutputs(b.String(), completedDeps)
-}
-
-// interpolateOutputs resolves `{{outputs.<taskId>.*}}` and
-// `{{outputs.<taskId>.stdout}}` tokens (SOL-TG-04's batch-wave prompt
-// interpolation, TASK-TG-04-07) against completedDeps' LastExecutionOutput
-// (persisted by a PRIOR dependency run's SimpleExecutor.Execute) — the
-// only field currently captured is stdout, so both the wildcard and the
-// explicit `.stdout` token resolve to the same value. A token naming a
-// task not in completedDeps (never ran, not yet finished, or not this
-// task's dependency at all) is left verbatim rather than silently
-// stripped, so a broken reference is visible in the dispatched prompt
-// instead of vanishing.
-func interpolateOutputs(prompt string, completedDeps []domain.Task) string {
-	if len(completedDeps) == 0 {
-		return prompt
-	}
-	for _, d := range completedDeps {
-		prompt = strings.ReplaceAll(prompt, fmt.Sprintf("{{outputs.%s.stdout}}", d.ID), d.LastExecutionOutput)
-		prompt = strings.ReplaceAll(prompt, fmt.Sprintf("{{outputs.%s.*}}", d.ID), d.LastExecutionOutput)
-	}
-	return prompt
 }
