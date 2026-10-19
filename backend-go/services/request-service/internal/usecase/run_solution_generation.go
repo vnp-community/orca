@@ -114,22 +114,6 @@ func parseAnalysisOutput(kind domain.SolutionKind, text string, minOptions int) 
 	return redacted, err
 }
 
-// priorArtifacts are the superseded and rejected attempts shown to the model; the draft being filled is excluded.
-func priorArtifacts(ctx context.Context, store SolutionStore, requestID string, kind domain.SolutionKind, exceptID string) []PriorArtifact {
-	all, err := store.ListByRequest(ctx, SolutionListFilter{RequestID: requestID})
-	if err != nil {
-		return nil // best effort: a missing history only costs quality
-	}
-	var out []PriorArtifact
-	for _, s := range all {
-		if s.ID == exceptID || (s.Status != domain.SolutionStatusSuperseded && s.Status != domain.SolutionStatusRejected) {
-			continue
-		}
-		out = append(out, PriorArtifact{Kind: string(s.Kind), Status: string(s.Status), Content: string(s.OptionsJSON)})
-	}
-	return out
-}
-
 func projectFacts(ctx context.Context, projects ProjectContextReader, projectID string) (name, repoURL string) {
 	if projects == nil {
 		return "", ""

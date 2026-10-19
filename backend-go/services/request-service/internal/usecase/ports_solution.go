@@ -35,7 +35,13 @@ type SolutionStore interface {
 	// SupersedeOpen retires proposed and rejected solutions of the same kind, keeping exceptID.
 	SupersedeOpen(ctx context.Context, requestID string, kind domain.SolutionKind, exceptID string) (int, error)
 	DeleteDraft(ctx context.Context, id string) error
+	// RunFeedbackByIDs maps analysis run id to its non-empty feedback, in the ctx tenant. Unknown ids and runs without
+	// feedback are absent from the map. Implementations deduplicate the ids and issue one query per RunFeedbackBatchSize.
+	RunFeedbackByIDs(ctx context.Context, runIDs []string) (map[string]string, error)
 }
+
+// RunFeedbackBatchSize bounds the IN list of one RunFeedbackByIDs query so a long history cannot exceed driver limits.
+const RunFeedbackBatchSize = 500
 
 type StartRunOptions struct {
 	LeaseTTL time.Duration

@@ -43,6 +43,13 @@ type RequestView struct {
 	// Request entered executing, empty before (CR-REQ-038).
 	Engine        string `json:"engine,omitempty"`
 	ExecutionMode string `json:"executionMode,omitempty"`
+	// BaseRef is always present, "" meaning the repository default (CR-REQ-039): a client tells a gateway that predates the
+	// feature from one that has it by the key, not by its value. The lock fields are set only where request-service works
+	// them out (see withBaseRefState).
+	BaseRef           string  `json:"baseRef"`
+	BaseRefLocked     *bool   `json:"baseRefLocked,omitempty"`
+	BaseRefLockReason *string `json:"baseRefLockReason,omitempty"`
+	BaseRefUnverified *bool   `json:"baseRefUnverified,omitempty"`
 }
 
 // RequestViewOf converts a Request; nil yields a zero view so callers never panic on a thin fake.
@@ -56,7 +63,7 @@ func RequestViewOf(r *requestv1.Request, withBody bool) RequestView {
 		ReturnedFromStage: r.GetReturnedFromStage(), ReturnCategory: r.GetReturnedCategory(), ReturnReason: r.GetReturnReason(),
 		PlanTaskID: r.GetPlanTaskId(), ReporterID: r.GetReporterId(),
 		CreatedAt: rfc3339(r.GetCreatedAt()), UpdatedAt: rfc3339(r.GetUpdatedAt()), Version: r.GetVersion(),
-		Engine: r.GetEngine(), ExecutionMode: r.GetExecutionMode(),
+		Engine: r.GetEngine(), ExecutionMode: r.GetExecutionMode(), BaseRef: r.GetBaseRef(),
 	}
 	if r != nil && r.Confidence != nil {
 		c := r.GetConfidence()
@@ -69,11 +76,11 @@ func RequestViewOf(r *requestv1.Request, withBody bool) RequestView {
 	return v
 }
 
-// RequestViews converts a page of Requests (no body).
+// RequestViews converts a page of Requests (no body). A list is one of the reads that work out the base ref lock.
 func RequestViews(rs []*requestv1.Request) []RequestView {
 	out := make([]RequestView, 0, len(rs))
 	for _, r := range rs {
-		out = append(out, RequestViewOf(r, false))
+		out = append(out, RequestViewOf(r, false).withBaseRefState(r, nil))
 	}
 	return out
 }
@@ -111,6 +118,10 @@ type SolutionView struct {
 	GenerationRunID string          `json:"generationRunId,omitempty"`
 	CreatedAt       string          `json:"createdAt"`
 	Version         int64           `json:"version"`
+	// Seq numbers the versions of one Request (1, 2, ...); absent for a draft that never got its document indexed.
+	Seq int32 `json:"seq,omitempty"`
+	// RevisionFeedback is what the person asked for to produce this version; readable by whoever can read the Request.
+	RevisionFeedback string `json:"revisionFeedback,omitempty"`
 }
 
 // SolutionViewOf converts a Solution.
@@ -120,6 +131,7 @@ func SolutionViewOf(s *requestv1.Solution) SolutionView {
 		Status:  enumLower(s.GetStatus().String(), "SOLUTION_STATUS_"),
 		Options: json.RawMessage("null"), ChosenOption: s.GetChosenOption(),
 		GenerationRunID: s.GetGenerationRunId(), CreatedAt: rfc3339(s.GetCreatedAt()), Version: s.GetVersion(),
+		Seq: s.GetSeq(), RevisionFeedback: s.GetRevisionFeedback(),
 	}
 	if raw := strings.TrimSpace(s.GetOptionsJson()); raw != "" && json.Valid([]byte(raw)) {
 		v.Options = json.RawMessage(raw)

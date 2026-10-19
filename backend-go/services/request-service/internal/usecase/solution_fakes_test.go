@@ -27,6 +27,9 @@ type solWorld struct {
 	failOpen  error
 	failCanc  error
 	now       time.Time
+	// feedbackReads counts RunFeedbackByIDs calls (one per batched read); failFeedback makes them fail.
+	feedbackReads int
+	failFeedback  error
 }
 
 func newSolWorld() *solWorld {
@@ -142,6 +145,23 @@ func (f fakeSolutions) SupersedeOpen(ctx context.Context, requestID string, kind
 		}
 	}
 	return n, nil
+}
+
+func (f fakeSolutions) RunFeedbackByIDs(ctx context.Context, ids []string) (map[string]string, error) {
+	f.w.feedbackReads++
+	if f.w.failFeedback != nil {
+		return nil, f.w.failFeedback
+	}
+	tid, _ := tenant.TenantID(ctx)
+	out := map[string]string{}
+	for _, batch := range RunFeedbackBatches(ids) {
+		for _, id := range batch {
+			if run, ok := f.w.runs[id]; ok && run.TenantID == tid && run.Feedback != "" {
+				out[id] = run.Feedback
+			}
+		}
+	}
+	return out, nil
 }
 
 func (f fakeSolutions) DeleteDraft(_ context.Context, id string) error {

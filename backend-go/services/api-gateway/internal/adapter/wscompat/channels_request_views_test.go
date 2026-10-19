@@ -92,3 +92,19 @@ func TestResolveRequestSource_Table(t *testing.T) {
 		}
 	}
 }
+
+func TestSolutionViewOf_CarriesSeqAndRevisionFeedback(t *testing.T) {
+	v := SolutionViewOf(&requestv1.Solution{Id: "s1", Seq: 3, RevisionFeedback: "keep the public API"})
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"seq":3`) || !strings.Contains(string(raw), `"revisionFeedback":"keep the public API"`) {
+		t.Fatalf("solution view lacks seq or revisionFeedback: %s", raw)
+	}
+	first := SolutionViewOf(&requestv1.Solution{Id: "s0"})
+	raw, _ = json.Marshal(first)
+	if strings.Contains(string(raw), "revisionFeedback") || strings.Contains(string(raw), `"seq"`) {
+		t.Fatalf("an unindexed first version must omit both fields: %s", raw)
+	}
+}

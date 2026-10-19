@@ -49,7 +49,7 @@ func TestBuildSolutionPrompt_PriorArtifactsAreCutAndFeedbackIncluded(t *testing.
 	if n := strings.Count(p, "x"); n < 8000 || n > 8100 { // 8000 x plus the few x in the instructions
 		t.Fatalf("artifact x count = %d", n)
 	}
-	for _, want := range []string{"kind=diagnosis", "status=superseded", "reviewer comment: không được", "thử cách khác", "<prior_artifacts>"} {
+	for _, want := range []string{"kind=diagnosis", "status=superseded", "reviewer feedback this version was written under: không được", "thử cách khác", "<prior_artifacts>"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("missing %q", want)
 		}

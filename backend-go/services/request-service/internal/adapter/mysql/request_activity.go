@@ -33,6 +33,10 @@ UNION ALL
 SELECT 'analysis.generated', CONCAT(id, ':solution'), created_at, 'system', '', 'solution', id, kind, status, '', '', CAST(COALESCE(seq, 0) AS SIGNED)
   FROM solutions WHERE tenant_id = ? AND request_id = ?
 UNION ALL
+-- The reviewer's feedback is user content (C9): it is tested here and never selected, so the line cannot carry it.
+SELECT 'analysis.revision_requested', CONCAT(id, ':revision'), started_at, 'user', COALESCE(actor_id, ''), 'solution', COALESCE(solution_id, ''), '', '', '', '', CAST(0 AS SIGNED)
+  FROM analysis_runs WHERE tenant_id = ? AND request_id = ? AND feedback IS NOT NULL AND feedback <> ''
+UNION ALL
 SELECT 'clarification.asked', CONCAT(id, ':asked'), created_at, 'system', created_by, 'clarification', id, source, status, resume_status, '', CAST(round AS SIGNED)
   FROM clarifications WHERE tenant_id = ? AND request_id = ?
 UNION ALL
@@ -66,7 +70,7 @@ SELECT CASE action WHEN 'returned' THEN 'request.returned' WHEN 'reopened' THEN 
   FROM request_return_history WHERE tenant_id = ? AND request_id = ?
 `
 
-const activityBranches = 10
+const activityBranches = 11
 
 // ListActivity reads the newest lines of one Request first; see the Postgres adapter for what runs in SQL and what does not.
 func (r *RequestActivityRepository) ListActivity(ctx context.Context, requestID string, q domain.ActivityQuery) ([]domain.ActivityRow, error) {

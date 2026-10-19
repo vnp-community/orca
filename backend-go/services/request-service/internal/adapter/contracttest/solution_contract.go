@@ -74,6 +74,8 @@ func RunSolutionContract(t *testing.T, newEnv func(t *testing.T) SolutionEnv) {
 		{"RPCReject", solRPCReject},
 		{"ApproverCanChoose", solApproverCanChoose},
 		{"SubjectHandlerContract", solSubjectHandlerContract},
+		{"RunFeedbackByIDs", solRunFeedbackByIDs},
+		{"RevisionRoundsCarryFeedback", solRevisionRoundsCarryFeedback},
 	}
 	if env.Artifacts.Index != nil {
 		scenarios = append(scenarios, struct {

@@ -66,6 +66,10 @@ type Solution struct {
 	ProvenanceJSON       []byte
 	InputRequestRevision int
 	ContentDigest        string
+
+	// RevisionFeedback is the reviewer's request for changes that produced this version: the feedback of its generation
+	// run, loaded on read and never stored on the row.
+	RevisionFeedback string
 }
 
 // StampArtifact records how and from which Request revision the document was produced (CR-REQ-027).

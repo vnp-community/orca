@@ -47,6 +47,12 @@ func TestSolutionMapping(t *testing.T) {
 		p.GetOptionsJson() != `{"a":"é"}` || p.GetChosenOption() != 1 || p.GetGenerationRunId() != "run" || p.GetVersion() != 4 || !p.GetCreatedAt().AsTime().Equal(at) {
 		t.Fatalf("mapped = %+v", p)
 	}
+	if got := toProtoSolution(domain.Solution{ID: "s2", RevisionFeedback: "đổi sang cách khác"}).GetRevisionFeedback(); got != "đổi sang cách khác" {
+		t.Fatalf("revision_feedback = %q", got)
+	}
+	if got := toProtoSolution(domain.Solution{ID: "s3"}).GetRevisionFeedback(); got != "" {
+		t.Fatalf("a first version has no revision_feedback, got %q", got)
+	}
 	if got := toProtoSolution(domain.Solution{Kind: domain.SolutionKindSolution, Status: domain.SolutionStatusDraft}).GetChosenOption(); got != -1 {
 		t.Fatalf("unchosen = %d, the wire uses -1", got)
 	}

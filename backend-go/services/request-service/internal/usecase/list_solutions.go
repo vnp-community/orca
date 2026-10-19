@@ -57,6 +57,9 @@ func (uc *ListSolutions) Execute(ctx context.Context, in ListSolutionsInput) (Li
 		}
 		out.Solutions = append(out.Solutions, s)
 	}
+	if err := uc.fillRevisionFeedback(ctx, out.Solutions); err != nil {
+		return ListSolutionsResult{}, err
+	}
 	runs, err := uc.runs.ListRecent(ctx, req.ID, domain.RecentRunsLimit)
 	for _, run := range runs {
 		if run.Kind != domain.RunKindPlan { // plan runs are read through GetPlanProposal
@@ -64,4 +67,24 @@ func (uc *ListSolutions) Execute(ctx context.Context, in ListSolutionsInput) (Li
 		}
 	}
 	return out, err
+}
+
+// fillRevisionFeedback sets RevisionFeedback on every version with one batched read of its generation runs, so a long
+// history costs one query, not one per version.
+func (uc *ListSolutions) fillRevisionFeedback(ctx context.Context, sols []domain.Solution) error {
+	ids := make([]string, 0, len(sols))
+	for _, s := range sols {
+		ids = append(ids, s.GenerationRunID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	feedback, err := uc.solutions.RunFeedbackByIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for i := range sols {
+		sols[i].RevisionFeedback = feedback[sols[i].GenerationRunID]
+	}
+	return nil
 }

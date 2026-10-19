@@ -54,6 +54,9 @@ message Solution {
   // 16 to 17: CR-REQ-026 engine fields.
   string engine = 16;
   string proposal_branch = 17;
+  // CR-REQ-041: the reviewer's request for changes that produced this version (the feedback of its generation run);
+  // empty for a first version. Readable by anyone who can read the Request.
+  string revision_feedback = 18;
 }
 
 message AnalysisRun {

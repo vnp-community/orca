@@ -99,3 +99,31 @@ func TestBuildActivityEntry_ByKind(t *testing.T) {
 		t.Fatalf("details are bounded: %d bytes", len(r))
 	}
 }
+
+func TestBuildActivityEntry_AnalysisRevisionRequestedIsInfoWithAFixedSummary(t *testing.T) {
+	row := ActivityRow{Kind: ActivityAnalysisRevisionRequested, ID: "r:revision", OccurredAt: activityT0, ActorKind: "user", ActorID: "u1", SubjectType: "solution", SubjectID: "s1"}
+	e := BuildActivityEntry(row, nil, 2)
+	if e.Summary != "Requested changes to the analysis" || e.Severity != ActivityInfo || e.ActorKind != "user" || e.ActorID != "u1" || e.SubjectID != "s1" || e.Details["solutionId"] != "s1" {
+		t.Fatalf("entry: %+v", e)
+	}
+	if len(e.Details) != 1 {
+		t.Fatalf("the line carries no reviewer text, only the solution id: %+v", e.Details)
+	}
+}
+
+func TestAllActivityKinds_NamesTheRevisionKindOnce(t *testing.T) {
+	n := 0
+	seen := map[string]bool{}
+	for _, k := range AllActivityKinds {
+		if seen[k] {
+			t.Fatalf("kind %q listed twice", k)
+		}
+		seen[k] = true
+		if k == "analysis.revision_requested" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("analysis.revision_requested must be a valid filter kind, found %d times", n)
+	}
+}

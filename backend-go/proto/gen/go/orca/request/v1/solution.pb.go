@@ -208,8 +208,11 @@ type Solution struct {
 	// 16 to 17: CR-REQ-026 engine fields.
 	Engine         string `protobuf:"bytes,16,opt,name=engine,proto3" json:"engine,omitempty"`
 	ProposalBranch string `protobuf:"bytes,17,opt,name=proposal_branch,json=proposalBranch,proto3" json:"proposal_branch,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// CR-REQ-041: the reviewer's request for changes that produced this version (the feedback of its generation run);
+	// empty for a first version. Readable by anyone who can read the Request.
+	RevisionFeedback string `protobuf:"bytes,18,opt,name=revision_feedback,json=revisionFeedback,proto3" json:"revision_feedback,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Solution) Reset() {
@@ -357,6 +360,13 @@ func (x *Solution) GetEngine() string {
 func (x *Solution) GetProposalBranch() string {
 	if x != nil {
 		return x.ProposalBranch
+	}
+	return ""
+}
+
+func (x *Solution) GetRevisionFeedback() string {
+	if x != nil {
+		return x.RevisionFeedback
 	}
 	return ""
 }
@@ -1502,7 +1512,7 @@ var File_orca_request_v1_solution_proto protoreflect.FileDescriptor
 
 const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\n" +
-	"\x1eorca/request/v1/solution.proto\x12\x0forca.request.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x87\x05\n" +
+	"\x1eorca/request/v1/solution.proto\x12\x0forca.request.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb4\x05\n" +
 	"\bSolution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1525,7 +1535,8 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\x16input_request_revision\x18\x0e \x01(\x05R\x14inputRequestRevision\x12%\n" +
 	"\x0econtent_digest\x18\x0f \x01(\tR\rcontentDigest\x12\x16\n" +
 	"\x06engine\x18\x10 \x01(\tR\x06engine\x12'\n" +
-	"\x0fproposal_branch\x18\x11 \x01(\tR\x0eproposalBranch\"\x96\x03\n" +
+	"\x0fproposal_branch\x18\x11 \x01(\tR\x0eproposalBranch\x12+\n" +
+	"\x11revision_feedback\x18\x12 \x01(\tR\x10revisionFeedback\"\x96\x03\n" +
 	"\vAnalysisRun\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x121\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x1d.orca.request.v1.SolutionKindR\x04kind\x12\x16\n" +
