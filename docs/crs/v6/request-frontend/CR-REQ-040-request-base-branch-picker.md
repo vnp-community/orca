@@ -9,7 +9,7 @@
 | **Effort** | Small đến Medium |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-19 |
-| **Trạng thái** | 📝 Đề xuất, chưa triển khai |
+| **Trạng thái** | 🟡 Đã triển khai (2026-10-20), chưa merge; còn: kiểm cập nhật thời gian thực giữa hai tab, hai lệnh verify i18n đỏ sẵn trên HEAD |
 | **Phụ thuộc** | Backend [CR-REQ-039](../plan-phase-task/CR-REQ-039-request-worktree-base-branch.md) (`request.create` nhận `baseRef`, `request.setBaseRef`, `baseRef`/`baseRefLocked` trên Request); CR-REQ-018 đến 021 (trang Request) |
 | **Mở khoá** | Không |
 | **Tác động** | `frontend/src/renderer/src/components/request/{CreateRequestDialog,CreateRequestProjectRepoNote,RequestOverviewTab,create-request-from-issue}.tsx`, `use-request-project-repos.ts`, picker nhánh dùng chung (tách từ `components/settings/BaseRefPicker.tsx`), `frontend/src/shared/request-types.ts`, `request-wire-parsers.ts`, `request-rpc-methods.ts`, 5 file locale |

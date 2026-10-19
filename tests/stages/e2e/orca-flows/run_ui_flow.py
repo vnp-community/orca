@@ -4,6 +4,8 @@
   python3 run_ui_flow.py                 # the dev server's own Claude (real AI, slower, spends usage)
   python3 run_ui_flow.py --ai-stub       # deterministic fake claude: swaps the agent, runs, restores it (like run_acceptance.py --ai-stub)
   python3 run_ui_flow.py --ai-stub -- --headed   # anything after `--` goes to `playwright test`
+  python3 run_ui_flow.py --ai-stub -- request-base-branch  # starting branch of a Request on a LedgerLite repo (CR-REQ-040): Create dialog, Overview row, edit, lock, unknown branch, feature off
+  python3 run_ui_flow.py --ai-stub -- analysis-revision   # revising an analysis by prompt (CR-REQ-041): versions, read-only old ones, Activity line, refusals; bug, spike, question once each
   python3 run_ui_flow.py --real readonly # REAL Claude Code, read-only analysis on a throwaway repo (question, bug)
   python3 run_ui_flow.py --real execute  # REAL Claude Code approves and EXECUTES a tiny Plan on a throwaway repo
   python3 run_ui_flow.py --real native-execute # REAL Claude Code executes a native `bug` and a native `task` (QA 2026-10-16: engine, tabs, agent log shows no CLI diagnostic as an error)

@@ -1,6 +1,6 @@
 # Kế hoạch triển khai CR-REQ-039, 040, 041, 042
 
-**Ngày soạn:** 2026-10-19 · **Nhánh nền:** `feat/e2e-acceptance-fixes` (đã đồng bộ `main`) · **Trạng thái:** 📝 chưa bắt đầu (0/27 task)
+**Ngày soạn:** 2026-10-19 · **Nhánh nền:** `feat/e2e-acceptance-fixes` (đã đồng bộ `main`) · **Trạng thái:** ✅ 25/27 task DONE, 2 task còn PARTIAL có lý do ghi trong file task (FE-040-04 realtime chưa kiểm hai tab trực tiếp; FE-040-05 hai lệnh verify i18n đỏ sẵn trên HEAD). Chưa commit/push tới lúc cập nhật bảng này
 
 Kế hoạch này gom bốn CR đã có solution và task checklist thành một lộ trình có thứ tự, cổng chất lượng và chiến lược e2e. Nó **không thay** các task; mỗi task vẫn là nguồn sự thật cho việc cần làm. Số liệu ước lượng ở mục 5 là ước lượng của người soạn, chưa được ai xác nhận.
 
@@ -213,12 +213,12 @@ Bảng cập nhật sau mỗi task (ngày, PR, bằng chứng test):
 
 | CR | Task | Trạng thái |
 |---|---|---|
-| 039 | 01, 02, 03, 04, 05, 06 | [ ] [ ] [ ] [ ] [ ] [ ] |
-| 040 | 01, 02, 03, 04, 05 | [ ] [ ] [ ] [ ] [ ] |
-| 041 BE | 01, 02, 03, 04 | [ ] [ ] [ ] [ ] |
-| 041 FE | 01, 02, 03, 04 | [ ] [ ] [ ] [ ] |
-| 042 | 01, 02, 03, 04, 05, 06, 07, 08 | [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] |
-| Fixture + harness | `ledgerlite-finance`, `ledgerlite_fixture.py`, `fixture-repo-ledgerlite.ts` | [ ] [ ] [ ] |
+| 039 | 01, 02, 03, 04, 05, 06 | [x] [x] [x] [x] [x] [x] (BRF-01..08 xanh, BRF-09 opt-in) |
+| 040 | 01, 02, 03, 04, 05 | [x] [x] [x] [~] [~] (04: realtime qua dòng registry gateway + test, chưa kiểm hai tab; 05: spec 3/3 xanh, hai lệnh verify i18n đỏ sẵn) |
+| 041 BE | 01, 02, 03, 04 | [x] [x] [x] [x] (ARV-01..12 xanh, ARV-13 chặn vì stack một người dùng) |
+| 041 FE | 01, 02, 03, 04 | [x] [x] [x] [x] (spec `analysis-revision` 5/5) |
+| 042 | 01, 02, 03, 04, 05, 06, 07, 08 | [x] [x] [x] [x] [x] [x] [x] [x] (goldens 158/158, `--real native-execute` 2/2; stdin chỉ kiểm trên macOS) |
+| Fixture + harness | `ledgerlite-finance`, `ledgerlite_fixture.py`, `fixture-repo-ledgerlite.ts` | [x] [x] [x] |
 
 Khi xong một CR: đổi trạng thái trong `docs/crs/v6/<thư mục>/CR-REQ-0xx-*.md`, bảng chỉ mục trong `docs/crs/v6/README.md` và README của thư mục, và `specs/**/solutions|tasks/README.md`.
 

@@ -73,7 +73,9 @@ export async function answerClarificationInPanel(page: Page, answer: string): Pr
   })
   const boxes = panel.getByRole('textbox')
   for (let i = 0; i < (await boxes.count()); i++) {
-    await boxes.nth(i).fill(`${answer}\n${answer} (second line)`)
+    // Why: a single-line input can be a number field (spike time box) that rejects words; text areas take the sentence.
+    const singleLine = await boxes.nth(i).evaluate((el) => el.tagName === 'INPUT')
+    await boxes.nth(i).fill(singleLine ? '8' : `${answer}\n${answer} (second line)`)
   }
   const numbers = panel.getByRole('spinbutton')
   for (let i = 0; i < (await numbers.count()); i++) {

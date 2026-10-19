@@ -9,7 +9,7 @@
 | **Effort** | Medium |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-19 |
-| **Trạng thái** | 📝 Đề xuất, chưa triển khai (câu hỏi mở 1 và 2 đã chốt 2026-10-19; còn 1 câu mở) |
+| **Trạng thái** | ✅ Đã triển khai (2026-10-20), chưa merge |
 | **Phụ thuộc** | CR-REQ-007 (sinh Solution, `feedback`, `TriggerAnalysisRevision`), CR-REQ-008 (chẩn đoán, Findings, Answer chạy qua agent chỉ-đọc), CR-REQ-010 (Approval), CR-REQ-016 (kênh gateway), CR-REQ-018 đến 021 (trang Request), CR-REQ-028 (Clarification), CR-REQ-037 (tab Activity) |
 | **Mở khoá** | Không |
 | **Tác động** | `backend-go/services/request-service` (`usecase/generate_solution.go`, `solution_authorization.go`, `list_solutions.go`, `domain/request_activity.go`, migration nhỏ), `backend-go/proto/orca/request/v1/solution.proto`, `backend-go/services/api-gateway` (`solution.*`, MCP), `frontend/src/renderer/src/components/request/solution/`, `request/activity/`, 5 file locale |

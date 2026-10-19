@@ -22,11 +22,13 @@ import time
 from pathlib import Path
 
 import suite_ai_stub_login
+import suite_analysis_revision
 import suite_dev_server_agent
 import suite_not_found_contract
 import suite_platform_health
 import suite_qa_regressions
 import suite_request_ai_stages
+import suite_request_base_ref
 import suite_request_exits
 import suite_request_lifecycle
 import suite_request_plan_stage
@@ -56,9 +58,14 @@ SUITES = [
     ("notfound", "Unknown ids are NotFound on every service", suite_not_found_contract),
     ("qa", "QA regressions 2026-10-16 (terminal cwd, engine of bug/task, GitHub and Jira sources)", suite_qa_regressions),
     ("aistub", "Fake claude wiring and the logged-out path (--ai-stub only)", suite_ai_stub_login),
+    # After aistub on purpose: approving a Plan makes the agent call the fake claude with an execution prompt it refuses (the
+    # task then fails), and AST-02/03 would count that call as an unrecognised prompt if they ran afterwards.
+    ("request_base_ref", "Base branch of a Request's worktrees, proved with real git (CR-REQ-039)", suite_request_base_ref),
+    # After aistub too: it relies on fake claude triggers ([stub:fail-once], [stub:slow]) and leaves analyses at their gates.
+    ("analysis_revision", "Revising an analysis by prompt: versions, approvals, approver, failure, hotfix (CR-REQ-041)", suite_analysis_revision),
 ]
 STUB_ONLY = {"aistub"}
-AI_USING = {"request", "matrix", "exits", "ai", "plan", "analysis", "qa"}  # suites whose requests go through classification
+AI_USING = {"request", "matrix", "exits", "ai", "plan", "analysis", "qa", "request_base_ref", "analysis_revision"}  # suites whose requests go through classification
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
 
 

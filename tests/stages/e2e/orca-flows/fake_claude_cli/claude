@@ -17,10 +17,15 @@ Answers are keyed on the prompts the real request-service builds (classification
 diagnosis / findings / answer analyses) and are written to pass the real parsers and validators (ParseClassificationProposal,
 SolutionOptions.Validate + coverage, ParsePlanOutput, ValidatePlanProposal, ValidateByKind). A prompt it does not recognise fails loudly instead of inventing an answer.
 
-State (calls.jsonl, logged_in) lives in $FAKE_CLAUDE_STATE_DIR, default ~/.fake-claude. The agent strips FAKE_* variables
+A reviewer's change request (a <feedback> block after </request>) is echoed in the answer, so each round differs; the code
+[stub:fail-once] in that feedback makes the first answer fail and later ones succeed, and [stub:slow] delays the answer
+(FAKE_CLAUDE_SLOW_SECONDS, default 6).
+
+State (calls.jsonl, logged_in, fail-once markers) lives in $FAKE_CLAUDE_STATE_DIR, default ~/.fake-claude. The agent strips FAKE_* variables
 from the environment of `claude -p`, so the login state can also be switched with the `logged_in` file (0 or 1).
 POSIX only (macOS, Linux); a Windows agent resolves claude.cmd, so the stub does not apply there.
 """
+import hashlib
 import json
 import os
 import re
@@ -175,8 +180,67 @@ def has_answered_clarifications(prompt):
     return len(after) == 2 and "\n<clarifications>\n" in after[1]
 
 
+def revision_feedback(prompt):
+    """The reviewer's change request in the prompt, or "". Only what follows </request> is read (the request text is untrusted
+    and may quote these tags)."""
+    after = prompt.split("\n</request>\n", 1)
+    if len(after) != 2:
+        return ""
+    m = re.search(r"\n<feedback>\n[^\n]*\n(.*?)\n</feedback>\n", after[1], re.S)
+    return m.group(1) if m else ""
+
+
+def revision_note(prompt):
+    """What a reviewer's change request looks like in the answer: "revised, round N, asked: <feedback>", or "" for a first attempt.
+    N counts the earlier versions in <prior_artifacts> + 1, so each round of one Request answers differently."""
+    feedback = revision_feedback(prompt)
+    if not feedback:
+        return ""
+    after = prompt.split("\n</request>\n", 1)[1]
+    prior = re.search(r"\n<prior_artifacts>\n(.*?)\n</prior_artifacts>\n", after, re.S)
+    earlier = len(re.findall(r"^--- artifact \d+ \(kind=", prior.group(1), re.M)) if prior else 0
+    asked = " ".join(feedback.split())[:60]
+    return f" [revised, round {earlier + 1}, asked: {asked}]"
+
+
+# A change request whose text carries this code fails the FIRST time it is asked and succeeds afterwards (a marker file per
+# distinct feedback in the state dir). Lets the analysis-revision suite prove a failed revision can be retried without
+# retyping the ask: the retry has the same feedback, so it answers.
+FAIL_ONCE_TRIGGER = "[stub:fail-once]"
+
+
+# A change request carrying this code is answered after a pause, so a suite can send a second change request while the first one
+# is still running (the agent strips FAKE_* from the environment, hence the fixed default).
+SLOW_TRIGGER = "[stub:slow]"
+
+
+def pause_if_slow(prompt):
+    if SLOW_TRIGGER in revision_feedback(prompt):
+        try:
+            seconds = float(os.environ.get("FAKE_CLAUDE_SLOW_SECONDS", "6"))
+        except ValueError:
+            seconds = 6.0
+        time.sleep(max(0.0, seconds))
+
+
+def fail_once(prompt):
+    feedback = revision_feedback(prompt)
+    if FAIL_ONCE_TRIGGER not in feedback:
+        return False
+    marker = os.path.join(state_dir(), "fail-once-" + hashlib.sha1(feedback.encode("utf-8")).hexdigest()[:16])
+    if os.path.exists(marker):
+        return False
+    try:
+        os.makedirs(state_dir(), exist_ok=True)
+        open(marker, "w").close()
+    except OSError:
+        return False  # cannot remember the failure: answering beats failing forever
+    return True
+
+
 def solution_answer(prompt):
     block = request_block(prompt)
+    note = revision_note(prompt)
     title = request_field(block, "title")[:80] or "the request"
     m = re.search(r"Give at least (\d+) options", prompt)
     count = min(4, max(2, int(m.group(1)) if m else 2))
@@ -185,7 +249,7 @@ def solution_answer(prompt):
         options.append({
             "id": f"opt-{i}",
             "title": f"Option {i}: {'extend the existing module' if i == 1 else 'add a dedicated component'}",
-            "summary": f"Fake-claude option {i} for: {title}",
+            "summary": f"Fake-claude option {i} for: {title}{note}",
             "approach": f"1. Change the code path that serves \"{title}\".\n2. Cover it with tests.\n3. Roll out behind a flag.",
             "pros": ["Small blast radius" if i == 1 else "Clear separation"],
             "cons": ["Couples to current code" if i == 1 else "More code to maintain"],
@@ -277,11 +341,12 @@ def readonly_kind(prompt):
 def readonly_answer(prompt, kind):
     block = request_block(prompt)
     title = request_field(block, "title")[:80] or "the request"
+    note = revision_note(prompt)
     # No file is claimed: the fixture reads nothing, and evidence must not pretend it did.
     evidence = [{"type": "command", "ref": "fake-claude", "excerpt": "Deterministic fixture; no repository file was read."}]
     if kind == "diagnosis":
         return {
-            "schema_version": 1, "kind": "diagnosis", "summary": f"Fake-claude diagnosis for: {title}",
+            "schema_version": 1, "kind": "diagnosis", "summary": f"Fake-claude diagnosis for: {title}{note}",
             "root_cause": {"statement": f"Fixture root cause for: {title}", "confidence": 0.5, "evidence": evidence},
             "reproduction": {"reproducible": "unknown", "steps": [], "notes": "Not reproduced by the fixture."},
             "impact": {"severity": "low", "scope": "fixture", "affected_components": [], "user_facing": False, "data_risk": False},
@@ -290,13 +355,13 @@ def readonly_answer(prompt, kind):
         }
     if kind == "findings":
         return {
-            "schema_version": 1, "kind": "findings", "question": title, "summary": f"Fake-claude findings for: {title}",
+            "schema_version": 1, "kind": "findings", "question": title, "summary": f"Fake-claude findings for: {title}{note}",
             "findings": [{"id": "f-1", "statement": "The fixture found nothing to report.", "confidence": 0.5, "evidence": evidence}],
             "recommendation": {"statement": "No follow-up needed.", "reason": "Fixture answer."},
             "follow_ups": [], "unknowns": [],
         }
     return {
-        "schema_version": 1, "kind": "answer", "answer_markdown": f"Fake-claude answer for: {title}. This is a deterministic fixture.",
+        "schema_version": 1, "kind": "answer", "answer_markdown": f"Fake-claude answer for: {title}. This is a deterministic fixture.{note}",
         "confidence": 0.5, "citations": [], "limitations": ["Fixture answer; no repository was read."],
     }
 
@@ -338,6 +403,10 @@ def run_print_stdin(argv):
         # The untrusted prompt must never get tools: fail the call so an agent regression is visible in the suite.
         return emit("fake claude: refusing to run without --tools \"\"", is_error=True, prompt_len=len(prompt))
     kind = prompt_kind(prompt)
+    if kind == "solution" and fail_once(prompt):
+        return emit("fake claude: scripted one-time failure", is_error=True, prompt_len=len(prompt))
+    if kind == "solution":
+        pause_if_slow(prompt)
     if kind == "classification":
         body = classify_answer(prompt)
     elif kind == "solution":
@@ -397,6 +466,10 @@ def run_print_arg(argv):
     if not kind.startswith("readonly:"):
         sys.stderr.write("fake claude: no canned answer for this prompt\n")
         return 1
+    if fail_once(prompt):
+        sys.stderr.write("fake claude: scripted one-time failure\n")
+        return 1
+    pause_if_slow(prompt)
     body = readonly_answer(prompt, kind.split(":", 1)[1])
     if streaming:
         # No tool event: the fixture reads nothing, and the activity stream must not pretend it did.

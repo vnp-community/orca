@@ -9,7 +9,7 @@
 | **Effort** | Large (chia ba giai đoạn độc lập, mục 2.6) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-19 |
-| **Trạng thái** | 📝 Đề xuất, chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (2026-10-20), chưa merge |
 | **Phụ thuộc** | CR-REQ-007, 008 (prompt phân tích), CR-REQ-012 (prompt Plan), CR-REQ-013, 029 (thực thi task, khối kết quả), CR-REQ-026 (OpenSpec), CR-REQ-033 (agent, `agent.execPrompt`) |
 | **Mở khoá** | [CR-REQ-034](./CR-REQ-034-ai-governance-budgets-evals-prompt-versioning.md) mục 2.3 (`PromptRegistry`, phiên bản prompt, provenance) và `AIGateway` bọc relay |
 | **Tác động** | `backend-go/prompts/` (module mới, thêm vào `go.work`), `backend-go/common/agentrelay/` (gói mới), `request-service`, `task-service`, `git-gateway-service`, `workflow-service`, `orchestration-service` (thay mã relay và gọi prompt), `agent/src/relay/agent-print-mode-exec.ts` (stdin), `ci/` (kiểm tra golden và kích thước prompt) |

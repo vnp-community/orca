@@ -60,7 +60,7 @@ func TestFakeClaude_Classification(t *testing.T) {
 		{"Speed up search", "Search is slow, latency doubled.", domain.RequestTypePerformance, domain.UrgencyNormal},
 	}
 	for _, c := range cases {
-		prompt := grpcclient.BuildClassificationPrompt(usecase.ClassificationInput{Title: c.title, Body: c.body})
+		prompt := renderedClassification(t, usecase.ClassificationInput{Title: c.title, Body: c.body})
 		p, err := domain.ParseClassificationProposal([]byte(askFakeClaude(t, prompt)))
 		if err != nil {
 			t.Fatalf("%q: the real parser rejected the answer: %v", c.title, err)
@@ -85,7 +85,7 @@ func TestFakeClaude_SolutionPassesTheRealValidators(t *testing.T) {
 		for _, acs := range [][]string{nil, {"AC-1"}, {"AC-1", "AC-2", "AC-3"}} {
 			req := requestWithACs(typ, domain.RequestSizeM, acs...)
 			min := domain.MinOptionsFor(typ)
-			text := askFakeClaude(t, usecase.BuildSolutionPrompt(usecase.SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: req, MinOptions: min}))
+			text := askFakeClaude(t, renderedSolution(t, usecase.SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: req, MinOptions: min}))
 			doc, err := usecase.ExtractJSONObject(text)
 			if err != nil {
 				t.Fatalf("%s: %v", typ, err)
@@ -144,7 +144,7 @@ func TestFakeClaude_PlanPassesTheRealValidators(t *testing.T) {
 			}
 			name := fmt.Sprintf("%s/%s", typ, size)
 			req := requestWithACs(typ, size, "AC-1")
-			text := askFakeClaude(t, usecase.BuildPlanPrompt(usecase.PlanPromptInput{Request: req, Shape: shape, Limits: domain.DefaultPlanLimits, ProjectName: "p", RepoURL: "r"}))
+			text := askFakeClaude(t, renderedPlan(t, usecase.PlanPromptInput{Request: req, Shape: shape, Limits: domain.DefaultPlanLimits, ProjectName: "p", RepoURL: "r"}))
 			p, err := usecase.ParsePlanOutput(text)
 			if err != nil {
 				t.Fatalf("%s: the real parser rejected the answer: %v", name, err)
@@ -168,7 +168,7 @@ func TestFakeClaude_PlanPassesTheRealValidators(t *testing.T) {
 func TestFakeClaude_FeedbackReachesThePlan(t *testing.T) {
 	flow, _ := domain.FlowFor(domain.RequestTypeTask)
 	req := requestWithACs(domain.RequestTypeTask, domain.RequestSizeS)
-	text := askFakeClaude(t, usecase.BuildPlanPrompt(usecase.PlanPromptInput{Request: req, Shape: domain.PlanShapeFor(flow, domain.RequestSizeS),
+	text := askFakeClaude(t, renderedPlan(t, usecase.PlanPromptInput{Request: req, Shape: domain.PlanShapeFor(flow, domain.RequestSizeS),
 		Limits: domain.DefaultPlanLimits, Feedback: "split it smaller"}))
 	p, err := usecase.ParsePlanOutput(text)
 	if err != nil || p.Notes == "" {
@@ -228,7 +228,7 @@ func TestFakeClaude_ReadonlyAnalysisPassesTheRealValidators(t *testing.T) {
 		}
 		for _, acs := range [][]string{nil, {"AC-1", "AC-2"}} {
 			req := requestWithACs(typ, domain.RequestSizeM, acs...)
-			prompt := usecase.BuildSolutionPrompt(usecase.SolutionPromptInput{Kind: kind, Request: req, MinOptions: domain.MinOptionsFor(typ)})
+			prompt := renderedSolution(t, usecase.SolutionPromptInput{Kind: kind, Request: req, MinOptions: domain.MinOptionsFor(typ)})
 			text := askFakeClaudeReadonly(t, prompt)
 			obj, err := usecase.ExtractJSONObject(text)
 			if err != nil {
@@ -252,4 +252,77 @@ func TestFakeClaude_ReadonlyAnalysisPassesTheRealValidators(t *testing.T) {
 			t.Errorf("no request type exercised kind %s", k)
 		}
 	}
+}
+
+// A reviewer's change request makes the fake answer differently on every round, and the answers still pass the real validators:
+// the analysis-revision e2e suite tells versions apart by that echo.
+func TestFakeClaude_RevisionRoundsAnswerDifferentlyAndStayValid(t *testing.T) {
+	const feedback = "keep the public API"
+	for _, kind := range []domain.SolutionKind{domain.SolutionKindSolution, domain.SolutionKindDiagnosis, domain.SolutionKindFindings, domain.SolutionKindAnswer} {
+		typ := map[domain.SolutionKind]domain.RequestType{
+			domain.SolutionKindSolution: domain.RequestTypeChangeRequest, domain.SolutionKindDiagnosis: domain.RequestTypeBug,
+			domain.SolutionKindFindings: domain.RequestTypeSpike, domain.SolutionKindAnswer: domain.RequestTypeQuestion,
+		}[kind]
+		req := requestWithACs(typ, domain.RequestSizeM, "AC-1")
+		min := domain.MinOptionsFor(typ)
+		var answers []string
+		for round := 0; round < 3; round++ {
+			in := usecase.SolutionPromptInput{Kind: kind, Request: req, MinOptions: min}
+			if round > 0 {
+				in.Feedback = feedback
+				for i := 0; i < round; i++ {
+					in.PriorArtifacts = append(in.PriorArtifacts, usecase.PriorArtifact{Kind: string(kind), Status: "superseded", Content: "{}", Feedback: feedback})
+				}
+			}
+			prompt := renderedSolution(t, in)
+			ask := askFakeClaudeReadonly
+			if kind == domain.SolutionKindSolution {
+				ask = askFakeClaude
+			}
+			text := ask(t, prompt)
+			obj, err := usecase.ExtractJSONObject(text)
+			if err != nil {
+				t.Fatalf("%s round %d: %v", kind, round+1, err)
+			}
+			if _, err := usecase.ValidateByKind(kind, obj, min); err != nil {
+				t.Fatalf("%s round %d: the real validator rejected the revised document: %v", kind, round+1, err)
+			}
+			answers = append(answers, text)
+		}
+		if answers[0] == answers[1] || answers[1] == answers[2] {
+			t.Errorf("%s: rounds must answer differently", kind)
+		}
+		if strings.Contains(answers[0], "revised") || !strings.Contains(answers[1], "[revised, round 2, asked: "+feedback+"]") || !strings.Contains(answers[2], "[revised, round 3, asked: "+feedback+"]") {
+			t.Errorf("%s: the round markers are wrong:\n%s\n%s\n%s", kind, answers[0], answers[1], answers[2])
+		}
+	}
+}
+
+// The prompt builders return an error the services turn into a failed run; here a failure is a bug in the fixture.
+
+func renderedClassification(t *testing.T, in usecase.ClassificationInput) string {
+	t.Helper()
+	text, err := grpcclient.RenderClassificationPrompt(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return text
+}
+
+func renderedSolution(t *testing.T, in usecase.SolutionPromptInput) string {
+	t.Helper()
+	text, err := usecase.RenderSolutionPrompt(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return text
+}
+
+func renderedPlan(t *testing.T, in usecase.PlanPromptInput) string {
+	t.Helper()
+	text, err := usecase.RenderPlanPrompt(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return text
 }

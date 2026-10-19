@@ -9,7 +9,7 @@
 | **Effort** | Medium |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-19 |
-| **Trạng thái** | 📝 Đề xuất, chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (2026-10-20), chưa merge |
 | **Phụ thuộc** | CR-REQ-001 và 002 (bảng và proto `Request`), CR-REQ-013 (thực thi Phase và task), CR-REQ-016 (kênh gateway), CR-REQ-026 (worktree đề xuất của engine OpenSpec), CR-REQ-038 (cùng chỗ ghim `engine`, `execution_mode`) |
 | **Mở khoá** | [CR-REQ-040](../request-frontend/CR-REQ-040-request-base-branch-picker.md) (giao diện chọn nhánh) |
 | **Tác động** | `backend-go/services/request-service` (domain, usecase `CreateRequest`, `ProposalWorkspace`, `AdvanceExecution`, migration mới), `backend-go/services/task-service` (`WorktreeProvisioner`, `TaskServiceExecuteRequest`), `backend-go/services/api-gateway` (kênh `request.*`, MCP), `backend-go/proto/orca/{request,task}/v1` |
