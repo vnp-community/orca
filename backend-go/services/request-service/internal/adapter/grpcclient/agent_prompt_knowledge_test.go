@@ -13,7 +13,11 @@ import (
 
 func paramsJSON(t *testing.T, in usecase.AgentPromptInput) map[string]any {
 	t.Helper()
-	raw, err := json.Marshal(buildAgentParams(in))
+	p, err := execParamsFor(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +28,7 @@ func paramsJSON(t *testing.T, in usecase.AgentPromptInput) map[string]any {
 	return m
 }
 
-func TestBuildAgentParams_SendsNoKnowledgeKeyWithoutARoot(t *testing.T) {
+func TestExecParamsFor_SendsNoKnowledgeKeyWithoutARoot(t *testing.T) {
 	for _, ro := range []bool{false, true} {
 		m := paramsJSON(t, usecase.AgentPromptInput{Prompt: "p", RepoPath: "/r", ReadOnlyEnforced: ro, ProposeChangesets: true})
 		if _, ok := m["knowledgeRoot"]; ok {
@@ -36,7 +40,7 @@ func TestBuildAgentParams_SendsNoKnowledgeKeyWithoutARoot(t *testing.T) {
 	}
 }
 
-func TestBuildAgentParams_SendsTheRootInBothModes(t *testing.T) {
+func TestExecParamsFor_SendsTheRootInBothModes(t *testing.T) {
 	for _, ro := range []bool{false, true} {
 		m := paramsJSON(t, usecase.AgentPromptInput{Prompt: "p", RepoPath: "/r", ReadOnlyEnforced: ro, KnowledgeRoot: "/proj"})
 		if m["knowledgeRoot"] != "/proj" {
@@ -52,7 +56,7 @@ func TestBuildAgentParams_SendsTheRootInBothModes(t *testing.T) {
 	}
 }
 
-func TestBuildAgentParams_KnowledgeRootNeverRaisesTrust(t *testing.T) {
+func TestExecParamsFor_KnowledgeRootNeverRaisesTrust(t *testing.T) {
 	m := paramsJSON(t, usecase.AgentPromptInput{Prompt: "p", ReadOnlyEnforced: true, KnowledgeRoot: "/proj", ProposeChangesets: true})
 	if m["accessMode"] != "readonly" {
 		t.Fatalf("accessMode: %v", m)
@@ -66,9 +70,9 @@ func TestBuildAgentParams_KnowledgeRootNeverRaisesTrust(t *testing.T) {
 	}
 }
 
-func TestClassifyAgentRelayError_KnowledgeHub(t *testing.T) {
+func TestAgentPromptRelay_KnowledgeHubRefusals(t *testing.T) {
 	for _, reason := range []string{"KNOWLEDGE_HUB_UNSUPPORTED", "KNOWLEDGE_ROOT_NOT_ABSOLUTE", "KNOWLEDGE_ROOT_MISSING", "KNOWLEDGE_CONFIG_MISSING"} {
-		err := classifyAgentRelayError(status.Error(codes.InvalidArgument, "agent error: agent.execPrompt: refused ("+reason+")"))
+		err := execFailing(status.Error(codes.InvalidArgument, "agent error: agent.execPrompt: refused ("+reason+")"))
 		if !errors.Is(err, usecase.ErrAgentKnowledgeHubUnavailable) {
 			t.Fatalf("%s: %v", reason, err)
 		}
@@ -76,12 +80,12 @@ func TestClassifyAgentRelayError_KnowledgeHub(t *testing.T) {
 			t.Fatalf("%s must not read as a readonly refusal", reason)
 		}
 	}
-	if errors.Is(classifyAgentRelayError(errors.New("boom")), usecase.ErrAgentKnowledgeHubUnavailable) {
+	if errors.Is(execFailing(errors.New("boom")), usecase.ErrAgentKnowledgeHubUnavailable) {
 		t.Fatal("an unrelated error must stay unrelated")
 	}
 }
 
-func TestBuildAgentParams_WriteProfileRunsInAWorktreeWithoutFullTrust(t *testing.T) {
+func TestExecParamsFor_WriteProfileRunsInAWorktreeWithoutFullTrust(t *testing.T) {
 	m := paramsJSON(t, usecase.AgentPromptInput{Prompt: "p", RepoPath: "/wt", WriteProfile: "openspec-author", ResultNonce: "abcdefghijklmnop", KnowledgeRoot: "/proj"})
 	if m["accessMode"] != "write" || m["workspaceKind"] != "worktree" || m["reportChanges"] != true || m["permissionProfile"] != "openspec-author" {
 		t.Fatalf("%v", m)
@@ -95,7 +99,7 @@ func TestBuildAgentParams_WriteProfileRunsInAWorktreeWithoutFullTrust(t *testing
 	}
 }
 
-func TestBuildAgentParams_NoProfileNoResultBlockMeansNoSuchKeys(t *testing.T) {
+func TestExecParamsFor_NoProfileNoResultBlockMeansNoSuchKeys(t *testing.T) {
 	m := paramsJSON(t, usecase.AgentPromptInput{Prompt: "p"})
 	for _, k := range []string{"permissionProfile", "resultBlock", "accessMode", "workspaceKind"} {
 		if _, ok := m[k]; ok {
@@ -111,6 +115,17 @@ func TestAgentPromptRelay_ReadOnlyAndWriteProfileCannotBeCombined(t *testing.T) 
 	if err == nil || len(infra.relay) != 0 {
 		t.Fatalf("must refuse before any call: %v", err)
 	}
+}
+
+// execFailing runs one prompt against an agent whose relay fails with err and returns what the usecase would see.
+func execFailing(err error) error {
+	_, got := NewAgentPromptRelay(&fakeAgentInfra{err: err}).ExecPrompt(ctxWithIdentity(), usecase.AnalysisConnection{ConnectionID: "c"}, usecase.AgentPromptInput{Prompt: "p"})
+	return got
+}
+
+// parseAgentResult runs one prompt against an agent that answers resultJSON and returns what the usecase would see.
+func parseAgentResult(resultJSON string) (usecase.AgentPromptResult, error) {
+	return NewAgentPromptRelay(&fakeAgentInfra{result: resultJSON}).ExecPrompt(ctxWithIdentity(), usecase.AnalysisConnection{ConnectionID: "c"}, usecase.AgentPromptInput{Prompt: "p"})
 }
 
 func TestParseAgentResult_ResultBlock(t *testing.T) {

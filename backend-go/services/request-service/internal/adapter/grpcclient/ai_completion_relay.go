@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	"github.com/stablyai/orca-go/common/tenant"
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -15,7 +16,7 @@ const defaultAICompletionTimeout = 120 * time.Second
 // AICompletionRelay runs ai.complete for solution generation. It shares the relay call and the
 // connection fallback with the classifier (BUG-025: connection id = project id rarely resolves).
 type AICompletionRelay struct {
-	infra     infrafleetv1.InfraFleetServiceClient
+	relay     *agentrelay.Relayer
 	resolver  connectionResolver
 	providers aiproviderv1.AiProviderServiceClient // optional: picks the account for ai.complete
 	caps      usecase.DevServerCapabilityReader    // optional: lets an unusable dev server fail fast with a remedy
@@ -28,7 +29,7 @@ func NewAICompletionRelay(infra infrafleetv1.InfraFleetServiceClient, resolver c
 	if timeout <= 0 {
 		timeout = defaultAICompletionTimeout
 	}
-	return &AICompletionRelay{infra: infra, resolver: resolver, providers: providers, timeout: timeout}
+	return &AICompletionRelay{relay: newTenantRelayer(infra), resolver: resolver, providers: providers, timeout: timeout}
 }
 
 // WithCapabilities enables the readiness check before each AI call.
@@ -45,7 +46,7 @@ func (c *AICompletionRelay) Complete(ctx context.Context, projectID, prompt stri
 	if err := checkAIReady(ctx, c.caps, conn); err != nil {
 		return "", err
 	}
-	return relayAIComplete(ctx, c.infra, conn, c.accountID(ctx, projectID), prompt, c.timeout)
+	return relayAIComplete(ctx, c.relay, conn, c.accountID(ctx, projectID), prompt, c.timeout)
 }
 
 // accountID is best effort: without it the dev server falls back to its own default account.

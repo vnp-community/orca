@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `services/request-service/internal/adapter/grpcclient/{agent_prompt_relay,ai_completion_relay,request_classifier}.go` (sửa), `cmd/server/wire_*.go`, test hiện có
 **Depends on:** TASK-REQ-042-01
-**Status:** [ ] TODO
+**Status:** [ ] PARTIAL (code and unit tests done 2026-10-19; acceptance `request`/`matrix`/`qa` and the UI flow were not run)
 
 ---
 
@@ -30,8 +30,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không còn struct/tham số `execPrompt` riêng trong request-service.
-- [ ] Hành vi lỗi và timeout không đổi.
+- [x] Không còn struct/tham số `execPrompt` riêng trong request-service.
+- [x] Hành vi lỗi và timeout không đổi.
 - [ ] Acceptance và UI xanh.
 
 ## Rủi ro và lưu ý
@@ -47,3 +47,39 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+---
+
+## Ghi chú triển khai (2026-10-19)
+
+**Blast radius** (grep, GitNexus không dùng được): chữ ký công khai không đổi (`NewAgentPromptRelay`, `NewAICompletionRelay`, `NewRelayClassifier`, `usecase.AgentPromptRunner`, `ProjectAICompleter`, `RequestClassifier`), nên `cmd/server/wire_solution.go` và `wire_classification.go` **không phải sửa**. Người gọi: `usecase/run_agent_readonly_analysis.go`, `engine_openspec.go` (qua `AgentPromptRunner`), `run_solution_generation.go`, `run_plan_generation.go` (qua `ProjectAICompleter`), classifier trong `wire_classification.go`. Symbol bị xoá chỉ được dùng trong gói `grpcclient`; `truncateUTF8`, `slackOverTimeout`, `maxStdoutBytes` còn được `dev_server_executor.go` dùng (xem dưới).
+
+### File
+- Sửa: `agent_prompt_relay.go` (còn 78 dòng: `AgentPromptRelay{relay *agentrelay.Relayer}`, `execParamsFor`, `mapAgentRelayError`, `newTenantRelayer` dùng `agentrelay.WithMetadata(withTenantMetadata)`), `ai_completion_relay.go`, `request_classifier.go` (`relayAIComplete` nhận `*agentrelay.Relayer`, thêm `mapAICompleteError`).
+- Mới: `agent_prompt_result.go` (`agentPromptResultFrom`, `runStatsFrom`, `maxStderrBytes`).
+- Sửa nhỏ ngoài danh sách: `dev_server_executor.go` (2 dòng: `slackOverTimeout` -> `agentrelay.DefaultTimeoutSlack`, `truncateUTF8` -> `agentrelay.TruncateUTF8`, `16*1024` -> `maxStderrBytes`) vì hai symbol cũ bị xoá; giá trị không đổi (30 s).
+- Đã xoá: `agentExecPromptParams`, `resultBlock`, `buildAgentParams`, `agentExecPromptResult`, `parseAgentResult`, `classifyAgentRelayError`, `statsFromAgent`, `truncateUTF8`, `trustPresetDefault`, `maxOutputBytesAsk`, `slackOverTimeout`, map `params` và giải mã `ai.complete` thủ công.
+- Test: `agent_wire_golden_test.go` (mới), `ai_complete_error_mapping_test.go` (mới); `agent_prompt_knowledge_test.go`, `agent_prompt_stats_test.go` (không đổi nội dung), `solution_clients_test.go`: chỉ đổi cách gọi (`execParamsFor` thay `buildAgentParams`; `classifyAgentRelayError`/`parseAgentResult` được thay bằng hai hàm trợ giúp test chạy thật `ExecPrompt` trên giả client). Kỳ vọng giữ nguyên.
+
+### Lệch so với văn bản task (và lý do)
+- Luồng "mặc định" của request-service dùng `agentrelay.Plain` với trust `default` (có `resultBlock` nếu có nonce), **không** `agentrelay.Contract`: `Contract` thêm `reportChanges`, 1 MiB output và timeout 25 phút mà request-service chưa từng gửi, và golden `request_contract.json`/`request_plain.json` không có các khoá đó. Đột biến thử (đổi sang `Contract`) làm hai ca golden fail, đã hoàn lại.
+- `ErrAgentKnowledgeHubUnavailable` bọc nguyên nhân bằng `%w: %w` (bản cũ `%v`); `errors.Is` cho lỗi gRPC gốc nay cũng đúng. Lỗi lấy tenant/giải mã kết quả có tiền tố `agentrelay:` thay vì `grpcclient:`; test chỉ kiểm `err != nil`.
+- Lỗi `ai.complete` có mã: `mapAICompleteError` gọi lại `mapAIRelayError` trên `CompleteError.Cause` (gRPC gốc) nên `aiCompleteCodes`/`ai_relay_errors.go` giữ nguyên, không sửa.
+- `stepId` rỗng nay bị bỏ khỏi JSON (bản cũ gửi `""`); cả hai nơi gọi thật luôn truyền `run.ID`.
+
+### Kiểm chứng JSON không đổi
+`TestAgentPromptRelay_SendsTheJSONRequestServiceAlwaysSent` (6 ca) và `TestAICompletionRelay_SendsTheJSONRequestServiceAlwaysSent` (2 ca) dựng input của từng luồng request-service, chạy qua relay thật với client giả, rồi so JSON đã gửi (sắp xếp khoá) với `common/agentrelay/testdata/wire/{request_*,complete_request_*}.json`; bằng nhau.
+
+### Lệnh
+```
+cd backend-go/services/request-service
+go build ./... && go vet ./...                 # OK
+gofmt -l internal/adapter/grpcclient           # sạch
+go test ./... -race -count=1                   # tất cả ok (cmd/server, e2e/stubs, adapter/contracttest, grpcclient, usecase, ...)
+```
+Không có test hợp đồng nào khác dùng ba relay này (`adapter/contracttest` là test kho lưu trữ, vẫn xanh).
+
+### Chưa kiểm chứng
+- Acceptance `request`, `matrix`, `qa` và UI `qa-bug-task-native-flow --ai-stub` (rule của lượt này cấm chạy e2e).
+- Test `-tags=integration` Postgres/MySQL: không liên quan thay đổi này, không chạy.
+- `golangci-lint` không chạy được trên máy này.

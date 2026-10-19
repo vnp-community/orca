@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 	"google.golang.org/grpc/codes"
@@ -57,7 +58,7 @@ func (e *DevServerExecutor) Exec(ctx context.Context, conn usecase.AnalysisConne
 	if timeout <= 0 || timeout > agentExecCeilingMs {
 		timeout = agentExecCeilingMs
 	}
-	tctx, cancel := context.WithTimeout(tctx, time.Duration(timeout)*time.Millisecond+slackOverTimeout)
+	tctx, cancel := context.WithTimeout(tctx, time.Duration(timeout)*time.Millisecond+agentrelay.DefaultTimeoutSlack)
 	defer cancel()
 	args := in.Args
 	if args == nil {
@@ -85,7 +86,7 @@ func (e *DevServerExecutor) Exec(ctx context.Context, conn usecase.AnalysisConne
 	if err := json.Unmarshal([]byte(resultJSON), &r); err != nil {
 		return usecase.ExecResult{}, fmt.Errorf("grpcclient: decode agent.exec result: %w", err)
 	}
-	out := usecase.ExecResult{Stdout: truncateUTF8(r.Stdout, maxStdoutBytes), Stderr: truncateUTF8(r.Stderr, 16*1024), TimedOut: r.TimedOut, SpawnError: r.SpawnError, ExitCode: -1}
+	out := usecase.ExecResult{Stdout: agentrelay.TruncateUTF8(r.Stdout, maxStdoutBytes), Stderr: agentrelay.TruncateUTF8(r.Stderr, maxStderrBytes), TimedOut: r.TimedOut, SpawnError: r.SpawnError, ExitCode: -1}
 	if r.ExitCode != nil { // no exit code means the process never completed
 		out.ExitCode = *r.ExitCode
 	}

@@ -174,11 +174,15 @@ func TestAgentPromptRelay_EnforcedReadonlyParams(t *testing.T) {
 	}
 }
 
-// buildAgentParams has no code path that yields full trust: check every combination of the inputs that vary.
-func TestBuildAgentParams_NeverFullTrust(t *testing.T) {
+// execParamsFor has no code path that yields full trust: check every combination of the inputs that vary.
+func TestExecParamsFor_NeverFullTrust(t *testing.T) {
 	for _, ro := range []bool{false, true} {
 		for _, timeout := range []int{0, 5000} {
-			raw, _ := json.Marshal(buildAgentParams(usecase.AgentPromptInput{Prompt: "p", RepoPath: "/r", ReadOnlyEnforced: ro, TimeoutMS: timeout}))
+			p, err := execParamsFor(usecase.AgentPromptInput{Prompt: "p", RepoPath: "/r", ReadOnlyEnforced: ro, TimeoutMS: timeout})
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := json.Marshal(p)
 			if strings.Contains(string(raw), `"full"`) {
 				t.Fatalf("ro=%v timeout=%d params carry full trust: %s", ro, timeout, raw)
 			}

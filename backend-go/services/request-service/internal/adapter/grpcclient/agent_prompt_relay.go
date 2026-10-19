@@ -2,232 +2,77 @@ package grpcclient
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
-	"time"
-	"unicode/utf8"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
-	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
-// trustPresetDefault is the only trust preset this client ever sends. task-service's SimpleExecutor sends "full";
-// analysis must not, and the type of AgentPromptInput gives callers no way to ask for it.
-const trustPresetDefault = "default"
-
-const (
-	// maxStdoutBytes caps what is read into memory; the agent is asked for slightly more so a JSON block at the end survives.
-	maxStdoutBytes    = 256 * 1024
-	maxOutputBytesAsk = maxStdoutBytes + 64*1024
-	// slackOverTimeout lets the agent report its own timeout before the RPC deadline hides it.
-	slackOverTimeout = 30 * time.Second
-)
+// maxStdoutBytes caps what is read into memory; the agent is asked for slightly more (agentrelay.AnalysisMaxOutputBytes)
+// so a JSON block at the end survives.
+const maxStdoutBytes = 256 * 1024
 
 // AgentPromptRelay calls agent.execPrompt through infra-fleet's Relay (or RelayByDevServer when the project has no
 // infra connection), so local, SSH and WSL dev servers behave the same.
 type AgentPromptRelay struct {
-	infra infrafleetv1.InfraFleetServiceClient
+	relay *agentrelay.Relayer
 }
 
 var _ usecase.AgentPromptRunner = (*AgentPromptRelay)(nil)
 
 func NewAgentPromptRelay(infra infrafleetv1.InfraFleetServiceClient) *AgentPromptRelay {
-	return &AgentPromptRelay{infra: infra}
+	return &AgentPromptRelay{relay: newTenantRelayer(infra)}
 }
 
-type agentExecPromptParams struct {
-	StepID       string            `json:"stepId"`
-	Prompt       string            `json:"prompt"`
-	WorktreePath string            `json:"worktreePath"`
-	TrustPreset  string            `json:"trustPreset,omitempty"`
-	Env          map[string]string `json:"env"`
-	TimeoutMS    int               `json:"timeoutMs,omitempty"`
-	// The fields below only exist for agents that advertise agent.execPrompt.readonly; old agents ignore unknown keys,
-	// which is why the caller decides before sending.
-	AccessMode     string `json:"accessMode,omitempty"`
-	WorkspaceKind  string `json:"workspaceKind,omitempty"`
-	ReportChanges  bool   `json:"reportChanges,omitempty"`
-	MaxOutputBytes int    `json:"maxOutputBytes,omitempty"`
-	// Only for agents that advertise agent.execPrompt.knowledgeHub; the agent builds the MCP config itself.
-	KnowledgeRoot     string `json:"knowledgeRoot,omitempty"`
-	ProposeChangesets bool   `json:"proposeChangesets,omitempty"`
-	// Write runs under a named profile: the agent chooses every flag from the name, so no tool rule travels.
-	PermissionProfile string       `json:"permissionProfile,omitempty"`
-	ResultBlock       *resultBlock `json:"resultBlock,omitempty"`
-}
-
-type resultBlock struct {
-	Nonce string `json:"nonce"`
-}
-
-// buildAgentParams fixes trust and env: the env holds two ids and never a token or credential.
-func buildAgentParams(in usecase.AgentPromptInput) agentExecPromptParams {
-	p := agentExecPromptParams{
+// execParamsFor fixes trust and env: the env holds two ids and never a token or credential, and no branch yields the
+// full trust preset (task-service's executor sends "full"; analysis must not).
+func execParamsFor(in usecase.AgentPromptInput) (agentrelay.ExecParams, error) {
+	run := agentrelay.Run{
 		StepID: in.StepID, Prompt: in.Prompt, WorktreePath: in.RepoPath, TimeoutMS: in.TimeoutMS,
-		Env: map[string]string{"ORCA_REQUEST_ID": in.RequestID, "ORCA_PROJECT_ID": in.ProjectID},
-	}
-	// proposeChangesets without a root would be rejected by the agent, so it is only sent together with one.
-	if in.KnowledgeRoot != "" {
-		p.KnowledgeRoot, p.ProposeChangesets = in.KnowledgeRoot, in.ProposeChangesets
-	}
-	if in.ResultNonce != "" {
-		p.ResultBlock = &resultBlock{Nonce: in.ResultNonce}
+		Env:           map[string]string{"ORCA_REQUEST_ID": in.RequestID, "ORCA_PROJECT_ID": in.ProjectID},
+		KnowledgeRoot: in.KnowledgeRoot, ProposeChangesets: in.ProposeChangesets, ResultNonce: in.ResultNonce,
 	}
 	switch {
+	case in.ReadOnlyEnforced && in.WriteProfile != "":
+		return agentrelay.ExecParams{}, agentrelay.ErrConflictingAccess
 	case in.ReadOnlyEnforced:
-		// With accessMode=readonly the agent drops any trust preset, so none is sent.
-		p.AccessMode, p.WorkspaceKind, p.ReportChanges, p.MaxOutputBytes = "readonly", "repo_root", true, maxOutputBytesAsk
+		return agentrelay.ReadOnly(run), nil
 	case in.WriteProfile != "":
-		// The profile is the whole permission story of a write run; the default trust preset is sent only so the agent never
-		// sees an empty one, and it ignores it under a profile.
-		p.AccessMode, p.WorkspaceKind, p.ReportChanges, p.MaxOutputBytes = "write", "worktree", true, maxOutputBytesAsk
-		p.PermissionProfile, p.TrustPreset = in.WriteProfile, trustPresetDefault
-	default:
-		p.TrustPreset = trustPresetDefault
+		return agentrelay.WriteProfile(run, in.WriteProfile)
 	}
-	return p
-}
-
-type agentExecPromptResult struct {
-	Stdout   string   `json:"stdout"`
-	Stderr   string   `json:"stderr"`
-	ExitCode *int     `json:"exitCode"`
-	TimedOut bool     `json:"timedOut"`
-	Warnings []string `json:"warnings"`
-	Applied  *struct {
-		AccessMode string `json:"accessMode"`
-	} `json:"applied"`
-	Changes *struct {
-		Available    bool              `json:"available"`
-		HeadMoved    bool              `json:"headMoved"`
-		ChangedFiles []json.RawMessage `json:"changedFiles"`
-	} `json:"changes"`
-	// Parsed is the agent's reading of the result block: {"ok":true,"value":{...}} or {"ok":false,"code":"..."}.
-	Parsed *struct {
-		OK    bool            `json:"ok"`
-		Value json.RawMessage `json:"value"`
-		Code  string          `json:"code"`
-	} `json:"parsed"`
-	// ToolCalls counts calls per tool name and Usage holds claude's own figures; an older agent sends neither.
-	ToolCalls map[string]int `json:"toolCalls"`
-	Usage     *struct {
-		Turns               int      `json:"turns"`
-		DurationMS          float64  `json:"durationMs"`
-		CostUSD             *float64 `json:"costUsd"`
-		InputTokens         float64  `json:"inputTokens"`
-		OutputTokens        float64  `json:"outputTokens"`
-		CacheReadTokens     float64  `json:"cacheReadTokens"`
-		CacheCreationTokens float64  `json:"cacheCreationTokens"`
-	} `json:"usage"`
+	// Not Contract: that adds reportChanges and a 25 minute timeout request-service never sent.
+	run.TrustPreset = agentrelay.TrustDefault
+	return agentrelay.Plain(run), nil
 }
 
 func (r *AgentPromptRelay) ExecPrompt(ctx context.Context, conn usecase.AnalysisConnection, in usecase.AgentPromptInput) (usecase.AgentPromptResult, error) {
-	if in.ReadOnlyEnforced && in.WriteProfile != "" {
-		return usecase.AgentPromptResult{}, errors.New("grpcclient: a run cannot be both read-only and a write profile")
-	}
-	tctx, err := withTenantMetadata(ctx)
+	params, err := execParamsFor(in)
 	if err != nil {
 		return usecase.AgentPromptResult{}, err
 	}
-	if in.TimeoutMS > 0 {
-		var cancel context.CancelFunc
-		tctx, cancel = context.WithTimeout(tctx, time.Duration(in.TimeoutMS)*time.Millisecond+slackOverTimeout)
-		defer cancel()
-	}
-	raw, err := json.Marshal(buildAgentParams(in))
+	res, err := r.relay.ExecPrompt(ctx, agentrelay.Target{DevServerID: conn.DevServerID, ConnectionID: conn.ConnectionID}, params)
 	if err != nil {
-		return usecase.AgentPromptResult{}, fmt.Errorf("grpcclient: marshal agent.execPrompt params: %w", err)
+		return usecase.AgentPromptResult{}, mapAgentRelayError(err)
 	}
-	var resultJSON string
-	if conn.DevServerID != "" {
-		resp, rerr := r.infra.RelayByDevServer(tctx, &infrafleetv1.RelayByDevServerRequest{DevServerId: conn.DevServerID, Method: "agent.execPrompt", ParamsJson: string(raw)})
-		resultJSON, err = resp.GetResultJson(), rerr
-	} else {
-		resp, rerr := r.infra.Relay(tctx, &infrafleetv1.RelayRequest{ConnectionId: conn.ConnectionID, Method: "agent.execPrompt", ParamsJson: string(raw)})
-		resultJSON, err = resp.GetResultJson(), rerr
-	}
-	if err != nil {
-		return usecase.AgentPromptResult{}, classifyAgentRelayError(err)
-	}
-	return parseAgentResult(resultJSON)
+	return agentPromptResultFrom(res), nil
 }
 
-// classifyAgentRelayError turns the agent's refusal of read-only into a typed error. Relay may flatten the JSON-RPC
-// error data to a message, so the reason code is matched in the text.
-func classifyAgentRelayError(err error) error {
-	if errors.Is(err, context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
+// mapAgentRelayError keeps the usecase's own sentinels for the refusals it reacts to; everything else passes through.
+func mapAgentRelayError(err error) error {
+	switch {
+	case errors.Is(err, agentrelay.ErrTimeout):
 		return context.DeadlineExceeded
-	}
-	if strings.Contains(err.Error(), "READONLY_MODE_UNSUPPORTED") {
+	case errors.Is(err, agentrelay.ErrReadonlyUnsupported):
 		return usecase.ErrAgentReadonlyUnsupported
+	case errors.Is(err, agentrelay.ErrKnowledgeHubUnavailable):
+		return fmt.Errorf("%w: %w", usecase.ErrAgentKnowledgeHubUnavailable, err)
 	}
-	if strings.Contains(err.Error(), "KNOWLEDGE_HUB_UNSUPPORTED") || strings.Contains(err.Error(), "KNOWLEDGE_ROOT_") || strings.Contains(err.Error(), "KNOWLEDGE_CONFIG_MISSING") {
-		return fmt.Errorf("%w: %v", usecase.ErrAgentKnowledgeHubUnavailable, err)
-	}
-	return fmt.Errorf("grpcclient: relay agent.execPrompt: %w", err)
+	return err
 }
 
-func parseAgentResult(resultJSON string) (usecase.AgentPromptResult, error) {
-	var r agentExecPromptResult
-	if err := json.Unmarshal([]byte(resultJSON), &r); err != nil {
-		return usecase.AgentPromptResult{}, fmt.Errorf("grpcclient: decode agent.execPrompt result: %w", err)
-	}
-	out := usecase.AgentPromptResult{Stdout: truncateUTF8(r.Stdout, maxStdoutBytes), Stderr: truncateUTF8(r.Stderr, 16*1024), TimedOut: r.TimedOut, Warnings: r.Warnings}
-	if r.ExitCode == nil {
-		out.ExitCode = -1 // no exit code means the process never completed
-	} else {
-		out.ExitCode = *r.ExitCode
-	}
-	if r.Applied != nil {
-		out.AppliedAccessMode = r.Applied.AccessMode
-	}
-	if r.Changes != nil {
-		out.ChangesAvailable, out.HeadMoved, out.ChangedFiles = r.Changes.Available, r.Changes.HeadMoved, len(r.Changes.ChangedFiles)
-	}
-	out.Stats = statsFromAgent(r)
-	if r.Parsed != nil {
-		if r.Parsed.OK {
-			out.ResultBlock = []byte(r.Parsed.Value)
-		} else {
-			out.ResultBlockCode = r.Parsed.Code
-		}
-	}
-	return out, nil
-}
-
-func truncateUTF8(s string, limit int) string {
-	if len(s) <= limit {
-		return s
-	}
-	cut := limit
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut]
-}
-
-// statsFromAgent keeps what the agent counted. The agent already caps the number of names; the sizes are bounded here too
-// because they come over the wire.
-func statsFromAgent(r agentExecPromptResult) domain.RunStats {
-	var s domain.RunStats
-	if len(r.ToolCalls) > 0 {
-		s.ToolCalls = make(map[string]int, len(r.ToolCalls))
-		for name, n := range r.ToolCalls {
-			if n > 0 && len(s.ToolCalls) < 128 {
-				s.ToolCalls[truncateUTF8(name, 100)] += n
-			}
-		}
-	}
-	if u := r.Usage; u != nil {
-		s.Usage = &domain.RunUsage{
-			Turns: u.Turns, DurationMS: int64(u.DurationMS), CostUSD: u.CostUSD, InputTokens: int64(u.InputTokens),
-			OutputTokens: int64(u.OutputTokens), CacheReadTokens: int64(u.CacheReadTokens), CacheCreationTokens: int64(u.CacheCreationTokens),
-		}
-	}
-	return s
+// newTenantRelayer is the one place this service builds its relayer: every agent RPC carries the validated tenant.
+func newTenantRelayer(infra infrafleetv1.InfraFleetServiceClient) *agentrelay.Relayer {
+	return agentrelay.New(infra, agentrelay.WithMetadata(withTenantMetadata))
 }

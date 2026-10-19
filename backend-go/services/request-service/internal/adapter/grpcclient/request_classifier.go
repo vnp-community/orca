@@ -2,18 +2,16 @@ package grpcclient
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/stablyai/orca-go/common/agentrelay"
 	"github.com/stablyai/orca-go/common/tenant"
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 const defaultClassifierTimeout = 60 * time.Second
@@ -25,7 +23,7 @@ type connectionResolver interface {
 // RelayClassifier asks the AI through infra-fleet-service's Relay (ai.complete). It never
 // trusts the reply: the proposal parser rejects anything outside the enums.
 type RelayClassifier struct {
-	infra     infrafleetv1.InfraFleetServiceClient
+	relay     *agentrelay.Relayer
 	resolver  connectionResolver
 	providers aiproviderv1.AiProviderServiceClient // optional: picks the account for ai.complete
 	caps      usecase.DevServerCapabilityReader    // optional: lets an unusable dev server fail fast with a remedy
@@ -41,7 +39,7 @@ func (c *RelayClassifier) WithCapabilities(caps usecase.DevServerCapabilityReade
 }
 
 func NewRelayClassifier(infra infrafleetv1.InfraFleetServiceClient, resolver connectionResolver, providers aiproviderv1.AiProviderServiceClient) *RelayClassifier {
-	return &RelayClassifier{infra: infra, resolver: resolver, providers: providers, timeout: defaultClassifierTimeout}
+	return &RelayClassifier{relay: newTenantRelayer(infra), resolver: resolver, providers: providers, timeout: defaultClassifierTimeout}
 }
 
 func (c *RelayClassifier) Classify(ctx context.Context, in usecase.ClassificationInput) (domain.ClassificationProposal, error) {
@@ -96,51 +94,33 @@ func (c *RelayClassifier) accountID(ctx context.Context, projectID string) strin
 }
 
 func (c *RelayClassifier) complete(ctx context.Context, conn AIConnection, accountID, prompt string) (string, error) {
-	return relayAIComplete(ctx, c.infra, conn, accountID, prompt, c.timeout)
+	return relayAIComplete(ctx, c.relay, conn, accountID, prompt, c.timeout)
 }
 
 // relayAIComplete runs ai.complete through Relay (infra connection) or RelayByDevServer (default-repo dev server).
-func relayAIComplete(ctx context.Context, infra infrafleetv1.InfraFleetServiceClient, conn AIConnection, accountID, prompt string, timeout time.Duration) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	ctx, err := withTenantMetadata(ctx)
+func relayAIComplete(ctx context.Context, relay *agentrelay.Relayer, conn AIConnection, accountID, prompt string, timeout time.Duration) (string, error) {
+	res, err := relay.Complete(ctx, agentrelay.Target{DevServerID: conn.DevServerID, ConnectionID: conn.ConnectionID},
+		agentrelay.CompleteParams{Prompt: prompt, AccountID: accountID, Timeout: timeout})
 	if err != nil {
-		return "", err
+		return "", mapAICompleteError(err)
 	}
-	params := map[string]any{"prompt": prompt}
-	if accountID != "" {
-		params["accountId"] = accountID
+	return res.Content, nil
+}
+
+// mapAICompleteError gives a typed ai.complete refusal the user-facing code this service owns (mapAIRelayError reads
+// the original gRPC message from the cause); a timeout becomes the classifier's own.
+func mapAICompleteError(err error) error {
+	if errors.Is(err, agentrelay.ErrTimeout) {
+		return usecase.ErrClassifierTimeout
 	}
-	raw, err := json.Marshal(params)
-	if err != nil {
-		return "", fmt.Errorf("grpcclient: marshal ai.complete params: %w", err)
-	}
-	var resultJSON string
-	if conn.DevServerID != "" {
-		var resp *infrafleetv1.RelayResponse
-		resp, err = infra.RelayByDevServer(ctx, &infrafleetv1.RelayByDevServerRequest{DevServerId: conn.DevServerID, Method: "ai.complete", ParamsJson: string(raw)})
-		resultJSON = resp.GetResultJson()
-	} else {
-		var resp *infrafleetv1.RelayResponse
-		resp, err = infra.Relay(ctx, &infrafleetv1.RelayRequest{ConnectionId: conn.ConnectionID, Method: "ai.complete", ParamsJson: string(raw)})
-		resultJSON = resp.GetResultJson()
-	}
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
-			return "", usecase.ErrClassifierTimeout
+	var refused *agentrelay.CompleteError
+	if errors.As(err, &refused) {
+		if mapped := mapAIRelayError(refused.Cause); mapped != refused.Cause {
+			return mapped
 		}
-		if mapped := mapAIRelayError(err); mapped != err {
-			return "", mapped
-		}
-		return "", fmt.Errorf("grpcclient: relay ai.complete: %w", err)
+		return fmt.Errorf("grpcclient: relay ai.complete: %w", refused.Cause)
 	}
-	var result struct {
-		Content string `json:"content"`
-	}
-	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
-		return "", fmt.Errorf("grpcclient: decode ai.complete result: %w", err)
-	}
-	return result.Content, nil
+	return err
 }
 
 // UnavailableClassifier is used when downstream addresses are not configured so the service still starts.
