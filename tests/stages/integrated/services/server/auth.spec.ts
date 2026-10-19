@@ -13,13 +13,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import {
-  apiFetch,
-  loginAs,
-  loginAsAdmin,
-  withTestUser,
-  ADMIN_EMAIL
-} from './helpers'
+import { apiFetch, loginAsAdmin, withTestUser, ADMIN_EMAIL } from './helpers'
 
 // ─── Login Flow ───────────────────────────────────────────────────────────────
 
@@ -31,16 +25,19 @@ describe('F23 — Auth: POST /auth/local', () => {
   })
 
   it('valid credentials → 200 + user object + session cookie', async () => {
-    const res = await fetch(`${process.env['ORCA_SERVER_URL'] ?? 'http://172.20.2.39:6769'}/auth/local`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: ADMIN_EMAIL,
-        password: process.env['ORCA_ADMIN_PASSWORD'] ?? 'Orca@Adm1n#2025'
-      })
-    })
+    const res = await fetch(
+      `${process.env['ORCA_SERVER_URL'] ?? 'http://172.20.2.39:6769'}/auth/local`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: ADMIN_EMAIL,
+          password: process.env['ORCA_ADMIN_PASSWORD'] ?? 'Orca@Adm1n#2025'
+        })
+      }
+    )
     expect(res.status).toBe(200)
-    const body = await res.json() as { id: string; email: string; role: string }
+    const body = (await res.json()) as { id: string; email: string; role: string }
     expect(body).toMatchObject({ id: expect.any(String), email: ADMIN_EMAIL, role: 'admin' })
     const cookie = res.headers.get('set-cookie')
     expect(cookie).toMatch(/orca_session=/)

@@ -61,13 +61,10 @@ export async function apiFetch<T = unknown>(
     ...restOpts
   })
 
-  let body: T
   const ct = res.headers.get('content-type') ?? ''
-  if (ct.includes('application/json')) {
-    body = (await res.json()) as T
-  } else {
-    body = (await res.text()) as unknown as T
-  }
+  const body: T = ct.includes('application/json')
+    ? ((await res.json()) as T)
+    : ((await res.text()) as unknown as T)
 
   return { status: res.status, body, headers: res.headers }
 }
@@ -89,7 +86,9 @@ export async function loginAs(email: string, password: string): Promise<string> 
   }
   const setCookie = res.headers.get('set-cookie') ?? ''
   const match = setCookie.match(/orca_session=[^;]+/)
-  if (!match) {throw new Error(`No session cookie in login response for ${email}`)}
+  if (!match) {
+    throw new Error(`No session cookie in login response for ${email}`)
+  }
   return match[0]
 }
 
