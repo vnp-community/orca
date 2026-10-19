@@ -1,0 +1,20 @@
+# Overlay for deploy/dev/docker-compose.yml (docs/integrate/TDD-WF-AGENT-001 §11.1): api-gateway also joins the network
+# that stands for the WAN between the Orca server and the dev servers. Every other control-plane service stays on
+# orca-go-net only, so a dev server reaches Orca the way a remote machine does: through the public gateway.
+services:
+  api-gateway:
+    networks:
+      orca-go-net: {}
+      orca-wan:
+        aliases: [orca-gateway]
+
+  workflow-service:
+    environment:
+      WORKFLOW_TDD_AGENT_ENABLED: "true"
+      WORKFLOW_STEP_APPROVER_ROLES: owner
+
+networks:
+  orca-wan:
+    # Fixed name: the dev-server compose project (another "host") joins it as an external network.
+    name: orca-e2e-wan
+    driver: bridge

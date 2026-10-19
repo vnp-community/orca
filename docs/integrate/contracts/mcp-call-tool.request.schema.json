@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "orca:agent/mcp.callTool/request",
+  "title": "mcp.callTool request (Dev Server Agent RPC)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["server", "projectDir", "tool"],
+  "properties": {
+    "server": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Name of an MCP server in the agent's allowlist (mcpBridge.servers), e.g. tdd-agent"
+    },
+    "projectDir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute directory on the dev server; must be an existing git repo under an allowed root"
+    },
+    "tool": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tool name; must be in that server's tool allowlist"
+    },
+    "arguments": { "type": "object", "default": {} },
+    "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 120000, "default": 60000 }
+  }
+}

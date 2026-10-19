@@ -149,6 +149,10 @@ import {
 } from '@/runtime/runtime-ssh-client'
 
 import { uiSet } from '@/runtime/runtime-ui-client'
+import { selectTaskIdsByCRSId } from '../store/selectors/task-selectors'
+import { parseConventionError } from '../components/tasks/task-rejection-banner'
+import type { TaskRejection } from '../types/task-types'
+
 function getShortcutPlatform(): NodeJS.Platform {
   if (navigator.userAgent.includes('Mac')) {
     return 'darwin'
@@ -3669,6 +3673,61 @@ export function useIpcEvents(): void {
           mobileStateHydrated = true
           applyPendingMobileStateEvents()
         })
+    }
+
+    // ─── CR-ORCA-003: Quality Gate IPC handlers ─────────────────────────────
+
+    // Task status changed (rejected/done từ CompletionHook — SOL-ORCA-003 §2.5)
+    // window.api.agent?.onTaskStatusChanged is optional — safe with ?. chaining
+    const unsubTaskStatus = (window.api as Record<string, unknown>)['agent'] != null
+      ? (window.api as { agent?: { onTaskStatusChanged?: (cb: (event: { taskId: string; status: string; rejection?: TaskRejection }) => void) => (() => void) } }).agent?.onTaskStatusChanged?.(
+          (event: { taskId: string; status: string; rejection?: TaskRejection }) => {
+            // Read latest store state dynamically in event callback
+            const storeState = useAppStore.getState() as unknown as Record<string, unknown>
+            if (typeof storeState['updateTaskStatus'] === 'function') {
+              (storeState['updateTaskStatus'] as (id: string, status: string, rejection?: TaskRejection) => void)(event.taskId, event.status, event.rejection)
+            }
+
+            // Toast chỉ khi quality gate fail (rejected bởi backend CompletionHook)
+            if (event.status === 'rejected' && event.rejection != null) {
+              const parsed = parseConventionError(event.rejection.reason)
+              toast.error(
+                parsed.isConventionFail
+                  ? `${parsed.missingCount} file(s) missing // implements: ${parsed.crsId}`
+                  : event.rejection.reason,
+                {
+                  // 10s — user cần đọc reason và action (SOL-ORCA-003 §2.5)
+                  duration: 10_000,
+                  description: event.rejection.action_required,
+                }
+              )
+            }
+          }
+        )
+      : undefined
+    if (unsubTaskStatus != null) {
+      unsubs.push(unsubTaskStatus)
+    }
+
+    // CRS status updated (best-effort từ PISTool.UpdateCRSStatus → "done")
+    // Backend: pis_update_crs_status → pikb-catalog PATCH /api/v1/kg/crs/{id}/status
+    const unsubCRSStatus = (window.api as Record<string, unknown>)['agent'] != null
+      ? (window.api as { agent?: { onCRSStatusUpdated?: (cb: (event: { crsId: string; newStatus: string; updatedBy: string }) => void) => (() => void) } }).agent?.onCRSStatusUpdated?.(
+          (event: { crsId: string; newStatus: string; updatedBy: string }) => {
+            // Batch update tất cả tasks có crs_id = event.crsId
+            const appState = useAppStore.getState()
+            const relevantTaskIds = selectTaskIdsByCRSId(appState, event.crsId)
+            const storeState = appState as unknown as Record<string, unknown>
+            if (typeof storeState['updateEnrichmentCRSStatus'] === 'function') {
+              relevantTaskIds.forEach((taskId) => {
+                (storeState['updateEnrichmentCRSStatus'] as (id: string, status: string) => void)(taskId, event.newStatus)
+              })
+            }
+          }
+        )
+      : undefined
+    if (unsubCRSStatus != null) {
+      unsubs.push(unsubCRSStatus)
     }
 
     return () => {

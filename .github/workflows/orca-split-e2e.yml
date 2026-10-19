@@ -1,0 +1,92 @@
+name: orca-split-e2e
+
+# docs/integrate/TDD-WF-AGENT-001 §11.1 (TASKS TE.5): Orca control plane and dev servers in separate compose projects,
+# joined only by a "WAN" network. Checks the topology (TOP-*) and, when tdd-agent is available, workflow steps driving
+# tdd-agent on the dev server (TWA-*). Manual for now: it has not run on a hosted runner yet.
+on:
+  workflow_dispatch:
+    inputs:
+      tdd_agent_repo:
+        description: "owner/repo of tdd-agentic-ai (empty: topology checks only)"
+        type: string
+        default: ""
+      tdd_agent_ref:
+        description: "branch or sha of tdd-agentic-ai"
+        type: string
+        default: "tasks/integrate-tetspec-agent"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orca-split-e2e
+  cancel-in-progress: false
+
+jobs:
+  split-topology:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        if: inputs.tdd_agent_repo != ''
+        with:
+          repository: ${{ inputs.tdd_agent_repo }}
+          ref: ${{ inputs.tdd_agent_ref }}
+          path: tdd-agentic-ai
+          token: ${{ secrets.TDD_AGENT_REPO_TOKEN || github.token }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Throwaway deploy/dev/.env
+        run: bash tests/stages/e2e/orca-flows/ci/run-orca-flows-ci.sh --prepare-env-only deploy/dev/.env
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false
+
+      - name: Bring the split topology up
+        run: |
+          if [ -d tdd-agentic-ai ]; then export TDD_AGENT_SRC="$PWD/tdd-agentic-ai"; fi
+          bash tests/stages/e2e/split-topology/split-up.sh --build --multi
+
+      - name: Topology checks (TOP-*)
+        run: python3 tests/stages/e2e/split-topology/verify_topology.py --multi
+
+      - name: Workflow + tdd-agent (TWA-*)
+        if: inputs.tdd_agent_repo != ''
+        run: python3 tests/stages/e2e/split-topology/suite_workflow_tdd_agent.py
+
+      - name: Summary
+        if: always()
+        run: cat tests/stages/e2e/split-topology/reports/*.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+      - name: Container logs
+        if: failure()
+        run: |
+          mkdir -p split-logs
+          for c in $(docker ps -a --format '{{.Names}}' | grep -E '^orca-(go|e2e)-'); do docker logs "$c" > "split-logs/$c.log" 2>&1 || true; done
+
+      - name: Upload reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orca-split-e2e-${{ github.run_id }}
+          path: |
+            tests/stages/e2e/split-topology/reports
+            split-logs
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Tear down
+        if: always()
+        run: bash tests/stages/e2e/split-topology/split-down.sh --volumes

@@ -69,7 +69,9 @@ describe('F25 — Admin Panel: User CRUD', () => {
 
   afterAll(async () => {
     if (createdUser?.id) {
-      await adminDeleteUser(adminCookie, createdUser.id).catch(() => {/* already deleted */})
+      await adminDeleteUser(adminCookie, createdUser.id).catch(() => {
+        /* already deleted */
+      })
     }
   })
 
@@ -157,10 +159,10 @@ describe('F25 — Admin Panel: Session Management', () => {
       expect(before).toBe(200)
 
       // Admin kills all sessions
-      const { status: killStatus } = await apiFetch(
-        `/admin/api/users/${user.id}/sessions`,
-        { method: 'DELETE', cookie: adminCookie }
-      )
+      const { status: killStatus } = await apiFetch(`/admin/api/users/${user.id}/sessions`, {
+        method: 'DELETE',
+        cookie: adminCookie
+      })
       expect([200, 204]).toContain(killStatus)
 
       // Session should be invalid
@@ -172,14 +174,12 @@ describe('F25 — Admin Panel: Session Management', () => {
   it('killing user A sessions does not invalidate user B sessions', async () => {
     let userACookie = ''
     let userBCookie = ''
-    let userAId = ''
 
     const userAEmail = `e2e-isol-a-${Date.now()}@test.orca.local`
     const userBEmail = `e2e-isol-b-${Date.now()}@test.orca.local`
 
     const userA = await adminCreateUser(adminCookie, userAEmail, 'PassA@2025')
     const userB = await adminCreateUser(adminCookie, userBEmail, 'PassB@2025')
-    userAId = userA.id
 
     try {
       userACookie = await loginAs(userAEmail, 'PassA@2025')
@@ -220,16 +220,15 @@ describe('F25 — Admin Panel: Audit Log', () => {
       { cookie: adminCookie }
     )
     expect(status).toBe(200)
-    const entries = Array.isArray(body) ? body : body.entries ?? []
+    const entries = Array.isArray(body) ? body : (body.entries ?? [])
     expect(Array.isArray(entries)).toBe(true)
   })
 
   it('audit log contains login.success events', async () => {
-    const { body } = await apiFetch<AuditEntry[] | { entries: AuditEntry[] }>(
-      '/admin/api/audit',
-      { cookie: adminCookie }
-    )
-    const entries = Array.isArray(body) ? body : body.entries ?? []
+    const { body } = await apiFetch<AuditEntry[] | { entries: AuditEntry[] }>('/admin/api/audit', {
+      cookie: adminCookie
+    })
+    const entries = Array.isArray(body) ? body : (body.entries ?? [])
     const loginEvents = entries.filter((e) => e.action === 'login.success')
     expect(loginEvents.length).toBeGreaterThanOrEqual(1)
   })
@@ -240,8 +239,8 @@ describe('F25 — Admin Panel: Audit Log', () => {
       { headers: { Cookie: adminCookie } }
     )
     expect(res.status).toBe(200)
-    const body = await res.json() as AuditEntry[] | { entries: AuditEntry[] }
-    const entries = Array.isArray(body) ? body : body.entries ?? []
+    const body = (await res.json()) as AuditEntry[] | { entries: AuditEntry[] }
+    const entries = Array.isArray(body) ? body : (body.entries ?? [])
     for (const entry of entries) {
       expect(entry.action).toBe('login.success')
     }
@@ -251,11 +250,10 @@ describe('F25 — Admin Panel: Audit Log', () => {
     const newEmail = `e2e-audit-${Date.now()}@test.orca.local`
     const user = await adminCreateUser(adminCookie, newEmail, 'Audit@2025')
 
-    const { body } = await apiFetch<AuditEntry[] | { entries: AuditEntry[] }>(
-      '/admin/api/audit',
-      { cookie: adminCookie }
-    )
-    const entries = Array.isArray(body) ? body : body.entries ?? []
+    const { body } = await apiFetch<AuditEntry[] | { entries: AuditEntry[] }>('/admin/api/audit', {
+      cookie: adminCookie
+    })
+    const entries = Array.isArray(body) ? body : (body.entries ?? [])
     const createEvents = entries.filter((e) => e.action === 'user.create')
     expect(createEvents.length).toBeGreaterThanOrEqual(1)
 

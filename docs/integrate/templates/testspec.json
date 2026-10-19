@@ -1,0 +1,37 @@
+{
+  "name": "tdd-agent: test specs from a TDD",
+  "description": "Generate the three test spec documents (tsagent) from the design knowledge graph of a TDD.",
+  "inputs": {
+    "projectDir": "optional",
+    "request": "JSON string, e.g. {\"params\": {\"tdd\": \"TDD-P\"}}"
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.start",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "mode": "run",
+          "flow": "testspec",
+          "request": "{{request}}"
+        }
+      }
+    },
+    {
+      "id": "testspecs",
+      "type": "action",
+      "config": {
+        "actionName": "tdd_agent.advance",
+        "params": {
+          "projectDir": "{{projectDir}}",
+          "runId": "{{outputs.start.runId}}",
+          "stopAt": ["completed"],
+          "deadlineMin": 60
+        }
+      },
+      "dependsOn": ["start"]
+    }
+  ]
+}

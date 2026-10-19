@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "orca:workflow/tdd_agent/step-output",
+  "title": "Output of a workflow step whose action is tdd_agent.* (StepResult.OutputJSON)",
+  "type": "object",
+  "required": ["action", "runId"],
+  "properties": {
+    "action": {
+      "enum": [
+        "tdd_agent.start",
+        "tdd_agent.advance",
+        "tdd_agent.wait_child",
+        "tdd_agent.approval",
+        "tdd_agent.wait_evidence"
+      ]
+    },
+    "runId": { "type": "string" },
+    "flow": { "type": "string" },
+    "status": {
+      "enum": [
+        "running",
+        "awaiting_approval",
+        "awaiting_evidence",
+        "blocked",
+        "completed",
+        "failed"
+      ]
+    },
+    "pendingGate": { "type": ["string", "null"] },
+    "blockedGate": { "type": ["string", "null"] },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "gates": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "gate name -> ledger status"
+    },
+    "children": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "runId": { "type": "string" },
+          "flow": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      }
+    },
+    "childRunId": { "type": "string" },
+    "gate": { "type": "string" },
+    "approvedBy": {
+      "type": "string",
+      "description": "Orca user id, or \"external\" when approved outside Orca"
+    },
+    "decisionHash": { "type": "string" },
+    "error": { "type": "string", "description": "TDD_AGENT_* failure code when the step failed" },
+    "projectDir": { "type": "string" }
+  }
+}
