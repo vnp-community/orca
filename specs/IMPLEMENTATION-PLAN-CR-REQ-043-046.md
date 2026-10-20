@@ -66,7 +66,7 @@ CR-044 (job + worker + commit server) ─▶ CR-045 (dùng lại CommitPlan.Exec
 |---|---|---|
 | 043 | Request đã ghim `step_by_step` có cần CR "đổi chế độ cho Request đang chạy" ngay không | ✅ Chốt: không, CR riêng sau |
 | 043 | Lựa chọn "chạy hết" ở Approval Inbox | Không |
-| 043 | Chủ dự án (không phải admin) có được đổi công tắc chế độ | Không trong CR này (backend chặn bằng quyền admin) |
+| 043 | Chủ dự án (không phải admin) có được đổi công tắc chế độ | ✅ Chốt: không (chỉ admin hệ thống) |
 | 044 | Giao diện cài đặt cho công tắc tự sinh Plan theo dự án | ✅ Chốt: không làm trong CR này; đổi qua kênh admin hoặc CLI |
 | 044 | Coi `REQUEST_PLAN_AI_UNAVAILABLE` ở cấp run là lỗi tạm | ✅ Chốt: có |
 | 045 | "Keep the previous version" sau khi lượt chỉnh thất bại; lượt chỉnh không đổi gì là lỗi hay tạo bản trùng | Không làm; lỗi `NO_CHANGE` |
