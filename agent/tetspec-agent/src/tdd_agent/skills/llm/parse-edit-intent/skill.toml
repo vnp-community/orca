@@ -1,0 +1,9 @@
+id = "parse-edit-intent"
+version = "1"
+agent = "promptedit"
+tier = "llm"
+description = "Turn a free-form edit prompt into a structured EditIntent (target mention, operation, property path, value, unit, cited upstream source). Numbers must appear in the prompt; the classification of the intent is done by rule afterwards."
+role = "extractor"
+reason = "Understanding what a user wants changed from natural language is language understanding."
+demotion = "Offer a structured edit form/command for frequent operations (set property X of element Y to N) so those never reach the model; keep the model for free-form requests only."
+verifiers = ["operation-enum", "path-form", "value-in-prompt"]

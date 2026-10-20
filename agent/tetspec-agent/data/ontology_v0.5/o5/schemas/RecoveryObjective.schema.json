@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/tdd/schema/RecoveryObjective-v0.6",
+  "title": "RecoveryObjective",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "class": {
+      "const": "RecoveryObjective"
+    },
+    "name": {
+      "type": "string"
+    },
+    "rto": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "object",
+        "array",
+        "null"
+      ]
+    },
+    "rpo": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "object",
+        "array",
+        "null"
+      ]
+    },
+    "recovery_procedure": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "object",
+        "array",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "class",
+    "id",
+    "name",
+    "recovery_procedure",
+    "rpo",
+    "rto"
+  ]
+}

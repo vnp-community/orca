@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/tdd/schema/TddSetRealization-v0.5",
+  "title": "TddSetRealization",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "class": {
+      "const": "TddSetRealization"
+    },
+    "name": {
+      "type": "string"
+    },
+    "baseline_snapshot": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "object",
+        "array",
+        "null"
+      ]
+    },
+    "actual_snapshot": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "object",
+        "array",
+        "null"
+      ]
+    },
+    "mappings": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "object",
+        "array",
+        "null"
+      ]
+    },
+    "status": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "object",
+        "array",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "actual_snapshot",
+    "baseline_snapshot",
+    "class",
+    "id",
+    "mappings",
+    "name",
+    "status"
+  ]
+}

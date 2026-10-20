@@ -1,0 +1,80 @@
+# Sample runtime configuration. Everything shown is the default unless noted.
+# Precedence: CLI flag > env TDD_AGENT__SECTION__KEY > this file > defaults.
+
+[llm]
+default = "claude_code"           # claude_code | codex_cli | any registered provider
+require_distinct_critic = false
+
+[llm.roles]                       # empty = use [llm].default
+author = ""
+critic = ""
+extractor = ""
+
+[llm.budget]                      # 0 = unlimited (default)
+max_calls_per_run = 0
+max_wall_seconds = 0
+max_runs_per_day = 0
+
+[llm.claude_code]
+command = "claude"
+model = "claude-sonnet-5-5"
+effort = "medium"
+timeout_seconds = 900
+max_attempts = 2
+
+[llm.codex_cli]
+command = "codex"
+model = ""
+timeout_seconds = 900
+max_attempts = 2
+
+[store]
+knowledge = "sqlite:.tdd-agent/knowledge.db"      # sqlite:<path> | sqlite::memory: | memory:
+operational = "sqlite:.tdd-agent/operational.db"
+
+[render]
+style = "standard"                # standard = reader TDD (11 parts of design v0.6 + appendix, rules over the KG, no payload) | kg = lossless KG projection with round-trip check
+format = "md"                     # writer plugin (entry-point group tdd_agent.tdd_writers); md is built in
+language = "vi"                   # part titles: vi | en
+source_detail = "section"         # section = "SRS §5.1" (reader) | line = "SRS@1.0 d.463" (audit)
+
+[retrieval]
+default_budget = 5000
+candidates = false
+
+[obs]
+log_level = "INFO"
+log_file = ".tdd-agent/logs/tdd-agent.jsonl"
+log_stderr = false
+log_payloads = "none"             # none | hash | full  (full stores redacted prompt/response)
+otlp_endpoint = ""                # needs the optional `otel` extra
+
+[mcp]
+transport = "stdio"               # stdio | http
+write = false
+approvals = false                 # also needs client_actor in the allowlist below
+client_actor = ""
+max_result_chars = 60000
+token_env = "TDD_AGENT_MCP_TOKEN" # name of the env var holding the HTTP token
+
+[approvals]
+# Who approves the gates G1 (SRS delta), G2 (impact), G5 (OpenSpec bundle) and G7 (acceptance).
+#   auto   = tdd-agent approves them itself, once the rules passed, and records "auto" as the approver (the default when no approver is declared below).
+#   manual = a registered person or coding agent approves (the default as soon as [[approvals.actors]] is declared).
+# Rules, the read-only SAD and the evidence gate G6 (test receipts) are never bypassed, in either mode.
+# mode = "auto"
+# required = ["G5"]              # in auto mode, gates that still wait for a person (needs [[approvals.actors]])
+require_review_receipt = true
+
+# Approver allowlist. kind = human | coding_agent. Pipeline agents are never approvers.
+# [[approvals.actors]]
+# id = "alice"
+# kind = "human"
+# roles = ["BA", "BA/owner"]
+
+[paths]
+repo_root = "."
+work_dir = ".tdd-agent"
+
+[acceptance]
+repetitions = 3

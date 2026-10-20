@@ -1,0 +1,46 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "change",
+      "tdd_id",
+      "sections"
+    ],
+    "properties": {
+      "change": {
+        "type": "object"
+      },
+      "tdd_id": {
+        "type": "string"
+      },
+      "sections": {
+        "type": "array"
+      },
+      "distance_by_id": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "decision",
+      "cited",
+      "reason"
+    ],
+    "properties": {
+      "decision": {
+        "enum": [
+          "no_change",
+          "update"
+        ]
+      },
+      "cited": {
+        "type": "array"
+      },
+      "reason": {
+        "type": "string"
+      }
+    }
+  }
+}

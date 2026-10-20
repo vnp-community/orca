@@ -1,0 +1,159 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "cr",
+      "requirements"
+    ],
+    "properties": {
+      "cr": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "acceptance_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "acceptance_text": {
+            "type": "object"
+          }
+        }
+      },
+      "requirements": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "statement"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "statement": {
+              "type": "string"
+            },
+            "line": {
+              "type": "integer"
+            },
+            "statement_cell": {
+              "type": "integer"
+            },
+            "class": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "known_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "edits",
+      "unmatched"
+    ],
+    "properties": {
+      "edits": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "op",
+            "id",
+            "find",
+            "replace",
+            "near_id",
+            "statement",
+            "acceptance_ids",
+            "cr_quote",
+            "rationale"
+          ],
+          "properties": {
+            "op": {
+              "enum": [
+                "modify",
+                "add",
+                "remove"
+              ]
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "find": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "replace": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "near_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "statement": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "acceptance_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cr_quote": {
+              "type": "string"
+            },
+            "rationale": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "unmatched": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "cr_quote",
+            "reason"
+          ],
+          "properties": {
+            "cr_quote": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

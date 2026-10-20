@@ -1,0 +1,9 @@
+id = "write-section"
+version = "1"
+agent = "promptedit"
+tier = "llm"
+description = "Write the text of one section of the TDD as the user asked in free words (add, rewrite, shorten, split into parts). Only facts of the request and of the section's current text may appear; numbers and ids are checked by rule."
+role = "author"
+reason = "Turning a free-form request into well-formed document text (bullets, paragraphs, rewording) is language work."
+demotion = "A structured form (section, text) would make the plain 'put this text in section X' case a rule; the model stays for rewording, shortening and splitting."
+verifiers = ["numbers-from-request", "ids-from-request", "no-headings", "length"]

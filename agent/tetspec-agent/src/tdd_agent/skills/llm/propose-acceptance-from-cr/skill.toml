@@ -1,0 +1,9 @@
+id = "propose-acceptance-from-cr"
+version = "1"
+agent = "changespec"
+tier = "llm"
+description = "When a change request states no acceptance criterion, propose one GIVEN/WHEN/THEN per changed requirement from the sentences of the CR. Each criterion quotes the CR; numbers and ids must come from the CR or the requirement."
+role = "author"
+reason = "Turning a prose request into testable GIVEN/WHEN/THEN statements is language work."
+demotion = "Ask the author of the CR to write acceptance criteria in the CR (the template names them); the model only fills the gap when nobody is there to ask."
+verifiers = ["quote-in-cr", "numbers-from-cr", "ids-from-cr", "known-change"]

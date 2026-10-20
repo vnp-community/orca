@@ -1,0 +1,9 @@
+id = "author-spec-prose"
+version = "1"
+agent = "changespec"
+tier = "llm"
+description = "Author the OpenSpec proposal/design/tasks/spec prose from the pinned canonical change-spec table and KG context, following the openspec-propose instructions. Output is verified for safe paths, required artifacts and assertion anchors before it can be published."
+role = "author"
+reason = "Explaining why a change is made, how the design achieves it and what each task delivers is prose generation."
+demotion = "Everything structural (rows, refs, verification, trace manifest, requirement/scenario skeletons) already comes from build-cs-table and the projection; move any repeating prose pattern into the projection template so the model writes less."
+verifiers = ["safe-relative-paths", "required-artifacts", "assertions-reference-artifacts", "o5-validate-artifacts"]

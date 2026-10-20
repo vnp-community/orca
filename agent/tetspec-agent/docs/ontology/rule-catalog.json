@@ -1,0 +1,1894 @@
+{
+  "designVersion": "0.2-draft",
+  "date": "2026-10-08",
+  "artifactKind": "design_rule_index",
+  "executable": false,
+  "notice": "Index of authored rule requirements, not executable schemas or validation results. Field/cardinality constraints in domain dictionaries are additionally mandatory.",
+  "rules": [
+    {
+      "id": "FND-001",
+      "module": "fnd",
+      "statement": "Qualified identity duy nhất; reference resolve đúng type/revision/project hoặc explicit external contract",
+      "evaluationMethod": "structural resolver",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 96
+      }
+    },
+    {
+      "id": "FND-002",
+      "module": "fnd",
+      "statement": "Revision immutable; supersedes/lineage không cycle và không tự tham chiếu",
+      "evaluationMethod": "digest + DAG check",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 97
+      }
+    },
+    {
+      "id": "FND-003",
+      "module": "fnd",
+      "statement": "Normative assertion có source bytes/anchor verify được hoặc authorized authoring event; derived có đủ inputs",
+      "evaluationMethod": "provenance traversal",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 98
+      }
+    },
+    {
+      "id": "FND-004",
+      "module": "fnd",
+      "statement": "Scope overlap được xác định trước so sánh conflict; scope unknown không suy ra disjoint",
+      "evaluationMethod": "predicate evaluator / review",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 99
+      }
+    },
+    {
+      "id": "FND-005",
+      "module": "fnd",
+      "statement": "Quantity, threshold, constants có kiểu/unit/dimension phù hợp; phép chuyển có nguồn",
+      "evaluationMethod": "type/unit checker",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 100
+      }
+    },
+    {
+      "id": "FND-006",
+      "module": "fnd",
+      "statement": "Accepted snapshot không chọn hai revision conflicting cùng identity/effective scope",
+      "evaluationMethod": "baseline set + overlap check",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 101
+      }
+    },
+    {
+      "id": "FND-007",
+      "module": "fnd",
+      "statement": "Approval role hợp lệ, actor thật đúng loại và payload hash khớp",
+      "evaluationMethod": "identity/policy check",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 102
+      }
+    },
+    {
+      "id": "FND-008",
+      "module": "fnd",
+      "statement": "Both/unknown/unsupported/error/stale không trở thành gate pass cho mandatory rule",
+      "evaluationMethod": "outcome aggregation",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 103
+      }
+    },
+    {
+      "id": "FND-009",
+      "module": "fnd",
+      "statement": "Alias/rename không đổi nghĩa nếu không có lineage revision; split/merge có phân bổ obligations",
+      "evaluationMethod": "diff + review",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 104
+      }
+    },
+    {
+      "id": "FND-010",
+      "module": "fnd",
+      "statement": "Constants/bindings overlapping không có hai effective values khác nhau cùng precedence",
+      "evaluationMethod": "scope/binding resolution",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 105
+      }
+    },
+    {
+      "id": "FND-011",
+      "module": "fnd",
+      "statement": "AST type-safe, quantified domain có completeness, function version supported",
+      "evaluationMethod": "static + execution check",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 106
+      }
+    },
+    {
+      "id": "FND-012",
+      "module": "fnd",
+      "statement": "Hash/anchor/inventory mismatch tạo stale/unresolved; không silent rebind theo heading",
+      "evaluationMethod": "source resolver",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 107
+      }
+    },
+    {
+      "id": "FND-013",
+      "module": "fnd",
+      "statement": "Derived graph không có self-support proof cycle; conclusion giữ input/rule dependencies",
+      "evaluationMethod": "provenance DAG",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 108
+      }
+    },
+    {
+      "id": "FND-014",
+      "module": "fnd",
+      "statement": "Valid-time và recorded-time hợp lệ, timezone/bounds rõ; receipt không backdate giả",
+      "evaluationMethod": "temporal check",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 109
+      }
+    },
+    {
+      "id": "FND-015",
+      "module": "fnd",
+      "statement": "Redacted/unavailable source không được báo verified nếu không có authorized verifier receipt đủ scope",
+      "evaluationMethod": "evidence/access check",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 110
+      }
+    },
+    {
+      "id": "FND-016",
+      "module": "fnd",
+      "statement": "Domain extension không nới mandatory core; profile/version collision hoặc unsupported check chặn",
+      "evaluationMethod": "registry compatibility",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "00-foundation-and-logic.md",
+        "line": 111
+      }
+    },
+    {
+      "id": "CR-001",
+      "module": "cr",
+      "statement": "Authorized CR có ít nhất một need, in-scope item và criterion; không tính placeholder",
+      "evaluationMethod": "shape + semantic review",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 57
+      }
+    },
+    {
+      "id": "CR-002",
+      "module": "cr",
+      "statement": "Scope in/out không mâu thuẫn trên overlapping applicability",
+      "evaluationMethod": "scope SAT/review",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 58
+      }
+    },
+    {
+      "id": "CR-003",
+      "module": "cr",
+      "statement": "Criterion có observable outcome và verification method đủ scope; vague criterion tạo gap",
+      "evaluationMethod": "typed fields + BA review",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 59
+      }
+    },
+    {
+      "id": "CR-004",
+      "module": "cr",
+      "statement": "Criterion định lượng có metric, threshold, unit, population/window phù hợp",
+      "evaluationMethod": "type/measurement check",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 60
+      }
+    },
+    {
+      "id": "CR-005",
+      "module": "cr",
+      "statement": "Criterion thuộc đúng CR revision và criterion group có explicit composition",
+      "evaluationMethod": "reference/group check",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 61
+      }
+    },
+    {
+      "id": "CR-006",
+      "module": "cr",
+      "statement": "Dependency requires/blocks không có cycle chưa được xử lý bằng delivery group có kế hoạch",
+      "evaluationMethod": "dependency DAG",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 62
+      }
+    },
+    {
+      "id": "CR-007",
+      "module": "cr",
+      "statement": "Duplicate disposition phải chứng minh scope/criteria tương đương và dẫn accepted sources; text similarity không đủ",
+      "evaluationMethod": "semantic equivalence review",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 63
+      }
+    },
+    {
+      "id": "CR-008",
+      "module": "cr",
+      "statement": "Authorization pin scope/criteria; đổi nghĩa làm authorization applicability stale",
+      "evaluationMethod": "semantic diff + digest",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 64
+      }
+    },
+    {
+      "id": "CR-009",
+      "module": "cr",
+      "statement": "Cancel không xóa implemented state; phải xác định hậu quả/rollback/corrective obligations",
+      "evaluationMethod": "delivery closure check",
+      "firstRequiredGate": "G6",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 65
+      }
+    },
+    {
+      "id": "CR-010",
+      "module": "cr",
+      "statement": "Mọi software criterion trong delivery scope có SRS operationalization hoặc blocker; technical enabler có derivation",
+      "evaluationMethod": "mapping coverage",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 66
+      }
+    },
+    {
+      "id": "CR-011",
+      "module": "cr",
+      "statement": "Criterion phi phần mềm có owner và evidence plan riêng, vẫn trong acceptance denominator",
+      "evaluationMethod": "coverage partition",
+      "firstRequiredGate": "G6",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 67
+      }
+    },
+    {
+      "id": "CR-012",
+      "module": "cr",
+      "statement": "CR accepted chỉ khi mọi mandatory acceptance group đạt và BA receipt đúng revisions/scope",
+      "evaluationMethod": "acceptance aggregation",
+      "firstRequiredGate": "G6",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 68
+      }
+    },
+    {
+      "id": "CR-013",
+      "module": "cr",
+      "statement": "Partial delivery/conditional acceptance không trở thành full acceptance; điều kiện chưa đạt giữ open",
+      "evaluationMethod": "state derivation",
+      "firstRequiredGate": "G6",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 69
+      }
+    },
+    {
+      "id": "CR-014",
+      "module": "cr",
+      "statement": "Defect CR pin observed evidence và expected normative behavior hoặc upstream clarification trước thiết kế",
+      "evaluationMethod": "source comparison",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "01-cr-ontology.md",
+        "line": 70
+      }
+    },
+    {
+      "id": "SRS-001",
+      "module": "srs",
+      "statement": "Mandatory requirement có modality, scope, actor/system subject và outcome có thể kiểm",
+      "evaluationMethod": "shape + BA semantic review",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 60
+      }
+    },
+    {
+      "id": "SRS-002",
+      "module": "srs",
+      "statement": "Compound requirement có atomic obligations/composition; không lấy một scenario thay toàn bộ requirement",
+      "evaluationMethod": "decomposition coverage",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 61
+      }
+    },
+    {
+      "id": "SRS-003",
+      "module": "srs",
+      "statement": "MUST và MUST_NOT không cho outcomes đối nghịch trong feasible overlapping context",
+      "evaluationMethod": "constraint satisfiability / review",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 62
+      }
+    },
+    {
+      "id": "SRS-004",
+      "module": "srs",
+      "statement": "Quality threshold có metric/unit/statistic/workload/window/environment phù hợp",
+      "evaluationMethod": "measurement type check",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 63
+      }
+    },
+    {
+      "id": "SRS-005",
+      "module": "srs",
+      "statement": "BusinessRule AST type-safe, authority resolve, exceptions/precedence không mơ hồ",
+      "evaluationMethod": "typed logic + review",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 64
+      }
+    },
+    {
+      "id": "SRS-006",
+      "module": "srs",
+      "statement": "Decision table hit policy đúng; unique không overlap; completeness claim có coverage proof",
+      "evaluationMethod": "finite enumeration / solver",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 65
+      }
+    },
+    {
+      "id": "SRS-007",
+      "module": "srs",
+      "statement": "Calculation xác định rounding/unit/currency/zero/null behavior khi applicable",
+      "evaluationMethod": "expression checker",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 66
+      }
+    },
+    {
+      "id": "SRS-008",
+      "module": "srs",
+      "statement": "Attribute ranges/cardinality/null constraints không mâu thuẫn và logical relationships resolve",
+      "evaluationMethod": "data constraint satisfiability",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 67
+      }
+    },
+    {
+      "id": "SRS-009",
+      "module": "srs",
+      "statement": "Business transitions dùng states hợp lệ, initial reachable scope, guards phù hợp rules và protected operations",
+      "evaluationMethod": "graph + guard checks",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 68
+      }
+    },
+    {
+      "id": "SRS-010",
+      "module": "srs",
+      "statement": "Scenario expected results phù hợp normative rules và permissions trong cùng context",
+      "evaluationMethod": "scenario simulation / review",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 69
+      }
+    },
+    {
+      "id": "SRS-011",
+      "module": "srs",
+      "statement": "Refinement graph acyclic; child không nới parent MUST nếu không có authorized upstream revision",
+      "evaluationMethod": "refinement proof / review",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 70
+      }
+    },
+    {
+      "id": "SRS-012",
+      "module": "srs",
+      "statement": "Every in-scope delta authorized và add/modify/remove before/after đúng; no phantom changes",
+      "evaluationMethod": "delta reconciliation",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 71
+      }
+    },
+    {
+      "id": "SRS-013",
+      "module": "srs",
+      "statement": "Split/merge/removal giữ criteria coverage và negative/removal obligations",
+      "evaluationMethod": "lineage coverage",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 72
+      }
+    },
+    {
+      "id": "SRS-014",
+      "module": "srs",
+      "statement": "Interface requirement đủ outcomes/error/auth/compatibility theo risk; unknown không tự default",
+      "evaluationMethod": "contract completeness",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 73
+      }
+    },
+    {
+      "id": "SRS-015",
+      "module": "srs",
+      "statement": "Assumption có validation owner/trigger; critical unresolved assumptions giữ blocker tại gate cần chứng minh",
+      "evaluationMethod": "applicability policy",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 74
+      }
+    },
+    {
+      "id": "SRS-016",
+      "module": "srs",
+      "statement": "Business constants/defaults đồng nhất across sections hoặc scoped explicitly",
+      "evaluationMethod": "binding/conflict check",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 75
+      }
+    },
+    {
+      "id": "SRS-017",
+      "module": "srs",
+      "statement": "No semantic delta defect có discrepancy và unchanged SRS refs; không giả add/modify để đủ schema",
+      "evaluationMethod": "context case check",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 76
+      }
+    },
+    {
+      "id": "SRS-018",
+      "module": "srs",
+      "statement": "Expected requirement inventory gồm mọi nguồn/phụ lục/bảng/negative clauses; omission giữ gap",
+      "evaluationMethod": "source-to-entity audit",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "02-srs-ontology.md",
+        "line": 77
+      }
+    },
+    {
+      "id": "SAD-001",
+      "module": "sad",
+      "statement": "Approved architecture có owner, scope, concerns, views và constraints inventory rõ",
+      "evaluationMethod": "shape + inventory review",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 54
+      }
+    },
+    {
+      "id": "SAD-002",
+      "module": "sad",
+      "statement": "View dùng viewpoint hợp lệ và shared identities; duplicate labels không tạo equivalence tự động",
+      "evaluationMethod": "view/model resolver",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 55
+      }
+    },
+    {
+      "id": "SAD-003",
+      "module": "sad",
+      "statement": "Containment không cycle; connector endpoints resolve đúng scope hoặc explicit external",
+      "evaluationMethod": "graph validation",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 56
+      }
+    },
+    {
+      "id": "SAD-004",
+      "module": "sad",
+      "statement": "Mỗi responsibility có owner/allocation; exclusive responsibilities không bị gán mâu thuẫn",
+      "evaluationMethod": "allocation check",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 57
+      }
+    },
+    {
+      "id": "SAD-005",
+      "module": "sad",
+      "statement": "Accepted ADR có authority, drivers, alternatives/rationale và consequences; supersedes không cycle",
+      "evaluationMethod": "decision/provenance check",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 58
+      }
+    },
+    {
+      "id": "SAD-006",
+      "module": "sad",
+      "statement": "Accepted decisions/constraints satisfiable trên overlap; conflict giữ witness và chặn",
+      "evaluationMethod": "constraint solver / architect review",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 59
+      }
+    },
+    {
+      "id": "SAD-007",
+      "module": "sad",
+      "statement": "Quality strategy trace tới NFR/scenario và assumptions/budget có semantics hợp lệ",
+      "evaluationMethod": "budget/semantic review",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 60
+      }
+    },
+    {
+      "id": "SAD-008",
+      "module": "sad",
+      "statement": "Cross-view runtime/deployment/data/security paths không mâu thuẫn với completeness claims",
+      "evaluationMethod": "graph path/conformance",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 61
+      }
+    },
+    {
+      "id": "SAD-009",
+      "module": "sad",
+      "statement": "Data writers/replicas/ownership phù hợp responsibilities và consistency assumptions",
+      "evaluationMethod": "ownership path review",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 62
+      }
+    },
+    {
+      "id": "SAD-010",
+      "module": "sad",
+      "statement": "Trust-boundary crossing có obligations cần thiết; thiếu đường trust/control không suy safe",
+      "evaluationMethod": "security path check",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 63
+      }
+    },
+    {
+      "id": "SAD-011",
+      "module": "sad",
+      "statement": "Unresolved critical risk/assumption có owner và chặn gate tương ứng theo declared policy",
+      "evaluationMethod": "risk/obligation evaluation",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 64
+      }
+    },
+    {
+      "id": "SAD-012",
+      "module": "sad",
+      "statement": "Product run pin readonly SAD; architecture mismatch cần separate SAD CR, không local waiver",
+      "evaluationMethod": "run-baseline check",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 65
+      }
+    },
+    {
+      "id": "SAD-013",
+      "module": "sad",
+      "statement": "SAD mới tạo rebaseline và invalidation downstream; old approval không tự tái dùng",
+      "evaluationMethod": "dependency invalidation",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 66
+      }
+    },
+    {
+      "id": "SAD-014",
+      "module": "sad",
+      "statement": "Ngoại lệ kiến trúc phải là authorized SAD decision đúng scope/thời hạn; không miễn upstream MUST",
+      "evaluationMethod": "exception/authority check",
+      "firstRequiredGate": "GA",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "03-sad-ontology.md",
+        "line": 67
+      }
+    },
+    {
+      "id": "TDD-001",
+      "module": "tdd",
+      "statement": "Design inventory complete; mỗi unit có owner/scope và actual sections resolve được",
+      "evaluationMethod": "inventory/reference check",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 97
+      }
+    },
+    {
+      "id": "TDD-002",
+      "module": "tdd",
+      "statement": "Mandatory obligations sinh từ sources/risk/profile đầy đủ; thiếu node không làm obligation N/A",
+      "evaluationMethod": "applicability reconciliation",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 98
+      }
+    },
+    {
+      "id": "TDD-003",
+      "module": "tdd",
+      "statement": "Operations/algorithms đủ input/output/pre/post/error/side-effects theo applicability",
+      "evaluationMethod": "shape + design review",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 99
+      }
+    },
+    {
+      "id": "TDD-004",
+      "module": "tdd",
+      "statement": "Flow bindings type-safe, ordering đúng, failure branches không bỏ required outcomes",
+      "evaluationMethod": "dataflow/branch analysis",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 100
+      }
+    },
+    {
+      "id": "TDD-005",
+      "module": "tdd",
+      "statement": "State transitions feasible trong model, bảo toàn invariants; reachability không thay semantic proof",
+      "evaluationMethod": "graph + solver / review",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 101
+      }
+    },
+    {
+      "id": "TDD-006",
+      "module": "tdd",
+      "statement": "Required termination/resource bounds có argument phù hợp supported algorithm model",
+      "evaluationMethod": "static/model/human check",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 102
+      }
+    },
+    {
+      "id": "TDD-007",
+      "module": "tdd",
+      "statement": "Interface input/output/error/auth contracts nhất quán giữa producer và consumers",
+      "evaluationMethod": "contract compatibility",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 103
+      }
+    },
+    {
+      "id": "TDD-008",
+      "module": "tdd",
+      "statement": "Retry/deadline/backoff/cancellation đồng bộ; worst-case budget hợp lệ theo declared model",
+      "evaluationMethod": "budget evaluator",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 104
+      }
+    },
+    {
+      "id": "TDD-009",
+      "module": "tdd",
+      "statement": "Retry write có duplicate/concurrency handling đủ key scope, fingerprint, atomicity và retention",
+      "evaluationMethod": "idempotency scenario checks",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 105
+      }
+    },
+    {
+      "id": "TDD-010",
+      "module": "tdd",
+      "statement": "Failure/timeout không giả no-effect; recovery/fallback giữ upstream invariants",
+      "evaluationMethod": "failure effect analysis",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 106
+      }
+    },
+    {
+      "id": "TDD-011",
+      "module": "tdd",
+      "statement": "Physical data mapping giữ meaning/range/unit/null/identity/constraints của logical model",
+      "evaluationMethod": "data refinement proof",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 107
+      }
+    },
+    {
+      "id": "TDD-012",
+      "module": "tdd",
+      "statement": "Transactions/invariants đúng boundary/isolation; cross-store atomicity có protocol thực",
+      "evaluationMethod": "transaction model review",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 108
+      }
+    },
+    {
+      "id": "TDD-013",
+      "module": "tdd",
+      "statement": "Saga compensation/recovery đủ failed/partial/irreversible states, có owner cho manual path",
+      "evaluationMethod": "failure-state coverage",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 109
+      }
+    },
+    {
+      "id": "TDD-014",
+      "module": "tdd",
+      "statement": "Migration DAG hợp lệ, old/new compatibility và backfill/retry/rollback-or-recovery có verification",
+      "evaluationMethod": "migration model checks",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 110
+      }
+    },
+    {
+      "id": "TDD-015",
+      "module": "tdd",
+      "statement": "Permission enforcement bao mọi access paths trong scope; default/precedence/deny nhất quán",
+      "evaluationMethod": "access-path/decision checks",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 111
+      }
+    },
+    {
+      "id": "TDD-016",
+      "module": "tdd",
+      "statement": "Security/audit design đáp ứng classification, no-secret exposure và tamper/retention obligations",
+      "evaluationMethod": "controls + review",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 112
+      }
+    },
+    {
+      "id": "TDD-017",
+      "module": "tdd",
+      "statement": "Capacity/SLO model có workload/unit/assumptions; target không gắn nhãn measured achievement",
+      "evaluationMethod": "quantity/model provenance",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 113
+      }
+    },
+    {
+      "id": "TDD-018",
+      "module": "tdd",
+      "statement": "HA/quorum/failure domains và RPO/RTO phù hợp SAD/SRS với degraded-mode nghĩa rõ",
+      "evaluationMethod": "topology/recovery analysis",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 114
+      }
+    },
+    {
+      "id": "TDD-019",
+      "module": "tdd",
+      "statement": "Rollout có detection, abort, owner và rollback/recovery tương thích migration/data",
+      "evaluationMethod": "operational consistency",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 115
+      }
+    },
+    {
+      "id": "TDD-020",
+      "module": "tdd",
+      "statement": "New side-effect/consumer/risk làm reassess profiles và impact closure",
+      "evaluationMethod": "semantic diff trigger",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 116
+      }
+    },
+    {
+      "id": "TDD-021",
+      "module": "tdd",
+      "statement": "no_change chỉ khi current design bao phủ cả value domain và guarantees; no match không đủ",
+      "evaluationMethod": "reuse conformance proof",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 117
+      }
+    },
+    {
+      "id": "TDD-022",
+      "module": "tdd",
+      "statement": "Realization giữ action, planned scope và actual anchors; ngoài plan quay impact approval",
+      "evaluationMethod": "plan-realization comparison",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 118
+      }
+    },
+    {
+      "id": "TDD-023",
+      "module": "tdd",
+      "statement": "Design decisions không override SRS/SAD; conflicts trả upstream, không local approve",
+      "evaluationMethod": "mapping/authority review",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 119
+      }
+    },
+    {
+      "id": "TDD-024",
+      "module": "tdd",
+      "statement": "Concurrency locking/ordering/isolation không vi phạm safety/progress trong claimed model",
+      "evaluationMethod": "concurrency/model review",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "04-tdd-ontology.md",
+        "line": 120
+      }
+    },
+    {
+      "id": "CS-001",
+      "module": "cs",
+      "statement": "Chưa human impact approval hoặc actual realization đủ thì không invoke CS authoring",
+      "evaluationMethod": "workflow preflight",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 56
+      }
+    },
+    {
+      "id": "CS-002",
+      "module": "cs",
+      "statement": "Every eligible item có stable ID, action, target, SRS và actual TDD sections, CR-derived criteria",
+      "evaluationMethod": "shape + dual-source resolver",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 57
+      }
+    },
+    {
+      "id": "CS-003",
+      "module": "cs",
+      "statement": "Item semantic effect phù hợp SRS context và actual design, không invent behavior/design",
+      "evaluationMethod": "semantic refinement review",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 58
+      }
+    },
+    {
+      "id": "CS-004",
+      "module": "cs",
+      "statement": "Modify/remove target resolve baseline; add target noncolliding và thuộc approved scope",
+      "evaluationMethod": "repository target resolution",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 59
+      }
+    },
+    {
+      "id": "CS-005",
+      "module": "cs",
+      "statement": "Preserved behavior/scenarios không bị rơi khi modify; removal có decommission/compatibility design",
+      "evaluationMethod": "before-after fidelity",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 60
+      }
+    },
+    {
+      "id": "CS-006",
+      "module": "cs",
+      "statement": "Task dependency DAG hoặc explicit atomic group có executable meaning; task completion không pass criteria",
+      "evaluationMethod": "dependency/group checks",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 61
+      }
+    },
+    {
+      "id": "CS-007",
+      "module": "cs",
+      "statement": "Criteria có assertions/method/expected outcomes đúng CR lineage; negative/failure obligations không mất",
+      "evaluationMethod": "oracle coverage review",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 62
+      }
+    },
+    {
+      "id": "CS-008",
+      "module": "cs",
+      "statement": "Projection pin canonical/version/hashes và mandatory semantics không loss",
+      "evaluationMethod": "round-trip/fidelity validation",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 63
+      }
+    },
+    {
+      "id": "CS-009",
+      "module": "cs",
+      "statement": "Import tạo candidates; thiếu references/authority không suy ra từ OpenSpec archive/checkbox",
+      "evaluationMethod": "import trust-boundary check",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 64
+      }
+    },
+    {
+      "id": "CS-010",
+      "module": "cs",
+      "statement": "Production publication recheck nguồn và target inventory dưới atomic transaction/lock",
+      "evaluationMethod": "optimistic concurrency check",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 65
+      }
+    },
+    {
+      "id": "VER-001",
+      "module": "ver",
+      "statement": "Test definition khác execution; receipt pin test/build/config/environment và timestamps/logs",
+      "evaluationMethod": "evidence resolver",
+      "firstRequiredGate": "G5",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 66
+      }
+    },
+    {
+      "id": "VER-002",
+      "module": "ver",
+      "statement": "Required assertions executed đúng oracle; test name/result tổng không đủ chứng minh criteria",
+      "evaluationMethod": "assertion-level coverage",
+      "firstRequiredGate": "G5",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 67
+      }
+    },
+    {
+      "id": "VER-003",
+      "module": "ver",
+      "statement": "Fail/error/skipped/aborted/missing/stale mandatory execution không thành verified",
+      "evaluationMethod": "outcome aggregation",
+      "firstRequiredGate": "G5",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 68
+      }
+    },
+    {
+      "id": "VER-004",
+      "module": "ver",
+      "statement": "Code/config/schema changes đều mapped tới approved items; unplanned normative behavior chặn",
+      "evaluationMethod": "implementation diff review",
+      "firstRequiredGate": "G5",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 69
+      }
+    },
+    {
+      "id": "VER-005",
+      "module": "ver",
+      "statement": "Performance/recovery/security achievement dùng actual measurement phù hợp target scope",
+      "evaluationMethod": "measurement applicability",
+      "firstRequiredGate": "G5",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 70
+      }
+    },
+    {
+      "id": "VER-006",
+      "module": "ver",
+      "statement": "BA acceptance có đúng authority, CR/criterion revisions, scope và supporting evidence",
+      "evaluationMethod": "receipt/role validator",
+      "firstRequiredGate": "G6",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 71
+      }
+    },
+    {
+      "id": "VER-007",
+      "module": "ver",
+      "statement": "Conditional/partial acceptance không full closure; multi-run criteria aggregation đúng composition",
+      "evaluationMethod": "acceptance aggregation",
+      "firstRequiredGate": "G6",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 72
+      }
+    },
+    {
+      "id": "VER-008",
+      "module": "ver",
+      "statement": "Evidence reuse có reassessment record; không sửa receipt/build ID hoặc bỏ failed attempts",
+      "evaluationMethod": "evidence history integrity",
+      "firstRequiredGate": "G5",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 73
+      }
+    },
+    {
+      "id": "VER-009",
+      "module": "ver",
+      "statement": "Release/operation drift tạo new findings và affected evidence stale; không sửa accepted baseline âm thầm",
+      "evaluationMethod": "drift-to-change reconciliation",
+      "firstRequiredGate": "G6",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "05-change-spec-and-verification.md",
+        "line": 74
+      }
+    },
+    {
+      "id": "MAP-001",
+      "module": "map",
+      "statement": "Mapping signature/domain/range/cardinality đúng contract và endpoints pin revisions",
+      "evaluationMethod": "typed resolver",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 115
+      }
+    },
+    {
+      "id": "MAP-002",
+      "module": "map",
+      "statement": "Mapping validated có obligations/evidence đủ, source/target scopes compatible",
+      "evaluationMethod": "evidence/scope evaluation",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 116
+      }
+    },
+    {
+      "id": "MAP-003",
+      "module": "map",
+      "statement": "Không suy sameAs/transitivity/coverage từ label hoặc trace path tồn tại",
+      "evaluationMethod": "inference policy check",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 117
+      }
+    },
+    {
+      "id": "MAP-004",
+      "module": "map",
+      "statement": "Refinement không loại valid input hay nới forbidden outcome trong required scope",
+      "evaluationMethod": "contract entailment / review",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 118
+      }
+    },
+    {
+      "id": "MAP-005",
+      "module": "map",
+      "statement": "Constants/rules/units/thresholds đồng nhất hoặc scoped authorized transformation",
+      "evaluationMethod": "binding/refinement checks",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 119
+      }
+    },
+    {
+      "id": "MAP-006",
+      "module": "map",
+      "statement": "Many-to-many có contributions/composition đủ; không mark all covered từ một partial match",
+      "evaluationMethod": "obligation matrix check",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 120
+      }
+    },
+    {
+      "id": "MAP-007",
+      "module": "map",
+      "statement": "Delta/criteria denominator xuất phát complete inventories, không từ matched subset",
+      "evaluationMethod": "inventory coverage audit",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 121
+      }
+    },
+    {
+      "id": "MAP-008",
+      "module": "map",
+      "statement": "Source revision/assumption/profile đổi làm dependent mappings/evidence stale theo facets",
+      "evaluationMethod": "dependency invalidation",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 122
+      }
+    },
+    {
+      "id": "MAP-009",
+      "module": "map",
+      "statement": "Impact closure đầy đủ và reason paths lưu; truncated/unresolved mandatory dependencies chặn",
+      "evaluationMethod": "fixed-point completeness",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 123
+      }
+    },
+    {
+      "id": "MAP-010",
+      "module": "map",
+      "statement": "Removal/split/merge xử lý consumers, residual obligations và tombstones",
+      "evaluationMethod": "lineage/consumer analysis",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 124
+      }
+    },
+    {
+      "id": "MAP-011",
+      "module": "map",
+      "statement": "Cross-domain conflicts do đúng owner giải quyết và decision pin payload, không silent overwrite",
+      "evaluationMethod": "resolution authority check",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 125
+      }
+    },
+    {
+      "id": "MAP-012",
+      "module": "map",
+      "statement": "Actual TDD mappings không dùng planned/baseline stale sections làm realized evidence",
+      "evaluationMethod": "realization resolver",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 126
+      }
+    },
+    {
+      "id": "MAP-013",
+      "module": "map",
+      "statement": "Source↔semantic fidelity giữ negation, modality, exceptions, numbers và conditions",
+      "evaluationMethod": "bidirectional source audit",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 127
+      }
+    },
+    {
+      "id": "MAP-014",
+      "module": "map",
+      "statement": "Quality/data/security mappings chứng minh theo semantics chuyên biệt, không generic similarity",
+      "evaluationMethod": "specialist validators / review",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "06-cross-domain-mappings.md",
+        "line": 128
+      }
+    },
+    {
+      "id": "FLOW-001",
+      "module": "flow",
+      "statement": "Source inventory pin đầy đủ docs/phụ lục/diagrams; missing/restricted không disappear",
+      "evaluationMethod": "inventory reconciliation",
+      "firstRequiredGate": "G0",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 139
+      }
+    },
+    {
+      "id": "FLOW-002",
+      "module": "flow",
+      "statement": "Extraction giữ raw spans và dispositions; không bỏ negation/exceptions/table units",
+      "evaluationMethod": "source fidelity audit",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 140
+      }
+    },
+    {
+      "id": "FLOW-003",
+      "module": "flow",
+      "statement": "Candidate/confidence không tự promote normative knowledge hoặc human approval",
+      "evaluationMethod": "promotion authority check",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 141
+      }
+    },
+    {
+      "id": "FLOW-004",
+      "module": "flow",
+      "statement": "Domain ownership theo semantics/authority, không file name; ambiguous classification giữ review gap",
+      "evaluationMethod": "classification review",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 142
+      }
+    },
+    {
+      "id": "FLOW-005",
+      "module": "flow",
+      "statement": "Bootstrap có explicit empty baseline và approved SAD trước product impact; không fake refs",
+      "evaluationMethod": "bootstrap branch validation",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 143
+      }
+    },
+    {
+      "id": "FLOW-006",
+      "module": "flow",
+      "statement": "Legacy/as-built/as-operated claims tách normative baseline, thiếu receipt giữ unverified",
+      "evaluationMethod": "onboarding trust validation",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 144
+      }
+    },
+    {
+      "id": "FLOW-007",
+      "module": "flow",
+      "statement": "Impact đối chiếu mọi SRS intent và toàn TDD inventory; add/update/no_change có evidence",
+      "evaluationMethod": "bidirectional impact coverage",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 145
+      }
+    },
+    {
+      "id": "FLOW-008",
+      "module": "flow",
+      "statement": "ImpactApproval bind human role/time/payload/input hashes; stale/rejected/missing chặn",
+      "evaluationMethod": "approval validation",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 146
+      }
+    },
+    {
+      "id": "FLOW-009",
+      "module": "flow",
+      "statement": "Realization đủ approved plan, actual refs và no_change revision; unplanned drift quay G2",
+      "evaluationMethod": "plan conformance",
+      "firstRequiredGate": "G3",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 147
+      }
+    },
+    {
+      "id": "FLOW-010",
+      "module": "flow",
+      "statement": "Không author CS trước G2/G3, kể cả gọi draft; source readiness không thay approval",
+      "evaluationMethod": "authoring preflight",
+      "firstRequiredGate": "G4",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 148
+      }
+    },
+    {
+      "id": "FLOW-011",
+      "module": "flow",
+      "statement": "Product SAD immutable; architecture CR hoàn tất vẫn cần rebaseline/reimpact",
+      "evaluationMethod": "SAD branch check",
+      "firstRequiredGate": "G2",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 149
+      }
+    },
+    {
+      "id": "FLOW-012",
+      "module": "flow",
+      "statement": "Baseline publish atomic, expected head/source hashes khớp; race không silent overwrite",
+      "evaluationMethod": "transaction/CAS check",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 150
+      }
+    },
+    {
+      "id": "FLOW-013",
+      "module": "flow",
+      "statement": "Evidence/invalidation append-only; corrective changes không backdate approvals",
+      "evaluationMethod": "audit event integrity",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 151
+      }
+    },
+    {
+      "id": "FLOW-014",
+      "module": "flow",
+      "statement": "Urgency/prompt/tool status không waive mandatory source/approval/realization gates",
+      "evaluationMethod": "policy non-bypass check",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 152
+      }
+    },
+    {
+      "id": "FLOW-015",
+      "module": "flow",
+      "statement": "Document↔graph edits có reconciliation/fidelity trước promote; không silent bidirectional sync",
+      "evaluationMethod": "round-trip/diff audit",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 153
+      }
+    },
+    {
+      "id": "FLOW-016",
+      "module": "flow",
+      "statement": "No-delta refactor/defect vẫn có authorized SRS context, source refs và impact đầy đủ",
+      "evaluationMethod": "context alternative validator",
+      "firstRequiredGate": "G1",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "07-digitization-and-lifecycle.md",
+        "line": 154
+      }
+    },
+    {
+      "id": "VAL-001",
+      "module": "val",
+      "statement": "Rule execution pin subject/input/rule/profile/engine; stale/unsupported/error không pass",
+      "evaluationMethod": "execution record validation",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 139
+      }
+    },
+    {
+      "id": "VAL-002",
+      "module": "val",
+      "statement": "Gate denominator đến từ complete expected obligations; empty scope cần explicit no-op/N/A authority",
+      "evaluationMethod": "obligation set reconciliation",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 140
+      }
+    },
+    {
+      "id": "VAL-003",
+      "module": "val",
+      "statement": "Required checker unsupported hoặc missing tạo blocker, không tự downgrade warning/N/A",
+      "evaluationMethod": "support registry check",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 141
+      }
+    },
+    {
+      "id": "VAL-004",
+      "module": "val",
+      "statement": "Semantic assertion ngoài formal fragment cần review evidence có scope, không confidence-to-proof",
+      "evaluationMethod": "proof capability check",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 142
+      }
+    },
+    {
+      "id": "VAL-005",
+      "module": "val",
+      "statement": "Findings resolved chỉ bằng new evidence/revision và successful rerun, không acknowledgement",
+      "evaluationMethod": "finding lifecycle check",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 143
+      }
+    },
+    {
+      "id": "VAL-006",
+      "module": "val",
+      "statement": "Profile composition không waive core và phải phát hiện constraint conflicts",
+      "evaluationMethod": "profile solver/review",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 144
+      }
+    },
+    {
+      "id": "VAL-007",
+      "module": "val",
+      "statement": "Graph/schema/adapter artifacts giữ manifest/type/constraint consistency",
+      "evaluationMethod": "generated artifact reconciliation",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 145
+      }
+    },
+    {
+      "id": "VAL-008",
+      "module": "val",
+      "statement": "Migration không mất normative content/trace/history và không auto-fill unknown required facts",
+      "evaluationMethod": "migration loss/round-trip checks",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 146
+      }
+    },
+    {
+      "id": "VAL-009",
+      "module": "val",
+      "statement": "Mandatory rule có positive/negative/unknown fixtures trước supported registration",
+      "evaluationMethod": "validator qualification",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 147
+      }
+    },
+    {
+      "id": "VAL-010",
+      "module": "val",
+      "statement": "Coverage counts phân biệt primary partitions và overlapping diagnostics; không inflated percent",
+      "evaluationMethod": "report arithmetic audit",
+      "firstRequiredGate": "ALL",
+      "mandatoryWhenApplicable": true,
+      "implementationStatus": "specified_not_implemented_by_this_design",
+      "source": {
+        "path": "08-validation-and-acceptance.md",
+        "line": 148
+      }
+    }
+  ]
+}

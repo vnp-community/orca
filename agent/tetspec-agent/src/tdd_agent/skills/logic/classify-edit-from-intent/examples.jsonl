@@ -1,0 +1,4 @@
+{"name": "timeout is semantic whatever the wording", "input": {"intent": {"operation": "modify", "path": "props.timeout_seconds", "value": 30}}, "expect": {"output": {"kind": "semantic"}, "resolved_by": "rule"}}
+{"name": "reorder is presentation", "input": {"intent": {"operation": "reorder", "path": "order"}}, "expect": {"output": {"kind": "presentation"}, "resolved_by": "rule"}}
+{"name": "locked upstream value conflicts", "input": {"intent": {"operation": "modify", "path": "props.timeout_seconds", "value": 5}, "upstream": {"locked": {"timeout_seconds": 30}}}, "expect": {"output": {"kind": "conflict"}, "resolved_by": "rule"}}
+{"name": "presentation operation carrying a design value is semantic", "input": {"intent": {"operation": "format", "path": "props.timeout_seconds", "value": 5}}, "expect": {"output": {"kind": "semantic"}, "resolved_by": "rule"}}

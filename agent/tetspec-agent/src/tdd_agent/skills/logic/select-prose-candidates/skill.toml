@@ -1,0 +1,5 @@
+id = "select-prose-candidates"
+version = "1"
+agent = "generation"
+tier = "logic"
+description = "Pick the paragraph/list lines that state an obligation, a condition or a quantity and are not already covered by structured facts."

@@ -1,0 +1,33 @@
+# TDD ontology profiles tsagent understands (ONTOLOGY-TDD sections 4, 5). Extended is on when the package declares an ontologyVersion with "+ext-N", N >= 1.
+# relations: logical name used by tsagent -> relation name in the KG. Defaults are the names proposed by ONTOLOGY-TDD section 5 (pending OQ-O1);
+# override with a YAML file of the same shape through TSAGENT_PROFILES.
+extended:
+  minExt: 1
+  relations:
+    obligationFor: obligationFor
+    resolves: resolves
+    designRef: designRef
+    gapOf: gapOf
+    decidesObligation: decides
+    ownedBy: ownedBy
+    operationFor: operationFor
+    hasStep: hasStep
+    performs: performs
+    decidesOperation: decides
+    invariantOf: invariantOf
+    governs: governs
+    errorOf: errorOf
+    budgetFor: budgetFor
+    idempotencyOf: idempotencyOf
+    failureOf: failureOf
+    compatibilityOf: compatibilityOf
+    includesOp: includesOp
+    hasStage: hasStage
+    constrains: constrains
+    protects: protects
+    secretOf: secretOf
+    auditOf: auditOf
+    loadFor: loadFor
+    recoveryOf: recoveryOf
+    observes: observes
+    rolloutOf: rolloutOf

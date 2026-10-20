@@ -1,0 +1,9 @@
+id = "critique-spec"
+version = "1"
+agent = "changespec"
+tier = "llm"
+description = "Independent review of authored OpenSpec artifacts against the pinned evidence, from a fresh conversation and (when configured) a different model; findings are anchored and verified, and any finding fails the review."
+role = "critic"
+reason = "Judging whether prose faithfully reflects its evidence, loses baseline scenarios or invents behaviour requires reading comprehension."
+demotion = "Deterministic checks already run beside it (assertions, strict validation, retained baseline scenarios, requirement->SRS mapping); add each recurring critic finding as a deterministic check."
+verifiers = ["findings-anchor-artifacts", "verdict-consistent-with-findings"]

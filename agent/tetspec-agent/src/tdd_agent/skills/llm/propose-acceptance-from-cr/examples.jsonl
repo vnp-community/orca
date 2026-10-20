@@ -1,0 +1,1 @@
+{"name": "a validation rule becomes a criterion", "input": {"cr_text": "# CR-9 Form\n- Check email format before saving\n", "changes": [{"id": "FR-1", "kind": "modified", "statement": "The form MUST check the email format before saving."}]}, "expect": {"resolved_by": "llm"}}

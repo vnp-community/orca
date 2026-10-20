@@ -1,0 +1,365 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "analysis",
+ "description": "LLM output of the analysis step (layer A): fill seed nodes, propose conditions, report gaps. Natural-language values are Vietnamese.",
+ "type": "object",
+ "required": [
+  "schemaVersion",
+  "subject",
+  "conditions"
+ ],
+ "additionalProperties": false,
+ "properties": {
+  "schemaVersion": {
+   "const": 2
+  },
+  "subject": {
+   "type": "string",
+   "minLength": 1
+  },
+  "obligations": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "seedCode",
+     "question"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "seedCode": {
+      "type": "string"
+     },
+     "question": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+     }
+    }
+   }
+  },
+  "conditions": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "seedCode",
+     "statement",
+     "expectedEffect",
+     "basedOn",
+     "evidence",
+     "confidence"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "seedCode": {
+      "type": "string",
+      "minLength": 1
+     },
+     "statement": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+     },
+     "expectedEffect": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+     },
+     "preState": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "maxLength": 600
+     },
+     "trigger": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "maxLength": 600
+     },
+     "oracle": {
+      "type": "object",
+      "required": [],
+      "additionalProperties": false,
+      "properties": {
+       "expected": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 600
+       },
+       "tolerance": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 600
+       },
+       "measurement": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 600
+       }
+      }
+     },
+     "faultModel": {
+      "type": "object",
+      "required": [],
+      "additionalProperties": false,
+      "properties": {
+       "expectedHandling": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 600
+       }
+      }
+     },
+     "partition": {
+      "type": "object",
+      "required": [],
+      "additionalProperties": false,
+      "properties": {
+       "values": {
+        "type": "array",
+        "minItems": 1
+       }
+      }
+     },
+     "path": {
+      "type": "object",
+      "required": [],
+      "additionalProperties": false,
+      "properties": {
+       "steps": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 600
+        }
+       }
+      }
+     },
+     "basedOn": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "minLength": 1
+      }
+     },
+     "evidence": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "sourceCode"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "sourceCode": {
+         "type": "string",
+         "minLength": 1
+        },
+        "quote": {
+         "type": "string",
+         "maxLength": 600
+        }
+       }
+      }
+     },
+     "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+     }
+    }
+   }
+  },
+  "proposedConditions": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "conditionKind",
+     "statement",
+     "expectedEffect",
+     "oracle",
+     "basedOn",
+     "evidence",
+     "confidence"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "conditionKind": {
+      "type": "string",
+      "enum": [
+       "functional",
+       "inputValidation",
+       "stateTransition",
+       "guardViolation",
+       "invariant",
+       "decisionRule",
+       "errorHandling",
+       "idempotency",
+       "concurrency",
+       "timing",
+       "atomicity",
+       "compensation",
+       "migration",
+       "compatibility",
+       "access",
+       "secretExposure",
+       "audit",
+       "performance",
+       "resilience",
+       "observability",
+       "rollout"
+      ]
+     },
+     "statement": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+     },
+     "expectedEffect": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+     },
+     "preState": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "maxLength": 600
+     },
+     "trigger": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "maxLength": 600
+     },
+     "oracle": {
+      "type": "object",
+      "required": [
+       "oracleKind",
+       "expected"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "oracleKind": {
+        "type": "string",
+        "enum": [
+         "postcondition",
+         "invariant",
+         "errorContract",
+         "threshold",
+         "stateMachine",
+         "decisionRow",
+         "schema",
+         "acceptanceCriterion",
+         "reference",
+         "humanJudgment"
+        ]
+       },
+       "expected": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 600
+       },
+       "tolerance": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 600
+       },
+       "measurement": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 600
+       },
+       "sourceCode": {
+        "type": [
+         "string",
+         "null"
+        ]
+       }
+      }
+     },
+     "basedOn": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "minLength": 1
+      }
+     },
+     "evidence": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "sourceCode"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "sourceCode": {
+         "type": "string",
+         "minLength": 1
+        },
+        "quote": {
+         "type": "string",
+         "maxLength": 600
+        }
+       }
+      }
+     },
+     "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+     }
+    }
+   }
+  },
+  "gaps": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "missing",
+     "askedQuestion"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "missing": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+     },
+     "askedQuestion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+     },
+     "blocks": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "minLength": 1
+      }
+     }
+    }
+   }
+  }
+ },
+ "$comment": "GENERATED from tso.yaml sha256 827d5259050344fed165347904c5b9d357c7b16d77ccb6c2ff9977cb6cce9982; do not edit by hand"
+}

@@ -1,0 +1,126 @@
+{
+  "purpose": "Read-only diagnostic; no production KG or source modified",
+  "graph": {
+    "elements": [
+      {
+        "id": "ALG-DEMO",
+        "class": "Algorithm",
+        "name": "Incomplete algorithm",
+        "origin": "own",
+        "maturity": "specified",
+        "version_introduced": "1",
+        "review_status": "approved",
+        "provenance": [
+          {
+            "source_id": "s",
+            "source_version": "1",
+            "source_hash": "h",
+            "block": "line:1"
+          }
+        ],
+        "props": {}
+      }
+    ],
+    "edges": []
+  },
+  "structural_validation": {
+    "version": "0.5.0",
+    "ok": true,
+    "errors": [],
+    "element_count": 1,
+    "edge_count": 0
+  },
+  "checks": {
+    "QG-01": {
+      "rule_id": "QG-01",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    },
+    "QG-02": {
+      "rule_id": "QG-02",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    },
+    "QG-03": {
+      "rule_id": "QG-03",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    },
+    "QG-04": {
+      "rule_id": "QG-04",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    },
+    "QG-05": {
+      "rule_id": "QG-05",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    },
+    "QG-06": {
+      "rule_id": "QG-06",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    },
+    "QG-07": {
+      "rule_id": "QG-07",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    },
+    "QG-08": {
+      "rule_id": "QG-08",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    },
+    "QG-09": {
+      "rule_id": "QG-09",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    },
+    "QG-10": {
+      "rule_id": "QG-10",
+      "version": "1",
+      "input_hash": "a6ff1c2b98e735cf2e97affdd1800e8913de984d6c62f6f3c5c02925ac03059f",
+      "outcome": "pass",
+      "evidence": [
+        "validator completed"
+      ]
+    }
+  },
+  "limitation": "No source content was supplied: QG evidence validation is metadata-only here. All QG passes are not full TS/spec readiness. Algorithm mandatory semantics are not checked."
+}

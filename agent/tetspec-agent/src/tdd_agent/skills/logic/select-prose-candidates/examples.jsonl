@@ -1,0 +1,1 @@
+{"name": "modal and quantity lines only", "input": {"text": "Intro text here is long enough.\nThe API must respond within 2 seconds.\n- retry 3 times\n"}, "expect": {"output": {"spans": [{"line": 2}, {"line": 3}]}, "resolved_by": "rule"}}

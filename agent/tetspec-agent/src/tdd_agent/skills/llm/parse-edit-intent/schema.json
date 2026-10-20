@@ -1,0 +1,68 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "prompt"
+    ],
+    "properties": {
+      "prompt": {
+        "type": "string"
+      },
+      "known_paths": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "target_mention",
+      "operation",
+      "path",
+      "value",
+      "unit",
+      "source_ref",
+      "notes"
+    ],
+    "properties": {
+      "target_mention": {
+        "type": "string"
+      },
+      "operation": {
+        "enum": [
+          "modify",
+          "add",
+          "remove",
+          "reorder",
+          "format",
+          "clarify"
+        ]
+      },
+      "path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "value": {},
+      "unit": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "source_ref": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "notes": {
+        "type": "string"
+      }
+    }
+  }
+}

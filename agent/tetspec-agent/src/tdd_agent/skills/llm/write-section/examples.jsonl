@@ -1,0 +1,1 @@
+{"name": "a short addition to a missing section", "input": {"instruction": "Trong mục 1.3 Phi mục tiêu của TDD, thêm: Hệ thống không hỗ trợ ứng dụng di động native.", "section": {"number": "1.3", "title": "Phi mục tiêu"}, "current": "> **[THIẾU] Phi mục tiêu.** Chưa có phần tử phi mục tiêu trong dữ liệu đã trích."}, "expect": {"output": {"mode": "append"}, "resolved_by": "llm"}}

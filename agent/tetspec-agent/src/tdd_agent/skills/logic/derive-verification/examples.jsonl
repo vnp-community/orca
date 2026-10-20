@@ -1,0 +1,2 @@
+{"name": "scenario to verification", "input": {"change_id": "FR-1", "scenarios": [{"id": "SC-1", "props": {"given": "a stored SBOM", "when": "the call exceeds 30 s", "then": "HTTP 504 is returned"}}]}, "expect": {"output": {"verification": "GIVEN a stored SBOM WHEN the call exceeds 30 s THEN HTTP 504 is returned"}, "resolved_by": "rule"}}
+{"name": "no scenario stays a gap", "input": {"change_id": "FR-2", "scenarios": []}, "expect": {"output": {"verification": null}, "resolved_by": "rule"}}

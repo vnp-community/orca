@@ -1,0 +1,8 @@
+--- SRS (before)
++++ SRS (proposed from the CR)
+@@ -463 +463 @@
+-| FR-AST-13 | Hệ thống phải cảnh báo Entitlement thuê bao tại T-60, T-30, T-7, T-0 | M | UC-36 | BRL-48; ALG-07 | ENT-35, ENT-26 | Lập lịch (job hằng ngày); API-S-32, API-G-15 | \[T\] Mỗi mốc gửi đúng một lần (`reminded_milestones`); gia hạn còn hơn 60 ngày đưa Entitlement về Active và xoá mốc đã nhắc |
++| FR-AST-13 | Hệ thống phải cảnh báo Entitlement thuê bao tại T-60, T-30, T-14, T-7, T-0 | M | UC-36 | BRL-48; ALG-07 | ENT-35, ENT-26 | Lập lịch (job hằng ngày); API-S-32, API-G-15 | \[T\] Mỗi mốc gửi đúng một lần (`reminded_milestones`); gia hạn còn hơn 60 ngày đưa Entitlement về Active và xoá mốc đã nhắc |
+@@ -1735 +1735 @@
+-| BRL-48 | Cảnh báo Entitlement T-60, T-30, T-7, T-0 | FR-AST-13 | ALG-07 | Job hằng ngày; Alert `entitlement_expiring` |
++| BRL-48 | Cảnh báo Entitlement T-60, T-30, T-14, T-7, T-0 | FR-AST-13 | ALG-07 | Job hằng ngày; Alert `entitlement_expiring` |

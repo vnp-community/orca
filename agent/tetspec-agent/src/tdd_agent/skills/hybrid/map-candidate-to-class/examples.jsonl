@@ -1,0 +1,1 @@
+{"name": "heading rule decides without a model", "input": {"candidate": {"block": "line:5", "text": "POST /v1/evidence returns 201", "heading_path": ["API catalogue"]}, "allowed_classes": ["Operation", "Requirement"]}, "expect": {"output": {"class": "Operation"}, "resolved_by": "rule"}}

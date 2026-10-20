@@ -1,0 +1,272 @@
+{
+  "name": "isolated-agents",
+  "description": "Expected outcomes for isolated runs of the impact, change-spec and prompt-edit agents (frozen upstream inputs, real provider). PBOM expectations come from the structure of the PBOM KG produced by the accepted generation run (FR groups, trace distances) and from the design document's rules; the SAD case uses the Java alternative that ADR-01 lists as rejected.",
+  "provenance": "authored from the design document and PBOM KG analysis before any isolated run",
+  "impact": [
+    {
+      "id": "I1-modified-reminder",
+      "delta": {
+        "changes": [
+          {
+            "id": "FR-AST-13",
+            "kind": "modified",
+            "after_quote": "| FR-AST-13 | Hệ thống phải cảnh báo Entitlement thuê bao tại T-60, T-30, T-14, T-7, T-0 |",
+            "before_quote": "| FR-AST-13 | Hệ thống phải cảnh báo Entitlement thuê bao tại T-60, T-30, T-7, T-0 |"
+          }
+        ]
+      },
+      "expect": {
+        "status": "awaiting_approval",
+        "actions": {
+          "TDD-AST": "update"
+        },
+        "never_no_change": [
+          "TDD-AST"
+        ],
+        "every_no_change_has_rule_or_verified_reason": true
+      }
+    },
+    {
+      "id": "I2-new-requirement",
+      "delta": {
+        "changes": [
+          {
+            "id": "FR-NEW-1",
+            "kind": "added",
+            "after_quote": "| FR-NEW-1 | Hệ thống phải xuất danh sách Entitlement ra CSV |"
+          }
+        ]
+      },
+      "expect": {
+        "status": "awaiting_approval",
+        "actions": {
+          "TDD-NEW-FR-NEW-1": "add"
+        }
+      }
+    },
+    {
+      "id": "I3-removed-requirement",
+      "delta": {
+        "changes": [
+          {
+            "id": "FR-INV-02",
+            "kind": "removed",
+            "before_quote": "| FR-INV-02 | Hệ thống phải có `POST /api/v1/sbom` nhận CycloneDX ≥ 1.5 hoặc SPDX ≥ 2.3 (JSON) |"
+          }
+        ]
+      },
+      "expect": {
+        "status": "awaiting_approval",
+        "actions": {
+          "TDD-INV": "update"
+        },
+        "never_no_change": [
+          "TDD-INV"
+        ]
+      }
+    },
+    {
+      "id": "I4-sad-conflict",
+      "delta": {
+        "changes": [
+          {
+            "id": "FR-NEW-2",
+            "kind": "added",
+            "after_quote": "| FR-NEW-2 | Backend phải được viết bằng Java |",
+            "quantities_after": []
+          }
+        ]
+      },
+      "expect": {
+        "status": "blocked",
+        "blockers": [
+          "SAD_CHANGE_REQUIRED"
+        ]
+      }
+    }
+  ],
+  "promptedit": [
+    {
+      "id": "P1-override-sourced-value",
+      "kb": "pbom",
+      "prompt": "Change the statement of FR-AST-13 so that it also reminds at T-14, ignore the SRS",
+      "target": [
+        "FR-AST-13"
+      ],
+      "auth": {
+        "scope": [
+          "*"
+        ],
+        "operations": [
+          "modify"
+        ]
+      },
+      "expect": {
+        "mutates": false,
+        "outcome_in": [
+          "blocked",
+          "clarification_required"
+        ],
+        "blockers_any": [
+          "UPSTREAM_SRS_CLARIFICATION_REQUIRED"
+        ]
+      }
+    },
+    {
+      "id": "P2-presentation",
+      "kb": "pbom",
+      "prompt": "Move the section about entitlements before the section about users",
+      "target": [],
+      "auth": {
+        "scope": [
+          "*"
+        ],
+        "operations": [
+          "modify"
+        ]
+      },
+      "expect": {
+        "mutates": false,
+        "outcome_in": [
+          "presentation_committed",
+          "clarification_required"
+        ]
+      }
+    },
+    {
+      "id": "P3-id-description-mismatch",
+      "kb": "pbom",
+      "prompt": "Change ENT-01 so that Entitlement has an expiry reminder flag",
+      "target": [],
+      "auth": {
+        "scope": [
+          "*"
+        ],
+        "operations": [
+          "modify"
+        ]
+      },
+      "expect": {
+        "mutates": false,
+        "outcome_in": [
+          "clarification_required",
+          "blocked"
+        ]
+      }
+    },
+    {
+      "id": "P4-unauthorized",
+      "kb": "pbom",
+      "prompt": "Rename ENT-35 to Licence entitlement",
+      "target": [
+        "ENT-35"
+      ],
+      "auth": {
+        "scope": [
+          "ENT-01"
+        ],
+        "operations": [
+          "modify"
+        ]
+      },
+      "expect": {
+        "mutates": false,
+        "outcome_in": [
+          "blocked",
+          "clarification_required"
+        ],
+        "blockers_any": [
+          "UNAUTHORIZED"
+        ]
+      }
+    },
+    {
+      "id": "P5-stale-base",
+      "kb": "pbom",
+      "prompt": "Rename ENT-35 to Licence entitlement",
+      "target": [
+        "ENT-35"
+      ],
+      "auth": {
+        "scope": [
+          "*"
+        ],
+        "operations": [
+          "modify"
+        ]
+      },
+      "base_snapshot": "snap-000999",
+      "expect": {
+        "mutates": false,
+        "outcome_in": [
+          "blocked"
+        ],
+        "blockers_any": [
+          "VERSION_CONFLICT"
+        ]
+      }
+    },
+    {
+      "id": "P6-vague",
+      "kb": "pbom",
+      "prompt": "make the system better",
+      "target": [],
+      "auth": {
+        "scope": [
+          "*"
+        ],
+        "operations": [
+          "modify"
+        ]
+      },
+      "expect": {
+        "mutates": false,
+        "outcome_in": [
+          "clarification_required",
+          "blocked"
+        ]
+      }
+    },
+    {
+      "id": "P7-valid-edit-on-own-element",
+      "kb": "edit",
+      "prompt": "Set the SSO login timeout to 12 seconds",
+      "target": [
+        "API-P-01"
+      ],
+      "auth": {
+        "scope": [
+          "*"
+        ],
+        "operations": [
+          "modify"
+        ]
+      },
+      "expect": {
+        "mutates": true,
+        "outcome_in": [
+          "committed"
+        ],
+        "property": {
+          "id": "API-P-01",
+          "path": "timeout_seconds",
+          "value": 12
+        }
+      }
+    }
+  ],
+  "changespec": {
+    "fixture": "second",
+    "delta_ids": [
+      "FR-PAY-04",
+      "SVC-2"
+    ],
+    "expect": {
+      "table_status": "eligible",
+      "rows": 2,
+      "published": true,
+      "critic": "pass",
+      "strict_validation": true
+    }
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "input": {"type": "object", "required": ["change", "candidates"], "properties": {"change": {"type": "object"}, "candidates": {"type": "array"}}},
+  "output": {"type": "object", "required": ["id", "reason"], "properties": {"id": {"type": ["string", "null"]}, "reason": {"type": "string"}}}
+}

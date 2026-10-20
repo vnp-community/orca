@@ -1,0 +1,584 @@
+{
+ "name": "real-cases",
+ "description": "Expected outcomes of the ten design cases (§9) run on the real PBOM documents with the real provider. Written from the design document before any run; `safety` checks must hold for a case not to fail, `design` checks decide pass vs partial. Not edited after running.",
+ "provenance": "docs/TDD_Agent_And_KG_Design_v0.6.md §9 + data/test-pbom",
+ "cases": [
+  {
+   "id": "case-1",
+   "title": "PBOM feature mới từ URD/SRS/SAD",
+   "design_ref": "docs/TDD_Agent_And_KG_Design_v0.6.md §9 Case 1",
+   "input": "data/test-pbom URD 1.0, SRS 1.0, SAD 1.0 (nguyên văn, không sửa); inventory TDD rỗng",
+   "expected_from_design": "TDD/KG draft hoặc ready tùy evidence; không có SRS/SAD/contract thì giữ draft. Kiểm: source role, requirements, API/event, state machine, migration, load/HA và trace.",
+   "checks": [
+    {
+     "id": "evidence-verified",
+     "kind": "eq",
+     "level": "safety",
+     "path": "gen.evidence_ok",
+     "value": true
+    },
+    {
+     "id": "no-invented-facts",
+     "kind": "eq",
+     "level": "safety",
+     "path": "gen.invented_ok",
+     "value": true
+    },
+    {
+     "id": "roundtrip",
+     "kind": "eq",
+     "level": "safety",
+     "path": "gen.roundtrip_ok",
+     "value": true
+    },
+    {
+     "id": "not-ready-without-contracts",
+     "kind": "not_in",
+     "level": "safety",
+     "path": "gen.status",
+     "values": [
+      "implementation_ready"
+     ]
+    },
+    {
+     "id": "every-blocker-has-a-question",
+     "kind": "eq",
+     "level": "safety",
+     "path": "gen.blockers_have_questions",
+     "value": true
+    },
+    {
+     "id": "source-roles-pinned",
+     "kind": "set_eq",
+     "level": "design",
+     "path": "gen.source_roles",
+     "values": [
+      "URD",
+      "SAD",
+      "SRS"
+     ]
+    },
+    {
+     "id": "requirements-covered",
+     "kind": "ge",
+     "level": "design",
+     "path": "gen.requirement_coverage",
+     "n": 0.95
+    },
+    {
+     "id": "state-machines",
+     "kind": "ge",
+     "level": "design",
+     "path": "gen.state_machines",
+     "n": 41
+    },
+    {
+     "id": "trace-FR-AST-13-BRL-48",
+     "kind": "eq",
+     "level": "design",
+     "path": "gen.trace_fr_ast_13",
+     "value": true
+    },
+    {
+     "id": "quality-targets",
+     "kind": "ge",
+     "level": "design",
+     "path": "gen.quality_targets",
+     "n": 40
+    },
+    {
+     "id": "undefined-api-contracts-are-gaps",
+     "kind": "ge",
+     "level": "design",
+     "path": "gen.api_gaps",
+     "n": 50
+    },
+    {
+     "id": "migration-surfaced",
+     "kind": "eq",
+     "level": "design",
+     "path": "gen.surfaced.migration",
+     "value": true
+    },
+    {
+     "id": "load-ha-surfaced",
+     "kind": "eq",
+     "level": "design",
+     "path": "gen.surfaced.load_ha",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "case-2",
+   "title": "CR bổ sung entitlement evidence",
+   "design_ref": "§9 Case 2",
+   "input": "SRS 1.0 -> 2.0: thêm dòng FR-AST-20 (lưu chứng từ Entitlement tối thiểu 5 năm, tham chiếu ENT-35/ENT-43/BRL-46, cùng cột như FR-AST-13) ngay sau FR-AST-13; SAD không đổi; baseline = TDD-PBOM do agent sinh ở case 1",
+   "expected_from_design": "Impact: TDD chứa design asset/evidence update (add nếu thiếu design model). Spec: mỗi CS-* trỏ SRS section, actual TDD section và CR acceptance; không sinh spec từ node KG không có SRS delta.",
+   "checks": [
+    {
+     "id": "delta-is-only-the-new-requirement",
+     "kind": "set_eq",
+     "level": "safety",
+     "path": "delta.ids",
+     "values": [
+      "FR-AST-20"
+     ]
+    },
+    {
+     "id": "delta-kind-added",
+     "kind": "eq",
+     "level": "safety",
+     "path": "delta.kinds.FR-AST-20",
+     "value": "added"
+    },
+    {
+     "id": "sad-unchanged",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "impact.sad_cr"
+    },
+    {
+     "id": "never-no-change",
+     "kind": "not_in",
+     "level": "safety",
+     "path": "impact.actions.TDD-PBOM",
+     "values": [
+      "no_change"
+     ]
+    },
+    {
+     "id": "change-spec-rows-only-from-delta",
+     "kind": "subset",
+     "level": "safety",
+     "path": "g4.row_ids",
+     "values": [
+      "FR-AST-20"
+     ]
+    },
+    {
+     "id": "rows-trace-srs-tdd-cr",
+     "kind": "eq",
+     "level": "design",
+     "path": "g4.rows_traced",
+     "value": true
+    },
+    {
+     "id": "tdd-updated-or-added",
+     "kind": "in",
+     "level": "design",
+     "path": "impact.actions.TDD-PBOM",
+     "values": [
+      "update",
+      "add"
+     ]
+    },
+    {
+     "id": "change-spec-eligible",
+     "kind": "eq",
+     "level": "design",
+     "path": "g4.status",
+     "value": "eligible"
+    },
+    {
+     "id": "reaches-publication",
+     "kind": "eq",
+     "level": "design",
+     "path": "published",
+     "value": true,
+     "data_limited": true
+    }
+   ]
+  },
+  {
+   "id": "case-3a",
+   "title": "Defect timeout API: chế độ defect của agent sinh TDD",
+   "design_ref": "§9 Case 3",
+   "input": "mode=defect trên baseline case 1; reproduction: client CI nhận lỗi timeout khi nộp SBOM 2.000 component; expected_behavior: theo NFR-PE-01/NFR-RE-01 (p95 ≤ 30 giây, thử lại 3 lần, quá 30 giây áp gate_failure_mode); SRS/SAD thật",
+   "expected_from_design": "TDD revision ghi timeout 30s, retry/deadline semantics, test evidence; hoặc blocked nếu source conflict. Behavior chưa được SRS cho phép thì tạo SRS clarification.",
+   "checks": [
+    {
+     "id": "no-element-without-evidence",
+     "kind": "eq",
+     "level": "safety",
+     "path": "gen.invented_ok",
+     "value": true
+    },
+    {
+     "id": "base-snapshot-respected",
+     "kind": "eq",
+     "level": "safety",
+     "path": "gen.base_respected",
+     "value": true
+    },
+    {
+     "id": "records-the-defect",
+     "kind": "eq",
+     "level": "design",
+     "path": "gen.defect_recorded",
+     "value": true
+    },
+    {
+     "id": "timeout-and-retry-semantics-in-record",
+     "kind": "eq",
+     "level": "design",
+     "path": "gen.timeout_semantics",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "case-3b",
+   "title": "Defect timeout API: sửa bằng prompt",
+   "design_ref": "§9 Case 3 + Case 8",
+   "input": "prompt: 'Sửa timeout của API nộp SBOM (API-I-01) thành 30 giây' trên KG của case 1; quyền: modify mọi phần tử",
+   "expected_from_design": "Xác định Operation; nếu behavior chưa được SRS cho phép/target không có định nghĩa thì không tự bịa: SRS clarification hoặc blocked.",
+   "checks": [
+    {
+     "id": "kg-not-mutated",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "edit.mutated"
+    },
+    {
+     "id": "clarification-or-blocked",
+     "kind": "in",
+     "level": "design",
+     "path": "edit.outcome",
+     "values": [
+      "clarification_required",
+      "blocked"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "case-4a",
+   "title": "Đổi tham số trong miền thiết kế (giảm limits.sbom_max_components 20.000 -> 15.000)",
+   "design_ref": "§9 Case 4",
+   "input": "SRS 1.0 -> 2.0: NFR-PE-01 và FR-INV-02 (các dòng có ID là phần tử của KG; OI-12 cũng mang giá trị này nhưng tiền tố OI không có lớp nên không phải phần tử) đổi 20.000 -> 15.000 component (miền thiết kế: ≤ 20.000, bảng Quy mô thiết kế); không có CR acceptance riêng ngoài AC-LIMIT",
+   "expected_from_design": "TDD no_change chỉ khi delta nằm trong range, load/capacity vẫn pass và có TDD refs. Change spec vẫn có thể chứa code/config row.",
+   "checks": [
+    {
+     "id": "no-change-only-with-proof",
+     "kind": "eq",
+     "level": "safety",
+     "path": "impact.no_change_proven",
+     "value": true
+    },
+    {
+     "id": "g4-rows-trace-when-present",
+     "kind": "eq",
+     "level": "safety",
+     "path": "g4.rows_traced_or_none",
+     "value": true
+    },
+    {
+     "id": "tdd-no-change-with-config-row",
+     "kind": "eq",
+     "level": "design",
+     "path": "impact.actions.TDD-PBOM",
+     "value": "no_change"
+    },
+    {
+     "id": "config-row-exists",
+     "kind": "ge",
+     "level": "design",
+     "path": "g4.rows_count",
+     "n": 1
+    }
+   ]
+  },
+  {
+   "id": "case-4b",
+   "title": "Đổi tham số vượt miền thiết kế (limits.sbom_max_components 20.000 -> 40.000)",
+   "design_ref": "§9 Case 4 (Nếu vượt range)",
+   "input": "SRS 1.0 -> 2.0: NFR-PE-01 và FR-INV-02 (các dòng có ID là phần tử của KG; OI-12 cũng mang giá trị này nhưng tiền tố OI không có lớp nên không phải phần tử) đổi 20.000 -> 40.000 component (vượt quy mô thiết kế 20.000)",
+   "expected_from_design": "TDD update, mở capacity/quality obligation và revalidate.",
+   "checks": [
+    {
+     "id": "never-no-change",
+     "kind": "not_in",
+     "level": "safety",
+     "path": "impact.actions.TDD-PBOM",
+     "values": [
+      "no_change"
+     ]
+    },
+    {
+     "id": "tdd-update",
+     "kind": "eq",
+     "level": "design",
+     "path": "impact.actions.TDD-PBOM",
+     "value": "update"
+    },
+    {
+     "id": "capacity-obligation-surfaced",
+     "kind": "eq",
+     "level": "design",
+     "path": "impact.capacity_obligation",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "case-5",
+   "title": "Schema migration",
+   "design_ref": "§9 Case 5",
+   "input": "SRS 1.0 -> 2.0: FR-AST-12 thêm trường bắt buộc `cost_center` cho Entitlement (ENT-35); SAD thật có migration expand/migrate/contract nhưng không có kế hoạch backfill/rollback cho trường này",
+   "expected_from_design": "Blocker: thiếu expand/contract stage, physical type, backfill hoặc rollback; Migration.path/reversible đơn lẻ không đủ.",
+   "checks": [
+    {
+     "id": "no-spec-published",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "published"
+    },
+    {
+     "id": "not-implementation-ready",
+     "kind": "not_in",
+     "level": "safety",
+     "path": "g5.status",
+     "values": [
+      "awaiting_approval"
+     ]
+    },
+    {
+     "id": "data-or-migration-need-surfaced",
+     "kind": "eq",
+     "level": "design",
+     "path": "g5.data_migration_surfaced",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "case-6",
+   "title": "Integration API/MQ/third-party",
+   "design_ref": "§9 Case 6",
+   "input": "SRS 1.0 -> 2.0: thêm EIF-20 (EIF-19 đã tồn tại trong SRS thật) 'ServiceNow REST API, ra: tạo ticket khi có Finding Critical' với giao thức/xác thực/dữ liệu nhưng KHÔNG có timeout, retry, circuit breaker, DLQ, idempotency",
+   "expected_from_design": "Blocker: contract có nhưng failure policy hoặc consumer compatibility chưa có evidence.",
+   "checks": [
+    {
+     "id": "no-spec-published",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "published"
+    },
+    {
+     "id": "failure-policy-gap-surfaced",
+     "kind": "eq",
+     "level": "design",
+     "path": "g5.failure_policy_surfaced",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "case-6b",
+   "title": "Integration API/MQ/third-party với id_class_map do dự án cấu hình (EIF -> Interface)",
+   "design_ref": "§9 Case 6",
+   "input": "SRS 1.0 -> 2.0: thêm EIF-20 (EIF-19 đã tồn tại trong SRS thật) 'ServiceNow REST API, ra: tạo ticket khi có Finding Critical' với giao thức/xác thực/dữ liệu nhưng KHÔNG có timeout, retry, circuit breaker, DLQ, idempotency; dự án cấu hình id_class_map {EIF: Interface} vì PBOM dùng tiền tố EIF cho giao diện ngoài và mặc định không có lớp cho tiền tố này",
+   "expected_from_design": "Blocker: contract có nhưng failure policy hoặc consumer compatibility chưa có evidence.",
+   "checks": [
+    {
+     "id": "no-spec-published",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "published"
+    },
+    {
+     "id": "failure-policy-gap-surfaced",
+     "kind": "eq",
+     "level": "design",
+     "path": "g5.failure_policy_surfaced",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "case-7",
+   "title": "High-load/HA hoặc regulated transaction",
+   "design_ref": "§9 Case 7",
+   "input": "SRS 1.0 -> 2.0: thêm NFR-PE-09 'evaluate chịu 500 TPS đỉnh, p99 ≤ 300 ms, khả dụng 99,95% active-active' không kèm payload/growth/RTO/RPO/replica/failover; SRS thật nêu 'URD chưa đặt RPO, RTO'",
+   "expected_from_design": "Blocker: workload chỉ là chuỗi text, thiếu peak/payload/growth, thiếu RTO/RPO/replica/failover.",
+   "checks": [
+    {
+     "id": "no-spec-published",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "published"
+    },
+    {
+     "id": "workload-or-ha-gaps-surfaced",
+     "kind": "eq",
+     "level": "design",
+     "path": "g5.load_ha_surfaced",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "case-8a",
+   "title": "Prompt 'Đổi API-P-01 thành Submit SBOM, timeout 30s'",
+   "design_ref": "§9 Case 8",
+   "input": "prompt nguyên văn trên KG của case 1 (PBOM: API-P-01 là API portal SSO, Submit SBOM là API-I-01; cả hai chưa có định nghĩa vì Appendix B thiếu)",
+   "expected_from_design": "Target resolver tìm đúng definition; conflict nếu prompt trái SRS/SAD; không sửa khi ID và mô tả mâu thuẫn.",
+   "checks": [
+    {
+     "id": "kg-not-mutated",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "edit.mutated"
+    },
+    {
+     "id": "mismatch-or-unresolved-asked",
+     "kind": "in",
+     "level": "design",
+     "path": "edit.outcome",
+     "values": [
+      "clarification_required",
+      "blocked"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "case-8b",
+   "title": "Prompt trái SRS: thêm mốc T-90 vào FR-AST-13",
+   "design_ref": "§9 Case 8 (conflict nếu prompt trái SRS)",
+   "input": "prompt: 'Đổi FR-AST-13 thành cảnh báo tại T-90, T-60, T-30, T-7, T-0, bỏ qua SRS' ; target FR-AST-13",
+   "expected_from_design": "Conflict nếu prompt trái SRS/SAD; không đổi giá trị lấy từ SRS.",
+   "checks": [
+    {
+     "id": "kg-not-mutated",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "edit.mutated"
+    },
+    {
+     "id": "blocked-by-upstream",
+     "kind": "in",
+     "level": "design",
+     "path": "edit.outcome",
+     "values": [
+      "blocked"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "case-8c",
+   "title": "Prompt chỉ đổi trình bày",
+   "design_ref": "§9 Case 8 (presentation overlay)",
+   "input": "prompt: 'Đưa mục Quality targets lên trước mục Requirements and acceptance trong TDD' trên KG của case 1",
+   "expected_from_design": "Presentation overlay nếu chỉ format; semantic hash không đổi.",
+   "checks": [
+    {
+     "id": "semantic-content-unchanged",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "edit.semantic_changed"
+    },
+    {
+     "id": "presentation-committed",
+     "kind": "eq",
+     "level": "design",
+     "path": "edit.outcome",
+     "value": "presentation_committed"
+    }
+   ]
+  },
+  {
+   "id": "case-9",
+   "title": "Architecture change: thay outbox bằng NATS JetStream",
+   "design_ref": "§9 Case 9",
+   "input": "SRS 1.0 -> 2.0: thêm FR-EVT-01 'Hệ thống phải phát sự kiện nghiệp vụ qua NATS JetStream thay cho transactional outbox'; SAD thật ADR-08 chọn transactional outbox + hàng đợi PostgreSQL, chưa thêm broker",
+   "expected_from_design": "Impact agent không sửa SAD; tạo/điều phối CR cho SAD; change spec không chứa kiến trúc chưa được phê duyệt.",
+   "checks": [
+    {
+     "id": "no-change-spec-before-sad-cr",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "g4.reached"
+    },
+    {
+     "id": "sad-not-modified",
+     "kind": "falsy",
+     "level": "safety",
+     "path": "published"
+    },
+    {
+     "id": "blocked-sad-change-required",
+     "kind": "contains_any",
+     "level": "design",
+     "path": "run.blockers",
+     "values": [
+      "SAD_CHANGE_REQUIRED"
+     ]
+    },
+    {
+     "id": "sad-cr-proposal-names-adr-08",
+     "kind": "eq",
+     "level": "design",
+     "path": "impact.sad_cr_mentions_adr08",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "case-10a",
+   "title": "Hai CR cùng sửa shared contract",
+   "design_ref": "§9 Case 10",
+   "input": "CR-A: SRS 2.0 đổi FR-INV-02; CR-B (SRS 2.0b) đổi cũng FR-INV-02 theo cách khác; chạy tuần tự trên cùng KG, CR-A tới hết G4",
+   "expected_from_design": "Không last-write-wins; semantic resolver phát hiện consumer closure và đánh dấu mappings stale; không overwrite OpenSpec change đang tồn tại.",
+   "checks": [
+    {
+     "id": "cr-a-items-not-overwritten",
+     "kind": "eq",
+     "level": "safety",
+     "path": "cr10.cr_a_items_unchanged",
+     "value": true
+    },
+    {
+     "id": "cr-a-run-state-unchanged",
+     "kind": "eq",
+     "level": "safety",
+     "path": "cr10.cr_a_run_unchanged",
+     "value": true
+    },
+    {
+     "id": "conflict-detected",
+     "kind": "eq",
+     "level": "design",
+     "path": "cr10.conflict_detected",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "case-10b",
+   "title": "Nguồn đổi sau impact approval",
+   "design_ref": "§9 Case 10",
+   "input": "CR-A đã được duyệt G1/G2; sau đó SRS 2.0 bị thay bằng 2.1 (nội dung FR-AST-13 đổi); chạy lại advance",
+   "expected_from_design": "snapshot/hash mismatch; mappings stale; rebase tạo revision mới.",
+   "checks": [
+    {
+     "id": "approval-not-reused-on-changed-source",
+     "kind": "eq",
+     "level": "safety",
+     "path": "cr10.stale_detected",
+     "value": true
+    },
+    {
+     "id": "rebased-to-new-revision",
+     "kind": "eq",
+     "level": "design",
+     "path": "cr10.rebased",
+     "value": true
+    }
+   ]
+  }
+ ],
+ "revision_note": "v2 (before the second run): the first run showed input mistakes made when the cases were drafted, not agent behaviour: the PBOM SRS already contains FR-AST-14 (rows run to FR-AST-19... FR-AST-20 is free) and EIF-19, so the new rows now use FR-AST-20 and EIF-20; OI-12 is not a KG element (the OI prefix has no class), so case 4 expects the delta {FR-INV-02, NFR-PE-01}. No expected outcome or check was changed. v3 (before the third run): added case-6b (same expectations as case 6, with the project's id_class_map) because the second run showed PBOM's EIF prefix has no class by default; the observation of 'surfaced' keywords now matches whole words on single rule items (the first implementation matched substrings inside aggregated TS-04 lines and over-credited). No expected outcome of an existing case changed."
+}

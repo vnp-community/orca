@@ -1,0 +1,306 @@
+{
+  "version": "0.6.0",
+  "relations": {
+    "has_section": {
+      "domain": [
+        "DocumentRef"
+      ],
+      "range": [
+        "SectionRef"
+      ],
+      "cardinality": "1-n",
+      "inverse": "section_of"
+    },
+    "has_srs_delta": {
+      "domain": [
+        "ChangeRequest"
+      ],
+      "range": [
+        "SrsDelta"
+      ],
+      "cardinality": "1-n",
+      "inverse": "delta_of"
+    },
+    "has_impact_report": {
+      "domain": [
+        "SrsDelta"
+      ],
+      "range": [
+        "ImpactReport"
+      ],
+      "cardinality": "1-1",
+      "inverse": "impact_for"
+    },
+    "has_impact_approval": {
+      "domain": [
+        "ImpactReport"
+      ],
+      "range": [
+        "ImpactApproval"
+      ],
+      "cardinality": "1-1",
+      "inverse": "approval_for"
+    },
+    "has_semantic_resolution": {
+      "domain": [
+        "ImpactReport",
+        "GenerationRun",
+        "PromptEditRequest"
+      ],
+      "range": [
+        "SemanticResolution"
+      ],
+      "cardinality": "1-1",
+      "inverse": "resolution_for"
+    },
+    "has_migration_stage": {
+      "domain": [
+        "Migration"
+      ],
+      "range": [
+        "MigrationStage"
+      ],
+      "cardinality": "1-n",
+      "inverse": "stage_of"
+    },
+    "has_measurement": {
+      "domain": [
+        "QualityTarget",
+        "LoadProfile",
+        "CapacityModel",
+        "RecoveryObjective"
+      ],
+      "range": [
+        "Measurement"
+      ],
+      "cardinality": "1-n",
+      "inverse": "measurement_of"
+    },
+    "realizes_tdd_set": {
+      "domain": [
+        "ImpactReport"
+      ],
+      "range": [
+        "TddSetRealization"
+      ],
+      "cardinality": "1-1",
+      "inverse": "realization_for"
+    },
+    "has_change_spec_item": {
+      "domain": [
+        "TddSetRealization"
+      ],
+      "range": [
+        "ChangeSpecItem"
+      ],
+      "cardinality": "1-n",
+      "inverse": "item_for"
+    },
+    "has_obligation_resolution": {
+      "domain": [
+        "DesignObligation"
+      ],
+      "range": [
+        "ObligationResolution"
+      ],
+      "cardinality": "1-n",
+      "inverse": "resolution_for"
+    },
+    "has_requirement": {
+      "domain": [
+        "Capability"
+      ],
+      "range": [
+        "RequirementVersion"
+      ],
+      "cardinality": "1-n",
+      "inverse": "requirement_of"
+    },
+    "for_change": {
+      "domain": [
+        "RequirementDelta"
+      ],
+      "range": [
+        "ChangeRequest"
+      ],
+      "cardinality": "n-1",
+      "inverse": "has_delta"
+    },
+    "before_requirement": {
+      "domain": [
+        "RequirementDelta"
+      ],
+      "range": [
+        "RequirementVersion"
+      ],
+      "cardinality": "n-1",
+      "inverse": "before_delta"
+    },
+    "after_requirement": {
+      "domain": [
+        "RequirementDelta"
+      ],
+      "range": [
+        "RequirementVersion"
+      ],
+      "cardinality": "n-1",
+      "inverse": "after_delta"
+    },
+    "in_baseline": {
+      "domain": [
+        "RequirementVersion",
+        "GenerationRun"
+      ],
+      "range": [
+        "Baseline"
+      ],
+      "cardinality": "n-1",
+      "inverse": "contains_version"
+    },
+    "has_scenario": {
+      "domain": [
+        "RequirementVersion"
+      ],
+      "range": [
+        "Scenario"
+      ],
+      "cardinality": "1-n",
+      "inverse": "scenario_for"
+    },
+    "implements": {
+      "domain": [
+        "WorkItem"
+      ],
+      "range": [
+        "ChangeSpecItem"
+      ],
+      "cardinality": "n-n",
+      "inverse": "implemented_by_work"
+    },
+    "verifies": {
+      "domain": [
+        "TestReceipt"
+      ],
+      "range": [
+        "WorkItem"
+      ],
+      "cardinality": "n-n",
+      "inverse": "verified_by_receipt"
+    },
+    "depends_on_work": {
+      "domain": [
+        "WorkItem"
+      ],
+      "range": [
+        "WorkItem"
+      ],
+      "cardinality": "n-n",
+      "inverse": "work_dependency",
+      "characteristics": [
+        "acyclic"
+      ]
+    },
+    "requires_knowledge": {
+      "domain": [
+        "GenerationProfile"
+      ],
+      "range": [
+        "KnowledgeNeed"
+      ],
+      "cardinality": "1-n",
+      "inverse": "required_by_profile"
+    },
+    "has_intake_report": {
+      "domain": [
+        "KnowledgeNeed"
+      ],
+      "range": [
+        "IntakeReport"
+      ],
+      "cardinality": "1-n",
+      "inverse": "reports_need"
+    },
+    "uses_baseline": {
+      "domain": [
+        "GenerationRun"
+      ],
+      "range": [
+        "Baseline"
+      ],
+      "cardinality": "n-1",
+      "inverse": "used_by_run"
+    },
+    "uses_profile": {
+      "domain": [
+        "GenerationRun"
+      ],
+      "range": [
+        "GenerationProfile"
+      ],
+      "cardinality": "n-1",
+      "inverse": "used_by_run"
+    },
+    "produces": {
+      "domain": [
+        "GenerationRun"
+      ],
+      "range": [
+        "Artefact"
+      ],
+      "cardinality": "1-n",
+      "inverse": "produced_by"
+    },
+    "has_readiness_report": {
+      "domain": [
+        "GenerationRun"
+      ],
+      "range": [
+        "ReadinessReport"
+      ],
+      "cardinality": "1-1",
+      "inverse": "reports_run"
+    },
+    "uses_repo_snapshot": {
+      "domain": [
+        "GenerationRun",
+        "PromptEditRequest"
+      ],
+      "range": [
+        "RepoSnapshot"
+      ],
+      "cardinality": "n-1",
+      "inverse": "used_by_run"
+    },
+    "requested_by_prompt": {
+      "domain": [
+        "ChangeRequest",
+        "ChangeSet",
+        "RequirementDelta"
+      ],
+      "range": [
+        "PromptEditRequest"
+      ],
+      "cardinality": "n-1",
+      "inverse": "requests_change"
+    },
+    "traces_to": {
+      "domain": "ANY",
+      "range": "ANY",
+      "cardinality": "n-n",
+      "inverse": "traced_from",
+      "impact": "reference_only",
+      "description": "Explicit source reference; does not assert design satisfaction or a foreign key"
+    },
+    "models_state_of": {
+      "domain": [
+        "StateMachine"
+      ],
+      "range": [
+        "Entity"
+      ],
+      "cardinality": "n-1",
+      "inverse": "has_state_model",
+      "impact": "behavior_dependency"
+    }
+  }
+}

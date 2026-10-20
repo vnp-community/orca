@@ -1,0 +1,655 @@
+{
+  "request_id": "change-add-t14-reminder",
+  "status": "draft",
+  "blockers": [
+    "NEED_VALIDATOR:work",
+    "RULE:QG-03",
+    "RULE:QG-07",
+    "RULE:TS-02",
+    "RULE:TS-04",
+    "RULE:TS-05",
+    "RULE:TS-06",
+    "RULE:TS-09",
+    "RULE:TS-10",
+    "work"
+  ],
+  "kg_snapshot": "change-add-t14-reminder-cs-v3",
+  "kg_hash": "1ae6fadf70511371712105cf5506416db8b0d1a0f5b5b3d4ffffcc1cae25ef6c",
+  "repo_hash": "94b10ab6341f86df45d71ba42037c733db909482aed82728ce3dac185be8e066",
+  "elements": [
+    "BRL-48",
+    "BRL-48@1",
+    "BRL-48@2",
+    "CR-PBOM-1/CS-001",
+    "CR-PBOM-1/CS-002",
+    "FR-AST-13",
+    "FR-AST-13@1",
+    "FR-AST-13@2",
+    "add-t14-reminder",
+    "change-add-t14-reminder/RD-BRL-48",
+    "change-add-t14-reminder/RD-FR-AST-13",
+    "change-add-t14-reminder/SC-BRL-48",
+    "change-add-t14-reminder/SC-FR-AST-13",
+    "change-add-t14-reminder/TC-CS-001",
+    "change-add-t14-reminder/TC-CS-002"
+  ],
+  "artifacts": {
+    "proposal.md": "b6752647a49831da7736cff060525196697591aaa731216c961e51508b2cbe2d",
+    "design.md": "fc7557c66457a78b88747a8661a4d1035bc9bd5c3c1f277510bca88e2423976b",
+    "specs/add-t14-reminder/spec.md": "82d5f08e53fd1d08a44604fed07a027c3e48f5184dcced0fe9b7bd611840873a",
+    "tasks.md": "2f23d2473415aa9605acc6c9a9c76f367a13ad650326a320841742163c1021b5"
+  },
+  "assertions": [
+    {
+      "artifact": "proposal.md",
+      "anchor": "line:3",
+      "references": [
+        "kg:BRL-48@1",
+        "kg:BRL-48@2"
+      ],
+      "text_hash": "c81ee6335249c82d1d47ad0074d84e8ba8a34ff0097daa7b7a44aa5f8c8b9a71",
+      "versions": {
+        "BRL-48@1": "change-add-t14-reminder-cs-v3",
+        "BRL-48@2": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "proposal.md",
+      "anchor": "line:7",
+      "references": [
+        "kg:CR-PBOM-1/CS-001"
+      ],
+      "text_hash": "3070b5f6a1aca9942f404809897188efc540baf12efaae64ffd4e3412134dd7f",
+      "versions": {
+        "CR-PBOM-1/CS-001": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "proposal.md",
+      "anchor": "line:8",
+      "references": [
+        "kg:BRL-48@2"
+      ],
+      "text_hash": "0868d725761532d103b11bee73065f1177f780f00ca22235f3f1d51e81c757c2",
+      "versions": {
+        "BRL-48@2": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "proposal.md",
+      "anchor": "line:9",
+      "references": [
+        "kg:FR-AST-13@2"
+      ],
+      "text_hash": "3447cf03b64dbad12db2e99f89c4bcb3c2f04bf3b388afad9bb6a1de255f2707",
+      "versions": {
+        "FR-AST-13@2": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "proposal.md",
+      "anchor": "line:14",
+      "references": [
+        "kg:add-t14-reminder"
+      ],
+      "text_hash": "ea2a68e26aa26cdb4ef332e0366ed50cbada8f2c11a727d7c7a28e058147318e",
+      "versions": {
+        "add-t14-reminder": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "proposal.md",
+      "anchor": "line:20",
+      "references": [
+        "kg:add-t14-reminder"
+      ],
+      "text_hash": "72e466e4afe4b25cf9704d39820494d3b9b105250015d4f500ad39151f87d61b",
+      "versions": {
+        "add-t14-reminder": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "proposal.md",
+      "anchor": "line:21",
+      "references": [
+        "kg:add-t14-reminder"
+      ],
+      "text_hash": "982303a65a61e8742c9a966894a5c7a7f0eb71d5f9e980112b971cdabb006673",
+      "versions": {
+        "add-t14-reminder": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "proposal.md",
+      "anchor": "line:22",
+      "references": [
+        "kg:CR-PBOM-1/CS-001",
+        "kg:CR-PBOM-1/CS-002"
+      ],
+      "text_hash": "8fe7d03fe2e21d6d7709c5afbb3cee8ecc030c338b6e94f55644352d829b577f",
+      "versions": {
+        "CR-PBOM-1/CS-001": "change-add-t14-reminder-cs-v3",
+        "CR-PBOM-1/CS-002": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:3",
+      "references": [
+        "kg:BRL-48"
+      ],
+      "text_hash": "8dcc4eae9747372421a497c01c85b2f892d9ddc118692445a3760cc81b7a8823",
+      "versions": {
+        "BRL-48": "2"
+      }
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:5",
+      "references": [
+        "repo:openspec/config.yaml"
+      ],
+      "text_hash": "b2bbb9d8299784254cba2853a82dbf079b2b00abdaf301a4e21a8b6d389ce5f9",
+      "versions": {}
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:7",
+      "references": [
+        "kg:CR-PBOM-1/CS-001",
+        "kg:CR-PBOM-1/CS-002"
+      ],
+      "text_hash": "6d9ca4d1fea1d1efecfc25bd12db401c57eab5fcbb34372c7eae31af65eb509b",
+      "versions": {
+        "CR-PBOM-1/CS-001": "change-add-t14-reminder-cs-v3",
+        "CR-PBOM-1/CS-002": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:11",
+      "references": [
+        "kg:add-t14-reminder"
+      ],
+      "text_hash": "ce981362eaf5c3e74e9822d55535b874cd999d9ba217491c1841876fec58069d",
+      "versions": {
+        "add-t14-reminder": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:12",
+      "references": [
+        "kg:change-add-t14-reminder/SC-BRL-48"
+      ],
+      "text_hash": "0233e3121e6f18c6bfe45725a8debe1a627494e85e57ed3ccf787e8c639c306e",
+      "versions": {
+        "change-add-t14-reminder/SC-BRL-48": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:14",
+      "references": [
+        "kg:add-t14-reminder"
+      ],
+      "text_hash": "36a15794070c0c30a73c9bfe05b2a234844329eb9021e7febbe666885ea7ffa2",
+      "versions": {
+        "add-t14-reminder": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:15",
+      "references": [
+        "repo:openspec/config.yaml"
+      ],
+      "text_hash": "72bcbb41d21f72225eb092edb1ece0082338e716a588d245f18fcf00de99e283",
+      "versions": {}
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:19",
+      "references": [
+        "decision:D-1",
+        "kg:CR-PBOM-1/CS-001"
+      ],
+      "text_hash": "75d4802e012ea8bd9a1768b954151e0c7ba4a863b1b6380f374b893fb8b10a77",
+      "versions": {
+        "CR-PBOM-1/CS-001": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:20",
+      "references": [
+        "kg:FR-AST-13@2"
+      ],
+      "text_hash": "72f3bbab3ed28a6efbd5d1e8d9e937a7ee00c5505e1fc1f51a1a299fab9678a8",
+      "versions": {
+        "FR-AST-13@2": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:24",
+      "references": [
+        "decision:D-2"
+      ],
+      "text_hash": "021f40ee4878fb555422e9c868101d0045ddcce1f1a829150dc5634da884e384",
+      "versions": {}
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:28",
+      "references": [
+        "decision:D-2"
+      ],
+      "text_hash": "bc93b5c51c5934c7c1d62cd197e69bed54d5797cf32ac29f69c61fc768352f89",
+      "versions": {}
+    },
+    {
+      "artifact": "design.md",
+      "anchor": "line:29",
+      "references": [
+        "kg:FR-AST-13@2",
+        "decision:D-2"
+      ],
+      "text_hash": "89d7e6054761d70c9eeb17a883ba2495bb68364aef96ad99d229395611f97f23",
+      "versions": {
+        "FR-AST-13@2": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "specs/add-t14-reminder/spec.md",
+      "anchor": "line:4",
+      "references": [
+        "kg:BRL-48@2"
+      ],
+      "text_hash": "dcfde001f418496133f4ae4b8247988cf55e7f5f1cf1e1890e0d97df45814584",
+      "versions": {
+        "BRL-48@2": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "specs/add-t14-reminder/spec.md",
+      "anchor": "line:7",
+      "references": [
+        "kg:change-add-t14-reminder/SC-BRL-48"
+      ],
+      "text_hash": "921714d8b441117e37068e1433d83552010554ac00e852241264c974f1c4526d",
+      "versions": {
+        "change-add-t14-reminder/SC-BRL-48": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "specs/add-t14-reminder/spec.md",
+      "anchor": "line:15",
+      "references": [
+        "kg:change-add-t14-reminder/SC-BRL-48"
+      ],
+      "text_hash": "921714d8b441117e37068e1433d83552010554ac00e852241264c974f1c4526d",
+      "versions": {
+        "change-add-t14-reminder/SC-BRL-48": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "specs/add-t14-reminder/spec.md",
+      "anchor": "line:8",
+      "references": [
+        "kg:change-add-t14-reminder/SC-BRL-48"
+      ],
+      "text_hash": "7d811548ee7a89e20c4753b8257c65fda0bcf536909209521bdfd965fb2f601f",
+      "versions": {
+        "change-add-t14-reminder/SC-BRL-48": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "specs/add-t14-reminder/spec.md",
+      "anchor": "line:16",
+      "references": [
+        "kg:change-add-t14-reminder/SC-BRL-48"
+      ],
+      "text_hash": "7d811548ee7a89e20c4753b8257c65fda0bcf536909209521bdfd965fb2f601f",
+      "versions": {
+        "change-add-t14-reminder/SC-BRL-48": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "specs/add-t14-reminder/spec.md",
+      "anchor": "line:9",
+      "references": [
+        "kg:change-add-t14-reminder/SC-BRL-48"
+      ],
+      "text_hash": "0a1e4672ec71e88a2d851b532b5de2d429a2844e64efc193564bc64b37efd12f",
+      "versions": {
+        "change-add-t14-reminder/SC-BRL-48": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "specs/add-t14-reminder/spec.md",
+      "anchor": "line:17",
+      "references": [
+        "kg:change-add-t14-reminder/SC-BRL-48"
+      ],
+      "text_hash": "0a1e4672ec71e88a2d851b532b5de2d429a2844e64efc193564bc64b37efd12f",
+      "versions": {
+        "change-add-t14-reminder/SC-BRL-48": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "specs/add-t14-reminder/spec.md",
+      "anchor": "line:12",
+      "references": [
+        "kg:FR-AST-13@2"
+      ],
+      "text_hash": "2e3195e717b72ce8941c18c733044334eefa73bb37ad8ee039a3a4a1319f850e",
+      "versions": {
+        "FR-AST-13@2": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "tasks.md",
+      "anchor": "line:3",
+      "references": [
+        "kg:CR-PBOM-1/CS-001",
+        "kg:change-add-t14-reminder/TC-CS-001"
+      ],
+      "text_hash": "550ed9a8fc915be6d8f18b6a0e3e93fa827b667e32cca36d9d971273601d947d",
+      "versions": {
+        "CR-PBOM-1/CS-001": "change-add-t14-reminder-cs-v3",
+        "change-add-t14-reminder/TC-CS-001": "change-add-t14-reminder-cs-v3"
+      }
+    },
+    {
+      "artifact": "tasks.md",
+      "anchor": "line:4",
+      "references": [
+        "kg:CR-PBOM-1/CS-002",
+        "kg:change-add-t14-reminder/TC-CS-002"
+      ],
+      "text_hash": "6163e57eeb4e5e1b75e76a1a2d716daa3985961bc78725e76bbce492106855db",
+      "versions": {
+        "CR-PBOM-1/CS-002": "change-add-t14-reminder-cs-v3",
+        "change-add-t14-reminder/TC-CS-002": "change-add-t14-reminder-cs-v3"
+      }
+    }
+  ],
+  "authoring": {
+    "workflow": "openspec-propose",
+    "runner": "claude_code",
+    "model": "claude-sonnet-5-5",
+    "config_hash": "6ee937834979f9dee19bdaaafd31da4860f55c4ed94644636b81464558dc757c",
+    "configuration": {
+      "roles": {
+        "author": "claude_code",
+        "critic": "claude_code",
+        "extractor": "claude_code"
+      },
+      "providers": {
+        "claude_code": {
+          "provider": "claude_code",
+          "command": "claude",
+          "model": "claude-sonnet-5-5",
+          "effort": "medium",
+          "cli_version": "2.1.266 (Claude Code)",
+          "timeout_seconds": 900,
+          "max_attempts": 2
+        }
+      },
+      "budget": {
+        "max_calls_per_run": 0,
+        "max_wall_seconds": 0,
+        "max_runs_per_day": 0
+      }
+    },
+    "input_hash": "ccf01e50ac33579436e42dbf5144b55358e2a92ad29344f88735ee272c5cb27a",
+    "attempts": [
+      {
+        "skill": "author-spec-prose",
+        "resolved_by": "llm",
+        "blockers": []
+      }
+    ],
+    "status": "authored",
+    "input_scope": {
+      "scoped": false,
+      "chars": 70213
+    },
+    "output_hash": "70b69e93cac28f9aab10a141f39023c09ad9f540149e973d44d8e1335366c1bb",
+    "proposed_decisions": [
+      {
+        "id": "D-1",
+        "rationale": "Add the T-14 milestone to Milestones in internal/entitlement/reminder.go, as required by CS-001/CS-002 and BRL-48/FR-AST-13 revision 2.",
+        "status": "proposed"
+      },
+      {
+        "id": "D-2",
+        "rationale": "The pack gives no TDD body text, risks, alternatives, rollback or migration; these are recorded as open questions pending confirmation.",
+        "status": "proposed"
+      }
+    ]
+  },
+  "canonical_change_spec": {
+    "status": "eligible",
+    "items": [
+      {
+        "id": "CS-001",
+        "action": "modify",
+        "code_target": "internal/entitlement/reminder.go::Milestones",
+        "srs_refs": [
+          {
+            "anchor": "line:1735",
+            "content_hash": "853baf31f49fa906fd25a82a6a89e97cd2756544dae192623089be8b789a9e21",
+            "document_id": "SRS",
+            "revision": "2",
+            "role": "SRS",
+            "section_id": "BRL-48"
+          }
+        ],
+        "tdd_refs": [
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "document"
+          },
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "BRL-48"
+          },
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "FR-AST-13"
+          },
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "change-add-t14-reminder/OBL-BRL-48"
+          },
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "change-add-t14-reminder/OBL-FR-AST-13"
+          }
+        ],
+        "verification": "GIVEN một Entitlement thuê bao hết hạn sau 14 ngày WHEN job hằng ngày chạy THEN gửi đúng một nhắc nhở T-14",
+        "cr_acceptance_refs": [
+          "AC-REM-14"
+        ]
+      },
+      {
+        "id": "CS-002",
+        "action": "modify",
+        "code_target": "internal/entitlement/reminder.go::Milestones",
+        "srs_refs": [
+          {
+            "anchor": "line:463",
+            "content_hash": "853baf31f49fa906fd25a82a6a89e97cd2756544dae192623089be8b789a9e21",
+            "document_id": "SRS",
+            "revision": "2",
+            "role": "SRS",
+            "section_id": "FR-AST-13"
+          }
+        ],
+        "tdd_refs": [
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "document"
+          },
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "BRL-48"
+          },
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "FR-AST-13"
+          },
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "change-add-t14-reminder/OBL-BRL-48"
+          },
+          {
+            "content_hash": "f6621cd89f6b99a2b67cf7a555af4f012bca25936f2f50b55fd926f243565deb",
+            "document_id": "TDD-PROJ-CR2",
+            "revision": "2",
+            "role": "TDD",
+            "section_id": "change-add-t14-reminder/OBL-FR-AST-13"
+          }
+        ],
+        "verification": "GIVEN một Entitlement thuê bao hết hạn sau 14 ngày WHEN job hằng ngày chạy THEN gửi đúng một nhắc nhở T-14",
+        "cr_acceptance_refs": [
+          "AC-REM-14"
+        ]
+      }
+    ],
+    "pending": [],
+    "errors": [],
+    "sources": {
+      "cr": {
+        "acceptance": [
+          "AC-REM-14"
+        ],
+        "id": "CR-PBOM-1",
+        "revision": "1",
+        "text_hash": "64067e5f063f6d366f6eb18766fb3a92b27085a20aeac1a8bb44b5e79d151d30",
+        "title": "CR-PBOM-1: Thêm mốc nhắc T-14 cho Entitlement thuê bao"
+      },
+      "srs": {
+        "content_hash": "853baf31f49fa906fd25a82a6a89e97cd2756544dae192623089be8b789a9e21",
+        "document_id": "SRS",
+        "revision": "2",
+        "role": "SRS",
+        "section_id": "delta"
+      },
+      "sad": {
+        "ref": {
+          "document_id": "SAD",
+          "role": "SAD",
+          "revision": "1",
+          "content_hash": "af6b536d89dd3010a999719e37e9bf6ec9b6554c9fedb6afba9cce4377270400",
+          "section_id": "document"
+        },
+        "architecture_change": false
+      },
+      "impact": "a87f546e3a94022bbfff216d76702a15babf6223dd9b06c542f1415108da2471",
+      "tdd_set": "snap-000002"
+    }
+  },
+  "semantic_review": {
+    "workflow": "semantic-review",
+    "runner": "claude_code",
+    "model": "claude-sonnet-5-5",
+    "config_hash": "6ee937834979f9dee19bdaaafd31da4860f55c4ed94644636b81464558dc757c",
+    "configuration": {
+      "roles": {
+        "author": "claude_code",
+        "critic": "claude_code",
+        "extractor": "claude_code"
+      },
+      "providers": {
+        "claude_code": {
+          "provider": "claude_code",
+          "command": "claude",
+          "model": "claude-sonnet-5-5",
+          "effort": "medium",
+          "cli_version": "2.1.266 (Claude Code)",
+          "timeout_seconds": 900,
+          "max_attempts": 2
+        }
+      },
+      "budget": {
+        "max_calls_per_run": 0,
+        "max_wall_seconds": 0,
+        "max_runs_per_day": 0
+      }
+    },
+    "input_hash": "11817e733eb0f739114f28a681311c6af8cfebc69e1466de7e588a4cc0ee7d2c",
+    "attempts": [
+      {
+        "skill": "critique-spec",
+        "resolved_by": "llm",
+        "blockers": []
+      }
+    ],
+    "status": "reviewed",
+    "input_scope": {
+      "scoped": false,
+      "chars": 70213
+    },
+    "outcome": "fail",
+    "findings": [
+      {
+        "artifact": "specs/add-t14-reminder/spec.md",
+        "anchor": "line:1",
+        "reason": "The pack's RequirementDeltas for BRL-48 and FR-AST-13 are kind=modified (rev 1 to 2), but the spec presents them under ADDED Requirements and doesn't say how the rev-1 baseline requirements are handled."
+      },
+      {
+        "artifact": "specs/add-t14-reminder/spec.md",
+        "anchor": "line:11",
+        "reason": "The FR-AST-13 requirement drops the SRS acceptance condition that renewing with more than 60 days left returns the Entitlement to Active and clears the reminded milestones, and it doesn't say it dropped it."
+      },
+      {
+        "artifact": "proposal.md",
+        "anchor": "line:12",
+        "reason": "The capability is listed as New while the pack shows modified BRL-48 and FR-AST-13 requirements, and Modified Capabilities is left empty."
+      },
+      {
+        "artifact": "design.md",
+        "anchor": "line:19",
+        "reason": "The claim that T-14 sits between T-30 and T-7 in `Milestones` is not supported by the pack, which has no code or ordering evidence for that function."
+      }
+    ],
+    "output_hash": "56b96d420de6db2bbc4e947523a0ee423711102cfd0736a790e836ecab2e6a94"
+  },
+  "cli_validation": {
+    "available": true,
+    "ok": true,
+    "returncode": 0,
+    "stdout": "Change 'add-t14-reminder' is valid\n",
+    "stderr": ""
+  }
+}

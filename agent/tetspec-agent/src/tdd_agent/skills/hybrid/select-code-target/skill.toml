@@ -1,0 +1,9 @@
+id = "select-code-target"
+version = "1"
+agent = "changespec"
+tier = "hybrid"
+description = "Find the code symbol a change should touch: repository scan by id literal or symbol-name tokens decides when exactly one candidate matches; with several the model chooses among them; with none the target stays a gap."
+role = "extractor"
+reason = "When several symbols plausibly implement a requirement, choosing the right one needs reading the code and the requirement together."
+demotion = "Require requirement ids in code comments/tests or a mapping file so the literal-match rule resolves it; promote repeated choices to a path-to-capability mapping in the repo snapshot."
+verifiers = ["choice-in-candidates"]
