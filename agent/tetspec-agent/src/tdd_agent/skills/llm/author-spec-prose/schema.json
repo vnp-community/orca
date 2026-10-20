@@ -1,0 +1,36 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "pack",
+      "instructions"
+    ],
+    "properties": {
+      "pack": {
+        "type": "object"
+      },
+      "instructions": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "artifacts",
+      "assertions",
+      "proposed_decisions"
+    ],
+    "properties": {
+      "artifacts": {
+        "type": "object"
+      },
+      "assertions": {
+        "type": "array"
+      },
+      "proposed_decisions": {
+        "type": "array"
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "records",
+      "sources"
+    ],
+    "properties": {
+      "records": {
+        "type": "array"
+      },
+      "sources": {
+        "type": "array"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "ok",
+      "results"
+    ],
+    "properties": {
+      "ok": {
+        "type": "boolean"
+      },
+      "results": {
+        "type": "array"
+      }
+    }
+  }
+}

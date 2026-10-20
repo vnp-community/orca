@@ -1,0 +1,97 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "before",
+      "after"
+    ],
+    "properties": {
+      "before": {
+        "type": "object",
+        "required": [
+          "source_id",
+          "revision",
+          "role",
+          "text"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "role": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "id_class_map": {
+            "type": "object"
+          }
+        }
+      },
+      "after": {
+        "type": "object",
+        "required": [
+          "source_id",
+          "revision",
+          "role",
+          "text"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "role": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "id_class_map": {
+            "type": "object"
+          }
+        }
+      },
+      "cr_ref": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "ref",
+      "changes",
+      "conflicts"
+    ],
+    "properties": {
+      "ref": {
+        "type": "object"
+      },
+      "cr_ref": {
+        "type": "object"
+      },
+      "changes": {
+        "type": "array"
+      },
+      "conflicts": {
+        "type": "array"
+      },
+      "unstructured": {
+        "type": "array"
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+id = "segment-and-anchor"
+version = "1"
+agent = "generation"
+tier = "logic"
+description = "Split a source document into line-anchored blocks (headings, table rows, list items, paragraphs, code)."

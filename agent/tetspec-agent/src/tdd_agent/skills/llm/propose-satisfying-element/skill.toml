@@ -1,0 +1,9 @@
+id = "propose-satisfying-element"
+version = "1"
+agent = "changespec"
+tier = "llm"
+description = "Pick, among the components, operations and modules already in the design, the one that realizes a changed requirement; the choice must be one of the candidates and comes with the reason."
+role = "critic"
+reason = "Matching what a requirement asks with what each component is responsible for needs reading both."
+demotion = "A row in the SRS naming the component (the extractor then links it by rule) or `change update --satisfied-by`; the model only fills the gap when nobody is there to say."
+verifiers = ["id-in-candidates", "reason-given"]

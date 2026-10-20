@@ -1,0 +1,38 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "change_id",
+      "scenarios"
+    ],
+    "properties": {
+      "change_id": {
+        "type": "string"
+      },
+      "scenarios": {
+        "type": "array"
+      },
+      "acceptance": {
+        "type": "array"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "verification",
+      "sources"
+    ],
+    "properties": {
+      "verification": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sources": {
+        "type": "array"
+      }
+    }
+  }
+}

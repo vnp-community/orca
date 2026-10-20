@@ -1,0 +1,41 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "change",
+      "repo_root"
+    ],
+    "properties": {
+      "change": {
+        "type": "object"
+      },
+      "repo_root": {
+        "type": "string"
+      },
+      "name_hints": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "code_target",
+      "candidates"
+    ],
+    "properties": {
+      "code_target": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "candidates": {
+        "type": "array"
+      }
+    }
+  }
+}

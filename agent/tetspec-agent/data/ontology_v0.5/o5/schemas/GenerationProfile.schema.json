@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/tdd/schema/GenerationProfile-v0.6",
+  "title": "GenerationProfile",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "class": {
+      "const": "GenerationProfile"
+    },
+    "name": {
+      "type": "string"
+    },
+    "artifact_types": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "object",
+        "array",
+        "null"
+      ]
+    },
+    "mandatory_needs": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "object",
+        "array",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "artifact_types",
+    "class",
+    "id",
+    "mandatory_needs",
+    "name"
+  ]
+}

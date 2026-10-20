@@ -1,0 +1,593 @@
+{
+  "version": "0.6.0",
+  "canonical_release": {
+    "version": "0.6.0",
+    "status": "active_runtime",
+    "compatibility_runtime": "0.5.0",
+    "deprecates": "0.5.0",
+    "cutover_date": "2026-10-07",
+    "source_versions": ["0.4.0", "0.5.0"],
+    "fixture": "fixtures/migration-v06-cases.json",
+    "acceptance": {
+      "runtime_contract": "passed",
+      "migration": "passed",
+      "authoring_quality": "pending_human_review",
+      "evidence": "data/test-pbom/run-quality-v6-authoring/benchmark.result.v6.json"
+    },
+    "requires": [
+      "complete_legacy_new_inventory",
+      "typed_quantity_and_evidence_contract",
+      "loss_report_and_exact_rollback",
+      "independent_semantic_acceptance"
+    ]
+  },
+  "base": {
+    "version": "0.4.0",
+    "compatibility_versions": ["0.5.0"],
+    "classes_source": "../../ontology_v0.4/o4/classes.yaml",
+    "relations_source": "../../ontology_v0.4/o4/relations.yaml",
+    "legacy_relations_passthrough": true
+  },
+  "property_aliases": {
+    "path_or_name": "path",
+    "authn": "auth",
+    "concurrency_control": "concurrency",
+    "measurement_ref": "measurement"
+  },
+  "typed_contracts": {
+    "Quantity": {
+      "value": "number",
+      "unit": "non_empty_string",
+      "stage": ["target", "budget", "observed", "measured", "assumed"]
+    },
+    "Evidence": {
+      "kind": ["extracted", "derived", "proposed", "prompt"],
+      "source_id": "non_empty_string",
+      "source_version": "non_empty_string",
+      "source_hash": "non_empty_string",
+      "anchor": "non_empty_string",
+      "quote_hash": "non_empty_string"
+    }
+  },
+  "legacy_required_properties": {
+    "Algorithm": ["inputs", "outputs", "deterministic"]
+  },
+  "maturity_policy": {
+    "values": ["sketch", "specified", "verified", "baselined"],
+    "requirements": {
+      "sketch": [],
+      "specified": ["origin", "maturity", "version_introduced", "provenance"],
+      "verified": ["origin", "maturity", "version_introduced", "provenance", "review_status"],
+      "baselined": ["origin", "maturity", "version_introduced", "provenance", "review_status"]
+    }
+  },
+  "conditional_requirements": [
+    {"id": "operation-write-contract", "class": "Operation", "when": {"property": "method", "in": ["POST", "PUT", "PATCH", "DELETE"]}, "required": ["idempotency", "concurrency"]},
+    {"id": "operation-transaction-contract", "class": "Operation", "when": {"property": "transactional", "equals": true}, "required": ["timeout", "retry", "failure_policy"]},
+    {"id": "measurement-source-contract", "class": "Measurement", "when": {"property": "stage", "in": ["observed", "measured"]}, "required": ["observed_at", "source_ref"]}
+  ],
+  "classes": {
+    "DocumentRef": {
+      "required": ["id", "role", "revision", "content_hash"]
+    },
+    "SectionRef": {
+      "required": ["id", "document_id", "role", "revision", "content_hash", "section_id"]
+    },
+    "SrsDelta": {
+      "required": ["id", "cr_id", "before_revision", "after_revision", "sections"]
+    },
+    "ImpactReport": {
+      "required": ["id", "cr_ref", "srs_ref", "sad_ref", "baseline_tdd_snapshot", "entries", "findings", "status"]
+    },
+    "ImpactApproval": {
+      "required": ["id", "impact_report_id", "approver_id", "role", "decision_hash"]
+    },
+    "TddSetRealization": {
+      "required": ["id", "baseline_snapshot", "actual_snapshot", "mappings", "status"]
+    },
+    "SemanticResolution": {
+      "required": ["id", "policy_version", "policy_hash", "roots", "ids", "boundary", "unresolved", "graph_snapshot", "resolution_hash", "status"]
+    },
+    "Quantity": {
+      "required": ["id", "value", "unit", "stage"]
+    },
+    "Migration": {
+      "required": ["id", "from_schema", "to_schema", "stages", "backfill", "lock", "compatibility", "rollback"]
+    },
+    "MigrationStage": {
+      "required": ["id", "action", "depends_on", "preconditions", "verification"]
+    },
+    "Measurement": {
+      "required": ["id", "metric", "value", "stage", "observed_at", "source_ref"]
+    },
+    "PermissionDecision": {
+      "required": ["id", "subject", "resource", "action", "effect", "evidence"]
+    },
+    "ChangeSpecItem": {
+      "required": ["id", "action", "code_target", "srs_refs", "tdd_refs", "verification", "cr_acceptance_refs"]
+    },
+    "Transaction": {"required": ["id", "boundary", "isolation", "consistency"]},
+    "Saga": {"required": ["id", "steps", "compensation"]},
+    "RetryPolicy": {"required": ["id", "max_attempts", "backoff", "retryable_errors"]},
+    "TimeoutBudget": {"required": ["id", "total", "allocations"]},
+    "IdempotencyPolicy": {"required": ["id", "key", "scope", "deduplication"]},
+    "ConsistencyModel": {"required": ["id", "mode", "guarantees"]},
+    "FailurePolicy": {"required": ["id", "failure_modes", "fallback", "dead_letter"]},
+    "LoadProfile": {"required": ["id", "average", "peak", "payload", "growth"]},
+    "CapacityModel": {"required": ["id", "resources", "headroom", "scaling"]},
+    "HighAvailabilityTopology": {"required": ["id", "replicas", "failure_domains", "failover"]},
+    "RecoveryObjective": {"required": ["id", "rto", "rpo", "recovery_procedure"]},
+    "Ownership": {"required": ["id", "team", "responsibilities", "escalation"]},
+    "ContractCompatibility": {"required": ["id", "versioning", "compatibility", "consumers"]},
+    "LedgerInvariant": {"required": ["id", "currency", "scale", "invariants"]},
+    "ReconciliationPolicy": {"required": ["id", "source", "schedule", "mismatch_handling"]},
+    "AuditTrail": {"required": ["id", "events", "retention", "integrity"]},
+    "DesignObligation": {"required": ["id", "question", "srs_refs", "cr_acceptance_refs", "applicability", "status"]},
+    "ObligationResolution": {"required": ["id", "obligation_id", "design_refs", "decision", "verification_refs", "status"]},
+    "TestReceipt": {"required": ["id", "cs_id", "criterion_refs", "result", "executed_at"]},
+    "AcceptanceReceipt": {"required": ["id", "cr_id", "criterion_refs", "accepted_by", "status"]},
+    "Capability": {
+      "required": [
+        "id",
+        "name",
+        "stable_key",
+        "purpose",
+        "scope",
+        "owner",
+        "lifecycle"
+      ]
+    },
+    "RequirementVersion": {
+      "required": [
+        "id",
+        "logical_requirement_id",
+        "revision",
+        "statement",
+        "modality",
+        "acceptance",
+        "baseline_id"
+      ],
+      "extends": "Requirement"
+    },
+    "RequirementDelta": {
+      "required": [
+        "id",
+        "kind",
+        "rationale",
+        "change_request_id"
+      ]
+    },
+    "KnowledgeNeed": {
+      "required": [
+        "id",
+        "profile_id",
+        "section_spec",
+        "slot",
+        "target_class",
+        "required"
+      ]
+    },
+    "IntakeReport": {
+      "required": [
+        "id",
+        "need_id",
+        "status",
+        "sources"
+      ]
+    },
+    "GenerationProfile": {
+      "required": [
+        "id",
+        "name",
+        "artifact_types",
+        "mandatory_needs"
+      ]
+    },
+    "GenerationRun": {
+      "required": [
+        "id",
+        "intent",
+        "scope",
+        "profile_id",
+        "status",
+        "manifest_hash"
+      ]
+    },
+    "ReadinessReport": {
+      "required": [
+        "id",
+        "run_id",
+        "outcomes",
+        "blockers",
+        "rule_coverage"
+      ]
+    },
+    "PromptEditRequest": {
+      "required": [
+        "id",
+        "prompt_hash",
+        "target",
+        "base_snapshot",
+        "authorization"
+      ]
+    },
+    "RepoSnapshot": {
+      "required": [
+        "id",
+        "repo",
+        "revision",
+        "content_hash"
+      ]
+    }
+  },
+  "relations": {
+    "has_section": {
+      "domain": ["DocumentRef"],
+      "range": ["SectionRef"],
+      "cardinality": "1-n",
+      "inverse": "section_of"
+    },
+    "has_srs_delta": {
+      "domain": ["ChangeRequest"],
+      "range": ["SrsDelta"],
+      "cardinality": "1-n",
+      "inverse": "delta_of"
+    },
+    "has_impact_report": {
+      "domain": ["SrsDelta"],
+      "range": ["ImpactReport"],
+      "cardinality": "1-1",
+      "inverse": "impact_for"
+    },
+    "has_impact_approval": {
+      "domain": ["ImpactReport"],
+      "range": ["ImpactApproval"],
+      "cardinality": "1-1",
+      "inverse": "approval_for"
+    },
+    "has_semantic_resolution": {
+      "domain": ["ImpactReport", "GenerationRun", "PromptEditRequest"],
+      "range": ["SemanticResolution"],
+      "cardinality": "1-1",
+      "inverse": "resolution_for"
+    },
+    "has_migration_stage": {
+      "domain": ["Migration"],
+      "range": ["MigrationStage"],
+      "cardinality": "1-n",
+      "inverse": "stage_of"
+    },
+    "has_measurement": {
+      "domain": ["QualityTarget", "LoadProfile", "CapacityModel", "RecoveryObjective"],
+      "range": ["Measurement"],
+      "cardinality": "1-n",
+      "inverse": "measurement_of"
+    },
+    "realizes_tdd_set": {
+      "domain": ["ImpactReport"],
+      "range": ["TddSetRealization"],
+      "cardinality": "1-1",
+      "inverse": "realization_for"
+    },
+    "has_change_spec_item": {
+      "domain": ["TddSetRealization"],
+      "range": ["ChangeSpecItem"],
+      "cardinality": "1-n",
+      "inverse": "item_for"
+    },
+    "has_obligation_resolution": {
+      "domain": ["DesignObligation"],
+      "range": ["ObligationResolution"],
+      "cardinality": "1-n",
+      "inverse": "resolution_for"
+    },
+    "has_requirement": {
+      "domain": [
+        "Capability"
+      ],
+      "range": [
+        "RequirementVersion"
+      ],
+      "cardinality": "1-n",
+      "inverse": "requirement_of"
+    },
+    "for_change": {
+      "domain": [
+        "RequirementDelta"
+      ],
+      "range": [
+        "ChangeRequest"
+      ],
+      "cardinality": "n-1",
+      "inverse": "has_delta"
+    },
+    "before_requirement": {
+      "domain": [
+        "RequirementDelta"
+      ],
+      "range": [
+        "RequirementVersion"
+      ],
+      "cardinality": "n-1",
+      "inverse": "before_delta"
+    },
+    "after_requirement": {
+      "domain": [
+        "RequirementDelta"
+      ],
+      "range": [
+        "RequirementVersion"
+      ],
+      "cardinality": "n-1",
+      "inverse": "after_delta"
+    },
+    "in_baseline": {
+      "domain": [
+        "RequirementVersion",
+        "GenerationRun"
+      ],
+      "range": [
+        "Baseline"
+      ],
+      "cardinality": "n-1",
+      "inverse": "contains_version"
+    },
+    "has_scenario": {
+      "domain": [
+        "RequirementVersion"
+      ],
+      "range": [
+        "Scenario"
+      ],
+      "cardinality": "1-n",
+      "inverse": "scenario_for"
+    },
+    "implements": {
+      "domain": [
+        "WorkItem"
+      ],
+      "range": [
+        "ChangeSpecItem"
+      ],
+      "cardinality": "n-n",
+      "inverse": "implemented_by_work"
+    },
+    "verifies": {
+      "domain": [
+        "TestReceipt"
+      ],
+      "range": [
+        "WorkItem"
+      ],
+      "cardinality": "n-n",
+      "inverse": "verified_by_receipt"
+    },
+    "depends_on_work": {
+      "domain": [
+        "WorkItem"
+      ],
+      "range": [
+        "WorkItem"
+      ],
+      "cardinality": "n-n",
+      "inverse": "work_dependency",
+      "characteristics": [
+        "acyclic"
+      ]
+    },
+    "requires_knowledge": {
+      "domain": [
+        "GenerationProfile"
+      ],
+      "range": [
+        "KnowledgeNeed"
+      ],
+      "cardinality": "1-n",
+      "inverse": "required_by_profile"
+    },
+    "has_intake_report": {
+      "domain": [
+        "KnowledgeNeed"
+      ],
+      "range": [
+        "IntakeReport"
+      ],
+      "cardinality": "1-n",
+      "inverse": "reports_need"
+    },
+    "uses_baseline": {
+      "domain": [
+        "GenerationRun"
+      ],
+      "range": [
+        "Baseline"
+      ],
+      "cardinality": "n-1",
+      "inverse": "used_by_run"
+    },
+    "uses_profile": {
+      "domain": [
+        "GenerationRun"
+      ],
+      "range": [
+        "GenerationProfile"
+      ],
+      "cardinality": "n-1",
+      "inverse": "used_by_run"
+    },
+    "produces": {
+      "domain": [
+        "GenerationRun"
+      ],
+      "range": [
+        "Artefact"
+      ],
+      "cardinality": "1-n",
+      "inverse": "produced_by"
+    },
+    "has_readiness_report": {
+      "domain": [
+        "GenerationRun"
+      ],
+      "range": [
+        "ReadinessReport"
+      ],
+      "cardinality": "1-1",
+      "inverse": "reports_run"
+    },
+    "uses_repo_snapshot": {
+      "domain": [
+        "GenerationRun",
+        "PromptEditRequest"
+      ],
+      "range": [
+        "RepoSnapshot"
+      ],
+      "cardinality": "n-1",
+      "inverse": "used_by_run"
+    },
+    "requested_by_prompt": {
+      "domain": [
+        "ChangeRequest",
+        "ChangeSet",
+        "RequirementDelta"
+      ],
+      "range": [
+        "PromptEditRequest"
+      ],
+      "cardinality": "n-1",
+      "inverse": "requests_change"
+    },
+    "traces_to": {
+      "domain": "ANY",
+      "range": "ANY",
+      "cardinality": "n-n",
+      "inverse": "traced_from",
+      "impact": "reference_only",
+      "description": "Explicit source reference; does not assert design satisfaction or a foreign key"
+    },
+    "models_state_of": {
+      "domain": [
+        "StateMachine"
+      ],
+      "range": [
+        "Entity"
+      ],
+      "cardinality": "n-1",
+      "inverse": "has_state_model",
+      "impact": "behavior_dependency"
+    }
+  },
+  "profiles": {
+    "tdd-generation": {
+      "artifact_types": [
+        "TDD"
+      ],
+      "mandatory_needs": [
+        "purpose",
+        "scope",
+        "requirements",
+        "contracts",
+        "data",
+        "behavior",
+        "decisions",
+        "quality",
+        "work",
+        "validation",
+        "provenance"
+      ],
+      "rules": [
+        "QG-01",
+        "QG-02",
+        "QG-03",
+        "QG-04",
+        "QG-05",
+        "QG-06",
+        "QG-07",
+        "QG-08",
+        "QG-09",
+        "QG-10"
+      ]
+    },
+    "spec-change-generation": {
+      "artifact_types": [
+        "proposal.md",
+        "design.md",
+        "tasks.md",
+        "spec.md"
+      ],
+      "mandatory_needs": [
+        "intent",
+        "baseline",
+        "delta",
+        "scenarios",
+        "design",
+        "impact",
+        "work",
+        "validation",
+        "repo_context",
+        "provenance"
+      ],
+      "rules": [
+        "QG-01",
+        "QG-02",
+        "QG-03",
+        "QG-04",
+        "QG-05",
+        "QG-06",
+        "QG-07",
+        "QG-08",
+        "QG-09",
+        "QG-10",
+        "TS-01",
+        "TS-02",
+        "TS-03",
+        "TS-04",
+        "TS-05",
+        "TS-06",
+        "TS-07",
+        "TS-08",
+        "TS-09",
+        "TS-10"
+      ]
+    },
+    "prompt-tdd-edit": {
+      "artifact_types": [
+        "TDD"
+      ],
+      "mandatory_needs": [
+        "prompt",
+        "target",
+        "base_snapshot",
+        "authorization",
+        "impact",
+        "validation",
+        "provenance"
+      ],
+      "rules": [
+        "QG-01",
+        "QG-02",
+        "QG-03",
+        "QG-04",
+        "QG-05",
+        "QG-06",
+        "QG-07",
+        "QG-08",
+        "QG-09",
+        "QG-10"
+      ]
+    }
+  },
+  "readiness_rules": [
+    "TS-01",
+    "TS-02",
+    "TS-03",
+    "TS-04",
+    "TS-05",
+    "TS-06",
+    "TS-07",
+    "TS-08",
+    "TS-09",
+    "TS-10"
+  ]
+}

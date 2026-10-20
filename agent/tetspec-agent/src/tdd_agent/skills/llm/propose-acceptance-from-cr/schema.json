@@ -1,0 +1,4 @@
+{
+  "input": {"type": "object", "required": ["cr_text", "changes"], "properties": {"cr_text": {"type": "string"}, "changes": {"type": "array"}}},
+  "output": {"type": "object", "required": ["criteria"], "properties": {"criteria": {"type": "array"}}}
+}

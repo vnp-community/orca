@@ -1,0 +1,1 @@
+{"name": "definition rows", "input": {"source_id": "SRS", "revision": "1", "role": "SRS", "text": "## 3\n| ID | Statement |\n|---|---|\n| FR-A-1 | Store evidence within 30 seconds. |\n| ZZ-1 | unknown prefix |\n"}, "expect": {"output": {"elements": [{"id": "FR-A-1", "class": "Requirement"}]}, "resolved_by": "rule"}}

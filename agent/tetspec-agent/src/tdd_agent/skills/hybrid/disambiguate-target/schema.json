@@ -1,0 +1,45 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "mention",
+      "candidates"
+    ],
+    "properties": {
+      "mention": {
+        "type": "string"
+      },
+      "candidates": {
+        "type": "array"
+      },
+      "context": {
+        "type": "string"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "id",
+      "reason",
+      "considered"
+    ],
+    "properties": {
+      "id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason": {
+        "type": "string"
+      },
+      "considered": {
+        "type": "array"
+      },
+      "mismatch": {
+        "type": "boolean"
+      }
+    }
+  }
+}

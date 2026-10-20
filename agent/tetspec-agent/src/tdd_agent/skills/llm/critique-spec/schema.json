@@ -1,0 +1,42 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "pack",
+      "artifacts",
+      "assertions"
+    ],
+    "properties": {
+      "pack": {
+        "type": "object"
+      },
+      "artifacts": {
+        "type": "object"
+      },
+      "assertions": {
+        "type": "array"
+      },
+      "proposed_decisions": {
+        "type": "array"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "verdict",
+      "findings"
+    ],
+    "properties": {
+      "verdict": {
+        "enum": [
+          "pass",
+          "fail"
+        ]
+      },
+      "findings": {
+        "type": "array"
+      }
+    }
+  }
+}

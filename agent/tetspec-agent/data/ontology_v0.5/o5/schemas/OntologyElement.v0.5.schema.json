@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/tdd/schema/OntologyElement-v0.5",
+  "title": "OntologyElement v0.5",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "class", "name", "origin", "maturity", "version_introduced", "provenance"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "class": {"type": "string", "minLength": 1},
+    "name": {"type": "string", "minLength": 1},
+    "origin": {"enum": ["own", "upstream", "external"]},
+    "maturity": {"enum": ["sketch", "specified", "verified", "baselined"]},
+    "version_introduced": {"type": "string", "minLength": 1},
+    "review_status": {"enum": ["auto", "needs_review", "approved", "rejected"]},
+    "provenance": {"type": "array", "items": {"$ref": "#/$defs/Provenance"}},
+    "props": {"type": "object"},
+    "gaps": {"type": "array", "items": {"$ref": "#/$defs/Gap"}},
+    "ext": {"type": "object"}
+  },
+  "$defs": {
+    "Provenance": {
+      "type": "object",
+      "required": ["kind", "source_id", "source_version"],
+      "properties": {
+        "kind": {"enum": ["extracted", "derived", "prompt", "decision", "assumption", "repo"]},
+        "source_id": {"type": "string", "minLength": 1},
+        "source_version": {"type": "string", "minLength": 1},
+        "block": {"type": "string"},
+        "quote_hash": {"type": "string"},
+        "inputs": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "Gap": {
+      "type": "object",
+      "required": ["slot", "status", "reason"],
+      "properties": {
+        "slot": {"type": "string"},
+        "status": {"enum": ["tbd", "unknown", "not_applicable", "deferred", "assumed", "proposed", "to_measure"]},
+        "reason": {"type": "string", "minLength": 1},
+        "owner": {"type": "string"},
+        "due": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

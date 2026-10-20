@@ -1,0 +1,54 @@
+{
+  "status": "passed",
+  "designVersion": "0.2-draft",
+  "date": "2026-10-08",
+  "scope": "Design artifact integrity only. No domain validators, workflow acceptance scenarios or runtime tests were executed.",
+  "checks": [
+    "All local Markdown links resolve",
+    "Code fences balanced",
+    "Embedded JSON examples parse",
+    "145 rule IDs unique; rule references resolve",
+    "Rule catalog source line references verified after final edits",
+    "Gate identifiers recognized",
+    "50 acceptance scenario IDs unique",
+    "20 mapping signatures unique",
+    "15 competency queries unique"
+  ],
+  "counts": {
+    "ruleCount": 145,
+    "mappingCount": 20,
+    "acceptanceScenarioCount": 50,
+    "competencyQueryCount": 15,
+    "markdownFiles": 11,
+    "markdownLines": 1229,
+    "localLinksChecked": 21,
+    "jsonExamplesParsed": 4
+  },
+  "rulesByModule": {
+    "cr": 14,
+    "cs": 10,
+    "flow": 16,
+    "fnd": 16,
+    "map": 14,
+    "sad": 14,
+    "srs": 18,
+    "tdd": 24,
+    "val": 10,
+    "ver": 9
+  },
+  "artifactHashes": {
+    "docs/ontology/00-foundation-and-logic.md": "cdcfb0a4e57889591dab6670035fb034bf0982d9914940235aca854a10111809",
+    "docs/ontology/01-cr-ontology.md": "4a77320745eab77cc082c87bdbf7ff4f0eefa4009c831f5516b85e50fd53ba8b",
+    "docs/ontology/02-srs-ontology.md": "271f052bda4afc88a589898c4aed740fe718b6b5465ce26fa6769cf69efb98b6",
+    "docs/ontology/03-sad-ontology.md": "1f9f14e9e4e157ea06232359ddd53e37156f4879ec835a0c3d9bd32e019065a6",
+    "docs/ontology/04-tdd-ontology.md": "931bcef12d39858122b6d1edc8e1e8ebc039991b633a2302a40d762f3c66a64f",
+    "docs/ontology/05-change-spec-and-verification.md": "e0c879ccb306ba2c2429d5e6089e8a9d0a8a6544e10b2e7ee5e196e1b7802d9f",
+    "docs/ontology/06-cross-domain-mappings.md": "8dec03e71c71074fda6ded75cfc8f606f38d24791f813c86d4d7e3413a211bee",
+    "docs/ontology/07-digitization-and-lifecycle.md": "f35727861859c4bccaff757551df81a7d689ec6bba6181d5545495cacbe98ca6",
+    "docs/ontology/08-validation-and-acceptance.md": "a832ef745e4b55c132b88dd3ff771dcaf6f9aa0c410ab37009ef4d2ffa775dba",
+    "docs/ontology/09-contract-examples-and-implementation-boundaries.md": "1de1d6b636e0b2e60de72eb2d0438863088db44080beef686072e7d80b2d935f",
+    "docs/ontology/README.md": "fe4883046ff9ad2c0ff343ef5a9eb8515cdc68dfcfd9e37c00cc43cbfa2b1c4b",
+    "docs/ontology/rule-catalog.json": "42cbaf80070835774e8b3df1f752fa989f5b537da66eedf497d3242f474e0f13",
+    "docs/Software_Delivery_Domain_Ontologies_Design.md": "35e416534a9f72b72f377770b6d76d5efc92e20be4dacccc710f71c31fcdcea2"
+  }
+}

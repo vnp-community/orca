@@ -1,0 +1,5 @@
+id = "derive-verification"
+version = "1"
+agent = "changespec"
+tier = "logic"
+description = "Compose a change item's verification (GIVEN/WHEN/THEN) from linked SRS scenarios and CR acceptance text; nothing is invented when no scenario exists."

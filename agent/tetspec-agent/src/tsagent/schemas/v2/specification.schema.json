@@ -1,0 +1,183 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "specification",
+ "description": "LLM output of the specification step (layer C): steps, data, fixtures, fault injections; figures come from the oracles. Natural-language values are Vietnamese.",
+ "type": "object",
+ "required": [
+  "schemaVersion",
+  "testcases"
+ ],
+ "additionalProperties": false,
+ "properties": {
+  "schemaVersion": {
+   "const": 2
+  },
+  "testcases": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "seedCode",
+     "objective",
+     "steps"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "seedCode": {
+      "type": "string",
+      "minLength": 1
+     },
+     "objective": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+     },
+     "preconditions": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 600
+      }
+     },
+     "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+       "type": "object",
+       "required": [
+        "stepKind",
+        "action"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "stepKind": {
+         "type": "string",
+         "enum": [
+          "given",
+          "when",
+          "then",
+          "cleanup"
+         ]
+        },
+        "action": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 600
+        },
+        "input": {},
+        "targetCode": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     },
+     "assertions": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "seedCode",
+        "description"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "seedCode": {
+         "type": "string",
+         "minLength": 1
+        },
+        "description": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 600
+        }
+       }
+      }
+     },
+     "data": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "seedCode",
+        "example"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "seedCode": {
+         "type": "string",
+         "minLength": 1
+        },
+        "example": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 600
+        }
+       }
+      }
+     },
+     "fixtures": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "seedCode",
+        "setup",
+        "teardown"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "seedCode": {
+         "type": "string",
+         "minLength": 1
+        },
+        "setup": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 600
+        },
+        "teardown": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 600
+        }
+       }
+      }
+     },
+     "faultInjections": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "seedCode",
+        "mechanism",
+        "trigger"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "seedCode": {
+         "type": "string",
+         "minLength": 1
+        },
+        "mechanism": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 600
+        },
+        "trigger": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 600
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "$comment": "GENERATED from tso.yaml sha256 827d5259050344fed165347904c5b9d357c7b16d77ccb6c2ff9977cb6cce9982; do not edit by hand"
+}

@@ -1,0 +1,164 @@
+{
+  "name": "pbom-generation",
+  "description": "TDD generation from the PBOM URD/SRS/SAD. Expected nodes and the relation are copied from the curated o5 oracle (data/test-pbom/run-quality-verified/oracle.json, fixed before this runtime existed); class counts are the totals recorded in the o5 pilot run; the missing Appendix A/B/C must surface as gaps, never as invented design.",
+  "provenance": "o5 oracle.json + implementation-status.md PBOM results",
+  "checks": [
+    {
+      "id": "element:FR-ADM-01",
+      "kind": "element",
+      "element": "FR-ADM-01",
+      "class": "Requirement"
+    },
+    {
+      "id": "element:FR-INV-02",
+      "kind": "element",
+      "element": "FR-INV-02",
+      "class": "Requirement"
+    },
+    {
+      "id": "element:BRL-47",
+      "kind": "element",
+      "element": "BRL-47",
+      "class": "BusinessRule"
+    },
+    {
+      "id": "element:BRL-48",
+      "kind": "element",
+      "element": "BRL-48",
+      "class": "BusinessRule"
+    },
+    {
+      "id": "element:FR-AST-13",
+      "kind": "element",
+      "element": "FR-AST-13",
+      "class": "Requirement"
+    },
+    {
+      "id": "element:M-06",
+      "kind": "element",
+      "element": "M-06",
+      "class": "Module"
+    },
+    {
+      "id": "element:ENT-35",
+      "kind": "element",
+      "element": "ENT-35",
+      "class": "Entity"
+    },
+    {
+      "id": "element:ERR-invalid_request",
+      "kind": "element",
+      "element": "ERR-invalid_request",
+      "class": "ErrorCode"
+    },
+    {
+      "id": "element:ENT-35:attribute:licensee",
+      "kind": "element",
+      "element": "ENT-35:attribute:licensee",
+      "class": "Attribute"
+    },
+    {
+      "id": "element:SM-ENT-35",
+      "kind": "element",
+      "element": "SM-ENT-35",
+      "class": "StateMachine"
+    },
+    {
+      "id": "element:WRK-03",
+      "kind": "element",
+      "element": "WRK-03",
+      "class": "Component"
+    },
+    {
+      "id": "element:ADR-01",
+      "kind": "element",
+      "element": "ADR-01",
+      "class": "Decision"
+    },
+    {
+      "id": "relation:FR-AST-13->BRL-48",
+      "kind": "relation",
+      "src": "FR-AST-13",
+      "rel": "traces_to",
+      "dst": "BRL-48"
+    },
+    {
+      "id": "counts:Entity",
+      "kind": "class_count_ge",
+      "class": "Entity",
+      "n": 46
+    },
+    {
+      "id": "counts:StateMachine",
+      "kind": "class_count_ge",
+      "class": "StateMachine",
+      "n": 41
+    },
+    {
+      "id": "counts:Transition",
+      "kind": "class_count_ge",
+      "class": "Transition",
+      "n": 181
+    },
+    {
+      "id": "counts:BusinessRule",
+      "kind": "class_count_ge",
+      "class": "BusinessRule",
+      "n": 53
+    },
+    {
+      "id": "counts:Decision",
+      "kind": "class_count_ge",
+      "class": "Decision",
+      "n": 15
+    },
+    {
+      "id": "counts:ErrorCode",
+      "kind": "class_count_ge",
+      "class": "ErrorCode",
+      "n": 36
+    },
+    {
+      "id": "gap:api-contracts",
+      "kind": "gap",
+      "need": "definition",
+      "target_prefix": "API-",
+      "n": 1
+    },
+    {
+      "id": "gap:algorithms",
+      "kind": "gap",
+      "need": "definition",
+      "target_prefix": "ALG-",
+      "n": 1
+    },
+    {
+      "id": "not-ready",
+      "kind": "not_ready"
+    },
+    {
+      "id": "blockers:work-validation",
+      "kind": "blocker",
+      "blockers": [
+        "work",
+        "validation"
+      ]
+    },
+    {
+      "id": "evidence-verified",
+      "kind": "evidence_verified"
+    },
+    {
+      "id": "no-invented-facts",
+      "kind": "no_invented_facts"
+    },
+    {
+      "id": "roundtrip",
+      "kind": "roundtrip"
+    },
+    {
+      "id": "questions",
+      "kind": "question_for_gap"
+    }
+  ]
+}

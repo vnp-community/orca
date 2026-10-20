@@ -1,0 +1,35 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "a",
+      "b"
+    ],
+    "properties": {
+      "a": {
+        "type": "object"
+      },
+      "b": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "same",
+      "reason"
+    ],
+    "properties": {
+      "same": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "reason": {
+        "type": "string"
+      }
+    }
+  }
+}

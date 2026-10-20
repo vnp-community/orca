@@ -1,0 +1,43 @@
+{
+ "$comment": "GENERATED from tso.yaml sha256 827d5259050344fed165347904c5b9d357c7b16d77ccb6c2ff9977cb6cce9982; do not edit by hand",
+ "rules": [
+  {
+   "class": "TestObligation",
+   "relation": "subject",
+   "to": "TestBasisItem",
+   "min": 1
+  },
+  {
+   "class": "Partition",
+   "field": "values",
+   "min": 1
+  },
+  {
+   "class": "ScenarioPath",
+   "field": "steps",
+   "min": 1
+  },
+  {
+   "class": "TestRequirement",
+   "relation": "groups",
+   "to": "TestCondition",
+   "min": 1
+  },
+  {
+   "class": "TestCase",
+   "relation": "covers",
+   "to": "CoverageItem",
+   "min": 1
+  },
+  {
+   "class": "TestSet",
+   "field": "entryCriteria",
+   "min": 1
+  },
+  {
+   "class": "TestSet",
+   "field": "exitCriteria",
+   "min": 1
+  }
+ ]
+}

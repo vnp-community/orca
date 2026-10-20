@@ -1,0 +1,1 @@
+{"name": "table and prose", "input": {"source_id": "SRS", "revision": "1", "role": "srs", "text": "# A\n| ID | S |\n|---|---|\n| FR-X-1 | must |\nThe system shall retry 3 times.\n"}, "expect": {"output": {"counts": {"heading": 1, "table_header": 1, "table_row": 1, "paragraph": 1}}, "resolved_by": "rule"}}

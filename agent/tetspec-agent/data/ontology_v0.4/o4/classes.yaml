@@ -1,0 +1,1814 @@
+version: 0.4.0
+packages:
+  doc: Tài liệu và tri thức
+  req: Yêu cầu thượng nguồn
+  struct: Cấu trúc hệ thống
+  iface: Giao diện và truy cập
+  data: Dữ liệu
+  behav: Hành vi và logic nghiệp vụ
+  qual: Chất lượng và quan sát
+  sec: Bảo mật và rủi ro
+  decis: Quyết định, giả định và phần còn mở
+  const: Hằng số và cấu hình
+  deliv: Triển khai và kiểm thử
+  change: Thay đổi và tác động
+  present: Trình bày và dựng lại
+groups:
+  DESIGN:
+  - Module
+  - Component
+  - Job
+  - Algorithm
+  - Formula
+  - DecisionTable
+  - Interface
+  - Operation
+  - Message
+  - Event
+  - Entity
+  - DataStore
+  - Flow
+  - StateMachine
+  - Transition
+  - Control
+  - Policy
+  - Screen
+  - Trigger
+  - Decision
+  - ConfigItem
+  CODE:
+  - Module
+  - Component
+  - Job
+  - Algorithm
+  - Operation
+  - Trigger
+  UPSTREAM_REQ:
+  - Requirement
+  - QualityTarget
+  - BusinessRule
+  - Scenario
+  - Milestone
+  - Constraint
+  POLICY:
+  - Policy
+  - RoutePolicy
+  - RateLimitProfile
+  - RetentionPolicy
+classes:
+  Element:
+    package: null
+    parent: null
+    vi: Phần tử
+    desc: 'Lớp gốc: mọi thứ trong kho tri thức.'
+    own_props:
+    - name: id
+      type: str
+      level: M
+      note: Bất biến, duy nhất toàn kho
+    - name: name
+      type: str
+      level: M
+      note: Tên ngắn dùng trong văn bản
+    - name: summary
+      type: text
+      level: O
+      note: Một câu
+    - name: owner_doc
+      type: ref:Document
+      level: M
+      note: Tài liệu sở hữu duy nhất
+    - name: origin
+      type: enum:Origin
+      level: M
+      note: own, upstream, external
+    - name: lifecycle
+      type: enum:LifecycleStatus
+      level: M
+      note: ''
+    - name: maturity
+      type: enum:Maturity
+      level: M
+      note: Mức chín muồi của chính phần tử
+    - name: priority
+      type: enum:PriorityLevel
+      level: C
+      note: Bắt buộc với phần tử thiết kế và đầu việc, kế thừa từ kế hoạch
+    - name: scope_status
+      type: enum:ScopeStatus
+      level: O
+      note: in_scope (mặc định), deferred, out_of_scope
+    - name: deferred_to
+      type: ref:Milestone
+      level: C
+      note: Bắt buộc khi scope_status=deferred
+    - name: source_ref
+      type: list:SourceRef
+      level: M
+      note: Khối nguồn, vị trí, quote_hash
+    - name: version_introduced
+      type: str
+      level: M
+      note: ''
+    - name: version_removed
+      type: str
+      level: O
+      note: ''
+    - name: confidence
+      type: num
+      level: M
+      note: 0 đến 1; 1 với dữ liệu xác định hoặc đã duyệt
+    - name: extracted_by
+      type: enum:ExtractionMethod
+      level: M
+      note: ''
+    - name: review_status
+      type: enum:ReviewStatus
+      level: M
+      note: ''
+    - name: reviewed_by
+      type: str
+      level: C
+      note: Bắt buộc khi review_status=approved
+    - name: reviewed_at
+      type: date
+      level: C
+      note: ''
+    - name: gaps
+      type: list:Gap
+      level: O
+      note: Các khuyết có chủ đích hoặc đã phát hiện, xem mục 6
+    - name: tags
+      type: list:str
+      level: O
+      note: ''
+    - name: ext
+      type: json
+      level: O
+      note: Thuộc tính ngoài lược đồ, chờ đưa vào lớp
+  Document:
+    package: doc
+    parent: Element
+    vi: Tài liệu
+    desc: Một tài liệu thuộc họ tài liệu của dự án.
+    own_props:
+    - name: doc_type
+      type: enum:DocumentType
+      level: M
+      note: ''
+    - name: version
+      type: str
+      level: M
+      note: ''
+    - name: profile
+      type: str
+      level: M
+      note: Hồ sơ loại tài liệu
+  DocumentVersion:
+    package: doc
+    parent: Element
+    vi: Phiên bản tài liệu
+    desc: Một phiên bản có băm nội dung.
+    own_props:
+    - name: content_hash
+      type: str
+      level: M
+      note: ''
+    - name: released_at
+      type: date
+      level: O
+      note: ''
+  Baseline:
+    package: doc
+    parent: Element
+    vi: Đường cơ sở
+    desc: Bộ phiên bản được ghim cùng nhau.
+    own_props:
+    - name: members
+      type: list:ref:DocumentVersion
+      level: M
+      note: ''
+    - name: signed_by
+      type: str
+      level: C
+      note: ''
+  Section:
+    package: doc
+    parent: Element
+    vi: Mục
+    desc: Mục của tài liệu.
+    own_props:
+    - name: number
+      type: str
+      level: M
+      note: ''
+    - name: title
+      type: str
+      level: M
+      note: ''
+  SourceBlock:
+    package: doc
+    parent: Element
+    vi: Khối nguồn
+    desc: Khối văn bản nhỏ nhất có neo.
+    own_props:
+    - name: kind
+      type: enum:BlockKind
+      level: M
+      note: ''
+    - name: line
+      type: int
+      level: M
+      note: ''
+    - name: text_hash
+      type: str
+      level: M
+      note: ''
+  Term:
+    package: doc
+    parent: Element
+    vi: Thuật ngữ
+    desc: Thuật ngữ miền hoặc kỹ thuật.
+    own_props:
+    - name: definition
+      type: text
+      level: M
+      note: ''
+    - name: synonyms
+      type: list:str
+      level: O
+      note: ''
+  Standard:
+    package: doc
+    parent: Element
+    vi: Chuẩn
+    desc: Tiêu chuẩn, RFC, quy ước bên ngoài.
+    own_props:
+    - name: identifier
+      type: str
+      level: M
+      note: ''
+    - name: edition
+      type: str
+      level: O
+      note: ''
+  Stakeholder:
+    package: req
+    parent: Element
+    vi: Bên liên quan
+    desc: Nhóm hoặc vai trò có lợi ích trong hệ thống.
+    own_props:
+    - name: concerns
+      type: list:str
+      level: O
+      note: ''
+  Concern:
+    package: req
+    parent: Element
+    vi: Mối quan tâm
+    desc: Mối quan tâm của bên liên quan (ISO/IEC/IEEE 42010).
+    own_props: []
+  Requirement:
+    package: req
+    parent: Element
+    vi: Yêu cầu
+    desc: Yêu cầu chức năng, phi chức năng, ràng buộc, giao diện hoặc dữ liệu.
+    own_props:
+    - name: req_kind
+      type: enum:RequirementKind
+      level: M
+      note: ''
+    - name: statement
+      type: text
+      level: M
+      note: ''
+    - name: acceptance
+      type: text
+      level: C
+      note: Bắt buộc với yêu cầu ưu tiên P0
+  BusinessRule:
+    package: req
+    parent: Element
+    vi: Quy tắc nghiệp vụ
+    desc: Quy tắc nghiệp vụ có cấu trúc điều kiện và kết quả (mục 7.1).
+    own_props:
+    - name: rule_form
+      type: json
+      level: C
+      note: when, then, otherwise, exceptions; bắt buộc khi quy tắc đã chín muồi
+    - name: precedence
+      type: int
+      level: O
+      note: Thứ tự ưu tiên khi nhiều quy tắc cùng áp dụng
+    - name: rule_kind
+      type: enum:BusinessRuleKind
+      level: O
+      note: ''
+    - name: severity
+      type: enum:RuleLevel
+      level: O
+      note: Mức tác động khi vi phạm
+  Scenario:
+    package: req
+    parent: Element
+    vi: Kịch bản
+    desc: Ca sử dụng hoặc kịch bản người dùng.
+    own_props:
+    - name: actors
+      type: list:ref:Stakeholder
+      level: M
+      note: ''
+    - name: main_flow
+      type: ref:Flow
+      level: O
+      note: ''
+    - name: end_conditions
+      type: text
+      level: O
+      note: ''
+  Milestone:
+    package: req
+    parent: Element
+    vi: Mốc
+    desc: Mốc giao hàng hoặc mục tiêu POC có tiêu chí đo.
+    own_props:
+    - name: criteria
+      type: list:str
+      level: M
+      note: ''
+    - name: target_date
+      type: date
+      level: O
+      note: ''
+  PriorityLevel:
+    package: req
+    parent: Element
+    vi: Mức ưu tiên
+    desc: Mức ưu tiên theo mục tiêu POC.
+    own_props: []
+  QualityCharacteristic:
+    package: req
+    parent: Element
+    vi: Đặc tính chất lượng
+    desc: Đặc tính theo ISO/IEC 25010.
+    own_props: []
+  System:
+    package: struct
+    parent: Element
+    vi: Hệ thống
+    desc: Hệ thống đang thiết kế.
+    own_props: []
+  Layer:
+    package: struct
+    parent: Element
+    vi: Tầng
+    desc: Tầng kiến trúc.
+    own_props: []
+  Module:
+    package: struct
+    parent: Element
+    vi: Mô-đun
+    desc: Mô-đun theo SAD; đơn vị sở hữu dữ liệu và ranh giới.
+    own_props:
+    - name: responsibility
+      type: text
+      level: M
+      note: ''
+    - name: runtime_unit
+      type: str
+      level: O
+      note: ''
+  Component:
+    package: struct
+    parent: Element
+    vi: Thành phần
+    desc: Thành phần cài đặt (dịch vụ, gói, bộ điều hợp, ứng dụng).
+    own_props:
+    - name: component_kind
+      type: enum:ComponentKind
+      level: M
+      note: ''
+    - name: responsibility
+      type: text
+      level: M
+      note: ''
+    - name: tech
+      type: str
+      level: C
+      note: Bắt buộc khi component_kind là service, ui_app, worker
+    - name: package
+      type: str
+      level: O
+      note: Đường dẫn gói mã
+    - name: stateless
+      type: bool
+      level: O
+      note: ''
+    - name: scaling_unit
+      type: str
+      level: O
+      note: ''
+    - name: runtime_unit
+      type: str
+      level: O
+      note: ''
+    - name: db_role
+      type: ref:DbRole
+      level: O
+      note: ''
+  DeploymentUnit:
+    package: struct
+    parent: Element
+    vi: Đơn vị triển khai
+    desc: Tệp nhị phân, ảnh, gói triển khai.
+    own_props:
+    - name: artifact
+      type: str
+      level: O
+      note: ''
+    - name: scaling
+      type: str
+      level: O
+      note: ''
+  Environment:
+    package: struct
+    parent: Element
+    vi: Môi trường
+    desc: Môi trường chạy (dev, staging, prod).
+    own_props: []
+  ExternalSystem:
+    package: struct
+    parent: Element
+    vi: Hệ thống ngoài
+    desc: Hệ thống không do dự án sở hữu.
+    own_props:
+    - name: contract
+      type: str
+      level: O
+      note: ''
+    - name: trust_level
+      type: str
+      level: O
+      note: ''
+  Dependency:
+    package: struct
+    parent: Element
+    vi: Phụ thuộc ngoài
+    desc: Thư viện hoặc dịch vụ bên thứ ba.
+    own_props:
+    - name: license
+      type: str
+      level: M
+      note: ''
+    - name: version
+      type: str
+      level: C
+      note: Bắt buộc khi phụ thuộc là thư viện
+    - name: approved
+      type: bool
+      level: O
+      note: Thuộc danh mục công nghệ được duyệt
+  Artefact:
+    package: struct
+    parent: Element
+    vi: Tệp liên kết
+    desc: OpenAPI, DDL, YAML, tài liệu ngoài.
+    own_props:
+    - name: path
+      type: str
+      level: M
+      note: ''
+    - name: format
+      type: str
+      level: O
+      note: ''
+    - name: artefact_kind
+      type: enum:ArtefactKind
+      level: O
+      note: ''
+  Screen:
+    package: struct
+    parent: Element
+    vi: Màn hình
+    desc: Màn hình hoặc luồng giao diện người dùng.
+    own_props:
+    - name: route
+      type: str
+      level: O
+      note: ''
+    - name: roles
+      type: list:ref:Role
+      level: O
+      note: ''
+  Interface:
+    package: iface
+    parent: Element
+    vi: Giao diện
+    desc: Điểm giao tiếp giữa các phần.
+    own_props:
+    - name: protocol
+      type: enum:Protocol
+      level: M
+      note: ''
+    - name: style
+      type: str
+      level: O
+      note: ''
+    - name: contract_ref
+      type: ref:Artefact
+      level: C
+      note: Bắt buộc khi protocol là http hoặc grpc
+    - name: authn
+      type: str
+      level: O
+      note: ''
+    - name: versioning
+      type: str
+      level: O
+      note: ''
+    - name: timeout
+      type: qty
+      level: O
+      note: ''
+  Operation:
+    package: iface
+    parent: Element
+    vi: Thao tác
+    desc: Thao tác của giao diện, ví dụ điểm cuối API.
+    own_props:
+    - name: method
+      type: str
+      level: C
+      note: Bắt buộc với giao diện http
+    - name: path_or_name
+      type: str
+      level: M
+      note: ''
+    - name: idempotent
+      type: bool
+      level: M
+      note: ''
+    - name: idempotency_key
+      type: bool
+      level: C
+      note: Bắt buộc khi thao tác ghi và idempotent
+    - name: concurrency_control
+      type: enum:ConcurrencyControl
+      level: C
+      note: Bắt buộc với thao tác sửa
+    - name: authn
+      type: str
+      level: O
+      note: ''
+    - name: timeout
+      type: qty
+      level: O
+      note: ''
+    - name: roles
+      type: list:ref:Role
+      level: O
+      note: ''
+    - name: sla_ref
+      type: ref:Slo
+      level: O
+      note: ''
+  Message:
+    package: iface
+    parent: Element
+    vi: Thông điệp
+    desc: Cấu trúc dữ liệu vào, ra hoặc sự kiện.
+    own_props:
+    - name: schema_ref
+      type: ref:Artefact
+      level: O
+      note: ''
+  Event:
+    package: iface
+    parent: Element
+    vi: Sự kiện
+    desc: Sự kiện miền hoặc tích hợp.
+    own_props:
+    - name: topic
+      type: str
+      level: M
+      note: ''
+    - name: channel
+      type: enum:EventChannel
+      level: M
+      note: ''
+    - name: delivery
+      type: enum:DeliverySemantics
+      level: M
+      note: ''
+    - name: ordering_key
+      type: str
+      level: O
+      note: ''
+    - name: payload
+      type: ref:Message
+      level: O
+      note: ''
+  ErrorCode:
+    package: iface
+    parent: Element
+    vi: Mã lỗi
+    desc: Mã lỗi nghiệp vụ hoặc kỹ thuật.
+    own_props:
+    - name: code
+      type: str
+      level: M
+      note: ''
+    - name: http_status
+      type: int
+      level: M
+      note: ''
+    - name: slug
+      type: str
+      level: O
+      note: ''
+    - name: retryable
+      type: bool
+      level: M
+      note: ''
+    - name: when
+      type: text
+      level: M
+      note: Điều kiện phát sinh
+    - name: handling
+      type: text
+      level: O
+      note: ''
+  Scope:
+    package: iface
+    parent: Element
+    vi: Quyền
+    desc: Scope của token hoặc quyền thao tác.
+    own_props: []
+  Role:
+    package: iface
+    parent: Element
+    vi: Vai trò
+    desc: Vai trò người dùng hoặc máy.
+    own_props:
+    - name: principal_type
+      type: enum:PrincipalType
+      level: O
+      note: ''
+  Credential:
+    package: iface
+    parent: Element
+    vi: Thông tin xác thực
+    desc: Token, cookie, khoá, bí mật và vòng đời của chúng.
+    own_props:
+    - name: credential_kind
+      type: enum:CredentialKind
+      level: M
+      note: ''
+    - name: storage
+      type: str
+      level: M
+      note: ''
+    - name: lifetime
+      type: qty
+      level: C
+      note: Bắt buộc khi có hạn dùng
+    - name: rotation
+      type: text
+      level: C
+      note: ''
+    - name: revocation
+      type: text
+      level: C
+      note: ''
+  Policy:
+    package: iface
+    parent: Element
+    vi: Chính sách
+    desc: Chính sách áp dụng cho thao tác, dữ liệu hoặc luồng.
+    own_props: []
+  RoutePolicy:
+    package: iface
+    parent: Policy
+    vi: Chính sách định tuyến
+    desc: Chính sách của một tuyến ở cổng vào.
+    own_props:
+    - name: upstream
+      type: str
+      level: M
+      note: ''
+    - name: auth
+      type: str
+      level: M
+      note: ''
+    - name: principals
+      type: str
+      level: O
+      note: ''
+    - name: rate_limit
+      type: ref:RateLimitProfile
+      level: M
+      note: ''
+    - name: timeout
+      type: qty
+      level: M
+      note: ''
+    - name: retry
+      type: enum:RetryMode
+      level: M
+      note: ''
+    - name: max_body
+      type: qty
+      level: M
+      note: ''
+  RateLimitProfile:
+    package: iface
+    parent: Policy
+    vi: Hạn mức tần suất
+    desc: Hồ sơ giới hạn tần suất.
+    own_props:
+    - name: limit
+      type: qty
+      level: M
+      note: ''
+    - name: key_by
+      type: str
+      level: M
+      note: ip, principal, project
+  RetentionPolicy:
+    package: iface
+    parent: Policy
+    vi: Chính sách lưu giữ
+    desc: Thời hạn lưu và cách xoá.
+    own_props:
+    - name: period
+      type: qty
+      level: M
+      note: ''
+    - name: action
+      type: enum:RetentionAction
+      level: M
+      note: ''
+    - name: legal_basis
+      type: str
+      level: O
+      note: ''
+  DataStore:
+    package: data
+    parent: Element
+    vi: Kho dữ liệu
+    desc: CSDL, hàng đợi, hệ lưu tệp.
+    own_props:
+    - name: technology
+      type: str
+      level: M
+      note: ''
+    - name: owner_module
+      type: ref:Module
+      level: O
+      note: ''
+  Schema:
+    package: data
+    parent: Element
+    vi: Lược đồ CSDL
+    desc: Không gian tên của bảng, sở hữu bởi một mô-đun.
+    own_props:
+    - name: owner_role
+      type: ref:DbRole
+      level: O
+      note: ''
+  Entity:
+    package: data
+    parent: Element
+    vi: Thực thể
+    desc: Thực thể nghiệp vụ hoặc bảng vật lý.
+    own_props:
+    - name: level
+      type: enum:EntityLevel
+      level: M
+      note: logical hoặc physical
+    - name: table_name
+      type: str
+      level: C
+      note: Bắt buộc khi level=physical
+    - name: store
+      type: ref:DataStore
+      level: C
+      note: ''
+    - name: pk
+      type: str
+      level: C
+      note: Bắt buộc khi level=physical
+    - name: soft_delete
+      type: bool
+      level: O
+      note: ''
+    - name: partition
+      type: str
+      level: O
+      note: ''
+    - name: data_class
+      type: enum:DataClassVocab
+      level: O
+      note: ''
+    - name: fillfactor
+      type: int
+      level: O
+      note: ''
+  Attribute:
+    package: data
+    parent: Element
+    vi: Cột hoặc thuộc tính
+    desc: Thuộc tính dữ liệu hoặc cột.
+    own_props:
+    - name: datatype
+      type: str
+      level: M
+      note: ''
+    - name: nullable
+      type: bool
+      level: M
+      note: ''
+    - name: default
+      type: str
+      level: O
+      note: ''
+    - name: enum_ref
+      type: ref:Enumeration
+      level: O
+      note: ''
+    - name: enum_values
+      type: list:str
+      level: O
+      note: ''
+    - name: unit
+      type: str
+      level: O
+      note: ''
+    - name: pii
+      type: bool
+      level: O
+      note: ''
+    - name: pk
+      type: bool
+      level: O
+      note: ''
+    - name: unique
+      type: bool
+      level: O
+      note: ''
+    - name: constraint
+      type: expr
+      level: O
+      note: ''
+  Index:
+    package: data
+    parent: Element
+    vi: Chỉ mục
+    desc: Chỉ mục của bảng.
+    own_props:
+    - name: columns
+      type: list:str
+      level: M
+      note: ''
+    - name: unique
+      type: bool
+      level: M
+      note: ''
+    - name: partial
+      type: expr
+      level: O
+      note: ''
+    - name: method
+      type: str
+      level: O
+      note: ''
+  View:
+    package: data
+    parent: Element
+    vi: Khung nhìn
+    desc: View hoặc view vật hoá.
+    own_props:
+    - name: definition
+      type: expr
+      level: O
+      note: ''
+    - name: materialized
+      type: bool
+      level: O
+      note: ''
+  Sequence:
+    package: data
+    parent: Element
+    vi: Dãy số
+    desc: Sequence của CSDL.
+    own_props:
+    - name: gap_allowed
+      type: bool
+      level: O
+      note: ''
+  Trigger:
+    package: data
+    parent: Element
+    vi: Trigger CSDL
+    desc: Trigger thi hành quy tắc ở tầng dữ liệu.
+    own_props:
+    - name: timing
+      type: str
+      level: M
+      note: ''
+    - name: enforces_text
+      type: text
+      level: O
+      note: ''
+  DbRole:
+    package: data
+    parent: Element
+    vi: Vai trò CSDL
+    desc: Vai trò truy cập CSDL.
+    own_props:
+    - name: privileges
+      type: text
+      level: O
+      note: ''
+  Migration:
+    package: data
+    parent: Element
+    vi: Di trú
+    desc: Tệp di trú lược đồ.
+    own_props:
+    - name: path
+      type: str
+      level: M
+      note: ''
+    - name: reversible
+      type: bool
+      level: O
+      note: ''
+  DataClass:
+    package: data
+    parent: Element
+    vi: Phân loại dữ liệu
+    desc: Mức nhạy cảm của dữ liệu.
+    own_props: []
+  Enumeration:
+    package: data
+    parent: Element
+    vi: Tập giá trị
+    desc: Tập giá trị liệt kê của miền (trạng thái, vai trò).
+    own_props:
+    - name: values
+      type: list:str
+      level: M
+      note: ''
+    - name: closed
+      type: bool
+      level: M
+      note: true nếu tập không được mở rộng nếu không đổi lược đồ
+  Flow:
+    package: behav
+    parent: Element
+    vi: Luồng
+    desc: Chuỗi bước xử lý có thứ tự.
+    own_props:
+    - name: trigger
+      type: str
+      level: O
+      note: ''
+    - name: steps
+      type: list:str
+      level: O
+      note: ''
+  StateMachine:
+    package: behav
+    parent: Element
+    vi: Mô hình trạng thái
+    desc: Mô hình trạng thái của một thực thể.
+    own_props:
+    - name: subject_entity
+      type: ref:Entity
+      level: M
+      note: ''
+    - name: initial_state
+      type: ref:State
+      level: M
+      note: ''
+    - name: terminal_states
+      type: list:ref:State
+      level: C
+      note: Bắt buộc nếu có trạng thái cuối
+  State:
+    package: behav
+    parent: Element
+    vi: Trạng thái
+    desc: Một trạng thái.
+    own_props:
+    - name: final
+      type: bool
+      level: O
+      note: ''
+    - name: meaning
+      type: text
+      level: O
+      note: ''
+  Transition:
+    package: behav
+    parent: Element
+    vi: Chuyển trạng thái
+    desc: Chuyển giữa hai trạng thái.
+    own_props:
+    - name: trigger
+      type: str
+      level: M
+      note: ''
+    - name: guard
+      type: expr
+      level: O
+      note: ''
+    - name: action
+      type: text
+      level: O
+      note: ''
+  Job:
+    package: behav
+    parent: Element
+    vi: Tác vụ nền
+    desc: Công việc chạy nền hoặc theo lịch.
+    own_props:
+    - name: trigger_kind
+      type: enum:JobTrigger
+      level: M
+      note: ''
+    - name: schedule
+      type: str
+      level: C
+      note: Bắt buộc khi trigger_kind=schedule
+    - name: queue
+      type: str
+      level: O
+      note: ''
+    - name: queue_priority
+      type: int
+      level: O
+      note: ''
+    - name: job_key
+      type: str
+      level: M
+      note: Khoá chống chạy trùng
+    - name: idempotent
+      type: bool
+      level: M
+      note: ''
+  Algorithm:
+    package: behav
+    parent: Element
+    vi: Thuật toán
+    desc: Thuật toán có đầu vào, đầu ra, bất biến.
+    own_props:
+    - name: inputs
+      type: list:str
+      level: M
+      note: ''
+    - name: outputs
+      type: list:str
+      level: M
+      note: ''
+    - name: complexity
+      type: str
+      level: O
+      note: ''
+    - name: deterministic
+      type: bool
+      level: M
+      note: ''
+    - name: steps
+      type: list:str
+      level: O
+      note: ''
+  Formula:
+    package: behav
+    parent: Element
+    vi: Công thức
+    desc: Biểu thức tính với biến có đơn vị.
+    own_props:
+    - name: expression
+      type: expr
+      level: M
+      note: ''
+    - name: variables
+      type: json
+      level: M
+      note: tên, đơn vị, miền giá trị
+    - name: result_unit
+      type: str
+      level: C
+      note: ''
+  DecisionTable:
+    package: behav
+    parent: Element
+    vi: Bảng quyết định
+    desc: Bảng điều kiện và kết quả (ma trận giấy phép, hạn SLA).
+    own_props:
+    - name: inputs
+      type: list:ref:Enumeration
+      level: M
+      note: Miền của từng đầu vào
+    - name: outputs
+      type: list:str
+      level: M
+      note: ''
+    - name: hit_policy
+      type: enum:HitPolicy
+      level: M
+      note: ''
+  DecisionRule:
+    package: behav
+    parent: Element
+    vi: Dòng quyết định
+    desc: Một dòng của bảng quyết định hoặc một quy tắc có mã.
+    own_props:
+    - name: when
+      type: json
+      level: M
+      note: ''
+    - name: then
+      type: json
+      level: M
+      note: ''
+    - name: level
+      type: enum:RuleLevel
+      level: O
+      note: ''
+    - name: grace
+      type: qty
+      level: O
+      note: ''
+  Condition:
+    package: behav
+    parent: Element
+    vi: Điều kiện
+    desc: Điều kiện tiên quyết, hậu điều kiện, bất biến hoặc điều kiện chuyển.
+    own_props:
+    - name: condition_kind
+      type: enum:ConditionKind
+      level: M
+      note: ''
+    - name: expression
+      type: expr
+      level: M
+      note: ''
+    - name: violation_error
+      type: ref:ErrorCode
+      level: O
+      note: ''
+  QualityTarget:
+    package: qual
+    parent: Element
+    vi: Mục tiêu chất lượng
+    desc: Mục tiêu đo được gắn đặc tính chất lượng.
+    own_props:
+    - name: characteristic
+      type: ref:QualityCharacteristic
+      level: M
+      note: ''
+    - name: target
+      type: qty
+      level: M
+      note: ''
+    - name: basis
+      type: enum:EvidenceBasis
+      level: M
+      note: ''
+    - name: measurement_ref
+      type: ref:Element
+      level: C
+      note: Bắt buộc khi basis là to_measure hoặc assumed
+  Budget:
+    package: qual
+    parent: Element
+    vi: Ngân sách
+    desc: Ngân sách tài nguyên hoặc thời gian của một phần.
+    own_props:
+    - name: scope
+      type: str
+      level: M
+      note: ''
+    - name: target
+      type: qty
+      level: M
+      note: ''
+    - name: basis
+      type: enum:EvidenceBasis
+      level: M
+      note: ''
+    - name: parent_budget
+      type: ref:Budget
+      level: O
+      note: ''
+  Metric:
+    package: qual
+    parent: Element
+    vi: Chỉ số
+    desc: Chỉ số quan sát (Prometheus).
+    own_props:
+    - name: metric_type
+      type: enum:MetricType
+      level: M
+      note: ''
+    - name: unit
+      type: str
+      level: C
+      note: Bắt buộc khi có đơn vị
+    - name: labels
+      type: list:str
+      level: M
+      note: ''
+  AlertRule:
+    package: qual
+    parent: Element
+    vi: Quy tắc cảnh báo
+    desc: Điều kiện phát cảnh báo trên chỉ số.
+    own_props:
+    - name: condition
+      type: expr
+      level: M
+      note: ''
+    - name: severity
+      type: enum:Severity
+      level: M
+      note: ''
+    - name: action
+      type: text
+      level: M
+      note: ''
+    - name: for
+      type: qty
+      level: O
+      note: ''
+  Slo:
+    package: qual
+    parent: Element
+    vi: Mục tiêu mức dịch vụ
+    desc: SLO trên một chỉ số.
+    own_props:
+    - name: objective
+      type: qty
+      level: M
+      note: ''
+    - name: window
+      type: qty
+      level: M
+      note: ''
+  LogSpec:
+    package: qual
+    parent: Element
+    vi: Đặc tả nhật ký
+    desc: Cấu trúc và mức nhật ký.
+    own_props:
+    - name: fields
+      type: list:str
+      level: M
+      note: ''
+    - name: level
+      type: str
+      level: O
+      note: ''
+    - name: pii_policy
+      type: text
+      level: O
+      note: ''
+  TraceSpec:
+    package: qual
+    parent: Element
+    vi: Đặc tả truy vết phân tán
+    desc: Cách lan truyền và lấy mẫu vết.
+    own_props:
+    - name: propagation
+      type: str
+      level: M
+      note: ''
+    - name: sampling
+      type: str
+      level: O
+      note: ''
+  Threat:
+    package: sec
+    parent: Element
+    vi: Mối đe doạ
+    desc: Mối đe doạ nhận diện được.
+    own_props:
+    - name: category
+      type: str
+      level: M
+      note: ''
+    - name: asset
+      type: str
+      level: O
+      note: ''
+  Control:
+    package: sec
+    parent: Element
+    vi: Biện pháp kiểm soát
+    desc: Biện pháp giảm rủi ro hoặc đe doạ.
+    own_props:
+    - name: control_kind
+      type: enum:ControlKind
+      level: M
+      note: ''
+    - name: standard_ref
+      type: ref:Standard
+      level: O
+      note: ''
+  Risk:
+    package: sec
+    parent: Element
+    vi: Rủi ro
+    desc: Rủi ro đã đánh giá.
+    own_props:
+    - name: likelihood
+      type: enum:RiskLevel
+      level: M
+      note: ''
+    - name: impact
+      type: enum:RiskLevel
+      level: M
+      note: ''
+    - name: treatment
+      type: enum:RiskTreatment
+      level: M
+      note: ''
+    - name: owner
+      type: str
+      level: M
+      note: ''
+  Decision:
+    package: decis
+    parent: Element
+    vi: Quyết định
+    desc: Quyết định thiết kế.
+    own_props:
+    - name: context
+      type: text
+      level: M
+      note: ''
+    - name: chosen
+      type: text
+      level: M
+      note: ''
+    - name: rationale
+      type: text
+      level: M
+      note: ''
+    - name: reversible
+      type: bool
+      level: M
+      note: ''
+    - name: decided_by
+      type: str
+      level: M
+      note: ''
+    - name: decided_on
+      type: date
+      level: C
+      note: Bắt buộc khi lifecycle=approved
+  Alternative:
+    package: decis
+    parent: Element
+    vi: Phương án
+    desc: Phương án đã cân nhắc.
+    own_props:
+    - name: pros
+      type: text
+      level: O
+      note: ''
+    - name: cons
+      type: text
+      level: O
+      note: ''
+  Assumption:
+    package: decis
+    parent: Element
+    vi: Giả định
+    desc: Điều được coi là đúng chưa kiểm chứng.
+    own_props:
+    - name: statement
+      type: text
+      level: M
+      note: ''
+    - name: validation_plan
+      type: text
+      level: M
+      note: Cách và lúc kiểm chứng
+    - name: validate_by
+      type: ref:Milestone
+      level: M
+      note: ''
+    - name: impact_if_false
+      type: text
+      level: M
+      note: ''
+    - name: owner
+      type: str
+      level: M
+      note: ''
+  Constraint:
+    package: decis
+    parent: Element
+    vi: Ràng buộc
+    desc: Ràng buộc kỹ thuật, nghiệp vụ, pháp lý hoặc hiệu năng.
+    own_props:
+    - name: constraint_kind
+      type: enum:ConstraintKind
+      level: M
+      note: ''
+    - name: statement
+      type: text
+      level: M
+      note: ''
+    - name: limit
+      type: qty
+      level: O
+      note: ''
+    - name: enforced_by
+      type: ref:Element
+      level: O
+      note: ''
+  OpenIssue:
+    package: decis
+    parent: Element
+    vi: Vấn đề mở
+    desc: Điều chưa quyết, chưa biết hoặc chưa làm, có chủ và hạn.
+    own_props:
+    - name: issue_kind
+      type: enum:OpenIssueKind
+      level: M
+      note: ''
+    - name: question
+      type: text
+      level: M
+      note: ''
+    - name: owner
+      type: str
+      level: M
+      note: ''
+    - name: due
+      type: date
+      level: M
+      note: Bắt buộc khi đạt đường cơ sở
+    - name: status
+      type: enum:OpenIssueStatus
+      level: M
+      note: ''
+    - name: proposed_default
+      type: text
+      level: O
+      note: Giá trị hay giả định tạm dùng trong lúc chờ
+    - name: resolution
+      type: text
+      level: C
+      note: Bắt buộc khi status=resolved
+  Deviation:
+    package: decis
+    parent: Element
+    vi: Lệch so với thượng nguồn
+    desc: Chỗ TDD khác tài liệu thượng nguồn có chủ ý.
+    own_props:
+    - name: upstream_ref
+      type: ref:Element
+      level: M
+      note: ''
+    - name: reason
+      type: text
+      level: M
+      note: ''
+    - name: approved_by
+      type: str
+      level: C
+      note: ''
+  Waiver:
+    package: decis
+    parent: Element
+    vi: Miễn trừ
+    desc: Miễn trừ có thời hạn cho một luật.
+    own_props:
+    - name: rule_id
+      type: str
+      level: M
+      note: ''
+    - name: target
+      type: ref:Element
+      level: M
+      note: ''
+    - name: reason
+      type: text
+      level: M
+      note: ''
+    - name: approved_by
+      type: str
+      level: M
+      note: ''
+    - name: expires
+      type: date
+      level: M
+      note: ''
+  Constant:
+    package: const
+    parent: Element
+    vi: Hằng số
+    desc: Giá trị thiết kế dùng chung, có đúng một nơi định nghĩa.
+    own_props:
+    - name: key
+      type: str
+      level: M
+      note: Ví dụ limits.sbom_max_bytes
+    - name: constant_kind
+      type: enum:ConstantKind
+      level: M
+      note: ''
+    - name: value
+      type: qty
+      level: M
+      note: ''
+    - name: basis
+      type: enum:EvidenceBasis
+      level: M
+      note: ''
+    - name: mutable
+      type: bool
+      level: M
+      note: ''
+    - name: by_phase
+      type: json
+      level: O
+      note: Giá trị theo giai đoạn, ví dụ POC và sau POC
+    - name: config_item
+      type: ref:ConfigItem
+      level: O
+      note: ''
+  ConfigItem:
+    package: const
+    parent: Element
+    vi: Cấu hình
+    desc: Khoá cấu hình khi chạy.
+    own_props:
+    - name: key
+      type: str
+      level: M
+      note: ''
+    - name: type
+      type: str
+      level: M
+      note: ''
+    - name: default
+      type: str
+      level: M
+      note: ''
+    - name: env_var
+      type: str
+      level: O
+      note: ''
+    - name: secret
+      type: bool
+      level: M
+      note: ''
+    - name: unit
+      type: str
+      level: O
+      note: ''
+    - name: runtime_changeable
+      type: bool
+      level: O
+      note: ''
+  WorkItem:
+    package: deliv
+    parent: Element
+    vi: Đầu việc
+    desc: Đầu việc triển khai.
+    own_props:
+    - name: estimate
+      type: str
+      level: M
+      note: S, M, L, XL
+    - name: milestone
+      type: ref:Milestone
+      level: O
+      note: ''
+    - name: definition_of_done
+      type: text
+      level: C
+      note: Bắt buộc với P0
+  Gate:
+    package: deliv
+    parent: Element
+    vi: Cổng
+    desc: Cổng chất lượng của mốc.
+    own_props:
+    - name: criteria
+      type: list:str
+      level: M
+      note: ''
+  TestCase:
+    package: deliv
+    parent: Element
+    vi: Ca kiểm thử
+    desc: Ca kiểm thử.
+    own_props:
+    - name: level
+      type: enum:TestLevel
+      level: M
+      note: ''
+    - name: kind
+      type: enum:TestKind
+      level: M
+      note: ''
+    - name: expected
+      type: text
+      level: M
+      note: ''
+    - name: tool
+      type: str
+      level: O
+      note: ''
+    - name: automation
+      type: enum:Automation
+      level: O
+      note: ''
+    - name: preconditions
+      type: text
+      level: O
+      note: ''
+  ChangeRequest:
+    package: change
+    parent: Element
+    vi: Yêu cầu thay đổi
+    desc: Đề nghị thay đổi một hay nhiều tài liệu, có lý do và nguồn.
+    own_props:
+    - name: change_source
+      type: enum:ChangeSource
+      level: M
+      note: ''
+    - name: requester
+      type: str
+      level: M
+      note: ''
+    - name: rationale
+      type: text
+      level: M
+      note: ''
+    - name: status
+      type: enum:ChangeStatus
+      level: M
+      note: ''
+    - name: target_docs
+      type: list:ref:Document
+      level: M
+      note: ''
+    - name: decision_by
+      type: str
+      level: C
+      note: Bắt buộc khi status=approved
+    - name: decided_at
+      type: date
+      level: C
+      note: ''
+  ChangeSet:
+    package: change
+    parent: Element
+    vi: Bộ thay đổi
+    desc: Tập thao tác áp dụng nguyên khối (hoặc không áp dụng gì).
+    own_props:
+    - name: request
+      type: ref:ChangeRequest
+      level: M
+      note: ''
+    - name: base_version
+      type: str
+      level: M
+      note: Phiên bản kho mà bộ thay đổi dựa vào
+    - name: result_version
+      type: str
+      level: C
+      note: Bắt buộc khi status=applied
+    - name: status
+      type: enum:ChangeStatus
+      level: M
+      note: ''
+    - name: applied_at
+      type: date
+      level: C
+      note: ''
+  ChangeOp:
+    package: change
+    parent: Element
+    vi: Thao tác thay đổi
+    desc: Một thao tác nguyên tử trong bộ thay đổi.
+    own_props:
+    - name: op
+      type: enum:ChangeOpKind
+      level: M
+      note: ''
+    - name: target
+      type: str
+      level: M
+      note: Mã phần tử hoặc khoá cạnh
+    - name: path
+      type: str
+      level: C
+      note: Tên thuộc tính khi modify
+    - name: before
+      type: json
+      level: C
+      note: Giá trị trước, bắt buộc khi modify hoặc remove để phát hiện ghi đè
+    - name: after
+      type: json
+      level: C
+      note: Giá trị sau, bắt buộc khi add hoặc modify
+    - name: cascade
+      type: enum:CascadePolicy
+      level: C
+      note: Bắt buộc khi remove
+    - name: seq
+      type: int
+      level: M
+      note: Thứ tự áp dụng
+  DocumentTemplate:
+    package: present
+    parent: Element
+    vi: Mẫu tài liệu
+    desc: Cấu trúc mục và lớp phần tử cho một loại tài liệu.
+    own_props:
+    - name: doc_type
+      type: enum:DocumentType
+      level: M
+      note: ''
+    - name: template_version
+      type: str
+      level: M
+      note: ''
+  SectionSpec:
+    package: present
+    parent: Element
+    vi: Đặc tả mục
+    desc: 'Một mục trong mẫu: vị trí, lớp phần tử chứa, dạng trình bày.'
+    own_props:
+    - name: number
+      type: str
+      level: M
+      note: ''
+    - name: title
+      type: str
+      level: M
+      note: ''
+    - name: seq
+      type: int
+      level: M
+      note: ''
+    - name: holds
+      type: list:str
+      level: M
+      note: Các lớp phần tử được định nghĩa trong mục
+    - name: render_mode
+      type: enum:RenderMode
+      level: M
+      note: ''
+    - name: required
+      type: bool
+      level: M
+      note: ''
+    - name: min_recall
+      type: num
+      level: O
+      note: Ngưỡng dựng lại từ cấu trúc, mặc định theo hồ sơ
+  Block:
+    package: present
+    parent: Element
+    vi: Khối nguồn
+    desc: Một khối văn bản có thứ tự của tài liệu (đoạn, dòng bảng, mục danh sách, mã), lưu nguyên văn để dựng lại không mất.
+    own_props:
+    - name: doc
+      type: ref:Document
+      level: M
+      note: ''
+    - name: section
+      type: str
+      level: M
+      note: ''
+    - name: seq
+      type: int
+      level: M
+      note: ''
+    - name: block_kind
+      type: str
+      level: M
+      note: ''
+    - name: text
+      type: text
+      level: M
+      note: ''
+    - name: text_hash
+      type: str
+      level: M
+      note: ''
+    - name: prose_only
+      type: bool
+      level: O
+      note: Khối chỉ là văn xuôi, không chứa phần tử; khai báo tường minh

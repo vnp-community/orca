@@ -1,0 +1,397 @@
+# Test ontology tso: (ONTOLOGY-TEST-TSO). Single source for the DDL, views, JSON Schemas of LLM outputs and shape rules.
+# After editing: make codegen. Never edit the generated files by hand.
+#
+# Fields: type in text | int | real | bool | json | enum:<name>; card in "!" (required), "?" (optional), "+" (array >= 1), "*" (array);
+#   llm: true  means the LLM may fill this field; maxLength applies to LLM text.
+# Relations: to: <class>; card "!"/"?" -> foreign key column to tso_node; "+"/"*" -> join table. Relations point to the stable identity
+#   of the node (tso_node); the concrete version is resolved through tso_spec_version_item.
+
+version: 1
+llmTextMaxLength: 600
+
+enums:
+  derivation: [stated, rule, llm, human]
+  reviewStatus: [proposed, approved, rejected, needsInfo]
+  status: [Draft, InReview, Baselined, Superseded, Retired]
+  conditionKind: [functional, inputValidation, stateTransition, guardViolation, invariant, decisionRule, errorHandling,
+                  idempotency, concurrency, timing, atomicity, compensation, migration, compatibility, access,
+                  secretExposure, audit, performance, resilience, observability, rollout]
+  oracleKind: [postcondition, invariant, errorContract, threshold, stateMachine, decisionRow, schema, acceptanceCriterion,
+               reference, humanJudgment]
+  faultTiming: [before, during, afterCommit, beforeAck]
+  classKind: [equivalence, boundary, enum, "null", format, missing]
+  pathKind: [main, alternative, failure, negative]
+  priority: [P0, P1, P2, P3]
+  level: [L1, L2, L3]
+  testType: [functional, reliability, performance, security, compatibility, maintainability, usability]
+  verificationMethod: [test, benchmark, analysis, inspection]
+  technique: [equivalencePartitioning, boundaryValue, stateTransition, decisionTable, causeEffect, pairwise, scenario,
+              useCase, errorGuessing, faultInjection, loadModel, accessMatrix]
+  stepKind: [given, when, then, cleanup]
+  stubBehavior: [success, errorTransient, errorPermanent, timeout, slow, duplicate, malformedPayload]
+  origin: [designObligation, seedRule, risk, llmProposal]
+  applicability: [applicable, notApplicable, unknown]
+  assertionKind: [status, errorCode, state, record, event, header, latency, count, absence, value, threshold]
+  sensitivity: [none, internal, secret]
+  likelihood: [Low, Medium, High]
+
+classes:
+  # ----------------------------------------------------------------- layer A: analysis
+  TestBasisItem:
+    layer: A
+    doc: Pointer to a TDD node in a given baseline
+    fields:
+      tddCode: {type: text, card: "!"}
+      tddClass: {type: text, card: "!"}
+      baselineId: {type: text, card: "!"}
+      inScope: {type: bool, card: "!"}
+  TestObligation:
+    layer: A
+    doc: What must be proven
+    fields:
+      question: {type: text, card: "!", llm: true}
+      origin: {type: "enum:origin", card: "!"}
+      applicability: {type: "enum:applicability", card: "!"}
+      priority: {type: "enum:priority", card: "!"}
+    relations:
+      subject: {to: TestBasisItem, card: "+"}
+      ratedBy: {to: RiskRating, card: "?"}
+  TestCondition:
+    layer: A
+    doc: One testable aspect of an obligation
+    fields:
+      conditionKind: {type: "enum:conditionKind", card: "!"}
+      statement: {type: text, card: "!", llm: true}
+      expectedEffect: {type: text, card: "!", llm: true}
+      preState: {type: text, card: "?", llm: true}
+      trigger: {type: text, card: "?", llm: true}
+      key: {type: text, card: "!"}
+    relations:
+      obligation: {to: TestObligation, card: "!"}
+      subject: {to: TestBasisItem, card: "!"}
+      oracle: {to: TestOracle, card: "!"}
+      faultModel: {to: FaultModel, card: "?"}
+      partition: {to: Partition, card: "?"}
+      path: {to: ScenarioPath, card: "?"}
+  TestOracle:
+    layer: A
+    doc: Source of the correct result
+    fields:
+      oracleKind: {type: "enum:oracleKind", card: "!"}
+      expected: {type: text, card: "!", llm: true}
+      tolerance: {type: text, card: "?", llm: true}
+      measurement: {type: text, card: "?", llm: true}
+    relations:
+      source: {to: TestBasisItem, card: "?"}
+  FaultModel:
+    layer: A
+    doc: Injected fault
+    fields:
+      faultKind: {type: text, card: "!"}
+      injectionPoint: {type: text, card: "!"}
+      timing: {type: "enum:faultTiming", card: "!"}
+      expectedHandling: {type: text, card: "!", llm: true}
+  Partition:
+    layer: A
+    doc: Equivalence class or boundary
+    fields:
+      parameter: {type: text, card: "!"}
+      classKind: {type: "enum:classKind", card: "!"}
+      values: {type: json, card: "+", llm: true}
+      valid: {type: bool, card: "!"}
+  ScenarioPath:
+    layer: A
+    doc: Path through a flow or state machine
+    fields:
+      pathKind: {type: "enum:pathKind", card: "!"}
+      steps: {type: json, card: "+", llm: true}
+    relations:
+      scenario: {to: TestBasisItem, card: "?"}
+  RiskRating:
+    layer: A
+    doc: Risk-based priority
+    fields:
+      likelihood: {type: "enum:likelihood", card: "!"}
+      impact: {type: "enum:likelihood", card: "!"}
+      priority: {type: "enum:priority", card: "!"}
+      rationale: {type: text, card: "!"}
+  TestGap:
+    layer: A
+    doc: Information missing to write a condition or oracle
+    fields:
+      missing: {type: text, card: "!", llm: true}
+      owner: {type: text, card: "!"}
+      askedQuestion: {type: text, card: "!", llm: true}
+      dueDate: {type: text, card: "?"}
+    relations:
+      blocks: {to: TestCondition, card: "*"}
+      blocksObligation: {to: TestObligation, card: "?"}
+
+  # ----------------------------------------------------------------- layer B: design
+  TestRequirement:
+    layer: B
+    doc: Groups conditions of the same subject and level
+    fields:
+      statement: {type: text, card: "!", llm: true}
+      level: {type: "enum:level", card: "!"}
+      testType: {type: "enum:testType", card: "!"}
+      priority: {type: "enum:priority", card: "!"}
+      verificationMethod: {type: "enum:verificationMethod", card: "!"}
+      scopeNote: {type: text, card: "!", llm: true}
+    relations:
+      subject: {to: TestBasisItem, card: "!"}
+      groups: {to: TestCondition, card: "+"}
+  PassCriterion:
+    layer: B
+    doc: Numbered criterion item of a TR
+    fields:
+      ordinal: {type: int, card: "!"}
+      text: {type: text, card: "!", llm: true}
+    relations:
+      requirement: {to: TestRequirement, card: "!"}
+      condition: {to: TestCondition, card: "!"}
+  TestDesign:
+    layer: B
+    doc: Technique and coverage criterion
+    fields:
+      technique: {type: "enum:technique", card: "!"}
+      coverageCriterion: {type: text, card: "!"}
+      coverageTarget: {type: int, card: "!"}
+      rationale: {type: text, card: "!", llm: true}
+    relations:
+      addresses: {to: TestRequirement, card: "!"}
+  CoverageItem:
+    layer: B
+    doc: Smallest coverage unit
+    fields:
+      coverageKind: {type: text, card: "!"}
+      description: {type: text, card: "!", llm: true}
+      expected: {type: text, card: "!"}
+      value: {type: json, card: "?", llm: true}
+    relations:
+      design: {to: TestDesign, card: "!"}
+      realizes: {to: TestCondition, card: "!"}
+      expectedFrom: {to: TestOracle, card: "!"}
+
+  # ----------------------------------------------------------------- layer C: specification
+  TestCase:
+    layer: C
+    doc: Test case
+    fields:
+      objective: {type: text, card: "!", llm: true}
+      level: {type: "enum:level", card: "!"}
+      priority: {type: "enum:priority", card: "!"}
+      automatable: {type: bool, card: "!"}
+      preconditions: {type: json, card: "*", llm: true}
+    relations:
+      covers: {to: CoverageItem, card: "+"}
+      inSet: {to: TestSet, card: "?"}
+      needsData: {to: TestData, card: "?"}
+      needsFixture: {to: Fixture, card: "*"}
+      needsStub: {to: StubSpec, card: "*"}
+      injects: {to: FaultInjection, card: "*"}
+  TestStep:
+    layer: C
+    doc: A given/when/then step
+    fields:
+      ordinal: {type: int, card: "!"}
+      stepKind: {type: "enum:stepKind", card: "!"}
+      action: {type: text, card: "!", llm: true}
+      input: {type: json, card: "?", llm: true}
+      targetCode: {type: text, card: "?"}
+    relations:
+      testCase: {to: TestCase, card: "!"}
+  Assertion:
+    layer: C
+    doc: Result check; the expected result comes from the oracle
+    fields:
+      ordinal: {type: int, card: "!"}
+      assertionKind: {type: "enum:assertionKind", card: "!"}
+      operator: {type: text, card: "!"}
+      expected: {type: text, card: "!"}
+      unit: {type: text, card: "?"}
+      description: {type: text, card: "?", llm: true}
+    relations:
+      testCase: {to: TestCase, card: "!"}
+      oracle: {to: TestOracle, card: "!"}
+  TestData:
+    layer: C
+    doc: Test data
+    fields:
+      entity: {type: text, card: "!"}
+      lifecycle: {type: text, card: "!"}
+      sensitivity: {type: "enum:sensitivity", card: "!"}
+  DataField:
+    layer: C
+    doc: Data field
+    fields:
+      name: {type: text, card: "!"}
+      valueClass: {type: text, card: "!"}
+      example: {type: text, card: "!", llm: true}
+      sensitive: {type: bool, card: "!"}
+    relations:
+      data: {to: TestData, card: "!"}
+  Fixture:
+    layer: C
+    doc: Background state
+    fields:
+      kind: {type: text, card: "!"}
+      setup: {type: text, card: "!", llm: true}
+      teardown: {type: text, card: "!", llm: true}
+  StubSpec:
+    layer: C
+    doc: Dependency stub
+    fields:
+      targetCode: {type: text, card: "!"}
+      behavior: {type: "enum:stubBehavior", card: "!"}
+      statusCode: {type: int, card: "?"}
+      delayMs: {type: int, card: "?"}
+      response: {type: json, card: "?"}
+  FaultInjection:
+    layer: C
+    doc: Realises a FaultModel
+    fields:
+      mechanism: {type: text, card: "!", llm: true}
+      trigger: {type: text, card: "!", llm: true}
+    relations:
+      realizes: {to: FaultModel, card: "!"}
+  TestEnvironment:
+    layer: C
+    doc: Execution environment
+    fields:
+      name: {type: text, card: "!"}
+      services: {type: json, card: "*"}
+      secretRef: {type: json, card: "*"}
+  TestSet:
+    layer: C
+    doc: Test case group
+    fields:
+      purpose: {type: text, card: "!"}
+      ordinal: {type: int, card: "!"}
+      entryCriteria: {type: json, card: "+"}
+      exitCriteria: {type: json, card: "+"}
+    relations:
+      runsIn: {to: TestEnvironment, card: "?"}
+
+# ------------------------------------------------------------------- source tables (ONTOLOGY-TDD section 7, TDD v2 section 5.3)
+source:
+  src_baseline:
+    columns:
+      id: "TEXT PRIMARY KEY"
+      feature: "TEXT NOT NULL"
+      ordinal: "INTEGER NOT NULL"
+      format: "TEXT NOT NULL"
+      ontology_version: "TEXT NOT NULL"
+      primary_doc: "TEXT"
+      content_hash: "TEXT NOT NULL"
+      docs: "TEXT NOT NULL DEFAULT '[]'"
+      ingested_at: "TEXT NOT NULL"
+    constraints: ["UNIQUE(feature, ordinal)"]
+  src_onto_class:
+    columns:
+      baseline_id: "TEXT NOT NULL REFERENCES src_baseline(id)"
+      name: "TEXT NOT NULL"
+      parent: "TEXT"
+      required: "TEXT NOT NULL DEFAULT '[]'"
+      attrs: "TEXT NOT NULL DEFAULT '[]'"
+      doc: "TEXT"
+    constraints: ["PRIMARY KEY(baseline_id, name)"]
+  src_onto_relation:
+    columns:
+      baseline_id: "TEXT NOT NULL REFERENCES src_baseline(id)"
+      name: "TEXT NOT NULL"
+      domain: "TEXT NOT NULL DEFAULT '[]'"
+      range: "TEXT NOT NULL DEFAULT '[]'"
+      doc: "TEXT"
+    constraints: ["PRIMARY KEY(baseline_id, name)"]
+  src_node:
+    columns:
+      id: "INTEGER PRIMARY KEY"
+      baseline_id: "TEXT NOT NULL REFERENCES src_baseline(id)"
+      code: "TEXT NOT NULL"
+      class: "TEXT NOT NULL"
+      base: "TEXT NOT NULL DEFAULT '{}'"
+      props: "TEXT NOT NULL DEFAULT '{}'"
+      test_scope: "TEXT"
+      origin: "TEXT"
+      content_hash: "TEXT NOT NULL"
+      supersedes_node_id: "INTEGER REFERENCES src_node(id)"
+    constraints: ["UNIQUE(baseline_id, code)"]
+    indexes: ["class"]
+  src_edge:
+    columns:
+      baseline_id: "TEXT NOT NULL REFERENCES src_baseline(id)"
+      src_id: "INTEGER NOT NULL REFERENCES src_node(id)"
+      rel: "TEXT NOT NULL"
+      dst_id: "INTEGER NOT NULL REFERENCES src_node(id)"
+      props: "TEXT NOT NULL DEFAULT '{}'"
+    constraints: ["PRIMARY KEY(baseline_id, src_id, rel, dst_id)"]
+    indexes: ["dst_id, rel"]
+  src_supersede:
+    columns:
+      baseline_id: "TEXT NOT NULL REFERENCES src_baseline(id)"
+      old_code: "TEXT NOT NULL"
+      new_code: "TEXT NOT NULL"
+    constraints: ["PRIMARY KEY(baseline_id, old_code)"]
+  src_derived_node:
+    doc: tsagent-derived node attached to an immutable baseline (e.g. the implicit CR)
+    columns:
+      id: "INTEGER PRIMARY KEY"
+      baseline_id: "TEXT NOT NULL REFERENCES src_baseline(id)"
+      code: "TEXT NOT NULL"
+      class: "TEXT NOT NULL"
+      props: "TEXT NOT NULL DEFAULT '{}'"
+      edges: "TEXT NOT NULL DEFAULT '[]'"
+      reason: "TEXT NOT NULL"
+      created_at: "TEXT NOT NULL"
+    constraints: ["UNIQUE(baseline_id, code)"]
+
+# ------------------------------------------------------------------- operational tables
+ops:
+  run:
+    columns:
+      run_id: "TEXT PRIMARY KEY"
+      feature: "TEXT NOT NULL"
+      run_key: "TEXT NOT NULL"
+      mode: "TEXT NOT NULL"
+      model: "TEXT"
+      status: "TEXT NOT NULL"
+      base_baseline_id: "TEXT"
+      params: "TEXT NOT NULL DEFAULT '{}'"
+      notes: "TEXT NOT NULL DEFAULT '[]'"
+      result: "TEXT NOT NULL DEFAULT '{}'"
+      created_at: "TEXT NOT NULL"
+      updated_at: "TEXT NOT NULL"
+    indexes: ["run_key", "feature"]
+  run_step:
+    columns:
+      run_id: "TEXT NOT NULL REFERENCES run(run_id)"
+      step: "TEXT NOT NULL"
+      status: "TEXT NOT NULL"
+      started_at: "TEXT"
+      finished_at: "TEXT"
+      llm_calls: "INTEGER NOT NULL DEFAULT 0"
+      cache_hits: "INTEGER NOT NULL DEFAULT 0"
+      error: "TEXT"
+    constraints: ["PRIMARY KEY(run_id, step)"]
+  stage_item:
+    columns:
+      run_id: "TEXT NOT NULL REFERENCES run(run_id)"
+      step: "TEXT NOT NULL"
+      code: "TEXT NOT NULL"
+      class: "TEXT NOT NULL"
+      payload: "TEXT NOT NULL"
+    constraints: ["PRIMARY KEY(run_id, step, code)"]
+  rendered_file:
+    columns:
+      feature: "TEXT NOT NULL"
+      kind: "TEXT NOT NULL"
+      path: "TEXT NOT NULL"
+      sha: "TEXT NOT NULL"
+      version: "INTEGER NOT NULL"
+    constraints: ["PRIMARY KEY(feature, kind)"]
+  schema_version:
+    columns:
+      version: "INTEGER NOT NULL"
+      yaml_hash: "TEXT NOT NULL"
+      applied_at: "TEXT NOT NULL"

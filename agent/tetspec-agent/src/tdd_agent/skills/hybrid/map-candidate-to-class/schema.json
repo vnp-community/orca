@@ -1,0 +1,46 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "candidate",
+      "allowed_classes"
+    ],
+    "properties": {
+      "candidate": {
+        "type": "object"
+      },
+      "allowed_classes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1
+      },
+      "rules_only": {
+        "type": "boolean"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "class",
+      "shortlist",
+      "reason"
+    ],
+    "properties": {
+      "class": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "shortlist": {
+        "type": "array"
+      },
+      "reason": {
+        "type": "string"
+      }
+    }
+  }
+}

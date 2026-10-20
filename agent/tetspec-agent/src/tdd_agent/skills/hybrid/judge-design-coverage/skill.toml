@@ -1,0 +1,9 @@
+id = "judge-design-coverage"
+version = "1"
+agent = "impact"
+tier = "hybrid"
+description = "Decide, for a TDD with only partial overlap, whether its existing design already covers a changed requirement. The model may only conclude 'no_change' with citations that the verifier confirms; anything else is 'update'."
+role = "extractor"
+reason = "Whether an existing design section satisfies a reworded or extended requirement is a semantic judgment that trace edges alone cannot make."
+demotion = "Promote recurring covered patterns (same requirement shape + same design element class) to rules in scan-inventory-overlap; require trace edges at authoring time so fewer TDDs end up as residue."
+verifiers = ["cited-ids-exist", "cited-within-trace-distance", "asymmetric-no-change"]

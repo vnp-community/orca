@@ -1,0 +1,5 @@
+id = "scan-inventory-overlap"
+version = "1"
+agent = "impact"
+tier = "logic"
+description = "For every baseline TDD compute deterministic overlap with the SRS delta (direct/indirect trace distance, bounds checks) and decide the clear cases by rule."

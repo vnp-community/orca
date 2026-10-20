@@ -1,0 +1,1248 @@
+{
+ "cr": "CR-001",
+ "title": "Chuyển tiền hẹn lịch và định kỳ",
+ "nodes": [
+  {
+   "class": "Document",
+   "code": "DOC-SRS-CR001",
+   "label": "SRS bổ sung CR-001: chuyển tiền hẹn lịch và định kỳ",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "-",
+   "docType": "SRS",
+   "baselineDate": "2026-10-09"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-040",
+   "label": "Tạo lịch chuyển tiền một lần tại thời điểm trong tương lai",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Tạo lịch chuyển tiền một lần tại thời điểm trong tương lai",
+   "priority": "Must"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-041",
+   "label": "Tạo lịch định kỳ DAILY/WEEKLY/MONTHLY có ngày kết thúc hoặc số lần tối đa",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Tạo lịch định kỳ DAILY/WEEKLY/MONTHLY có ngày kết thúc hoặc số lần tối đa",
+   "priority": "Must"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-042",
+   "label": "Tra cứu một lịch, danh sách lịch của tài khoản và các lần chạy của lịch",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Tra cứu một lịch, danh sách lịch của tài khoản và các lần chạy của lịch",
+   "priority": "Must"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-043",
+   "label": "Hủy lịch chuyển tiền",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Hủy lịch chuyển tiền",
+   "priority": "Must"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-044",
+   "label": "Tạm dừng và tiếp tục lịch định kỳ",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Tạm dừng và tiếp tục lịch định kỳ",
+   "priority": "Should"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-045",
+   "label": "Đến hạn, tự chuyển tiền bằng luồng chuyển tiền hiện có; Idempotency-Key = mã lịch + thời điểm dự kiến",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Đến hạn, tự chuyển tiền bằng luồng chuyển tiền hiện có; Idempotency-Key = mã lịch + thời điểm dự kiến",
+   "priority": "Must"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-046",
+   "label": "Xử lý thất bại của lần chạy theo loại lỗi (BR-13): thử lại, FAILED, tự PAUSED sau 3 lần FAILED liên tiếp",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Xử lý thất bại của lần chạy theo loại lỗi (BR-13): thử lại, FAILED, tự PAUSED sau 3 lần FAILED liên tiếp",
+   "priority": "Must"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-047",
+   "label": "Thông báo kết quả mỗi lần chạy qua SMS (ScheduledRunCompleted/ScheduledRunFailed qua outbox)",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Thông báo kết quả mỗi lần chạy qua SMS (ScheduledRunCompleted/ScheduledRunFailed qua outbox)",
+   "priority": "Should"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-048",
+   "label": "Ghi audit cho tạo, hủy, tạm dừng, tiếp tục lịch và mọi kết quả lần chạy, tác nhân SCHEDULER",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Ghi audit cho tạo, hủy, tạm dừng, tiếp tục lịch và mọi kết quả lần chạy, tác nhân SCHEDULER",
+   "priority": "Must"
+  },
+  {
+   "class": "FunctionalRequirement",
+   "code": "FR-049",
+   "label": "Chạy bù các lần chạy quá hạn không quá 24 giờ sau khi hệ thống ngừng; quá hạn thì MISSED",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "text": "Chạy bù các lần chạy quá hạn không quá 24 giờ sau khi hệ thống ngừng; quá hạn thì MISSED",
+   "priority": "Should"
+  },
+  {
+   "class": "NonFunctionalRequirement",
+   "code": "NFR-010",
+   "label": "Đúng giờ: 99% lần chạy bắt đầu trong 60 giây kể từ thời điểm dự kiến",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "text": "Đúng giờ: 99% lần chạy bắt đầu trong 60 giây kể từ thời điểm dự kiến",
+   "priority": "Must",
+   "targetValue": 60,
+   "targetUnit": "s"
+  },
+  {
+   "class": "NonFunctionalRequirement",
+   "code": "NFR-011",
+   "label": "Không chạy trùng: 0 giao dịch trùng cho một lần chạy, kể cả khi hai scheduler cùng quét",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "text": "Không chạy trùng: 0 giao dịch trùng cho một lần chạy, kể cả khi hai scheduler cùng quét",
+   "priority": "Must",
+   "targetValue": 0,
+   "targetUnit": "giao dịch trùng"
+  },
+  {
+   "class": "NonFunctionalRequirement",
+   "code": "NFR-012",
+   "label": "Phục hồi: sau khởi động lại, lần chạy quá hạn trong 24 giờ được xử lý trong 5 chu kỳ quét đầu",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "text": "Phục hồi: sau khởi động lại, lần chạy quá hạn trong 24 giờ được xử lý trong 5 chu kỳ quét đầu",
+   "priority": "Must",
+   "targetValue": 5,
+   "targetUnit": "chu kỳ quét"
+  },
+  {
+   "class": "NonFunctionalRequirement",
+   "code": "NFR-013",
+   "label": "Xử lý 100 lần chạy đến hạn cùng lúc mà p95 chuyển tiền qua API vẫn <= 500 ms",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "text": "Xử lý 100 lần chạy đến hạn cùng lúc mà p95 chuyển tiền qua API vẫn <= 500 ms",
+   "priority": "Must",
+   "targetValue": 500,
+   "targetUnit": "ms"
+  },
+  {
+   "class": "NonFunctionalRequirement",
+   "code": "NFR-014",
+   "label": "Truy vết: 100% lần chạy có correlationId riêng, đi theo giao dịch, audit và lời gọi Fraud Check",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "text": "Truy vết: 100% lần chạy có correlationId riêng, đi theo giao dịch, audit và lời gọi Fraud Check",
+   "priority": "Must",
+   "targetValue": 100,
+   "targetUnit": "%"
+  },
+  {
+   "class": "Constraint",
+   "code": "CON-010",
+   "label": "Scheduler chạy cùng tiến trình và cùng CSDL với MiniPay",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Ràng buộc",
+   "constraintType": "technology"
+  },
+  {
+   "class": "Module",
+   "code": "MOD-Scheduler",
+   "label": "Scheduler",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "Phân rã module",
+   "layer": "domain",
+   "responsibility": "Quản lý lịch chuyển tiền và lần chạy; quét lần chạy đến hạn mỗi 30 giây, chiếm lần chạy bằng UPDATE có điều kiện, gọi lõi chuyển tiền, thử lại, chạy bù, giới hạn 20 lần chạy mỗi chu kỳ"
+  },
+  {
+   "class": "DataEntity",
+   "code": "DE-ScheduledTransfer",
+   "label": "ScheduledTransfer",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "Dữ liệu mức khái niệm",
+   "retentionRule": "Giữ 5 năm",
+   "volumeEstimate": "Tối đa 20 lịch ACTIVE/PAUSED mỗi tài khoản (BR-15)"
+  },
+  {
+   "class": "DataEntity",
+   "code": "DE-ScheduledRun",
+   "label": "ScheduledRun",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "Dữ liệu mức khái niệm",
+   "retentionRule": "Giữ 5 năm"
+  },
+  {
+   "class": "Decision",
+   "code": "AD-05",
+   "label": "Scheduler polling trong tiến trình, chu kỳ 30 giây, chiếm lần chạy bằng UPDATE có điều kiện",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "Quyết định",
+   "statement": "Scheduler là vòng lặp nền trong tiến trình MiniPay, quét lần chạy đến hạn mỗi 30 giây và chiếm lần chạy bằng UPDATE có điều kiện",
+   "rationale": "Tuân CON-010, không thêm hạ tầng; chu kỳ 30 giây đủ cho NFR-010 (60 giây); UPDATE có điều kiện chống chạy trùng (NFR-011)"
+  },
+  {
+   "class": "Alternative",
+   "code": "ALT-DelayedQueue",
+   "label": "Delayed queue riêng",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "Quyết định",
+   "reasonRejected": "Thêm hạ tầng ngoài, vi phạm CON-010"
+  },
+  {
+   "class": "Alternative",
+   "code": "ALT-OSCron",
+   "label": "Cron của hệ điều hành",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "Quyết định",
+   "reasonRejected": "Tách khỏi tiến trình và CSDL, vi phạm CON-010; khó kiểm soát chạy trùng"
+  },
+  {
+   "class": "Alternative",
+   "code": "ALT-APScheduler",
+   "label": "Thư viện APScheduler",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "Quyết định",
+   "reasonRejected": "Thêm phụ thuộc không cần thiết; vòng lặp đơn giản đã đủ"
+  },
+  {
+   "class": "Scenario",
+   "code": "SCN-ScheduledRun",
+   "label": "Chạy lịch chuyển tiền đến hạn",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "8",
+   "responseBudgetMs": 60000,
+   "steps": "Quét mỗi 30 giây -> chọn tối đa 20 lần chạy đến hạn -> chiếm lần chạy (UPDATE có điều kiện) -> sinh correlationId -> lõi chuyển tiền (idempotency, hạn mức/số dư, Fraud Check, ghi sổ + outbox) -> cập nhật lần chạy -> thử lại/FAILED -> audit + sự kiện"
+  },
+  {
+   "class": "Mechanism",
+   "code": "MECH-RunClaim",
+   "label": "Chiếm lần chạy bằng UPDATE có điều kiện trên scheduled_runs",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "mechanismKind": "concurrency"
+  },
+  {
+   "class": "Mechanism",
+   "code": "MECH-ScheduleRetry",
+   "label": "Thử lại theo loại lỗi BR-13 và tự PAUSED sau 3 lần FAILED liên tiếp",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "mechanismKind": "resilience",
+   "note": "FRAUD_CHECK_UNAVAILABLE: 3 lần cách 5 phút; INSUFFICIENT_FUNDS: 2 lần cách 1 giờ (OQ-010 đã chốt); lỗi vĩnh viễn không thử lại"
+  },
+  {
+   "class": "Mechanism",
+   "code": "MECH-CatchUp",
+   "label": "Chạy bù lần quá hạn trong 24 giờ, quá hạn thì MISSED",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "mechanismKind": "availability",
+   "note": "Thời hạn chạy bù 24 giờ (OQ-012 đã chốt)"
+  },
+  {
+   "class": "Mechanism",
+   "code": "MECH-SchedulerThrottle",
+   "label": "Giới hạn 20 lần chạy mỗi chu kỳ quét và rate limit 10 rps cho scheduler",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "mechanismKind": "rate-limit"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S01",
+   "label": "test_create_once_and_validation",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_create_once_and_validation"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S02",
+   "label": "test_query_schedules_and_runs",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_query_schedules_and_runs"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S03",
+   "label": "test_cancel_and_pause_resume",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_cancel_and_pause_resume"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S04",
+   "label": "test_due_run_creates_one_transfer",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_due_run_creates_one_transfer"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S05",
+   "label": "test_retry_policy_and_auto_pause",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_retry_policy_and_auto_pause"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S06",
+   "label": "test_run_result_events_and_sms",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_run_result_events_and_sms"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S07",
+   "label": "test_schedule_audit_actor_scheduler",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_schedule_audit_actor_scheduler"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S08",
+   "label": "test_catch_up_and_missed",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_catch_up_and_missed"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S09",
+   "label": "test_scan_punctuality_fake_clock",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_scan_punctuality_fake_clock"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S10",
+   "label": "test_two_schedulers_no_duplicate",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_two_schedulers_no_duplicate"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S11",
+   "label": "test_restart_between_claim_and_transfer",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_restart_between_claim_and_transfer"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S12",
+   "label": "test_scheduler_correlation_id",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "integration",
+   "testStatus": "Planned",
+   "location": "tests/test_scheduler.py::test_scheduler_correlation_id"
+  },
+  {
+   "class": "TestCase",
+   "code": "TC-S13",
+   "label": "benchmark_scheduler_100_runs",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "level": "benchmark",
+   "testStatus": "Planned",
+   "location": "scripts/benchmark_scheduler.py::main"
+  },
+  {
+   "class": "DesignItem",
+   "code": "DI-Scheduler",
+   "label": "Scheduler.scan_and_run",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "kind": "function",
+   "location": "minipay/scheduler.py::scan_and_run"
+  },
+  {
+   "class": "DesignItem",
+   "code": "DI-ScheduledRepo",
+   "label": "Kho scheduled_transfers/scheduled_runs",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "kind": "function",
+   "location": "minipay/scheduler.py::create_schedule"
+  },
+  {
+   "class": "DesignItem",
+   "code": "DI-TransferCore",
+   "label": "service.execute_transfer (lõi dùng chung API và scheduler)",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "kind": "function",
+   "location": "minipay/service.py::execute_transfer"
+  },
+  {
+   "class": "DesignItem",
+   "code": "DI-SchedAPI",
+   "label": "api.py: sáu endpoint scheduled-transfers",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "kind": "function",
+   "location": "minipay/api.py::scheduled_transfers"
+  },
+  {
+   "class": "DesignItem",
+   "code": "DI-SchedNotify",
+   "label": "notify: mẫu SMS kết quả lần chạy",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "kind": "function",
+   "location": "minipay/notify.py::scheduled_run_sms"
+  },
+  {
+   "class": "DesignItem",
+   "code": "DI-SchedAudit",
+   "label": "service.audit: sự kiện lịch, tác nhân SCHEDULER",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "kind": "function",
+   "location": "minipay/service.py::audit_schedule_event"
+  },
+  {
+   "class": "Message",
+   "code": "MSG-INT02-scheduled-run",
+   "label": "Sự kiện ScheduledRunCompleted/ScheduledRunFailed",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "messageType": "event",
+   "direction": "outbound",
+   "example": "{\"eventId\":\"RUN-AB12\",\"scheduleId\":\"SCH-01\",\"runId\":\"RUN-AB12\",\"fromAccountId\":\"..\",\"toAccountId\":\"..\",\"amount\":1000,\"correlationId\":\"..\",\"transferId\":\"TRF-AB12\"}",
+   "sensitiveFields": "fromAccountId,toAccountId"
+  },
+  {
+   "class": "Schema",
+   "code": "SCH-INT02-scheduled-run",
+   "label": "ScheduledRun event schema",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "format": "JSONSchema",
+   "schemaVersion": "1.0",
+   "location": "contracts/scheduled-run.event.schema.json",
+   "compatibilityRule": "backward"
+  },
+  {
+   "class": "Risk",
+   "code": "RISK-005",
+   "label": "Chạy trùng giao dịch khi nhiều scheduler và tải thêm lên Fraud Check giờ cao điểm",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "TDD",
+   "sourceSection": "11",
+   "likelihood": "Medium",
+   "impact": "High",
+   "mitigation": "MECH-RunClaim (UPDATE có điều kiện) + idempotency key cố định; giới hạn 20 lần chạy mỗi chu kỳ và rate limit 10 rps (MECH-SchedulerThrottle)"
+  },
+  {
+   "class": "Assumption",
+   "code": "ASM-010",
+   "label": "Chu kỳ quét 30 giây đủ cho NFR-010",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Giả định",
+   "owner": "Tech Lead",
+   "statement": "Chu kỳ quét 30 giây đủ cho NFR-010",
+   "dueDate": "2026-10-21",
+   "confirmStatus": "Confirmed",
+   "note": "Q4: vòng lặp nền trong tiến trình, 30 giây, khóa bằng UPDATE có điều kiện"
+  },
+  {
+   "class": "Assumption",
+   "code": "ASM-011",
+   "label": "Fraud Check chịu được tải thêm từ scheduler (liên quan ASM-001)",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Giả định",
+   "owner": "Tech Lead",
+   "statement": "Fraud Check chịu được tải thêm từ scheduler (liên quan ASM-001)",
+   "dueDate": "2026-10-21",
+   "confirmStatus": "Confirmed",
+   "note": "Q5: giới hạn 20 lần chạy mỗi chu kỳ, rate limit 10 rps cho scheduler; ASM-001 (đối tác xác nhận 50 rps) vẫn Open"
+  },
+  {
+   "class": "OpenQuestion",
+   "code": "OQ-010",
+   "label": "Quy tắc thử lại khi thiếu số dư",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Câu hỏi mở",
+   "owner": "Business Analyst",
+   "statement": "Quy tắc thử lại khi thiếu số dư",
+   "dueDate": "2026-10-21",
+   "confirmStatus": "Confirmed",
+   "note": "Q1: thử lại 2 lần, cách 1 giờ (BR-13)"
+  },
+  {
+   "class": "OpenQuestion",
+   "code": "OQ-011",
+   "label": "Giới hạn 20 lịch ACTIVE/PAUSED mỗi tài khoản phù hợp nghiệp vụ",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Câu hỏi mở",
+   "owner": "Business Analyst",
+   "statement": "Giới hạn 20 lịch ACTIVE/PAUSED mỗi tài khoản phù hợp nghiệp vụ",
+   "dueDate": "2026-10-21",
+   "confirmStatus": "Confirmed",
+   "note": "Q2: 20 lịch (BR-15)"
+  },
+  {
+   "class": "OpenQuestion",
+   "code": "OQ-012",
+   "label": "Thời hạn chạy bù khi hệ thống ngừng",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "sourceSection": "Câu hỏi mở",
+   "owner": "Business Analyst",
+   "statement": "Thời hạn chạy bù khi hệ thống ngừng",
+   "dueDate": "2026-10-21",
+   "confirmStatus": "Confirmed",
+   "note": "Q3: 24 giờ"
+  }
+ ],
+ "edges": [
+  [
+   "FR-040",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "FR-041",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "FR-042",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "FR-043",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "FR-044",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "FR-045",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "FR-046",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "FR-047",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "FR-048",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "FR-049",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "NFR-010",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "NFR-011",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "NFR-012",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "NFR-013",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "NFR-014",
+   "describedIn",
+   "DOC-SRS-CR001"
+  ],
+  [
+   "MOD-Scheduler",
+   "dependsOn",
+   "MOD-Transfer"
+  ],
+  [
+   "MOD-Scheduler",
+   "dependsOn",
+   "MOD-Audit"
+  ],
+  [
+   "MOD-Scheduler",
+   "dependsOn",
+   "MOD-Account"
+  ],
+  [
+   "MOD-Scheduler",
+   "dependsOn",
+   "MOD-Risk"
+  ],
+  [
+   "MOD-Scheduler",
+   "deployedIn",
+   "ENV-Demo"
+  ],
+  [
+   "MOD-Scheduler",
+   "describedIn",
+   "DOC-HLD"
+  ],
+  [
+   "MOD-Scheduler",
+   "uses",
+   "TECH-SQLite"
+  ],
+  [
+   "MOD-Scheduler",
+   "uses",
+   "TECH-Python"
+  ],
+  [
+   "MOD-Scheduler",
+   "constrainedBy",
+   "CON-010"
+  ],
+  [
+   "MOD-Scheduler",
+   "ownsData",
+   "DE-ScheduledTransfer"
+  ],
+  [
+   "MOD-Scheduler",
+   "ownsData",
+   "DE-ScheduledRun"
+  ],
+  [
+   "MOD-Scheduler",
+   "participatesIn",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "MOD-Scheduler",
+   "refinedBy",
+   "DI-Scheduler"
+  ],
+  [
+   "MOD-Scheduler",
+   "refinedBy",
+   "DI-ScheduledRepo"
+  ],
+  [
+   "MOD-Scheduler",
+   "hasRisk",
+   "RISK-005"
+  ],
+  [
+   "MOD-Scheduler",
+   "integratesVia",
+   "INT-01"
+  ],
+  [
+   "MOD-API",
+   "participatesIn",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "MOD-Transfer",
+   "participatesIn",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "MOD-API",
+   "dependsOn",
+   "MOD-Scheduler"
+  ],
+  [
+   "MOD-Notify",
+   "dependsOn",
+   "MOD-Scheduler"
+  ],
+  [
+   "DE-ScheduledTransfer",
+   "relatesTo",
+   "DE-ScheduledRun",
+   {
+    "cardinality": "1:0..n"
+   }
+  ],
+  [
+   "DE-ScheduledRun",
+   "relatesTo",
+   "DE-Transfer",
+   {
+    "cardinality": "1:0..1"
+   }
+  ],
+  [
+   "AD-05",
+   "rejects",
+   "ALT-DelayedQueue"
+  ],
+  [
+   "AD-05",
+   "rejects",
+   "ALT-OSCron"
+  ],
+  [
+   "AD-05",
+   "rejects",
+   "ALT-APScheduler"
+  ],
+  [
+   "AD-05",
+   "describedIn",
+   "DOC-HLD"
+  ],
+  [
+   "AD-05",
+   "constrainedBy",
+   "CON-010"
+  ],
+  [
+   "AD-05",
+   "assumes",
+   "ASM-010"
+  ],
+  [
+   "AD-05",
+   "hasRisk",
+   "RISK-005"
+  ],
+  [
+   "SCN-ScheduledRun",
+   "invokes",
+   "INT-01"
+  ],
+  [
+   "FR-040",
+   "verifiedBy",
+   "TC-S01"
+  ],
+  [
+   "FR-041",
+   "verifiedBy",
+   "TC-S01"
+  ],
+  [
+   "FR-042",
+   "verifiedBy",
+   "TC-S02"
+  ],
+  [
+   "FR-043",
+   "verifiedBy",
+   "TC-S03"
+  ],
+  [
+   "FR-044",
+   "verifiedBy",
+   "TC-S03"
+  ],
+  [
+   "FR-045",
+   "verifiedBy",
+   "TC-S04"
+  ],
+  [
+   "FR-046",
+   "verifiedBy",
+   "TC-S05"
+  ],
+  [
+   "FR-047",
+   "verifiedBy",
+   "TC-S06"
+  ],
+  [
+   "FR-048",
+   "verifiedBy",
+   "TC-S07"
+  ],
+  [
+   "FR-049",
+   "verifiedBy",
+   "TC-S08"
+  ],
+  [
+   "NFR-012",
+   "verifiedBy",
+   "TC-S08"
+  ],
+  [
+   "NFR-010",
+   "verifiedBy",
+   "TC-S09"
+  ],
+  [
+   "NFR-011",
+   "verifiedBy",
+   "TC-S10"
+  ],
+  [
+   "NFR-011",
+   "verifiedBy",
+   "TC-S11"
+  ],
+  [
+   "NFR-014",
+   "verifiedBy",
+   "TC-S12"
+  ],
+  [
+   "NFR-013",
+   "verifiedBy",
+   "TC-S13"
+  ],
+  [
+   "FR-040",
+   "allocatedTo",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-040",
+   "satisfiedBy",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-040",
+   "satisfiedBy",
+   "MOD-API"
+  ],
+  [
+   "FR-041",
+   "allocatedTo",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-041",
+   "satisfiedBy",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-041",
+   "satisfiedBy",
+   "MOD-API"
+  ],
+  [
+   "FR-042",
+   "allocatedTo",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-042",
+   "satisfiedBy",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-042",
+   "satisfiedBy",
+   "MOD-API"
+  ],
+  [
+   "FR-043",
+   "allocatedTo",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-043",
+   "satisfiedBy",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-043",
+   "satisfiedBy",
+   "MOD-API"
+  ],
+  [
+   "FR-044",
+   "allocatedTo",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-044",
+   "satisfiedBy",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-044",
+   "satisfiedBy",
+   "MOD-API"
+  ],
+  [
+   "FR-045",
+   "allocatedTo",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-045",
+   "satisfiedBy",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-045",
+   "satisfiedBy",
+   "MOD-Transfer"
+  ],
+  [
+   "FR-045",
+   "satisfiedBy",
+   "MECH-RunClaim"
+  ],
+  [
+   "FR-045",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "FR-046",
+   "allocatedTo",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-046",
+   "satisfiedBy",
+   "MECH-ScheduleRetry"
+  ],
+  [
+   "FR-046",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "FR-047",
+   "allocatedTo",
+   "MOD-Notify"
+  ],
+  [
+   "FR-047",
+   "satisfiedBy",
+   "MOD-Notify"
+  ],
+  [
+   "FR-047",
+   "satisfiedBy",
+   "MECH-Outbox"
+  ],
+  [
+   "FR-047",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "FR-048",
+   "allocatedTo",
+   "MOD-Audit"
+  ],
+  [
+   "FR-048",
+   "satisfiedBy",
+   "MOD-Audit"
+  ],
+  [
+   "FR-048",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "FR-049",
+   "allocatedTo",
+   "MOD-Scheduler"
+  ],
+  [
+   "FR-049",
+   "satisfiedBy",
+   "MECH-CatchUp"
+  ],
+  [
+   "FR-049",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "NFR-010",
+   "satisfiedBy",
+   "AD-05"
+  ],
+  [
+   "NFR-010",
+   "satisfiedBy",
+   "MOD-Scheduler"
+  ],
+  [
+   "NFR-010",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "NFR-011",
+   "satisfiedBy",
+   "MECH-RunClaim"
+  ],
+  [
+   "NFR-011",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "NFR-012",
+   "satisfiedBy",
+   "MECH-CatchUp"
+  ],
+  [
+   "NFR-012",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "NFR-013",
+   "satisfiedBy",
+   "MECH-SchedulerThrottle"
+  ],
+  [
+   "NFR-013",
+   "satisfiedBy",
+   "MECH-TimeoutBudget"
+  ],
+  [
+   "NFR-013",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "NFR-014",
+   "satisfiedBy",
+   "MECH-Correlation"
+  ],
+  [
+   "NFR-014",
+   "realizedBy",
+   "SCN-ScheduledRun"
+  ],
+  [
+   "MOD-Transfer",
+   "refinedBy",
+   "DI-TransferCore"
+  ],
+  [
+   "MOD-API",
+   "refinedBy",
+   "DI-SchedAPI"
+  ],
+  [
+   "MOD-Notify",
+   "refinedBy",
+   "DI-SchedNotify"
+  ],
+  [
+   "MOD-Audit",
+   "refinedBy",
+   "DI-SchedAudit"
+  ],
+  [
+   "MSG-INT02-scheduled-run",
+   "hasSchema",
+   "SCH-INT02-scheduled-run"
+  ],
+  [
+   "MSG-INT02-scheduled-run",
+   "requiresHeader",
+   "HDR-INT02-corr"
+  ],
+  [
+   "CH-INT02-events",
+   "carries",
+   "MSG-INT02-scheduled-run"
+  ],
+  [
+   "RISK-005",
+   "mitigatedBy",
+   "MECH-RunClaim"
+  ],
+  [
+   "RISK-005",
+   "mitigatedBy",
+   "MECH-SchedulerThrottle"
+  ],
+  [
+   "INT-01",
+   "hasRisk",
+   "RISK-005"
+  ]
+ ],
+ "supersede": [],
+ "baselined_at": "2026-10-09"
+}

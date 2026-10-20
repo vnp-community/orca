@@ -1,0 +1,32 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "changes",
+      "sad_elements",
+      "sad_source"
+    ],
+    "properties": {
+      "changes": {
+        "type": "array"
+      },
+      "sad_elements": {
+        "type": "array"
+      },
+      "sad_source": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "findings"
+    ],
+    "properties": {
+      "findings": {
+        "type": "array"
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+id = "map-candidate-to-class"
+version = "1"
+agent = "generation"
+tier = "hybrid"
+description = "Assign an ontology class to a candidate fact: heading/keyword rules decide when exactly one class fits; the model only chooses among the rule-selected shortlist."
+role = "extractor"
+reason = "Headings and wording in free-form documents are not a closed vocabulary, so rules cannot always pick between two plausible classes."
+demotion = "Log each LLM-resolved candidate (heading path + chosen class); add a heading/keyword rule once the same heading maps to the same class repeatedly; extend DEFAULT heading rules per document template."
+verifiers = ["class-in-shortlist", "class-allowed"]

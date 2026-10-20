@@ -1,0 +1,5 @@
+id = "build-cs-table"
+version = "1"
+agent = "changespec"
+tier = "logic"
+description = "Build the canonical ChangeSpecItem table with o5's workflow function; missing code targets or verification stay gaps and keep the row pending."

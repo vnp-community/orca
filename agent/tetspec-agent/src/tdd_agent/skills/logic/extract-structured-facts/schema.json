@@ -1,0 +1,50 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "source_id",
+      "revision",
+      "role",
+      "text"
+    ],
+    "properties": {
+      "source_id": {
+        "type": "string"
+      },
+      "revision": {
+        "type": [
+          "string",
+          "number"
+        ]
+      },
+      "role": {
+        "type": "string"
+      },
+      "text": {
+        "type": "string"
+      },
+      "id_class_map": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "elements",
+      "edges",
+      "gaps"
+    ],
+    "properties": {
+      "elements": {
+        "type": "array"
+      },
+      "edges": {
+        "type": "array"
+      },
+      "gaps": {
+        "type": "array"
+      }
+    }
+  }
+}

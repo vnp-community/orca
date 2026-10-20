@@ -1,0 +1,51 @@
+{
+  "cr": "CR-001",
+  "summary": "15 yêu cầu: 10 thêm mới (FR-040..044, FR-046, FR-049, NFR-010..012), 5 cập nhật (FR-045, FR-047, FR-048, NFR-013, NFR-014), 0 không đổi. Rủi ro chính: chạy trùng giao dịch khi nhiều scheduler (NFR-011), tải thêm lên Fraud Check (ASM-001 chưa xác nhận) và tranh chấp ghi SQLite (RISK-004); 3 câu hỏi mở OQ-010/011/012 cần chốt.",
+  "requirements": [
+    {"code": "FR-040", "verdict": "add", "rationale": "Tạo lịch một lần cần module lập lịch và thực thể ScheduledTransfer mới; KG chưa có thành phần lập lịch. Xác thực/kiểm tra số tiền tái dùng FR-002, FR-011.", "kg_refs": ["FR-002", "FR-011", "MOD-API"]},
+    {"code": "FR-041", "verdict": "add", "rationale": "Lịch định kỳ (DAILY/WEEKLY/MONTHLY, BR-11, BR-12) và sinh lần chạy kế tiếp là cơ chế mới (ScheduledRun, quy tắc ngày cuối tháng).", "kg_refs": ["MOD-API"]},
+    {"code": "FR-042", "verdict": "add", "rationale": "Ba endpoint tra cứu lịch/lần chạy mới trên dữ liệu mới; mẫu tương tự FR-013 nhưng không có thiết kế sẵn cho lịch.", "kg_refs": ["FR-013", "MOD-API"]},
+    {"code": "FR-043", "verdict": "add", "rationale": "Hủy lịch với chuyển trạng thái lịch/lần chạy và mã lỗi SCHEDULE_NOT_CANCELLABLE là hành vi mới trong MOD-Scheduler.", "kg_refs": ["MOD-API"]},
+    {"code": "FR-044", "verdict": "add", "rationale": "Tạm dừng/tiếp tục, đánh dấu SKIPPED là máy trạng thái lịch mới.", "kg_refs": ["MOD-API"]},
+    {"code": "FR-045", "verdict": "update", "rationale": "Tái dùng luồng FR-010..012, FR-020 nhưng MOD-Transfer/DI-Transfer phải tách lõi xử lý để gọi nội bộ không qua API key; Idempotency-Key cố định = mã lịch + thời điểm dự kiến.", "kg_refs": ["FR-010", "FR-011", "FR-012", "FR-020", "MOD-Transfer", "DI-Transfer", "MECH-Idempotency", "SCN-Transfer"]},
+    {"code": "FR-046", "verdict": "add", "rationale": "Phân loại thất bại BR-13, thử lại theo lần chạy, tự PAUSED sau 3 lần FAILED là chính sách mới (khác retry INT-01 hiện có); phụ thuộc OQ-010.", "kg_refs": ["FB-INT01", "MOD-Risk"]},
+    {"code": "FR-047", "verdict": "update", "rationale": "Mở rộng sự kiện outbox/INT-02 với ScheduledRunCompleted và ScheduledRunFailed, thêm mẫu SMS ở MOD-Notify; INT-03 không đổi contract.", "kg_refs": ["FR-021", "MOD-Notify", "INT-02", "CH-INT02-events", "MSG-INT02-event", "MECH-Outbox", "INT-03", "DI-Outbox", "DI-Consumer"]},
+    {"code": "FR-048", "verdict": "update", "rationale": "Mở rộng audit FR-030 với loại sự kiện lịch và tác nhân SCHEDULER trong MOD-Audit.", "kg_refs": ["FR-030", "MOD-Audit", "DE-AuditLog", "DI-Audit"]},
+    {"code": "FR-049", "verdict": "add", "rationale": "Chạy bù lần quá hạn và trạng thái MISSED là cơ chế mới; phụ thuộc OQ-012.", "kg_refs": ["MOD-Transfer"]},
+    {"code": "NFR-010", "verdict": "add", "rationale": "Mục tiêu đúng giờ 99% trong 60 giây là yêu cầu mới, cần chu kỳ quét 30 giây và ngân sách thời gian scheduler (ASM-010).", "kg_refs": ["NFR-006", "MECH-TimeoutBudget"]},
+    {"code": "NFR-011", "verdict": "add", "rationale": "Không chạy trùng cần cơ chế chiếm lần chạy bằng cập nhật có điều kiện, bổ sung cho idempotency hiện có.", "kg_refs": ["NFR-002", "MECH-Idempotency", "MECH-WriteLock"]},
+    {"code": "NFR-012", "verdict": "add", "rationale": "Phục hồi sau khởi động lại trong 5 chu kỳ quét là yêu cầu mới (OQ-012).", "kg_refs": ["NFR-004"]},
+    {"code": "NFR-013", "verdict": "update", "rationale": "Giữ p95 giao dịch API ≤ 500 ms khi 100 lần chạy cùng lúc: bổ sung benchmark, ngân sách và giới hạn số lần chạy mỗi chu kỳ; liên quan LIM-INT01/ASM-001, RISK-004.", "kg_refs": ["NFR-001", "EV-001", "LIM-INT01", "ASM-001", "RISK-004", "INT-01"]},
+    {"code": "NFR-014", "verdict": "update", "rationale": "Mở rộng MECH-Correlation: mỗi lần chạy có correlationId riêng, đi theo giao dịch, audit và lời gọi Fraud Check.", "kg_refs": ["NFR-005", "MECH-Correlation", "HDR-INT01-corr", "HDR-INT02-corr"]}
+  ],
+  "tdd_elements": [
+    {"ref": "MOD-Scheduler", "verdict": "add", "why": "Module lập lịch: quản lý lịch, quét lần chạy đến hạn mỗi 30 giây, chiếm lần chạy, thử lại, chạy bù (CON-010 cùng tiến trình và CSDL).", "evidence": ["MOD-Transfer", "AD-01"]},
+    {"ref": "DE-ScheduledTransfer", "verdict": "add", "why": "Bảng scheduled_transfers: lịch, chu kỳ, trạng thái ACTIVE/PAUSED/COMPLETED/CANCELLED.", "evidence": ["DE-Transfer"]},
+    {"ref": "DE-ScheduledRun", "verdict": "add", "why": "Bảng scheduled_runs: lần chạy, trạng thái, mã giao dịch, mã lý do, số lần thử.", "evidence": ["DE-Transfer"]},
+    {"ref": "AD-05", "verdict": "add", "why": "Quyết định scheduler polling trong tiến trình, loại delayed queue và cron OS.", "evidence": ["AD-01", "ALT-Microservices"]},
+    {"ref": "SCN-ScheduledRun", "verdict": "add", "why": "Kịch bản chạy lịch đến hạn và ngân sách thời gian 60 giây (NFR-010).", "evidence": ["SCN-Transfer", "SCN-Notify"]},
+    {"ref": "MECH-RunClaim", "verdict": "add", "why": "Khóa theo lần chạy bằng cập nhật có điều kiện trên scheduled_runs, chống chạy trùng giữa các scheduler (CR1-R1).", "evidence": ["MECH-Idempotency", "MECH-WriteLock"]},
+    {"ref": "MECH-ScheduleRetry", "verdict": "add", "why": "Chính sách thử lại theo loại lỗi BR-13 và tự tạm dừng sau 3 lần FAILED.", "evidence": ["FB-INT01"]},
+    {"ref": "MECH-CatchUp", "verdict": "add", "why": "Chạy bù lần quá hạn trong thời hạn cấu hình, quá hạn thì MISSED.", "evidence": ["MOD-Transfer"]},
+    {"ref": "MSG-INT02-scheduled-run", "verdict": "add", "why": "Hai loại sự kiện ScheduledRunCompleted/ScheduledRunFailed, schema tương thích ngược trên cùng topic.", "evidence": ["MSG-INT02-event", "CH-INT02-events"]},
+    {"ref": "RISK-005", "verdict": "add", "why": "Rủi ro chạy trùng/giờ cao điểm do scheduler (CR1-R1, CR1-R2) cùng tải lên Fraud Check.", "evidence": ["RISK-001", "RISK-004"]},
+    {"ref": "MOD-Transfer", "verdict": "update", "why": "Tách lõi chuyển tiền để scheduler gọi nội bộ không qua API key.", "evidence": ["MOD-Transfer", "DI-Transfer"]},
+    {"ref": "DI-Transfer", "verdict": "update", "why": "Hàm service.transfer cần tách lõi dùng chung API và scheduler.", "evidence": ["DI-Transfer"]},
+    {"ref": "MOD-Notify", "verdict": "update", "why": "Thêm mẫu SMS cho kết quả lần chạy.", "evidence": ["MOD-Notify", "DI-Consumer"]},
+    {"ref": "MOD-Audit", "verdict": "update", "why": "Thêm loại sự kiện audit lịch và tác nhân SCHEDULER.", "evidence": ["MOD-Audit", "DI-Audit"]},
+    {"ref": "MOD-API", "verdict": "update", "why": "Thêm sáu endpoint scheduled-transfers và mã lỗi SCHEDULE_*.", "evidence": ["MOD-API", "DI-API"]},
+    {"ref": "INT-02", "verdict": "update", "why": "Thêm hai loại sự kiện trên cùng topic, tương thích ngược.", "evidence": ["INT-02", "CH-INT02-events", "MSG-INT02-event"]},
+    {"ref": "INT-01", "verdict": "update", "why": "Contract không đổi nhưng tải tăng do scheduler; cần xác nhận lại ASM-001 và rate limit.", "evidence": ["INT-01", "LIM-INT01", "ASM-001"]},
+    {"ref": "MECH-Correlation", "verdict": "update", "why": "Sinh correlationId riêng cho mỗi lần chạy của scheduler.", "evidence": ["MECH-Correlation"]},
+    {"ref": "INT-03", "verdict": "unchanged", "why": "Chỉ thêm nội dung tin nhắn, contract giữ nguyên.", "evidence": ["INT-03", "FB-INT03"]},
+    {"ref": "MOD-Risk", "verdict": "unchanged", "why": "Scheduler gọi qua luồng chuyển tiền hiện có, chính sách Fraud lỗi giữ nguyên.", "evidence": ["MOD-Risk", "FB-INT01"]},
+    {"ref": "MOD-Ledger", "verdict": "unchanged", "why": "Ghi sổ qua đường hiện có, không tạo đường ghi thứ hai.", "evidence": ["MOD-Ledger", "MECH-AppendOnlyLedger"]}
+  ],
+  "questions": [
+    {"id": "Q1", "relates": "OQ-010", "text": "Khi lần chạy thiếu số dư (INSUFFICIENT_FUNDS) thì thử lại hay thất bại ngay, và thử bao nhiêu lần?", "options": ["Thử lại 2 lần, cách 1 giờ", "Thất bại ngay", "Thử lại 1 lần sau 30 phút"], "default": "Thử lại 2 lần, cách 1 giờ (theo BR-13)"},
+    {"id": "Q2", "relates": "OQ-011", "text": "Giới hạn số lịch ACTIVE/PAUSED mỗi tài khoản có phù hợp với nghiệp vụ không?", "options": ["20 lịch", "50 lịch", "Không giới hạn"], "default": "20 lịch (BR-15)"},
+    {"id": "Q3", "relates": "OQ-012", "text": "Thời hạn chạy bù khi hệ thống ngừng là bao lâu?", "options": ["24 giờ", "6 giờ", "72 giờ"], "default": "24 giờ"},
+    {"id": "Q4", "relates": "ASM-010", "text": "Chu kỳ quét 30 giây có đủ cho NFR-010 không, và công nghệ lập lịch/khóa nào được chọn?", "options": ["Vòng lặp nền trong tiến trình, chu kỳ 30 giây, khóa bằng UPDATE có điều kiện", "Chu kỳ 10 giây", "Thư viện lập lịch (APScheduler)"], "default": "Vòng lặp nền trong tiến trình, 30 giây, UPDATE có điều kiện"},
+    {"id": "Q5", "relates": "ASM-011", "text": "Fraud Check chịu được tải thêm từ scheduler không (ASM-001 chưa xác nhận 50 rps)? Giới hạn số lần chạy mỗi chu kỳ là bao nhiêu?", "options": ["Giới hạn 20 lần chạy mỗi chu kỳ quét, rate limit 10 rps cho scheduler", "Không giới hạn riêng", "Chờ đối tác xác nhận"], "default": "Giới hạn 20 lần chạy mỗi chu kỳ, rate limit 10 rps cho scheduler"}
+  ]
+}

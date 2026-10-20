@@ -1,0 +1,65 @@
+{
+  "name": "prose-generation",
+  "description": "Facts that a careful reader takes from src/tdd_agent/acceptance/data/prose-spec.md (no tables). Written from the document text before any run; any design class is accepted for a fact as long as its anchor line and typed values are right.",
+  "provenance": "authored from prose-spec.md",
+  "checks": [
+    {
+      "id": "fact:reminder-milestones",
+      "kind": "fact",
+      "class": "*",
+      "props": {},
+      "quote_contains": "60 days, 30 days and 7 days"
+    },
+    {
+      "id": "fact:exactly-once",
+      "kind": "fact",
+      "class": "*",
+      "props": {},
+      "quote_contains": "exactly once"
+    },
+    {
+      "id": "fact:latency",
+      "kind": "fact",
+      "class": "*",
+      "props": {},
+      "quote_contains": "within 2 seconds"
+    },
+    {
+      "id": "fact:retry",
+      "kind": "fact",
+      "class": "*",
+      "props": {},
+      "quote_contains": "retried 3 times"
+    },
+    {
+      "id": "fact:operation",
+      "kind": "fact",
+      "class": "Operation",
+      "props": {
+        "method": "GET",
+        "path": "/api/v1/reminders"
+      },
+      "quote_contains": "GET /api/v1/reminders"
+    },
+    {
+      "id": "evidence-verified",
+      "kind": "evidence_verified"
+    },
+    {
+      "id": "no-invented-facts",
+      "kind": "no_invented_facts"
+    },
+    {
+      "id": "not-ready",
+      "kind": "not_ready"
+    },
+    {
+      "id": "questions",
+      "kind": "question_for_gap"
+    },
+    {
+      "id": "roundtrip",
+      "kind": "roundtrip"
+    }
+  ]
+}

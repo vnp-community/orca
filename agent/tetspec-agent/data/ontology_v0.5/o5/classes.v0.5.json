@@ -1,0 +1,394 @@
+{
+  "version": "0.5.0",
+  "canonical_version": "0.6.0",
+  "classes": {
+    "DocumentRef": {
+      "required": [
+        "id",
+        "role",
+        "revision",
+        "content_hash"
+      ]
+    },
+    "SectionRef": {
+      "required": [
+        "id",
+        "document_id",
+        "role",
+        "revision",
+        "content_hash",
+        "section_id"
+      ]
+    },
+    "SrsDelta": {
+      "required": [
+        "id",
+        "cr_id",
+        "before_revision",
+        "after_revision",
+        "sections"
+      ]
+    },
+    "ImpactReport": {
+      "required": [
+        "id",
+        "cr_ref",
+        "srs_ref",
+        "sad_ref",
+        "baseline_tdd_snapshot",
+        "entries",
+        "findings",
+        "status"
+      ]
+    },
+    "ImpactApproval": {
+      "required": [
+        "id",
+        "impact_report_id",
+        "approver_id",
+        "role",
+        "decision_hash"
+      ]
+    },
+    "TddSetRealization": {
+      "required": [
+        "id",
+        "baseline_snapshot",
+        "actual_snapshot",
+        "mappings",
+        "status"
+      ]
+    },
+    "SemanticResolution": {
+      "required": [
+        "id",
+        "policy_version",
+        "policy_hash",
+        "roots",
+        "ids",
+        "boundary",
+        "unresolved",
+        "graph_snapshot",
+        "resolution_hash",
+        "status"
+      ]
+    },
+    "Quantity": {
+      "required": [
+        "id",
+        "value",
+        "unit",
+        "stage"
+      ]
+    },
+    "Migration": {
+      "required": [
+        "id",
+        "from_schema",
+        "to_schema",
+        "stages",
+        "backfill",
+        "lock",
+        "compatibility",
+        "rollback"
+      ]
+    },
+    "MigrationStage": {
+      "required": [
+        "id",
+        "action",
+        "depends_on",
+        "preconditions",
+        "verification"
+      ]
+    },
+    "Measurement": {
+      "required": [
+        "id",
+        "metric",
+        "value",
+        "stage",
+        "observed_at",
+        "source_ref"
+      ]
+    },
+    "PermissionDecision": {
+      "required": [
+        "id",
+        "subject",
+        "resource",
+        "action",
+        "effect",
+        "evidence"
+      ]
+    },
+    "ChangeSpecItem": {
+      "required": [
+        "id",
+        "action",
+        "code_target",
+        "srs_refs",
+        "tdd_refs",
+        "verification",
+        "cr_acceptance_refs"
+      ]
+    },
+    "Transaction": {
+      "required": [
+        "id",
+        "boundary",
+        "isolation",
+        "consistency"
+      ]
+    },
+    "Saga": {
+      "required": [
+        "id",
+        "steps",
+        "compensation"
+      ]
+    },
+    "RetryPolicy": {
+      "required": [
+        "id",
+        "max_attempts",
+        "backoff",
+        "retryable_errors"
+      ]
+    },
+    "TimeoutBudget": {
+      "required": [
+        "id",
+        "total",
+        "allocations"
+      ]
+    },
+    "IdempotencyPolicy": {
+      "required": [
+        "id",
+        "key",
+        "scope",
+        "deduplication"
+      ]
+    },
+    "ConsistencyModel": {
+      "required": [
+        "id",
+        "mode",
+        "guarantees"
+      ]
+    },
+    "FailurePolicy": {
+      "required": [
+        "id",
+        "failure_modes",
+        "fallback",
+        "dead_letter"
+      ]
+    },
+    "LoadProfile": {
+      "required": [
+        "id",
+        "average",
+        "peak",
+        "payload",
+        "growth"
+      ]
+    },
+    "CapacityModel": {
+      "required": [
+        "id",
+        "resources",
+        "headroom",
+        "scaling"
+      ]
+    },
+    "HighAvailabilityTopology": {
+      "required": [
+        "id",
+        "replicas",
+        "failure_domains",
+        "failover"
+      ]
+    },
+    "RecoveryObjective": {
+      "required": [
+        "id",
+        "rto",
+        "rpo",
+        "recovery_procedure"
+      ]
+    },
+    "Ownership": {
+      "required": [
+        "id",
+        "team",
+        "responsibilities",
+        "escalation"
+      ]
+    },
+    "ContractCompatibility": {
+      "required": [
+        "id",
+        "versioning",
+        "compatibility",
+        "consumers"
+      ]
+    },
+    "LedgerInvariant": {
+      "required": [
+        "id",
+        "currency",
+        "scale",
+        "invariants"
+      ]
+    },
+    "ReconciliationPolicy": {
+      "required": [
+        "id",
+        "source",
+        "schedule",
+        "mismatch_handling"
+      ]
+    },
+    "AuditTrail": {
+      "required": [
+        "id",
+        "events",
+        "retention",
+        "integrity"
+      ]
+    },
+    "DesignObligation": {
+      "required": [
+        "id",
+        "question",
+        "srs_refs",
+        "cr_acceptance_refs",
+        "applicability",
+        "status"
+      ]
+    },
+    "ObligationResolution": {
+      "required": [
+        "id",
+        "obligation_id",
+        "design_refs",
+        "decision",
+        "verification_refs",
+        "status"
+      ]
+    },
+    "TestReceipt": {
+      "required": [
+        "id",
+        "cs_id",
+        "criterion_refs",
+        "result",
+        "executed_at"
+      ]
+    },
+    "AcceptanceReceipt": {
+      "required": [
+        "id",
+        "cr_id",
+        "criterion_refs",
+        "accepted_by",
+        "status"
+      ]
+    },
+    "Capability": {
+      "required": [
+        "id",
+        "name",
+        "stable_key",
+        "purpose",
+        "scope",
+        "owner",
+        "lifecycle"
+      ]
+    },
+    "RequirementVersion": {
+      "required": [
+        "id",
+        "logical_requirement_id",
+        "revision",
+        "statement",
+        "modality",
+        "acceptance",
+        "baseline_id"
+      ],
+      "extends": "Requirement"
+    },
+    "RequirementDelta": {
+      "required": [
+        "id",
+        "kind",
+        "rationale",
+        "change_request_id"
+      ]
+    },
+    "KnowledgeNeed": {
+      "required": [
+        "id",
+        "profile_id",
+        "section_spec",
+        "slot",
+        "target_class",
+        "required"
+      ]
+    },
+    "IntakeReport": {
+      "required": [
+        "id",
+        "need_id",
+        "status",
+        "sources"
+      ]
+    },
+    "GenerationProfile": {
+      "required": [
+        "id",
+        "name",
+        "artifact_types",
+        "mandatory_needs"
+      ]
+    },
+    "GenerationRun": {
+      "required": [
+        "id",
+        "intent",
+        "scope",
+        "profile_id",
+        "status",
+        "manifest_hash"
+      ]
+    },
+    "ReadinessReport": {
+      "required": [
+        "id",
+        "run_id",
+        "outcomes",
+        "blockers",
+        "rule_coverage"
+      ]
+    },
+    "PromptEditRequest": {
+      "required": [
+        "id",
+        "prompt_hash",
+        "target",
+        "base_snapshot",
+        "authorization"
+      ]
+    },
+    "RepoSnapshot": {
+      "required": [
+        "id",
+        "repo",
+        "revision",
+        "content_hash"
+      ]
+    }
+  }
+}

@@ -1,0 +1,118 @@
+{
+ "feature": "SCHEDULED-TRANSFER",
+ "version": 1,
+ "status": "Draft",
+ "runId": "run-1791519448-3093be",
+ "counts": {
+  "testRequirements": 25,
+  "coverageItems": 183,
+  "testCases": 183
+ },
+ "changes": [
+  "CR-001"
+ ],
+ "added": 1555,
+ "modified": 0,
+ "validation": {
+  "blocking": 0,
+  "baselineBlockers": 0,
+  "warnings": 0
+ },
+ "pending": {
+  "total": 1555,
+  "byClass": {
+   "tsp:Assertion": 250,
+   "tsp:CoverageItem": 183,
+   "tsp:DataField": 183,
+   "tsp:StubSpec": 17,
+   "tsp:TestCase": 183,
+   "tsp:TestDataSpec": 40,
+   "tsp:TestDesign": 40,
+   "tsp:TestEnvironment": 3,
+   "tsp:TestRequirement": 25,
+   "tsp:TestSet": 40,
+   "tsp:TestStep": 591
+  },
+  "pendingConfirmation": 123,
+  "inferred": 0
+ },
+ "solution": {
+  "EP": 6,
+  "FLD": 26,
+  "RSP": 34,
+  "AC": 43,
+  "SM": 2,
+  "TRN": 15
+ },
+ "requirements": [
+  "FR-040",
+  "FR-041",
+  "FR-042",
+  "FR-043",
+  "FR-044",
+  "FR-045",
+  "FR-046",
+  "FR-047",
+  "FR-048",
+  "FR-049",
+  "NFR-010",
+  "NFR-011",
+  "NFR-012",
+  "NFR-013",
+  "NFR-014"
+ ],
+ "files": {
+  "TestRequirements": "01-test-requirements.md",
+  "TestDesign": "02-test-design.md",
+  "TestCases": "03-test-cases.md"
+ },
+ "notes": [
+  "LLM viết lại 183 trong 183 TestCase mới"
+ ],
+ "slice": {
+  "seeds": 56,
+  "context": 96,
+  "requirements": [
+   "FR-040",
+   "FR-041",
+   "FR-042",
+   "FR-043",
+   "FR-044",
+   "FR-045",
+   "FR-046",
+   "FR-047",
+   "FR-048",
+   "FR-049",
+   "NFR-010",
+   "NFR-011",
+   "NFR-012",
+   "NFR-013",
+   "NFR-014"
+  ]
+ },
+ "review": {
+  "supplementRows": {
+   "EP": 0,
+   "FLD": 0,
+   "RSP": 0,
+   "AC": 6,
+   "SM": 0,
+   "TRN": 0
+  },
+  "before": {
+   "testRequirements": 25,
+   "testCases": 177,
+   "pendingConfirmation": 111
+  },
+  "after": {
+   "testRequirements": 25,
+   "testCases": 183,
+   "pendingConfirmation": 123
+  },
+  "findings": 7,
+  "kinds": [
+   "missing_ac",
+   "other"
+  ]
+ }
+}

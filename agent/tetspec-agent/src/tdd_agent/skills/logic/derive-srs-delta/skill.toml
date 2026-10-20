@@ -1,0 +1,5 @@
+id = "derive-srs-delta"
+version = "1"
+agent = "impact"
+tier = "logic"
+description = "Diff two SRS revisions by requirement id into added/modified/removed changes with line-anchored section refs; unstructured prose changes become gaps, never silently ignored."
