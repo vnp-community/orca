@@ -1608,6 +1608,10 @@
     "kind": "unary"
   },
   {
+    "name": "repo.listBranches",
+    "kind": "unary"
+  },
+  {
     "name": "repo.rebindDevServer",
     "kind": "unary"
   },

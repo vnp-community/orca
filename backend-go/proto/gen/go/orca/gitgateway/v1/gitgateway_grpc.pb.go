@@ -62,6 +62,7 @@ const (
 	GitGatewayService_Clone_FullMethodName                       = "/orca.gitgateway.v1.GitGatewayService/Clone"
 	GitGatewayService_BaseRefDefault_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/BaseRefDefault"
 	GitGatewayService_SearchRefs_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/SearchRefs"
+	GitGatewayService_ListRepoBranches_FullMethodName            = "/orca.gitgateway.v1.GitGatewayService/ListRepoBranches"
 	GitGatewayService_InitRepo_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/InitRepo"
 	GitGatewayService_CheckHooks_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/CheckHooks"
 	GitGatewayService_ReadIssueCommand_FullMethodName            = "/orca.gitgateway.v1.GitGatewayService/ReadIssueCommand"
@@ -189,6 +190,7 @@ type GitGatewayServiceClient interface {
 	Clone(ctx context.Context, in *CloneRequest, opts ...grpc.CallOption) (*CloneResponse, error)
 	BaseRefDefault(ctx context.Context, in *BaseRefDefaultRequest, opts ...grpc.CallOption) (*BaseRefDefaultResponse, error)
 	SearchRefs(ctx context.Context, in *SearchRefsRequest, opts ...grpc.CallOption) (*SearchRefsResponse, error)
+	ListRepoBranches(ctx context.Context, in *ListRepoBranchesRequest, opts ...grpc.CallOption) (*ListRepoBranchesResponse, error)
 	InitRepo(ctx context.Context, in *InitRepoRequest, opts ...grpc.CallOption) (*InitRepoResponse, error)
 	CheckHooks(ctx context.Context, in *CheckHooksRequest, opts ...grpc.CallOption) (*CheckHooksResponse, error)
 	ReadIssueCommand(ctx context.Context, in *ReadIssueCommandRequest, opts ...grpc.CallOption) (*ReadIssueCommandResponse, error)
@@ -701,6 +703,16 @@ func (c *gitGatewayServiceClient) SearchRefs(ctx context.Context, in *SearchRefs
 	return out, nil
 }
 
+func (c *gitGatewayServiceClient) ListRepoBranches(ctx context.Context, in *ListRepoBranchesRequest, opts ...grpc.CallOption) (*ListRepoBranchesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListRepoBranchesResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ListRepoBranches_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gitGatewayServiceClient) InitRepo(ctx context.Context, in *InitRepoRequest, opts ...grpc.CallOption) (*InitRepoResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InitRepoResponse)
@@ -1150,6 +1162,7 @@ type GitGatewayServiceServer interface {
 	Clone(context.Context, *CloneRequest) (*CloneResponse, error)
 	BaseRefDefault(context.Context, *BaseRefDefaultRequest) (*BaseRefDefaultResponse, error)
 	SearchRefs(context.Context, *SearchRefsRequest) (*SearchRefsResponse, error)
+	ListRepoBranches(context.Context, *ListRepoBranchesRequest) (*ListRepoBranchesResponse, error)
 	InitRepo(context.Context, *InitRepoRequest) (*InitRepoResponse, error)
 	CheckHooks(context.Context, *CheckHooksRequest) (*CheckHooksResponse, error)
 	ReadIssueCommand(context.Context, *ReadIssueCommandRequest) (*ReadIssueCommandResponse, error)
@@ -1358,6 +1371,9 @@ func (UnimplementedGitGatewayServiceServer) BaseRefDefault(context.Context, *Bas
 }
 func (UnimplementedGitGatewayServiceServer) SearchRefs(context.Context, *SearchRefsRequest) (*SearchRefsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SearchRefs not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ListRepoBranches(context.Context, *ListRepoBranchesRequest) (*ListRepoBranchesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRepoBranches not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) InitRepo(context.Context, *InitRepoRequest) (*InitRepoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InitRepo not implemented")
@@ -2231,6 +2247,24 @@ func _GitGatewayService_SearchRefs_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_ListRepoBranches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRepoBranchesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ListRepoBranches(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ListRepoBranches_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ListRepoBranches(ctx, req.(*ListRepoBranchesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GitGatewayService_InitRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InitRepoRequest)
 	if err := dec(in); err != nil {
@@ -2999,6 +3033,10 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchRefs",
 			Handler:    _GitGatewayService_SearchRefs_Handler,
+		},
+		{
+			MethodName: "ListRepoBranches",
+			Handler:    _GitGatewayService_ListRepoBranches_Handler,
 		},
 		{
 			MethodName: "InitRepo",

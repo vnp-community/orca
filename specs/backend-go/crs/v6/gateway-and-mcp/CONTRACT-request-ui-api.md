@@ -353,6 +353,22 @@ Lỗi chung của `setBaseRef`: `REQUEST_VERSION_CONFLICT` (phiên bản cũ, t�
 
 **Cờ tính năng `request.flowStatus.features`.** `request.flowStatus` trả thêm `features: string[]`, do **gateway** công bố (không phải `request-service`), hiện là `["request.baseRef"]`. Frontend chỉ hiện ô nhánh gốc khi mảng có `request.baseRef`; gateway cũ không trả `features` (và `RequestView` thiếu khoá `baseRef`) nên ô ẩn. Tên chỉ được thêm, không bỏ. `features` có mặt kể cả khi `enabled=false`.
 
+### 2.12 Danh sách nhánh của repo cho ô "Start from" (CR-REQ-039, CR-REQ-040 sửa đổi 2026-10-20)
+
+Ô "Start from" mở ra **danh sách nhánh** của repo ngay khi bấm, không bắt người dùng gõ trước. Kênh chỉ đọc, theo repo (không theo worktree):
+
+**`repo.listBranches {repoId}`** (RPC git-gateway `ListRepoBranches`) trả `{branches: [{name, remote}], truncated}`.
+- `name` là tên ngắn của ref: nhánh local là `main`, `release/1.x`; nhánh remote là `origin/hotfix/x` (đủ tên remote, dùng được ngay làm `baseRef`).
+- `remote` là `true` chỉ cho nhánh remote **không có bản local cùng tên** (sau khi bỏ tiền tố remote); nhánh remote có bản local bị ẩn để không lặp. `<remote>/HEAD` không bao giờ có mặt.
+- Thứ tự: nhánh local theo tên (so byte), rồi nhánh remote theo tên. Tối đa 500 mục; vượt thì cắt và `truncated: true` (frontend vẫn cho gõ tìm bằng `repo.searchRefs`).
+- Không chứa tag. Tag vẫn chọn được bằng tìm kiếm hoặc nhập tay.
+- Lỗi: repo không có `WORKTREE_REPO_NOT_FOUND`; host không tới được `Unavailable` (cùng mã với `repo.searchRefs`). Kênh không có ở gateway cũ: frontend rơi về picker tìm kiếm, không báo lỗi.
+- Không có tool MCP (chỉ phục vụ màn hình); chạy được qua SSH vì dùng `git branch --list --all --format` (git 2.13 trở lên, nằm trong allowlist `git.exec`).
+
+**Lưu ý dạng JSON:** gateway bỏ khoá `remote` khi giá trị là `false` (không `omitempty` ở phía client), nên vắng mặt nghĩa là nhánh local; và `repo.baseRefDefault` trả `{ref}` (không phải `defaultBaseRef`), frontend web ánh xạ hai tên này trong `web/base-ref-default-wire.ts`.
+
+**Nhánh mặc định** vẫn lấy từ `repo.baseRefDefault` (đã sửa ở BE-REQ-TASK-039-04); frontend ghim nó lên đầu danh sách.
+
 ## 3. Sự kiện thời gian thực: `request.subscribe`
 
 - Mở: `request.subscribe {id?}`. Có `id`: chỉ sự kiện của Request đó; không `id`: mọi sự kiện Request trong tenant của người dùng, lọc thêm theo quyền đọc. Gateway gọi `GetRequest` một lần để kiểm quyền khi có `id`.

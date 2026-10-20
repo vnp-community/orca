@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
@@ -104,6 +106,7 @@ type fakeRepoGitGatewayClient struct {
 	cloneFunc                  func(ctx context.Context, in *gitgatewayv1.CloneRequest) (*gitgatewayv1.CloneResponse, error)
 	baseRefDefaultFunc         func(ctx context.Context, in *gitgatewayv1.BaseRefDefaultRequest) (*gitgatewayv1.BaseRefDefaultResponse, error)
 	searchRefsFunc             func(ctx context.Context, in *gitgatewayv1.SearchRefsRequest) (*gitgatewayv1.SearchRefsResponse, error)
+	listRepoBranchesFunc       func(ctx context.Context, in *gitgatewayv1.ListRepoBranchesRequest) (*gitgatewayv1.ListRepoBranchesResponse, error)
 	initRepoFunc               func(ctx context.Context, in *gitgatewayv1.InitRepoRequest) (*gitgatewayv1.InitRepoResponse, error)
 	checkHooksFunc             func(ctx context.Context, in *gitgatewayv1.CheckHooksRequest) (*gitgatewayv1.CheckHooksResponse, error)
 	readIssueCommandFunc       func(ctx context.Context, in *gitgatewayv1.ReadIssueCommandRequest) (*gitgatewayv1.ReadIssueCommandResponse, error)
@@ -119,6 +122,9 @@ func (f *fakeRepoGitGatewayClient) BaseRefDefault(ctx context.Context, in *gitga
 }
 func (f *fakeRepoGitGatewayClient) SearchRefs(ctx context.Context, in *gitgatewayv1.SearchRefsRequest, _ ...grpc.CallOption) (*gitgatewayv1.SearchRefsResponse, error) {
 	return f.searchRefsFunc(ctx, in)
+}
+func (f *fakeRepoGitGatewayClient) ListRepoBranches(ctx context.Context, in *gitgatewayv1.ListRepoBranchesRequest, _ ...grpc.CallOption) (*gitgatewayv1.ListRepoBranchesResponse, error) {
+	return f.listRepoBranchesFunc(ctx, in)
 }
 func (f *fakeRepoGitGatewayClient) InitRepo(ctx context.Context, in *gitgatewayv1.InitRepoRequest, _ ...grpc.CallOption) (*gitgatewayv1.InitRepoResponse, error) {
 	return f.initRepoFunc(ctx, in)
@@ -389,6 +395,46 @@ func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
 		}
 	})
 
+	t.Run("repo.listBranches", func(t *testing.T) {
+		var gotReq *gitgatewayv1.ListRepoBranchesRequest
+		var gotTenant string
+		git.listRepoBranchesFunc = func(ctx context.Context, in *gitgatewayv1.ListRepoBranchesRequest) (*gitgatewayv1.ListRepoBranchesResponse, error) {
+			gotReq = in
+			gotTenant, _ = outgoingTenantUser(ctx)
+			return &gitgatewayv1.ListRepoBranchesResponse{
+				Branches:  []*gitgatewayv1.RepoBranch{{Name: "main"}, {Name: "origin/hotfix/x", Remote: true}},
+				Truncated: true,
+			}, nil
+		}
+		got, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.listBranches",
+			argsJSON(t, map[string]any{"repoId": "r1"}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRepoId() != "r1" {
+			t.Errorf("unexpected ListRepoBranchesRequest: %+v", gotReq)
+		}
+		if gotTenant != "t1" {
+			t.Errorf("identity not attached to the RPC context, tenant = %q", gotTenant)
+		}
+		resp, ok := got.(*gitgatewayv1.ListRepoBranchesResponse)
+		if !ok || len(resp.GetBranches()) != 2 || !resp.GetBranches()[1].GetRemote() || !resp.GetTruncated() {
+			t.Errorf("response not passed through: %#v", got)
+		}
+	})
+
+	t.Run("repo.listBranches passes the RPC error through", func(t *testing.T) {
+		wantErr := status.Error(codes.Unavailable, "dev server offline")
+		git.listRepoBranchesFunc = func(context.Context, *gitgatewayv1.ListRepoBranchesRequest) (*gitgatewayv1.ListRepoBranchesResponse, error) {
+			return nil, wantErr
+		}
+		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.listBranches",
+			argsJSON(t, map[string]any{"repoId": "r1"}))
+		if !errors.Is(err, wantErr) {
+			t.Errorf("err = %v, want %v", err, wantErr)
+		}
+	})
+
 	t.Run("repo.create", func(t *testing.T) {
 		var gotReq *gitgatewayv1.InitRepoRequest
 		git.initRepoFunc = func(ctx context.Context, in *gitgatewayv1.InitRepoRequest) (*gitgatewayv1.InitRepoResponse, error) {
@@ -500,7 +546,7 @@ func TestRegisterRepoChannels_RegistrationCoverage(t *testing.T) {
 	want := []string{
 		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update", "repo.assignToProject", "repo.rebindDevServer",
 		"repo.getMembers", "repo.addMember", "repo.removeMember", "repo.updateMemberRole",
-		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.create",
+		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.listBranches", "repo.create",
 		"repo.hooksCheck", "repo.issueCommandRead", "repo.issueCommandWrite",
 		"repo.setupScriptImports",
 		"sparsePresets.list", "sparsePresets.save", "sparsePresets.remove",
@@ -1151,7 +1197,7 @@ func TestRegisterRepoSshStatusWorkspaceChannels_RegistersEverything(t *testing.T
 	want := []string{
 		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update", "repo.assignToProject", "repo.rebindDevServer",
 		"repo.getMembers", "repo.addMember", "repo.removeMember", "repo.updateMemberRole",
-		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.create",
+		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.listBranches", "repo.create",
 		"repo.hooksCheck", "repo.issueCommandRead", "repo.issueCommandWrite",
 		"repo.setupScriptImports",
 		"ssh.listTargets", "ssh.getUserAccount", "ssh.getState", "ssh.connect",

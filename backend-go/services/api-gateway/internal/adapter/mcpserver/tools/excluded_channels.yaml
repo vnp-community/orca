@@ -540,6 +540,10 @@
   category: backlog
   reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
 
+- pattern: "repo.listBranches"
+  category: ui-only
+  reason: "Feeds the Start from branch picker of the Create request dialog; agents find branches with repo_searchRefs (CONTRACT-request-ui-api 2.12)."
+
 - pattern: "repo.setupScriptImports"
   category: backlog
   reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."

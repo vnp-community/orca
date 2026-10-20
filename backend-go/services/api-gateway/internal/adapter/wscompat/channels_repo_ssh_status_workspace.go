@@ -103,8 +103,8 @@ type initRepoResultView struct {
 // repo.add/list/reorder/rm/update map 1:1 onto ProjectService's
 // AddRepo/ListRepos/ReorderRepos/RemoveRepo/UpdateRepo — pure catalog CRUD
 // against the repos Postgres table, per project-service.md §4's "Repo —
-// pure metadata, no working-tree state." The remaining 8 (clone,
-// baseRefDefault, searchRefs, create, hooksCheck, issueCommandRead,
+// pure metadata, no working-tree state." The remaining 9 (clone,
+// baseRefDefault, searchRefs, listBranches, create, hooksCheck, issueCommandRead,
 // issueCommandWrite, setupScriptImports) are file/host operations against a
 // repo's working tree, so they dispatch to git-gateway-service instead —
 // see SOL-023 Bucket 3.
@@ -516,6 +516,25 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
 		defer cancel()
 		resp, err := git.SearchRefs(rpcCtx, &gitgatewayv1.SearchRefsRequest{RepoId: in.RepoID, Query: in.Query})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// Branch list for the "Start from" picker (CONTRACT-request-ui-api 2.12); repo-scoped like repo.searchRefs, no MCP tool.
+	r.Register("repo.listBranches", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type listBranchesArgs struct {
+			RepoID string `json:"repoId"`
+		}
+		in, err := decodeArg[listBranchesArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		resp, err := git.ListRepoBranches(rpcCtx, &gitgatewayv1.ListRepoBranchesRequest{RepoId: in.RepoID})
 		if err != nil {
 			return nil, err
 		}

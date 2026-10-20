@@ -77,6 +77,7 @@ type Server struct {
 	checkHooks             *usecase.CheckHooks
 	readEphemeralVmRecipes *usecase.ReadEphemeralVmRecipes
 	watchWorktreeFiles     *usecase.WatchWorktreeFiles
+	listRepoBranches       *usecase.ListRepoBranches
 	readIssueCommand       *usecase.ReadIssueCommand
 	writeIssueCommand      *usecase.WriteIssueCommand
 	scanSetupScriptImports *usecase.ScanSetupScriptImports
@@ -196,6 +197,7 @@ func New(
 	deleteBranch *usecase.DeleteBranch,
 	readEphemeralVmRecipes *usecase.ReadEphemeralVmRecipes,
 	watchWorktreeFiles *usecase.WatchWorktreeFiles,
+	listRepoBranches *usecase.ListRepoBranches,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -281,6 +283,8 @@ func New(
 		readEphemeralVmRecipes: readEphemeralVmRecipes,
 
 		watchWorktreeFiles: watchWorktreeFiles,
+
+		listRepoBranches: listRepoBranches,
 	}
 }
 
@@ -774,6 +778,18 @@ func (s *Server) SearchRefs(ctx context.Context, req *gitgatewayv1.SearchRefsReq
 		return nil, toStatus(err)
 	}
 	return &gitgatewayv1.SearchRefsResponse{Refs: refs}, nil
+}
+
+func (s *Server) ListRepoBranches(ctx context.Context, req *gitgatewayv1.ListRepoBranchesRequest) (*gitgatewayv1.ListRepoBranchesResponse, error) {
+	result, err := s.listRepoBranches.Execute(ctx, usecase.ListRepoBranchesInput{RepoID: req.GetRepoId()})
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	branches := make([]*gitgatewayv1.RepoBranch, 0, len(result.Branches))
+	for _, b := range result.Branches {
+		branches = append(branches, &gitgatewayv1.RepoBranch{Name: b.Name, Remote: b.Remote})
+	}
+	return &gitgatewayv1.ListRepoBranchesResponse{Branches: branches, Truncated: result.Truncated}, nil
 }
 
 func (s *Server) CheckHooks(ctx context.Context, req *gitgatewayv1.CheckHooksRequest) (*gitgatewayv1.CheckHooksResponse, error) {

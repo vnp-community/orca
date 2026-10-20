@@ -99,6 +99,7 @@ service GitGatewayService {
   rpc Clone(CloneRequest) returns (CloneResponse);
   rpc BaseRefDefault(BaseRefDefaultRequest) returns (BaseRefDefaultResponse);
   rpc SearchRefs(SearchRefsRequest) returns (SearchRefsResponse);
+  rpc ListRepoBranches(ListRepoBranchesRequest) returns (ListRepoBranchesResponse); // repo.listBranches
   rpc InitRepo(InitRepoRequest) returns (InitRepoResponse);          // repo.create
   rpc CheckHooks(CheckHooksRequest) returns (CheckHooksResponse);     // repo.hooksCheck
   rpc ReadIssueCommand(ReadIssueCommandRequest) returns (ReadIssueCommandResponse);
@@ -696,6 +697,12 @@ message BaseRefDefaultResponse { string ref = 1; }
 // See BaseRefDefaultRequest's doc comment — same repo_id addition, same reason.
 message SearchRefsRequest { string worktree_id = 1; string query = 2; string repo_id = 3; }
 message SearchRefsResponse { repeated string refs = 1; }
+
+// ListRepoBranches is repo-scoped (no worktree_id), same dispatch as SearchRefs.
+// name is the short ref: "main", or "origin/hotfix/x" for a remote-only branch.
+message ListRepoBranchesRequest { string repo_id = 1; }
+message RepoBranch { string name = 1; bool remote = 2; }
+message ListRepoBranchesResponse { repeated RepoBranch branches = 1; bool truncated = 2; }
 
 // InitRepo runs `git init` at dest_path on the resolved host and returns
 // enough for the caller to then call ProjectService.AddRepo — mirrors

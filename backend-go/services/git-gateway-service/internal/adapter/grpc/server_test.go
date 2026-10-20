@@ -178,6 +178,10 @@ func (fakeExecutor) SearchRefs(context.Context, string, string) ([]string, error
 	return []string{"main", "feature/x"}, nil
 }
 
+func (fakeExecutor) ListRepoBranches(context.Context, string) ([]domain.RepoBranch, bool, error) {
+	return []domain.RepoBranch{{Name: "main"}, {Name: "origin/hotfix/x", Remote: true}}, true, nil
+}
+
 func (fakeExecutor) CheckHooks(context.Context, string) ([]string, bool, error) {
 	return []string{"pre-commit", "post-checkout"}, true, nil
 }
@@ -498,6 +502,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		// wiring, not WatchWorktree's own behavior (no dedicated test needs
 		// one yet — BACKLOG-003).
 		usecase.NewWatchWorktreeFiles(resolver, nil),
+		usecase.NewListRepoBranches(reachability, projects, exec, exec),
 	)
 }
 
@@ -1200,4 +1205,48 @@ func TestServer_MergeBranch_TranslatesResult(t *testing.T) {
 	if resp.GetResultSha() == "" {
 		t.Error("expected a non-empty result_sha")
 	}
+}
+
+// localReposReachability routes every repo to the in-process executor, so a test reaches the executor without a dev server.
+type localReposReachability struct{ fakeReachability }
+
+func (localReposReachability) LocalReposAllowed() bool { return true }
+
+func TestServer_ListRepoBranches_TranslatesResult(t *testing.T) {
+	s := &Server{listRepoBranches: usecase.NewListRepoBranches(localReposReachability{}, fakeProjectClient{}, fakeExecutor{}, fakeExecutor{})}
+	resp, err := s.ListRepoBranches(context.Background(), &gitgatewayv1.ListRepoBranchesRequest{RepoId: "repo-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := resp.GetBranches()
+	if len(got) != 2 || got[0].GetName() != "main" || got[0].GetRemote() || got[1].GetName() != "origin/hotfix/x" || !got[1].GetRemote() {
+		t.Errorf("unexpected branches: %+v", got)
+	}
+	if !resp.GetTruncated() {
+		t.Error("truncated flag was not carried over")
+	}
+}
+
+func TestServer_ListRepoBranches_ErrorsKeepTheirStatus(t *testing.T) {
+	t.Run("missing repo id is InvalidArgument", func(t *testing.T) {
+		s := &Server{listRepoBranches: usecase.NewListRepoBranches(localReposReachability{}, fakeProjectClient{}, fakeExecutor{}, fakeExecutor{})}
+		_, err := s.ListRepoBranches(context.Background(), &gitgatewayv1.ListRepoBranchesRequest{})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("code = %v, want InvalidArgument", status.Code(err))
+		}
+	})
+	t.Run("unreachable dev server surfaces as Unavailable", func(t *testing.T) {
+		projects := devServerBoundProjectClient{}
+		s := &Server{listRepoBranches: usecase.NewListRepoBranches(fakeReachability{reachable: false}, projects, fakeExecutor{}, fakeExecutor{})}
+		_, err := s.ListRepoBranches(context.Background(), &gitgatewayv1.ListRepoBranchesRequest{RepoId: "repo-1"})
+		if status.Code(err) != codes.Unavailable {
+			t.Errorf("code = %v, want Unavailable", status.Code(err))
+		}
+	})
+}
+
+type devServerBoundProjectClient struct{ fakeProjectClient }
+
+func (devServerBoundProjectClient) GetRepo(_ context.Context, repoID string) (domain.RepoInfo, error) {
+	return domain.RepoInfo{ID: repoID, DevServerID: "ds1", URL: "/srv/repo"}, nil
 }

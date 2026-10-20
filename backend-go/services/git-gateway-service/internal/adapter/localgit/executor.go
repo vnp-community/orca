@@ -385,6 +385,16 @@ func (e *Executor) SearchRefs(ctx context.Context, repoPath, query string) ([]st
 	return matched, nil
 }
 
+// ListRepoBranches lists local and remote-only branches in one `git branch --list --all` call.
+func (e *Executor) ListRepoBranches(ctx context.Context, repoPath string) ([]domain.RepoBranch, bool, error) {
+	out, err := e.run(ctx, repoPath, domain.RepoBranchListArgs()...)
+	if err != nil {
+		return nil, false, err
+	}
+	branches, truncated := domain.ParseRepoBranchRefs(out)
+	return branches, truncated, nil
+}
+
 // CheckHooks lists installed hooks under .git/hooks and reports whether
 // orca's own hooks (pre-commit, post-checkout — the two orca installs, per
 // this scaffold's own install-hooks convention) are present and current.

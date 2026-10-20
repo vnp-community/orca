@@ -200,6 +200,8 @@ type GitExecutor interface {
 	// exists locally.
 	BaseRefDefault(ctx context.Context, repoPath, preferredBranch string) (ref string, err error)
 	SearchRefs(ctx context.Context, repoPath, query string) (refs []string, err error)
+	// ListRepoBranches lists local and remote-only branches (already deduplicated, ordered and capped), truncated when cut.
+	ListRepoBranches(ctx context.Context, repoPath string) (branches []domain.RepoBranch, truncated bool, err error)
 	CheckHooks(ctx context.Context, repoPath string) (installedHooks []string, orcaHooksCurrent bool, err error)
 	ReadIssueCommand(ctx context.Context, repoPath string) (content string, exists bool, err error)
 	WriteIssueCommand(ctx context.Context, repoPath, content string) error

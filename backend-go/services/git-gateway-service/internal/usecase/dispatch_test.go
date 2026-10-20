@@ -54,6 +54,7 @@ type fakeGitExecutor struct {
 	calledInitRepo               bool
 	calledBaseRefDefault         bool
 	calledSearchRefs             bool
+	calledListRepoBranches       bool
 	calledCheckHooks             bool
 	calledReadIssueCommand       bool
 	calledWriteIssueCommand      bool
@@ -141,6 +142,9 @@ type fakeGitExecutor struct {
 	initRepoErr               error
 	baseRefDefaultErr         error
 	searchRefsErr             error
+	listRepoBranchesErr       error
+	repoBranches              []domain.RepoBranch
+	repoBranchesTruncated     bool
 	checkHooksErr             error
 	readIssueCommandErr       error
 	writeIssueCommandErr      error
@@ -388,6 +392,15 @@ func (f *fakeGitExecutor) BaseRefDefault(ctx context.Context, repoPath, preferre
 		return "", f.baseRefDefaultErr
 	}
 	return f.baseRef, nil
+}
+
+func (f *fakeGitExecutor) ListRepoBranches(ctx context.Context, repoPath string) ([]domain.RepoBranch, bool, error) {
+	f.calledListRepoBranches = true
+	f.gotRepoPath = repoPath
+	if f.listRepoBranchesErr != nil {
+		return nil, false, f.listRepoBranchesErr
+	}
+	return f.repoBranches, f.repoBranchesTruncated, nil
 }
 
 func (f *fakeGitExecutor) SearchRefs(ctx context.Context, repoPath, query string) ([]string, error) {

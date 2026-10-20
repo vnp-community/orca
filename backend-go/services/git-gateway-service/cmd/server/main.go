@@ -208,6 +208,7 @@ func run() error {
 	initRepoUC := usecase.NewInitRepo(devServerReachability, local, relay)
 	baseRefDefaultUC := usecase.NewBaseRefDefault(devServerReachability, projectClient, local, relay)
 	searchRefsUC := usecase.NewSearchRefs(devServerReachability, projectClient, local, relay)
+	listRepoBranchesUC := usecase.NewListRepoBranches(devServerReachability, projectClient, local, relay)
 	checkHooksUC := usecase.NewCheckHooks(devServerReachability, projectClient, local, relay)
 	readIssueCommandUC := usecase.NewReadIssueCommand(devServerReachability, projectClient, local, relay)
 	writeIssueCommandUC := usecase.NewWriteIssueCommand(devServerReachability, projectClient, local, relay)
@@ -292,6 +293,7 @@ func run() error {
 		mergeIntoBranchUC, stashPushUC, stashPopUC, createBranchUC, deleteBranchUC,
 		readEphemeralVmRecipesUC,
 		watchWorktreeFilesUC,
+		listRepoBranchesUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

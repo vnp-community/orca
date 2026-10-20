@@ -789,6 +789,23 @@ func (r *RelayExecutor) SearchRefs(ctx context.Context, repoPath, query string) 
 	return result.Refs, err
 }
 
+// ListRepoBranches relays the same `git branch` argv localgit runs, through git.exec (the agent allowlist accepts it).
+func (r *RelayExecutor) ListRepoBranches(ctx context.Context, repoPath string) ([]domain.RepoBranch, bool, error) {
+	var result gitExecResult
+	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
+		"args": domain.RepoBranchListArgs(),
+		"cwd":  repoPath,
+	}, &result)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := result.failed("git branch --list --all"); err != nil {
+		return nil, false, err
+	}
+	branches, truncated := domain.ParseRepoBranchRefs(result.Stdout)
+	return branches, truncated, nil
+}
+
 func (r *RelayExecutor) CheckHooks(ctx context.Context, repoPath string) ([]string, bool, error) {
 	var result struct {
 		InstalledHooks   []string `json:"installedHooks"`
