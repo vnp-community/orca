@@ -87,13 +87,24 @@ function expectPushBlocked(repo: string): void {
   }
 }
 
-export function createDeepseekFixture(_prefix: string): DeepseekFixture {
-  if (!existsSync(DEEPSEEK_REPO)) {
+export type UserRepoOptions = {
+  /** The user's repo to work in (default: the deepseek-harness one). */
+  repo?: string
+  /** Leave the task worktrees and branches the run created, for the owner to inspect (ci-cd-kit); everything else is still compared. */
+  keepGrowth?: boolean
+}
+
+export function createDeepseekFixture(
+  _prefix: string,
+  options: UserRepoOptions = {}
+): DeepseekFixture {
+  const repo = options.repo ?? DEEPSEEK_REPO
+  if (!existsSync(repo)) {
     throw new Error(
-      `${DEEPSEEK_REPO} does not exist: set ORCA_E2E_DEEPSEEK_REPO to the repo the real specs may work in`
+      `${repo} does not exist: set ORCA_E2E_DEEPSEEK_REPO to the repo the real specs may work in`
     )
   }
-  const repoPath = realpathSync(DEEPSEEK_REPO)
+  const repoPath = realpathSync(repo)
   if (git(repoPath, ['rev-parse', '--is-inside-work-tree']).trim() !== 'true') {
     throw new Error(`${repoPath} is not a git work tree`)
   }
@@ -101,6 +112,15 @@ export function createDeepseekFixture(_prefix: string): DeepseekFixture {
   process.env.ORCA_E2E_GUARD_EXCLUDE = [process.env.ORCA_E2E_GUARD_EXCLUDE, repoPath]
     .filter(Boolean)
     .join(':')
+  if (options.keepGrowth) {
+    // Why: the kept worktrees are new entries of the repo's parent folder, which the generic listing comparison would call a leak.
+    process.env.ORCA_E2E_GUARD_KEEP_NEW_PREFIXES = [
+      process.env.ORCA_E2E_GUARD_KEEP_NEW_PREFIXES,
+      `${basename(repoPath)}-`
+    ]
+      .filter(Boolean)
+      .join(':')
+  }
   const before = captureCheckout(repoPath)
   // Why: the watchdog polls in the cheap mode (size+mtime); a cheap reading is only comparable with a cheap baseline.
   const beforeCheap = captureCheckout(repoPath, true)
@@ -129,7 +149,7 @@ export function createDeepseekFixture(_prefix: string): DeepseekFixture {
       const agents = agentsWithPushBlock()
       if (agents.total === 0 || agents.blocked < agents.total) {
         throw new Error(
-          `${agents.blocked}/${agents.total} agent process(es) run with the push block: start the run with run_ui_flow.py --real deepseek (it restarts the agent with GIT_CONFIG_* so nothing can be pushed to ${git(repoPath, ['remote', 'get-url', 'origin']).trim()})`
+          `${agents.blocked}/${agents.total} agent process(es) run with the push block: start the run with run_ui_flow.py --real (deepseek or ci-cd-kit; it restarts the agent with GIT_CONFIG_* so nothing can be pushed to ${git(repoPath, ['remote', 'get-url', 'origin']).trim()})`
         )
       }
       expectPushBlocked(repoPath)
@@ -155,16 +175,25 @@ export function createDeepseekFixture(_prefix: string): DeepseekFixture {
           ...checkoutViolations(beforeCheap, captureCheckout(repoPath, true))
         ])
       ]
-      for (const done of removeGrowth(before)) {
-        console.log(`[deepseek] cleanup: ${done}`)
+      if (options.keepGrowth) {
+        const kept = growthSince(before, captureCheckout(repoPath, true))
+        console.log(
+          `[deepseek] kept for inspection: ${kept.worktrees.join(', ') || 'no worktree'}; branches ${kept.branches.map((b) => b.replace('refs/heads/', '')).join(', ') || 'none'}`
+        )
+      } else {
+        for (const done of removeGrowth(before)) {
+          console.log(`[deepseek] cleanup: ${done}`)
+        }
       }
       disposed = true
     },
     afterCleanup: () => [
       ...violations.map((v) => `the user's repo: ${v}`),
-      ...restoredProblems(before, captureCheckout(repoPath)).map(
-        (p) => `the user's repo after cleanup: ${p}`
-      )
+      // Why: kept growth is allowed by checkoutViolations (new heads and `<repo>-*` worktrees only); restoredProblems would demand it gone.
+      ...(options.keepGrowth
+        ? checkoutViolations(before, captureCheckout(repoPath))
+        : restoredProblems(before, captureCheckout(repoPath))
+      ).map((p) => `the user's repo after cleanup: ${p}`)
     ]
   }
 }

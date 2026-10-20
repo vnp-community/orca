@@ -22,6 +22,7 @@
   python3 run_ui_flow.py --real all      # all four; never combined with --ai-stub
   python3 run_ui_flow.py --real deepseek # REAL Claude Code working on the USER's repo deepseek-harness through the UI (TASK-FE-E2E-028): Add Project, Requests, read-only analysis, review controls, execution with Phases, live agent session; `git push` is blocked for the whole run
   python3 run_ui_flow.py --real deepseek-ui|deepseek-readonly|deepseek-review|deepseek-execute|deepseek-task   # one part of it
+  python3 run_ui_flow.py --real ci-cd-kit # REAL Claude Code, COST CLASS C (an OpenSpec plan plus real task runs, an order of 10 to 40 USD, up to 2 hours): a change_request taken from backlog BL-E07 of the USER's project vnp-qa-platform, started from branch claude/tms-bug-triage-report-09f310, driven from the UI through "Approve and run all steps" to the end; needs the owner's explicit consent each time; not part of `all`; the new branches and worktrees are KEPT for inspection
   python3 run_ui_flow.py --repro add-project-worktree  # no AI: Add Project (host dev-local-mac) -> worktree "test-02" through the UI on a throwaway repo (TASK-FE-E2E-015); regression spec: GREEN once the host binding of SOL-FE-E2E-004 is deployed, RED if repo/project lose their dev server again
 
 The agent switch is the same StubbedAgent run_acceptance.py uses, so the stub behaves identically in both runners.
@@ -63,12 +64,21 @@ REAL_SPECS = {
     "deepseek-execute": ["deepseek-execute-real"],
     "deepseek-task": ["deepseek-task-real"],
     "deepseek": ["deepseek-ui-real", "deepseek-readonly-real", "deepseek-review-real", "deepseek-hotfix-real", "deepseek-execute-real", "deepseek-task-real"],
+    # Cost class C, never part of "all": the user's project vnp-qa-platform with an OpenSpec plan and real task runs (see the README).
+    "ci-cd-kit": ["ci-cd-kit-real"],
 }
+# Why: the task and proposal worktrees of this repo sit next to it (vnp-qa-platform-task-<id>), outside the orca checkout the agent normally uses as its work dir,
+# and the relay refuses writes outside AGENT_WORK_DIR; the agent runs with the parent folder for this run only.
+AGENT_WORK_DIRS = {"ci-cd-kit": "/Users/datbeohbbh/Desktop/work/vnpay/agentic-app"}
+# Why: the whole spec, quiet-tree wait and cleanup excluded, must end within 2 hours (the owner's stop-loss); the harness reads it as the hard limit.
+REAL_TIMEOUT_MIN = {"ci-cd-kit": "110"}
+# Why: people edit specs/ and docs/ of this checkout while a two-hour run goes on, and the exact comparison would call that a leak (README, "Bảo vệ checkout"); nothing else is ignored.
+GUARD_IGNORE = {"ci-cd-kit": "specs/:docs/"}
 # Why: no AI and no Request: UI-only regression specs of reported bugs; each prints BUG REPRODUCED and fails if the bug comes back.
 REPRO_SPECS = {"add-project-worktree": ["add-project-worktree-repro"]}
 # Why: these approve a Plan, which runs a real agent that WRITES to the throwaway repo; read-only analysis does not need the flag
 # (addproject only reads: it never approves the analysis).
-EXECUTING = ("execute", "continuous", "native-execute", "monitor", "all", "deepseek-execute", "deepseek-task", "deepseek")
+EXECUTING = ("execute", "continuous", "native-execute", "monitor", "all", "deepseek-execute", "deepseek-task", "deepseek", "ci-cd-kit")
 
 
 def run_playwright(env: dict[str, str], extra: list[str]) -> int:
@@ -109,6 +119,10 @@ def main() -> int:
         env["ORCA_E2E_READONLY_ANALYSIS"] = "1"
         if args.real in EXECUTING:
             env["ORCA_E2E_EXECUTE_AGENT"] = "1"
+        if args.real in REAL_TIMEOUT_MIN:
+            env.setdefault("ORCA_E2E_REAL_TIMEOUT_MIN", REAL_TIMEOUT_MIN[args.real])
+        if args.real in GUARD_IGNORE:
+            env.setdefault("ORCA_E2E_GUARD_IGNORE", GUARD_IGNORE[args.real])
         args.playwright_args = [*REAL_SPECS[args.real], *args.playwright_args]
         print(f"AI mode: REAL Claude Code (dev server '{env.get('ORCA_E2E_DEV_SERVER_NAME', cfg.dev_server_name)}'); specs: {', '.join(REAL_SPECS[args.real])}")
     stub: StubbedAgent | None = None
@@ -128,9 +142,9 @@ def main() -> int:
             # Why: auto-plan-generation makes the fake claude fail by writing a marker file there; only valid when the agent runs on this machine.
             env["ORCA_E2E_FAKE_CLAUDE_STATE_DIR"] = str(stub.state_dir)
             print(f"AI mode: STUB (wiring only, not AI quality); dev server {stub.current_cfg.dev_server_name}")
-        if args.real and args.real.startswith("deepseek"):
+        if args.real and (args.real.startswith("deepseek") or args.real in AGENT_WORK_DIRS):
             try:
-                blocked = PushBlockedAgent(cfg)
+                blocked = PushBlockedAgent(cfg, AGENT_WORK_DIRS.get(args.real))
                 print("restarting the agent with `git push` blocked (the repo has a real GitHub remote) ...")
                 blocked.start()
             except StubAgentError as exc:

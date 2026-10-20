@@ -12,7 +12,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from agent_push_block import PUSH_BLOCK_ENV  # noqa: E402
+import agent_push_block  # noqa: E402
+from agent_push_block import PUSH_BLOCK_ENV, PushBlockedAgent  # noqa: E402
 
 FIXTURE_TS = HERE / "ui-live" / "deepseek-repo-fixture.ts"
 
@@ -38,6 +39,35 @@ class PushBlockTest(unittest.TestCase):
                                       capture_output=True, text=True, timeout=20)
                 self.assertNotEqual(done.returncode, 0, target)
                 self.assertIn("orca-e2e-push-blocked", done.stderr + done.stdout, target)
+
+
+class WorkDirTest(unittest.TestCase):
+    """ci-cd-kit widens AGENT_WORK_DIR for its run only: start() sets it, restore() hands the captured original back."""
+
+    def _agent(self, work_dir):
+        original = agent_push_block.capture_running_agent
+        agent_push_block.capture_running_agent = lambda: {"AGENT_WORK_DIR": "/orig", "DEV_SERVER_ID": "dev"}
+        try:
+            agent = PushBlockedAgent(None, work_dir)
+        finally:
+            agent_push_block.capture_running_agent = original
+        seen = []
+        agent._restart = lambda env: seen.append(dict(env))  # type: ignore[method-assign]
+        return agent, seen
+
+    def test_start_sets_and_restore_drops_the_work_dir(self) -> None:
+        agent, seen = self._agent("/wide")
+        agent.start()
+        agent.restore()
+        self.assertEqual(seen[0]["AGENT_WORK_DIR"], "/wide")
+        self.assertEqual(seen[0]["GIT_CONFIG_COUNT"], "4")
+        self.assertNotIn("AGENT_WORK_DIR", seen[1])  # _restart's setdefault then puts "/orig" back
+        self.assertFalse(any(k.startswith("GIT_CONFIG_") for k in seen[1]))
+
+    def test_without_a_work_dir_nothing_changes(self) -> None:
+        agent, seen = self._agent(None)
+        agent.start()
+        self.assertNotEqual(seen[0].get("AGENT_WORK_DIR"), "/wide")
 
 
 if __name__ == "__main__":

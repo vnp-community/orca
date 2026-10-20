@@ -219,6 +219,27 @@ python3 -m unittest tests/stages/e2e/orca-flows/test_agent_push_block.py        
 
 An toàn (mọi spec `deepseek-*`): checkout chính, mọi ref, worktree của người dùng và thư mục cạnh repo được lấy dấu vân tay, so mỗi 15 giây và sau dọn dẹp; `git push` bị chặn bằng `GIT_CONFIG_*` trong môi trường agent (agent khởi động lại cho run rồi khôi phục); fixture từ chối chạy nếu khối chặn chưa có. Không cài được hook `tool-guard` trong repo này (`.claude/settings.json` bị `.gitignore`), nên agent vẫn chạy `--dangerously-skip-permissions` không sandbox (B4): các biện pháp trên PHÁT HIỆN và DỪNG, không NGĂN mọi ghi ngoài worktree.
 
+## Change request THẬT từ backlog của người dùng, chi phí loại C (`run_ui_flow.py --real ci-cd-kit`)
+
+**CẢNH BÁO CHI PHÍ: loại C, tốn lượt AI thật.** Một Plan OpenSpec thật tốn vài đến hơn chục USD (đo trước đây: 1 đến 13 USD), cộng Analysis do agent viết và các task chạy thật bằng `claude --dangerously-skip-permissions`, tối đa 110 phút. Chỉ chạy khi chủ repo đồng ý rõ ràng cho từng lượt; KHÔNG nằm trong `--real all`.
+
+Spec `ui-live/ci-cd-kit-real.web.e2e.ts` lấy mục backlog `docs/backlog/BL-E07_ci-cd-kit.md` của repo `vnp-qa-platform` (đổi bằng `ORCA_E2E_CICDKIT_REPO`) làm Request mới trên project **có sẵn** `vnp-qa-platform` (không Add Project, không repo tạm, không xoá gì của người dùng), qua UI như người dùng:
+
+1. Create request: tiêu đề `[TMS] CI-CD-KIT (BL-E07)`, nội dung = mục tiêu, hiện trạng, phạm vi, tiêu chí nghiệm thu đọc từ BL-E07 lúc chạy (ghi rõ nguồn) cộng ba dòng giới hạn thực thi (không docker/deploy/push), "Start from" chọn nhánh `claude/tms-bug-triage-report-09f310` trong danh sách (không còn nhánh đó thì dừng trước khi tốn gì).
+2. AI phân loại, xác nhận `change_request` cỡ M; Clarification được đọc rồi trả lời từng câu bằng câu trong BL-E07 (`ci-cd-kit-backlog.ts`), chỉ dùng câu "See BL-E07 acceptance criteria" khi không câu nào khớp.
+3. Analysis (CR-REQ-046: tiếng Việt, đo tỉ lệ chữ có dấu) rồi duyệt; Plan OpenSpec **tự hiện, không bấm Generate** (CR-REQ-044); tab Documents (CR-REQ-045) được mở từng tab, chụp ảnh, kiểm không có bí mật; Plan được đọc (số task, lệnh không an toàn: `ci-cd-kit-plan-safety.ts`).
+4. "Approve and run all steps" (CR-REQ-043), agent thật chạy từng task trong worktree `<repo>-task-<id>` (CR-REQ-039: kiểm bằng `git merge-base --is-ancestor` rằng mọi worktree, cả `request/<n>-proposal`, là hậu duệ của tip nhánh đã chọn). Thời gian từng bước, file agent viết (diff stat, kiểm cú pháp, không chạy) và số liệu chi phí của sản phẩm vào báo cáo tiếng Việt `ci-cd-kit-report.vi.md` cạnh ảnh chụp trong `test-results/`.
+
+```bash
+ORCA_E2E_CICDKIT_STOP=dialog python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real ci-cd-kit   # diễn tập: điền hộp thoại, chọn nhánh, KHÔNG tạo Request, không tốn AI
+python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real ci-cd-kit                               # lượt thật (loại C)
+node --test tests/stages/e2e/orca-flows/ui-live/ci-cd-kit-backlog.test.ts tests/stages/e2e/orca-flows/ui-live/ci-cd-kit-plan-safety.test.ts   # không cần stack
+```
+
+Kết quả thật (2026-10-20, Request #2297, 13 phút, ~3,5 USD cho Analysis + Plan): xanh; Analysis tiếng Việt, Plan tự hiện sau 3 phút, tab Documents 6 tài liệu, run-all chạy 4 Phase / 9 task trong ~6 phút, mọi nhánh là hậu duệ của tip. Điều cần biết khi đọc kết quả: (1) cả 9 task chạy chung MỘT worktree `<repo>-task-<id của task đầu>` và để file chưa commit; worktree `request/<n>-proposal` do Orca tự gỡ sau khi archive (nhánh còn); (2) agent thật có thể cài gói vào user-site của Python (`pip install --user pytest` đã xảy ra), ngoài worktree: hook tool-guard không có ở repo này; (3) Analysis có thể hỏi chặn (ask-back): câu trả lời lấy từ BL-E07 bằng `answerAskBackFromBacklog`; (4) kiểm tĩnh chạy Python với `-E` trong thư mục rỗng (không `-I`, vì PyYAML nằm ở user-site).
+
+An toàn: như `deepseek` (dấu vân tay checkout, mọi ref, worktree của người dùng; `git push` bị chặn cho cả lượt; watchdog 15 giây), thêm: agent được khởi động với `AGENT_WORK_DIR` là thư mục cha của hai repo trong lượt này (relay chỉ ghi trong thư mục đó, mà worktree nằm cạnh repo) rồi khôi phục như cũ. Worktree và nhánh mới **được giữ lại** để xem (thư mục cha chỉ được thêm mục `vnp-qa-platform-*`, `ORCA_E2E_GUARD_KEEP_NEW_PREFIXES`); mọi thay đổi khác là đỏ. Dừng lỗ: task thất bại hai lần, lượt Plan lỗi không tạm thời, Request rời `executing`, hay 20 phút không tiến triển thì kill `claude` của lượt, huỷ Request qua UI và đỏ.
+
 ## Bảo vệ repo của người dùng khi chạy thật (pilot, `pilot_guard.py`)
 
 Dùng cho mọi repo của người dùng mà agent thật làm việc trên đó (pilot vnp-qa-platform), không phụ thuộc deepseek-harness. Quy tắc lấy từ `ui-live/live-main-checkout-rules.ts`: Orca chỉ được thêm nhánh `refs/heads/*` và worktree `<repo>-*` cạnh repo; đổi HEAD, tệp, cấu hình git cục bộ, ref đã có, tag, stash, worktree của người dùng đều là vi phạm (ref `refs/remotes/*` được phép dịch chuyển vì tạo worktree có fetch).

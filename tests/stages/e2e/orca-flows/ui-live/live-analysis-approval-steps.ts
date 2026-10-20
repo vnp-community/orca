@@ -25,7 +25,8 @@ async function askBackAndAnswer(
   f: LiveFlow,
   r: RequestUnderTest,
   round: number,
-  seen: Set<string>
+  seen: Set<string>,
+  answer?: (f: LiveFlow) => Promise<boolean>
 ): Promise<void> {
   const { rpc, page, shots, gaps } = f
   await f.step(`ask back the blocking question(s) (round ${round})`, async () => {
@@ -76,7 +77,8 @@ async function askBackAndAnswer(
       apiWaitMs: 30_000
     })
     expect(
-      await answerClarificationInPanel(page, `${f.cfg.runPrefix} ask-back answer ${round}`),
+      await (answer?.(f) ??
+        answerClarificationInPanel(page, `${f.cfg.runPrefix} ask-back answer ${round}`)),
       'the ask-back Clarification can be submitted'
     ).toBe(true)
     await expectScreenFollowsService(page, rpc, gaps, {
@@ -121,7 +123,13 @@ async function askBackAndAnswer(
 export async function approveAnalysis(
   f: LiveFlow,
   r: RequestUnderTest,
-  o: { autoStarted: boolean; next: { api: string; chip: RegExp }; expectAskBacks?: number }
+  o: {
+    autoStarted: boolean
+    next: { api: string; chip: RegExp }
+    expectAskBacks?: number
+    /** Fills and submits the Clarification that an ask-back opens; default is a placeholder sentence (specs that read the questions pass their own). */
+    answerAskBack?: (f: LiveFlow) => Promise<boolean>
+  }
 ): Promise<{ askBacks: number }> {
   const { rpc, page, shots, gaps, lags } = f
   let askBacks = 0
@@ -247,7 +255,7 @@ export async function approveAnalysis(
       ).toBeLessThan(MAX_ASK_BACKS)
       askBacks++
       autoStarted = true // the answer restarts the analysis by itself
-      await askBackAndAnswer(f, r, askBacks, seenSolutionIds)
+      await askBackAndAnswer(f, r, askBacks, seenSolutionIds, o.answerAskBack)
     }
     try {
       await expectScreenFollowsService(page, rpc, gaps, {

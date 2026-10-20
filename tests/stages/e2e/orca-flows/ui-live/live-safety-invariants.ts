@@ -182,7 +182,14 @@ export function diffGuardedState(
         : dir === homedir()
           ? n.startsWith('.') || n === 'Library'
           : false
-    const real = [...added, ...removed].filter((n) => !ignorable(n))
+    // Why: a spec that keeps the new worktrees for the owner to inspect (ci-cd-kit) names their prefix; only ADDED entries get the pass.
+    const keptPrefixes = (process.env.ORCA_E2E_GUARD_KEEP_NEW_PREFIXES ?? '')
+      .split(':')
+      .filter(Boolean)
+    const real = [
+      ...added.filter((n) => !keptPrefixes.some((p) => n.startsWith(p))),
+      ...removed
+    ].filter((n) => !ignorable(n))
     if (real.length > 0) {
       problems.push(
         `${dir}: entries changed (+${added.join(',') || '-'} / -${removed.join(',') || '-'})`

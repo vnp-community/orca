@@ -38,8 +38,11 @@ PUSH_BLOCK_ENV = {
 class PushBlockedAgent:
     """Restarts the agent (same dev server, same work dir, same log, real HOME and PATH) with the push block, and back."""
 
-    def __init__(self, cfg: StackConfig) -> None:
+    def __init__(self, cfg: StackConfig, work_dir: str | None = None) -> None:
         self.cfg = cfg
+        # Why: a repo whose task worktrees sit outside the agent's AGENT_WORK_DIR (vnp-qa-platform-task-<id> next to the repo) cannot be written by the
+        # relay; `work_dir` widens it for the run only, and restore() puts back the captured original.
+        self.work_dir = work_dir
         self.original = capture_running_agent()
 
     def _restart(self, env: dict[str, str]) -> None:
@@ -54,10 +57,14 @@ class PushBlockedAgent:
     def start(self) -> None:
         env = dict(os.environ)
         env.update(PUSH_BLOCK_ENV)
+        if self.work_dir:
+            env["AGENT_WORK_DIR"] = self.work_dir
         self._restart(env)
 
     def restore(self) -> str:
         env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_CONFIG_")}
+        if self.work_dir:
+            env.pop("AGENT_WORK_DIR", None)  # the captured original comes back through setdefault in _restart
         self._restart(env)
         return "agent restored without the push block"
 
