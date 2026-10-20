@@ -18,6 +18,13 @@
 | | [TASK-REQ-042-07](./TASK-REQ-042-07-prompts-task-and-git-flows.md) | Module `prompts/`: thực thi task, tách task, git | P2 | 042-05, 042-06 |
 | | [TASK-REQ-042-06](./TASK-REQ-042-06-prompts-module-analysis-plan-classify.md) | Module `prompts/`: classify, analysis, plan, OpenSpec; xoá `PromptRegistry` chết | P1 | 042-05 |
 | | [TASK-REQ-042-05](./TASK-REQ-042-05-golden-capture-of-current-prompts.md) | Chụp golden mọi prompt hiện tại | P1 | TASK-REQ-041-02 |
+| | [TASK-REQ-046-07](./TASK-REQ-046-07-fake-claude-language-and-e2e.md) | Claude giả hiểu chỉ thị ngôn ngữ, suite `OLG`, spec UI và kiểm `--real` một lượt | P2 | 046 |
+| | [TASK-REQ-046-06](./TASK-REQ-046-06-deploy-config-and-docs.md) | Cấu hình triển khai và tài liệu cho `REQUEST_DEFAULT_OUTPUT_LANGUAGE` | P2 | 046 |
+| | [TASK-REQ-046-05](./TASK-REQ-046-05-openspec-vietnamese-skill-and-validator-tests.md) | OpenSpec bằng tiếng Việt: mục Language trong kỹ năng và bằng chứng qua parser, bộ kiểm gói và `openspec validate` | P2 | 046 |
+| | [TASK-REQ-046-04](./TASK-REQ-046-04-utf8-safe-truncation-and-vietnamese-limits.md) | Cắt chuỗi theo byte không làm hỏng UTF-8 (`NewEvidence`) và kiểm giới hạn với văn bản tiếng Việt | P2 | 046 |
+| | [TASK-REQ-046-03](./TASK-REQ-046-03-golden-cases-and-prompt-budget.md) | Ca golden mới cho `vi`/`en`, bằng chứng golden cũ không đổi, ngân sách và CI | P2 | 046 |
+| | [TASK-REQ-046-02](./TASK-REQ-046-02-request-service-config-and-prompt-wiring.md) | `REQUEST_DEFAULT_OUTPUT_LANGUAGE` trong `request-service`: đọc cấu hình, dừng khi sai, truyền ngôn ngữ vào sáu nơi dựng prompt | P2 | 046 |
+| | [TASK-REQ-046-01](./TASK-REQ-046-01-output-language-package-and-prompt-rules.md) | Gói `output_language` và chỉ thị ngôn ngữ trong mẫu prompt (JSON và OpenSpec) | P2 | 046 |
 | | [TASK-REQ-042-04](./TASK-REQ-042-04-agent-prompt-via-stdin.md) | Agent: prompt `execPrompt` qua stdin, công tắc quay lui | P1 | Không |
 | | [TASK-REQ-042-03](./TASK-REQ-042-03-migrate-task-workflow-orchestration-git-relays.md) | Chuyển relay task, workflow, orchestration, git-gateway | P1 | 042-01 |
 | | [TASK-REQ-042-02](./TASK-REQ-042-02-migrate-request-service-relays.md) | Chuyển relay của request-service | P1 | 042-01 |

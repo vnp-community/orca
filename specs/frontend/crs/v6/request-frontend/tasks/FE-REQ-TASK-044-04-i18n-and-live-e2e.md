@@ -1,0 +1,55 @@
+# FE-REQ-TASK-044-04: i18n 5 locale và e2e giao diện trên repo fixture tài chính
+
+**From Solution:** [FE-REQ-SOL-044](../solutions/FE-REQ-SOL-044-automatic-plan-generation.md)
+**Priority:** P1
+**Area:** frontend / request
+**File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json`, `tests/stages/e2e/orca-flows/ui-live/auto-plan-generation.web.e2e.ts` (mới), `tests/stages/e2e/orca-flows/ui-live/live-auto-plan-steps.ts` (mới), `tests/stages/e2e/orca-flows/run_ui_flow.py` (chỉ chú thích tên spec nếu cần)
+**Depends on:** FE-REQ-TASK-044-03, backend TASK-REQ-044-09 (stub gây lỗi Plan theo trạng thái)
+**Status:** [ ] TODO
+
+---
+
+## Context
+
+- Lint chạy `verify:localization-catalog` và `verify:localization-coverage`; `components/request/plan/plan-locale-coverage.test.ts` kiểm riêng vùng plan. Ở CR-REQ-040 hai lệnh verify toàn cục **đỏ sẵn trên HEAD** (không do CR đó); đối chiếu với HEAD trước khi tick.
+- Spec UI dùng `runLiveFlow`, `configureProject` và repo tạm LedgerLite: `ui-live/live-ledgerlite-project-flow.ts` (`runLedgerliteFlow`), `fixture-repo-ledgerlite.ts`; bước duyệt Analysis có mẫu ở `live-analysis-approval-steps.ts`. Guard quiet-checkout khi chạy `--real`.
+- Kịch bản 1 của fixture là `bug` cỡ S, engine native (kế hoạch `specs/IMPLEMENTATION-PLAN-CR-REQ-039-042.md` mục 4.6): dùng cho spec này. `--ai-stub` không spawn được PTY nhưng spec này không dùng terminal.
+- Backend TASK-REQ-044-09 thêm tệp trạng thái `$FAKE_CLAUDE_STATE_DIR/fail_plan_next` cho `claude` giả (`<số lần>:<error|invalid>`); spec đặt tệp này trên máy chạy dev server (cục bộ) trước khi duyệt Analysis.
+
+## Việc cần làm
+
+1. Thêm mọi khoá mới vào 5 locale (en là nguồn; es/ja/ko/zh dịch có kiểm tra; ghi vào PR rằng cần người bản ngữ rà), dạng `auto.components.request.plan.<Component>.<key>`: `PlanAutoWriting.{title,starting,attempt,retrying}`, `PlanRunFailedCard.{title,retry,generateManually,hint.timeout,hint.interrupted,hint.invalidOutput,hint.busy,hint.commit,hint.generic}`, `PlanAutoSkippedNote.{text,reason.noDevServer,reason.noRepoPath,reason.engineUnavailable}`, `PlanRewriteStrip.text`. Giữ nguyên placeholder `{{code}}`, `{{attempt}}`, `{{max}}`, `{{reason}}` ở mọi locale. Chạy hai lệnh verify và `plan-locale-coverage.test.ts`.
+2. Spec `auto-plan-generation.web.e2e.ts` (`ORCA_E2E_LIVE=1`, `--ai-stub`, dự án trỏ repo LedgerLite kịch bản 1): (a) tạo Request `bug`, đến `awaiting_analysis_approval`, duyệt Analysis trên giao diện, mở tab Plan: thấy `plan-auto-writing`, **không** thấy `plan-generate`; sau đó thấy cây Plan và thanh duyệt Plan; ở phía API `request.planProposal.autoPlan.state=done` và không có lời gọi `request.generatePlan` từ trình duyệt; (b) lỗi không tạm thời: đặt `fail_plan_next` = `2:invalid`, duyệt Analysis: thấy `plan-run-failed` có mã `REQUEST_PLAN_AI_INVALID_JSON`; tải lại trang: thẻ còn; bấm `plan-run-retry` (stub hết lỗi): `plan-auto-writing` rồi cây Plan; (c) lỗi tạm thời: `1:error`: thấy "Attempt 2 of 2" (hoặc bỏ qua nếu quá nhanh, kiểm bằng API: hai run) rồi cây Plan; (d) gateway giả lập không có `request.planAuto` (kỹ thuật proxy WebSocket của `live-base-branch-gateway-features.ts`, bỏ `request.planAuto` khỏi `features`): Request `planning` hiện nút `plan-generate` như cũ và bấm tay vẫn ra Plan; (e) công tắc dự án tắt qua `request.engineSettingsSet` (admin): sau khi duyệt Analysis không có `plan-auto-writing`, có `plan-generate`, `autoPlan.enabled=false`.
+3. Chụp ảnh các trạng thái chính: `plan-auto-writing`, `plan-run-failed-card`, `plan-run-failed-after-reload`, `plan-rewrite-strip` (nếu dựng được replan), `plan-generate-flag-off`, `plan-generate-project-off`.
+4. Đăng ký/nhắc tên spec trong docstring của `run_ui_flow.py` (tên spec là bộ lọc của Playwright, không cần danh sách riêng), ghi cách chạy: `python3 tests/stages/e2e/orca-flows/run_ui_flow.py --ai-stub -- auto-plan-generation`.
+
+## Kiểm thử
+
+- `pnpm run verify:localization-catalog && pnpm run verify:localization-coverage` xanh (hoặc, nếu đỏ sẵn trên HEAD như ở CR-REQ-040, đầu ra giống hệt HEAD và không dòng nào thuộc file đã đổi).
+- `python3 tests/stages/e2e/orca-flows/run_ui_flow.py --ai-stub -- auto-plan-generation` xanh trên stack local.
+- Chạy lại `qa-bug-task-native-flow` và `analysis-revision` để chắc không hồi quy.
+- Loại B (một lần cuối đợt, Claude thật, native): `run_ui_flow.py --real` cho ca (a); **không** chạy OpenSpec thật trong task này (tốn 7 đến 13 USD, cần người dùng đồng ý riêng; xem backend `APG-10`).
+
+## Tiêu chí hoàn thành
+
+- [ ] Đủ khoá ở 5 locale; placeholder giữ nguyên; kiểm tra i18n không xấu hơn HEAD.
+- [ ] Spec UI xanh: (a) Plan tự xuất hiện không cần bấm; (b) thẻ lỗi bền vững qua tải lại và Retry hoạt động; (c) lỗi tạm thời tự thử lại; (d) gateway cũ giữ hành vi cũ; (e) công tắc dự án tắt thì như cũ.
+- [ ] Không hồi quy các spec hiện có.
+
+## Rủi ro và lưu ý
+
+- Spec phụ thuộc stub gây lỗi theo tệp trạng thái (backend task 09) và chỉ chạy được khi dev server cùng máy với runner; ghi rõ trong đầu spec.
+- Ca (c) phụ thuộc mã lỗi mà stub `error` thực sự tạo ra (có thể là `REQUEST_PLAN_AI_UNAVAILABLE`, mã tạm thời; chưa kiểm).
+- Bản dịch es/ja/ko/zh cần người bản ngữ rà.
+- Spec chưa chạy lần nào lúc soạn.
+
+## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
+
+- Mã chạy thật, **không stub, không TODO, không dữ liệu giả trong mã sản phẩm**; mọi trạng thái (tải, rỗng, lỗi, offline, quyền) được xử lý.
+- Chạy `gitnexus_impact` trước khi sửa symbol có sẵn và báo blast radius; chạy `detect_changes` trước khi commit (CLAUDE.md).
+- Nhãn tiếng Anh; khoá i18n cho **cả 5 locale** (en, es, ja, ko, zh); kiểm tra coverage i18n xanh.
+- Dùng token `assets/main.css` và primitive shadcn (`guides/STYLEGUIDE.md`); phím tắt và nhãn phụ thuộc nền tảng qua kiểm tra runtime.
+- Không file nào vượt `max-lines` (tách file, không thêm disable); không đặt tên `helpers`, `utils`, `common`, `misc`.
+- Chạy được khi repo nằm trên host SSH; không giả định đường dẫn cục bộ.
+- Parser dây không bao giờ ném lỗi; gateway cũ thiếu trường mới vẫn hiển thị đúng.
+- `pnpm lint`, kiểm kiểu và test vitest của vùng đã đổi xanh.

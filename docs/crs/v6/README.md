@@ -182,6 +182,10 @@ Thuộc tính phụ: `size` ∈ {`S`,`M`,`L`}; `urgency` ∈ {`normal`,`urgent`}
 | [`request-frontend`](./request-frontend/README.md) | CR-REQ-040 | Chọn nhánh gốc của worktree khi tạo và xem Request (giao diện) | 🟠 P1 | Small đến Medium |
 | [`solution-analysis`](./solution-analysis/README.md) | CR-REQ-041 | Chỉnh phương án phân tích bằng prompt tại cổng duyệt Analysis, danh sách phiên bản | 🟠 P1 | Medium |
 | [`ai-governance`](./ai-governance/README.md) | CR-REQ-042 | Gom prompt về `backend-go/prompts/<luồng>/`, một relay dùng chung tới dev server, `execPrompt` qua stdin | 🟡 P2 | Large |
+| [`plan-phase-task`](./plan-phase-task/README.md) | CR-REQ-043 | Duyệt Plan và chạy hết các bước một lần ("Approve and run all steps"), công tắc chế độ thực thi theo dự án | 🟠 P1 | Medium |
+| [`plan-phase-task`](./plan-phase-task/README.md) | CR-REQ-044 | Tự sinh Plan khi Analysis được duyệt, commit phía server, tự thử lại giới hạn và thẻ Retry bền | 🟠 P1 | Large |
+| [`plan-phase-task`](./plan-phase-task/README.md) | CR-REQ-045 | Xem tài liệu OpenSpec của Plan (proposal, design, specs, tasks) và chỉnh bằng prompt tại cổng Plan | 🟠 P1 | Large |
+| [`ai-governance`](./ai-governance/README.md) | CR-REQ-046 | Ngôn ngữ đầu ra của AI là cấu hình hệ thống, mặc định tiếng Việt | 🟡 P2 | Medium |
 
 ## 5. Thứ tự thực thi
 
