@@ -132,15 +132,18 @@ def run(ctx: AcceptanceContext) -> None:
         first = call("request.review.generate", {"id": f.id, "runContext": False})
         r1 = first["review"]
         assert first["created"] is True and first["reused"] is False and r1["phase"] == "design" and r1["state"] == "ready", f"first = {first!r}"
-        assert r1.get("inputsDigest") == held.get("digest"), "the review was built on other inputs than the estimate said"
+        # Why: the wire review carries no digest; "built on what the estimate said" is seen as the estimate staying the same.
+        est = call("request.review.estimate", {"id": f.id})
+        assert est["reviewExists"] is True and est["reviewId"] == r1["reviewId"] and est["stale"] is False, f"estimate after = {est!r}"
+        assert est["currentInputsDigest"] == held.get("digest"), "the inputs changed between the estimate and the review"
         second = call("request.review.generate", {"id": f.id, "runContext": False})
         r2 = second["review"]
         assert second["reused"] is True and second["created"] is False, f"second = {second!r}"
-        assert (r2["id"], r2["version"]) == (r1["id"], r1["version"]), "asking again changed the stored review"
+        assert (r2["reviewId"], r2["version"]) == (r1["reviewId"], r1["version"]), "asking again changed the stored review"
         listed = call("request.review.list", {"id": f.id}).get("reviews") or []
-        assert [r["id"] for r in listed] == [r1["id"]], f"list = {listed!r}"
+        assert [r["reviewId"] for r in listed] == [r1["reviewId"]], f"list = {listed!r}"
         got = call("request.review.get", {"id": f.id})
-        assert got["found"] is True and got["review"]["id"] == r1["id"], f"get = {got!r}"
+        assert got["found"] is True and got["review"]["reviewId"] == r1["reviewId"], f"get = {got!r}"
         held["review"] = r1
     rec.run("ORV-04", "Generate without the context run builds the facts; the second ask is `reused` with the same id and version", facts_then_cached)
 
@@ -152,11 +155,11 @@ def run(ctx: AcceptanceContext) -> None:
             assert any(exc.has_code(c) for c in CLOSED_CODES), f"refused with an open-ended error: {exc.message[:240]}"
             reply = None
         if reply and reply.get("run"):
-            run_id = reply["run"]["id"]
+            run_id = reply["run"]["runId"]
 
             def ended():
                 runs = call("request.review.runs", {"id": f.id}).get("runs") or []
-                mine = [r for r in runs if r["id"] == run_id]
+                mine = [r for r in runs if r["runId"] == run_id]
                 return mine[0] if mine and mine[0]["status"] not in ("queued", "running") else None
             done = wait_until(ended, timeout=RUN_WAIT, interval=2.0, what="the context run to end")
             assert done["status"] in ("succeeded", "failed"), f"run = {done!r}"
@@ -165,13 +168,13 @@ def run(ctx: AcceptanceContext) -> None:
         runs = call("request.review.runs", {"id": f.id}).get("runs") or []
         assert not [r for r in runs if r["status"] in ("queued", "running")], f"a run is still active: {runs!r}"
         got = call("request.review.get", {"id": f.id})
-        assert got["found"] is True and got["review"]["id"] == r1["id"], "the review of the Request disappeared"
+        assert got["found"] is True and got["review"]["reviewId"] == r1["reviewId"], "the review of the Request disappeared"
     rec.run("ORV-05", "Generate with the context run on the fake agent ends with a closed code and leaves the facts review intact", context_run_on_stub)
 
     def no_decisions_before_code():
         f, r1 = need("flow", "ORV-01"), need("review", "ORV-04")
-        refused("request.review.decide", {"id": f.id, "reviewId": r1["id"], "itemKey": "nope", "decision": "accept", "expectedVersion": r1["version"]}, "REQUEST_REVIEW_")
-        refused("request.review.approve", {"id": f.id, "reviewId": r1["id"], "expectedVersion": r1["version"]}, "REQUEST_REVIEW_")
+        refused("request.review.decide", {"id": f.id, "reviewId": r1["reviewId"], "itemKey": "nope", "decision": "accept", "expectedVersion": r1["version"]}, "REQUEST_REVIEW_")
+        refused("request.review.approve", {"id": f.id, "reviewId": r1["reviewId"], "expectedVersion": r1["version"]}, "REQUEST_REVIEW_")
         got = call("request.review.get", {"id": f.id})["review"]
         assert got["state"] != "approved", "a design-phase review was approved"
     rec.run("ORV-06", "Deciding or approving a design-phase review is refused with a REQUEST_REVIEW_ code and approves nothing", no_decisions_before_code)
@@ -196,16 +199,16 @@ def run(ctx: AcceptanceContext) -> None:
         pid = project()
         base = call("request.review.profile.get", {"projectId": pid})
         assert base.get("projectLayer") is None and base["effective"].get("style", {}).get("variant"), f"default profile = {base!r}"
-        spec = {"schema": "review-drawing-profile/1", "style": {"detail": "detailed"}}
+        spec = {"schema": "review-drawing-profile/1", "style": {"detail": "simplified"}}
         saved = call("request.review.profile.save", {"projectId": pid, "spec": spec, "expectedVersion": 0})["layer"]
         assert saved["version"] >= 1, f"saved = {saved!r}"
         after = call("request.review.profile.get", {"projectId": pid})
-        assert after["effective"]["style"]["detail"] == "detailed" and after["sources"].get("style.detail") == "project", f"effective = {after!r}"
+        assert after["effective"]["style"]["detail"] == "simplified" and after["sources"].get("style.detail") == "project", f"effective = {after!r}"
         refused("request.review.profile.save", {"projectId": pid, "spec": {"schema": "review-drawing-profile/1", "colour": "red"}, "expectedVersion": saved["version"]},
                 "REQUEST_REVIEW_PROFILE_INVALID")
         call("request.review.profile.reset", {"projectId": pid, "expectedVersion": saved["version"]})
         back = call("request.review.profile.get", {"projectId": pid})
-        assert back.get("projectLayer") is None and back["effective"]["style"]["detail"] != "detailed", f"after reset = {back!r}"
+        assert back.get("projectLayer") is None and back["effective"]["style"]["detail"] != "simplified", f"after reset = {back!r}"
     rec.run("ORV-09", "Drawing profile: default served, a project layer saved and effective, an unknown key refused, reset brings the default back", profile_round_trip)
 
     # ── the paid path ────────────────────────────────────────────────────────────────────────────────
@@ -215,7 +218,7 @@ def run(ctx: AcceptanceContext) -> None:
         f = need("flow", "ORV-01")
         first = call("request.review.generate", {"id": f.id, "force": True})
         assert first.get("run"), f"no context run started: {first!r}"
-        done = wait_until(lambda: next((r for r in call("request.review.runs", {"id": f.id})["runs"] if r["id"] == first["run"]["id"] and r["status"] not in ("queued", "running")), None),
+        done = wait_until(lambda: next((r for r in call("request.review.runs", {"id": f.id})["runs"] if r["runId"] == first["run"]["runId"] and r["status"] not in ("queued", "running")), None),
                           timeout=900, interval=5.0, what="the real context run to end")
         assert done["status"] == "succeeded", f"run = {done!r}"
         again = call("request.review.generate", {"id": f.id})

@@ -183,6 +183,11 @@ test.describe('the Outcome Review of a Request (live stack)', () => {
               }
               expect(await f.page.locator('body').innerText()).not.toMatch(/REQUEST_REVIEW_[A-Z_]+/)
               await f.shots.take('outcome-review-regenerate-outcome')
+              // Why: a refused panel stays open on purpose; leave it the way a person would before cancelling the Request.
+              if (await panel.isVisible()) {
+                await panel.getByRole('button', { name: 'Cancel' }).click()
+                await expect(panel).toBeHidden()
+              }
             }
           )
 

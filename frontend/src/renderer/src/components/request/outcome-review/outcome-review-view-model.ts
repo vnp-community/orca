@@ -362,3 +362,9 @@ export function reviewHintOf(input: {
   }
   return 'none'
 }
+
+/** The sections a regeneration may draw: the ones the review has diagrams for, else the two every review draws. */
+export function drawnSectionsOf(review: OutcomeReview): string[] {
+  const seen = [...new Set(review.model.diagrams.map((d) => d.section))]
+  return seen.length > 0 ? seen : ['architecture', 'flow']
+}

@@ -50,6 +50,8 @@ export type WorktreeFact = {
 export type TaskFact = { type: string; title: string; status: string }
 
 export type ReportFacts = {
+  /** Lines of the Outcome Review phases (ORCA_E2E_CICDKIT_REVIEW=1); absent when the review was not exercised. */
+  reviewLines?: string[]
   requestNumber: number | null
   requestId: string
   finalStatus: string
@@ -137,6 +139,13 @@ export function renderReportVi(f: ReportFacts): string {
       : ['- không có file để kiểm'])
   )
   out.push('')
+  if (f.reviewLines) {
+    out.push('## Outcome Review (agent thật)')
+    out.push(
+      ...(f.reviewLines.length > 0 ? f.reviewLines.map((l) => `- ${l}`) : ['- không có dữ liệu'])
+    )
+    out.push('')
+  }
   out.push('## Chi phí (từ số liệu của sản phẩm)')
   out.push(...(f.costLines.length > 0 ? f.costLines.map((l) => `- ${l}`) : ['- chưa lấy được']))
   out.push('')

@@ -3,6 +3,7 @@ import { makeItem, makeModel, makeReview, makeRun, makeVerdict } from './outcome
 import {
   bannersOf,
   designCardOf,
+  drawnSectionsOf,
   failedContextRun,
   gateOf,
   needsDecisionItems,
@@ -401,5 +402,23 @@ describe('timeline row and hint', () => {
     expect(reviewHintOf({ ...base, enabled: false })).toBe('none')
     expect(reviewHintOf({ ...base, loaded: false })).toBe('none')
     expect(reviewHintOf({ ...base, requestStatus: 'planning' })).toBe('none')
+  })
+})
+
+describe('drawnSectionsOf', () => {
+  it('names the sections the review has diagrams for, each once', () => {
+    const diagrams = [
+      { section: 'flow', variant: 'design', status: 'ready' },
+      { section: 'flow', variant: 'delta', status: 'ready' },
+      { section: 'data', variant: 'design', status: 'failed' }
+    ] as never
+    expect(drawnSectionsOf(makeReview({ model: makeModel({ diagrams }) }))).toEqual([
+      'flow',
+      'data'
+    ])
+  })
+
+  it('falls back to architecture and flow when nothing is drawn yet, never to an empty list the server refuses', () => {
+    expect(drawnSectionsOf(makeReview())).toEqual(['architecture', 'flow'])
   })
 })

@@ -23,6 +23,14 @@ import {
   requestBody
 } from './ci-cd-kit-backlog'
 import { ownRequestIds } from './ci-cd-kit-fixture'
+import {
+  enableReview,
+  reviewEnabled,
+  reviewFactLines,
+  reviewTheDelivery,
+  reviewTheDesign,
+  type ReviewFacts
+} from './ci-cd-kit-review-steps'
 import { runCicdKitFlow } from './ci-cd-kit-harness'
 import { describeNewWorktrees, staticChecksOfWorktree } from './ci-cd-kit-git-evidence'
 import {
@@ -88,6 +96,9 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
       let runAllUsed = false
       let worktrees: WorktreeFact[] = []
       const staticChecks: string[] = []
+      let designReview: ReviewFacts | null = null
+      let deliveredReview: ReviewFacts | null = null
+      let putReviewBack: (() => Promise<void>) | null = null
       let costLines: string[] = []
       const limitMs = realRunBudgetMs('execute')
       f.budgets.classifyMs = 3 * MINUTE
@@ -122,6 +133,9 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
       }
 
       try {
+        if (reviewEnabled()) {
+          putReviewBack = await enableReview(f)
+        }
         r = await createRequestFromBacklog(
           f,
           run.tap,
@@ -160,6 +174,10 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
         docs = await readPlanDocuments(f)
         timeline.mark('plan documents read')
         tasks = await reviewPlanBeforeRunAll(f, r)
+        if (reviewEnabled()) {
+          designReview = await reviewTheDesign(f, r)
+          timeline.mark('design review done')
+        }
         const proposal = describeNewWorktrees(run.fx.taskWorktrees(), run.fx.baseTip).filter((w) =>
           /-request-\d+-proposal$/.test(w.path)
         )
@@ -180,6 +198,10 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
         )
         findings.push(...record.notes)
         await recordFinishedScreens(f, r, findings)
+        if (reviewEnabled()) {
+          deliveredReview = await reviewTheDelivery(f, r)
+          timeline.mark('delivered review done')
+        }
         expect(run.fx.headSha(), "the owner's checkout kept its commit").toBe(run.fx.baseTip)
       } catch (e) {
         findings.push(`STOPPED: ${(e as Error).message.split('\n')[0].slice(0, 300)}`)
@@ -204,6 +226,11 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
         }
         throw e
       } finally {
+        await putReviewBack?.().catch((c: Error) =>
+          findings.push(
+            `the project's review choice could not be put back: ${c.message.slice(0, 120)}`
+          )
+        )
         if (r) {
           const state = await requestState(f.rpc, r.requestId).catch(() => ({
             status: '?',
@@ -256,6 +283,12 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
           worktrees,
           staticChecks,
           costLines,
+          reviewLines: reviewEnabled()
+            ? [
+                ...reviewFactLines('thiết kế', designReview),
+                ...reviewFactLines('sau code', deliveredReview)
+              ]
+            : undefined,
           findings: [...findings, ...f.lags.map((l) => `độ trễ màn hình: ${l}`)],
           timeline: timeline.lines(),
           screenshotsDir: testInfo.outputDir,

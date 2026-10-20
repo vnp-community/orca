@@ -45,7 +45,8 @@ import {
   needsDecisionItems,
   phaseOf,
   phaseOfRequest,
-  screenOf
+  screenOf,
+  drawnSectionsOf
 } from './outcome-review-view-model'
 import type { UseOutcomeReviewResult } from '../../../hooks/useOutcomeReview'
 import type { ReviewSection } from '../../../../../shared/outcome-review-types'
@@ -175,7 +176,7 @@ export function OutcomeReviewTab({
     >
       <OutcomeReviewHeader
         review={review}
-        onRegenerate={canAct ? () => setPanel({ sections: [] }) : undefined}
+        onRegenerate={canAct ? () => setPanel({ sections: drawnSectionsOf(review) }) : undefined}
       />
       <GeneratingLine
         phase={phaseOfRequest(request.status)}
@@ -191,7 +192,10 @@ export function OutcomeReviewTab({
         onRegenerate={canAct ? () => void generate(true) : undefined}
       />
       {followUpDone && canAct && (
-        <OutcomeFollowUpBanner busy={generating} onRegenerate={() => setPanel({ sections: [] })} />
+        <OutcomeFollowUpBanner
+          busy={generating}
+          onRegenerate={() => setPanel({ sections: drawnSectionsOf(review) })}
+        />
       )}
       {waitingForContext ? (
         <PendingBlock
