@@ -30,6 +30,14 @@ def register_project(ctx: AcceptanceContext, repo: LedgerliteRepo, suffix: str, 
     return proj["id"]
 
 
+def repo_id_of(ctx: AcceptanceContext, project_id: str) -> str:
+    """The id of the repo the project is bound to (repo.* channels take a repoId, not a projectId)."""
+    repos = ctx.ws.call("repo.list", {}).get("repos", [])
+    mine = [r for r in repos if r.get("projectId") == project_id]
+    assert mine, f"project {project_id} has no repo in repo.list"
+    return mine[0]["id"]
+
+
 def cancel_when_idle(ctx: AcceptanceContext, request_id: str) -> None:
     """Cancel is refused while a task of the Request runs (agent guard); an executed Request is retried until its tasks settle."""
     def cancelled():

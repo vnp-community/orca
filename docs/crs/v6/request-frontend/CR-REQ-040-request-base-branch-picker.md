@@ -26,10 +26,14 @@ Giao diện chọn nhánh đã có sẵn ở nơi khác: `components/settings/Ba
 
 ## 2. Giải pháp đề xuất
 
+### 2.1a Sửa đổi 2026-10-20: dropdown hiện nhánh mặc định và danh sách nhánh
+
+Theo duyệt mockup: (1) khi không chọn, dropdown ghi đúng tên nhánh mặc định (như `repo.baseRefDefault` trả) kèm nhãn "default", chưa phân giải được mới ghi "Default branch"; (2) bấm vào dropdown hiện ngay danh sách nhánh của repo (mặc định ghim đầu, nhánh local, nhánh remote-only), có ô tìm kiếm lọc tại chỗ; (3) vẫn cho nhập tay tag/commit; (4) chọn lại nhánh mặc định là "không chọn" và không gửi `baseRef`. Kênh dữ liệu mới `repo.listBranches` (TASK-REQ-039-07); việc giao diện ở FE-REQ-TASK-040-06. Không đổi hợp đồng `baseRef` của Request.
+
 ### 2.1 Ô "Start from" trong Create request
 
 - Đặt dưới `CreateRequestProjectRepoNote`, chỉ hiện khi dự án có ít nhất một repo và runtime hỗ trợ (`request.flow` / capability của CR-REQ-039; runtime cũ thì ẩn ô và không gửi `baseRef`).
-- Trạng thái mặc định: chip **"Default branch (`main`)"**, trong đó `main` là kết quả `getRuntimeRepoBaseRefDefault` của repo đầu tiên; nếu chưa phân giải được thì chỉ ghi "Default branch", không bịa tên (cùng nguyên tắc với `BaseRefPicker`: không hiển thị `origin/main` giả).
+- Trạng thái mặc định (**sửa đổi 2026-10-20**, xem mục 2.1a): nút hiện **tên chính xác của nhánh mặc định** kèm nhãn "default"; bản trước ghi chip **"Default branch (`main`)"**, trong đó `main` là kết quả `getRuntimeRepoBaseRefDefault` của repo đầu tiên; nếu chưa phân giải được thì chỉ ghi "Default branch", không bịa tên (cùng nguyên tắc với `BaseRefPicker`: không hiển thị `origin/main` giả).
 - Bấm chip mở picker tìm kiếm nhánh/tag của repo đó (debounce, giới hạn độ dài truy vấn theo `runtime-repo-search-bounds`). Chọn một ref thì chip hiện tên ref kèm nút "Use default branch" để quay lại mặc định.
 - Gửi `baseRef` trong `request.create` **chỉ khi** người dùng chọn khác mặc định; không gửi gì nghĩa là dùng nhánh mặc định, khớp quy tắc backend (rỗng = mặc định).
 - Runtime hỗ trợ được nhận biết bằng `request.flowStatus.features` có `request.baseRef` (gateway cũ bỏ qua tham số lạ, nên không thể chỉ dựa vào lỗi); sau khi tạo, so `baseRef` trả về với giá trị đã gửi và cảnh báo nếu lệch.

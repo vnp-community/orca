@@ -1,6 +1,7 @@
 """BRF: the base branch of a Request's worktrees (CR-REQ-039), on the LedgerLite fixture repo with real git.
 
   BRF-01..05  request.create / request.setBaseRef / request.get / request.flowStatus (default, stored, invalid, unknown, version)
+  BRF-10      repo.listBranches (CONTRACT 2.12) lists the fixture's branches for the "Start from" picker: no HEAD, no duplicates
   BRF-06..07  THE PROOF: a `task` Request is planned and approved; task-service creates the task's worktree, and `git rev-parse HEAD` in
               it equals the tip of the chosen branch, or of the default branch (never the third branch the primary checkout is left on)
   BRF-08      once a worktree exists the ref is locked (REQUEST_BASE_REF_LOCKED, reason task or execution)
@@ -99,6 +100,20 @@ def run(ctx: AcceptanceContext) -> None:
         reset = ws.call("request.setBaseRef", {"id": req["id"], "baseRef": "", "expectedVersion": done["version"]})["request"]
         assert reset["baseRef"] == "", f"setBaseRef with '' left {reset['baseRef']!r}; it must go back to the repository default"
     rec.run("BRF-05", "setBaseRef on an unlocked Request changes the ref and bumps the version; a stale version conflicts; '' resets", set_ref_and_version)
+
+    def list_branches():
+        repo, pid = fixture()
+        reply = ws.call("repo.listBranches", {"repoId": stack.repo_id_of(ctx, pid)})
+        branches = reply.get("branches") or []
+        names = [b["name"] for b in branches]
+        for want in (DEFAULT, THIRD_BRANCH, RELEASE):
+            assert want in names, f"repo.listBranches {names!r} lacks {want!r} (fixture branches {repo.branches!r})"
+        assert not [n for n in names if n == "HEAD" or n.endswith("/HEAD")], f"a HEAD entry is listed: {names!r}"
+        assert len(names) == len(set(names)), f"duplicate names in {names!r}"
+        remote_flagged = [b["name"] for b in branches if b["name"] in (DEFAULT, THIRD_BRANCH, RELEASE) and b.get("remote")]
+        assert not remote_flagged, f"local branches flagged remote: {remote_flagged!r}"
+        assert not reply.get("truncated"), "a three-branch repo reported truncated"
+    rec.run("BRF-10", "repo.listBranches lists main, feature/other and release/1.x as local branches, without HEAD or duplicates", list_branches)
 
     # ── the proof: where the task's worktree really starts ────────────────────────────────────────────────
     def executed(key: str, base_ref: str | None) -> dict:

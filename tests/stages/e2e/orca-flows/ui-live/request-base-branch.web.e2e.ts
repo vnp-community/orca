@@ -1,6 +1,7 @@
 /**
- * The starting branch of a Request (CR-REQ-040 / FE-REQ-TASK-040-05), through the real UI on a LedgerLite repo with three branches
- * (main, release/1.x, and a third one the primary checkout stays on).
+ * The starting branch of a Request (CR-REQ-040 / FE-REQ-TASK-040-05 and -06), through the real UI on a LedgerLite repo with three
+ * branches (main, release/1.x, and a third one the primary checkout stays on). The dropdown names the default branch, opens on the
+ * branch list (repo.listBranches) and picks from it.
  *
  *   python3 tests/stages/e2e/orca-flows/run_ui_flow.py --ai-stub -- request-base-branch
  *
@@ -13,8 +14,12 @@ import { advertiseNoBaseRefFeature, BASE_REF_FEATURE } from './live-base-branch-
 import {
   baseRefRow,
   changeBranchOnOverview,
+  chooseDefaultStartingBranch,
   chooseStartingBranch,
+  expectBranchesListed,
   expectRowLocked,
+  expectTriggerShowsDefault,
+  LEDGERLITE_DEFAULT_BRANCH,
   openCreateDialog,
   startFromField,
   startFromTrigger,
@@ -63,24 +68,42 @@ test.describe('starting branch of a Request (live stack)', () => {
         const title = `${f.cfg.runPrefix} weekly limit on release`
         let requestId = ''
         await f.step(
-          'the Create request dialog offers "Default branch" as the starting branch',
+          'the Create request dialog names the real default branch on the button, with a "default" tag',
           async () => {
             await openRequestsPage(f.page)
             await openCreateDialog(f.page, { title, body: BODY, projectName: f.project.name })
             await expect(startFromField(f.page)).toBeVisible({ timeout: 30_000 })
-            await expect(startFromTrigger(f.page)).toContainText(/^Default branch/)
+            await expectTriggerShowsDefault(f.page, LEDGERLITE_DEFAULT_BRANCH)
             await f.shots.take('create-dialog-default-chip')
           }
         )
-        await f.step(`choose ${LEDGERLITE_RELEASE_BRANCH} and create`, async () => {
-          await chooseStartingBranch(f.page, LEDGERLITE_RELEASE_BRANCH)
-          await expect(
-            f.page.getByRole('button', { name: 'Use default branch' }),
-            'a chosen branch can be dropped again'
-          ).toBeVisible()
-          await f.shots.take('create-dialog-branch-chosen')
-          requestId = await submitCreateDialog(f, title)
-        })
+        await f.step(
+          `the dropdown lists main, ${THIRD_BRANCH} and ${LEDGERLITE_RELEASE_BRANCH} without typing`,
+          async () => {
+            // main is the pinned default row (checked by expectBranchesListed itself), not part of the Local group.
+            await expectBranchesListed(f.page, [THIRD_BRANCH, LEDGERLITE_RELEASE_BRANCH])
+            await f.shots.take('create-dialog-branch-list')
+            await f.page.keyboard.press('Escape')
+          }
+        )
+        await f.step(
+          `choose ${LEDGERLITE_RELEASE_BRANCH}, reset to the default, choose it again and create`,
+          async () => {
+            await chooseStartingBranch(f.page, LEDGERLITE_RELEASE_BRANCH)
+            await expect(
+              f.page.getByRole('button', { name: `Use default (${LEDGERLITE_DEFAULT_BRANCH})` }),
+              'a chosen branch can be dropped again'
+            ).toBeVisible()
+            await chooseDefaultStartingBranch(f.page)
+            await expect(
+              f.page.getByRole('button', { name: /^Use default/ }),
+              'the default is "no choice": nothing to drop'
+            ).toHaveCount(0)
+            await chooseStartingBranch(f.page, LEDGERLITE_RELEASE_BRANCH)
+            await f.shots.take('create-dialog-branch-chosen')
+            requestId = await submitCreateDialog(f, title)
+          }
+        )
         await f.step(
           'the service stored the branch and the Overview says where worktrees start',
           async () => {
@@ -122,9 +145,12 @@ test.describe('starting branch of a Request (live stack)', () => {
             })
           }
         )
-        await f.step('choosing "Default branch" on the Overview stores the empty ref', async () => {
-          await changeBranchOnOverview(f, requestId, null)
-        })
+        await f.step(
+          'choosing the pinned default on the Overview stores the empty ref',
+          async () => {
+            await changeBranchOnOverview(f, requestId, null)
+          }
+        )
         await f.step(
           'cancel the Request: the row is locked with the reason, and the service refuses a change',
           async () => {
@@ -201,10 +227,12 @@ test.describe('starting branch of a Request (live stack)', () => {
         })
         let requestId = ''
         await f.step(
-          '"Use default branch" and Create: the Request follows the default',
+          '"Use default (main)" and Create: the Request follows the default',
           async () => {
-            await f.page.getByRole('button', { name: 'Use default branch' }).click()
-            await expect(startFromTrigger(f.page)).toContainText(/^Default branch/)
+            await f.page
+              .getByRole('button', { name: `Use default (${LEDGERLITE_DEFAULT_BRANCH})` })
+              .click()
+            await expectTriggerShowsDefault(f.page, LEDGERLITE_DEFAULT_BRANCH)
             requestId = await submitCreateDialog(f, title)
             expect(await storedBaseRef(f, requestId), 'nothing is pinned').toBe('')
             await expect(baseRefRow(f.page)).toContainText(

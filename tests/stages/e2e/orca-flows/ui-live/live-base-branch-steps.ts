@@ -29,12 +29,58 @@ export async function openCreateDialog(
   return dialog
 }
 
-/** Picks a branch from the search list of the field's popover (two characters are enough for the host to answer). */
-export async function chooseStartingBranch(page: Page, ref: string): Promise<void> {
+/** The name of the repository default branch of the LedgerLite fixture: no remote, so the conventional local `main`. */
+export const LEDGERLITE_DEFAULT_BRANCH = 'main'
+
+/** The branch list popover. A closed popover also has role dialog, so the list is found by its own name. */
+export const branchList = (page: Page): Locator => page.getByRole('listbox', { name: 'Branches' })
+
+/** The unchosen button names the real default branch (as repo.baseRefDefault says) with a "default" tag, not a generic label. */
+export async function expectTriggerShowsDefault(page: Page, name: string): Promise<void> {
+  const trigger = startFromTrigger(page)
+  // The name is cut in two spans for middle truncation, so the text reads "main" + "default" with no space between.
+  await expect(trigger).toHaveText(
+    new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}\\s*default$`)
+  )
+  await expect(trigger).not.toContainText('Default branch')
+  await expect(trigger).toHaveAccessibleName(`Starting branch: Default branch (${name})`)
+}
+
+/** Opens the field's popover on the repo's branch list: no typing needed before anything is shown. */
+export async function openBranchList(page: Page): Promise<Locator> {
   await startFromTrigger(page).click()
-  await page.getByRole('combobox', { name: 'Search branches' }).fill(ref.slice(0, 3))
-  await page.getByRole('option', { name: ref, exact: true }).click()
+  const list = branchList(page)
+  await expect(list).toBeVisible({ timeout: 30_000 })
+  return list
+}
+
+/** Opens the list and checks the pinned default and every wanted local branch is in it. */
+export async function expectBranchesListed(page: Page, refs: string[]): Promise<void> {
+  const list = await openBranchList(page)
+  await expect(
+    list.getByRole('option', { name: `${LEDGERLITE_DEFAULT_BRANCH} (default)` })
+  ).toBeVisible()
+  for (const ref of refs) {
+    await expect(
+      list.getByRole('option', { name: ref, exact: true }),
+      `${ref} is listed`
+    ).toBeVisible()
+  }
+  await expect(list.getByText('Local branches')).toBeVisible()
+}
+
+/** Picks a branch from the list of the field's popover. */
+export async function chooseStartingBranch(page: Page, ref: string): Promise<void> {
+  const list = await openBranchList(page)
+  await list.getByRole('option', { name: ref, exact: true }).click()
   await expect(startFromTrigger(page)).toContainText(ref)
+}
+
+/** Picks the pinned default row of the list: "no choice", nothing is sent as baseRef. */
+export async function chooseDefaultStartingBranch(page: Page): Promise<void> {
+  const list = await openBranchList(page)
+  await list.getByRole('option', { name: `${LEDGERLITE_DEFAULT_BRANCH} (default)` }).click()
+  await expectTriggerShowsDefault(page, LEDGERLITE_DEFAULT_BRANCH)
 }
 
 /** Types a branch name by hand: the way to name one the search does not list. */
@@ -66,7 +112,7 @@ export async function storedBaseRef(f: LiveFlow, requestId: string): Promise<str
 }
 
 /**
- * Changes the branch with the pen on the Overview row: a ref from the search, or the "Default branch" row when `ref` is null.
+ * Changes the branch with the pen on the Overview row: a branch of the list, or the pinned default row when `ref` is null.
  * Waits for the service to hold the new value, then for the row to say it.
  */
 export async function changeBranchOnOverview(
@@ -76,12 +122,13 @@ export async function changeBranchOnOverview(
 ): Promise<void> {
   const { page } = f
   await baseRefRow(page).getByTestId('base-ref-edit').click()
-  if (ref === null) {
-    await page.getByRole('option', { name: /^Default branch/ }).click()
-  } else {
-    await page.getByRole('combobox', { name: 'Search branches' }).fill(ref.slice(0, 3))
-    await page.getByRole('option', { name: ref, exact: true }).click()
-  }
+  const list = branchList(page)
+  await expect(list).toBeVisible({ timeout: 30_000 })
+  await (
+    ref === null
+      ? list.getByRole('option', { name: /\(default\)$/ })
+      : list.getByRole('option', { name: ref, exact: true })
+  ).click()
   await expect
     .poll(() => storedBaseRef(f, requestId), { timeout: 20_000, message: 'the service stores it' })
     .toBe(ref ?? '')
