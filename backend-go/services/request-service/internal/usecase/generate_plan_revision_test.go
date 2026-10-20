@@ -268,6 +268,24 @@ func TestGeneratePlan_HotfixRevisionNotApplicable(t *testing.T) {
 	}
 }
 
+// A hotfix Request records no Plan (its fix task comes from the diagnosis), so the refusal must not depend on PlanTaskID: before, an ask at its
+// gate cancelled the approval of the fix task and left the Request in planning with a Plan run nobody would commit.
+func TestGeneratePlan_HotfixWithoutARecordedPlanIsNotRevisable(t *testing.T) {
+	var asked int
+	k := newRevisionKit(countingConns{n: &asked}, domain.RequestTypeHotfix, true)
+	req := k.req
+	req.PlanTaskID = ""
+	k.w.requests[req.ID] = req
+	_, err := k.generate.Execute(k.reporter(), GeneratePlanInput{RequestID: req.ID, Feedback: "change the fix"})
+	requireCode(t, err, "REQUEST_PLAN_REVISION_NOT_APPLICABLE")
+	if asked != 0 || len(k.w.runs) != 0 || len(k.w.cancelled) != 0 || k.jobs.count() != 0 || len(k.spawner.runs) != 0 {
+		t.Fatalf("a refused ask must change nothing: asked=%d runs=%d cancels=%d jobs=%d spawned=%d", asked, len(k.w.runs), len(k.w.cancelled), k.jobs.count(), len(k.spawner.runs))
+	}
+	if got := k.w.requests[req.ID].Status; got != domain.RequestStatusAwaitingPlanApproval {
+		t.Fatalf("status = %s", got)
+	}
+}
+
 type countingConns struct{ n *int }
 
 func (c countingConns) ResolveForProject(context.Context, string) (AnalysisConnection, error) {

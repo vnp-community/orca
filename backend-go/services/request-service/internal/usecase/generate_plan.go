@@ -234,9 +234,10 @@ func (uc *GeneratePlan) queueRevisionCommit(ctx context.Context, req domain.Requ
 	return nil
 }
 
-// checkRevisable refuses a change request on a type whose single fix task comes from its diagnosis (a hotfix).
+// checkPlanRevisable refuses a change request on a type whose single fix task comes from its diagnosis (a hotfix). A hotfix
+// records no Plan on the Request (PlanTaskID stays empty), so any ask at the gate counts, not only one on a recorded Plan.
 func checkPlanRevisable(req domain.Request, feedback string, system bool) error {
-	if system || !isPlanRevision(req, feedback) {
+	if system || !(isPlanRevision(req, feedback) || (req.Status == domain.RequestStatusAwaitingPlanApproval && feedback != "")) {
 		return nil
 	}
 	flow, err := domain.FlowFor(req.Type)

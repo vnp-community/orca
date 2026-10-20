@@ -24,6 +24,10 @@ The Request (reference, title, body, acceptance criteria with their ids, answers
 (chosen option and rationale), the change id, and the worktree. Read all of them
 first. If one is missing, stop and say which.
 
+## Language
+
+Write the prose (proposal, design, requirement sentences, scenario steps, task titles, and the text after `Serves:`, `Verify:` and `Done when:`) in the language the prompt names ("Output language: ..."); with no such line, in the language of the Request. Always keep in English, because `openspec` and Orca's parser match them literally: the headings the templates define (`## Why`, `## What Changes`, `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`, `### Requirement:`, `#### Scenario:`, `## PH-n`, `## TASKS`), `SHALL` and `MUST`, `WHEN`/`THEN`/`AND`, `**Reason**` and `**Migration**`, the `orca:begin`/`orca:end` markers, the task line labels (`Serves:`, `Code:`, `Verify:`, `Done when:`), the attributes in `[...]`, `modify`/`create`, ids, paths, code and the final block (`Change:`, `Phases:`, `Validation:`...).
+
 ## Steps
 
 1. **Knowledge first.** Follow `tdd-knowledge` for the Request and the chosen

@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,7 +54,7 @@ func (p *Publisher) Publish(ctx context.Context, tenantID, eventType string, pay
 	}
 	event := domain.OutboxEvent{
 		ID:          uuid.NewString(),
-		Subject:     eventType,
+		Subject:     streamSubject(eventType),
 		OccurredAt:  time.Now().UTC(),
 		PayloadJSON: payloadJSON,
 	}
@@ -61,4 +62,14 @@ func (p *Publisher) Publish(ctx context.Context, tenantID, eventType string, pay
 		p.logger.WarnContext(ctx, "eventbus: write outbox event failed, event dropped",
 			slog.String("subject", eventType), slog.Any("error", err))
 	}
+}
+
+// streamSubject puts an event type under the TASK stream (`orca.task.>`). A subject outside every stream is refused by JetStream
+// ("no response from stream") on every poll, and the relay stops at the first failure of a batch, so one such row would hold back every
+// later event, including the status changes request-service waits for to finish a task.
+func streamSubject(eventType string) string {
+	if strings.HasPrefix(eventType, "orca.") {
+		return eventType
+	}
+	return "orca." + eventType
 }

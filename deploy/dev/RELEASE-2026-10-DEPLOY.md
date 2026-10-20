@@ -114,7 +114,8 @@ Hai ràng buộc của OpenSpec và Solution do agent viết: repo cần `.tdd-a
 
 ### 4.3 Cài đặt theo dự án (ghi đè mặc định)
 
-Chỉ admin. Chưa có màn hình cài đặt; dùng kênh WebSocket `request.engineSettingsSet`:
+Chỉ admin. Chế độ thực thi đổi được trên giao diện: **Project Settings, tab General, mục "Request execution"** (hai lựa chọn "Ask before each step" và "Run all steps after one approval");
+người không phải admin chỉ thấy giá trị ở dạng chỉ đọc. Engine và `solutionAgent` vẫn đặt bằng kênh WebSocket `request.engineSettingsSet` (kênh này vẫn dùng được cho cả chế độ thực thi):
 
 ```json
 { "projectId": "<id>", "engine": "native", "openspecMinVersion": "", "solutionAgent": false,
@@ -201,7 +202,7 @@ Kiểm tay nhanh trên giao diện (tài khoản admin):
 1. Sidebar có dòng **Requests**. Mở một Request: dòng thời gian khớp loại (bug, task không có bước Handover; chỉ OpenSpec có Handover).
 2. Mở terminal từ một worktree phụ trong sidebar, gõ `pwd`: ra thư mục worktree.
 3. Tab Tasks, Jira: Connect Jira bằng email + PAT, thấy danh sách issue.
-4. Đặt dự án `continuous` (4.3), tạo task nhỏ, duyệt Plan một lần: tab Execution chạy hết, không phải duyệt từng Phase.
+4. Ở Plan của một `change_request` (dự án `step_by_step`), bấm **"Approve and run all steps"** và xác nhận (hoặc đặt dự án `continuous` ở Project Settings, 4.3): tab Execution chạy hết và ghi "Runs all steps on its own", không phải duyệt từng Phase.
 
 ## 7. Quay lại
 
@@ -217,6 +218,6 @@ Kiểm tay nhanh trên giao diện (tài khoản admin):
 - **QA-03 GitHub (chưa sửa)**: `github.listWorkItems` với `repo:"id:<repoId>"` trả `WORKTREE_REPO_NOT_FOUND` vì gateway chuyển nguyên tiền tố `id:`; không có thông tin đăng nhập thì lỗi bị gán `not_found` thay vì `auth_required`; dải "Some GitHub source hosts unavailable" hiện cả khi host đang nối.
   Phương án: [`specs/frontend/bugs/qa-2026-10-16/solutions/SOL-QA-03-github-task-source.md`](../../specs/frontend/bugs/qa-2026-10-16/solutions/SOL-QA-03-github-task-source.md). Test đỏ chờ sẵn: `QA-GH-01`, `QA-GH-03`, `QA-UI-GH-01`.
 - Các bản dịch `es`, `ja`, `ko`, `zh` của 192 khoá mới chưa được người bản ngữ rà.
-- Chưa có màn hình cài đặt engine và chế độ thực thi; cài bằng kênh WebSocket (4.3).
+- Màn hình Project Settings chỉ có chế độ thực thi (4.3); engine và `solutionAgent` chưa có màn hình, cài bằng kênh WebSocket.
 - `.env.example` chưa liệt kê khối `JIRA_*`/`JR_*` (mục 4.5).
 - Một số lỗi có sẵn từ trước, không do bản này: test `infra-fleet` về đường dẫn socket SSH identity-agent quá dài, vài test frontend, và lỗi kiểu trong `agent/src/relay/pty-agent-bridge.test.ts` (`env` trên `{}`).
