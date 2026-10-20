@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant U as Người dùng
+  participant GW as Gateway
+  participant BM as bug-management
+  participant DB as MySQL
+  participant R as Outbox relay
+  participant K as Kafka
+  participant IN as integration
+  participant SS as system-setting
+  U->>GW: POST /bug/update/status
+  GW->>BM: proxy có chữ ký
+  BM->>DB: BEGIN; cập nhật bug; ghi bug_histories; ghi event_outbox_bug; COMMIT
+  BM-->>U: 200
+  R->>DB: đọc outbox chưa phát
+  R->>K: tms.bug.v1 bug.status_changed
+  K->>IN: consumer integration-jira
+  IN->>IN: đặt tác vụ CONVERGE (gộp theo active_key)
+  K->>SS: consumer thông báo
+  SS->>DB: ghi notification (khử trùng bằng inbox)

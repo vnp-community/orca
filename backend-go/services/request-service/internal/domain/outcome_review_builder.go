@@ -65,6 +65,8 @@ type ReviewBuildInput struct {
 	Diagrams    []DiagramRef
 	Arch        DesignVerdict
 	FlowVerdict DesignVerdict
+	// ExtraWarnings are warnings of the context run (a design block ignored, an edge that differed from the parser).
+	ExtraWarnings []string
 	// Redact removes secrets from free text; nil means no redaction, which only tests use.
 	Redact func(string) string
 }
@@ -80,7 +82,7 @@ func BuildOutcomeReview(requestID string, in ReviewBuildInput) (OutcomeReview, e
 	for _, r := range reqs {
 		items = append(items, r.Item)
 	}
-	warnings := append([]string(nil), f.Warnings...)
+	warnings := append(append([]string(nil), f.Warnings...), in.ExtraWarnings...)
 
 	pc := ClassifyChangedPaths(f.Changed)
 	if f.Phase == ReviewPhaseDelivered {

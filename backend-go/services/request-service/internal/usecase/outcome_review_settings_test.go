@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -91,5 +92,28 @@ func TestOutcomeReviewConfig_EffectiveMode(t *testing.T) {
 	})
 	if len(warnings) != 2 || bad.Default != domain.OutcomeReviewOff || bad.KillSwitch {
 		t.Fatalf("unreadable values keep the safe answers and say so: %+v %v", bad, warnings)
+	}
+}
+
+func TestOutcomeReviewConfigFromEnv_ContextLimits(t *testing.T) {
+	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+	cfg, warn := domain.OutcomeReviewConfigFromEnv(env(map[string]string{
+		"REQUEST_REVIEW_CONTEXT_TTL": "48h", "REQUEST_REVIEW_CONTEXT_TIMEOUT": "12m", "REQUEST_REVIEW_CONTEXT_MAX_FILES": "80",
+	}))
+	if len(warn) != 0 || cfg.ContextTTLOrDefault().Hours() != 48 || cfg.ContextTimeoutMS() != 720_000 || cfg.ContextMaxFilesOrDefault() != 80 {
+		t.Errorf("good values: %+v %v", cfg, warn)
+	}
+	def, warn := domain.OutcomeReviewConfigFromEnv(env(nil))
+	if len(warn) != 0 || def.ContextTTLOrDefault() != domain.DefaultReviewContextTTL || def.ContextTimeoutMS() != 600_000 || def.ContextMaxFilesOrDefault() != 60 {
+		t.Errorf("defaults: %+v %v", def, warn)
+	}
+	bad, warn := domain.OutcomeReviewConfigFromEnv(env(map[string]string{
+		"REQUEST_REVIEW_CONTEXT_TTL": "soon", "REQUEST_REVIEW_CONTEXT_TIMEOUT": "2h", "REQUEST_REVIEW_CONTEXT_MAX_FILES": "9999",
+	}))
+	if len(warn) != 3 || bad.ContextTTLOrDefault() != domain.DefaultReviewContextTTL || bad.ContextTimeoutMS() != 600_000 || bad.ContextMaxFilesOrDefault() != 60 {
+		t.Errorf("bad values must keep the defaults and warn: %+v %v", bad, warn)
+	}
+	if long := (domain.OutcomeReviewConfig{ContextTimeout: time.Hour}); long.ContextTimeoutMS() != 900_000 {
+		t.Errorf("the agent stops a run at 15 minutes, so the timeout is capped: %d", long.ContextTimeoutMS())
 	}
 }

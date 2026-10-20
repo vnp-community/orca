@@ -65,6 +65,9 @@ func toProtoPreflight(v usecase.EngineSettingsView) *requestv1.EnginePreflight {
 		for _, f := range r.Gaps {
 			out.Gaps = append(out.Gaps, &requestv1.EnginePreflightNote{Code: f.Code, Message: f.Message, FixHint: f.FixHint})
 		}
+		for _, f := range r.ReviewGaps {
+			out.ReviewGaps = append(out.ReviewGaps, &requestv1.EnginePreflightNote{Code: f.Code, Message: f.Message, FixHint: f.FixHint})
+		}
 	}
 	return out
 }

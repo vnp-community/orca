@@ -148,6 +148,7 @@ var isolationFixtures = map[string]string{
 	"plan_auto_jobs":            `INSERT INTO request.plan_auto_jobs (tenant_id, request_id, anchor, origin, project_id, state) VALUES ({tenant}, {req}, 'sol', 'event', gen_random_uuid(), 'pending')`,
 	"outcome_reviews":           `INSERT INTO request.outcome_reviews (id, tenant_id, request_id, phase, head_key, inputs_digest, state, model) VALUES (gen_random_uuid(), {tenant}, {req}, 'design', 'design', 'd', 'ready', '{}')`,
 	"outcome_review_runs":       `INSERT INTO request.outcome_review_runs (id, tenant_id, review_id, request_id, kind, status) VALUES (gen_random_uuid(), {tenant}, gen_random_uuid(), {req}, 'context', 'succeeded')`,
+	"outcome_review_contexts":   `INSERT INTO request.outcome_review_contexts (id, tenant_id, request_id, kind, digest, payload, expires_at) VALUES (gen_random_uuid(), {tenant}, {req}, 'design', 'd', '{}', now() + interval '1 day')`,
 	"tenant_settings":           `INSERT INTO request.tenant_settings (tenant_id) VALUES ({tenant})`,
 	"tenant_security_settings":  `INSERT INTO request.tenant_security_settings (tenant_id) VALUES ({tenant})`,
 }

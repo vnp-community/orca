@@ -194,8 +194,14 @@ type EstimateOutcomeReviewResponse struct {
 	Stale               bool                   `protobuf:"varint,5,opt,name=stale,proto3" json:"stale,omitempty"`
 	CurrentInputsDigest string                 `protobuf:"bytes,6,opt,name=current_inputs_digest,json=currentInputsDigest,proto3" json:"current_inputs_digest,omitempty"`
 	Warnings            []string               `protobuf:"bytes,7,rep,name=warnings,proto3" json:"warnings,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// The context run (CR-OR-002): whether a checked result for these inputs is kept, whether the design is locked, and whether a run
+	// could start on the project's dev server now. context_gaps say why not.
+	ContextCached   bool     `protobuf:"varint,8,opt,name=context_cached,json=contextCached,proto3" json:"context_cached,omitempty"`
+	DesignLocked    bool     `protobuf:"varint,9,opt,name=design_locked,json=designLocked,proto3" json:"design_locked,omitempty"`
+	ContextRunnable bool     `protobuf:"varint,10,opt,name=context_runnable,json=contextRunnable,proto3" json:"context_runnable,omitempty"`
+	ContextGaps     []string `protobuf:"bytes,11,rep,name=context_gaps,json=contextGaps,proto3" json:"context_gaps,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *EstimateOutcomeReviewResponse) Reset() {
@@ -277,11 +283,45 @@ func (x *EstimateOutcomeReviewResponse) GetWarnings() []string {
 	return nil
 }
 
+func (x *EstimateOutcomeReviewResponse) GetContextCached() bool {
+	if x != nil {
+		return x.ContextCached
+	}
+	return false
+}
+
+func (x *EstimateOutcomeReviewResponse) GetDesignLocked() bool {
+	if x != nil {
+		return x.DesignLocked
+	}
+	return false
+}
+
+func (x *EstimateOutcomeReviewResponse) GetContextRunnable() bool {
+	if x != nil {
+		return x.ContextRunnable
+	}
+	return false
+}
+
+func (x *EstimateOutcomeReviewResponse) GetContextGaps() []string {
+	if x != nil {
+		return x.ContextGaps
+	}
+	return nil
+}
+
 type GenerateOutcomeReviewRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	// Empty lets the service pick: delivered once execution is over, design before that.
-	Phase         string `protobuf:"bytes,2,opt,name=phase,proto3" json:"phase,omitempty"`
+	Phase string `protobuf:"bytes,2,opt,name=phase,proto3" json:"phase,omitempty"`
+	// Also read the design (and, after coding, the code) with a read-only agent. The facts are built either way.
+	RunContext bool `protobuf:"varint,3,opt,name=run_context,json=runContext,proto3" json:"run_context,omitempty"`
+	// Run without the knowledge graph when the project has none. Only for an after-code review; every item is then unverified.
+	AllowCodeOnly bool `protobuf:"varint,4,opt,name=allow_code_only,json=allowCodeOnly,proto3" json:"allow_code_only,omitempty"`
+	// Ignore the cache and the locked design and ask the agent again (regenerate).
+	Force         bool `protobuf:"varint,5,opt,name=force,proto3" json:"force,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -330,14 +370,41 @@ func (x *GenerateOutcomeReviewRequest) GetPhase() string {
 	return ""
 }
 
+func (x *GenerateOutcomeReviewRequest) GetRunContext() bool {
+	if x != nil {
+		return x.RunContext
+	}
+	return false
+}
+
+func (x *GenerateOutcomeReviewRequest) GetAllowCodeOnly() bool {
+	if x != nil {
+		return x.AllowCodeOnly
+	}
+	return false
+}
+
+func (x *GenerateOutcomeReviewRequest) GetForce() bool {
+	if x != nil {
+		return x.Force
+	}
+	return false
+}
+
 type GenerateOutcomeReviewResponse struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Review *OutcomeReview         `protobuf:"bytes,1,opt,name=review,proto3" json:"review,omitempty"`
 	// True when a review with the same inputs already existed and nothing was written.
-	Reused        bool `protobuf:"varint,2,opt,name=reused,proto3" json:"reused,omitempty"`
-	Created       bool `protobuf:"varint,3,opt,name=created,proto3" json:"created,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Reused  bool `protobuf:"varint,2,opt,name=reused,proto3" json:"reused,omitempty"`
+	Created bool `protobuf:"varint,3,opt,name=created,proto3" json:"created,omitempty"`
+	// The context run that was started; the review gains its context when the run ends.
+	Run *OutcomeReviewRun `protobuf:"bytes,4,opt,name=run,proto3" json:"run,omitempty"`
+	// True when a checked result for the same inputs was applied and no agent was called.
+	ContextCached bool `protobuf:"varint,5,opt,name=context_cached,json=contextCached,proto3" json:"context_cached,omitempty"`
+	// kg_unavailable when no run was started because the project has no knowledge graph.
+	ContextSkipped string `protobuf:"bytes,6,opt,name=context_skipped,json=contextSkipped,proto3" json:"context_skipped,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GenerateOutcomeReviewResponse) Reset() {
@@ -391,6 +458,253 @@ func (x *GenerateOutcomeReviewResponse) GetCreated() bool {
 	return false
 }
 
+func (x *GenerateOutcomeReviewResponse) GetRun() *OutcomeReviewRun {
+	if x != nil {
+		return x.Run
+	}
+	return nil
+}
+
+func (x *GenerateOutcomeReviewResponse) GetContextCached() bool {
+	if x != nil {
+		return x.ContextCached
+	}
+	return false
+}
+
+func (x *GenerateOutcomeReviewResponse) GetContextSkipped() string {
+	if x != nil {
+		return x.ContextSkipped
+	}
+	return ""
+}
+
+// OutcomeReviewRun is one agent run of a review. The run ends in succeeded, failed or cancelled; error_code says why it failed.
+type OutcomeReviewRun struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RunId     string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	ReviewId  string                 `protobuf:"bytes,2,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
+	RequestId string                 `protobuf:"bytes,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// context | draw
+	Kind string `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
+	// queued | running | succeeded | failed | cancelled
+	Status string `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	// design | delivered for a context run
+	Scope         string                 `protobuf:"bytes,6,opt,name=scope,proto3" json:"scope,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,7,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	CostEstimate  string                 `protobuf:"bytes,8,opt,name=cost_estimate,json=costEstimate,proto3" json:"cost_estimate,omitempty"`
+	CostActual    string                 `protobuf:"bytes,9,opt,name=cost_actual,json=costActual,proto3" json:"cost_actual,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OutcomeReviewRun) Reset() {
+	*x = OutcomeReviewRun{}
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OutcomeReviewRun) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OutcomeReviewRun) ProtoMessage() {}
+
+func (x *OutcomeReviewRun) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OutcomeReviewRun.ProtoReflect.Descriptor instead.
+func (*OutcomeReviewRun) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *OutcomeReviewRun) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *OutcomeReviewRun) GetReviewId() string {
+	if x != nil {
+		return x.ReviewId
+	}
+	return ""
+}
+
+func (x *OutcomeReviewRun) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *OutcomeReviewRun) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *OutcomeReviewRun) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *OutcomeReviewRun) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *OutcomeReviewRun) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *OutcomeReviewRun) GetCostEstimate() string {
+	if x != nil {
+		return x.CostEstimate
+	}
+	return ""
+}
+
+func (x *OutcomeReviewRun) GetCostActual() string {
+	if x != nil {
+		return x.CostActual
+	}
+	return ""
+}
+
+func (x *OutcomeReviewRun) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *OutcomeReviewRun) GetFinishedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return nil
+}
+
+type ListOutcomeReviewRunsRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Empty means the newest review of the Request that is not superseded.
+	ReviewId      string `protobuf:"bytes,2,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOutcomeReviewRunsRequest) Reset() {
+	*x = ListOutcomeReviewRunsRequest{}
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOutcomeReviewRunsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOutcomeReviewRunsRequest) ProtoMessage() {}
+
+func (x *ListOutcomeReviewRunsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOutcomeReviewRunsRequest.ProtoReflect.Descriptor instead.
+func (*ListOutcomeReviewRunsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListOutcomeReviewRunsRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ListOutcomeReviewRunsRequest) GetReviewId() string {
+	if x != nil {
+		return x.ReviewId
+	}
+	return ""
+}
+
+type ListOutcomeReviewRunsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Oldest first.
+	Runs          []*OutcomeReviewRun `protobuf:"bytes,1,rep,name=runs,proto3" json:"runs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOutcomeReviewRunsResponse) Reset() {
+	*x = ListOutcomeReviewRunsResponse{}
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOutcomeReviewRunsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOutcomeReviewRunsResponse) ProtoMessage() {}
+
+func (x *ListOutcomeReviewRunsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOutcomeReviewRunsResponse.ProtoReflect.Descriptor instead.
+func (*ListOutcomeReviewRunsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ListOutcomeReviewRunsResponse) GetRuns() []*OutcomeReviewRun {
+	if x != nil {
+		return x.Runs
+	}
+	return nil
+}
+
 type GetOutcomeReviewRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// request_id is required: it is how the caller is authorized. With review_id the review must belong to that Request; without
@@ -403,7 +717,7 @@ type GetOutcomeReviewRequest struct {
 
 func (x *GetOutcomeReviewRequest) Reset() {
 	*x = GetOutcomeReviewRequest{}
-	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[5]
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -415,7 +729,7 @@ func (x *GetOutcomeReviewRequest) String() string {
 func (*GetOutcomeReviewRequest) ProtoMessage() {}
 
 func (x *GetOutcomeReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[5]
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -428,7 +742,7 @@ func (x *GetOutcomeReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOutcomeReviewRequest.ProtoReflect.Descriptor instead.
 func (*GetOutcomeReviewRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{5}
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetOutcomeReviewRequest) GetReviewId() string {
@@ -455,7 +769,7 @@ type GetOutcomeReviewResponse struct {
 
 func (x *GetOutcomeReviewResponse) Reset() {
 	*x = GetOutcomeReviewResponse{}
-	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[6]
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +781,7 @@ func (x *GetOutcomeReviewResponse) String() string {
 func (*GetOutcomeReviewResponse) ProtoMessage() {}
 
 func (x *GetOutcomeReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[6]
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +794,7 @@ func (x *GetOutcomeReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOutcomeReviewResponse.ProtoReflect.Descriptor instead.
 func (*GetOutcomeReviewResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{6}
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetOutcomeReviewResponse) GetReview() *OutcomeReview {
@@ -508,7 +822,7 @@ type ListOutcomeReviewsRequest struct {
 
 func (x *ListOutcomeReviewsRequest) Reset() {
 	*x = ListOutcomeReviewsRequest{}
-	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[7]
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -520,7 +834,7 @@ func (x *ListOutcomeReviewsRequest) String() string {
 func (*ListOutcomeReviewsRequest) ProtoMessage() {}
 
 func (x *ListOutcomeReviewsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[7]
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -533,7 +847,7 @@ func (x *ListOutcomeReviewsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOutcomeReviewsRequest.ProtoReflect.Descriptor instead.
 func (*ListOutcomeReviewsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{7}
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListOutcomeReviewsRequest) GetRequestId() string {
@@ -567,7 +881,7 @@ type ListOutcomeReviewsResponse struct {
 
 func (x *ListOutcomeReviewsResponse) Reset() {
 	*x = ListOutcomeReviewsResponse{}
-	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[8]
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -579,7 +893,7 @@ func (x *ListOutcomeReviewsResponse) String() string {
 func (*ListOutcomeReviewsResponse) ProtoMessage() {}
 
 func (x *ListOutcomeReviewsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[8]
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -592,7 +906,7 @@ func (x *ListOutcomeReviewsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOutcomeReviewsResponse.ProtoReflect.Descriptor instead.
 func (*ListOutcomeReviewsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{8}
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListOutcomeReviewsResponse) GetReviews() []*OutcomeReview {
@@ -633,7 +947,7 @@ const file_orca_request_v1_outcome_review_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"=\n" +
 	"\x1cEstimateOutcomeReviewRequest\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"\x8c\x02\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\"\xa6\x03\n" +
 	"\x1dEstimateOutcomeReviewResponse\x12\x14\n" +
 	"\x05phase\x18\x01 \x01(\tR\x05phase\x12-\n" +
 	"\x12execution_finished\x18\x02 \x01(\bR\x11executionFinished\x12#\n" +
@@ -641,15 +955,51 @@ const file_orca_request_v1_outcome_review_proto_rawDesc = "" +
 	"\treview_id\x18\x04 \x01(\tR\breviewId\x12\x14\n" +
 	"\x05stale\x18\x05 \x01(\bR\x05stale\x122\n" +
 	"\x15current_inputs_digest\x18\x06 \x01(\tR\x13currentInputsDigest\x12\x1a\n" +
-	"\bwarnings\x18\a \x03(\tR\bwarnings\"S\n" +
+	"\bwarnings\x18\a \x03(\tR\bwarnings\x12%\n" +
+	"\x0econtext_cached\x18\b \x01(\bR\rcontextCached\x12#\n" +
+	"\rdesign_locked\x18\t \x01(\bR\fdesignLocked\x12)\n" +
+	"\x10context_runnable\x18\n" +
+	" \x01(\bR\x0fcontextRunnable\x12!\n" +
+	"\fcontext_gaps\x18\v \x03(\tR\vcontextGaps\"\xb2\x01\n" +
 	"\x1cGenerateOutcomeReviewRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
-	"\x05phase\x18\x02 \x01(\tR\x05phase\"\x89\x01\n" +
+	"\x05phase\x18\x02 \x01(\tR\x05phase\x12\x1f\n" +
+	"\vrun_context\x18\x03 \x01(\bR\n" +
+	"runContext\x12&\n" +
+	"\x0fallow_code_only\x18\x04 \x01(\bR\rallowCodeOnly\x12\x14\n" +
+	"\x05force\x18\x05 \x01(\bR\x05force\"\x8e\x02\n" +
 	"\x1dGenerateOutcomeReviewResponse\x126\n" +
 	"\x06review\x18\x01 \x01(\v2\x1e.orca.request.v1.OutcomeReviewR\x06review\x12\x16\n" +
 	"\x06reused\x18\x02 \x01(\bR\x06reused\x12\x18\n" +
-	"\acreated\x18\x03 \x01(\bR\acreated\"U\n" +
+	"\acreated\x18\x03 \x01(\bR\acreated\x123\n" +
+	"\x03run\x18\x04 \x01(\v2!.orca.request.v1.OutcomeReviewRunR\x03run\x12%\n" +
+	"\x0econtext_cached\x18\x05 \x01(\bR\rcontextCached\x12'\n" +
+	"\x0fcontext_skipped\x18\x06 \x01(\tR\x0econtextSkipped\"\x84\x03\n" +
+	"\x10OutcomeReviewRun\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1b\n" +
+	"\treview_id\x18\x02 \x01(\tR\breviewId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x03 \x01(\tR\trequestId\x12\x12\n" +
+	"\x04kind\x18\x04 \x01(\tR\x04kind\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12\x14\n" +
+	"\x05scope\x18\x06 \x01(\tR\x05scope\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\a \x01(\tR\terrorCode\x12#\n" +
+	"\rcost_estimate\x18\b \x01(\tR\fcostEstimate\x12\x1f\n" +
+	"\vcost_actual\x18\t \x01(\tR\n" +
+	"costActual\x129\n" +
+	"\n" +
+	"started_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12;\n" +
+	"\vfinished_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"finishedAt\"Z\n" +
+	"\x1cListOutcomeReviewRunsRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
+	"\treview_id\x18\x02 \x01(\tR\breviewId\"V\n" +
+	"\x1dListOutcomeReviewRunsResponse\x125\n" +
+	"\x04runs\x18\x01 \x03(\v2!.orca.request.v1.OutcomeReviewRunR\x04runs\"U\n" +
 	"\x17GetOutcomeReviewRequest\x12\x1b\n" +
 	"\treview_id\x18\x01 \x01(\tR\breviewId\x12\x1d\n" +
 	"\n" +
@@ -679,30 +1029,37 @@ func file_orca_request_v1_outcome_review_proto_rawDescGZIP() []byte {
 	return file_orca_request_v1_outcome_review_proto_rawDescData
 }
 
-var file_orca_request_v1_outcome_review_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_orca_request_v1_outcome_review_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_orca_request_v1_outcome_review_proto_goTypes = []any{
 	(*OutcomeReview)(nil),                 // 0: orca.request.v1.OutcomeReview
 	(*EstimateOutcomeReviewRequest)(nil),  // 1: orca.request.v1.EstimateOutcomeReviewRequest
 	(*EstimateOutcomeReviewResponse)(nil), // 2: orca.request.v1.EstimateOutcomeReviewResponse
 	(*GenerateOutcomeReviewRequest)(nil),  // 3: orca.request.v1.GenerateOutcomeReviewRequest
 	(*GenerateOutcomeReviewResponse)(nil), // 4: orca.request.v1.GenerateOutcomeReviewResponse
-	(*GetOutcomeReviewRequest)(nil),       // 5: orca.request.v1.GetOutcomeReviewRequest
-	(*GetOutcomeReviewResponse)(nil),      // 6: orca.request.v1.GetOutcomeReviewResponse
-	(*ListOutcomeReviewsRequest)(nil),     // 7: orca.request.v1.ListOutcomeReviewsRequest
-	(*ListOutcomeReviewsResponse)(nil),    // 8: orca.request.v1.ListOutcomeReviewsResponse
-	(*timestamppb.Timestamp)(nil),         // 9: google.protobuf.Timestamp
+	(*OutcomeReviewRun)(nil),              // 5: orca.request.v1.OutcomeReviewRun
+	(*ListOutcomeReviewRunsRequest)(nil),  // 6: orca.request.v1.ListOutcomeReviewRunsRequest
+	(*ListOutcomeReviewRunsResponse)(nil), // 7: orca.request.v1.ListOutcomeReviewRunsResponse
+	(*GetOutcomeReviewRequest)(nil),       // 8: orca.request.v1.GetOutcomeReviewRequest
+	(*GetOutcomeReviewResponse)(nil),      // 9: orca.request.v1.GetOutcomeReviewResponse
+	(*ListOutcomeReviewsRequest)(nil),     // 10: orca.request.v1.ListOutcomeReviewsRequest
+	(*ListOutcomeReviewsResponse)(nil),    // 11: orca.request.v1.ListOutcomeReviewsResponse
+	(*timestamppb.Timestamp)(nil),         // 12: google.protobuf.Timestamp
 }
 var file_orca_request_v1_outcome_review_proto_depIdxs = []int32{
-	9, // 0: orca.request.v1.OutcomeReview.created_at:type_name -> google.protobuf.Timestamp
-	9, // 1: orca.request.v1.OutcomeReview.updated_at:type_name -> google.protobuf.Timestamp
-	0, // 2: orca.request.v1.GenerateOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
-	0, // 3: orca.request.v1.GetOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
-	0, // 4: orca.request.v1.ListOutcomeReviewsResponse.reviews:type_name -> orca.request.v1.OutcomeReview
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	12, // 0: orca.request.v1.OutcomeReview.created_at:type_name -> google.protobuf.Timestamp
+	12, // 1: orca.request.v1.OutcomeReview.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 2: orca.request.v1.GenerateOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
+	5,  // 3: orca.request.v1.GenerateOutcomeReviewResponse.run:type_name -> orca.request.v1.OutcomeReviewRun
+	12, // 4: orca.request.v1.OutcomeReviewRun.started_at:type_name -> google.protobuf.Timestamp
+	12, // 5: orca.request.v1.OutcomeReviewRun.finished_at:type_name -> google.protobuf.Timestamp
+	5,  // 6: orca.request.v1.ListOutcomeReviewRunsResponse.runs:type_name -> orca.request.v1.OutcomeReviewRun
+	0,  // 7: orca.request.v1.GetOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
+	0,  // 8: orca.request.v1.ListOutcomeReviewsResponse.reviews:type_name -> orca.request.v1.OutcomeReview
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_orca_request_v1_outcome_review_proto_init() }
@@ -716,7 +1073,7 @@ func file_orca_request_v1_outcome_review_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_request_v1_outcome_review_proto_rawDesc), len(file_orca_request_v1_outcome_review_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

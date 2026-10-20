@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // OutcomeReviewMode is whether a project offers the review. There is no automatic mode: a review costs an agent run, so a person asks.
@@ -24,6 +25,45 @@ func (m OutcomeReviewMode) Enabled() bool { return m == OutcomeReviewManual }
 type OutcomeReviewConfig struct {
 	Default    OutcomeReviewMode
 	KillSwitch bool
+	// ContextTTL is how long a checked context result is reused without asking the agent again; zero means the default.
+	ContextTTL time.Duration
+	// ContextTimeout bounds one context run; the agent itself stops a run at 15 minutes. Zero means the default.
+	ContextTimeout time.Duration
+	// ContextMaxFiles is the number of files the agent may open in one run. Zero means the default.
+	ContextMaxFiles int
+}
+
+const (
+	DefaultReviewContextTTL      = 7 * 24 * time.Hour
+	DefaultReviewContextTimeout  = 10 * time.Minute
+	MaxReviewContextTimeout      = 15 * time.Minute
+	DefaultReviewContextMaxFiles = 60
+	MaxReviewContextMaxFiles     = 400
+)
+
+func (c OutcomeReviewConfig) ContextTTLOrDefault() time.Duration {
+	if c.ContextTTL > 0 {
+		return c.ContextTTL
+	}
+	return DefaultReviewContextTTL
+}
+
+func (c OutcomeReviewConfig) ContextTimeoutMS() int {
+	d := c.ContextTimeout
+	if d <= 0 {
+		d = DefaultReviewContextTimeout
+	}
+	if d > MaxReviewContextTimeout {
+		d = MaxReviewContextTimeout
+	}
+	return int(d / time.Millisecond)
+}
+
+func (c OutcomeReviewConfig) ContextMaxFilesOrDefault() int {
+	if c.ContextMaxFiles > 0 {
+		return c.ContextMaxFiles
+	}
+	return DefaultReviewContextMaxFiles
 }
 
 // OutcomeReviewConfigFromEnv reads REQUEST_DEFAULT_OUTCOME_REVIEW (off|manual) and REQUEST_REVIEW_KILL_SWITCH (true|false).
@@ -45,7 +85,37 @@ func OutcomeReviewConfigFromEnv(getenv func(string) string) (OutcomeReviewConfig
 	default:
 		warnings = append(warnings, "REQUEST_REVIEW_KILL_SWITCH "+strconv.Quote(raw)+" is not true or false; the switch stays off")
 	}
+	if d, ok, w := envDuration(getenv, "REQUEST_REVIEW_CONTEXT_TTL", time.Hour, 90*24*time.Hour); w != "" {
+		warnings = append(warnings, w)
+	} else if ok {
+		c.ContextTTL = d
+	}
+	if d, ok, w := envDuration(getenv, "REQUEST_REVIEW_CONTEXT_TIMEOUT", time.Minute, MaxReviewContextTimeout); w != "" {
+		warnings = append(warnings, w)
+	} else if ok {
+		c.ContextTimeout = d
+	}
+	if raw := strings.TrimSpace(getenv("REQUEST_REVIEW_CONTEXT_MAX_FILES")); raw != "" {
+		if n, err := strconv.Atoi(raw); err != nil || n < 5 || n > MaxReviewContextMaxFiles {
+			warnings = append(warnings, "REQUEST_REVIEW_CONTEXT_MAX_FILES "+strconv.Quote(raw)+" is not a number from 5 to "+strconv.Itoa(MaxReviewContextMaxFiles)+"; the default applies")
+		} else {
+			c.ContextMaxFiles = n
+		}
+	}
 	return c, warnings
+}
+
+// envDuration reads a Go duration within [lo, hi]. An absent variable is not a warning; a bad one keeps the default and says so.
+func envDuration(getenv func(string) string, name string, lo, hi time.Duration) (time.Duration, bool, string) {
+	raw := strings.TrimSpace(getenv(name))
+	if raw == "" {
+		return 0, false, ""
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d < lo || d > hi {
+		return 0, false, name + " " + strconv.Quote(raw) + " is not a duration from " + lo.String() + " to " + hi.String() + "; the default applies"
+	}
+	return d, true, ""
 }
 
 // Effective is the mode a project runs with: the kill switch wins over everything, then the project's choice, then the default.

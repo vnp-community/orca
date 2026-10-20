@@ -2,7 +2,9 @@ package contracttest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -230,4 +232,112 @@ func contains(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// RunReviewContextStoreContract is what both dialects must do for the locked design and the cached context results: replace on the
+// same (request, kind, digest), serve only unexpired records, return the newest, and never cross tenants.
+func RunReviewContextStoreContract(t *testing.T, store usecase.ReviewContextStore) {
+	t.Helper()
+	tenantA, tenantB := newTenant(), newTenant()
+	ctxA, ctxB := CtxForTenant(tenantA), CtxForTenant(tenantB)
+	req := uuid.NewString()
+	now := time.Now().UTC().Truncate(time.Second)
+	rec := func(kind usecase.ReviewContextKind, digest, payload string, ttl time.Duration) usecase.ReviewContextRecord {
+		return usecase.ReviewContextRecord{ID: uuid.NewString(), RequestID: req, Kind: kind, Digest: digest, PromptVersion: "p/1", Payload: []byte(payload), ExpiresAt: now.Add(ttl)}
+	}
+
+	t.Run("put and read back", func(t *testing.T) {
+		got, err := store.Put(ctxA, rec(usecase.ReviewContextDesign, "d1", `{"design":{"available":true}}`, time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.TenantID != tenantA || got.Kind != usecase.ReviewContextDesign || got.Digest != "d1" || got.PromptVersion != "p/1" || got.CreatedAt.Location() != time.UTC {
+			t.Fatalf("put returned %+v", got)
+		}
+		read, ok, err := store.Get(ctxA, req, usecase.ReviewContextDesign, "d1", now)
+		if err != nil || !ok || read.ID != got.ID || !jsonEqual(read.Payload, got.Payload) {
+			t.Fatalf("get: %+v ok=%v err=%v", read, ok, err)
+		}
+		if _, ok, _ := store.Get(ctxA, req, usecase.ReviewContextDesign, "other", now); ok {
+			t.Error("a digest that was never stored must not be found")
+		}
+		if _, ok, _ := store.Get(ctxA, req, usecase.ReviewContextResult, "d1", now); ok {
+			t.Error("the kind is part of the key")
+		}
+	})
+
+	t.Run("the same key is replaced, not duplicated", func(t *testing.T) {
+		first, _ := store.Put(ctxA, rec(usecase.ReviewContextResult, "k1", `{"v":1}`, time.Hour))
+		second, err := store.Put(ctxA, rec(usecase.ReviewContextResult, "k1", `{"v":2}`, 2*time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if second.ID != first.ID || !jsonEqual(second.Payload, []byte(`{"v":2}`)) || !second.ExpiresAt.After(first.ExpiresAt) {
+			t.Errorf("the second put must update the row: %+v then %+v", first, second)
+		}
+	})
+
+	t.Run("an expired record is not served", func(t *testing.T) {
+		if _, err := store.Put(ctxA, rec(usecase.ReviewContextResult, "old", `{"v":0}`, -time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok, _ := store.Get(ctxA, req, usecase.ReviewContextResult, "old", now); ok {
+			t.Error("expired record served by Get")
+		}
+	})
+
+	t.Run("latest is the newest unexpired of its kind", func(t *testing.T) {
+		r2 := uuid.NewString()
+		mk := func(digest string, ttl time.Duration) usecase.ReviewContextRecord {
+			x := rec(usecase.ReviewContextDesign, digest, `{"d":"`+digest+`"}`, ttl)
+			x.RequestID = r2
+			return x
+		}
+		if _, err := store.Put(ctxA, mk("a", time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(20 * time.Millisecond)
+		if _, err := store.Put(ctxA, mk("b", time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(20 * time.Millisecond)
+		if _, err := store.Put(ctxA, mk("c", -time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		got, ok, err := store.Latest(ctxA, r2, usecase.ReviewContextDesign, now)
+		if err != nil || !ok || got.Digest != "b" {
+			t.Fatalf("latest = %+v ok=%v err=%v, want digest b (c is expired)", got, ok, err)
+		}
+		if _, ok, _ := store.Latest(ctxA, r2, usecase.ReviewContextResult, now); ok {
+			t.Error("latest looks only at its kind")
+		}
+		if _, ok, _ := store.Latest(ctxA, "not-a-uuid", usecase.ReviewContextDesign, now); ok {
+			t.Error("a malformed id finds nothing")
+		}
+	})
+
+	t.Run("tenants do not see each other", func(t *testing.T) {
+		if _, ok, _ := store.Get(ctxB, req, usecase.ReviewContextDesign, "d1", now); ok {
+			t.Error("tenant B read tenant A's record")
+		}
+		if _, ok, _ := store.Latest(ctxB, req, usecase.ReviewContextDesign, now); ok {
+			t.Error("tenant B saw tenant A's latest")
+		}
+		if _, err := store.Put(ctxB, usecase.ReviewContextRecord{ID: uuid.NewString(), RequestID: req, Kind: usecase.ReviewContextDesign, Digest: "d1", Payload: []byte(`{"b":1}`), ExpiresAt: now.Add(time.Hour)}); err != nil {
+			t.Fatalf("the same key in another tenant is a different row: %v", err)
+		}
+		a, _, _ := store.Get(ctxA, req, usecase.ReviewContextDesign, "d1", now)
+		if jsonEqual(a.Payload, []byte(`{"b":1}`)) {
+			t.Error("tenant B's put changed tenant A's row")
+		}
+	})
+}
+
+// jsonEqual compares two JSON documents by value, since a JSON column may be stored with other spacing and key order.
+func jsonEqual(a, b []byte) bool {
+	var x, y any
+	if json.Unmarshal(a, &x) != nil || json.Unmarshal(b, &y) != nil {
+		return false
+	}
+	return reflect.DeepEqual(x, y)
 }

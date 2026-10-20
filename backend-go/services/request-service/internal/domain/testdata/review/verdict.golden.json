@@ -1,0 +1,22 @@
+{
+  "architecture": {
+    "newEdges": 2,
+    "removedEdges": 1,
+    "unplannedEdges": 2,
+    "reportedDeviations": 3,
+    "withEvidence": 2,
+    "advisory": 3,
+    "designChecked": true,
+    "reviewedRatio": 0.08333333333333333
+  },
+  "flow": {
+    "newCalls": 1,
+    "reordered": 1,
+    "unplannedCalls": 1,
+    "reportedDeviations": 1,
+    "withEvidence": 1,
+    "advisory": 1,
+    "designChecked": true,
+    "reviewedRatio": 0.08333333333333333
+  }
+}

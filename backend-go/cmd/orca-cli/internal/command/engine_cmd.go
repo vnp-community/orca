@@ -121,6 +121,7 @@ func renderEngineSettings(doc apiclient.Document) string {
 	}
 	writeNotes(&b, "blocked", pre.Docs("blockers"))
 	writeNotes(&b, "knowledge hub unused", pre.Docs("gaps"))
+	writeNotes(&b, "outcome review cannot run", pre.Docs("reviewGaps"))
 	for _, w := range pre.Strs("warnings") {
 		fmt.Fprintf(&b, "    warning: %s\n", w)
 	}

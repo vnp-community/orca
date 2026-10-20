@@ -197,6 +197,8 @@ message EnginePreflight {
   repeated string warnings = 5;
   string openspec_version = 6;
   string checked_at = 7;
+  // review_gaps say why the outcome review cannot run its context run on this dev server; they never stop an engine.
+  repeated EnginePreflightNote review_gaps = 8;
 }
 
 message EnginePreflightNote {

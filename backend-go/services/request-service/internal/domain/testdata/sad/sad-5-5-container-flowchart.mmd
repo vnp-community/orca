@@ -1,0 +1,29 @@
+flowchart LR
+  SPA[SPA Vue 3]
+  CI[CI/CD]
+  AGT[AI Agent]
+  GW["ms-gateway<br/>route table, auth, MCP"]
+  SS["ms-system-setting<br/>gRPC identity"]
+  PM[ms-project-management]
+  CM[ms-case-management]
+  TP[ms-test-plan]
+  BG[ms-bug-management]
+  AT["ms-api-test<br/>+ runner RUNNER_MODE=1"]
+  DB[ms-dashboard]
+  IN[ms-integration]
+  MY[(MySQL)]
+  RD[(Redis)]
+  KF[[Kafka]]
+  S3[(MinIO)]
+  SPA --> GW
+  CI --> GW
+  AGT --> GW
+  GW --> SS & PM & CM & TP & BG & AT & DB & IN
+  SS & PM & CM & TP & BG & AT & DB & IN --> MY
+  GW & SS --> RD
+  CM & TP & BG & AT & SS & PM & IN --> KF
+  KF --> DB & IN & SS & BG & PM
+  PM & CM & BG & AT --> S3
+  TP --> AT
+  IN -->|Jira, Google| EXT[Ngoài]
+  IN -->|/internal/bug| BG

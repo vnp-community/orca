@@ -424,6 +424,7 @@ service RequestService {
   rpc GenerateOutcomeReview(GenerateOutcomeReviewRequest) returns (GenerateOutcomeReviewResponse);
   rpc GetOutcomeReview(GetOutcomeReviewRequest) returns (GetOutcomeReviewResponse);
   rpc ListOutcomeReviews(ListOutcomeReviewsRequest) returns (ListOutcomeReviewsResponse);
+  rpc ListOutcomeReviewRuns(ListOutcomeReviewRunsRequest) returns (ListOutcomeReviewRunsResponse);
 
   // Security and compliance (CR-REQ-035), admin only.
   rpc EraseRequest(EraseRequestRequest) returns (EraseRequestResponse);

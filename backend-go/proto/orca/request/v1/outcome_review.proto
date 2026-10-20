@@ -38,12 +38,24 @@ message EstimateOutcomeReviewResponse {
   bool stale = 5;
   string current_inputs_digest = 6;
   repeated string warnings = 7;
+  // The context run (CR-OR-002): whether a checked result for these inputs is kept, whether the design is locked, and whether a run
+  // could start on the project's dev server now. context_gaps say why not.
+  bool context_cached = 8;
+  bool design_locked = 9;
+  bool context_runnable = 10;
+  repeated string context_gaps = 11;
 }
 
 message GenerateOutcomeReviewRequest {
   string request_id = 1;
   // Empty lets the service pick: delivered once execution is over, design before that.
   string phase = 2;
+  // Also read the design (and, after coding, the code) with a read-only agent. The facts are built either way.
+  bool run_context = 3;
+  // Run without the knowledge graph when the project has none. Only for an after-code review; every item is then unverified.
+  bool allow_code_only = 4;
+  // Ignore the cache and the locked design and ask the agent again (regenerate).
+  bool force = 5;
 }
 
 message GenerateOutcomeReviewResponse {
@@ -51,6 +63,41 @@ message GenerateOutcomeReviewResponse {
   // True when a review with the same inputs already existed and nothing was written.
   bool reused = 2;
   bool created = 3;
+  // The context run that was started; the review gains its context when the run ends.
+  OutcomeReviewRun run = 4;
+  // True when a checked result for the same inputs was applied and no agent was called.
+  bool context_cached = 5;
+  // kg_unavailable when no run was started because the project has no knowledge graph.
+  string context_skipped = 6;
+}
+
+// OutcomeReviewRun is one agent run of a review. The run ends in succeeded, failed or cancelled; error_code says why it failed.
+message OutcomeReviewRun {
+  string run_id = 1;
+  string review_id = 2;
+  string request_id = 3;
+  // context | draw
+  string kind = 4;
+  // queued | running | succeeded | failed | cancelled
+  string status = 5;
+  // design | delivered for a context run
+  string scope = 6;
+  string error_code = 7;
+  string cost_estimate = 8;
+  string cost_actual = 9;
+  google.protobuf.Timestamp started_at = 10;
+  google.protobuf.Timestamp finished_at = 11;
+}
+
+message ListOutcomeReviewRunsRequest {
+  string request_id = 1;
+  // Empty means the newest review of the Request that is not superseded.
+  string review_id = 2;
+}
+
+message ListOutcomeReviewRunsResponse {
+  // Oldest first.
+  repeated OutcomeReviewRun runs = 1;
 }
 
 message GetOutcomeReviewRequest {

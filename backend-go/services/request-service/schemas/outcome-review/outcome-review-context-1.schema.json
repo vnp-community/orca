@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orca.local/schemas/outcome-review/outcome-review-context-1.schema.json",
+  "title": "Outcome Review context result",
+  "description": "What a read-only agent returns from a context run (CR-OR-002). Orca checks more than this schema says: ids, evidence and states are verified in domain.ValidateContext. No state or verdict is part of the contract; Orca derives them.",
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "outcome-review-context/1" },
+    "kg": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "available": { "type": "boolean" },
+        "snapshot": { "type": "string", "maxLength": 80 },
+        "read": { "type": "array", "items": { "$ref": "#/$defs/kgId" }, "maxItems": 400 },
+        "gaps": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 160 },
+          "maxItems": 20
+        },
+        "conflicts": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 160 },
+          "maxItems": 20
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 120,
+      "items": {
+        "type": "object",
+        "required": ["section", "change", "title"],
+        "additionalProperties": false,
+        "properties": {
+          "subject": { "type": "string", "maxLength": 200 },
+          "section": {
+            "enum": [
+              "architecture",
+              "flow",
+              "behavior",
+              "data",
+              "contracts",
+              "requirements",
+              "config"
+            ]
+          },
+          "change": { "enum": ["added", "modified", "removed", "unchanged", "missing"] },
+          "title": { "type": "string", "minLength": 1, "maxLength": 400 },
+          "detail": { "type": "string", "maxLength": 2000 },
+          "severity": { "enum": ["info", "warning", "breaking", "deviation", "regression"] },
+          "needsDecision": { "type": "boolean" },
+          "containers": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 80 },
+            "maxItems": 6
+          },
+          "protocol": { "type": "string", "maxLength": 40 },
+          "source": { "enum": ["kg", "sad-text", "code", ""] },
+          "reviewState": { "$ref": "#/$defs/reviewState" },
+          "expected": { "type": ["boolean", "null"] },
+          "evidence": { "$ref": "#/$defs/evidenceList" },
+          "before": { "type": "string", "maxLength": 400 },
+          "after": { "type": "string", "maxLength": 400 }
+        }
+      }
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "available": { "type": "boolean" },
+        "docSha256": {
+          "type": "object",
+          "maxProperties": 24,
+          "additionalProperties": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+        },
+        "elementsRead": {
+          "type": "array",
+          "maxItems": 400,
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "$ref": "#/$defs/kgId" },
+              "class": { "type": "string", "maxLength": 40 },
+              "reviewState": { "$ref": "#/$defs/reviewState" }
+            }
+          }
+        },
+        "containers": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "required": ["label", "kind", "source"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "maxLength": 80 },
+              "kgId": { "oneOf": [{ "$ref": "#/$defs/kgId" }, { "type": "null" }] },
+              "source": { "enum": ["kg", "sad-text"] },
+              "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+              "kind": { "$ref": "#/$defs/containerKind" },
+              "tech": { "type": "string", "maxLength": 40 },
+              "reviewState": { "$ref": "#/$defs/reviewState" },
+              "aliases": {
+                "type": "array",
+                "items": { "type": "string", "maxLength": 40 },
+                "maxItems": 8
+              },
+              "parent": { "type": "string", "maxLength": 80 },
+              "evidence": { "$ref": "#/$defs/evidenceList" }
+            }
+          }
+        },
+        "sourceBlocks": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": ["doc", "section", "kind", "text"],
+            "additionalProperties": false,
+            "properties": {
+              "doc": { "type": "string", "maxLength": 200 },
+              "section": { "type": "string", "maxLength": 40 },
+              "kind": { "enum": ["mermaid", "text"] },
+              "text": { "type": "string", "maxLength": 8192 }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "additionalProperties": false,
+            "properties": {
+              "from": { "type": "string", "maxLength": 80 },
+              "to": { "type": "string", "maxLength": 80 },
+              "protocol": { "type": "string", "maxLength": 20 },
+              "label": { "type": "string", "maxLength": 40 },
+              "evidence": { "$ref": "#/$defs/evidenceList" }
+            }
+          }
+        },
+        "flows": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "required": ["name", "messages"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["from", "to", "order"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "from": { "type": "string", "maxLength": 80 },
+                    "to": { "type": "string", "maxLength": 80 },
+                    "protocol": { "type": "string", "maxLength": 20 },
+                    "label": { "type": "string", "maxLength": 40 },
+                    "order": { "type": "integer", "minimum": 1 }
+                  }
+                }
+              },
+              "evidence": { "$ref": "#/$defs/evidenceList" }
+            }
+          }
+        }
+      }
+    },
+    "diagrams": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": ["section", "type", "variant"],
+        "additionalProperties": false,
+        "properties": {
+          "section": { "enum": ["architecture", "flow", "behavior", "data"] },
+          "type": {
+            "enum": ["architecture-delta", "sequence", "state-machine", "database-schema"]
+          },
+          "variant": { "enum": ["design", "delta"] },
+          "level": { "enum": ["container", ""] },
+          "name": { "type": "string", "maxLength": 60 },
+          "nodes": {
+            "type": "array",
+            "maxItems": 60,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": { "type": "string", "maxLength": 80 },
+                "kgId": { "type": "string", "maxLength": 80 },
+                "source": { "enum": ["kg", "sad-text", "code", ""] },
+                "reviewState": { "$ref": "#/$defs/reviewState" },
+                "label": { "type": "string", "maxLength": 40 },
+                "kind": { "type": "string", "maxLength": 20 },
+                "tech": { "type": "string", "maxLength": 40 },
+                "parent": { "type": "string", "maxLength": 80 },
+                "inBase": { "type": "boolean" },
+                "inHead": { "type": "boolean" },
+                "componentsChanged": { "type": "integer", "minimum": 0, "maximum": 999 },
+                "columns": {
+                  "type": "array",
+                  "maxItems": 40,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": { "type": "string", "maxLength": 40 },
+                      "type": { "type": "string", "maxLength": 30 },
+                      "inBase": { "type": "boolean" },
+                      "inHead": { "type": "boolean" }
+                    }
+                  }
+                },
+                "evidence": { "$ref": "#/$defs/evidenceList" }
+              }
+            }
+          },
+          "edges": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "required": ["from", "to"],
+              "additionalProperties": false,
+              "properties": {
+                "from": { "type": "string", "maxLength": 80 },
+                "to": { "type": "string", "maxLength": 80 },
+                "protocol": { "type": "string", "maxLength": 20 },
+                "label": { "type": "string", "maxLength": 40 },
+                "order": { "type": "integer", "minimum": 0 },
+                "baseOrder": { "type": "integer", "minimum": 0 },
+                "inBase": { "type": "boolean" },
+                "inHead": { "type": "boolean" },
+                "evidence": { "$ref": "#/$defs/evidenceList" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "notes": { "type": "string", "maxLength": 800 },
+    "warnings": {
+      "type": "array",
+      "items": { "enum": ["budget_exhausted", "kg_partial", "partial_result"] },
+      "maxItems": 20
+    }
+  },
+  "$defs": {
+    "kgId": {
+      "type": "string",
+      "pattern": "^[A-Z]{2,6}(-[A-Z0-9]+)*-[0-9A-Za-z._:-]+$",
+      "maxLength": 80
+    },
+    "reviewState": { "enum": ["approved", "needs_review", "unknown", ""] },
+    "containerKind": { "enum": ["service", "app", "datastore", "queue", "agent", "external"] },
+    "evidenceList": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": ["kg", "source", "file", "rpc", "channel", "migration", "check", "task"]
+          },
+          "ref": { "type": "string", "maxLength": 200 },
+          "snapshot": { "type": "string", "maxLength": 80 },
+          "doc": { "type": "string", "maxLength": 200 },
+          "section": { "type": "string", "maxLength": 40 },
+          "line": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

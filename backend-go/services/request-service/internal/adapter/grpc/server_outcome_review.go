@@ -15,6 +15,8 @@ import (
 // OutcomeReviewUseCases are the CR-OR-001 use cases behind the review RPCs.
 type OutcomeReviewUseCases struct {
 	Service *usecase.OutcomeReviewService
+	// Context may be nil; the review is then built from the facts alone and a request to run the context is refused.
+	Context *usecase.ReviewContextRunner
 }
 
 // WithOutcomeReview attaches the review handlers; without it those RPCs stay Unimplemented.
@@ -35,10 +37,18 @@ func (s *Server) EstimateOutcomeReview(ctx context.Context, req *requestv1.Estim
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &requestv1.EstimateOutcomeReviewResponse{
+	out := &requestv1.EstimateOutcomeReviewResponse{
 		Phase: string(est.Phase), ExecutionFinished: est.Finished, ReviewExists: est.Exists, ReviewId: est.ReviewID, Stale: est.Stale,
 		CurrentInputsDigest: est.CurrentInputsDigest, Warnings: est.Warnings,
-	}, nil
+	}
+	if run := s.outcomeReview.Context; run != nil {
+		ce, cerr := run.EstimateContext(ctx, req.GetRequestId(), est)
+		if cerr != nil {
+			return nil, apperrors.ToGRPCStatus(cerr)
+		}
+		out.ContextCached, out.DesignLocked, out.ContextRunnable, out.ContextGaps = ce.Cached, ce.DesignLocked, ce.Runnable, ce.Gaps
+	}
+	return out, nil
 }
 
 func (s *Server) GenerateOutcomeReview(ctx context.Context, req *requestv1.GenerateOutcomeReviewRequest) (*requestv1.GenerateOutcomeReviewResponse, error) {
@@ -52,6 +62,24 @@ func (s *Server) GenerateOutcomeReview(ctx context.Context, req *requestv1.Gener
 	phase := domain.ReviewPhase(req.GetPhase())
 	if phase != "" && !phase.Valid() {
 		return nil, status.Error(codes.InvalidArgument, "phase must be design or delivered")
+	}
+	if req.GetRunContext() {
+		if s.outcomeReview.Context == nil {
+			return nil, status.Error(codes.Unimplemented, "the outcome review context run is not wired")
+		}
+		res, err := s.outcomeReview.Context.Start(ctx, usecase.StartContextInput{
+			RequestID: req.GetRequestId(), Phase: phase, Force: req.GetForce(), AllowCodeOnly: req.GetAllowCodeOnly(), CreatedBy: actor,
+		})
+		if err != nil {
+			return nil, apperrors.ToGRPCStatus(err)
+		}
+		out := &requestv1.GenerateOutcomeReviewResponse{
+			Review: toProtoOutcomeReview(res.View.Stored), Reused: res.Reused, Created: res.Created, ContextCached: res.ContextCached, ContextSkipped: res.Skipped,
+		}
+		if res.Run != nil {
+			out.Run = toProtoOutcomeReviewRun(*res.Run)
+		}
+		return out, nil
 	}
 	res, err := s.outcomeReview.Service.Generate(ctx, usecase.GenerateInput{RequestID: req.GetRequestId(), Phase: phase, CreatedBy: actor})
 	if err != nil {
@@ -116,4 +144,33 @@ func toProtoOutcomeReview(st usecase.StoredReview) *requestv1.OutcomeReview {
 		ModelJson: string(st.Model), KgSnapshot: st.KGSnapshot, Version: st.Version,
 		CreatedAt: timestamppb.New(st.CreatedAt), UpdatedAt: timestamppb.New(st.UpdatedAt),
 	}
+}
+
+func (s *Server) ListOutcomeReviewRuns(ctx context.Context, req *requestv1.ListOutcomeReviewRunsRequest) (*requestv1.ListOutcomeReviewRunsResponse, error) {
+	if err := s.outcomeReviewWired(); err != nil {
+		return nil, err
+	}
+	if s.outcomeReview.Context == nil {
+		return &requestv1.ListOutcomeReviewRunsResponse{}, nil
+	}
+	runs, err := s.outcomeReview.Context.ListRuns(ctx, req.GetRequestId(), req.GetReviewId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := &requestv1.ListOutcomeReviewRunsResponse{}
+	for _, r := range runs {
+		out.Runs = append(out.Runs, toProtoOutcomeReviewRun(r))
+	}
+	return out, nil
+}
+
+func toProtoOutcomeReviewRun(r usecase.ReviewRun) *requestv1.OutcomeReviewRun {
+	out := &requestv1.OutcomeReviewRun{
+		RunId: r.ID, ReviewId: r.ReviewID, RequestId: r.RequestID, Kind: string(r.Kind), Status: string(r.Status), Scope: r.Scope,
+		ErrorCode: r.ErrorCode, CostEstimate: r.CostEstimate, CostActual: r.CostActual, StartedAt: timestamppb.New(r.StartedAt),
+	}
+	if r.FinishedAt != nil {
+		out.FinishedAt = timestamppb.New(*r.FinishedAt)
+	}
+	return out
 }

@@ -67,6 +67,8 @@ type requestStores struct {
 	// outcomeReviews and reviewRuns store the Outcome Review (CR-OR-001) and the agent runs that made it.
 	outcomeReviews usecase.OutcomeReviewRepository
 	reviewRuns     usecase.OutcomeReviewRunRepository
+	// reviewContexts keeps the locked design and the checked results of context runs (CR-OR-002).
+	reviewContexts usecase.ReviewContextStore
 	close          func()
 }
 
@@ -116,6 +118,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			execution:         postgresExecutionStores(base),
 			outcomeReviews:    postgresadapter.NewOutcomeReviewRepository(base),
 			reviewRuns:        postgresadapter.NewOutcomeReviewRunRepository(base),
+			reviewContexts:    postgresadapter.NewOutcomeReviewContextRepository(base),
 			close:             pool.Close,
 		}, nil
 	case dbcapability.DialectMySQL:
@@ -169,6 +172,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			execution:         mysqlExecutionStores(base),
 			outcomeReviews:    mysqladapter.NewOutcomeReviewRepository(base),
 			reviewRuns:        mysqladapter.NewOutcomeReviewRunRepository(base),
+			reviewContexts:    mysqladapter.NewOutcomeReviewContextRepository(base),
 			close:             func() { _ = db.Close() },
 		}, nil
 	default:

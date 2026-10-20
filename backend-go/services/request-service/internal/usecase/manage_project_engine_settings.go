@@ -37,11 +37,13 @@ type EngineSettingsView struct {
 // ManageProjectEngineSettings reads and changes the per-project switches: which engine writes the Plan and whether the
 // Solution is written by the read-only agent. Both default to off.
 type ManageProjectEngineSettings struct {
-	repo  EngineSettingsRepository
-	gate  *EngineReadinessGate
-	audit *AuditRecorder
-	tx    TxRunner
-	now   func() time.Time
+	repo EngineSettingsRepository
+	gate *EngineReadinessGate
+	// reviewCfg decides whether a project without its own choice has the outcome review on, so the check can look at it.
+	reviewCfg domain.OutcomeReviewConfig
+	audit     *AuditRecorder
+	tx        TxRunner
+	now       func() time.Time
 }
 
 func NewManageProjectEngineSettings(repo EngineSettingsRepository) *ManageProjectEngineSettings {
@@ -49,6 +51,12 @@ func NewManageProjectEngineSettings(repo EngineSettingsRepository) *ManageProjec
 }
 
 // WithReadiness lets a read ask for the preflight and a write run it for what was switched on.
+// WithOutcomeReviewConfig lets the readiness check include the outcome review for projects that follow the deployment default.
+func (uc *ManageProjectEngineSettings) WithOutcomeReviewConfig(c domain.OutcomeReviewConfig) *ManageProjectEngineSettings {
+	uc.reviewCfg = c
+	return uc
+}
+
 func (uc *ManageProjectEngineSettings) WithReadiness(g *EngineReadinessGate) *ManageProjectEngineSettings {
 	uc.gate = g
 	return uc
@@ -179,13 +187,14 @@ func (uc *ManageProjectEngineSettings) SetProjectEngineSettings(ctx context.Cont
 // reasons, and the old mode keeps working until the dev server is ready.
 func (uc *ManageProjectEngineSettings) preflight(ctx context.Context, s domain.ProjectEngineSettings) (*PreflightReport, []string) {
 	openspec := s.Engine == domain.EngineOpenSpec
-	if !openspec && !s.SolutionAgent {
+	review := uc.reviewCfg.Effective(s.OutcomeReview).Enabled()
+	if !openspec && !s.SolutionAgent && !review {
 		return nil, nil
 	}
 	if uc.gate == nil {
 		return nil, []string{"preflight_not_run"}
 	}
-	rep, err := uc.gate.CheckForFresh(ctx, s.ProjectID, &s, openspec)
+	rep, err := uc.gate.CheckForFreshWithReview(ctx, s.ProjectID, &s, openspec, review)
 	if err != nil {
 		return nil, []string{"preflight_not_run"}
 	}

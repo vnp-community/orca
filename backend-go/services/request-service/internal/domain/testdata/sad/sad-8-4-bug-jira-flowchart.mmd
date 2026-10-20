@@ -1,0 +1,21 @@
+flowchart LR
+  subgraph TMS
+    BM[bug-management]
+    OB[(outbox)]
+  end
+  subgraph INT["ms-integration"]
+    C[consumer integration-jira]
+    Q[(jira_sync_task<br/>SKIP LOCKED)]
+    W[worker CONVERGE]
+    P[poller theo mapping]
+    J[job runner<br/>initial/project/bug]
+    N[thông báo gộp]
+  end
+  JR[(Jira)]
+  BM --> OB -->|tms.bug.v1| C --> Q --> W
+  W -->|đọc bug, ghi bug, link| BM
+  W <-->|REST v2/v3| JR
+  P -->|poll theo con trỏ| JR
+  P --> Q
+  J --> Q
+  W --> N -->|tms.integration.v1| SS[system-setting thông báo admin]

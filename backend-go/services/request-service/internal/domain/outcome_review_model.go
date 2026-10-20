@@ -253,6 +253,7 @@ type KGInfo struct {
 type DiagramRef struct {
 	Section     ReviewSection `json:"section"`
 	Variant     string        `json:"variant"` // design|delta
+	Name        string        `json:"name,omitempty"`
 	Type        string        `json:"type"`
 	InputDigest string        `json:"inputDigest"`
 	ArtifactID  string        `json:"artifactId,omitempty"`

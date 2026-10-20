@@ -1401,8 +1401,10 @@ type EnginePreflight struct {
 	Warnings        []string               `protobuf:"bytes,5,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	OpenspecVersion string                 `protobuf:"bytes,6,opt,name=openspec_version,json=openspecVersion,proto3" json:"openspec_version,omitempty"`
 	CheckedAt       string                 `protobuf:"bytes,7,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// review_gaps say why the outcome review cannot run its context run on this dev server; they never stop an engine.
+	ReviewGaps    []*EnginePreflightNote `protobuf:"bytes,8,rep,name=review_gaps,json=reviewGaps,proto3" json:"review_gaps,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EnginePreflight) Reset() {
@@ -1482,6 +1484,13 @@ func (x *EnginePreflight) GetCheckedAt() string {
 		return x.CheckedAt
 	}
 	return ""
+}
+
+func (x *EnginePreflight) GetReviewGaps() []*EnginePreflightNote {
+	if x != nil {
+		return x.ReviewGaps
+	}
+	return nil
 }
 
 type EnginePreflightNote struct {
@@ -1671,7 +1680,7 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\x13_plan_auto_generate\"\xa6\x01\n" +
 	" SetProjectEngineSettingsResponse\x12B\n" +
 	"\bsettings\x18\x01 \x01(\v2&.orca.request.v1.ProjectEngineSettingsR\bsettings\x12>\n" +
-	"\tpreflight\x18\x02 \x01(\v2 .orca.request.v1.EnginePreflightR\tpreflight\"\x95\x02\n" +
+	"\tpreflight\x18\x02 \x01(\v2 .orca.request.v1.EnginePreflightR\tpreflight\"\xdc\x02\n" +
 	"\x0fEnginePreflight\x12\x10\n" +
 	"\x03ran\x18\x01 \x01(\bR\x03ran\x12\x0e\n" +
 	"\x02ok\x18\x02 \x01(\bR\x02ok\x12@\n" +
@@ -1680,7 +1689,9 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\bwarnings\x18\x05 \x03(\tR\bwarnings\x12)\n" +
 	"\x10openspec_version\x18\x06 \x01(\tR\x0fopenspecVersion\x12\x1d\n" +
 	"\n" +
-	"checked_at\x18\a \x01(\tR\tcheckedAt\"^\n" +
+	"checked_at\x18\a \x01(\tR\tcheckedAt\x12E\n" +
+	"\vreview_gaps\x18\b \x03(\v2$.orca.request.v1.EnginePreflightNoteR\n" +
+	"reviewGaps\"^\n" +
 	"\x13EnginePreflightNote\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x19\n" +
@@ -1761,11 +1772,12 @@ var file_orca_request_v1_solution_proto_depIdxs = []int32{
 	17, // 17: orca.request.v1.SetProjectEngineSettingsResponse.preflight:type_name -> orca.request.v1.EnginePreflight
 	18, // 18: orca.request.v1.EnginePreflight.blockers:type_name -> orca.request.v1.EnginePreflightNote
 	18, // 19: orca.request.v1.EnginePreflight.gaps:type_name -> orca.request.v1.EnginePreflightNote
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	18, // 20: orca.request.v1.EnginePreflight.review_gaps:type_name -> orca.request.v1.EnginePreflightNote
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_orca_request_v1_solution_proto_init() }

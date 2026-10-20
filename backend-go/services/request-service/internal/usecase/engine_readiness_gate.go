@@ -20,9 +20,11 @@ type PreflightFailure struct {
 // PreflightReport separates what stops an engine (Failures) from what only means the knowledge hub will not be used (Gaps):
 // without the hub a Solution and a Plan are still written, so a gap never turns an engine off.
 type PreflightReport struct {
-	OK              bool
-	Failures        []PreflightFailure
-	Gaps            []PreflightFailure
+	OK       bool
+	Failures []PreflightFailure
+	Gaps     []PreflightFailure
+	// ReviewGaps say why the outcome review cannot run its context run here; like Gaps they never turn an engine off.
+	ReviewGaps      []PreflightFailure
 	Warnings        []string
 	CheckedAt       time.Time
 	OpenSpecVersion string
@@ -111,18 +113,26 @@ func (g *EngineReadinessGate) Check(ctx context.Context, projectID string, setti
 // CheckFor is Check for a switch being turned on: with openspec=false only the knowledge hub is looked at (a project that
 // turns on solution_agent alone has no need of openspec).
 func (g *EngineReadinessGate) CheckFor(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec bool) (PreflightReport, error) {
-	return g.checkFor(ctx, projectID, settings, openspec, false)
+	return g.checkFor(ctx, projectID, settings, gateScope{openspec: openspec}, false)
 }
 
 // CheckForFresh is CheckFor for a person asking "is it ready now": it ignores the cached clean verdict and asks the dev server
 // agent for its capabilities again, which its profile cache would otherwise keep for a day (a skill installed a minute ago
 // would still show as missing).
 func (g *EngineReadinessGate) CheckForFresh(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec bool) (PreflightReport, error) {
-	return g.checkFor(ctx, projectID, settings, openspec, true)
+	return g.checkFor(ctx, projectID, settings, gateScope{openspec: openspec}, true)
 }
 
-func (g *EngineReadinessGate) checkFor(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec, fresh bool) (PreflightReport, error) {
-	report, err := g.check(ctx, projectID, settings, openspec, fresh)
+// CheckForFreshWithReview is CheckForFresh that also says whether the outcome review can run on the dev server.
+func (g *EngineReadinessGate) CheckForFreshWithReview(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec, review bool) (PreflightReport, error) {
+	return g.checkFor(ctx, projectID, settings, gateScope{openspec: openspec, review: review}, true)
+}
+
+// gateScope names what a check looks at; the engine and the review each add their own requirements.
+type gateScope struct{ openspec, review bool }
+
+func (g *EngineReadinessGate) checkFor(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, scope gateScope, fresh bool) (PreflightReport, error) {
+	report, err := g.check(ctx, projectID, settings, scope, fresh)
 	if err == nil {
 		// A clean verdict taken from the cache has no failures, so only a fresh finding is counted.
 		for _, f := range report.Failures {
@@ -132,7 +142,8 @@ func (g *EngineReadinessGate) checkFor(ctx context.Context, projectID string, se
 	return report, err
 }
 
-func (g *EngineReadinessGate) check(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, openspec, fresh bool) (PreflightReport, error) {
+func (g *EngineReadinessGate) check(ctx context.Context, projectID string, settings *domain.ProjectEngineSettings, scope gateScope, fresh bool) (PreflightReport, error) {
+	openspec := scope.openspec
 	report := PreflightReport{OK: true, CheckedAt: g.now()}
 	conn, err := g.conns.ResolveForProject(ctx, projectID)
 	if err != nil {
@@ -149,7 +160,7 @@ func (g *EngineReadinessGate) check(ctx context.Context, projectID string, setti
 	if settings != nil && settings.MinVersion != "" {
 		want = settings.MinVersion
 	}
-	key := fmt.Sprintf("%s|%s|%s|%t|%s", conn.DevServerID, conn.ConnectionID, conn.RepoPath, openspec, want)
+	key := fmt.Sprintf("%s|%s|%s|%t|%t|%s", conn.DevServerID, conn.ConnectionID, conn.RepoPath, openspec, scope.review, want)
 	if !fresh && g.cachedClean(key) {
 		return report, nil
 	}
@@ -159,9 +170,9 @@ func (g *EngineReadinessGate) check(ctx context.Context, projectID string, setti
 			return report, err
 		}
 	}
-	g.checkAgent(ctx, conn, openspec, fresh, &report)
+	g.checkAgent(ctx, conn, scope, fresh, &report)
 	g.checkRepoFiles(ctx, conn, &report)
-	if len(report.Failures) == 0 && len(report.Gaps) == 0 {
+	if len(report.Failures) == 0 && len(report.Gaps) == 0 && len(report.ReviewGaps) == 0 {
 		g.remember(key)
 	}
 	return report, nil
@@ -221,17 +232,30 @@ func (g *EngineReadinessGate) checkOpenSpec(ctx context.Context, conn AnalysisCo
 }
 
 // checkAgent reads the agent's own report: what the openspec engine needs is a blocker, what the knowledge hub needs is a gap.
-func (g *EngineReadinessGate) checkAgent(ctx context.Context, conn AnalysisConnection, openspec, fresh bool, report *PreflightReport) {
+func (g *EngineReadinessGate) checkAgent(ctx context.Context, conn AnalysisConnection, scope gateScope, fresh bool, report *PreflightReport) {
+	openspec := scope.openspec
 	if g.caps == nil {
 		return
 	}
 	profile, err := g.caps.Get(ctx, DevServerRef{ConnectionID: conn.ConnectionID, DevServerID: conn.DevServerID}, fresh)
 	if err != nil {
+		if scope.review {
+			reviewGap(report, "REQUEST_REVIEW_AGENT_UNKNOWN", "the dev server agent's capabilities could not be read, so the outcome review cannot be confirmed", "Check that the dev server is connected, then try again.")
+		}
 		if openspec {
 			block(report, "REQUEST_ENGINE_AGENT_UNKNOWN", "the dev server agent's capabilities could not be read", "Check that the dev server is connected, then try again.")
 		}
 		gap(report, "REQUEST_KNOWLEDGE_AGENT_UNKNOWN", "the dev server agent's capabilities could not be read, so the knowledge hub cannot be confirmed", "Check that the dev server is connected, then try again.")
 		return
+	}
+	if scope.review {
+		for _, rg := range domain.ReviewContextGaps(profile) {
+			hint := "Update the Orca agent on the dev server."
+			if rg.Code == domain.CodeReviewSkillMissing {
+				hint = SkillInstallCommand(g.skillsRepo)
+			}
+			reviewGap(report, rg.Code, rg.Message, hint)
+		}
 	}
 	if openspec && !domain.SupportsOpenSpecAuthoring(profile) {
 		block(report, "REQUEST_ENGINE_AGENT_TOO_OLD", "the dev server agent cannot author a change in a worktree under a permission profile", "Update the Orca agent on the dev server.")
@@ -291,6 +315,10 @@ func failed(r PreflightReport, code, msg, hint string) PreflightReport {
 func block(r *PreflightReport, code, msg, hint string) {
 	r.OK = false
 	r.Failures = append(r.Failures, PreflightFailure{Code: code, Message: msg, FixHint: hint})
+}
+
+func reviewGap(r *PreflightReport, code, msg, hint string) {
+	r.ReviewGaps = append(r.ReviewGaps, PreflightFailure{Code: code, Message: msg, FixHint: hint})
 }
 
 func gap(r *PreflightReport, code, msg, hint string) {

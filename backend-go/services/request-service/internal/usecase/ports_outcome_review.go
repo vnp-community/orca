@@ -95,3 +95,35 @@ type OutcomeReviewRunRepository interface {
 	// CountSince counts runs of kind started since t for the Request; the regeneration limit reads it.
 	CountSince(ctx context.Context, requestID string, kind ReviewRunKind, since time.Time) (int, error)
 }
+
+// ReviewContextKind says what a stored context record holds.
+type ReviewContextKind string
+
+const (
+	// ReviewContextDesign is the locked design: kept per Request and reused by the delivered phase and by later runs.
+	ReviewContextDesign ReviewContextKind = "design"
+	// ReviewContextResult is one whole checked context result, keyed by its context digest.
+	ReviewContextResult ReviewContextKind = "context"
+)
+
+type ReviewContextRecord struct {
+	ID            string
+	TenantID      string
+	RequestID     string
+	Kind          ReviewContextKind
+	Digest        string
+	PromptVersion string
+	Payload       []byte
+	CreatedAt     time.Time
+	ExpiresAt     time.Time
+}
+
+// ReviewContextStore keeps what a context run produced so the next review does not ask the agent again. Reads return only records
+// that have not expired at the time given.
+type ReviewContextStore interface {
+	// Put inserts the record, or replaces the payload and expiry of the one with the same (request, kind, digest).
+	Put(ctx context.Context, r ReviewContextRecord) (ReviewContextRecord, error)
+	Get(ctx context.Context, requestID string, kind ReviewContextKind, digest string, now time.Time) (ReviewContextRecord, bool, error)
+	// Latest returns the newest unexpired record of the kind for the Request.
+	Latest(ctx context.Context, requestID string, kind ReviewContextKind, now time.Time) (ReviewContextRecord, bool, error)
+}

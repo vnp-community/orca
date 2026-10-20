@@ -32,7 +32,7 @@ agent_rpcs := {
 	"read": {
 		"GetRequest", "ListRequests", "ListBacklog", "ListRequestTypeHistory", "ListRequestLinks",
 		"ListSolutions", "GetApproval", "ListApprovals", "ListRequestActivity", "GetExecutionSummary",
-		"EstimateOutcomeReview", "GetOutcomeReview", "ListOutcomeReviews",
+		"EstimateOutcomeReview", "GetOutcomeReview", "ListOutcomeReviews", "ListOutcomeReviewRuns",
 	},
 	"create": {"CreateRequest", "SpawnChildRequest"},
 	"triage": {"ClassifyRequest", "ChangeRequestType"},

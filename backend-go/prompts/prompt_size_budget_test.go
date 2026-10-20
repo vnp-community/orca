@@ -10,6 +10,7 @@ import (
 	"github.com/stablyai/orca-go/prompts/git_agent_prompt"
 	"github.com/stablyai/orca-go/prompts/git_commit_message"
 	"github.com/stablyai/orca-go/prompts/git_pull_request"
+	"github.com/stablyai/orca-go/prompts/outcome_review_context"
 	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/prompts/plan_native"
 	"github.com/stablyai/orca-go/prompts/plan_openspec"
@@ -46,6 +47,7 @@ var maxPromptBytes = map[string]int{
 	"git_commit_message/stats_only":      380000,
 	"git_pull_request/fields":            545000,
 	"git_agent_prompt/issue":             235000,
+	"outcome_review_context/context":     200000,
 }
 
 // filler returns about n runes of text that mixes ASCII with multi-byte letters, so a cap counted in bytes instead of runes
@@ -203,6 +205,21 @@ func sizeCases() []sizeCase {
 			return git_commit_message.RenderStatsOnly(git_commit_message.StatsOnlyInput{Files: largeFiles(2000)})
 		}},
 		{git_pull_request.ID, func() (string, error) { return git_pull_request.Render(git_pull_request.Input{Diff: filler(400000)}) }},
+		{outcome_review_context.ID, func() (string, error) {
+			paths := make([]string, 400)
+			rows := make([]outcome_review_context.DesignContainer, 100)
+			for i := range paths {
+				paths[i] = "services/" + filler(150) + "/file.go"
+			}
+			for i := range rows {
+				rows[i] = outcome_review_context.DesignContainer{ID: "SVC-" + filler(10), Label: filler(200), Kind: "service"}
+			}
+			return outcome_review_context.Render(outcome_review_context.Input{
+				Mode: outcome_review_context.ModeDelivered, Request: largeRequest(), Project: largeProject(), UseKnowledge: true,
+				LockedDesign: rows, BaseRef: filler(100), ChangedPaths: paths, PlanTargets: paths, MaxFiles: 60, ResultNonce: filler(64),
+				Violations: []string{filler(5000), filler(5000)}, Language: output_language.Vietnamese,
+			})
+		}},
 		{git_agent_prompt.ID, func() (string, error) {
 			return git_agent_prompt.Render(git_agent_prompt.Input{
 				Title: filler(300), Description: filler(100000), AcceptanceCriteria: filler(100000), Comments: comments,

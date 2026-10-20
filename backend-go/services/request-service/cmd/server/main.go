@@ -226,6 +226,8 @@ func run(ctx context.Context, cfg config.Config) error {
 
 	httpHandler = rollout.MetricsHandler(httpHandler)
 
+	reviewCfg := loadOutcomeReviewConfig(log)
+
 	// ChainUnary (recovery, tenant extraction, logging) stays first; the security chain (with the flow gate and RPC audit hooks) runs after it.
 	grpcServer := grpc.NewServer(append(append([]grpc.ServerOption{grpcmw.ChainUnary(log), grpcmw.StatsHandler()}, security.options...), rollout.ServerOptions()...)...)
 	requestv1.RegisterRequestServiceServer(grpcServer, artifact.attach(rollout.WithRPCs(requestgrpc.NewServer(
@@ -236,8 +238,8 @@ func run(ctx context.Context, cfg config.Config) error {
 		WithLifecycle(requestgrpc.LifecycleUseCases{Flow: lifecycle.GetFlow, Return: lifecycle.Return, Reopen: lifecycle.Reopen, Cancel: lifecycle.Cancel, SpawnChild: lifecycle.SpawnChild, Links: lifecycle.ListLinks}).
 		WithSolution(solution.useCases()).
 		WithPlan(plan).
-		WithOutcomeReview(wireOutcomeReview(log, stores, execTasks, solution, usecase.EngineSettingsReviewReader{Repo: stores.engineSettings}, security.audit)).
-		WithEngineSettings(usecase.NewManageProjectEngineSettings(stores.engineSettings).WithReadiness(solution.gate).WithAudit(security.audit, stores.tx)).
+		WithOutcomeReview(wireOutcomeReview(log, reviewCfg, stores, execTasks, solution, usecase.EngineSettingsReviewReader{Repo: stores.engineSettings}, security.audit)).
+		WithEngineSettings(usecase.NewManageProjectEngineSettings(stores.engineSettings).WithReadiness(solution.gate).WithOutcomeReviewConfig(reviewCfg).WithAudit(security.audit, stores.tx)).
 		WithCompliance(security.compliance))
 	if approval.Enabled {
 		requestv1.RegisterApprovalServiceServer(grpcServer, requestgrpc.NewApprovalServer(approval.Server))

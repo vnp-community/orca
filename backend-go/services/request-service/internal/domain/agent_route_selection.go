@@ -12,13 +12,16 @@ const (
 // FeatureKnowledgeHub mirrors infra-fleet's domain.FeatureKnowledgeHub; the agent declares it after the code exists.
 const FeatureKnowledgeHub = "agent.execPrompt.knowledgeHub"
 
+// FeatureReadonly is declared by agents that enforce accessMode=readonly themselves.
+const FeatureReadonly = "agent.execPrompt.readonly"
+
 // FeaturePermissionProfile is declared by agents that run a write run under a named profile instead of full trust.
 const FeaturePermissionProfile = "agent.execPrompt.permissionProfile"
 
 var ErrReadonlyUnsupported = errors.New("readonly unsupported by agent")
 
 func SelectReadonlyRoute(c DevServerCapability, requireEnforced bool) (ReadonlyRoute, error) {
-	if c.HasFeature("agent.execPrompt.readonly") {
+	if c.HasFeature(FeatureReadonly) {
 		return RouteAgentEnforced, nil
 	}
 

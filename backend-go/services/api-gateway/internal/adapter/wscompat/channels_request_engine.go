@@ -22,6 +22,7 @@ type EnginePreflightView struct {
 	OK              bool                      `json:"ok"`
 	Blockers        []EnginePreflightNoteView `json:"blockers"`
 	Gaps            []EnginePreflightNoteView `json:"gaps"`
+	ReviewGaps      []EnginePreflightNoteView `json:"reviewGaps"`
 	Warnings        []string                  `json:"warnings"`
 	OpenSpecVersion string                    `json:"openspecVersion"`
 	CheckedAt       string                    `json:"checkedAt"`
@@ -124,7 +125,7 @@ func engineSettingsView(s *requestv1.ProjectEngineSettings, p *requestv1.EngineP
 	}
 	if p != nil {
 		v.Preflight = &EnginePreflightView{
-			Ran: p.GetRan(), OK: p.GetOk(), Blockers: engineNotes(p.GetBlockers()), Gaps: engineNotes(p.GetGaps()),
+			Ran: p.GetRan(), OK: p.GetOk(), Blockers: engineNotes(p.GetBlockers()), Gaps: engineNotes(p.GetGaps()), ReviewGaps: engineNotes(p.GetReviewGaps()),
 			Warnings: nonNilStrings(p.GetWarnings()), OpenSpecVersion: p.GetOpenspecVersion(), CheckedAt: p.GetCheckedAt(),
 		}
 	}

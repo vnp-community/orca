@@ -13,3 +13,8 @@ func TestPostgres_OutcomeReviewContract(t *testing.T) {
 	base := New(f.app)
 	contracttest.RunOutcomeReviewContract(t, NewOutcomeReviewRepository(base), NewOutcomeReviewRunRepository(base))
 }
+
+func TestPostgres_ReviewContextStoreContract(t *testing.T) {
+	f := newMigratedPostgres(t)
+	contracttest.RunReviewContextStoreContract(t, NewOutcomeReviewContextRepository(New(f.app)))
+}

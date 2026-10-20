@@ -125,6 +125,8 @@ type GenerateResult struct {
 	Reused bool
 	// Created is true when a new row was inserted.
 	Created bool
+	// Collected is what the facts were built from, so a context run does not collect them a second time.
+	Collected Collected
 }
 
 // Generate builds the review from the facts Orca measures and stores it. The same inputs give the same stored review: asking
@@ -150,22 +152,12 @@ func (s *OutcomeReviewService) Generate(ctx context.Context, in GenerateInput) (
 	}
 	if found && existing.InputsDigest == built.InputsDigest && existing.State != domain.ReviewStateStale {
 		view, derr := decodeReview(existing)
-		return GenerateResult{View: view, Reused: true}, derr
+		return GenerateResult{View: view, Reused: true, Collected: col}, derr
 	}
 
-	model, err := json.Marshal(built)
+	model, err := encodeReviewModel(&built)
 	if err != nil {
 		return GenerateResult{}, err
-	}
-	if len(model) > domain.MaxReviewModelBytes {
-		built.Items, built.Truncated = built.Items[:len(built.Items)/2], true
-		built.Warnings = append(built.Warnings, "truncated:model")
-		if model, err = json.Marshal(built); err != nil {
-			return GenerateResult{}, err
-		}
-		if len(model) > domain.MaxReviewModelBytes {
-			return GenerateResult{}, domain.ErrReviewResultInvalid("the review model is larger than the limit even after cutting")
-		}
 	}
 
 	row := StoredReview{
@@ -175,7 +167,8 @@ func (s *OutcomeReviewService) Generate(ctx context.Context, in GenerateInput) (
 	var stored StoredReview
 	created := false
 	if found {
-		row.ID, row.KGSnapshot, row.DesignDigest, row.ContextDigest = existing.ID, existing.KGSnapshot, existing.DesignDigest, existing.ContextDigest
+		// The facts changed, so the context built on the old ones is gone with them; the locked design is kept for the next run.
+		row.ID, row.DesignDigest = existing.ID, existing.DesignDigest
 		if stored, err = s.Reviews.Update(ctx, row, existing.Version); err != nil {
 			return GenerateResult{}, err
 		}
@@ -185,7 +178,7 @@ func (s *OutcomeReviewService) Generate(ctx context.Context, in GenerateInput) (
 			if domainCode(err) == "REQUEST_REVIEW_ALREADY_EXISTS" { // lost a race with another Generate: its row is the answer
 				if again, ok, gerr := s.Reviews.GetByKey(ctx, req.ID, built.Phase, headKey); gerr == nil && ok {
 					view, derr := decodeReview(again)
-					return GenerateResult{View: view, Reused: true}, derr
+					return GenerateResult{View: view, Reused: true, Collected: col}, derr
 				}
 			}
 			return GenerateResult{}, err
@@ -199,7 +192,26 @@ func (s *OutcomeReviewService) Generate(ctx context.Context, in GenerateInput) (
 	}
 	s.auditGenerate(ctx, req, stored, created)
 	view, err := decodeReview(stored)
-	return GenerateResult{View: view, Created: created}, err
+	return GenerateResult{View: view, Created: created, Collected: col}, err
+}
+
+// encodeReviewModel marshals the review and, when it is over the size limit, cuts the items in half once and says so.
+func encodeReviewModel(built *domain.OutcomeReview) ([]byte, error) {
+	model, err := json.Marshal(built)
+	if err != nil {
+		return nil, err
+	}
+	if len(model) > domain.MaxReviewModelBytes {
+		built.Items, built.Truncated = built.Items[:len(built.Items)/2], true
+		built.Warnings = append(built.Warnings, "truncated:model")
+		if model, err = json.Marshal(built); err != nil {
+			return nil, err
+		}
+		if len(model) > domain.MaxReviewModelBytes {
+			return nil, domain.ErrReviewResultInvalid("the review model is larger than the limit even after cutting")
+		}
+	}
+	return model, nil
 }
 
 func (s *OutcomeReviewService) auditGenerate(ctx context.Context, req domain.Request, st StoredReview, created bool) {

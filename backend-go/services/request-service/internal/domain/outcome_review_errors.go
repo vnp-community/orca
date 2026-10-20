@@ -24,6 +24,7 @@ const (
 	CodeReviewArtifactNotFound  = "REQUEST_REVIEW_ARTIFACT_NOT_FOUND"
 	CodeReviewArtifactCorrupt   = "REQUEST_REVIEW_ARTIFACT_CORRUPT"
 	CodeReviewKnowledgeRequired = "REQUEST_REVIEW_KNOWLEDGE_REQUIRED"
+	CodeReviewAgentTooOld       = "REQUEST_REVIEW_AGENT_TOO_OLD"
 )
 
 func ErrReviewDisabled() error {
@@ -97,4 +98,17 @@ func ErrReviewDecisionInvalid(reason string) error {
 
 func ErrReviewAlreadyExists(requestID string) error {
 	return apperrors.New(apperrors.KindAlreadyExists, "REQUEST_REVIEW_ALREADY_EXISTS", "a review for this request and code already exists: "+requestID, nil)
+}
+
+func ErrReviewNoDevServer(reason string) error {
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_REVIEW_NO_DEV_SERVER", "no dev server can run the review: "+reason, nil)
+}
+
+func ErrReviewAgentTooOld(reason string) error {
+	return apperrors.New(apperrors.KindFailedPrecondition, CodeReviewAgentTooOld, "the dev server agent cannot run the review: "+reason, nil)
+}
+
+func ErrReviewKnowledgeRequired() error {
+	return apperrors.New(apperrors.KindFailedPrecondition, CodeReviewKnowledgeRequired,
+		"the design review needs the project's knowledge graph, which is not available", nil)
 }

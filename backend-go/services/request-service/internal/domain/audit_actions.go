@@ -15,6 +15,8 @@ const (
 	// AuditReviewGenerate records a person building or rebuilding an Outcome Review (CR-OR-001). Best effort: it describes an
 	// action that writes a derived record, not a decision.
 	AuditReviewGenerate = "request.review.generate"
+	// AuditReviewContext records a context run being started for a review: it costs an agent run, so it is audited apart from the build.
+	AuditReviewContext = "request.review.context"
 )
 
 // DurableAuditActions must survive an auth-service outage: they are written to the audit outbox in the
