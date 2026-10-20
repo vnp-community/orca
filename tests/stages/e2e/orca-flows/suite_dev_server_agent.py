@@ -110,4 +110,5 @@ def _native_without_knowledge_hub(ws, project_id: str) -> None:
     ws.call("request.engineSettingsSet", {
         "projectId": project_id, "engine": "native", "openspecMinVersion": cur.get("openspecMinVersion", "") or "",
         "solutionAgent": False, "executionMode": cur.get("executionMode", "") or "", "expectedVersion": cur.get("version", 0) or 0,
+        "planAutoGenerate": False,  # the suites press Generate plan themselves; automatic generation (CR-REQ-044) has its own suite
     })

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/approval_flow_contract.go` (sửa), `internal/adapter/contracttest/execution_flow_contract.go` (sửa), `internal/usecase/continuous_execution_test.go` (sửa)
 **Depends on:** TASK-REQ-043-02, TASK-REQ-043-03
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ghim cùng commit với quyết định và cuộn lại cùng nhau, chứng minh trên Postgres 16 và MySQL 8.
-- [ ] Hàng outbox `approval.decided` có `execution_mode` đúng điều kiện (điều acceptance qua WS không kiểm được).
-- [ ] Luồng ba Phase chạy hết sau một lần duyệt, không `StartPhase` thủ công, không Approval `phase`.
+- [x] Ghim cùng commit với quyết định và cuộn lại cùng nhau, chứng minh trên Postgres 16 và MySQL 8. Bằng chứng: `TestPostgres_ApprovalFlowContract` và `TestMySQL_ApprovalFlowContract`, các ca `RunAll*`/`ApproveWithoutMode*` xanh trên cả hai.
+- [x] Hàng outbox `approval.decided` có `execution_mode` đúng điều kiện (điều acceptance qua WS không kiểm được). Bằng chứng: `RunAllPinsTheModeInTheDecisionsTransaction` (có khoá) và `ApproveWithoutModeLeavesTheModeUnpinned` (vắng khoá).
+- [x] Luồng ba Phase chạy hết sau một lần duyệt, không `StartPhase` thủ công, không Approval `phase`. Bằng chứng: `ExecutionFlow_RunAll_OneDecisionPinsAndRunsEveryPhase` xanh trên Postgres và MySQL; ca usecase nhanh `TestContinuous_ApprovingThePlanWithTheChoiceRunsEveryPhase`.
 
 ## Rủi ro và lưu ý
 
@@ -49,3 +49,11 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+## Ghi chú triển khai (2026-10-20)
+
+- File: `contracttest/approval_flow_run_all_contract.go` (mới, 5 ca: ghim cùng commit và nhấp đúp, không chọn, handler lỗi cuộn lại, đã ghim `step_by_step`, đua hai quyết định 12 vòng) được đăng ký trong `approval_flow_contract.go`; `contracttest/execution_flow_run_all_contract.go` (mới, `flowRunAllFromTheDecision`: `DecideApproval` thật + `TransitionSubjectHandler` + `StartExecution`, ba Phase, không `pinContinuous`, không Approval `phase`, `phase_starts.start_trigger = auto` do người duyệt) đăng ký trong `execution_flow_contract.go`; `usecase/continuous_execution_test.go` thêm ca fake.
+- Ngoài danh sách file của task: `ExecutionEnv` thêm trường `Locker` (`contracttest/execution_repository_contract.go`) và hai file nối môi trường `adapter/{postgres,mysql}/execution_integration_test.go` đặt `Locker: NewRequestLocker(base)`, vì `DecideApproval` cần khoá Request; không có thay đổi mã sản phẩm. `expected_columns*.go`: không có cột mới nên không đổi (file đó đang được luồng khác sửa).
+- Lệnh: `go test -tags=integration -p 1 ./internal/adapter/postgres/ ./internal/adapter/mysql/ -run 'Execution|Approval' -count=1` xanh; `go test ./internal/usecase/... -run Continuous -v` xanh.
+- Sai khác: ca nhiều Phase kiểm `StartedBy` bằng người duyệt thật ở tầng contract (DB thật) nhưng ở ca fake chỉ kiểm `trigger=auto` vì `exActors` của rig cố định `approver-1`.
+- Không kiểm chứng: chạy trên stack (task 06 bỏ qua).

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/{postgres,mysql}/0103_openspec_change_redaction.{up,down}.sql` (mới: cột `redacted_secrets`), `internal/domain/openspec_change.go` (sửa: `RedactedSecrets`, `ParseOmittedMarker`), `internal/usecase/{plan_bundle_redaction,run_proposal_generation,get_plan_bundle_file,get_plan_proposal,tasks_md_sync}.go` (mới/sửa), `internal/adapter/{postgres,mysql}/openspec_change_repository.go` (sửa), `internal/adapter/contracttest/{openspec_change_contract,expected_columns}.go` (sửa)
 **Depends on:** Không
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -37,11 +37,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bộ tài liệu có bí mật cắm sẵn được che khi lưu; `redacted_secrets` đúng; cảnh báo `SECRETS_REDACTED` hiện.
-- [ ] Dòng cũ lưu thô được che khi đọc qua `GetPlanBundleFile`; không cần backfill.
-- [ ] `Size` của file bị lược trong danh sách là kích thước thật.
-- [ ] `TasksMdSyncer` không ghi dấu che vào `tasks.md` thật; hành vi cũ khi không có bí mật không đổi.
-- [ ] Digest Approval của Request đang chờ không bị đổi bởi migration.
+- [x] Bộ tài liệu có bí mật cắm sẵn được che khi lưu; `redacted_secrets` đúng; cảnh báo `SECRETS_REDACTED` hiện. (`TestFinish_StoresRedactedBundle_AndCount`, `TestRedactBundle_MasksEveryKindInEveryDocument`, `TestPlanChecks_SecretsRedacted`)
+- [x] Dòng cũ lưu thô được che khi đọc qua `GetPlanBundleFile`; không cần backfill. (`TestGetPlanBundleFile_RedactsLegacyRow`)
+- [x] `Size` của file bị lược trong danh sách là kích thước thật. (`TestGetPlanProposal_OmittedFileListsItsRealSize`)
+- [x] `TasksMdSyncer` không ghi dấu che vào `tasks.md` thật; hành vi cũ khi không có bí mật không đổi. (`TestRestoreDrift_*` (4 test))
+- [x] Digest Approval của Request đang chờ không bị đổi bởi migration. (`TestPostgres_Migration_OpenSpecChangeRedaction`, `TestMySQL_Migration_OpenSpecChangeRedaction`: migration chỉ thêm cột, không ghi lại dòng nào; `BundleDigest` không đổi cách tính)
 
 ## Rủi ro và lưu ý
 
@@ -58,3 +58,24 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+## Ghi chú triển khai
+
+**Số migration.** `0102_openspec_change_redaction` (không phải `0103` như đề bài): theo chỉ dẫn của orchestrator, 0102 và các số sau thuộc CR-045 và task 02 chưa làm; **task 02 (cần sửa CHECK/ENUM `origin` của `plan_auto_jobs`) phải dùng `0104`**, không phải `0102`, vì golang-migrate bỏ qua số nhỏ hơn bản đã áp dụng. Task 04 dùng `0103`.
+
+**Blast radius (grep).** `commitAndRead` chỉ có một người gọi (`RunProposalGeneration.finish`); `GetPlanBundleFile.Execute` được gọi bởi `server_plan.go`; `restoreDrift` chỉ trong `TasksMdSyncer.syncTasks`; `OpenSpecChange` có thêm trường `RedactedSecrets` (mọi nơi dựng literal đều dùng tên trường nên không gãy); cột mới đi qua hai adapter `openspec_change_repository.go` (cột chọn, quét, upsert).
+
+**Tệp đã đổi.** Mới: `migrations/{postgres,mysql}/0102_openspec_change_redaction.{up,down}.sql`, `internal/usecase/plan_bundle_redaction.go` (`redactBundle`, `isOmittedMarker`), `internal/adapter/contracttest/expected_columns_plan_documents.go` (bảng `openspec_changes` chưa nằm trong kiểm tra cột nào; thêm đủ 25 cột), `internal/domain/openspec_change_omitted_test.go`, test `plan_bundle_redaction_test.go`, `tasks_md_sync_redaction_test.go`, `{postgres,mysql}/plan_documents_migration_integration_test.go`. Sửa: `domain/openspec_change.go` (`RedactedSecrets`, `ParseOmittedMarker`), `usecase/{run_proposal_generation,get_plan_bundle_file,get_plan_proposal,tasks_md_sync}.go`, `adapter/{postgres,mysql}/openspec_change_repository.go`, `contracttest/{openspec_change_contract,expected_columns}.go`. `get_plan_proposal.go` là file của agent CR-044: chỉ sửa `addChange`, `planChecksFor` và import.
+
+**Hành vi.**
+- `redactBundle` che từng file bằng `RedactSecrets` (mỗi file đọc tối đa 256 KiB nên một lần quét phủ hết), rồi tính ngân sách trên văn bản đã che: file vượt phần còn lại thành `omittedMarker` của byte thô (kích thước và hash thật) và không tính bí mật của nó. Nhánh `proposal` trên dev server giữ văn bản thô.
+- `GetPlanBundleFile` che lại khi đọc (dòng cũ lưu thô), bỏ qua file `omitted`.
+- `addChange` dùng `ParseOmittedMarker` đặt `Size` thật; dấu sai khuôn rơi về `len(content)` và vẫn `Omitted`.
+- `SECRETS_REDACTED` (info) khi `RedactedSecrets > 0`, thông điệp đúng chữ của đề bài, không chứa nội dung hay vị trí.
+- `restoreDrift` trả `driftNone|driftRestored|driftKept`. Khi `RedactedSecrets > 0` không bao giờ ghi lại `stored`: đã đồng bộ thì so với `SyncDigest` (digest vùng Orca đã ghi); chưa đồng bộ thì so digest **cả file** `md` với `TasksMDDigest` (digest cả file thô lúc tác giả; đề bài ghi "digest bản thô" mà `TasksMDDigest` là của cả file chứ không phải của vùng nên phải so cả file). Lệch thì giữ vùng hiện có, `TasksDrift()` + log warn một lần (sau đó `recordInSync` đặt `SyncDigest` mới). Hệ quả đã biết: trước lần đồng bộ đầu, sửa tay phần văn xuôi ngoài vùng Plan cũng bị đếm là drift khi bản lưu đã che (chỉ ghi số đo và log, không đổi file). Khi `RedactedSecrets == 0` hành vi cũ nguyên vẹn (các test cũ vẫn xanh).
+
+**Lệnh đã chạy.**
+- `go test ./internal/usecase/ -run 'Redact|Bundle|RestoreDrift|PlanChecks|Finish_|GetPlanProposal_Omitted' -race -count=1` xanh; `go test ./... -race -count=1` toàn module xanh.
+- Integration (colima): `go test -tags=integration -p 1 ./internal/adapter/postgres/ ./internal/adapter/mysql/ -run 'OpenSpec|PlanRevision|SchemaContract|Security|Erasable' -count=1` xanh trên Postgres 16 và MySQL 8: hợp đồng `redacted_secrets` ghi/đọc/thay đổi, mặc định 0 cho dòng cũ, migration 0102 xuôi, ngược, xuôi lại với một dòng có sẵn.
+
+**Chưa kiểm chứng.** Đo dương tính giả của `secretscan` trên bộ tài liệu pilot (đề bài ghi "chưa đo"); chạy thật với agent thật trên stack.

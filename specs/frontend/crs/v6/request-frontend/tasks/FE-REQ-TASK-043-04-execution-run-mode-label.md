@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/components/request/execution/{execution-run-mode-model.ts,ExecutionRunModeLabel.tsx,ExecutionSummaryStrip.tsx,ExecutionTab.tsx}` và test (`execution-components.test.tsx`, `execution-run-mode-model.test.ts`)
 **Depends on:** FE-REQ-TASK-043-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -31,13 +31,22 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Nhãn đúng cho Request `continuous` và `step_by_step` có Phase; vắng ở các trường hợp còn lại.
-- [ ] Không có nút Pause hay điều khiển mới.
+- [x] Nhãn đúng cho Request `continuous` và `step_by_step` có Phase; vắng ở các trường hợp còn lại. (`execution-run-mode-model.test.ts` 8 ca; `ExecutionTab.run-mode.test.tsx` 3 ca; `ExecutionRunModeLabel.test.tsx`).
+- [x] Không có nút Pause hay điều khiển mới. (chip chỉ là văn bản có tooltip; test khẳng định không có nút Pause và "Stop run" vẫn có).
 
 ## Rủi ro và lưu ý
 
 - Không có tên người duyệt trong `summary`; tooltip chỉ nói "the person who approved the plan" (không thêm trường backend).
 - Chạy `gitnexus_impact` cho `ExecutionSummaryStrip`.
+
+## Ghi chú triển khai (2026-10-20)
+
+**File** (`frontend/src/renderer/src/components/request/`): mới `execution/execution-run-mode-model.ts`, `execution/ExecutionRunModeLabel.tsx` (`Badge variant="outline"` có `tabIndex=0` để tooltip tới được bằng bàn phím, tự bọc `TooltipProvider`), test `execution-run-mode-model.test.ts`, `ExecutionRunModeLabel.test.tsx`, `ExecutionTab.run-mode.test.tsx`; sửa `execution/ExecutionSummaryStrip.tsx` (prop `runMode`), `execution/ExecutionTab.tsx` (prop `flow?`, truyền `runModeLabelOf(summary.executionMode, flow?.hasPhases)`).
+- **Ngoài danh sách file được giao**: `RequestDetailPane.tsx` thêm đúng một dòng `flow={flow}` cho `ExecutionTab` (task cho phép "nhận qua props từ RequestDetailPane như RequestPlanTab"); biến `flow` có sẵn ở đó.
+
+**Blast radius**: `ExecutionSummaryStrip` chỉ dùng ở `ExecutionTab`; `ExecutionTab` chỉ dùng ở `RequestDetailPane`. Prop mới đều tuỳ chọn; `execution-run-components.test.tsx`, `execution-components.test.tsx`, `ExecutionTab.failure-card.test.tsx` xanh.
+
+**Kiểm chứng**: `npx vitest run --config config/vitest.config.ts src/renderer/src/components/request/execution`: 10 file, 71 test xanh. Tooltip chỉ nói "the person who approved the plan" (không thêm trường backend).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

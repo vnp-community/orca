@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_activity.go` (sửa: hằng, `AllActivityKinds`, mô tả theo kind nếu có), `internal/adapter/{postgres,mysql}/request_activity.go` (sửa), `internal/adapter/contracttest/{activity_revision_contract,activity_contract}.go` (sửa), `internal/adapter/contracttest/activity_revision_sql_test.go` (sửa), test domain của danh sách kind
 **Depends on:** TASK-REQ-045-02
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -33,10 +33,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Lượt Plan có phản hồi hiện đúng một dòng `plan.revision_requested`, không còn dòng `analysis.revision_requested` cho lượt Plan.
-- [ ] Dòng không chứa nội dung phản hồi (C9).
-- [ ] Bộ lọc theo kind nhận kind mới; Request cũ không đổi.
-- [ ] EXPLAIN dùng chỉ mục.
+- [x] Lượt Plan có phản hồi hiện đúng một dòng `plan.revision_requested`, không còn dòng `analysis.revision_requested` cho lượt Plan. (`Activity_PlanRevisionRequested_NotMistakenForAnAnalysis` (Postgres và MySQL): 1 dòng `plan.*`, 1 dòng `analysis.*`)
+- [x] Dòng không chứa nội dung phản hồi (C9). (cùng kịch bản (chuỗi đánh dấu không có trong hàng hay entry) và `TestActivityUnionFeedbackProblem` (phép kiểm văn bản câu lệnh áp cho cả hai nhánh))
+- [x] Bộ lọc theo kind nhận kind mới; Request cũ không đổi. (`TestAllActivityKinds_NamesThePlanRevisionKindOnce`; kịch bản lọc `kinds` trộn hai loại; Request không có lượt Plan có phản hồi không đổi)
+- [x] EXPLAIN dùng chỉ mục. (`TestPostgres_PlanRevisionActivityBranchUsesAnIndex` (Index Scan); MySQL: `possible_keys` có `analysis_runs_idem` (khoá duy nhất không từng phần), bảng thử quá nhỏ nên optimizer chọn quét)
 
 ## Rủi ro và lưu ý
 
@@ -52,3 +52,15 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+## Ghi chú triển khai
+
+**Blast radius (grep).** `AllActivityKinds`: chỉ `cleanActivityKinds` (`list_request_activity.go`) nên bộ lọc `kinds` của gateway/MCP nhận kind mới mà không đổi gì; `BuildActivityEntry` chỉ được gọi ở `list_request_activity.go`; `activityUnion`/`activityBranches` chỉ dùng trong hai adapter. Gateway không liệt kê kind. Frontend rơi vào nhánh kind lạ cho tới FE-REQ-TASK-045-07.
+
+**Tệp đã đổi.** `internal/domain/request_activity.go` (hằng `ActivityPlanRevisionRequested = "plan.revision_requested"`, vào `AllActivityKinds`, nhánh `BuildActivityEntry`: tóm tắt cố định `Requested changes to the plan`, severity info, không `Details`) + `request_activity_test.go`; `internal/adapter/{postgres,mysql}/request_activity.go` (nhánh `analysis.revision_requested` thêm `AND kind <> 'plan'`; nhánh mới thứ 12 `kind = 'plan'`, `id || ':plan-revision'`, `started_at`, `'user'`, `actor_id`, `subject_type = 'plan'`, `subject_id = ''`, **không** chọn `feedback`; MySQL `activityBranches` 11 -> 12); `contracttest/activity_revision_contract.go` (phép kiểm văn bản cho cả hai nhánh, kịch bản mới `activityPlanRevisionRequested`), `activity_revision_sql_test.go` (4 ca sai mới), `execution_repository_contract.go` (đăng ký một dòng); `mysql/request_activity_sql_test.go` (test số nhánh khớp số tham số, vì quên tăng `activityBranches` sẽ lệch đối số âm thầm); `{postgres,mysql}/plan_documents_migration_integration_test.go` (EXPLAIN).
+
+**Lệnh đã chạy.** `go test ./internal/domain/ ./internal/adapter/... -run 'Activity|Union' -count=1` xanh; `go test ./... -race -count=1` toàn module xanh; integration `go test -tags=integration -p 1 ./internal/adapter/postgres/ ./internal/adapter/mysql/ -run 'Activity|Execution'` xanh trên cả hai dialect.
+
+**Lệch so với đề bài.** (1) Hậu tố id là `:plan-revision` (đề bài ghi `id:revision`) để không trùng với hậu tố `:revision` của nhánh analysis nếu một ngày hai nhánh chung một id. (2) Không có migration/chỉ mục mới: Postgres dùng `analysis_runs_by_request` (0100); đo EXPLAIN trên bảng nhỏ (30 lượt) với `enable_seqscan=off` chỉ chứng minh chỉ mục *có thể* phục vụ, chưa đo trên bảng lớn như bản của 041-03.
+
+**Chưa kiểm chứng / ngoài phạm vi.** `proto/orca/request/v1/activity.proto` còn comment liệt kê kind chưa có `plan.revision_requested` (chỉ là comment, không phải file của tôi). Frontend chưa hiển thị kind mới.

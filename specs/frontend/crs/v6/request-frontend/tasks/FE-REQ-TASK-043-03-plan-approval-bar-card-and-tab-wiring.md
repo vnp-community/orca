@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/components/request/plan/{PlanApprovalBar,PlanDecisionButtons,PlanApprovalCard,RequestPlanTab}.tsx` và test (`plan-approval-bars.test.tsx`, `PlanApprovalCard.test.tsx`, `RequestPlanTab.test.tsx`)
 **Depends on:** FE-REQ-TASK-043-02
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -33,15 +33,30 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai nút trên thanh duyệt Plan của `change_request` và `bug`/`refactor` cỡ L; một nút ở thẻ liên tục; không nút ở luồng không có Phase.
-- [ ] Nút phụ gửi đủ trường rủi ro như nút chính.
-- [ ] Nhấp đúp, bấm hai nút liên tiếp: chỉ một lời gọi.
-- [ ] Phím tắt, thứ tự Tab: nút chính, nút phụ, Reject.
+- [x] Hai nút trên thanh duyệt Plan của `change_request` và `bug`/`refactor` cỡ L; một nút ở thẻ liên tục; không nút ở luồng không có Phase. (`plan-approval-bars.run-all.test.tsx`, `RequestPlanTab.run-all.test.tsx`, `PlanApprovalCard.test.tsx`; luồng được mời là luồng backend có `hasPhases`, không xét theo tên loại; xem "chưa kiểm" về bố cục).
+- [x] Nút phụ gửi đủ trường rủi ro như nút chính. ("sends the risk-gate fields together with the execution mode" trong `plan-approval-bars.run-all.test.tsx`).
+- [x] Nhấp đúp, bấm hai nút liên tiếp: chỉ một lời gọi. (test "locks the choice while the main Approve is in flight" và "opening and cancelling... confirming sends executionMode once"; `usePlanDecision.run-all.test.ts` "blocks a second call...").
+- [x] Phím tắt, thứ tự Tab: nút chính, nút phụ, Reject. (thứ tự DOM `plan-approve`, `plan-approve-run-all`, `plan-reject` được kiểm; nút phụ nằm giữa vì `PlanDecisionButtons` dựng nó ngay sau Approve).
 
 ## Rủi ro và lưu ý
 
 - Chạy `gitnexus_impact` cho `PlanApprovalBar`, `PlanDecisionButtons`, `PlanApprovalCard`, `RequestPlanTab`.
 - Bố cục thanh hẹp (ba nút + Regenerate): kiểm ở 3 kích thước, cho phép xuống dòng.
+
+## Ghi chú triển khai (2026-10-20)
+
+**File sửa** (`frontend/src/renderer/src/components/request/plan/`): `PlanDecisionButtons.tsx` (props `approveExecutionMode`, `runAll`; vùng nút `flex-wrap`; nút phụ giữa Approve và Reject), `PlanApprovalBar.tsx` (props `approveExecutionMode`, `runAll`; tự đọc `supportsApproveRunAll` từ store; tính `canOfferRunAll` với `risk.approverNotAllowed` và `decision.runAllPinned`), `PlanApprovalCard.tsx` (`approveExecutionMode="continuous"`, không nút phụ), `RequestPlanTab.tsx` (250 dòng, +1: truyền `runAll={{ request, flow: flowView, stepCount: tree.phases.length }}`), `hooks/usePlanDecision.ts` (cờ `runAllPinned` theo Request, giữ qua các lần làm mới). Test mới: `plan-approval-bars.run-all.test.tsx` (16), `RequestPlanTab.run-all.test.tsx` (6); thêm 1 ca vào `PlanApprovalCard.test.tsx`.
+
+**Blast radius**: `PlanApprovalBar` dùng ở `RequestPlanTab` và `PlanApprovalCard`; `PlanDecisionButtons` dùng ở `PlanApprovalBar`, `PhaseApprovalBar`, `PlanGateChips` (các props mới đều tuỳ chọn nên hành vi cũ không đổi; cổng Phase/pre_deploy không có nút phụ); `PlanApprovalCard` dùng ở `RequestPlanTab`. Approval Inbox, `PhaseApprovalBar`, `ExecutionNeedsYou` không đổi.
+
+**Khác với task text**
+- Việc đọc cờ `supported` đặt trong `PlanApprovalBar` (không ở `RequestPlanTab`) để giữ `RequestPlanTab` dưới 300 dòng và để mọi nơi dùng thanh duyệt đúng quy tắc.
+- Cờ "đã ghim" lưu trong `usePlanDecision` (sống cùng `RequestPlanTab`) chứ không `useState` trong thanh duyệt, vì thanh bị gỡ rồi dựng lại khi tab tải lại sau `onSettled`.
+- Thanh duyệt không mời lựa chọn khi `stepCount === 0` (không có số thật để hỏi).
+
+**Chưa kiểm**: bố cục thanh hẹp (ba nút + Regenerate) ở 3 kích thước chưa nhìn bằng mắt (chưa dựng giao diện); dùng `flex-wrap` nên cho phép xuống dòng. Chưa chạy trên stack.
+
+**Kiểm chứng (từ `frontend/`)**: `npx vitest run --config config/vitest.config.ts src/renderer/src/components/request`: mọi test đã đổi xanh; test hiện có của ba file (`plan-approval-bars.test.tsx`, `PlanApprovalCard.test.tsx`, `RequestPlanTab.test.tsx`) xanh.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

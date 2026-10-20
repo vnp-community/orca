@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/evidence.go` (sửa), `internal/domain/evidence_truncation_test.go` (mới), `internal/domain/vietnamese_limits_test.go` (mới), `internal/adapter/contracttest/solution_contract.go` (sửa: thêm ca), test tích hợp `internal/adapter/{postgres,mysql}/solution_integration_test.go` (chạy lại)
 **Depends on:** không (độc lập, làm bất kỳ lúc nào)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -32,14 +32,33 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `NewEvidence` không bao giờ trả UTF-8 không hợp lệ hoặc quá 4096 byte; test bắt được lỗi cũ.
-- [ ] Giới hạn rune chạy đúng với tiếng Việt có dấu ở ngưỡng và ngay trên ngưỡng.
-- [ ] Ca hợp đồng tài liệu lớn xanh trên Postgres 16 và MySQL 8.
+- [x] `NewEvidence` không bao giờ trả UTF-8 không hợp lệ hoặc quá 4096 byte; test bắt được lỗi cũ. `TestNewEvidence_*` bắt được lỗi cũ (đột biến); kết quả luôn `utf8.ValidString`, `<= 4096` byte, là tiền tố, chỉ bỏ tối đa một ký tự.
+- [x] Giới hạn rune chạy đúng với tiếng Việt có dấu ở ngưỡng và ngay trên ngưỡng. `TestVietnameseTextAgainstTheRuneLimits` ở ngưỡng, ngưỡng +1 và NFD.
+- [x] Ca hợp đồng tài liệu lớn xanh trên Postgres 16 và MySQL 8. `LargeVietnameseDocumentSurvivesTheDatabase` xanh trên Postgres 16 và MySQL 8 (testcontainers).
 
 ## Rủi ro và lưu ý
 
 - Văn bản NFD đếm nhiều rune hơn NFC; CR không chuẩn hoá (R5). Test chỉ ghi nhận sự khác biệt, không đổi hành vi.
 - Không đổi các hàm cắt đã hợp lệ ở danh sách trên (ngoài phạm vi, sẽ làm lệch giới hạn hiện có).
+
+## Ghi chú triển khai
+
+**Tệp (dưới `services/request-service/internal/`):** sửa `domain/evidence.go` (hằng `evidenceExcerptMaxBytes`, cắt lùi về ranh giới rune bằng `utf8.RuneStart`), `adapter/contracttest/solution_contract.go` (một dòng đăng ký ca); mới `domain/evidence_truncation_test.go`, `domain/vietnamese_limits_test.go`, `adapter/contracttest/solution_contract_vietnamese.go` (tách file để không làm `solution_contract.go` dài thêm).
+
+**Lệnh và kết quả:**
+- `go test ./internal/domain -run 'Evidence|Vietnamese' -race -count=1` xanh.
+- Kiểm đột biến: bỏ vòng lùi `utf8.RuneStart` thì 11 kiểm tra "valid UTF-8" của `evidence_truncation_test.go` đỏ; hoàn lại thì xanh.
+- Hợp đồng lưu trữ, hai dialect, testcontainers: `go test -tags=integration -p 1 ./internal/adapter/postgres/ -run TestPostgres_SolutionContract` và `./internal/adapter/mysql/ -run TestMySQL_SolutionContract` đều xanh, gồm `UnicodeAndDigestSurviveTheDatabase` và ca mới `LargeVietnameseDocumentSurvivesTheDatabase`.
+- `go test ./... -count=1` toàn module xanh.
+
+**Test giới hạn:** `TestVietnameseTextAgainstTheRuneLimits` (6 giới hạn: `approach` 4000, `title` 120, `summary` 600, `excerpt` 600, `answer_markdown` 8000, tiêu đề task 200): đúng ngưỡng qua, ngưỡng +1 bị từ chối đúng thông báo, và bản NFD của cùng văn bản (đếm nhiều rune hơn, assert) bị từ chối, nên R5 có bằng chứng; không chuẩn hoá, không đổi hành vi.
+
+**Lệch so với đặc tả:**
+- Ca hợp đồng so khớp tài liệu qua digest chuẩn hoá và từng chuỗi (`title`/`summary`/`approach`) chứ không so byte tài liệu, vì cột `JSON` của MySQL sắp xếp lại khoá và khoảng trắng; `RawOutput` (cột TEXT/MEDIUMTEXT) so khớp từng byte.
+- `RawOutput` trong ca là chuỗi 3 byte/ký tự cắt bằng `domain.TruncateRaw` ở trần 256 KB (262,144 byte; 262,144 chia 3 dư 1 nên phép cắt phải lùi một byte), không phải "vài trăm KB" không cắt, vì mã thật không bao giờ lưu quá trần đó.
+- Tài liệu bốn option 4000 rune có dấu nằm trong `MaxOptionsBytes` (64 KiB) với chữ 3 byte; ca kiểm `len(doc) <= MaxOptionsBytes`.
+
+**Blast radius:** `NewEvidence` không có người gọi (đã `grep`); không đổi migration hay cột.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

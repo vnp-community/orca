@@ -54,9 +54,9 @@ proto/orca/request/v1/plan.proto                                                
                                                                                           PlanBundle.redacted_secrets=10; ListPlanRevisions + PlanRevision
 proto/orca/request/v1/request.proto                                                 (sửa) rpc ListPlanRevisions
 services/request-service/
-  migrations/{postgres,mysql}/0102_plan_auto_jobs_revision_origin.{up,down}.sql      (mới) mở rộng CHECK/ENUM origin của plan_auto_jobs (0101 là của BE-REQ-SOL-044)
-  migrations/{postgres,mysql}/0103_openspec_change_redaction.{up,down}.sql          (mới) cột redacted_secrets
-  migrations/{postgres,mysql}/0104_openspec_change_revisions.{up,down}.sql          (mới) bảng bản
+  migrations/{postgres,mysql}/0104_plan_auto_jobs_revision_origin.{up,down}.sql      (mới) mở rộng CHECK/ENUM origin của plan_auto_jobs (0101 là của BE-REQ-SOL-044; 0104 chứ không phải 0102, vì golang-migrate bỏ qua số nhỏ hơn bản đã áp dụng)
+  migrations/{postgres,mysql}/0102_openspec_change_redaction.{up,down}.sql          (mới) cột redacted_secrets
+  migrations/{postgres,mysql}/0103_openspec_change_revisions.{up,down}.sql          (mới) bảng bản
   internal/domain/openspec_change_revision.go (+ _test)                             (mới) PlanRevision, trạng thái, nhãn đổi, hằng PlanRevisionTextKept
   internal/domain/openspec_change.go                                                (sửa) RedactedSecrets
   internal/domain/plan_errors.go                                                    (sửa) 5 mã lỗi mới
@@ -100,7 +100,7 @@ tests/stages/e2e/orca-flows/suite_plan_revision.py, plan_documents_seed.py      
 - `GeneratePlanRequest.idempotency_key` (trường 3, tối đa 128 ký tự, kiểm như `GenerateSolution`) chuyển vào `GeneratePlanInput.IdempotencyKey` (trường usecase do BE-REQ-SOL-044 thêm cho đường hệ thống; nếu 044 chưa vào thì thêm giống hệt ở đây để hai CR không xung đột) và vào `AnalysisRun.IdempotencyKey`.
 - `inheritedPlanFeedback`: khi `in.Feedback == ""` và Request ở `planning`, lấy `Feedback` của lượt Plan gần nhất nếu `failed` (qua `AnalysisRunStore.ListSucceeded`-cùng-họ hoặc `ListRecent`, xem task 02); lượt `succeeded` hoặc `running` không kế thừa. Phản hồi mới thay hẳn.
 - `refuseSecondPlanRevision`: có `feedback`, `res.Created == false`, khác khoá idempotency → `ErrPlanRevisionInProgress` (`REQUEST_PLAN_REVISION_IN_PROGRESS`, `FailedPrecondition`). Gọi hệ thống và không phản hồi giữ cách cũ (trả lượt đang chạy).
-- **Job commit phía server**: khi `req.PlanTaskID != ""` và `run.Feedback != ""` (thật hoặc kế thừa) và repository job đã nối, trong cùng `InTx` với `StartRun` (chỉ khi `res.Created`) chèn `PlanAutoJob{Origin: "revision", State: running, RunID: run.ID, MaxAttempts: 1, Anchor: "rev-<run.ID>", RequestedBy: actor}`; migration `0102` mở rộng giá trị `origin`. Worker của 044 xử lý tiếp (`running → committing → done/gave_up`). Không tạo job ở lần sinh Plan đầu. `GetPlanProposal.auto_plan` (044) cho giao diện thấy `origin = 'revision'`.
+- **Job commit phía server**: khi `req.PlanTaskID != ""` và `run.Feedback != ""` (thật hoặc kế thừa) và repository job đã nối, trong cùng `InTx` với `StartRun` (chỉ khi `res.Created`) chèn `PlanAutoJob{Origin: "revision", State: running, RunID: run.ID, MaxAttempts: 1, Anchor: "rev-<run.ID>", RequestedBy: actor}`; migration `0104` mở rộng giá trị `origin`. Worker của 044 xử lý tiếp (`running → committing → done/gave_up`). Không tạo job ở lần sinh Plan đầu. `GetPlanProposal.auto_plan` (044) cho giao diện thấy `origin = 'revision'`.
 - Hotfix: ở đường chỉnh (`awaiting_plan_approval` + phản hồi), `flow.PlanKind == PlanSingleTask` → `ErrPlanRevisionNotApplicable` (`REQUEST_PLAN_REVISION_NOT_APPLICABLE`, `FailedPrecondition`), trước mọi ghi.
 - Dev server: `connCtx` như `generate_solution.go` (người gọi khác reporter thì tra bằng reporter); `reporterIdentity` bỏ loại trừ `RunKindPlan` (chỉ đổi ngữ cảnh tra kết nối/chạy; `run.ActorID` vẫn là người gọi). Trước khi đổi: `git log -S 'RunKindPlan' -- analysis_runner.go`, đọc mọi lời gọi của hai worker Plan với `tenant.UserID`.
 

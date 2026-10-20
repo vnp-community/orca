@@ -5,7 +5,7 @@
 **Area:** frontend / project
 **File:** `frontend/src/renderer/src/hooks/useProjectEngineSettings.ts` (mới), `frontend/src/renderer/src/components/project/ProjectRequestExecutionSection.tsx` (mới), `frontend/src/renderer/src/components/project/ProjectSettings.tsx` (sửa một dòng nhúng), `frontend/src/shared/request-run-all.ts` (parse cài đặt engine) và test
 **Depends on:** FE-REQ-TASK-043-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -34,15 +34,31 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Admin đổi chế độ dự án từ giao diện mà không làm đổi engine, `openspecMinVersion`, `solutionAgent`.
-- [ ] Người không phải admin thấy giá trị và lý do không sửa được.
-- [ ] Request đã ghim không bị đổi (mô tả đúng trong giao diện).
+- [x] Admin đổi chế độ dự án từ giao diện mà không làm đổi engine, `openspecMinVersion`, `solutionAgent`. (`useProjectEngineSettings.test.ts` "saves the new mode together with everything it read" và `ProjectRequestExecutionSection.test.tsx` "lets an administrator switch and save, keeping the other settings as read" với engine `openspec`, `1.2.3`, `solutionAgent: true`; chưa chạy trên stack).
+- [x] Người không phải admin thấy giá trị và lý do không sửa được. ("shows anyone else the value read-only with the reason").
+- [x] Request đã ghim không bị đổi (mô tả đúng trong giao diện). (dòng mô tả "Applies to requests that start running from now on. Requests already running keep their mode."; việc không đổi Request đã ghim là hành vi backend, chưa kiểm trên stack).
 
 ## Rủi ro và lưu ý
 
 - Chạy `gitnexus_impact` cho `ProjectSettings`.
 - Chưa rõ vai trò admin ở client có luôn khớp `callerIsAdmin` của backend (admin toàn hệ thống); lỗi `FORBIDDEN` từ backend vẫn được hiển thị đúng.
 - Câu hỏi mở 5 của CR: chủ dự án không phải admin chưa đổi được.
+
+## Ghi chú triển khai (2026-10-20)
+
+**File** (`frontend/src/`): mới `renderer/src/hooks/useProjectEngineSettings.ts` (+ test, 11), `renderer/src/components/project/ProjectRequestExecutionSection.tsx` (+ `__tests__/ProjectRequestExecutionSection.test.tsx`, 9); `shared/request-run-all.ts` thêm `parseEngineSettings`; `ProjectSettings.tsx` thêm đúng một import và một dòng nhúng sau `ProjectJiraMappingSection`.
+- **Ngoài danh sách**: `components/project/__tests__/ProjectSettings.test.tsx` — thêm mock cho mục mới (như các mục khác) và một test "embeds the request execution section in the General tab, after the Jira mapping". File test này **đã đỏ sẵn trên HEAD** (8/8 ca báo `useConfirmationDialog must be used inside ConfirmationDialogProvider` vì `ProjectSettings` gọi hook xoá dự án mà test không bọc provider); tôi thêm mock `../../confirmation-dialog` nên nay 9/9 xanh.
+
+**Thiết kế**
+- Hook: trạng thái `loading | ready | forbidden | unsupported | error` (kênh không có hoặc `feature_off` → `unsupported`, mục không hiển thị); `saveExecutionMode` gửi cả bộ vừa đọc + `expectedVersion`; `REQUEST_ENGINE_SETTINGS_VERSION_CONFLICT` → đọc lại, trả `conflict`; token đọc chống kết quả muộn của dự án cũ; khoá lưu bằng `useRef`.
+- Mục dùng `SettingsSegmentedControl` có sẵn (`role=radiogroup`/`radio`) vì `components/ui` không có radio; bản nháp chỉ là state `draft`, giá trị hiển thị còn lại là giá trị backend trả. Admin theo `currentUser.role === 'admin'`; `FORBIDDEN` từ backend biến mục thành chỉ đọc cho dự án đó. Dòng `version === 0` chỉ hiện với người sửa được.
+- `parseEngineSettings`: `engine` bắt buộc là chuỗi (ghi lại nguyên văn, kể cả rỗng), `openspecMinVersion`/`solutionAgent`/`version` thiếu thì lấy mặc định proto3, `executionMode` rỗng hoặc thiếu = `step_by_step`, giá trị lạ → `null`. Đối chiếu với `EngineSettingsView` của gateway (`channels_request_engine.go`): các khoá `projectId, engine, openspecMinVersion, solutionAgent, executionMode, version`.
+
+**Blast radius**: `ProjectSettings` chỉ được dựng bởi `ProjectSwitcher` (trang Workspace). Không đổi mục nào khác trong tab General; `react-doctor` có 1 cảnh báo có sẵn ở `ProjectSettings.tsx:95` (không phải của thay đổi này).
+
+**Chưa kiểm**: giao diện thật trong hộp thoại (độ rộng của control, cuộn); chưa chạy trên stack. Admin ở client khớp backend (`callerIsAdmin`) chưa kiểm.
+
+**Kiểm chứng**: `npx vitest run --config config/vitest.config.ts src/renderer/src/hooks/useProjectEngineSettings.test.ts src/renderer/src/components/project`: 12 file, 91 test xanh.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

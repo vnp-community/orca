@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/{decide_approval,decide_approval_execution_mode,audit_event_tap}.go` (sửa/mới), `internal/adapter/grpc/approval_server.go` (sửa), `cmd/server/wire_approval.go` (sửa), test tương ứng
 **Depends on:** TASK-REQ-043-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -35,10 +35,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Duyệt Plan kèm `continuous` ghim chế độ và chuyển Request sang `executing` trong một transaction; handler lỗi để lại cột `NULL`.
-- [ ] Quyết định không kèm chế độ hành xử y hệt trước (so sánh test hiện có, không sửa kỳ vọng).
-- [ ] Payload `approval.decided` có `execution_mode` đúng điều kiện; audit có metadata.
-- [ ] Thiếu `Pinner` khi khởi động thì lỗi.
+- [x] Duyệt Plan kèm `continuous` ghim chế độ và chuyển Request sang `executing` trong một transaction; handler lỗi để lại cột `NULL`. Bằng chứng: `TestDecideApproval_ContinuousPinsTheModeWithTheDecision`, `TestDecideApproval_HandlerFailureRollsTheModeBack`; contract thật trên Postgres 16 và MySQL 8: `RunAllPinsTheModeInTheDecisionsTransaction`, `RunAllRollsBackWithTheSubjectHandler`.
+- [x] Quyết định không kèm chế độ hành xử y hệt trước (so sánh test hiện có, không sửa kỳ vọng). Bằng chứng: toàn bộ `TestApproval_*` cũ xanh không sửa kỳ vọng; thêm `TestDecideApproval_NoChoiceBehavesAsBefore`, `...NoChoiceReportsTheModeAlreadyPinned`, contract `ApproveWithoutModeLeavesTheModeUnpinned`.
+- [x] Payload `approval.decided` có `execution_mode` đúng điều kiện; audit có metadata. Bằng chứng: `TestDecideApproval_*` kiểm khoá có/vắng; `TestAudit_EveryEventDerivedActionWritesExactlyOneEntry/approve_and_run_all_steps`; contract đọc hàng outbox thật.
+- [x] Thiếu `Pinner` khi khởi động thì lỗi. Bằng chứng: `requireWired` duyệt mọi trường xuất khẩu của `DecideApproval` trừ `Log, Confirm, StartPrecheck`, nên `Pinner` nil làm khởi động lỗi `wiring: DecideApproval.Pinner is nil`; `go test ./cmd/...` xanh. `TestDecideApproval_ModeWithoutAPinnerIsAnExplicitError` giữ lỗi `REQUEST_EXECUTION_MODE_PINNER_MISSING` (Internal) cho đường dùng trực tiếp.
 
 ## Rủi ro và lưu ý
 
@@ -55,3 +55,13 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+## Ghi chú triển khai (2026-10-20)
+
+- Mã: `usecase/decide_approval.go` (Input/Result/`Pinner`, phân tích sớm, kiểm `ExecutionModeChoiceApplies` trước precheck, ghim sau stage mismatch và trước `a.Approve`, payload, kết quả đọc từ `after`), `usecase/decide_approval_execution_mode.go` (mới, `pinRequestedMode`), `usecase/audit_event_tap.go` (`auditFields.ExecutionMode`, `md["execution_mode"]`), `adapter/grpc/approval_server.go` (`decide(...)` thêm `executionMode`, `Approve` trả `ExecutionMode`, `Reject` truyền `""`), `cmd/server/wire_approval.go` (`Pinner: stores.executionModes`).
+- Test mới: `usecase/decide_approval_execution_mode_test.go` (hợp lệ, không chọn, đã ghim `step_by_step`/`continuous`, handler lỗi cuộn lại, nhấp đúp, `Pinner == nil`, hai quyết định đồng thời, subject/stage sai, `reject` kèm chế độ, precheck thấy chế độ yêu cầu), thêm ca vào `audit_test.go`, `adapter/grpc/approval_server_test.go` (`Approve` chuyển `execution_mode` xuống use case).
+- Lệnh: `go test ./internal/usecase/... -run 'DecideApproval|Audit|ExecutionMode'`, `go test ./internal/adapter/grpc/...`, `go test ./...` trong request-service: xanh. Contract: `go test -tags=integration -p 1 ./internal/adapter/postgres/ ./internal/adapter/mysql/ -run 'Execution|Approval'` xanh (Postgres 23s, MySQL 62s).
+- Chứng minh ghim cuộn lại cùng transaction trên hai DB: `RunAllRollsBackWithTheSubjectHandler` đọc lại cột `execution_mode` rỗng, Approval `pending` v1, Request ở `awaiting_plan_approval`, không có hàng outbox.
+- Blast radius (grep): `DecideApproval.Execute` được gọi duy nhất từ `adapter/grpc/approval_server.go`; `DecideApprovalInput`/`Result` dùng trong `contracttest/approval_flow_contract.go`, `e2e/*` (tag `e2e`, `go vet -tags=e2e` xanh) và test usecase. `approvalAudit` chỉ đọc thêm một khoá, các nhánh `rejected/cancelled/expired` không đổi. `ApprovalServer.decide` đổi chữ ký nội bộ (hai chỗ gọi).
+- Sai khác so với spec: thứ tự kiểm `NotApplicable` chạy cả khi Approval đã được quyết định (gọi lại), vì dựa vào `probe`; gọi lại một quyết định đã xong với `continuous` trả chế độ đang ghim, không ghim lại.
+- Không kiểm chứng: chạy trên stack thật (WS, UI).

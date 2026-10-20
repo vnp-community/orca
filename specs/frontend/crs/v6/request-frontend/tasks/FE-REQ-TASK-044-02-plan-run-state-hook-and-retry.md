@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/hooks/usePlanRunState.ts` (mới) và `usePlanRunState.test.ts` (mới), `frontend/src/renderer/src/hooks/usePlanRetry.ts` (mới) và `usePlanRetry.test.ts` (mới), `frontend/src/renderer/src/components/request/plan/plan-auto-display.ts` (mới) và `plan-auto-display.test.ts` (mới), `frontend/src/renderer/src/hooks/usePlanRunInFlight.ts` và `usePlanRunInFlight.test.ts` (xoá sau khi chuyển người gọi ở task 03)
 **Depends on:** FE-REQ-TASK-044-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -32,15 +32,24 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Trạng thái hiển thị suy ra thuần từ run và `autoPlan`, đúng bảng, kể cả gateway cũ.
-- [ ] `usePlanRunState` coi run `running` là bận cả khi `planTaskId` đã có.
-- [ ] Retry đi qua server khi được, rơi về luồng thủ công khi không; không bấm kép.
-- [ ] Không còn người gọi `usePlanRunInFlight` sau task 03.
+- [x] Trạng thái hiển thị suy ra thuần từ run và `autoPlan`, đúng bảng, kể cả gateway cũ. (`plan-auto-display.test.ts`, gồm bảng đầy đủ 3 status x 4 run x 7 job x planTaskId x grace)
+- [x] `usePlanRunState` coi run `running` là bận cả khi `planTaskId` đã có. (`usePlanRunState.test.ts`: "polls although the Request already has a Plan")
+- [x] Retry đi qua server khi được, rơi về luồng thủ công khi không; không bấm kép. (`usePlanRetry.test.ts`)
+- [x] Không còn người gọi `usePlanRunInFlight` sau task 03. (đã xoá file và test; grep không còn tham chiếu trong `frontend/src`)
 
 ## Rủi ro và lưu ý
 
 - Chạy `gitnexus_impact` cho `usePlanRunInFlight` và `usePlanDecision` trước khi sửa/xoá.
 - Ân hạn "starting" đo ở client (20 giây): trang mở trên Request kẹt sẽ hiện "starting" tối đa 20 giây rồi trả về nút Generate; chấp nhận được.
+
+## Ghi chú triển khai (2026-10-20)
+
+- **File**: mới `components/request/plan/plan-auto-display.ts`, `hooks/usePlanRunState.ts`, `hooks/usePlanRetry.ts`, `hooks/usePlanAutoGeneration.ts` (hook ghép ba phần cho `RequestPlanTab`, để tab không phình) và các test cùng tên; xoá `hooks/usePlanRunInFlight.ts` + test.
+- **Lệnh**: `npx vitest run --config config/vitest.config.ts src/renderer/src/hooks/usePlanRunState.test.ts src/renderer/src/hooks/usePlanRetry.test.ts src/renderer/src/components/request/plan/plan-auto-display.test.ts` xanh (65 test); `oxlint` và `oxlint --config frontend/config/oxlint-react-doctor.json` sạch.
+- **Thiết kế**: `usePlanRunState` trả thêm `graceElapsed`; state theo `requestId` (snapshot) thay cho `setState` trong effect để qua `react-doctor/no-adjust-state-on-prop-change`; `refresh()` trong lúc một lần đọc đang bay sẽ đọc lại ngay sau đó. `usePlanRetry` bỏ qua lỗi `IN_FLIGHT` của `decision.regeneratePlan`. `derivePlanAutoDisplay` bỏ qua `autoPlan` khi `supportsPlanAuto` sai; mã mặc định `REQUEST_INTERNAL` khi run `failed` không có mã (cùng luồng thủ công).
+- **Blast radius**: `usePlanRunInFlight` chỉ có `RequestPlanTab` gọi (đã chuyển). `usePlanDecision` không sửa.
+- **Điểm cần backend làm rõ (quan trọng)**: BE task 07 nói "không run và không job thì vẫn `REQUEST_PLAN_RUN_NOT_FOUND`". Khi đó giao diện không biết `enabled` trong khoảng giữa duyệt Analysis và lúc job được tạo, nên "starting" không xuất hiện và nút Generate có thể hiện vài giây rồi mất. Để "starting" hoạt động, `request.planProposal` cần trả view rỗng kèm `autoPlan{enabled:true}` (không lỗi) khi tính năng bật; client cũ coi view rỗng giống "không có run". Tương tự cho công tắc dự án tắt: spec e2e (e) chờ `autoPlan.enabled=false` từ API.
+- **Chưa kiểm**: hành vi với gateway thật.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

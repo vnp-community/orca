@@ -5,7 +5,7 @@
 **Service:** `deploy/dev`, `docs`
 **File:** `deploy/dev/docker-compose.yml` (sửa, khối `request-service` quanh dòng 463-475), `deploy/dev/.env.example` (sửa, khối "Request defaults" quanh dòng 221-228), `deploy/dev/README.md` (sửa), `deploy/dev/RELEASE-2026-10-DEPLOY.md` (sửa mục 4.1) hoặc tài liệu phát hành của bản kế tiếp nếu bản 2026-10 đã phát hành, `docs/guides/request/admin-enable-request-flow.md` (thêm một mục ngắn), `docs/guides/request/knowledge-hub-setup.md` (một dòng về kỹ năng)
 **Depends on:** TASK-REQ-046-02
-**Status:** [ ] TODO
+**Status:** [ ] PARTIAL (2026-10-20): các kiểm thủ công (a) và (b) trên stack chưa chạy (not run on the stack)
 
 ---
 
@@ -32,14 +32,24 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Compose, `.env.example`, README, tài liệu phát hành, hướng dẫn quản trị nêu biến, giá trị, mặc định, hiệu lực và ngoại lệ "sai thì dừng".
-- [ ] Ghi chú phát hành nêu tác động lên tenant hiện có và cách quay lại.
-- [ ] Hai kiểm thủ công (a) và (b) có kết quả trong PR.
+- [x] Compose, `.env.example`, README, tài liệu phát hành, hướng dẫn quản trị nêu biến, giá trị, mặc định, hiệu lực và ngoại lệ "sai thì dừng". Bằng chứng ở "Ghi chú triển khai": cả năm tài liệu nêu biến, giá trị, mặc định, hiệu lực sau `redeploy-local.sh request-service` và ngoại lệ "sai thì dừng".
+- [x] Ghi chú phát hành nêu tác động lên tenant hiện có và cách quay lại. Mục "Tác động" ở `RELEASE-2026-10-DEPLOY.md` 4.1: tenant hiện có, `en` vẫn ép tiếng Anh, giao diện chưa có locale `vi`, kỹ năng cần `npx skills update`, cách quay lại.
+- [ ] Hai kiểm thủ công (a) và (b) có kết quả trong PR. Chưa chạy: hai kiểm thủ công (a) và (b) cần stack local (not run on the stack).
 
 ## Rủi ro và lưu ý
 
 - Đổi mặc định của mọi triển khai sang tiếng Việt là có chủ ý (quyết định của người dùng); không thêm cờ "giữ hành vi cũ" ngoài `en`.
 - `RELEASE-2026-10-DEPLOY.md` là tài liệu của một bản phát hành cụ thể: nếu bản đó đã phát hành, thêm vào tài liệu phát hành kế tiếp thay vì sửa lịch sử.
+
+## Ghi chú triển khai
+
+**Tệp:** `deploy/dev/docker-compose.yml` (khối `request-service`, ngay dưới `REQUEST_DEFAULT_EXECUTION_MODE`), `deploy/dev/.env.example`, `deploy/dev/README.md` (mục mới "Ngôn ngữ đầu ra của AI" trong "Luồng Request trên stack local"), `deploy/dev/RELEASE-2026-10-DEPLOY.md` (hàng mới ở mục 1 và bảng 4.1, câu "giá trị sai không làm service chết" nay chỉ nói ba biến cũ và nêu ngoại lệ, đoạn "Tác động", dòng quay lại ở mục 7), `docs/guides/request/admin-enable-request-flow.md` (mục "Ngôn ngữ đầu ra của AI"), `docs/guides/request/knowledge-hub-setup.md` (một câu cạnh `npx skills update`).
+
+**Lệnh và kết quả:** `docker compose -f deploy/dev/docker-compose.yml config` hợp lệ và hiện `REQUEST_DEFAULT_OUTPUT_LANGUAGE: vi`; `grep` toàn `deploy/` và `docs/` không còn câu nói chung "mọi `REQUEST_DEFAULT_*` đều không làm service chết" (chỉ còn câu giới hạn ở ba biến cũ). Liên kết tương đối mới (`../../../deploy/dev/README.md` từ `docs/guides/request/`) cùng mẫu với các liên kết sẵn có trong tệp đó.
+
+**Quyết định:** bản 2026-10 chưa có tag/phát hành (chỉ một commit tài liệu và nhánh đang phát triển), nên thêm vào `RELEASE-2026-10-DEPLOY.md` thay vì mở tài liệu bản kế tiếp. Nếu bản đó đã phát hành thật thì chuyển các đoạn này sang tài liệu bản sau.
+
+**Chưa chạy (cần stack, do bên điều phối):** (a) `redeploy-local.sh request-service` không đặt biến: log khởi động có `output language code=vi`; (b) đặt `REQUEST_DEFAULT_OUTPUT_LANGUAGE=fr`: container thoát với thông báo đúng và `docker compose logs request-service` hiện nó, rồi trả lại `vi`. Phần mã của (b) đã có test đơn vị (`TestRun_UnsupportedOutputLanguageStopsBeforeAnythingIsOpened`).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

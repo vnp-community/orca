@@ -6,10 +6,15 @@
   python3 run_ui_flow.py --ai-stub -- --headed   # anything after `--` goes to `playwright test`
   python3 run_ui_flow.py --ai-stub -- request-base-branch  # starting branch of a Request on a LedgerLite repo (CR-REQ-040): Create dialog, Overview row, edit, lock, unknown branch, feature off
   python3 run_ui_flow.py --ai-stub -- analysis-revision   # revising an analysis by prompt (CR-REQ-041): versions, read-only old ones, Activity line, refusals; bug, spike, question once each
+  python3 run_ui_flow.py --ai-stub -- approve-run-all     # "Approve and run all steps" (CR-REQ-043): the choice and its confirmation, what it pins, the Execution tab label, the Project Settings switch, a gateway without approval.runAll
+  python3 run_ui_flow.py --ai-stub -- auto-plan-generation  # the Plan written by Orca after the Analysis is approved (CR-REQ-044): no Generate button, failed run kept on screen with Retry, transient failure retried, project switch off, a gateway without request.planAuto (the dev server must run on this machine: the spec makes the fake claude fail through its state dir)
+  python3 run_ui_flow.py --ai-stub -- plan-documents      # reading the plan the AI wrote (CR-REQ-045): Proposal of a native plan, Documents of an OpenSpec change (rows planted by plan_documents_seed.py), no Documents entry on the native engine; the real OpenSpec case (7 to 13 USD) is skipped unless ORCA_E2E_OPENSPEC=1
+  python3 run_ui_flow.py --ai-stub -- plan-revision       # revising a plan by prompt (CR-REQ-045): three versions, read-only old ones, one Approval at a time, the History line, too long, an out-of-date screen, a failed round and Try again
+  python3 run_ui_flow.py --real plan-revision # REAL Claude Code, one revision round of a native `bug` plan on a throwaway repo (a small cost)
   python3 run_ui_flow.py --real readonly # REAL Claude Code, read-only analysis on a throwaway repo (question, bug)
   python3 run_ui_flow.py --real execute  # REAL Claude Code approves and EXECUTES a tiny Plan on a throwaway repo
   python3 run_ui_flow.py --real native-execute # REAL Claude Code executes a native `bug` and a native `task` (QA 2026-10-16: engine, tabs, agent log shows no CLI diagnostic as an error)
-  python3 run_ui_flow.py --real continuous # REAL Claude Code runs a two-step Plan that is approved ONCE (project execution mode `continuous`); the Execution tab follows it (CR-REQ-038 / FE-REQ-037)
+  python3 run_ui_flow.py --real continuous # REAL Claude Code runs a two-step Plan that is approved ONCE with "Approve and run all steps" (project stays `step_by_step`); the Execution tab follows it (CR-REQ-038 / FE-REQ-037 / CR-REQ-043)
   python3 run_ui_flow.py --real monitor  # REAL Claude Code executes a one-task Plan while the spec watches the agent through the UI (TASK-FE-E2E-011)
   python3 run_ui_flow.py --real addproject # REAL Claude Code, read-only: Add Project makes its own project per repo, a duplicate folder is refused, a Request in that project is answered from the right repo (TASK-FE-E2E-027)
   python3 run_ui_flow.py --real all      # all four; never combined with --ai-stub
@@ -43,6 +48,8 @@ REAL_SPECS = {
     "continuous": ["continuous-execute-real"],
     "native-execute": ["qa-native-execute-real"],
     "monitor": ["agent-session-monitoring-real"],
+    # Why: the file also holds fake-claude tests; they skip themselves when the AI mode is not the stub.
+    "plan-revision": ["plan-revision.web"],
     "addproject": ["add-project-own-project-request-real"],
     "all": ["/readonly-real", "/execute-real", "agent-session-monitoring-real", "add-project-own-project-request-real"],
     # The user's repo deepseek-harness (ORCA_E2E_DEEPSEEK_REPO overrides the path); the agent runs with `git push` blocked.
@@ -114,6 +121,8 @@ def main() -> int:
                 return 2
             env["ORCA_E2E_DEV_SERVER_NAME"] = stub.current_cfg.dev_server_name
             env["ORCA_E2E_AI_MODE"] = "stub"
+            # Why: auto-plan-generation makes the fake claude fail by writing a marker file there; only valid when the agent runs on this machine.
+            env["ORCA_E2E_FAKE_CLAUDE_STATE_DIR"] = str(stub.state_dir)
             print(f"AI mode: STUB (wiring only, not AI quality); dev server {stub.current_cfg.dev_server_name}")
         if args.real and args.real.startswith("deepseek"):
             try:

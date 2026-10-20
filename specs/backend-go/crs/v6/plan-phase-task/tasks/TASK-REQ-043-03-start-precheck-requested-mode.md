@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/approval_execution_precheck.go` (sửa), `internal/usecase/approval_execution_precheck_test.go` (sửa), `cmd/server/wire_execution.go` (kiểm, không đổi nếu chữ ký đủ)
 **Depends on:** TASK-REQ-043-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -32,9 +32,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Lựa chọn "chạy hết" ở dự án `step_by_step` bị từ chối trước khi ghi quyết định khi người duyệt thiếu quyền execute.
-- [ ] Không còn `switch` trùng lặp giữa precheck và `ExecutionModeChoiceApplies`.
-- [ ] Mọi test precheck cũ xanh với kỳ vọng cũ.
+- [x] Lựa chọn "chạy hết" ở dự án `step_by_step` bị từ chối trước khi ghi quyết định khi người duyệt thiếu quyền execute. Bằng chứng: `TestStartPrecheck_RequestedContinuousInAStepByStepProjectChecksTheApprover`, `TestDecideApproval_PrecheckSeesTheRequestedMode` (không ghi gì, Approval vẫn `pending`).
+- [x] Không còn `switch` trùng lặp giữa precheck và `ExecutionModeChoiceApplies`. Bằng chứng: `Check` dùng `domain.ExecutionModeChoiceApplies(a)`.
+- [x] Mọi test precheck cũ xanh với kỳ vọng cũ. Bằng chứng: tám `TestStartPrecheck_*` cũ chỉ đổi chữ ký (thêm đối số `""`), kỳ vọng không đổi.
 
 ## Rủi ro và lưu ý
 
@@ -50,3 +50,10 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+## Ghi chú triển khai (2026-10-20)
+
+- Mã: `usecase/approval_execution_precheck.go`: `Check(ctx, a, approverID, requested)`; chế độ hiệu lực = `requested` nếu khác rỗng, ngược lại `Modes.Mode`. `wire_execution.go` không đổi (chữ ký của `Check` không ảnh hưởng việc nối).
+- Test thêm: `TestStartPrecheck_RequestedContinuousPassesForAnApproverWhoMayExecute`, `...RequestedModeIsIgnoredForApprovalsThatDoNotStartARun` (phase, solution, request_type, stage khác), `...RequestedContinuousFromSomeoneWhoMayNotDecideLeavesTheRefusalToTheDecision`; ca `requested=""` ở dự án `step_by_step` trả nil khi không có quyền (chứng tỏ `CheckReady` không được gọi).
+- Lệnh: `go test ./internal/usecase/... -run StartPrecheck -v` (12 test xanh).
+- Blast radius (grep): `ExecutionStartPrecheck.Check` chỉ có một chỗ gọi (`decide_approval.go`) và test của chính nó.

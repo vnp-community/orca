@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/manage_project_engine_settings.go` (sửa), `internal/usecase/plan_auto_switch.go` (mới), `internal/usecase/plan_auto_switch_test.go`, `internal/usecase/manage_project_engine_settings_plan_auto_test.go` (mới), `internal/adapter/grpc/server_engine_settings.go` (sửa), `internal/adapter/grpc/server_engine_settings_test.go` (sửa), `backend-go/proto/orca/request/v1/solution.proto` (sửa) + mã sinh
 **Depends on:** TASK-REQ-044-01, TASK-REQ-044-02
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -33,16 +33,26 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Client cũ (không gửi trường) không bao giờ đổi công tắc.
-- [ ] Dự án chưa có dòng và dòng cũ đều đọc ra `true`.
-- [ ] Lỗi đọc cài đặt không bật tính năng.
-- [ ] Proto lint không báo breaking.
+- [x] Client cũ (không gửi trường) không bao giờ đổi công tắc.
+- [x] Dự án chưa có dòng và dòng cũ đều đọc ra `true`.
+- [x] Lỗi đọc cài đặt không bật tính năng.
+- [x] Proto lint không báo breaking.
 
 ## Rủi ro và lưu ý
 
 - `optional` trong proto3 sinh trường con trỏ; kiểm mã sinh của `buf` ở repo này (đã có ví dụ `ai_admin.proto`).
 - Chạy `gitnexus_impact` cho `SetProjectEngineSettingsInput` và `toProtoEngineSettings` (dùng ở test gateway).
 - Giao diện cho công tắc này chưa có (CR mục 5.1): chỉ kênh admin và `orca-cli` (task 08).
+
+## Ghi chú triển khai
+
+**Hoàn thành 2026-10-20.** Đường dẫn dưới `backend-go/services/request-service/`.
+
+- Proto: `solution.proto` `ProjectEngineSettings.plan_auto_generate = 7`, `SetProjectEngineSettingsRequest.plan_auto_generate = 7` (`optional bool`). `buf` không có: sinh bằng protoc 33.4 + protoc-gen-go v1.36.11 qua script trong scratchpad (chỉ ghi file có nội dung đổi, giữ nguyên bốn dòng header của từng file); `git diff --stat` chỉ thêm `solution.pb.go` (và `approval.pb.go` đã đổi từ CR-043). Lần chạy đầu của tôi làm đổi dòng header của 11 file không liên quan, đã khôi phục từ HEAD.
+- `usecase/manage_project_engine_settings.go`: `SetProjectEngineSettingsInput.PlanAutoGenerate *bool` (nil giữ giá trị đã lưu, `true` khi chưa có dòng), audit thêm `plan_auto_generate`, mặc định đọc dự án chưa có dòng là `true`; `usecase/engine_settings_defaults.go` đặt `PlanAutoGenerate: true` (cạm bẫy ghi ở task 01). `usecase/plan_auto_switch.go`: `PlanAutoSwitch{EnvOn, CommitWired, Settings}` với `Enabled` (lỗi đọc trả `(false, err)`) và `GloballyAvailable`. `adapter/grpc/server_engine_settings.go` ánh xạ hai chiều.
+- Test: `manage_project_engine_settings_plan_auto_test.go` (nil giữ `false`, dự án chưa có dòng, `&false`/`&true`, client cũ đổi `SolutionAgent` không đổi công tắc, audit, xung đột phiên bản, `DefaultedEngineSettings`), `plan_auto_switch_test.go` (bảng env/commit/dòng/lỗi đọc), `server_engine_settings_test.go` (thêm ca ánh xạ `optional`). Không có `SetProjectEngineSettings` nào còn ghi `false` âm thầm.
+- Lệch spec: `PlanAutoSwitch` nằm ở `plan_auto_switch.go` (không ở `ports_plan_auto.go`). Lệnh: `go test ./internal/usecase/ ./internal/adapter/grpc/ -run 'EngineSettings|PlanAutoSwitch'` xanh. `proto-lint` (buf breaking) không chạy được: chỉ thêm trường mới nên không phá tương thích.
+- Blast radius (grep): người dựng `ProjectEngineSettings` bằng literal ngoài test chỉ còn hai nơi trên; `toProtoEngineSettings` dùng bởi `server_engine_settings.go`.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

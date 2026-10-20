@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/components/request/plan/{plan-run-all-model.ts,RunAllStepsConfirmDialog.tsx,PlanRunAllButton.tsx}` và test
 **Depends on:** FE-REQ-TASK-043-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -32,14 +32,28 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Quy tắc mời lựa chọn đúng tập luồng có Phase của backend, không dựa vào bảng dự phòng.
-- [ ] Hộp thoại đúng nội dung, truy cập được bằng bàn phím và đọc được bằng trình đọc màn hình.
-- [ ] Không file nào vượt `max-lines`.
+- [x] Quy tắc mời lựa chọn đúng tập luồng có Phase của backend, không dựa vào bảng dự phòng. (`plan-run-all-model.test.ts`: mỗi điều kiện sai một lần, kể cả `fallback`, `hasPhases=false`, `continuous`, `task_list` hợp lệ).
+- [x] Hộp thoại đúng nội dung, truy cập được bằng bàn phím và đọc được bằng trình đọc màn hình. (`PlanRunAllButton.test.tsx`: tên accessible của dialog là tiêu đề, mô tả accessible; Esc đóng, Esc bị chặn khi đang gửi, focus trả về nút mở).
+- [x] Không file nào vượt `max-lines`. (file lớn nhất 96 dòng; `npx oxlint` sạch).
 
 ## Rủi ro và lưu ý
 
 - Văn bản hộp thoại khác bản gợi ý của người yêu cầu một vế (Clarification); ghi trong PR để người yêu cầu xác nhận.
 - Số bước lấy từ `tree.phases.length`; nếu Plan lớn bị cắt (`truncated`) thì số có thể thấp hơn thật: dùng cùng nguồn với thẻ hiện có và không bịa số.
+
+## Ghi chú triển khai (2026-10-20)
+
+**File mới** (`frontend/src/renderer/src/components/request/plan/`): `plan-run-all-model.ts` (`canOfferRunAll`, `runAllDialogModel`), `RunAllStepsConfirmDialog.tsx`, `PlanRunAllButton.tsx`, và test `plan-run-all-model.test.ts` (19), `PlanRunAllButton.test.tsx` (8). `plan-test-fixtures.ts` thêm `backendFlowOf` (luồng `source: 'backend'`).
+
+**Thiết kế**
+- `canOfferRunAll` nhận `alreadyPinned` (tên theo task, solution gọi `alreadyPinnedHint`) và xét `rawSubjectType ?? subjectType`.
+- `PlanRunAllButton` nhận `locked`, `blockedReason`, `onConfirm` (trả `PlanDecisionOutcome`); chỉ đường xác nhận mới gửi. Đóng dialog sau khi `onConfirm` xong (kể cả lỗi: thông điệp lỗi đã hiện ở thanh duyệt); toast cảnh báo khi `runAllApplied === false`. Khoá gửi bằng `useRef` nên nhấp đúp xác nhận chỉ một lần.
+- Văn bản thân hộp thoại tách hai đoạn (`bodyStart`, `bodyStops`) trong `DialogDescription asChild`; vế pre-deploy là khoá riêng `preDeploy` để dịch được. Văn bản khác bản gợi ý của người yêu cầu một vế (Clarification: "when the agent needs information from you"), cần người yêu cầu xác nhận.
+- Radix chỉ trả focus về `DialogTrigger`; hộp thoại này mở bằng state nên `PlanRunAllButton` tự đặt `onCloseAutoFocus` trả focus về nút mở (có test).
+- Biểu tượng nút: `FastForward` (lucide), cỡ `sm` như nút chính, không màu mới.
+- Số bước lấy từ `tree.phases.length` (cùng nguồn với `PlanApprovalCard`); bằng 0 thì thanh duyệt không mời lựa chọn (xem 03) để khỏi bịa "Run all 0 steps".
+
+**Kiểm chứng**: `npx vitest run --config config/vitest.config.ts src/renderer/src/components/request/plan`: xanh (trừ `plan-locale-coverage` cho tới khi có khoá locale ở 06; sau 06 xanh). `oxlint`, `oxfmt --check` sạch.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

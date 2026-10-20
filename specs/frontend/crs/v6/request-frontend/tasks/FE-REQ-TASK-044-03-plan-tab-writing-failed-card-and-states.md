@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/components/request/plan/PlanAutoWriting.tsx`, `PlanRunFailedCard.tsx`, `PlanAutoSkippedNote.tsx`, `PlanRewriteStrip.tsx` (mới), `PlanStates.tsx`, `RequestPlanTab.tsx` (sửa), các file test cùng thư mục (`PlanStates.auto.test.tsx`, `PlanRunFailedCard.test.tsx`, `RequestPlanTab.auto.test.tsx` mới; `RequestPlanTab.test.tsx` sửa nếu cần), xoá `hooks/usePlanRunInFlight.ts` và `usePlanRunInFlight.test.ts`
 **Depends on:** FE-REQ-TASK-044-02
-**Status:** [ ] TODO
+**Status:** [ ] PARTIAL (2026-10-20): các tiêu chí không cần stack đã xong; chưa chạy trên stack (not run on the stack).
 
 ---
 
@@ -37,17 +37,25 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Duyệt Analysis xong, tab Plan không còn nút Generate trong lúc Orca đang viết; hiện "Orca is writing the plan...".
-- [ ] Thẻ "Plan generation failed (mã)" còn sau khi tải lại trang, có Retry; nút Generate thủ công vẫn dùng được (dạng phụ).
-- [ ] Trường hợp không tự chạy được hiển thị ghi chú và nút Generate như cũ.
-- [ ] Replan có dải "đang viết lại" sau khi tải lại.
-- [ ] Gateway cũ hiển thị đúng; test hiện có của tab Plan xanh; không file nào vượt 300 dòng.
+- [ ] Duyệt Analysis xong, tab Plan không còn nút Generate trong lúc Orca đang viết; hiện "Orca is writing the plan...". (đúng ở mức component: `PlanStates.auto.test.tsx`, `RequestPlanTab.auto.test.tsx`; not run on the stack)
+- [ ] Thẻ "Plan generation failed (mã)" còn sau khi tải lại trang, có Retry; nút Generate thủ công vẫn dùng được (dạng phụ). (mount mới với run `failed` hiện thẻ: test xanh; not run on the stack)
+- [x] Trường hợp không tự chạy được hiển thị ghi chú và nút Generate như cũ. (`PlanStates.auto.test.tsx`, `RequestPlanTab.auto.test.tsx`)
+- [ ] Replan có dải "đang viết lại" sau khi tải lại. (`RequestPlanTab.auto.test.tsx`: dải hiện trên cây Plan có sẵn; not run on the stack; không dựng được ảnh vì replan có feedback thuộc CR-REQ-045)
+- [x] Gateway cũ hiển thị đúng; test hiện có của tab Plan xanh; không file nào vượt 300 dòng. (`RequestPlanTab.tsx` 262 dòng, `PlanStates.tsx` 227)
 
 ## Rủi ro và lưu ý
 
 - `PlanStates` có thể dùng ở nơi khác ngoài `RequestPlanTab` (chưa kiểm); chạy `gitnexus_impact` cho `PlanStates` và `RequestPlanTab` trước khi sửa.
 - Thẻ lỗi và banner AI-setup cùng có nút thử lại: chỉ một nút Retry được hiện cho mỗi trường hợp (banner dùng `onRetry` của thẻ khi có mã AI-setup).
 - Chưa dựng giao diện thử: kiểm bằng ảnh chụp ở task 04.
+
+## Ghi chú triển khai (2026-10-20)
+
+- **File mới**: `PlanAutoWriting.tsx`, `PlanRunFailedCard.tsx`, `PlanAutoSkippedNote.tsx`, `PlanRewriteStrip.tsx`, `PlanRunNotice.tsx` (dải viết lại hoặc thẻ lỗi phía trên cây Plan đã có), test `PlanRunFailedCard.test.tsx`, `PlanStates.auto.test.tsx`, `RequestPlanTab.auto.test.tsx`. **Sửa**: `PlanStates.tsx` (prop `autoDisplay`, `onRetryRun`, `retryingRun`, `retryRunError`, `generateErrorCode`), `RequestPlanTab.tsx` (dùng `usePlanAutoGeneration`; 250 -> 262 dòng). **Xoá**: `usePlanRunInFlight.ts` + test.
+- **Lệnh**: `npx vitest run --config config/vitest.config.ts src/renderer/src/components/request/plan src/renderer/src/hooks/usePlan` xanh (254 test cùng `request-plan-auto`, kể cả `RequestPlanTab.test.tsx`, `RequestPlanTab.run-all.test.tsx` có sẵn và `plan-locale-coverage.test.ts`). `oxlint` + react-doctor sạch; `tsc` giữ mốc 113.
+- **Sai lệch so với spec**: (1) thẻ lỗi không đặt nút Retry của `RequestAiSetupBanner`; thẻ giữ đúng một nút `plan-run-retry` bên dưới banner, để có `data-testid` ổn định và cùng khoá làm nguội AI. (2) `generateError` inline bị ẩn khi `failed` chỉ nếu cùng mã với thẻ (`generateErrorCode`); một lỗi không bắt đầu được (mã khác) vẫn hiện. (3) `PlanRunNotice` hiện thêm thẻ lỗi (không chỉ dải) phía trên cây Plan khi replan thất bại: nếu không, Request kẹt ở `planning` với cây cũ và không có đường thử lại. (4) hook ghép `usePlanAutoGeneration` để giữ `RequestPlanTab` dưới 285 dòng.
+- **Blast radius** (grep): `PlanStates` chỉ được `RequestPlanTab` dùng; `RequestPlanTab` được `RequestDetailPane` dùng (props không đổi).
+- **Chưa kiểm**: ảnh chụp và hành vi trên stack thật (task 04); khoảng "starting" phụ thuộc backend (xem ghi chú task 02).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

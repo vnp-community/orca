@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/plan_auto_worker.go`, `plan_auto_worker_start.go`, `plan_auto_worker_observe.go`, `plan_auto_worker_commit.go` (mới), các `plan_auto_worker_*_test.go` tương ứng (mới), `backend-go/services/request-service/cmd/server/wire_plan_auto.go` (mới), `cmd/server/main.go` (sửa), `cmd/server/wire_plan_auto_test.go` (mới)
 **Depends on:** TASK-REQ-044-03, TASK-REQ-044-05
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -35,17 +35,29 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Lỗi không tạm thời không bao giờ sinh run thứ hai (test đếm lần `StartRun`).
-- [ ] Lỗi tạm thời sinh đúng tối đa `MaxExtraAttempts` lượt thêm, mỗi lượt khoá mới.
-- [ ] Bận không phải lỗi cứng; mọi lỗi vĩnh viễn là `skipped` với mã, không làm consumer lặp.
-- [ ] Người bấm tay chen ngang vô hại; job không làm gì thêm khi Plan đã có.
-- [ ] Env tắt hoặc thiếu `Commit`: không consumer, không worker, có đúng một dòng log lý do.
+- [x] Lỗi không tạm thời không bao giờ sinh run thứ hai (test đếm lần `StartRun`).
+- [x] Lỗi tạm thời sinh đúng tối đa `MaxExtraAttempts` lượt thêm, mỗi lượt khoá mới.
+- [x] Bận không phải lỗi cứng; mọi lỗi vĩnh viễn là `skipped` với mã, không làm consumer lặp.
+- [x] Người bấm tay chen ngang vô hại; job không làm gì thêm khi Plan đã có.
+- [x] Env tắt hoặc thiếu `Commit`: không consumer, không worker, có đúng một dòng log lý do.
 
 ## Rủi ro và lưu ý
 
 - Run mồ côi (tạo xong mà ghi `running` thất bại) không có goroutine gia hạn lease nên sẽ thành `REQUEST_SOLUTION_RUN_INTERRUPTED` rồi được thử lại; chưa tốn tiền vì chưa chạy gì. Ghi vào nhận xét mã.
 - Vòng thăm dò mỗi instance mỗi 5 giây; chưa đo tải.
 - Chạy `gitnexus_impact` cho `PlanUseCases` và `wirePlan` (đổi chữ ký trả về ở task 07).
+
+## Ghi chú triển khai
+
+**Hoàn thành 2026-10-20.** Đường dẫn dưới `backend-go/services/request-service/`.
+
+- `internal/usecase/plan_auto_worker.go` (struct, `RunLoop`, `RunOnce`, luật `superseded`, `move` kiểm `CanMove` rồi `Update(job, owner)`, log có cấu trúc `plan auto-generation job finished` với `request_id`, `origin`, `state`, `reason_code`, `attempt`, không nội dung), `plan_auto_worker_start.go`, `plan_auto_worker_observe.go`, `plan_auto_worker_commit.go`; `cmd/server/wire_plan_auto.go` (`planAutoUnavailable`, `buildPlanAuto`, `wirePlanAuto`, `planAuthorizer`), `cmd/server/main.go` gọi `wirePlanAuto` sau `wireArtifact` và gán lại `plan`; `cmd/server/store_wiring.go` thêm `planAutoJobs` (hai dialect).
+- Hành vi theo bảng solution 2.4: `pending` dùng khoá `PlanAutoKey(anchor, attempt)`; bận hoãn `BusyDelay` rồi `gave_up(REQUEST_ANALYSIS_BUSY)` sau `StartWindow`; lỗi `FailedPrecondition/InvalidArgument/NotFound/PermissionDenied` thành `skipped(code)`; lỗi hạ tầng thử lại trong cửa sổ rồi `gave_up`; `running` thăm dò, `succeeded` sang `committing`, `failed` tạm thời còn lượt thì lượt n+1 với khoá mới, còn lại `gave_up`; `committing` giải mã `RawOutput` rồi `CommitPlan.ExecuteForSystem` (`REQUEST_STATE_STALE` đọc lại Request: đã có Plan thì `done`, không thì `superseded`; mã vĩnh viễn thì `gave_up(code)`; lỗi khác đếm `CommitAttempts` đến 5 rồi `gave_up(REQUEST_PLAN_COMMIT_FAILED)` mà không gọi lại AI). Luật `PlanTaskID != ""` chỉ áp cho `origin` `event`/`retry`.
+- Lệch spec (đều bổ sung): (1) `domain.PlanAutoState.CanMove` thêm `running→running` (bước thăm dò cần; task 01 thiếu), sửa `plan_auto.go` và bảng 7x7 trong `plan_auto_test.go`. (2) Worker nhận thêm `PlanAutoSwitch` để đọc lại công tắc (env và dự án) trước khi bắt đầu run của job `event`, nên tắt dự án chặn job đã xếp hàng; job `retry` của người dùng không bị công tắc dự án chặn. (3) Lý do `superseded` dùng ba mã `REQUEST_PLAN_REQUEST_MOVED`, `REQUEST_PLAN_EXISTS`, `REQUEST_PLAN_NEWER_RUN` (hằng ở `plan_auto_worker.go`). (4) Luật "run mới hơn" tách làm hai: ở `pending` chỉ khi run của người đã kết thúc và bắt đầu sau job (run đang chạy thì nhận lại qua `StartRun`, đúng ca (e)); ở `running` khi có run Plan của người bắt đầu sau run của job. (5) `owner` của lease là `solution.owner + "-plan-auto"`. (6) `ClaimDue` batch 10.
+- Test: `plan_auto_worker_{start,observe,commit}_test.go`, `plan_auto_worker_test.go`, `plan_auto_worker_kit_test.go` (đồng hồ giả, `GeneratePlan`/`CommitPlan` thật trên kho giả): mọi mục (a) đến (j) của spec, thêm hai worker song song không xử lý trùng (`-race`), `RunLoop` dừng khi hết ctx, lỗi lưu rồi lease hết hạn thì nhận lại run bằng cùng khoá, commit `RawOutput` của run OpenSpec thật. `cmd/server/wire_plan_auto_test.go`: bảng điều kiện và hai ca `buildPlanAuto` (dựng đủ / không dựng gì).
+- Lệnh: `go test ./internal/usecase/ -run PlanAutoWorker -race -count=1` xanh; `go test ./cmd/server/ -run PlanAuto` xanh; toàn bộ request-service xanh (`go build`, `go vet`, `go vet -tags=integration`).
+- Blast radius: `PlanUseCases` thêm `Retry` (task 07); người dựng nó: `cmd/server/wire_plan.go` (không đổi) và `wirePlanAuto`. `wirePlan` không đổi chữ ký. `approversMayRevisePlan` (agent CR-045, `cmd/server/plan_revision_wiring.go`) hiện vẫn trả `false`; khi worker này đã nối (`wirePlanAuto` trả `Retry != nil`) họ có thể đổi nó, tôi không đụng.
+- Chưa kiểm: worker chạy trên Postgres/MySQL thật và NATS thật (task 09), run mồ côi thành `REQUEST_SOLUTION_RUN_INTERRUPTED` rồi thử lại (cần sweeper thật), tải thăm dò mỗi 5 giây.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/{postgres,mysql}/0104_openspec_change_revisions.{up,down}.sql` (mới), `internal/domain/openspec_change_revision.go` (+ test, mới), `internal/usecase/{ports,run_proposal_generation}.go` (sửa: `OpenSpecChangeRevisionRepository`, `AnalysisRunStore.ListSucceeded`), `internal/adapter/{postgres,mysql}/{openspec_change_revision_repository,analysis_run_repository}.go` (mới/sửa), `cmd/server/{store_wiring,wire_plan}.go` (sửa), `internal/adapter/contracttest/{openspec_change_revision_contract,expected_columns_openspec_revisions}.go` (mới), mọi fake của `AnalysisRunStore`
 **Depends on:** TASK-REQ-045-03
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -36,11 +36,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi lượt sinh OpenSpec thành công thêm đúng một dòng bản cùng transaction với `Upsert`.
-- [ ] Số bản liên tục và bằng thứ tự lượt Plan thành công.
-- [ ] Chỉ 10 bản mới nhất giữ toàn văn; chỉ mục và digest của mọi bản còn.
-- [ ] Migration xuôi và ngược trên hai dialect; Request cũ đọc được.
-- [ ] Không đổi hành vi của `PlanArtifacts.Describe`, `TasksMdSyncer`, `ProposalJanitor`.
+- [x] Mỗi lượt sinh OpenSpec thành công thêm đúng một dòng bản cùng transaction với `Upsert`. (`TestFinish_AppendsRevisionInSameTx`, `RollbackLosesBothTheChangeAndTheVersion` (cả hai dialect))
+- [x] Số bản liên tục và bằng thứ tự lượt Plan thành công. (`TestFinish_RevisionNumberFollowsSucceededPlanRuns`, `ListSucceededReturnsTheSucceededRunsOfAKindOldestFirst`)
+- [x] Chỉ 10 bản mới nhất giữ toàn văn; chỉ mục và digest của mọi bản còn. (`OnlyTheNewestVersionsKeepTheirText` (cả hai dialect))
+- [x] Migration xuôi và ngược trên hai dialect; Request cũ đọc được. (migration 0103 xuôi, ngược, xuôi lại trên cả hai dialect; Request cũ không có dòng bản đọc ra `found=false`)
+- [x] Không đổi hành vi của `PlanArtifacts.Describe`, `TasksMdSyncer`, `ProposalJanitor`. (không đổi một dòng của `PlanArtifacts.Describe`, `TasksMdSyncer`, `ProposalJanitor`; test cũ của chúng xanh)
 
 ## Rủi ro và lưu ý
 
@@ -58,3 +58,27 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+## Ghi chú triển khai
+
+**Số migration.** `0103_openspec_change_revisions` (đề bài ghi 0104; xem ghi chú số migration ở TASK-REQ-045-03: 0102 là của task 03, task 02 phải dùng 0104).
+
+**Blast radius (grep).** `AnalysisRunStore` thêm `ListSucceeded`: người cài là hai adapter và `fakeRuns` (test); `syncRuns`, `failingRunList` nhúng giao diện nên không phải sửa. `finish` chỉ có một người gọi (`RunProposalGeneration.Execute`). `RunProposalGenerationDeps` có thêm `Revisions`; chỉ `wire_plan.go` và `proposalKit` (test) dựng nó.
+
+**Tệp đã đổi.** Mới: `migrations/{postgres,mysql}/0103_openspec_change_revisions.{up,down}.sql`, `domain/openspec_change_revision.go` (+ `_test.go`: `OpenSpecChangeRevision`, `RevisionFile`, `PlanRevisionTextKept = 10`, `NewRevisionFiles`, `DiffFileIndex`), `usecase/plan_revision_history.go` (`appendRevision`), `adapter/{postgres,mysql}/openspec_change_revision_repository.go`, `contracttest/openspec_change_revision_contract.go` (`RunPlanRevisionContract`), `usecase/plan_revision_fakes_test.go`, `plan_revision_history_test.go`. Sửa: `usecase/ports.go` (`OpenSpecChangeRevisionRepository`), `ports_solution.go` (`ListSucceeded`), `run_proposal_generation.go`, `adapter/{postgres,mysql}/analysis_run_repository.go`, `cmd/server/{store_wiring,wire_plan}.go`, `contracttest/expected_columns_plan_documents.go`, `domain/erasable_columns.go` (xem dưới), test fake `solution_fakes_test.go`, `run_proposal_generation_test.go`, hai `security_integration_test.go`.
+
+**Thiết kế.**
+- Bảng: `id, tenant_id, request_id (FK), revision, run_id, commit_sha, tasks_md_digest, bundle_digest, files_json, bundle_json NULL, created_at`; `UNIQUE (tenant_id, request_id, revision)`, `UNIQUE (tenant_id, run_id)` (một lượt một bản; phục vụ `GetByRun`), chỉ mục `(tenant_id, request_id, revision DESC)`; RLS `ENABLE/FORCE` + `tenant_isolation` ở Postgres; MySQL khoá theo `tenant_id`.
+- `Append` dùng `scoped` nên nhập vào transaction đang mở của `InTx` (cùng `Upsert` và `finishPlanRun`); sau khi chèn, `UPDATE ... SET bundle_json = NULL WHERE revision <= new - keep AND bundle_json IS NOT NULL`. `List` không chọn `bundle_json` (chỉ cờ `TextKept = bundle_json IS NOT NULL`) để một trang không kéo tới ~10 MiB; `Get`/`GetByRun` có văn bản. Trần một trang 500.
+- `appendRevision`: `revision = len(ListSucceeded(plan)) + 1` chạy trước `finishPlanRun` trong cùng `InTx`; lỗi `Append` làm hỏng cả giao dịch (và lượt). `wireOpenSpecEngine` từ chối khởi động nếu thiếu repository bản.
+- Xoá dữ liệu theo yêu cầu (erasure): hai cột nội dung của bảng mới đăng ký vào `domain.ErasableColumns` (`bundle_json` -> NULL, `files_json` -> `[]`), ba cột hash/digest vào danh sách miễn trừ; seed trong hai `security_integration_test.go`. `domain/erasable_columns.go` là file chung với agent CR-044: chỉ thêm dòng.
+
+**Lệnh đã chạy.**
+- `go build ./... && go vet ./...`; `go test ./... -race -count=1` toàn module xanh.
+- Integration, cả hai dialect, `-p 1`: `go test -tags=integration ./internal/adapter/postgres/ ./internal/adapter/mysql/ -count=1` (toàn bộ, gồm `PlanRevisionContract` 9 kịch bản, `Migration_OpenSpecChangeRevisions`, `PlanRevisionListUsesAnIndex` với 60 bản: Postgres `Index Scan`, không `Seq Scan` (bật `enable_seqscan=off` vì bảng nhỏ), MySQL `key` có tên chỉ mục của bảng), kết quả ở mục "Kết quả chạy tích hợp" cuối file.
+
+**Lệch so với đề bài.** (1) Số migration 0103. (2) `OpenSpecChangeRevision` có cờ `TextKept` và `Bundle` chỉ điền khi đọc một bản (đề bài chỉ nói `bundle_json NULL`). (3) EXPLAIN của Postgres cần `enable_seqscan=off` vì bảng thử nhỏ; chưa đo trên bộ dữ liệu lớn.
+
+**Chưa kiểm chứng.** Kích thước hàng thực (~1 MiB văn bản mỗi bản x 10) trên bộ tài liệu pilot; Request cũ chưa có dòng bản thì đường đọc (task 05) chưa viết.
+
+**Kết quả chạy tích hợp (colima, Postgres 16 và MySQL 8, `-p 1`, toàn bộ gói adapter).** Postgres `ok` (45,96 s) và MySQL `ok` (86,14 s) sau khi thêm vào `rls_audit_integration_test.go` ca cô lập tenant cho bảng mới (`isolationFixtures["openspec_change_revisions"]`; lần chạy đầu fail ba test RLS vì thiếu ca này, đã sửa). Lệnh: `DOCKER_HOST=unix:///Users/datbeohbbh/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock go test -tags=integration -p 1 ./internal/adapter/postgres/ ./internal/adapter/mysql/ -count=1`.

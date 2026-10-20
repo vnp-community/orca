@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/config/config.go` (sửa), `cmd/server/output_language_wiring.go` (+ `_test.go`, mới), `cmd/server/{main.go,wire_solution.go,wire_solution_test.go}` (sửa), `internal/usecase/{analysis_settings,solution_prompt,plan_prompt,openspec_plan_prompt,run_solution_generation,run_agent_readonly_analysis,run_plan_generation,engine_openspec,engine_native}.go` (sửa), test cùng gói
 **Depends on:** TASK-REQ-046-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -35,16 +35,33 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không biến: `vi`; `en`: English; giá trị sai: service thoát mã 1 trước khi mở kho, thông báo rõ.
-- [ ] Cả sáu nơi gọi mang ngôn ngữ cấu hình; test chứng minh từng nơi.
-- [ ] `DefaultAnalysisSettings()`/`withDefaults()` không đổi; mọi test và golden hiện có xanh.
-- [ ] Mọi nơi lấy ngôn ngữ qua `OutputLanguageFor`, không đọc `OutputLanguage` trực tiếp ngoài hàm đó.
+- [x] Không biến: `vi`; `en`: English; giá trị sai: service thoát mã 1 trước khi mở kho, thông báo rõ. `parseOutputLanguage` (bảng 9 ca), `TestLoad_OutputLanguageIsTheTrimmedRawValue`, `TestRun_UnsupportedOutputLanguageStopsBeforeAnythingIsOpened` (thoát với `REQUEST_DEFAULT_OUTPUT_LANGUAGE "fr" is not supported; use one of: vi, en`, trước kiểm DSN), `TestRun_SupportedOutputLanguagesGetPastTheLanguageCheck`. Thoát mã 1 do `main()` sẵn có.
+- [x] Cả sáu nơi gọi mang ngôn ngữ cấu hình; test chứng minh từng nơi. `output_language_prompt_sites_test.go`: một test cho mỗi nơi gọi (giải pháp ai.complete kể cả lần thử lại, đọc-chỉ cho diagnosis/findings/answer, lần dựng lại không đồ thị, Plan native, OpenSpec, `nativeEngine` với và không `WithOutputLanguage`) và ánh xạ ba struct đầu vào.
+- [x] `DefaultAnalysisSettings()`/`withDefaults()` không đổi; mọi test và golden hiện có xanh. `TestAnalysisSettings_OutputLanguageForIsTheConfiguredLanguage` và `TestAnalysisSettings_MapsConfigAndKeepsDefaults`; `go test ./... -count=1` và `check-prompt-golden.sh` xanh.
+- [x] Mọi nơi lấy ngôn ngữ qua `OutputLanguageFor`, không đọc `OutputLanguage` trực tiếp ngoài hàm đó. Chỉ `OutputLanguageFor` đọc `OutputLanguage` (grep: không nơi nào khác ngoài `analysisSettings` ghi và test).
 
 ## Rủi ro và lưu ý
 
 - Blast radius: `RenderSolutionPrompt` (năm nơi gọi, nhiều test), `AnalysisSettings` (bốn worker): chạy `gitnexus_impact` và ghi vào PR.
 - Đổi chữ ký `analysisSettings` kéo theo test; không để tham số mặc định ẩn làm bật ngôn ngữ trong test khác.
 - Đây là biến `REQUEST_DEFAULT_*` đầu tiên làm service dừng khi sai; ghi rõ trong tài liệu (task 06).
+
+## Ghi chú triển khai
+
+**Tệp (dưới `backend-go/services/request-service/`):** sửa `internal/config/config.go`, `cmd/server/{main.go,wire_solution.go,wire_solution_test.go}`, `internal/usecase/{analysis_settings,solution_prompt,plan_prompt,openspec_plan_prompt,run_solution_generation,run_agent_readonly_analysis,run_plan_generation,engine_openspec,engine_native}.go`; mới `cmd/server/output_language_wiring{,_test}.go`, `internal/config/config_output_language_test.go`, `internal/usecase/output_language_prompt_sites_test.go`.
+
+**Lệnh và kết quả:** `go vet ./...` sạch; `go test ./... -count=1` xanh toàn module; `bash backend-go/ci/check-request-service-wiring.sh` xanh; `bash backend-go/ci/check-prompt-golden.sh` xanh (golden dùng ngôn ngữ rỗng). Kiểm đột biến: bỏ `Language:` ở `run_plan_generation.go` làm đỏ `TestRunPlanGeneration_PromptCarriesTheConfiguredLanguage`.
+
+**Thiết kế:**
+- `run()` gọi `parseOutputLanguage` ngay sau khi tạo logger, trước `tracing.Init` và `openStores`; kết quả truyền cho `wireSolution(..., lang, ...)` rồi `analysisSettings(cfg, lang)`. `TestRun_UnsupportedOutputLanguageStopsBeforeAnythingIsOpened` chứng minh thứ tự (DSN `sqlite://x` sẽ báo lỗi DSN nếu ngôn ngữ không được kiểm trước).
+- `Config.OutputLanguage` là giá trị thô đã `TrimSpace`; `parseOutputLanguage("")` và chuỗi toàn khoảng trắng cho `Vietnamese`.
+- `AnalysisSettings.OutputLanguage` + `OutputLanguageFor(domain.Request)` là chỗ duy nhất đọc trường; `DefaultAnalysisSettings()` và `withDefaults()` không đổi (test khẳng định ngôn ngữ rỗng).
+- Sáu nơi gọi: `run_solution_generation.go` (struct đầu vào dựng một lần, nên lần thử lại cũng mang), `run_agent_readonly_analysis.go` (cùng `in` cho lần dựng lại không đồ thị, có test riêng `TestAgentReadonly_PromptWithoutTheGraphKeepsTheLanguage`), `run_plan_generation.go`, `engine_openspec.go:runAgent` (qua `e.d.Settings`), `engine_native.go`.
+- **Lệch so với đặc tả:** `WithOutputLanguage` là tuỳ chọn hàm của `NewNativeEngine(completer, planGen, opts ...NativeEngineOption)` thay cho method trên `nativeEngine`, vì hàm trả về interface `SolutionEngine` nên method không gọi được từ ngoài; chữ ký cũ vẫn biên dịch (mọi người gọi hiện có không đổi).
+
+**Blast radius (grep, không có GitNexus):** `RenderSolutionPrompt` (người gọi: `run_solution_generation.go`, `run_agent_readonly_analysis.go` x2, `engine_native.go`), `RenderPlanPrompt` (`run_plan_generation.go`), `RenderOpenSpecPlanPrompt` (`engine_openspec.go`), `analysisSettings` (chỉ `wire_solution.go` và `wire_solution_test.go`), `wireSolution` (`main.go` và hai test). Người gọi khác của `NewNativeEngine` là test, không đổi.
+
+**Không xác minh:** đường chạy thật của `request-service` trong container (task 06 và 07 do bên điều phối). Một test cạnh tranh dữ liệu trong `decide_approval_execution_mode_test.go` (`TestDecideApproval_ConcurrentDecisionsOneWins`, việc của CR-REQ-043) đỏ dưới `-race`; không thuộc task này, và `go test` không `-race` xanh.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`, `backend-go/prompts`
 **File:** `services/request-service/internal/usecase/{prompt_golden_solution_test.go,prompt_golden_plan_test.go,prompt_golden_openspec_test.go}` (sửa: thêm ca), `.../testdata/prompt-golden/{BuildSolutionPrompt,BuildPlanPrompt,BuildOpenSpecPlanPrompt}/*.txt` (thêm tệp), `backend-go/prompts/README.md` (số đo ngân sách)
 **Depends on:** TASK-REQ-046-01, 046-02
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -35,14 +35,28 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Golden so sánh xanh trước khi thêm ca (bằng chứng không đổi).
-- [ ] 11 tệp golden mới, không tệp cũ nào đổi (`git diff --stat` chỉ có thêm).
-- [ ] `make check-prompts` và test ngân sách kích thước xanh; số đo ghi trong README.
+- [x] Golden so sánh xanh trước khi thêm ca (bằng chứng không đổi). Bước 1 ở ghi chú: xanh trước khi thêm ca.
+- [x] 11 tệp golden mới, không tệp cũ nào đổi (`git diff --stat` chỉ có thêm). 11 tệp `??`, không `M`/`D`; 158 -> 169.
+- [x] `make check-prompts` và test ngân sách kích thước xanh; số đo ghi trong README. `make check-prompts` xanh; `TestPromptSize_*` xanh; số đo trong `prompts/README.md`.
 
 ## Rủi ro và lưu ý
 
 - Không chạy `--update` để làm một golden cũ xanh; nếu một golden cũ đổi thì đó là lỗi (rất có thể là khoảng trắng quanh dòng gọi partial).
 - Job `prompt-catalog` của `.github/workflows/backend-go-request-contracts.yml` chạy khi `backend-go/prompts/**` hoặc `services/**` đổi; xác nhận nó xanh trên nhánh.
+
+## Ghi chú triển khai
+
+**Tệp:** `services/request-service/internal/usecase/{prompt_golden_solution_test.go,prompt_golden_plan_test.go,prompt_golden_openspec_test.go}` (thêm ca), 11 tệp mới trong `testdata/prompt-golden/{BuildSolutionPrompt,BuildPlanPrompt,BuildOpenSpecPlanPrompt}/`, `backend-go/prompts/README.md` (số đo, làm ở task 01).
+
+**Trình tự và kết quả:**
+1. Trước khi thêm ca: `check-prompt-golden.sh` xanh với 046-01 và 046-02 đã vào (158 tệp, `git status` golden rỗng).
+2. Thêm 11 ca; chạy so sánh: đúng 11 lỗi "missing golden", không ca cũ nào đỏ.
+3. `bash backend-go/ci/check-prompt-golden.sh --update`; `git status --short -- '*/testdata/prompt-golden/*'` chỉ có 11 dòng `??`, không `M`/`D`; tổng 169 tệp (`find`).
+4. Đọc tay các golden `solution_ai_complete_language_vi`, `diagnosis_bug_language_vi`, `type_bug_plan_tasks_language_vi`, `tasks_medium_no_knowledge_language_en`: dòng `Output language: …` xuất hiện đúng một lần, ngay trước `<request>`; `diff` của `solution_ai_complete_language_vi` sau khi bỏ khối chỉ thị với `solution_ai_complete_project` là rỗng.
+5. `check-prompt-golden.sh` chạy hai lần liên tiếp cùng kết quả xanh; `make check-prompts` xanh (relay, ngoài danh mục, golden, tự kiểm); `cd backend-go/prompts && go test ./... -race` xanh.
+6. Đột biến: đổi `Never translate:` thành `Do not translate:` trong partial JSON làm đỏ đúng chín ca `*_language_*` dùng partial JSON (hai ca OpenSpec dùng partial riêng) và không ca cũ nào; hoàn lại thì xanh (đã `cmp` với bản lưu).
+
+**Chưa kiểm:** job `prompt-catalog` của `.github/workflows/backend-go-request-contracts.yml` chạy trên CI, không chạy ở đây (các lệnh nó gọi, `make check-prompts` và `go test ./... -race` của `prompts`, đã chạy cục bộ).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

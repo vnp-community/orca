@@ -26,7 +26,8 @@ def register_project(ctx: AcceptanceContext, repo: LedgerliteRepo, suffix: str, 
     ctx.on_cleanup(f"delete project {proj['id']}", lambda: ws.call("project.delete", {"projectId": proj["id"]}))
     cur = ws.call("request.engineSettings", {"projectId": proj["id"]})
     ws.call("request.engineSettingsSet", {"projectId": proj["id"], "engine": engine, "openspecMinVersion": cur.get("openspecMinVersion", "") or "",
-                                          "solutionAgent": False, "executionMode": cur.get("executionMode", "") or "", "expectedVersion": cur.get("version", 0) or 0})
+                                          "solutionAgent": False, "executionMode": cur.get("executionMode", "") or "", "expectedVersion": cur.get("version", 0) or 0,
+                                          "planAutoGenerate": False})
     return proj["id"]
 
 

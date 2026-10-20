@@ -5,7 +5,7 @@
 **Service:** `api-gateway`, `request-service`, `orca-cli`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_plan_auto.go` (mới) và test, `channels_request_plan.go` (sửa), `channels_request_engine.go` (sửa), `channels_request_base_ref.go` (sửa `requestFeatures()`), `request_rpc_channel_map_test.go` (sửa), `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/excluded_channels.yaml` (sửa), `backend-go/policy/orca-authz/request_test.rego` (sửa), `backend-go/cmd/orca-cli/internal/command/engine_cmd.go` và `engine_cmd_test.go` (sửa), `specs/backend-go/crs/v6/gateway-and-mcp/CONTRACT-request-ui-api.md` (sửa), `docs/guides/request/runbook-request-flow.md` (sửa)
 **Depends on:** TASK-REQ-044-04, TASK-REQ-044-07
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -36,15 +36,24 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `request.retryPlan` và `autoPlan` hoạt động và có test; gateway cũ không có `request.planAuto` nên frontend giữ hành vi cũ.
-- [ ] Client cũ không đổi công tắc dự án khi không gửi `planAutoGenerate`.
-- [ ] `parity_test` xanh, `request.rego` chặn agent.
-- [ ] CONTRACT và runbook nêu hai công tắc, chi phí và cách quay lui.
+- [x] `request.retryPlan` và `autoPlan` hoạt động và có test; gateway cũ không có `request.planAuto` nên frontend giữ hành vi cũ.
+- [x] Client cũ không đổi công tắc dự án khi không gửi `planAutoGenerate`.
+- [x] `parity_test` xanh, `request.rego` chặn agent.
+- [x] CONTRACT và runbook nêu hai công tắc, chi phí và cách quay lui.
 
 ## Rủi ro và lưu ý
 
 - Token CLI hiện chưa mang claim `role` nên `orca engine set` có thể bị từ chối (README của `orca-cli`); công tắc dự án vẫn đặt được qua phiên web admin hoặc kênh `request.engineSettingsSet`.
 - Hai CR cùng sửa `requestFeatures()`: rebase cẩn thận, test `features` phải liệt kê đủ.
+
+## Ghi chú triển khai
+
+**Hoàn thành 2026-10-20.** Đường dẫn dưới `backend-go/`.
+
+- Gateway `services/api-gateway/internal/adapter/wscompat/`: `channels_request_plan_auto.go` (mới: `request.retryPlan`, `PlanAutoView`, hằng `request.planAuto`, `addPlanAutoView`), `channels_request_plan.go` (đăng ký `registerPlanAuto`, `request.planProposal` thêm khoá `autoPlan` chỉ khi service gửi khối), `channels_request_engine.go` (`planAutoGenerate` trong view và `*bool` ở đầu vào: thiếu khoá = không gửi = giữ nguyên, sai kiểu bị từ chối), `channels_request_base_ref.go` (`requestFeatures()` cộng dồn tên: `request.baseRef`, `approval.runAll` của CR-043, `request.planAuto`), `request_rpc_channel_map_test.go` (`RetryPlanGeneration`), `channels_request_base_ref_test.go` (test `features` liệt kê đủ ba tên), `channels_request_test.go` (kiểm kê kênh), golden `testdata/channel_inventory.json` (regen bằng `UPDATE_GOLDEN=1`, chỉ thêm `request.retryPlan`). Tên khoá JSON của `autoPlan` khớp `frontend/src/shared/request-plan-auto.ts` (`enabled`, `state`, `origin`, `attempt`, `maxAttempts`, `reasonCode`, `nextAttemptAt`); khác biệt duy nhất: gateway luôn gửi `nextAttemptAt` (chuỗi rỗng khi không áp dụng) và `origin` có thể là `revision` (job CR-REQ-045) mà parser frontend chỉ liệt kê `event`/`retry`/rỗng.
+- MCP: `mcpserver/tools/excluded_channels.yaml` thêm dòng cho `request.retryPlan` (category `request_flow`, có lý do). OPA: file mới `policy/orca-authz/request_plan_auto_test.rego` (không sửa `request_test.rego` của agent CR-045): owner/reporter/admin đi qua nhóm `plan`, member và người ngoài không, agent không bao giờ, và `RetryPlanGeneration` không nằm trong `agent_rpcs`. CLI: `orca engine set --plan-auto-generate=<true|false>` (chỉ gửi khi cờ được nêu), `orca engine show` hiện dòng `plan auto-generate` khi gateway gửi khoá; README của CLI. Tài liệu: CONTRACT mục 2.13 mới + mã lỗi + tên tính năng trong 2.11; runbook mục "Tự sinh Plan sau khi duyệt Analysis" (hai công tắc, biến chỉnh nhịp, chi phí OpenSpec, quay lui).
+- Lệnh (từ `backend-go/services/api-gateway`, với `GOFLAGS=-overlay=.../gw-overlay.json`): `go test ./internal/adapter/wscompat/ ./internal/adapter/mcpserver/... ./internal/adapter/httpgateway/ ./cmd/...` xanh (gồm `parity_test`, `TestChannelInventoryMatchesGolden`). Rego: 133 test (gồm 4 mới) xanh bằng chương trình `opa/v1/tester` tạm (đã xoá). `go test ./internal/command/` của orca-cli xanh; `go test ./internal/adapter/opaclient/ ./internal/adapter/grpc/` của request-service xanh.
+- Lệch spec: không thêm route REST cho `request.retryPlan` (spec không yêu cầu; giao diện dùng kênh WS). Chưa kiểm trên stack: token CLI chưa mang claim `role` nên `orca engine set` có thể bị từ chối (cảnh báo sẵn trong README của CLI).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

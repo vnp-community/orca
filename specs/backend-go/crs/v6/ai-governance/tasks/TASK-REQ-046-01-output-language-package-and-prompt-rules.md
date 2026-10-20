@@ -5,7 +5,7 @@
 **Service:** `backend-go/prompts`
 **File:** `prompts/output_language/{output_language.go,output_language_test.go}` (mới), `prompts/request_context/_language_rule.tmpl` (mới), `prompts/plan_openspec/_language_rule_openspec.tmpl` (mới), `prompts/analysis/{solution,agent_solution,diagnosis,findings,answer}.tmpl` + `analysis.go` (sửa), `prompts/plan_native/{plan.tmpl,plan_native.go}` (sửa), `prompts/plan_openspec/{plan.tmpl,plan_openspec.go}` (sửa), `prompts/{analysis,plan_native,plan_openspec}/*_test.go` (sửa), `prompts/prompt_size_budget_test.go`, `prompts/README.md` (sửa)
 **Depends on:** không (làm đầu tiên)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -34,15 +34,33 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `Parse` đúng cho `vi`, `VI `, `en`, `fr`, rỗng; lỗi nêu mã hợp lệ.
-- [ ] `Language` rỗng: đầu ra mọi luồng trùng từng byte với trước khi sửa; `check-prompt-golden.sh` xanh.
-- [ ] `vi`/`en` phát chỉ thị đúng một lần, trước dữ liệu; mẫu JSON nói giữ tiếng Anh khoá, `kind`, enum, id, nhãn, đường dẫn; mẫu OpenSpec nói giữ tiếng Anh tiêu đề ngữ pháp, `SHALL`/`MUST`, `#### Scenario:`, nhãn dòng task, `modify`/`create`, `ORCA_RESULT_*`.
-- [ ] Ngân sách kích thước xanh; README cập nhật.
+- [x] `Parse` đúng cho `vi`, `VI `, `en`, `fr`, rỗng; lỗi nêu mã hợp lệ. `TestParse` (`output_language_test.go`): `vi`, `VI `, ` En`, `en`, `fr`, rỗng, khoảng trắng, `vi-VN`, `vietnamese`; lỗi chứa `use one of: vi, en`.
+- [x] `Language` rỗng: đầu ra mọi luồng trùng từng byte với trước khi sửa; `check-prompt-golden.sh` xanh. Golden so sánh xanh sau khi thêm partial (158 tệp không đổi); `TestRender_EmptyLanguageAddsNothing` ở ba gói.
+- [x] `vi`/`en` phát chỉ thị đúng một lần, trước dữ liệu; mẫu JSON nói giữ tiếng Anh khoá, `kind`, enum, id, nhãn, đường dẫn; mẫu OpenSpec nói giữ tiếng Anh tiêu đề ngữ pháp, `SHALL`/`MUST`, `#### Scenario:`, nhãn dòng task, `modify`/`create`, `ORCA_RESULT_*`. `TestRender_LanguageInstructionOnceBeforeTheData*` (ba gói): một dòng `Output language: <Name>.`, trước `<request>`, không có `"kind":"`, có danh sách giữ tiếng Anh (JSON: khoá, `kind`, enum `a|b|c`, id, nhãn, đường dẫn; OpenSpec: tiêu đề, `SHALL`/`MUST`, `#### Scenario:`, nhãn dòng, `modify`/`create`, `ORCA_RESULT_*`).
+- [x] Ngân sách kích thước xanh; README cập nhật. `TestPromptSize_*` xanh; README có mục "Output language", gói `output_language`, `_language_rule` trong bảng Layout và số đo mới.
 
 ## Rủi ro và lưu ý
 
 - Vị trí chỉ thị (trước dữ liệu) chưa kiểm bằng mô hình thật; nếu `--real` (task 07) cho kết quả tiếng Anh với thân dài, chuyển dòng gọi xuống sau `_body` (một dòng mỗi mẫu).
 - Không viết "Vietnamese" cứng trong mẫu: luôn `{{.Language.Name}}`, để thêm ngôn ngữ chỉ sửa `output_language.go`.
+
+## Ghi chú triển khai
+
+**Tệp (đường dẫn dưới `backend-go/prompts/`):** mới `output_language/{output_language.go,output_language_test.go}`, `request_context/_language_rule.tmpl`, `plan_openspec/_language_rule_openspec.tmpl`, `analysis/language_test.go`, `plan_native/language_test.go`, `plan_openspec/language_test.go`; sửa `analysis/{solution,agent_solution,diagnosis,findings,answer}.tmpl`, `analysis/analysis.go`, `plan_native/{plan.tmpl,plan_native.go}`, `plan_openspec/{plan.tmpl,plan_openspec.go}`, `prompt_size_budget_test.go`, `README.md`.
+
+**Lệnh và kết quả:**
+- Trước khi sửa: `bash backend-go/ci/check-prompt-golden.sh` xanh (đường cơ sở). Sau khi thêm hai partial và các dòng gọi (chưa thêm ca mới): vẫn xanh, `git status -- '*/testdata/prompt-golden/*'` rỗng, tức 158 golden giữ nguyên từng byte.
+- `cd backend-go/prompts && go build ./... && go vet ./... && go test ./... -race -count=1` xanh.
+- Kiểm đột biến: đổi `Never translate:` thành `Do not translate:` trong partial JSON làm đỏ 7 test mới của `analysis` và `plan_native` (ca chỉ thị, vị trí, danh sách giữ tiếng Anh); hoàn lại thì xanh.
+- Số đo ngân sách (fixture đặt `Language: output_language.Vietnamese`): `analysis/solution` 174,137 -> 174,719; `agent_solution` 175,563 -> 176,145; `diagnosis` 173,840 -> 174,422; `findings` 173,635 -> 174,217; `answer` 173,498 -> 174,080; `plan_native/plan` 62,971 -> 63,553; `plan_openspec/plan` 66,050 -> 67,109 (byte). Không nâng `maxPromptBytes`.
+
+**Cách chứng minh "Language rỗng = đầu ra cũ":** ngoài golden, mỗi gói có test `TestRender_EmptyLanguageAddsNothing`: bỏ khối chỉ thị khỏi đầu ra `vi` phải cho đúng đầu ra `Language` rỗng, nên chỉ thị là khác biệt duy nhất.
+
+**Lệch so với đặc tả:** test so sánh "với chuỗi dựng không có trường" được thay bằng phép so sánh trên (đầu ra `vi` bỏ khối = đầu ra rỗng) cộng với golden, vì mã cũ không còn để dựng chuỗi đối chiếu. Test vị trí dùng `"<request>\ntitle:"` làm mốc vì chính chỉ thị có chữ `<request>`.
+
+**Blast radius:** chỉ thêm trường `Language` (giá trị zero = không đổi) vào ba `Input`; người gọi ngoài module `prompts` là ba hàm của `request-service/internal/usecase` (task 02).
+
+**Chưa kiểm:** vị trí chỉ thị trước dữ liệu với mô hình thật (task 07 `--real`).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

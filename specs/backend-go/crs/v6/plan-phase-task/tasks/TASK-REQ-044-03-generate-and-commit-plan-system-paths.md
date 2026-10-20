@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/generate_plan.go` (sửa), `internal/usecase/commit_plan.go` (sửa), `internal/usecase/generate_plan_system_test.go`, `internal/usecase/commit_plan_system_test.go`, `internal/usecase/commit_plan_race_test.go` (mới)
 **Depends on:** TASK-REQ-044-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -34,17 +34,27 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Đường hệ thống không đi qua `AuthorizePlan` và không có RPC công khai nào truy cập được nó.
-- [ ] Gọi lại cùng khoá không tạo run thứ hai; khoá mới tạo run mới.
-- [ ] Commit chịu được cuộc đua: một Plan, một Approval, không lỗi hiển thị cho bên thua.
-- [ ] `RawOutput` của cả hai engine commit được.
-- [ ] Test hiện có của `GeneratePlan`, `CommitPlan` xanh.
+- [x] Đường hệ thống không đi qua `AuthorizePlan` và không có RPC công khai nào truy cập được nó.
+- [x] Gọi lại cùng khoá không tạo run thứ hai; khoá mới tạo run mới.
+- [x] Commit chịu được cuộc đua: một Plan, một Approval, không lỗi hiển thị cho bên thua.
+- [x] `RawOutput` của cả hai engine commit được.
+- [x] Test hiện có của `GeneratePlan`, `CommitPlan` xanh.
 
 ## Rủi ro và lưu ý
 
 - Blast radius: `GeneratePlan.Execute` và `CommitPlan.Execute` được gRPC và nhiều test gọi; chạy `gitnexus_impact` cho cả hai và `record`, báo mức rủi ro.
 - Không mở rộng `ActorKind` ở đây (solution S9): transition và Approval ghi người báo cáo làm `ActorID`.
 - Hotfix (`PlanSingleTask`) có đường commit riêng (`bindHotfixFixTask`); không đụng.
+
+## Ghi chú triển khai
+
+**Hoàn thành 2026-10-20.** Đường dẫn dưới `backend-go/services/request-service/`.
+
+- Sửa `internal/usecase/generate_plan.go`: `GeneratePlanInput.IdempotencyKey`, `GeneratePlanResult.Status/ErrorCode`, thân `Execute` tách thành `run(ctx, in, system)`, thêm `ExecuteForSystem`. Nhánh system đặt `actor = req.ReporterID` và `tenant.WithUserID` (project-service từ chối lời gọi chỉ có tenant), bỏ `AuthorizePlan`, giữ `checkPlannable`/`modeFor`/`StartRun`. Sửa `internal/usecase/commit_plan.go`: `run(ctx, in, system)`, `ExecuteForSystem`, và `record` coi Request đã `awaiting_plan_approval` với đúng `PlanTaskID` là thành công (bên thua cuộc đua không thấy `REQUEST_STATE_STALE`; `PlanTaskID` khác hoặc Request đã rời `planning` vẫn lỗi). gRPC `GeneratePlan`/`CommitPlan` không đổi chữ ký; không RPC công khai nào gọi `ExecuteForSystem`.
+- Test mới: `generate_plan_system_test.go` (7 ca: không caller, dev server tra bằng người báo cáo, cùng khoá trả cùng run và không spawn thêm, khoá khớp run `failed` trả `Status=failed`+mã, khoá mới tạo run mới, không dev server không ghi gì, thiếu người báo cáo, `Execute` thường vẫn đòi user và `AuthorizePlan`), `commit_plan_system_test.go` (commit không cần quyền, validate như đường công khai, `AlreadyExists`, `RawOutput` của run `agent_proposal` giải mã rồi commit được), `commit_plan_race_test.go` (bên thua `record` thành công; một Plan, một Approval, một `plan.generated`; `PlanTaskID` khác hoặc Request rời `planning` vẫn `REQUEST_STATE_STALE`).
+- Lệnh: `go test ./internal/usecase/ -run 'GeneratePlan|CommitPlan' -count=1` xanh; toàn bộ `go test ./...` của request-service xanh.
+- Lệch spec: không có (tên file test đúng danh sách). Blast radius (grep): `GeneratePlan.Execute` gọi bởi `adapter/grpc/server_plan.go` và test; `CommitPlan.Execute` bởi `server_plan.go` và test; `record` chỉ trong `commit_plan.go`. Hotfix (`bindHotfixFixTask`) không đụng.
+- Chưa kiểm: không có gì cần stack. Test dùng `refusingPlanAuth` (nhúng interface `PlanActorAuthorizer`) để chứng minh đường system không hỏi quyền; nếu agent CR-045 đổi interface thì test vẫn biên dịch vì chỉ ghi đè `AuthorizePlan`.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

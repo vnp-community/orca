@@ -5,7 +5,7 @@
 **Area:** frontend / request / plan
 **File:** `renderer/src/hooks/{usePlanRevisions,usePlanBundleFile,usePlanProposalOfRun}.ts` (+ test, mới), `renderer/src/components/request/plan/documents/plan-document-model.ts` (+ test, mới)
 **Depends on:** FE-REQ-TASK-045-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -33,15 +33,24 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi tài liệu chỉ tải khi mở, được nhớ trong phiên.
-- [ ] Danh sách phiên bản phân trang và làm mới theo sự kiện.
-- [ ] Gateway cũ (`supported=false`) không gây lỗi.
-- [ ] Thứ tự và nhãn tài liệu đúng cho cấu trúc OpenSpec chuẩn.
+- [x] Mỗi tài liệu chỉ tải khi mở, được nhớ trong phiên. Bằng chứng: `usePlanBundleFile.test.ts` (tải một lần, tab mở lại không gọi lại, bản khác nhớ riêng, lỗi không nhớ, đổi Request bỏ nhớ, huỷ); `PlanDocumentsView.test.tsx` ("reads the open document only, once…").
+- [x] Danh sách phiên bản phân trang và làm mới theo sự kiện. Bằng chứng: `usePlanRevisions.test.ts` (trang đầu 20, `loadMore` theo token, giữ trang cũ khi làm mới, sự kiện `plan.*` và khung thăm dò khi `planning`, gộp loạt kích hoạt thành một lần gọi đang bay).
+- [x] Gateway cũ (`supported=false`) không gây lỗi. Bằng chứng: `usePlanRevisions.test.ts` (không cờ: không gọi kênh; kênh `unsupported`: `supported=false`, `error=null`); `PlanDocumentsView.test.tsx` ("works on a gateway without versions").
+- [x] Thứ tự và nhãn tài liệu đúng cho cấu trúc OpenSpec chuẩn. Bằng chứng: `plan-document-model.test.ts` (thứ tự chuẩn, nhiều spec, thiếu design, file lạ, đường dẫn độc hại, trùng).
 
 ## Rủi ro và lưu ý
 
 - Làm mới khi `request.version` đổi có thể kích nhiều lần liên tiếp: gộp bằng một lần gọi đang bay (`inFlight` ref).
 - `commit` có thể rỗng ở gateway cũ: khoá dự phòng `tasksMdDigest`, rồi `generatedAt` của bản hiện hành.
+
+## Ghi chú triển khai (2026-10-20)
+
+- **File mới**: `hooks/usePlanRevisions.ts`, `hooks/usePlanBundleFile.ts`, `hooks/usePlanProposalOfRun.ts`, `components/request/plan/documents/plan-document-model.ts` (+ test cho từng file).
+- **Lệnh**: `vitest run` trên bốn file test: 4 file, 52 test xanh; `tsc` mốc 113; `oxlint` sạch.
+- **Thiết kế**: `usePlanRevisions` đọc trang đầu qua một hàm có cờ `inFlight`/`again` (một loạt kích hoạt cùng lúc gây đúng một lần gọi đang bay và tối đa một lần nữa), gộp trang đã tải thêm khi làm mới (`pagedBack`), và chỉ gọi khi có `planTaskId` và cờ `request.planRevisions`; lỗi mạng giữ danh sách cũ. `usePlanBundleFile(requestId, path, revision, currentKey)`: thêm tham số thứ tư `currentKey` (`tasksMdDigest` hoặc `commit` của bản hiện hành) để bản hiện hành không bị nhớ qua một lần chỉnh; `Map` trong `useRef`, đặt lại khi đổi Request, trạng thái `idle|loading|ready|error|omitted|pruned|notFound`, `retry()`. `usePlanProposalOfRun(requestId, {runId, revision, refreshKey}, enabled)`: một lần gọi mỗi cặp; làm mới cùng bản thì giữ câu trả lời cũ, bản khác thì không bao giờ hiện câu trả lời của bản này (tránh hiện nhầm bản hiện hành dưới banner "older version"). `running` được báo, không thăm dò.
+- **Sai lệch**: hook `usePlanProposalOfRun` nhận thêm `refreshKey` và `enabled`; khoá cache của bản hiện hành nằm ở hook thứ hai (task nói cùng ý). `orderDocuments` thêm lọc `isSafeDocumentPath` (tuyệt đối, `..`, `\`, NUL, `//`) và bỏ trùng. Nhãn tab fixed ("Proposal/Design/Tasks") qua `translate` với khoá chữ nghĩa đầy đủ.
+- **Blast radius**: chỉ file mới, chưa có chỗ dùng cũ.
+- **Chưa kiểm**: hành vi với gateway thật (task 08).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

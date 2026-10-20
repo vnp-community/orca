@@ -5,7 +5,7 @@
 **Service:** `backend-go/prompts`, `request-service`
 **File:** `backend-go/prompts/plan_openspec/{plan.tmpl,_revise_in_place.tmpl,plan_openspec.go,plan_openspec_test.go}`, `backend-go/prompts/plan_native/{plan.tmpl,_prior_plan.tmpl,plan_native.go,plan_native_test.go}`, `backend-go/prompts/prompt_size_budget_test.go` (sửa/mới), `services/request-service/internal/usecase/{openspec_plan_prompt,plan_prompt,engine_openspec,run_proposal_generation,run_plan_generation}.go` (sửa), `services/request-service/internal/usecase/{prompt_golden_openspec_test,prompt_golden_plan_test}.go` + `testdata/prompt-golden/{BuildOpenSpecPlanPrompt,BuildPlanPrompt}/*.txt` (thêm ca mới)
 **Depends on:** TASK-REQ-045-02, TASK-REQ-045-05
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -36,11 +36,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Prompt lượt chỉnh OpenSpec dặn sửa tại chỗ và liệt kê file của phiên bản trước; prompt lần đầu không đổi.
-- [ ] Prompt lượt chỉnh native chứa Plan hiện hành trong khối được bọc; prompt lần đầu không đổi.
-- [ ] Mọi golden hiện có không đổi một byte (diff chỉ gồm file thêm mới).
-- [ ] Ngân sách kích thước xanh hoặc được nâng kèm lý do.
-- [ ] Phối hợp 046 được ghi trong PR.
+- [x] Prompt lượt chỉnh OpenSpec dặn sửa tại chỗ và liệt kê file của phiên bản trước; prompt lần đầu không đổi. (`TestRender_RevisionListsThePreviousFilesAndAsksForAnInPlaceEdit`, golden `revise_in_place_*`)
+- [x] Prompt lượt chỉnh native chứa Plan hiện hành trong khối được bọc; prompt lần đầu không đổi. (`TestRender_RevisionCarriesThePriorPlanInAFencedBlock`, golden `prior_plan*`)
+- [x] Mọi golden hiện có không đổi một byte (diff chỉ gồm file thêm mới). (so sánh sha256 của toàn bộ thư mục `prompt-golden` trước và sau: chỉ có 5 file thêm mới, không file nào đổi)
+- [x] Ngân sách kích thước xanh hoặc được nâng kèm lý do. (đo lại: native 87.956 B, openspec 95.916 B; ngân sách nâng lên 100.000 và 108.000 (README cập nhật, lý do ở dưới))
+- [x] Phối hợp 046 được ghi trong PR. (ghi ở mục "Phối hợp CR-REQ-046" dưới đây; mô tả PR do orchestrator viết khi mở PR (chưa có PR))
 
 ## Rủi ro và lưu ý
 
@@ -57,3 +57,22 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+## Ghi chú triển khai
+
+**Blast radius (grep).** `RenderOpenSpecPlanPrompt` có một người gọi (`engine_openspec.go:runAgent`), `RenderPlanPrompt` một (`run_plan_generation.go`); `plan_openspec.Input` và `plan_native.Input` chỉ thêm trường (`PreviousFiles`, `PriorPlan`), mọi nơi dựng literal dùng tên trường. `RunProposalGeneration.Execute` và `RunPlanGeneration.Execute` chỉ thêm một dòng đặt đầu vào. Task phụ thuộc 02 và 05 chưa làm; phần việc 4 chỉ cần `ListSucceeded` (task 04) nên làm được.
+
+**Tệp đã đổi.** Mới: `prompts/plan_openspec/_revise_in_place.tmpl`, `prompts/plan_native/_prior_plan.tmpl`, `prompts/plan_openspec/revise_in_place_test.go`, `prompts/plan_native/prior_plan_test.go`, `internal/usecase/plan_revision_prompt_context.go` (`previousChangeFiles`, `priorPlanText`) + `_test.go`, 5 file golden. Sửa: `prompts/plan_openspec/{plan.tmpl,plan_openspec.go}`, `prompts/plan_native/{plan.tmpl,plan_native.go}` (+ `PriorPlanRunes = 20000`, hàm `priorPlanRunes`), `prompts/prompt_size_budget_test.go`, `prompts/README.md`, `internal/usecase/{openspec_plan_prompt,plan_prompt,engine_openspec,run_proposal_generation,run_plan_generation}.go`, `prompt_golden_openspec_test.go`, `prompt_golden_plan_test.go`. Không sửa `skills/tdd-openspec-author/SKILL.md`.
+
+**Hành vi.**
+- OpenSpec: khi `PreviousFiles` không rỗng, `_revise_in_place.tmpl` (sau `_feedback`, trước `RetryNote`) in khối `<previous_change>` (mỗi tên file một dòng, qua `fence` rồi `quote` rồi `closing "previous_change"`, nên xuống dòng hay thẻ đóng trong tên không thoát khỏi khối) và dặn sửa tại chỗ với thay đổi nhỏ nhất, giữ mã change, dấu vùng Plan và id task còn tồn tại, tạo/xoá file chỉ khi phản hồi đòi, chạy lại `openspec validate --strict`. `RunProposalGeneration.Execute` đặt `PreviousFiles` từ `existing.Bundle` (đã sắp, tối đa 200) chỉ khi dòng `ready`: `prepare` reset worktree về đầu nhánh nên file chỉ có mặt ở trạng thái đó. Lượt thử lại trong cùng một run (có `RetryNote`) giữ cả hai khối.
+- Native: `_prior_plan.tmpl` in `<prior_plan>` (cắt 20.000 rune, `fence` + `closing "prior_plan"`) cùng câu "Return the complete revised plan as the same JSON schema; change only what the feedback asks."; `RunPlanGeneration.Execute` lấy `raw_output` của lượt Plan thành công mới nhất (`ListSucceeded`); chưa có lượt thành công (lần đầu, hoặc lần đầu thất bại) thì rỗng. Lỗi đọc lịch sử lượt làm hỏng lượt (không nuốt, không gọi mô hình thiếu Plan cũ).
+- `fence.blockTags` không đổi (tránh đổi byte của prompt thường); hai khối mới tự niêm phong bằng `closing`.
+
+**Quy trình golden đã làm.** (a) sửa template và `Input`; (b) thêm 5 ca: `BuildOpenSpecPlanPrompt/{revise_in_place_knowledge,revise_in_place_with_feedback_and_retry,revise_in_place_hostile_filename}`, `BuildPlanPrompt/{prior_plan,prior_plan_hostile}`; (c) `backend-go/ci/check-prompt-golden.sh`: chỉ báo thiếu golden của đúng 5 ca mới, golden cũ (kể cả 11 ca vi/en của CR-046) không đổi; (d) thay vì `--update` toàn cục (sẽ ghi đè luôn golden của agent khác đang sửa prompt), sinh bằng `go test ./internal/usecase -run 'TestPromptGolden_(BuildOpenSpecPlanPrompt|BuildPlanPrompt)$' -update` rồi kiểm; (e) `shasum` của 114 file trước và 119 file sau: `diff` chỉ có 5 dòng thêm, không dòng sửa; (f) fixture ngân sách: `PriorPlan = filler(40000)` (bị cắt ở 20.000 rune) và 200 tên file `specs/<100 rune>/spec.md`; đo `plan_native/plan` 87.956 B (trước 63.553), `plan_openspec/plan` 95.916 B (trước 67.109); nâng ngân sách lên 100.000 và 108.000 (khoảng 12 đến 14% trên số đo), lý do: ngữ cảnh chỉnh là 20.000 rune Plan cũ (đa byte, tới ~24 KB) hoặc 200 tên file (~29 KB), README cập nhật bảng và đoạn mô tả fixture; (g) `cd backend-go/prompts && go test ./... -race` xanh, `cd backend-go && make check-prompts` xanh (exit 0); (h) commit template + Go + golden **cùng một commit**: chưa commit (orchestrator làm).
+
+**Phối hợp CR-REQ-046.** 046 đã vào cây làm việc: partial `_language_rule*.tmpl` đứng một dòng `{{template ...}}` riêng, partial của task này cũng một dòng riêng ngay sau `_feedback`; ca golden mới giữ `Language` rỗng nên không phụ thuộc thứ tự phát hành; golden của ca thường và 11 ca ngôn ngữ không đổi byte. Fixture ngân sách của 046 (`Language: Vietnamese`) giữ nguyên, tôi chỉ thêm `PriorPlan`/`PreviousFiles`. Khi mở PR cần ghi: golden ca thường không đổi vì task này.
+
+**Lệnh đã chạy.** `backend-go/ci/check-prompt-golden.sh` (6 gói `ok`), `make check-prompts` (exit 0), `cd backend-go/prompts && go test ./... -race -count=1`, `cd backend-go/services/request-service && go test ./... -race -count=1`; test usecase mới: `TestRunProposalGeneration_{FirstRunHasNoPreviousFiles,RevisionListsTheFilesOfTheReadyChangeSorted,ChangeThatIsNotReadyHasNothingToEdit}`, `TestPreviousChangeFiles_IsBounded`, `TestRunPlanGeneration_{FirstPlanPromptHasNoPriorPlan,RevisionPromptCarriesTheLastSucceededPlan,RunHistoryThatCannotBeReadFailsTheRun}`.
+
+**Chưa kiểm chứng.** Chất lượng sửa tại chỗ với Claude thật (đề bài xếp loại C, 7 đến 13 USD, cần đồng ý): chỉ dẫn là yêu cầu, không phải bảo đảm.

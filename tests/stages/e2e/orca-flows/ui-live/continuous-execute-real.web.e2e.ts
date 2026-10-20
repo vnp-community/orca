@@ -1,7 +1,8 @@
 /**
- * A plan that runs on its own, with the REAL Claude Code of the dev server, through the UI (CR-REQ-038 + FE-REQ-037). The project
- * is set to `continuous`; the Plan tab then shows ONE approval card, the Plan is approved once on screen, every step runs on its
- * own with no Phase approval, the Execution tab follows the run, and the Request completes. Safety net: real-flow-harness.ts.
+ * A plan that runs on its own, with the REAL Claude Code of the dev server, through the UI (CR-REQ-038 + FE-REQ-037 + CR-REQ-043).
+ * The project stays `step_by_step`; the Plan tab offers "Approve and run all steps", the Plan is approved once with that choice
+ * and its confirmation, every step runs on its own with no Phase approval and no further click, the Execution tab follows the
+ * run, and the Request completes. Safety net: real-flow-harness.ts.
  *
  *   python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real continuous
  */
@@ -12,13 +13,13 @@ import {
   generatePlanThroughTheUi
 } from './live-flow-steps'
 import { approveAnalysis } from './live-analysis-approval-steps'
-import { approvePlanThroughTheUi, reviewPlanBeforeApproving } from './live-execution-steps'
+import { reviewPlanBeforeApproving } from './live-execution-steps'
 import {
   expectFinishedRunScreens,
-  expectSingleApprovalCard,
   followContinuousRun,
   configureProject
 } from './live-continuous-execution-steps'
+import { approveAndRunAllThroughTheUi, expectBothApproveButtons } from './live-run-all-steps'
 import { expectExpectedChangeInFixture } from './live-fixture-change-checks'
 import { isLiveRun } from './live-stack-config'
 import { realRunBudgetMs, runRealFlow } from './real-flow-harness'
@@ -26,7 +27,7 @@ import { realRunBudgetMs, runRealFlow } from './real-flow-harness'
 test.describe('A plan that runs on its own, with the real Claude, through the UI', () => {
   test.skip(!isLiveRun(), 'live-stack suite: set ORCA_E2E_LIVE=1 (see orca-flows/README.md)')
 
-  test('change_request (native engine): approve once, every step runs on its own, the Request completes', async ({
+  test('change_request (native engine): "Approve and run all steps" once, every step runs on its own, the Request completes', async ({
     page,
     context
   }, testInfo) => {
@@ -40,7 +41,7 @@ test.describe('A plan that runs on its own, with the real Claude, through the UI
         const before = await configureProject(f, {
           engine: 'native',
           solutionAgent: false,
-          executionMode: 'continuous'
+          executionMode: 'step_by_step'
         })
         try {
           const r = await createClassifyAndConfirm(f, {
@@ -60,8 +61,8 @@ test.describe('A plan that runs on its own, with the real Claude, through the UI
           })
           await generatePlanThroughTheUi(f, r)
           await reviewPlanBeforeApproving(f, r)
-          await expectSingleApprovalCard(f, r)
-          await approvePlanThroughTheUi(f, r)
+          await expectBothApproveButtons(f)
+          await approveAndRunAllThroughTheUi(f, r)
           const run = await followContinuousRun(f, r, realRunBudgetMs('execute'), fx.base)
           expect(run.sawStrip, 'the Execution tab showed the summary strip').toBe(true)
           expect(run.sawRunning, 'the Execution tab showed the run as running').toBe(true)

@@ -54,6 +54,8 @@ export async function configureProject(
       openspecMinVersion: cur.openspecMinVersion ?? '',
       solutionAgent: want.solutionAgent,
       executionMode: want.executionMode,
+      // Why: these flows press Generate plan themselves; automatic plan generation (CR-REQ-044) has its own spec.
+      planAutoGenerate: false,
       expectedVersion: cur.version
     })
     expect(next.executionMode, 'the mode was stored').toBe(want.executionMode)

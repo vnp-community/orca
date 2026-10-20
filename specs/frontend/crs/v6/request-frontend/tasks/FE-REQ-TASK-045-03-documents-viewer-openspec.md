@@ -5,7 +5,7 @@
 **Area:** frontend / request / plan
 **File:** `renderer/src/components/request/plan/documents/{PlanDocumentsView,PlanDocumentTabs,PlanDocumentBody,PlanChecksPanel}.tsx` (+ test, mới), `renderer/src/components/request/solution/RequestMarkdownContent.tsx` (sửa: tuỳ chọn `gfm`), `renderer/src/components/request/plan/{PlanSummaryHeader,RequestPlanTab}.tsx` (sửa), `renderer/src/components/request/plan/plan-view-state.ts` (kiểu `PlanDisplayView`)
 **Depends on:** FE-REQ-TASK-045-02
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -38,17 +38,25 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Người dùng đọc được proposal, design, từng spec delta và tasks của change.
-- [ ] File bị lược hiện placeholder với kích thước thật; không tải cả bộ tài liệu.
-- [ ] Kiểm tra và khoảng trống tri thức hiển thị, ghi rõ là lời của agent.
-- [ ] Không HTML thô; Solution hiển thị như cũ.
-- [ ] Không file nào vượt `max-lines`.
+- [x] Người dùng đọc được proposal, design, từng spec delta và tasks của change. Bằng chứng: `PlanDocumentsView.test.tsx` (tab đúng thứ tự, đọc khi mở, Rendered/Source, checkbox chỉ đọc); `RequestPlanTab.revision.test.tsx` ("offers Documents…") với payload dạng gateway.
+- [x] File bị lược hiện placeholder với kích thước thật; không tải cả bộ tài liệu. Bằng chứng: `PlanDocumentsView.test.tsx` ("too large to display (8.6 MB) … request/7-proposal", không gọi `planBundleFile` cho file đó; chỉ một lần đọc lúc đầu). Kích thước đúng nếu backend sửa G10 (task BE-045-03): UI lấy từ danh sách file.
+- [x] Kiểm tra và khoảng trống tri thức hiển thị, ghi rõ là lời của agent. Bằng chứng: `PlanChecksPanel.test.tsx` (mức bằng chữ, mở sẵn khi có cảnh báo, `SECRETS_REDACTED`, "Reported by the authoring agent", dòng "Orca did not verify it", bản cũ).
+- [x] Không HTML thô; Solution hiển thị như cũ. Bằng chứng: `RequestMarkdownContent.test.tsx` (`gfm` bật: bảng, checkbox chỉ đọc, `skipHtml`, liên kết chỉ http(s); tắt: không bảng/checkbox như trước; 40 test cũ giữ xanh).
+- [x] Không file nào vượt `max-lines`. Bằng chứng: `oxlint` sạch; `RequestPlanTab.tsx` 263 dòng mã (cap 300).
 
 ## Rủi ro và lưu ý
 
 - Văn bản do agent viết: không bao giờ chèn HTML; `Source` chỉ là văn bản.
 - `RequestPlanTab` đang dài: tách trước khi thêm.
 - Chạy `gitnexus_impact` cho `RequestMarkdownContent` (dùng ở Solution, Answer, Findings), `PlanSummaryHeader`.
+
+## Ghi chú triển khai (2026-10-20)
+
+- **File mới** (`components/request/plan/documents/`): `PlanDocumentsView.tsx`, `PlanDocumentTabs.tsx`, `PlanDocumentBody.tsx`, `PlanChecksPanel.tsx`, `PlanDocumentsPane.tsx` (chọn Documents/Proposal theo engine) và test của từng phần. **Sửa**: `solution/RequestMarkdownContent.tsx` (+ test: prop `gfm`), `plan/PlanSummaryHeader.tsx` (+ `PlanSummaryHeader.test.tsx` mới), `plan/plan-view-state.ts` (`PlanDisplayView = 'tree'|'graph'|'documents'`), `plan/RequestPlanTab.tsx`.
+- **Lệnh**: `vitest run` trên `plan/documents`, `RequestMarkdownContent.test.tsx`, `PlanSummaryHeader.test.tsx`: 8 file, 127 test xanh; `RequestPlanTab.revision.test.tsx` kiểm mục Documents trong tab thật. `tsc` mốc 113; `oxlint` sạch.
+- **Quyết định**: (1) `react-markdown` v10 không có `rehype-raw` nên HTML thô (kể cả `<!-- orca:begin plan -->`) bị hiện thành văn bản chứ không bị bỏ như CR giả định; vì vậy `gfm` bật luôn `skipHtml` (mọi HTML thô bị bỏ, comment máy ẩn khỏi Rendered, vẫn thấy ở Source). Solution không đổi (mặc định `gfm=false`). (2) Thanh tab dùng `Tabs` shadcn (Radix: mũi tên trái/phải, `aria-selected`) trong khung cuộn ngang riêng; huy hiệu New/Changed/Removed bằng chữ + token (`status-success`, `quality-warning`, `destructive`), không hiện ở phiên bản 1 (mọi file sẽ là "New"). (3) File `omitted` hoặc `removed` hoặc bản bị lược chữ không bao giờ bị yêu cầu đọc (chỉ mục đã nói rõ). (4) Copy dùng lại `McpCopyButton` (không toast). (5) Prop của `PlanSummaryHeader` là `documentsView?: 'documents'|'proposal'` (ẩn khi vắng) thay cho `documentsAvailable` vì task 04 cần nhãn thứ hai; mục hiện khi `flowPlanKind !== 'single_task'` (hotfix không có).
+- **Blast radius** (grep): `RequestMarkdownContent` dùng ở `SolutionSection`, `AnswerView`, `DiagnosisView`, `FindingsView` và hai view mới (thêm prop tuỳ chọn, không đổi chỗ cũ); `PlanSummaryHeader` chỉ `RequestPlanTab` dùng (+ test).
+- **Chưa kiểm**: Rendered/Source với tài liệu OpenSpec thật và ảnh chụp (task 08, spec `plan-documents`).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

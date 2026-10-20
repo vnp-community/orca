@@ -5,7 +5,7 @@
 **Area:** frontend / request / plan
 **File:** `renderer/src/components/request/plan/revision/{PlanVersionSwitcher,plan-version-history}.ts(x)` (+ test, mới), `renderer/src/components/request/solution/OlderVersionBanner.tsx` (sửa: prop `testId`), `renderer/src/components/request/plan/documents/{PlanDocumentsView,PlanProposalView}.tsx` (sửa: nhận `revision`), `renderer/src/components/request/plan/RequestPlanTab.tsx` (sửa)
 **Depends on:** FE-REQ-TASK-045-03, 045-04, 045-05
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -37,15 +37,24 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Danh sách phiên bản hiện mọi bản (kể cả đã superseded) kèm yêu cầu chỉnh đã sinh ra nó.
-- [ ] Xem bản cũ ở chế độ chỉ đọc: không panel chỉnh, không nút duyệt; về bản hiện hành bằng một cú nhấp.
-- [ ] Bản bị lược chữ và Request cũ hiển thị đúng thông điệp, không hứa nội dung không có.
-- [ ] Danh sách dài (hơn 20) dùng được bằng bàn phím, không lồng cuộn.
+- [x] Danh sách phiên bản hiện mọi bản (kể cả đã superseded) kèm yêu cầu chỉnh đã sinh ra nó. Bằng chứng: `PlanVersionSwitcher.test.tsx`, `PlanVersionBar.test.tsx` ("shows the whole request…"), `RequestPlanTab.revision.test.tsx` ("shows what was asked…").
+- [x] Xem bản cũ ở chế độ chỉ đọc: không panel chỉnh, không nút duyệt; về bản hiện hành bằng một cú nhấp. Bằng chứng: `RequestPlanTab.revision.test.tsx` ("reads an older version read only…": banner, không panel, tài liệu của bản 1 qua `revision`, cây và thanh duyệt của bản hiện hành, "Back to current"). Thanh duyệt vẫn hiện vì thuộc bản hiện hành theo U9 của solution, không phải của bản đang đọc.
+- [x] Bản bị lược chữ và Request cũ hiển thị đúng thông điệp, không hứa nội dung không có. Bằng chứng: `PlanDocumentsView.test.tsx` (không gọi `planBundleFile`, "The text of this version is no longer kept.", Request cũ không có danh sách file); `PlanVersionSwitcher.test.tsx`.
+- [x] Danh sách dài (hơn 20) dùng được bằng bàn phím, không lồng cuộn. Bằng chứng: `PlanVersionSwitcher.test.tsx` (100 phiên bản trong một `ul` `max-h-60 overflow-y-auto`, mỗi mục là `button` có `aria-pressed`, "Show older" tải trang kế bằng `loadMore`).
 
 ## Rủi ro và lưu ý
 
 - Chạy `gitnexus_impact` cho `OlderVersionBanner` (dùng ở `SolutionPanel`).
 - Số bản của Request cũ có thể bắt đầu muộn hơn 1 (các lượt trước CR không có dòng lịch sử) nhưng vẫn liên tục.
+
+## Ghi chú triển khai (2026-10-20)
+
+- **File mới** (`plan/revision/`): `plan-version-history.ts`, `PlanVersionSwitcher.tsx`, `PlanVersionBar.tsx`, `usePlanVersions.ts` (+ test). **Sửa**: `solution/OlderVersionBanner.tsx` (props `testId`, `backTestId`, mặc định là id của Analysis; Plan dùng `plan-older-version-banner` / `plan-back-to-current`), `plan/RequestPlanTab.tsx`.
+- **Lệnh**: `vitest run plan/revision RequestPlanTab* plan-approval-bars* …`: 17 file, 216 test xanh (gồm task 05). `tsc` mốc 113; `oxlint` sạch.
+- **Thiết kế**: `usePlanVersions` giữ lựa chọn theo Request (`null` = hiện hành, theo bản mới nhất); chọn bản cũ đưa tab sang Documents/Proposal (nơi duy nhất đọc được bản cũ); bản hiện hành mới xuất hiện khi đang đọc bản cũ thì giữ bản đang đọc và hiện "A newer version is available" + "Show it". `PlanVersionBar` nằm dưới `PlanRevisionSection`, ở mọi chế độ: banner bản cũ, dòng "The tree shows the current version." (chỉ ở Documents/Proposal), danh sách trong `Collapsible` "Versions (n)", khối "What was asked for this version" (văn bản thuần, `whitespace-pre-wrap`).
+- **Sai lệch**: (1) không có `versionPageOf`/phân trang phía client như `solution-version-history`: phân trang do server (`loadMore`, "Show older") và danh sách cuộn trong khung giới hạn; chỉ dùng lại `versionNote` (80 ký tự, theo ký tự Unicode). (2) Với gateway không có `request.planRevisions` không có danh sách phiên bản (đúng spec: `supported=false`).
+- **Blast radius**: `OlderVersionBanner` chỉ `SolutionPanel` (mặc định giữ nguyên id, test Analysis xanh) và `PlanVersionBar`.
+- **Chưa kiểm**: trên stack, ảnh `older-version-1` (task 08).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

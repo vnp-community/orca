@@ -5,7 +5,7 @@
 **Area:** frontend / request / plan
 **File:** `renderer/src/components/request/activity/{activity-entry-presentation,activity-entry-text}.ts` (+ test, sửa), `renderer/src/components/request/activity/activity-locale-coverage.test.ts` (cập nhật), `renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `renderer/src/components/request/plan/plan-locale-coverage.test.ts` (mở rộng) và test phủ i18n mới cho `plan/documents/` và `plan/revision/`
 **Depends on:** FE-REQ-TASK-045-03, 045-04, 045-05, 045-06; backend BE-REQ-TASK-045-07
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -33,14 +33,23 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Activity hiển thị "Requested changes to the plan", không lộ nội dung phản hồi.
-- [ ] Mọi chuỗi mới có trong 5 locale cùng placeholder.
-- [ ] Coverage i18n không xấu hơn mốc; test phủ mới xanh.
+- [x] Activity hiển thị "Requested changes to the plan", không lộ nội dung phản hồi. Bằng chứng: `activity-entry-text.test.ts` (tiêu đề, không dòng chi tiết dù payload có `feedback`/`reason`/`comment`, không dòng nào chứa chữ bí mật), `RequestActivityTab.test.tsx` (một dòng, có tác nhân "User", không huy hiệu mức độ), `activity-entry-presentation.test.ts` (nhóm `changes`, biểu tượng `ClipboardPen` khác Analysis/`plan.done`, tab Plan, tông trung tính).
+- [x] Mọi chuỗi mới có trong 5 locale cùng placeholder. Bằng chứng: `plan/documents/plan-documents-locale-coverage.test.ts`, `plan/revision/plan-revision-locale-coverage.test.ts` (bằng `describeTranslateCallLocales` + kiểm bản dịch không sao chép tiếng Anh, trừ "Irreversible", "Error", "{{hours}} h" của es), `plan-locale-coverage.test.ts` (khoá `${P}` của `PlanRunFailedCard`), `solution-locale-coverage.test.ts` (checkbox GFM), `activity-locale-coverage.test.ts`, `analysis-revision-ui-locale-coverage.test.ts` (thêm `RevisionPromptBox.tsx`).
+- [x] Coverage i18n không xấu hơn mốc; test phủ mới xanh. Bằng chứng: `node config/scripts/verify-localization-catalog.mjs` (chạy trong `desktop/`): "Verified 196 localization key references", parity 10573 khoá ở es/ja/ko/zh. `audit-localization-coverage.mjs --check`: đỏ sẵn vì năm nhãn `store/slices/bootstrap.ts` (không phải của task này), không có dòng nào thuộc file đã đổi.
 
 ## Rủi ro và lưu ý
 
 - Bản dịch es/ja/ko/zh tự dịch: cần người bản ngữ rà trước khi phát hành.
 - Chạy `gitnexus_impact` cho `ACTIVITY_GROUP_KINDS` và `activityTargetTab` (cùng blast radius đã ghi ở TASK-041-04).
+
+## Ghi chú triển khai (2026-10-20)
+
+- **Sửa**: `activity/activity-entry-presentation.ts` (`plan.revision_requested` trong nhóm `changes`, biểu tượng `ClipboardPen`, `activityTargetTab` -> `plan`), `activity/activity-entry-text.ts` (tiêu đề cố định "Requested changes to the plan"; không dòng chi tiết nào), các test activity tương ứng, năm file `i18n/locales/{en,es,ja,ko,zh}.json` (94 khoá, thêm bằng một script, mỗi file ghi một lần bằng thay tên file; en = chữ trong mã; chỉ thêm khoá, không đổi khoá cũ), hai test phủ mới.
+- **Khoá**: `auto.components.request.plan.documents.*` (Documents/Proposal/kiểm tra/tri thức), `auto.components.request.plan.revision.*` (panel, lỗi, chip, danh sách phiên bản), `auto.components.request.plan.PlanRunFailedCard.{hint.noChange,hint.baseRefGone,titleRevise,tryAgain,writeNew}`, `auto.components.request.RequestMarkdownContent.{taskDone,taskOpen}`, `auto.components.request.activity.title.planRevisionRequested`. Các chuỗi dùng lại của panel Analysis (`AnalysisRevision.counter`, `.suggestions`, `.shortcutHint`) không nhân đôi.
+- **Bản dịch es/ja/ko/zh tự dịch, cần người bản ngữ rà trước khi phát hành** (giữ thuật ngữ đã có: kế hoạch/プラン/plan, "Superseded", "Version n").
+- **Lệnh**: `vitest run` activity + plan + solution + i18n: xanh trừ lỗi đã biết ngoài phạm vi (`no-top-level-translate` do `FleetServerStatusBadge`).
+- **Blast radius**: kind lạ vẫn chịu được (test cũ); `analysis.revision_requested` không đổi.
+- **Chưa kiểm**: dòng History trên stack (task 08, ca (c)); phụ thuộc BE-045-07 phát kind `plan.revision_requested` và bỏ lượt Plan khỏi `analysis.revision_requested`.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

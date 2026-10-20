@@ -5,7 +5,7 @@
 **Area:** frontend / request / plan
 **File:** `renderer/src/components/request/solution/{RevisionPromptBox,AnalysisRevisionPanel}.tsx` (+ test; mới/sửa), `renderer/src/components/request/plan/revision/{usePlanRevision,PlanRevisionPanel,PlanRevisionSection,plan-revision-errors,plan-revision-suggestions}.ts(x)` (+ test, mới; `PlanRevisionSection` gom thẻ lỗi + panel + dải để `RequestPlanTab` chỉ thêm một dòng), `renderer/src/components/request/plan/{RequestPlanTab,PlanApprovalBar,PlanDecisionButtons,PlanApprovalCard,PlanRunFailedCard}.tsx` (sửa; hai file cuối của 043/044), `renderer/src/hooks/usePlanDecision.ts` (sửa), test hiện có của các file đó
 **Depends on:** FE-REQ-TASK-045-01, 045-02; **FE-REQ-TASK-044-02 và 044-03** (`usePlanRunState`, `derivePlanAutoDisplay`, `PlanRunFailedCard`, `PlanRewriteStrip`, cờ `request.planAuto`); FE-REQ-TASK-043-03 (cùng sửa `PlanApprovalBar`/`PlanApprovalCard`; hợp nhất theo hàm); backend BE-REQ-TASK-045-01, 045-02
-**Status:** [ ] TODO
+**Status:** [ ] PARTIAL (2026-10-20): mọi tiêu chí không cần stack đã xong và có test; tiêu chí "Approval cũ bị huỷ và Approval mới xuất hiện sau khi lượt xong" và trải nghiệm thật cần backend CR-045 và stack: not run on the stack (spec `plan-revision`).
 
 ---
 
@@ -40,17 +40,26 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chỉnh Plan bằng một thao tác, không qua từ chối; Approval cũ bị huỷ và Approval mới xuất hiện sau khi lượt xong (qua server commit).
-- [ ] Trong lúc chỉnh tab hiển thị rõ đang viết bản mới dù cây cũ còn đó; thất bại có "Try again" giữ phản hồi.
-- [ ] Hai đường sinh lại cũ của cổng Plan không còn; "Generate plan" lần đầu vẫn hoạt động.
-- [ ] Panel Analysis hoạt động như cũ sau khi tách.
-- [ ] Đúng truy cập bàn phím và đọc màn hình; không file nào vượt `max-lines`.
+- [ ] Chỉnh Plan bằng một thao tác, không qua từ chối; Approval cũ bị huỷ và Approval mới xuất hiện sau khi lượt xong (qua server commit). (còn lại: chưa chạy trên stack (not run on the stack))
+- [x] Trong lúc chỉnh tab hiển thị rõ đang viết bản mới dù cây cũ còn đó; thất bại có "Try again" giữ phản hồi. Bằng chứng: `RequestPlanTab.revision.test.tsx`, `RequestPlanTab.auto.test.tsx` (đã cập nhật), `usePlanRevision.test.ts`.
+- [x] Hai đường sinh lại cũ của cổng Plan không còn; "Generate plan" lần đầu vẫn hoạt động. Bằng chứng: `plan-approval-bars.test.tsx` (không `plan-regenerate`, hộp thoại từ chối không có tuỳ chọn regenerate, từ chối chỉ gọi `approval.reject`); `PlanStates.auto.test.tsx` và `RequestPlanTab.auto.test.tsx` (Generate plan giữ nguyên).
+- [x] Panel Analysis hoạt động như cũ sau khi tách. Bằng chứng: `AnalysisRevisionPanel.test.tsx` và `SolutionPanel.revision.test.tsx` xanh, không sửa.
+- [x] Đúng truy cập bàn phím và đọc màn hình; không file nào vượt `max-lines`. Bằng chứng: `PlanRevisionPanel.test.tsx` (phím tắt theo nền tảng, `aria-live`, `aria-invalid`), `oxlint` sạch.
 
 ## Rủi ro và lưu ý
 
 - Chưa kiểm chứng bằng chạy thật rằng hai đường cũ lỗi; nếu thực tế chúng chạy được (ví dụ gateway chuyển tiếp khác), vẫn bỏ vì phản hồi khi từ chối không bao giờ thành feedback và từ chối đưa về backlog.
 - Chạy `gitnexus_impact` cho `usePlanDecision`, `PlanDecisionButtons`, `RejectReasonDialog`, `AnalysisRevisionPanel`.
 - FE-REQ-SOL-044 chưa triển khai: tên hook, thẻ và cờ lấy từ tài liệu v1.0, đối chiếu mã thật trước khi viết. Ba CR cùng sửa `RequestPlanTab.tsx` (249 dòng, trần 300), `PlanApprovalBar`, `PlanApprovalCard`: giữ phần của CR này trong file con.
+
+## Ghi chú triển khai (2026-10-20)
+
+- **File mới**: `solution/RevisionPromptBox.tsx` (tách từ `AnalysisRevisionPanel`, không đổi hành vi: `testIdPrefix`, nhãn qua props, khoá i18n cũ giữ nguyên), `plan/revision/{usePlanRevision.ts,PlanRevisionPanel.tsx,PlanRevisionSection.tsx,plan-revision-errors.ts,plan-revision-suggestions.ts}` + test. **Sửa**: `solution/AnalysisRevisionPanel.tsx` (dùng `RevisionPromptBox`), `plan/RequestPlanTab.tsx`, `plan/PlanApprovalBar.tsx` (bỏ `plan-regenerate`), `plan/PlanDecisionButtons.tsx` (bỏ `offerRegenerate`), `hooks/usePlanDecision.ts` (`reject` không còn `options.regenerate`; `regeneratePlan` giữ cho "Generate plan"), `plan/PlanRunFailedCard.tsx` (biến thể `revise`: tiêu đề "The plan could not be revised", nút "Try again", dòng "Or write a new request below.", gợi ý cho `REQUEST_PLAN_REVISION_NO_CHANGE` và `REQUEST_BASE_REF_NOT_FOUND`), `plan/PlanRunNotice.tsx` (`hideStrip`, `hideFailure`, thẻ lỗi luôn là biến thể `revise` vì chỉ nằm trên Plan đã có), `hooks/usePlanAutoGeneration.ts` (trả thêm `run` và `refresh`). Test cũ đã cập nhật: `plan-approval-bars.test.tsx` (hai test), `RequestPlanTab.auto.test.tsx` (ca "rewrite": panel nói "Writing", dải `plan-rewrite-strip` bị ẩn như task yêu cầu).
+- **Lệnh**: `vitest run` trên `plan/revision`, `RequestPlanTab*`, `plan-approval-bars*`, `AnalysisRevisionPanel.test.tsx`, `SolutionPanel.revision.test.tsx`, `PlanRunFailedCard.test.tsx`: 17 file, 216 test xanh. Toàn vùng `plan solution activity hooks/usePlan shared/request store/slices/request`: 81 file, 1269 test xanh. `tsc` mốc 113; `oxlint` sạch; `RequestPlanTab.tsx` 263 dòng mã (cap 300).
+- **Thiết kế `usePlanRevision`**: `busy = calling || retrying || revising || (server đang viết lại)`; `revising` suy từ Request (`planning` kể từ khi gửi, hoặc quay về `awaiting_plan_approval` mà `version`/`updatedAt`/`planTaskId` chưa đổi) và kết thúc khi lượt thất bại **mới** (so `runId` đã thấy lúc gửi với `run.runId` hiện tại, để thẻ lỗi của lượt trước không làm tab hết bận); không bao giờ xoá chữ khi lỗi; không gọi `reject`; `serverCommit = supportsPlanAuto` thì `generatePlanPropose`, ngược lại `generatePlanProposeCommit` (chỉ reporter/admin chỉnh được; thông điệp `forbidden` nói rõ). "Try again" = `generatePlanPropose(id, {})` (hoặc `…Commit`), không `request.retryPlan`. Sau 240 giây (native) / 64 phút (openspec) hiện "Taking longer than expected" nhưng vẫn bận. Panel hiện khi `viewingCurrent` và (đang ở cổng, hoặc `planning` còn Plan và lượt không đang chạy, hoặc bận); cổng Approval/Card ẩn khi `busy`. Chỉ kind `plan`/`task_list` (hotfix `single_task` không).
+- **Sai lệch**: (1) `PlanRunFailedCard` nhận `variant` thay vì `onRetry`/`retryLabel` (đã có `onRetry`). (2) `usePlanAutoGeneration` sửa nhỏ (trả `run`, `refresh`) vì không thể phân biệt lỗi của lượt mới với lỗi lượt cũ nếu thiếu `runId`; hook thuộc 044. (3) `RequestPlanTab.auto.test.tsx` có một ca đổi kỳ vọng (xem trên).
+- **Blast radius** (grep): `PlanDecisionButtons` dùng ở `PlanApprovalBar`, `PhaseApprovalBar`, `PlanGateChips`, `PlanApprovalCard`, `PlanRunAllButton` (chỉ prop `offerRegenerate` bỏ; không ai khác truyền); `usePlanDecision.reject` chỉ `PlanDecisionButtons` gọi; `RejectReasonDialog` giữ `offerRegenerate` cho cổng Analysis (`SolutionDecisionBar`); `usePlanAutoGeneration` chỉ `RequestPlanTab`; `AnalysisRevisionPanel` chỉ `SolutionPanel`; `PlanRunNotice` chỉ `RequestPlanTab`.
+- **Chưa kiểm**: chuỗi thật "chỉnh → Approval cũ huỷ → job `revision` commit → Approval mới" cần backend CR-045 (BE-045-01, 02, 05, 08) và stack; hai đường cũ lỗi trạng thái trên stack thật chưa được xác nhận (đã bỏ vì không thành feedback và từ chối đưa về backlog).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

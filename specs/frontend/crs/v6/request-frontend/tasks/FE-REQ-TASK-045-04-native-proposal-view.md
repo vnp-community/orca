@@ -5,7 +5,7 @@
 **Area:** frontend / request / plan
 **File:** `renderer/src/components/request/plan/documents/PlanProposalView.tsx` (+ test, mới), `renderer/src/components/request/plan/documents/plan-proposal-model.ts` (+ test, mới), `renderer/src/components/request/plan/{PlanSummaryHeader,RequestPlanTab}.tsx` (sửa)
 **Depends on:** FE-REQ-TASK-045-02, FE-REQ-TASK-045-03 (cùng chỗ sửa `PlanSummaryHeader`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -33,14 +33,22 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Người dùng đọc được `summary`, `notes`, từng Phase và task (mô tả, loại, nhãn, phụ thuộc, ước lượng, cờ không đảo ngược) của Plan native.
-- [ ] Chỉ đọc, không HTML thô; chỉ số phụ thuộc lệch không làm hỏng trang.
-- [ ] Hoạt động với gateway cũ (không `planRevisions`).
+- [x] Người dùng đọc được `summary`, `notes`, từng Phase và task (mô tả, loại, nhãn, phụ thuộc, ước lượng, cờ không đảo ngược) của Plan native. Bằng chứng: `PlanProposalView.test.tsx` ("shows the summary, the notes, every phase and every task field…", "marks an irreversible task…"); `plan-proposal-model.test.ts`.
+- [x] Chỉ đọc, không HTML thô; chỉ số phụ thuộc lệch không làm hỏng trang. Bằng chứng: `PlanProposalView.test.tsx` ("has no button that edits or runs anything", "drops raw HTML…"); `plan-proposal-model.test.ts` (chỉ số ngoài khoảng/chính nó/trùng bị bỏ).
+- [x] Hoạt động với gateway cũ (không `planRevisions`). Bằng chứng: `PlanProposalView.test.tsx` ("on a gateway without versions it reads the latest run…"); `RequestPlanTab.revision.test.tsx` (tab không gọi `request.planRevisions` khi thiếu cờ).
 
 ## Rủi ro và lưu ý
 
 - Chạy `gitnexus_impact` cho `PlanSummaryHeader` (dùng ở `RequestPlanTab` và đồ thị).
 - Đề xuất của lượt mới nhất có thể khác Plan đã commit (khoảng giữa lượt thành công và commit): ghi chú "Not committed yet" nếu `request.status === 'planning'` và `planTaskId` khác bản đề xuất; kiểm khi triển khai.
+
+## Ghi chú triển khai (2026-10-20)
+
+- **File mới**: `plan/documents/plan-proposal-model.ts` (`toProposalOutline`, `formatEstimatedHours`, `formatDependencies`), `plan/documents/PlanProposalView.tsx` (+ test cả hai). `PlanSummaryHeader` và `RequestPlanTab` đã sửa ở task 03 (mục "Proposal" cùng `PlanDisplayView`).
+- **Lệnh**: `vitest run` hai file test: 18 test xanh (cùng nhóm task 03: 127). `tsc` mốc 113; `oxlint` sạch.
+- **Quyết định**: chỉ số hiển thị 1-based theo từng danh sách (Phase hoặc Plan); phụ thuộc ngoài khoảng/chính nó/trùng bị bỏ thay vì lỗi; phase mở sẵn bằng `Collapsible`; `prompt_template` trong `<details>` (đóng) với `<pre>` văn bản thuần; summary/notes/mô tả qua `RequestMarkdownContent gfm`. Bản đọc theo `runId` + `revision` của bản đang xem (không dùng "lượt mới nhất" khi có danh sách phiên bản, vì nó rỗng lúc đang chỉnh). Ghi chú "Not committed yet": chỉ hiện khi không có danh sách phiên bản và Request ở `planning` ("This is the latest proposal. It is not saved as the plan yet."), vì dây không có trường nào để so với `planTaskId`.
+- **Blast radius**: file mới; chỉ `RequestPlanTab` (qua `PlanDocumentsPane`) dùng.
+- **Chưa kiểm**: đề xuất thật trên stack và ảnh chụp (task 08, spec `plan-documents` ca (a)).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

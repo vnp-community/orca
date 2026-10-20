@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/plan_auto.go` (mới), `internal/domain/plan_auto_test.go` (mới), `internal/domain/engine_settings.go` (sửa)
 **Depends on:** (không)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -37,16 +37,27 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Một bảng mã tạm thời, có test theo từng mã.
-- [ ] `WantsAutoPlan` đúng bảng 11 loại × trigger; `hotfix`, `spike`, `question` và replan không bao giờ được nhận.
-- [ ] Máy trạng thái job có test đầy đủ; trạng thái cuối không đi tiếp.
-- [ ] Giá trị env lạ không làm service dừng, có cảnh báo.
-- [ ] `go build ./...` và test miền xanh.
+- [x] Một bảng mã tạm thời, có test theo từng mã. (`TestIsTransientPlanRunCode`: từng mã đúng và 19 mã sai)
+- [x] `WantsAutoPlan` đúng bảng 11 loại × trigger; `hotfix`, `spike`, `question` và replan không bao giờ được nhận. (`TestWantsAutoPlan`: ma trận 11 loại x trigger x `PlanTaskID` x `to`; `hotfix`, `spike`, `question`, `plan_revision` và mọi ca đã có `PlanTaskID` đều sai)
+- [x] Máy trạng thái job có test đầy đủ; trạng thái cuối không đi tiếp. (`TestPlanAutoStateCanMove`: bảng 7x7 đầy đủ, ba trạng thái cuối không đi tiếp)
+- [x] Giá trị env lạ không làm service dừng, có cảnh báo. (`TestPlanAutoPolicyFromEnv`: giá trị lạ giữ mặc định hoặc kẹp, trả cảnh báo, không có đường dừng service)
+- [x] `go build ./...` và test miền xanh. (`go build ./...`, `go vet ./internal/domain/`, `go test ./internal/domain/... ./internal/usecase/... ./internal/adapter/grpc/...` xanh ngày 2026-10-20)
 
 ## Rủi ro và lưu ý
 
 - Thêm trường vào `ProjectEngineSettings` đổi struct dùng ở nhiều test; chạy `gitnexus_impact` cho `ProjectEngineSettings` và `NewProjectEngineSettings` trước khi sửa.
 - Nếu một mã tạm thời mới xuất hiện ở worker khác, bảng này là nơi duy nhất cần thêm; ghi chú điều đó ở đầu bảng.
+
+## Ghi chú triển khai
+
+**Hoàn thành 2026-10-20.** Đường dẫn dưới `backend-go/services/request-service/`.
+
+- File mới: `internal/domain/plan_auto.go` (trạng thái job, `CanMove`, `IsActive`/`IsFinal`, `PlanAutoOrigin`, `PlanAutoJob`, `PlanAutoKey` và ba hàm anchor, bảng mã tạm thời `IsTransientPlanRunCode`, `WantsAutoPlan`), `internal/domain/plan_auto_policy.go` (`PlanAutoPolicy`, `DefaultPlanAutoPolicy`, `PlanAutoPolicyFromEnv`), `internal/domain/plan_auto_errors.go` (`ErrPlanAutoDisabled`), `internal/domain/plan_auto_test.go`. Sửa `internal/domain/engine_settings.go` (`PlanAutoGenerate`, `NewProjectEngineSettings` đặt `true`) và `engine_settings_test.go` (thêm một test).
+- Lệch so với spec: (1) `PlanAutoKey` trả `(string, error)` thay vì chỉ chuỗi, vì spec đòi lỗi miền khi vượt 128 ký tự; lỗi là `KindInvalidArgument` mã `REQUEST_PLAN_AUTO_KEY_INVALID`. (2) Tách policy ra `plan_auto_policy.go` và lỗi ra `plan_auto_errors.go` (không ghi thêm vào `plan_errors.go` để không đụng file dùng chung). (3) `WantsAutoPlan` với `analysis_approved` đòi thêm `flow.AnalysisGate != none` (loại không có Analysis như `task` không bao giờ đi qua trigger này), nên ma trận 11 loại cho kết quả đúng như bảng kỳ vọng của spec.
+- Mã `REQUEST_PLAN_AI_UNAVAILABLE` ở cấp run được tính là tạm thời (quyết định đã chốt). `REQUEST_PLAN_AUTO_DISABLED` và `REQUEST_PLAN_COMMIT_FAILED` có hằng `PlanAutoCode*`.
+- Lệnh đã chạy: `go test ./internal/domain/... -count=1` xanh; `go vet ./internal/domain/` xanh; `go build ./...` xanh. Các test: `TestIsTransientPlanRunCode` (6 mã đúng, 19 mã sai gồm rỗng và mã lạ), `TestPlanAutoStateCanMove` (bảng 7x7 đầy đủ), `TestPlanAutoKey`, `TestPlanAutoPolicyFromEnv` (mặc định, hợp lệ, kẹp 5 về 2 và -3 về 0 kèm cảnh báo, 5 giá trị sai giữ mặc định), `TestWantsAutoPlan` (11 loại x 2 cỡ x `PlanTaskID` x 2 trạng thái đích x 5 trigger), `TestErrPlanAutoDisabled`, `TestNewProjectEngineSettingsPlansAutomaticallyByDefault`.
+- Blast radius (grep, GitNexus không có): `ProjectEngineSettings` thêm trường; nơi dựng struct bằng literal (không qua `NewProjectEngineSettings`) sẽ có `PlanAutoGenerate=false`: `internal/usecase/engine_settings_defaults.go:29` (mặc định theo deployment) và `internal/usecase/manage_project_engine_settings.go:72` (dự án chưa có dòng). **Task 04 phải đặt `true` ở cả hai** (và cho `PlanAutoGenerate *bool` giữ giá trị đã lưu), nếu không dự án mới lưu cài đặt engine sẽ tắt tính năng ngầm. `NewProjectEngineSettings` chỉ được gọi ở `manage_project_engine_settings.go:105` và contract test. Không có người gọi nào bị đổi hành vi hiện tại vì chưa có consumer đọc trường mới.
+- Chưa kiểm: không có gì cần stack.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

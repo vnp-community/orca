@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/retry_plan_generation.go` (mới), `internal/usecase/retry_plan_generation_test.go` (mới), `internal/usecase/get_plan_proposal.go` (sửa), `internal/usecase/get_plan_proposal_auto_test.go` (mới), `internal/adapter/grpc/server_plan_auto.go` (mới), `internal/adapter/grpc/server_plan.go` (sửa), `internal/adapter/grpc/server_plan_auto_test.go` (mới), `internal/adapter/grpc/flow_gate.go` (sửa), `internal/domain/rpc_catalog.go` (sửa), `cmd/server/wire_plan.go`, `cmd/server/wire_plan_auto.go` (sửa), `backend-go/proto/orca/request/v1/plan.proto`, `backend-go/proto/orca/request/v1/request.proto` (sửa) + mã sinh
 **Depends on:** TASK-REQ-044-06
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -34,15 +34,26 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Retry sau lỗi commit không tốn AI lần nữa; Retry sau lỗi AI tạo job mới một lượt.
-- [ ] Bấm Retry hai lần không sinh hai job hay hai run.
-- [ ] `GetPlanProposal` cũ (không job) trả đúng như trước; client không biết `auto_plan` không bị ảnh hưởng.
-- [ ] RPC mới có mục trong `rpc_catalog` và `flow_gate`, agent không gọi được.
+- [x] Retry sau lỗi commit không tốn AI lần nữa; Retry sau lỗi AI tạo job mới một lượt.
+- [x] Bấm Retry hai lần không sinh hai job hay hai run.
+- [x] `GetPlanProposal` cũ (không job) trả đúng như trước; client không biết `auto_plan` không bị ảnh hưởng.
+- [x] RPC mới có mục trong `rpc_catalog` và `flow_gate`, agent không gọi được.
 
 ## Rủi ro và lưu ý
 
 - Chạy `gitnexus_impact` cho `GetPlanProposal.Execute` (gateway và nhiều test dùng) và `NewGetPlanProposal`; `PlanProposalView` thêm trường.
 - Trả `auto_plan` cho mọi Request tốn thêm một lần đọc cài đặt dự án; chấp nhận được (cùng pattern `RequestEngineResolver` đọc một lần mỗi dự án).
+
+## Ghi chú triển khai
+
+**Hoàn thành 2026-10-20.** Đường dẫn dưới `backend-go/services/request-service/`.
+
+- Proto: `plan.proto` thêm message `PlanAutoState` (7 trường), `GetPlanProposalResponse.auto_plan = 13`, `RetryPlanGenerationRequest/Response`; `request.proto` thêm `rpc RetryPlanGeneration`; sinh lại `plan.pb.go`, `request.pb.go`, `request_grpc.pb.go`. `domain/rpc_catalog.go`: `onRequest(GroupPlan, "request_id", RateAI, false)`; `adapter/grpc/flow_gate.go`: `classAdvance`; không thêm vào `agent_rpcs`.
+- `usecase/retry_plan_generation.go` (`AuthorizePlan` người thật, `REQUEST_PLAN_AUTO_DISABLED` khi công tắc triển khai/commit tắt, `planning` mới được, trả job đang hoạt động, run mới nhất `succeeded` chưa có Plan thì job `retry` ở `committing`, ngược lại `pending` với `RetryAnchor(uuid)`, `max_attempts=1`, `requested_by`), `usecase/plan_auto_view.go`, `usecase/plan_proposal_auto.go` (`GetPlanProposal.WithAutoPlan`), `usecase/get_plan_proposal.go` (thêm `AutoPlan` và nhánh không-run), `adapter/grpc/server_plan_auto.go` + `server_plan.go` (`PlanUseCases.Retry`, ánh xạ `auto_plan`), `cmd/server/wire_plan_auto.go` gắn `Retry` và `Get.WithAutoPlan` (khi tính năng tắt, `Retry` nil nhưng `Get` vẫn trả `auto_plan{enabled=false}`).
+- Sửa theo yêu cầu điều phối (2026-10-20): (a) khi chưa có run Plan nào và server có tính năng, `GetPlanProposal` trả view rỗng **kèm `auto_plan`** (kể cả khi chưa có job) thay vì `REQUEST_PLAN_RUN_NOT_FOUND`; server không có tính năng giữ lỗi cũ; run id tường minh không tồn tại vẫn lỗi. (b) job mới nhất được báo ở mọi trạng thái Request (đọc được `done` sau khi commit chuyển sang `awaiting_plan_approval`); ngoại lệ: job đã kết thúc khi Request lại `planning` với Plan cũ (replan) là lịch sử nên `state` rỗng. Hai điểm này lệch spec gốc của task 07 (đã nêu trong CR-044 mục 2.6 là "chỉ khi planning").
+- Test: `retry_plan_generation_test.go` (7 ca spec: job `pending` anchor `retry-`, job đang hoạt động trả lại, run thành công chưa commit tiếp tục từ commit và không gọi AI, run lỗi tạo job mới, trạng thái sai/công tắc tắt/không có quyền/thiếu user, công tắc dự án không chặn, bấm hai lần một job một run), `get_plan_proposal_auto_test.go` (job kèm run `failed`, chỉ job, không run không job, `done` sau commit, lịch sử replan, hai công tắc và lỗi đọc cài đặt, không có reader thì như cũ), `adapter/grpc/server_plan_auto_test.go` (ánh xạ, `Unimplemented`, lỗi thành mã gRPC).
+- Lệnh: `go test ./internal/usecase/ ./internal/adapter/grpc/ ./internal/domain/` xanh (gồm test `rpc_catalog`/`flow_gate`/ma trận OPA).
+- Blast radius: `GetPlanProposal.Execute` được gọi bởi `server_plan.go` và test; `PlanProposalView` thêm trường (không phá người dùng hiện có). Chưa kiểm trên stack: hành vi `Retry` với worker thật và Approval thật (task 09).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

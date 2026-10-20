@@ -91,6 +91,11 @@ python3 tests/stages/e2e/orca-flows/run_ui_flow.py -- --grep change_request
 # Spec CR-REQ-039/041 (chỉ stub; cần build lại container frontend sau khi đổi mã giao diện):
 #   run_ui_flow.py --ai-stub -- request-base-branch      # nhánh bắt đầu của Request: chọn, sửa, khóa, lỗi, tính năng tắt
 #   run_ui_flow.py --ai-stub -- analysis-revision       # chỉnh phân tích bằng prompt: phiên bản, Approval, bản cũ chỉ đọc
+# Spec CR-REQ-045 (Plan; claude giả; cần build lại container frontend và triển khai backend CR-045 trước):
+#   run_ui_flow.py --ai-stub -- plan-documents          # xem Plan: "Proposal" (native), "Documents" (OpenSpec, dữ liệu gieo bằng plan_documents_seed.py), chỉ tải tài liệu khi mở tab, che bí mật
+#   run_ui_flow.py --ai-stub -- plan-revision           # chỉnh Plan bằng prompt: 3 phiên bản, bản cũ chỉ đọc, một Approval mỗi lúc, dòng History, quá 2000 ký tự, màn hình cũ, lượt thất bại + "Try again"
+#   run_ui_flow.py --real plan-revision                 # loại B: một vòng chỉnh Plan native bằng Claude thật trên repo tạm (chi phí nhỏ; chỉ chạy khi được yêu cầu, không sửa checkout trong lúc chạy)
+#   ORCA_E2E_OPENSPEC=1 run_ui_flow.py -- plan-documents  # loại C: Plan OpenSpec thật của kịch bản 3 trên release/1.x, 7 đến 13 USD mỗi lượt sinh Plan (cộng một lượt chỉnh); cần đồng ý rõ ràng, cần openspec và tdd-agent trên máy; KHÔNG tự chạy
 # Chỉ Playwright, khi agent đã chạy sẵn (tên dev server qua ORCA_E2E_DEV_SERVER_NAME):
 ORCA_E2E_LIVE=1 npx playwright test -c tests/configs/playwright.web.config.ts --project=request-live
 ```

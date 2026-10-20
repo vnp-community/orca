@@ -1,6 +1,6 @@
 # FE-REQ-SOL-043: "Approve and run all steps", công tắc chế độ theo dự án và nhãn chế độ trên tab Execution
 
-> **📝 Chưa triển khai (0/6 task).** Soạn 2026-10-20 từ đọc mã.
+> **🟡 Đã triển khai 5/6 task (01 đến 05 DONE), task 06 PARTIAL (2026-10-20).** i18n 5 locale xong; hai spec giao diện sống đã viết và kiểm kiểu nhưng chưa chạy trên stack. Soạn 2026-10-20 từ đọc mã.
 
 **CR:** [CR-REQ-043](../../../../../../docs/crs/v6/plan-phase-task/CR-REQ-043-approve-plan-and-run-all-steps.md)
 **Area:** frontend / request

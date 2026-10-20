@@ -5,7 +5,7 @@
 **Service:** `api-gateway`, `cmd/orca-cli`, `request-service`
 **File:** `services/api-gateway/internal/adapter/wscompat/{channels_request_plan.go,testdata/channel_inventory.json}` (sửa), `services/api-gateway/internal/adapter/httpgateway/request_routes_flow.go` (sửa), `services/api-gateway/internal/adapter/mcpserver/tools/excluded_channels.yaml` (sửa), `cmd/orca-cli/internal/{apiclient/request.go,command/plan_cmd.go}` (sửa), `specs/backend-go/crs/v6/gateway-and-mcp/CONTRACT-request-ui-api.md` (sửa), test của từng phần, bảng ánh xạ mã lỗi gateway nếu có
 **Depends on:** TASK-REQ-045-05, TASK-REQ-045-07
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -41,10 +41,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Giao diện gọi được `request.planRevisions`, `request.planProposal`/`request.planBundleFile` với `revision`, `request.generatePlan` với `idempotencyKey`.
-- [ ] Mọi kênh mới có `ToolSpec` hoặc dòng loại trừ có lý do; `parity_test` xanh; `channel_inventory.json` khớp.
-- [ ] REST và CLI có tham số `revision` và lệnh `plan revisions`.
-- [ ] CONTRACT khớp mã.
+- [x] Giao diện gọi được `request.planRevisions`, `request.planProposal`/`request.planBundleFile` với `revision`, `request.generatePlan` với `idempotencyKey`. (`channels_request_plan_revisions_test.go`; `textKept:false` được gửi tường minh)
+- [x] Mọi kênh mới có `ToolSpec` hoặc dòng loại trừ có lý do; `parity_test` xanh; `channel_inventory.json` khớp. (`go test ./internal/adapter/mcpserver/...`, `TestChannelInventoryMatchesGolden`, `TestRequestRPCChannelParity`)
+- [x] REST và CLI có tham số `revision` và lệnh `plan revisions`. (`request_routes_plan_revisions_test.go`, `plan_revisions_test.go`, `apiclient/request_plan_revisions_test.go`)
+- [x] CONTRACT khớp mã. (mục 2.14 mới, cờ trong 2.11)
 
 ## Rủi ro và lưu ý
 
@@ -61,3 +61,17 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+## Ghi chú triển khai
+
+**Hoàn thành 2026-10-20.** Đường dẫn dưới `backend-go/`.
+
+**Blast radius (grep).** `requestFeatures()` (gateway) thêm `request.planRevisions`: test `TestRequestFlowStatus_PublishesFeatures` (của 043/044) cập nhật thành bốn tên. `requestErrorHTTPStatus` thêm hai mã `REQUEST_PLAN_REVISION_PAGE_TOKEN_INVALID`, `REQUEST_PLAN_IDEMPOTENCY_KEY_INVALID` về 400 (còn lại: `_NOT_FOUND` 404 qua hậu tố có sẵn, mọi mã REQUEST_* khác 412). `bridge` của REST đọc thêm `revision` (số nguyên, âm hoặc không phải số: 400 trước khi gọi RPC). `TestRequestChannels_Inventory` tăng lên 48 kênh. Bảng ánh xạ lỗi của `wscompat` không cần sửa: mã `REQUEST_*` do service gửi được chuyển nguyên dạng `CODE: message` (kiểm bằng `TestRequestGeneratePlan_RevisionErrorsReachTheScreenAsCodedMessages` cho 7 mã qua cả ba kênh).
+
+**Tệp đã đổi.** Gateway `services/api-gateway/internal/adapter/`: mới `wscompat/channels_request_plan_revisions.go` (kênh `request.planRevisions`, `planRevisionArg`, hằng cờ), `wscompat/channels_request_plan_revisions_test.go`, `httpgateway/request_routes_plan_revisions_test.go`; sửa `wscompat/channels_request_plan.go` (`idempotencyKey`, `revision`), `wscompat/channels_request_base_ref.go` (cờ), `httpgateway/{request_routes,request_routes_flow}.go` (route `GET /{id}/plan/revisions`, `setRevision`, trạng thái HTTP), `mcpserver/tools/excluded_channels.yaml` (dòng mới cho `request.planRevisions`; lý do của `request.planProposal`, `request.planBundleFile` nhắc `revision`), `wscompat/testdata/channel_inventory.json` (`UPDATE_GOLDEN=1`: thêm `request.planRevisions`; dòng `request.retryPlan` của 044 đã nằm trong golden từ trước nhưng chưa commit), `wscompat/{request_rpc_channel_map_test,channels_request_test,channels_request_base_ref_test}.go`. CLI `cmd/orca-cli`: mới `internal/command/{plan_revisions_render,plan_revisions_test}.go`, `internal/apiclient/request_plan_revisions_test.go`; sửa `internal/apiclient/request.go` (`GetPlanProposalRevision`, `GetPlanBundleFileRevision`, `ListPlanRevisions`; hai hàm cũ giữ nguyên chữ ký), `internal/command/{plan_cmd,plan_render}.go` (`orca plan revisions`, `orca plan bundle --revision`, nhãn `[changed]`/`[removed]` trong danh sách file), `README.md`. Tài liệu: `specs/backend-go/crs/v6/gateway-and-mcp/CONTRACT-request-ui-api.md` (mục 2.14, danh sách cờ ở 2.11).
+
+**Lệnh đã chạy.** Từ `backend-go/services/api-gateway` với `GOFLAGS=-overlay=.../gw-overlay.json`: `go vet` các gói đã đổi, `go test ./internal/adapter/wscompat/ ./internal/adapter/mcpserver/... ./internal/adapter/httpgateway/ ./cmd/... -count=1` xanh (một lần `TestAgentFlow_StartStatusSendBusyStop` của `mcpserver/tools` rớt vì thời gian pty khi máy đang chạy testcontainers; chạy lại riêng 3 lần và cả gói đều xanh). `cd backend-go/cmd/orca-cli && go vet ./... && go test ./... -count=1` xanh.
+
+**Lệch so với đề bài.** (1) Không thêm tool MCP, đúng quyết định của CR; (2) `orca plan generate` chưa gửi `idempotencyKey` (đề bài không yêu cầu; CLI chờ run và commit tại chỗ); (3) REST `POST /{id}/plan` nhận `idempotencyKey` qua body như kênh (không cần mã mới).
+
+**Chưa kiểm chứng.** Gateway thật với request-service thật (task 09); token CLI sống khoảng 10 phút không ảnh hưởng các lệnh đọc mới.

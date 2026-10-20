@@ -5,7 +5,7 @@
 **Service:** `request-service` · `proto/orca/request/v1`
 **File:** `backend-go/proto/orca/request/v1/approval.proto` (sửa) + mã sinh, `services/request-service/internal/domain/{approval_execution_mode,approval_execution_mode_test}.go` (mới), `domain/approval_events.go` (sửa)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -34,9 +34,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Proto thêm đúng hai trường, mã sinh cập nhật, `buf breaking` không báo phá vỡ.
-- [ ] Hàm phân tích từ chối `step_by_step`; hai lỗi mới có đúng loại gRPC và mã.
-- [ ] Payload không đổi byte khi không chọn chế độ (test so JSON).
+- [x] Proto thêm đúng hai trường, mã sinh cập nhật, `buf breaking` không báo phá vỡ. Bằng chứng: `ApproveRequest.execution_mode = 5`, `ApproveResponse.execution_mode = 3`; `git diff --stat` chỉ đụng `approval.proto` và `approval.pb.go` (+28/-6, chỉ phần thêm). `buf` không cài trong môi trường này nên `buf lint`/`buf breaking` chưa chạy; hai trường thêm mới với số trường chưa dùng nên không thể là thay đổi phá vỡ.
+- [x] Hàm phân tích từ chối `step_by_step`; hai lỗi mới có đúng loại gRPC và mã. Bằng chứng: `TestParseApprovalExecutionMode`, `TestExecutionModeErrors`.
+- [x] Payload không đổi byte khi không chọn chế độ (test so JSON). Bằng chứng: `TestApprovalDecidedPayload_ExecutionModeKey` và golden `TestApprovalEvents_DecidedPayloadMatchesGolden` giữ nguyên.
 
 ## Rủi ro và lưu ý
 
@@ -52,3 +52,12 @@
 - Chạy được trên macOS, Linux, Windows và qua SSH; lệnh git theo baseline 2.25 (`guides/reference/git-compatibility.md`).
 - Không ghi nội dung Request, Solution, phản hồi hoặc bí mật vào log, span hay khung sự kiện (C9).
 - `go build ./...` và `go test` của gói đã đổi xanh; `go vet` xanh; lint xanh; không làm hỏng test hiện có.
+
+## Ghi chú triển khai (2026-10-20)
+
+- Proto: sửa `backend-go/proto/orca/request/v1/approval.proto`, sinh lại bằng `protoc 33.4` + `protoc-gen-go v1.36.11` (`--go_opt=paths=source_relative`), đặt lại hai dòng header cũ (`protoc-gen-go v1.36.12`, `protoc (unknown)`) để diff chỉ còn phần thêm. `approval_grpc.pb.go` không đổi (không có RPC mới).
+- Miền: `domain/approval_execution_mode.go` (`ParseApprovalExecutionMode`, `ExecutionModeChoiceApplies`, `ErrExecutionModeNotApplicable`, `ErrExecutionModeAlreadyPinned`), `domain/approval_events.go` (`ApprovalDecidedPayload.ExecutionMode`, `omitempty`), test `domain/approval_execution_mode_test.go`.
+- Lệnh: `go test ./internal/domain/... -run 'ApprovalExecutionMode|ApprovalDecidedPayload|ExecutionModeChoice|ExecutionModeErrors|ApprovalEvents' -v` xanh (6 test); `go test ./internal/domain/` xanh; `go build ./...` và `go test ./...` trong `backend-go/proto` xanh.
+- Danh mục mã lỗi: service không có danh mục mã lỗi tập trung (kiểm `rpc_catalog.go`: chỉ là danh mục RPC); không có test danh mục nào cần thêm. Hai mã mới được liệt kê trong CONTRACT (task 04).
+- Blast radius (không có GitNexus, dùng grep): `NewApprovalDecidedPayload` được gọi ở `usecase/decide_approval.go`, `usecase/cancel_approval.go`, `usecase/expire_approvals.go`, `usecase/cancel_pending_approvals_for_request.go`, `usecase/approval_request_type_recorder.go` và test; chữ ký không đổi, trường mới `omitempty` nên payload của các đường kia không đổi byte.
+- Không kiểm chứng: `buf lint`/`buf breaking` (không có `buf`).

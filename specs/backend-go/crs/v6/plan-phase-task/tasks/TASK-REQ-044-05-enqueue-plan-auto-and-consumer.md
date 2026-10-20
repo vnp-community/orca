@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/enqueue_plan_auto.go` (mới), `internal/usecase/enqueue_plan_auto_test.go` (mới), `internal/adapter/eventbus/plan_auto_consumer.go` (mới), `internal/adapter/eventbus/plan_auto_consumer_test.go` (mới)
 **Depends on:** TASK-REQ-044-02, TASK-REQ-044-04
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -34,15 +34,24 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Giao lại cùng sự kiện hai lần chỉ tạo một job.
-- [ ] Không có job cho `spike`, `question`, `hotfix`, replan, Request đã có Plan, hay khi một công tắc tắt.
-- [ ] Lỗi cài đặt hoặc hạ tầng được giao lại; lỗi nghiệp vụ thì ack.
-- [ ] Không nội dung Request trong log.
+- [x] Giao lại cùng sự kiện hai lần chỉ tạo một job.
+- [x] Không có job cho `spike`, `question`, `hotfix`, replan, Request đã có Plan, hay khi một công tắc tắt.
+- [x] Lỗi cài đặt hoặc hạ tầng được giao lại; lỗi nghiệp vụ thì ack.
+- [x] Không nội dung Request trong log.
 
 ## Rủi ro và lưu ý
 
 - Một sự kiện chỉ được một consumer đánh dấu; nếu sau này thêm consumer khác cho `analysis_approved`, `processed_events` sẽ làm chúng tranh nhau (xem Context). Ghi chú điều đó ở đầu file consumer.
 - Thứ tự: sự kiện đến sau commit của transition nên Request đã `planning`; nhưng vẫn đọc lại Request (có thể đã bị người đổi trong lúc chờ).
+
+## Ghi chú triển khai
+
+**Hoàn thành 2026-10-20.** Đường dẫn dưới `backend-go/services/request-service/`.
+
+- `internal/usecase/enqueue_plan_auto.go`: `EnqueuePlanAuto.Handle` lọc `to=planning` và trigger `analysis_approved`/`type_confirmed` trước khi đánh dấu; trong một `InTx`: `MarkProcessed`, đọc Request (không tìm thấy thì ack), `PlanAutoSwitch.Enabled` (lỗi đọc trả lỗi để giao lại, giao lại được vì dấu `processed` rollback cùng transaction), Request còn `planning`, `domain.WantsAutoPlan`, anchor (`SolutionAnchor` bằng cách đọc thẳng `ListByRequest` để lỗi đọc không bị nuốt thành "không có Solution"; `TypeConfirmAnchor(eventID)`), chèn job `pending`/`event` với `MaxAttempts = 1 + MaxExtraAttempts`. Chèn trùng chỉ ghi log info. `internal/adapter/eventbus/plan_auto_consumer.go`: durable `request-service-plan-auto-generate`, struct payload riêng (`request_id`, `project_id`, `to`, `trigger`), ghi chú đầu type về ràng buộc `processed_events` theo `event_id`.
+- Test: `enqueue_plan_auto_test.go` (13 ca: anchor/`max_attempts=2`, giao lại 3 lần còn một job, job `retry` đang hoạt động, bảng ba công tắc, lỗi đọc cài đặt rồi giao lại thành công, lỗi chèn, `spike`/`question`/`hotfix`/trigger khác/trạng thái khác, đã có `PlanTaskID`, Request đã rời `planning`, `type_confirmed` của `task` có anchor `ty-<id>` còn `bug` thì không, không có Solution đã duyệt, Request không tồn tại, `MaxExtraAttempts=0`), `plan_auto_fakes_test.go` (kho job/processed trong bộ nhớ có rollback theo transaction, dùng chung với task 06 và 07), `plan_auto_consumer_test.go` (ack payload hỏng, không request, không tenant, trigger/status khác, trả lỗi khi use case lỗi).
+- Lệnh: `go test ./internal/usecase/ ./internal/adapter/eventbus/ -run 'EnqueuePlanAuto|PlanAutoConsumer'` xanh. Test NATS thật của consumer không viết (mẫu `*_nats_integration_test.go` cần NATS; thuộc task 09).
+- Lệch spec: không. Chưa kiểm: giao lại sự kiện qua `processed_events` thật hai dialect (task 09).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

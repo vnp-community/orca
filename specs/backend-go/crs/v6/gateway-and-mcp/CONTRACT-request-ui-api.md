@@ -195,7 +195,7 @@ Ghi chú:
 | `approval.get` | `{id}` | `{approval: ApprovalView}` | đọc Request chứa nó | 8s | `GetApproval` |
 | `approval.list` | `{requestId, subjectType?, status?, pageSize?, pageToken?}` | `{approvals: ApprovalView[], nextPageToken}` | đọc | 8s | `ListApprovals` |
 | `approval.listPending` | `{subjectType?, pageSize?, pageToken?}` | `{approvals: ApprovalView[], nextPageToken}` | người dùng hiện tại | 8s | `ListPendingForUser` |
-| `approval.approve` | `{id, expectedVersion, expectedDigest, comment?}` | `{approval: ApprovalView, requestStatus: RequestStatus}` | người duyệt (CR-REQ-009, 010) | 8s | `Approve` |
+| `approval.approve` | `{id, expectedVersion, expectedDigest, comment?, executionMode?}` (mục 2.11) | `{approval: ApprovalView, requestStatus: RequestStatus, executionMode?}` | người duyệt (CR-REQ-009, 010) | 8s | `Approve` |
 | `approval.reject` | `{id, expectedVersion, expectedDigest, comment (bắt buộc)}` | `{approval, requestStatus}` | như trên | 8s | `Reject` |
 | `approval.cancel` | `{id, reason}` | `{approval}` | người yêu cầu hoặc admin | 8s | `Cancel` |
 
@@ -351,7 +351,9 @@ Lỗi chung của `setBaseRef`: `REQUEST_VERSION_CONFLICT` (phiên bản cũ, t�
 
 **Kiểm ref fail-open.** Khi `baseRef` không rỗng, `request-service` hỏi git trên dev server xem ref có tồn tại không. Chỉ câu trả lời "không có" mới bị từ chối (`REQUEST_BASE_REF_NOT_FOUND`). Nếu dev server không với tới được hoặc git báo lỗi chung thì ref **vẫn được lưu** và kết quả mang `baseRefUnverified: true`: tạo Request không bị chặn chỉ vì agent offline. Worktree sẽ được tạo từ ref đó sau; nếu khi đó ref vẫn không có thì lỗi xuất hiện lúc tạo worktree. UI nên hiện cảnh báo nhẹ khi `baseRefUnverified`. Không có kiểm tra thì `baseRefUnverified` là `false` (ref rỗng).
 
-**Cờ tính năng `request.flowStatus.features`.** `request.flowStatus` trả thêm `features: string[]`, do **gateway** công bố (không phải `request-service`), hiện là `["request.baseRef"]`. Frontend chỉ hiện ô nhánh gốc khi mảng có `request.baseRef`; gateway cũ không trả `features` (và `RequestView` thiếu khoá `baseRef`) nên ô ẩn. Tên chỉ được thêm, không bỏ. `features` có mặt kể cả khi `enabled=false`.
+**Cờ tính năng `request.flowStatus.features`.** `request.flowStatus` trả thêm `features: string[]`, do **gateway** công bố (không phải `request-service`), hiện là `["request.baseRef","approval.runAll","request.planAuto","request.planRevisions"]`. Frontend chỉ hiện ô nhánh gốc khi mảng có `request.baseRef` và chỉ mời "Approve and run all steps" khi có `approval.runAll`; gateway cũ không trả `features` (và `RequestView` thiếu khoá `baseRef`) nên ô ẩn. Tên chỉ được thêm, không bỏ. `features` có mặt kể cả khi `enabled=false`.
+
+**`approval.approve` nhận `executionMode` (CR-REQ-043).** Rỗng hoặc vắng = duyệt như cũ; giá trị duy nhất khác rỗng là `continuous` (`step_by_step` bị từ chối). Chỉ hợp lệ khi duyệt `plan`, `task_list` hoặc `pre_deploy` ở `awaiting_plan_approval`. Gateway chuyển nguyên văn, `request-service` kiểm. `request-service` ghim chế độ trong cùng transaction với quyết định, nên quyết định lỗi thì chế độ không được ghim; kết quả `executionMode` là chế độ đang ghim trên Request sau quyết định (cũng trả khi gọi lại một quyết định đã xong), vắng khi chưa ghim. Request đã ghim `step_by_step` không đổi được: duyệt kèm `continuous` trả `REQUEST_EXECUTION_MODE_ALREADY_PINNED` và không ghi quyết định. `approval.reject` kèm `executionMode` khác rỗng trả `REQUEST_EXECUTION_MODE_INVALID: executionMode applies to approve only` ngay ở gateway (REST 400). Gateway cũ bỏ qua khoá lạ nên không được gửi khi `features` thiếu `approval.runAll`. Payload `approval.decided` có `execution_mode` (chỉ khi người duyệt đã chọn) và audit `approval.approve` có `metadata.execution_mode`; khung `request.event` không chuyển khoá này. MCP không có công cụ này (agent không duyệt).
 
 ### 2.12 Danh sách nhánh của repo cho ô "Start from" (CR-REQ-039, CR-REQ-040 sửa đổi 2026-10-20)
 
@@ -368,6 +370,70 @@ Lỗi chung của `setBaseRef`: `REQUEST_VERSION_CONFLICT` (phiên bản cũ, t�
 **Lưu ý dạng JSON:** gateway bỏ khoá `remote` khi giá trị là `false` (không `omitempty` ở phía client), nên vắng mặt nghĩa là nhánh local; và `repo.baseRefDefault` trả `{ref}` (không phải `defaultBaseRef`), frontend web ánh xạ hai tên này trong `web/base-ref-default-wire.ts`.
 
 **Nhánh mặc định** vẫn lấy từ `repo.baseRefDefault` (đã sửa ở BE-REQ-TASK-039-04); frontend ghim nó lên đầu danh sách.
+
+### 2.13 Tự sinh Plan sau khi duyệt Analysis (mới, CR-REQ-044)
+
+Khi một Request vào `planning` sau khi Analysis được duyệt (hoặc sau khi xác nhận loại, với loại không có Analysis), `request-service` tự bắt đầu run sinh Plan, tự commit proposal khi run thành công và tự thử lại có giới hạn lỗi tạm thời. Gateway chỉ chuyển ba thứ ra giao diện. Cờ `request.planAuto` trong `request.flowStatus.features` báo gateway có đủ; vắng thì giao diện giữ nút Generate thủ công.
+
+| Kênh | Tham số | Kết quả | RPC |
+|---|---|---|---|
+| `request.retryPlan` (mới) | `{id}` | `{autoPlan: AutoPlanView}` | `RetryPlanGeneration` |
+| `request.planProposal` | không đổi | thêm khoá `autoPlan: AutoPlanView` khi service gửi khối này | `GetPlanProposal` |
+| `request.engineSettings`, `request.engineSettingsSet` | `engineSettingsSet` nhận thêm `planAutoGenerate?: boolean` | `planAutoGenerate: boolean` trong kết quả | `Get/SetProjectEngineSettings` |
+
+`AutoPlanView = {enabled: boolean, state: AutoPlanState, origin: "event"|"retry"|"revision"|"", attempt: number, maxAttempts: number, reasonCode: string, nextAttemptAt: string}` (camelCase, luôn đủ khoá; `nextAttemptAt` là RFC 3339, rỗng khi không áp dụng; `origin = "revision"` là job của lượt chỉnh Plan, CR-REQ-045).
+
+| `state` | Nghĩa | `reasonCode` |
+|---|---|---|
+| `""` | không có job (hoặc job đã xong của vòng trước, nay Request lại `planning` với Plan cũ) | rỗng |
+| `pending` | chờ bắt đầu hoặc chờ lượt thử lại; `nextAttemptAt` điền khi chờ sau lỗi hoặc hoãn vì bận | mã lỗi của lượt trước, hoặc `REQUEST_ANALYSIS_BUSY` |
+| `running` | run đang chạy | rỗng |
+| `committing` | run xong, đang ghi Plan | rỗng |
+| `done` | Plan đã được ghi (cũng đọc được sau khi Request sang `awaiting_plan_approval`) | rỗng |
+| `gave_up` | hết lượt hoặc lỗi không thể tự thử lại; giao diện hiện thẻ lỗi và nút Retry | mã lỗi (`REQUEST_PLAN_AI_INVALID_JSON`, `REQUEST_PLAN_COMMIT_FAILED`...) |
+| `skipped` | không bắt đầu được tự động (không có dev server, thiếu đường dẫn repo, engine không có, bị tắt giữa chừng); nút Generate thủ công vẫn dùng | mã lý do |
+| `superseded` | người đã làm trước (Request rời `planning`, đã có Plan, hoặc có run mới hơn) | `REQUEST_PLAN_REQUEST_MOVED`, `REQUEST_PLAN_EXISTS`, `REQUEST_PLAN_NEWER_RUN` |
+
+- `enabled` luôn được điền (cả khi chưa có job): công tắc triển khai `REQUEST_PLAN_AUTO_GENERATE` **và** công tắc dự án `planAutoGenerate`. `false` nghĩa là giao diện dùng luồng thủ công.
+- `request.planProposal` khi Request chưa có run Plan nào và server có tính năng này: trả view rỗng (`runId:""`, `proposal:null`) **kèm `autoPlan`** thay vì `REQUEST_PLAN_RUN_NOT_FOUND`. Server không có tính năng giữ lỗi cũ.
+- `request.retryPlan` yêu cầu Request `planning`; có job hoạt động thì trả chính nó (bấm hai lần không sinh thêm); run Plan mới nhất đã thành công mà chưa commit thì tiếp tục từ bước commit, không tốn AI lần nữa. Quyền như `request.generatePlan` (người báo cáo, owner, admin). Lỗi: `REQUEST_PLAN_AUTO_DISABLED` (công tắc triển khai tắt hoặc không có `CommitPlan`; giao diện rơi về luồng thủ công), `REQUEST_STATE_STALE`, `REQUEST_PLAN_FORBIDDEN`. Không có tool MCP (agent đi qua `request_generatePlan`).
+- `planAutoGenerate` trong `engineSettingsSet`: thiếu khoá = giữ giá trị đã lưu (`true` nếu dự án chưa có dòng); sai kiểu bị từ chối `INVALID_ARGUMENT`. Chỉ admin. Giao diện cho công tắc này chưa có (chỉ kênh này và `orca engine set --plan-auto-generate=<true|false>`).
+- Mã `REQUEST_PLAN_COMMIT_FAILED` chỉ xuất hiện làm `reasonCode`, không là lỗi RPC. Mã lỗi run mới `REQUEST_PLAN_AUTO_DISABLED` (FailedPrecondition) chỉ do `request.retryPlan` trả.
+
+### 2.14 Phiên bản của Plan và chỉnh Plan bằng prompt (mới, CR-REQ-045)
+
+Mỗi run Plan thành công là một phiên bản, đánh số từ 1 theo thứ tự (cả engine `native` lẫn `openspec`). Phiên bản mới nhất là bản hiện hành (`status: "current"`), các bản còn lại `superseded`. Chỉ bản hiện hành mới có `checks` và `knowledge`. Cờ `request.planRevisions` trong `request.flowStatus.features` báo gateway hiểu tham số `revision`; gateway cũ bỏ qua khoá lạ nên giao diện không được gửi `revision` khi thiếu cờ. Tài liệu chỉ để xem; chỉnh Plan là gửi phản hồi bằng chữ qua `request.generatePlan`.
+
+| Kênh | Tham số | Kết quả | RPC |
+|---|---|---|---|
+| `request.planRevisions` (mới, nhóm đọc, 8s) | `{id, pageSize?, pageToken?}` (mặc định 20, tối đa 100) | `{revisions: PlanRevision[], nextPageToken}` (mới nhất trước) | `ListPlanRevisions` |
+| `request.planProposal` | thêm `revision?: number >= 0` | `bundle.files[]` thêm `sha256`, `change` | `GetPlanProposal` |
+| `request.planBundleFile` | thêm `revision?: number >= 0` | không đổi `{path, content, omitted}` | `GetPlanBundleFile` |
+| `request.generatePlan` (propose) | thêm `idempotencyKey?: string` (tối đa 128 ký tự) | không đổi | `GeneratePlan` |
+
+`PlanRevision = {revision, runId, status: "current"|"superseded", engine: "native"|"openspec", revisionFeedback, actorId, generatedAt, commit, filesChanged, fileCount, textKept, stats}` (camelCase, luôn đủ khoá; `stats` là `RunStats` hoặc `null`).
+
+- `revision` vắng hoặc 0: hành vi cũ (theo `runId`, hoặc bản mới nhất). `revision > 0` thắng `runId`. `revision < 0` hoặc không phải số: `INVALID_ARGUMENT` ngay ở gateway.
+- `revisionFeedback` là chữ người yêu cầu chỉnh; rỗng với bản đầu, với lần thử lại không chữ và với câu trả lời một Clarification (`clarification:`).
+- `filesChanged` đếm file `added`, `changed`, `removed` so với bản liền trước (bản 1 và bản không có chỉ mục bản trước: bằng `fileCount`). `fileCount` và `commit` chỉ có với engine `openspec`.
+- `textKept=false` (luôn được gửi tường minh): chữ của bản đã bị lược, chỉ còn danh sách file. Chỉ 10 bản mới nhất giữ chữ. Request có Plan từ trước CR này chỉ có tài liệu cho bản hiện hành; các bản cũ hơn là `textKept=false`, `fileCount=0`.
+- `bundle.files[].change` là `added|changed|unchanged|removed` so với bản liền trước, rỗng khi không có gì để so (bản 1); file `removed` có trong danh sách (kèm kích thước cũ) nhưng không đọc được ở bản này. `sha256` là hash của chữ đã lưu (bí mật đã che); với file `omitted` là hash của chính file.
+- `idempotencyKey`: gửi lại cùng khoá trả đúng run đã tạo, không tạo run thứ hai. Giao diện sinh khoá mới mỗi lần bấm: khoá gắn mãi với run đầu tiên dùng nó, kể cả khi run đó đã thất bại.
+- Người chỉnh Plan đang chờ duyệt là người báo cáo, owner/admin hoặc approver của cổng `plan`, `task_list`, `pre_deploy` (kể cả khi họ chỉ là member của dự án). Chỉ khi `request-service` chạy worker tự sinh Plan (mục 2.13) thì approver mới chỉnh được, vì worker commit Plan thay họ; tắt worker thì approver nhận `REQUEST_PLAN_FORBIDDEN` và người báo cáo tự commit như cũ. Lượt chỉnh tạo một job `autoPlan.origin = "revision"` (`maxAttempts = 1`).
+- REST (cùng kênh): `GET /v1/requests/{id}/plan/revisions?pageSize&pageToken`, và tham số query `revision` cho `GET /v1/requests/{id}/plan`, `.../plan/bundle`, `.../plan/bundle/file`. CLI: `orca plan revisions <id>`, `orca plan bundle <id> --revision N [--file ...]`.
+- Không có tool MCP đọc hay ghi (`request.planRevisions` có dòng loại trừ trong `excluded_channels.yaml`); `request.planProposal` và `request.planBundleFile` cũng chưa có.
+
+| Mã lỗi | Kiểu | Khi nào |
+|---|---|---|
+| `REQUEST_PLAN_REVISION_IN_PROGRESS` | FailedPrecondition | đã có yêu cầu chỉnh khác của Plan này đang chạy (khoá khác); cũng trả trong vài giây sau khi lượt chỉnh trước thất bại, tới khi worker ghi nhận |
+| `REQUEST_PLAN_REVISION_NOT_APPLICABLE` | FailedPrecondition | chỉnh Plan của loại `hotfix` (chỉ có một task sửa từ chẩn đoán) |
+| `REQUEST_PLAN_REVISION_NO_CHANGE` | (nằm ở `errorCode` của run, không ném) | agent không đổi tài liệu nào; Request ở `planning`, người dùng sửa chữ rồi gửi lại |
+| `REQUEST_PLAN_REVISION_NOT_FOUND` | NotFound | `revision` lớn hơn số bản |
+| `REQUEST_PLAN_REVISION_TEXT_PRUNED` | FailedPrecondition | đọc file của bản đã bị lược chữ |
+| `REQUEST_PLAN_REVISION_PAGE_TOKEN_INVALID` | InvalidArgument | `pageToken` không do danh sách này trả |
+| `REQUEST_PLAN_IDEMPOTENCY_KEY_INVALID` | InvalidArgument | `idempotencyKey` dài hơn 128 ký tự |
+
+REST ánh xạ: `*_NOT_FOUND` 404; `REQUEST_PLAN_REVISION_PAGE_TOKEN_INVALID` và `REQUEST_PLAN_IDEMPOTENCY_KEY_INVALID` 400; các mã còn lại 412.
 
 ## 3. Sự kiện thời gian thực: `request.subscribe`
 
@@ -405,7 +471,7 @@ Lỗi chung của `setBaseRef`: `REQUEST_VERSION_CONFLICT` (phiên bản cũ, t�
 | `POST /v1/requests` | `request.create` | cùng tham số, `source` theo mục 6.1 |
 | `GET /v1/requests`, `GET /v1/requests/{id}` | `request.list`, `request.get` | query: `projectId`, `status`, `type`, `pageSize`, `pageToken` |
 | `GET /v1/approvals/pending` | `approval.listPending` | query: `subjectType`, `pageSize`, `pageToken`; dùng cho deep link thông báo |
-| `POST /v1/approvals/{id}/approve`, `.../reject` | `approval.approve`, `approval.reject` | body `{version, digest, comment}` (CR-016 chỉ ghi `{version, comment}`, thiếu `digest`; xem mục 8) |
+| `POST /v1/approvals/{id}/approve`, `.../reject` | `approval.approve`, `approval.reject` | body `{version, digest, comment, executionMode?}` (CR-016 chỉ ghi `{version, comment}`, thiếu `digest`; xem mục 8). `executionMode` chỉ hợp lệ ở `approve` (CR-REQ-043) |
 
 Lỗi JSON: 400 `INVALID_ARGUMENT`; chưa đăng nhập: 401; lỗi gRPC qua `writeGRPCError` (mẫu `task_routes.go`). `tenant_id` không nằm trong body.
 
@@ -439,6 +505,8 @@ Tiền tố `REQUEST_` cho **mọi** mã (README v6 mục 8 dòng 5; CR-REQ-007 
 | `REQUEST_APPROVAL_NOT_APPROVER`, `REQUEST_APPROVAL_SELF_APPROVAL_FORBIDDEN`, `REQUEST_APPROVAL_AGENT_FORBIDDEN`, `REQUEST_APPROVAL_FORBIDDEN`, `REQUEST_APPROVAL_NO_ELIGIBLE_APPROVER` | PermissionDenied, FailedPrecondition | quyền duyệt (CR-REQ-010) | toast, ẩn nút, tải lại |
 | `REQUEST_BACKLOG_INVALID_VIEW`, `REQUEST_BACKLOG_BAD_PAGE_TOKEN`, `REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE` | InvalidArgument, Unavailable | `backlog.*` | thử lại |
 | `REQUEST_BASE_REF_INVALID`, `REQUEST_BASE_REF_NOT_FOUND`, `REQUEST_BASE_REF_LOCKED` | InvalidArgument, NotFound, FailedPrecondition | `request.create` và `request.setBaseRef` (CR-REQ-039, mục 2.11) | lỗi cạnh ô nhánh gốc; `NOT_FOUND` gợi ý nhánh gần đúng; `LOCKED` khoá ô |
+| `REQUEST_EXECUTION_MODE_INVALID`, `REQUEST_EXECUTION_MODE_NOT_APPLICABLE`, `REQUEST_EXECUTION_MODE_ALREADY_PINNED`, `REQUEST_EXECUTION_ACTOR_NOT_ALLOWED` | InvalidArgument, FailedPrecondition | `approval.approve` kèm `executionMode` (CR-REQ-043): giá trị lạ hoặc kèm `reject`; không phải Approval khởi đầu run; Request đã ghim `step_by_step`; người duyệt không có quyền chạy | toast với thông điệp của service; không ghi quyết định |
+| `REQUEST_PLAN_AUTO_DISABLED` | FailedPrecondition | `request.retryPlan` khi tự sinh Plan tắt ở triển khai (mới, CR-REQ-044, mục 2.13) | dùng luồng Generate thủ công |
 | `REQUEST_FLOW_DISABLED` | FailedPrecondition | cờ tắt | ẩn màn hình Request |
 | `REQUEST_RATE_LIMITED`, `REQUEST_PENDING_LIMIT` | ResourceExhausted | chống spam (chủ yếu nguồn MCP), giới hạn theo lớp đọc/ghi/AI/webhook (`REQUEST_RATE_<LỚP>_PER_SECOND`, `_BURST`) | chờ đúng `retryAfterMs` rồi thử lại; thông báo có đuôi JSON `{"retryAfterMs":N}` khi service gửi `RetryInfo` |
 | `REQUEST_CLARIFICATION_NOT_FOUND` | NotFound | id Clarification sai hoặc khác tenant | làm mới danh sách |
