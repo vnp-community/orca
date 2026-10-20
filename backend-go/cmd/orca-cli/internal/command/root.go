@@ -64,7 +64,7 @@ func NewRootCmd(clientFactory func() (*apiclient.Client, error)) (*cobra.Command
 	root.AddCommand(newServeCmd(&jsonOutput, exitCode))
 	root.AddCommand(newLoginCmd(&jsonOutput, exitCode))
 	flow := flowEnv{factory: clientFactory, json: &jsonOutput, exit: exitCode}
-	root.AddCommand(newRequestCmd(flow), newSolutionCmd(flow), newApprovalCmd(flow), newPlanCmd(flow), newClarificationCmd(flow), newDecisionCmd(flow), newEngineCmd(flow))
+	root.AddCommand(newRequestCmd(flow), newSolutionCmd(flow), newApprovalCmd(flow), newPlanCmd(flow), newClarificationCmd(flow), newDecisionCmd(flow), newEngineCmd(flow), newReviewCmd(flow))
 	return root, exitCode
 }
 

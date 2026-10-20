@@ -35,6 +35,12 @@ type RequestEventFrame struct {
 	SolutionID  string `json:"solutionId,omitempty"`
 	PhaseTaskID string `json:"phaseTaskId,omitempty"`
 	PlanTaskID  string `json:"planTaskId,omitempty"`
+	// Outcome Review: ids and enums only; the screen re-reads the review itself.
+	ReviewID    string `json:"reviewId,omitempty"`
+	ReviewPhase string `json:"reviewPhase,omitempty"`
+	RunID       string `json:"runId,omitempty"`
+	RunKind     string `json:"runKind,omitempty"`
+	RunStatus   string `json:"runStatus,omitempty"`
 }
 
 // requestEventFields is the superset of payload keys the registry understands;
@@ -52,6 +58,11 @@ type requestEventFields struct {
 	PlanTaskID  string `json:"plan_task_id"`
 	ReporterID  string `json:"reporter_id"`
 	ActorID     string `json:"actor_id"`
+	ReviewID    string `json:"review_id"`
+	ReviewPhase string `json:"phase"`
+	RunID       string `json:"run_id"`
+	RunKind     string `json:"run_kind"`
+	RunStatus   string `json:"run_status"`
 }
 
 // requestEventMapping maps one NATS subject to a CONTRACT eventType. Extract is
@@ -79,6 +90,11 @@ var requestEventRegistry = []requestEventMapping{
 	{Stream: requestStreamName, Subject: "orca.request.plan.generated", EventType: "plan.generated"},
 	{Stream: requestStreamName, Subject: "orca.request.phase.started", EventType: "phase.started"},
 	{Stream: requestStreamName, Subject: "orca.request.phase.completed", EventType: "phase.completed"},
+	// The three review subjects share one event: the screen re-reads the review whatever changed it.
+	{Stream: requestStreamName, Subject: "orca.request.review.generated", EventType: "review.changed"},
+	{Stream: requestStreamName, Subject: "orca.request.review.artifact_regenerated", EventType: "review.changed"},
+	{Stream: requestStreamName, Subject: "orca.request.review.decided", EventType: "review.changed"},
+	{Stream: requestStreamName, Subject: "orca.request.review.progress", EventType: "review.progress"},
 }
 
 func extractRequestEventFields(raw json.RawMessage) (requestEventFields, bool) {
@@ -168,5 +184,6 @@ func translateRequestEvent(m requestEventMapping, ev commoneventbus.Event, id Id
 		RequestID: f.RequestID, EventType: m.EventType, Status: status, Type: f.Type,
 		OccurredAt: ev.OccurredAt.UTC().Format(time.RFC3339), Trigger: f.Trigger, ApprovalID: f.ApprovalID,
 		SubjectType: f.SubjectType, SolutionID: f.SolutionID, PhaseTaskID: f.PhaseTaskID, PlanTaskID: f.PlanTaskID,
+		ReviewID: f.ReviewID, ReviewPhase: f.ReviewPhase, RunID: f.RunID, RunKind: f.RunKind, RunStatus: f.RunStatus,
 	}, true
 }

@@ -23,6 +23,10 @@ message OutcomeReview {
   int64 version = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  // Set while the review is approved (CR-OR-022).
+  string approved_by = 11;
+  google.protobuf.Timestamp approved_at = 12;
+  string approval_note = 13;
 }
 
 // EstimateOutcomeReview costs no agent run: it reads the database and git-gateway and says what GenerateOutcomeReview would do.

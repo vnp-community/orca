@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -160,6 +161,16 @@ func RunOutcomeReviewContract(t *testing.T, reviews usecase.OutcomeReviewReposit
 		cur, _, _ := reviews.GetByKey(ctxA, req, domain.ReviewPhaseDesign, domain.ReviewDesignHeadKey)
 		if _, err := reviews.Get(ctxB, cur.ID); appCode(err) != domain.CodeReviewNotFound {
 			t.Fatalf("get across tenants: %v", err)
+		}
+		// A review of another tenant must look exactly like one that does not exist: same kind, same code, same wording once the id is out.
+		_, crossErr := reviews.Get(ctxB, cur.ID)
+		unknown := uuid.NewString()
+		_, missingErr := reviews.Get(ctxB, unknown)
+		var crossAE, missingAE *apperrors.AppError
+		if !errors.As(crossErr, &crossAE) || !errors.As(missingErr, &missingAE) ||
+			crossAE.Kind != missingAE.Kind || crossAE.Code != missingAE.Code ||
+			strings.ReplaceAll(crossAE.Message, cur.ID, "ID") != strings.ReplaceAll(missingAE.Message, unknown, "ID") {
+			t.Fatalf("another tenant's review is told apart from a missing one: %v / %v", crossErr, missingErr)
 		}
 		if _, err := reviews.SetState(ctxB, cur.ID, domain.ReviewStateReady, cur.Version); appCode(err) != domain.CodeReviewNotFound {
 			t.Fatalf("write across tenants: %v", err)

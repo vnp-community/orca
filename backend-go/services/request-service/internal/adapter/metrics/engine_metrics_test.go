@@ -3,6 +3,7 @@ package metrics
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
@@ -76,5 +77,49 @@ func TestEngineMetrics_ReviewDrawingsAreCountedByAClosedSetOfResults(t *testing.
 	}
 	if strings.Contains(body, "surprise") {
 		t.Error("a result outside the set must not become a label")
+	}
+}
+
+func TestEngineMetrics_ReviewSeriesHaveClosedLabelsAndNoContent(t *testing.T) {
+	s := New()
+	s.ReviewContextLookup(true)
+	s.ReviewContextLookup(false)
+	s.ReviewContextLookup(false)
+	s.ReviewRunEnded("context", "succeeded", 42*time.Second)
+	s.ReviewRunEnded("my-kind", "exploded", time.Second)
+	s.ReviewTokens("draw", 1200, 300)
+	s.ReviewTokens("draw", 0, 0)
+	s.ReviewCostEstimateError("context", 0.2)
+	s.ReviewDrawn(3, 1, "REQUEST_REVIEW_ARTIFACT_UNSAFE")
+	s.ReviewDrawn(0, 2, "some free text with a secret")
+	s.ReviewRegenerated("looks_wrong")
+	s.ReviewRegenerated("because I said so")
+	s.ReviewFirstFacts(300 * time.Millisecond)
+	s.ReviewItems(10, 3)
+	s.ReviewItems(2, 9)
+	s.ReviewDesignReviewed(0.5)
+	s.ReviewDesignReviewed(7)
+	body := scrape(t, s)
+	for _, want := range []string{
+		`request_review_context_lookups_total{result="hit"} 1`, `request_review_context_lookups_total{result="miss"} 2`,
+		`request_review_run_duration_seconds_count{kind="context",result="succeeded"} 1`,
+		`request_review_run_duration_seconds_count{kind="other",result="other"} 1`,
+		`request_review_tokens_total{direction="input",kind="draw"} 1200`, `request_review_tokens_total{direction="output",kind="draw"} 300`,
+		`request_review_cost_estimate_error_ratio_count{kind="context"} 1`,
+		`request_review_diagrams_total{result="drawn"} 3`, `request_review_diagrams_total{result="failed"} 3`,
+		`request_review_draw_failures_total{error_code="REQUEST_REVIEW_ARTIFACT_UNSAFE"} 1`, `request_review_draw_failures_total{error_code="other"} 2`,
+		`request_review_regenerations_total{reason="looks_wrong"} 1`, `request_review_regenerations_total{reason="other"} 1`,
+		`request_review_time_to_first_facts_seconds_count 1`,
+		`request_review_agent_items_total{verified="no"} 5`, `request_review_agent_items_total{verified="yes"} 7`,
+		`request_review_design_reviewed_ratio_count 1`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %s", want)
+		}
+	}
+	for _, leak := range []string{"secret", "free text", "because I said so", "my-kind", "exploded"} {
+		if strings.Contains(body, leak) {
+			t.Errorf("a value outside the closed sets became a label: %q", leak)
+		}
 	}
 }

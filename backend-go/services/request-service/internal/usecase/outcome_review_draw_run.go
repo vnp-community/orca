@@ -95,7 +95,7 @@ type StartDrawResult struct {
 	Failed int
 	// Pending is the number of diagrams handed to the agent.
 	Pending int
-	// Skipped is no_context when the review has no diagram models yet.
+	// Skipped is no_context when the review has no diagram models yet, or draw_disabled when the deployment draws nothing.
 	Skipped string
 }
 
@@ -116,6 +116,9 @@ func (r *ReviewDrawRunner) Start(ctx context.Context, in StartDrawInput) (StartD
 	req, err := r.Service.requireReadyRequest(ctx, in.RequestID)
 	if err != nil {
 		return StartDrawResult{}, err
+	}
+	if r.Config.DrawDisabled { // rollout stage 1: text only, and no agent run is ever spent on a drawing
+		return StartDrawResult{Skipped: "draw_disabled"}, nil
 	}
 	review, err := r.reviewOf(ctx, in)
 	if err != nil {
@@ -189,6 +192,7 @@ func (r *ReviewDrawRunner) Start(ctx context.Context, in StartDrawInput) (StartD
 		return StartDrawResult{}, err
 	}
 	res.Run = &run
+	r.Service.Events.runProgress(ctx, run, run.Status, "")
 	job := &drawJob{req: req, review: review, conn: conn, profile: profile, skill: skill, pending: pending, reason: in.Reason, origin: in.Origin, createdBy: in.CreatedBy}
 	detached := tenant.Detach(ctx)
 	spawn := r.Spawn
@@ -276,7 +280,11 @@ func (r *ReviewDrawRunner) execute(ctx context.Context, j *drawJob, run ReviewRu
 		if err := r.Runs.Finish(ctx, run.ID, status, code, costFigure(total.cost)); err != nil {
 			r.logger().ErrorContext(ctx, "outcome review: could not end the draw run", slog.String("run_id", run.ID), slog.Any("error", err))
 		}
+		r.Service.Events.runFinished(ctx, run, status, code)
 		observerOrNoop(r.Observer).RunFinished("review", string(ReviewRunDraw), string(status))
+		ro := reviewObserverOf(r.Observer)
+		ro.ReviewDrawn(total.stored, total.failed, code)
+		observeRunEnd(ro, run, status, r.now(), total.cost.Usage, costFigure(total.cost))
 		observerOrNoop(r.Observer).KnowledgeToolCalls(total.cost)
 	}
 	defer func() {

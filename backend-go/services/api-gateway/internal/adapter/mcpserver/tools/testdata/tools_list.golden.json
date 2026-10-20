@@ -1732,6 +1732,51 @@
     "props": ["id", "reason", "stage"]
   },
   {
+    "name": "request_review_decisions",
+    "channel": "request.review.decisions",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id", "review_id"],
+    "props": ["id", "item_key", "review_id"]
+  },
+  {
+    "name": "request_review_estimate",
+    "channel": "request.review.estimate",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["id", "scope", "sections"]
+  },
+  {
+    "name": "request_review_get",
+    "channel": "request.review.get",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["id", "review_id"]
+  },
+  {
+    "name": "request_review_list",
+    "channel": "request.review.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["id", "page_size", "page_token"]
+  },
+  {
+    "name": "request_review_runs",
+    "channel": "request.review.runs",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["id", "review_id"]
+  },
+  {
     "name": "request_spawnChild",
     "channel": "request.spawnChild",
     "pack": 2,

@@ -54,6 +54,21 @@ var projectEngineRoutes = []requestFlowRoute{
 	{http.MethodPut, "/v1/projects/{id}/request-engine", "request.engineSettingsSet", map[string]string{"id": "projectId"}},
 }
 
+// reviewProfileRoutes are absolute paths: the drawing profile of the Outcome Review, one layer for the tenant and one for a project.
+// Reading needs a signed-in caller; saving and resetting are administrator-only, which the channel and request-service enforce.
+// tenantProfile pins projectId to "" (the URL parameter named "" is always empty), so a body or query that names a project cannot turn a
+// tenant route into a project one.
+var tenantProfile = map[string]string{"": "projectId"}
+
+var reviewProfileRoutes = []requestFlowRoute{
+	{http.MethodGet, "/v1/projects/{id}/review-drawing-profile", "request.review.profile.get", map[string]string{"id": "projectId"}},
+	{http.MethodPut, "/v1/projects/{id}/review-drawing-profile", "request.review.profile.save", map[string]string{"id": "projectId"}},
+	{http.MethodPost, "/v1/projects/{id}/review-drawing-profile/reset", "request.review.profile.reset", map[string]string{"id": "projectId"}},
+	{http.MethodGet, "/v1/review-drawing-profile", "request.review.profile.get", tenantProfile},
+	{http.MethodPut, "/v1/review-drawing-profile", "request.review.profile.save", tenantProfile},
+	{http.MethodPost, "/v1/review-drawing-profile/reset", "request.review.profile.reset", tenantProfile},
+}
+
 // approvalFlowRoutes is relative to /v1/approvals: a decider reads the version and digest it is about to decide.
 var approvalFlowRoutes = []requestFlowRoute{
 	{http.MethodGet, "/{id}", "approval.get", byID},

@@ -54,8 +54,8 @@ func openRequestStream(t *testing.T, bus ephemeralSubscriber, fake *fakeRequestC
 }
 
 func TestRequestStream_EveryRegisteredEventMapsToItsType(t *testing.T) {
-	if len(requestEventRegistry) != 15 {
-		t.Fatalf("registry has %d rows, want the 15 of CONTRACT section 3 (14 + base_ref_changed, CR-REQ-039)", len(requestEventRegistry))
+	if len(requestEventRegistry) != 19 {
+		t.Fatalf("registry has %d rows, want 19: the 15 of CONTRACT section 3 (14 + base_ref_changed, CR-REQ-039) and the 4 Outcome Review subjects", len(requestEventRegistry))
 	}
 	bus := &fakeEphemeralSubscriber{events: map[string][]commoneventbus.Event{}}
 	for _, m := range requestEventRegistry {
@@ -232,5 +232,41 @@ func TestRequestStream_UnavailableWithoutClientOrBus(t *testing.T) {
 	sh, _ = r.StreamHandlerFor("request.subscribe")
 	if _, err := sh(context.Background(), Identity{TenantID: "t1"}, []json.RawMessage{json.RawMessage(`{"id":"r"}`)}); err == nil || !strings.HasPrefix(err.Error(), "REQUEST_UNAVAILABLE") {
 		t.Errorf("nil client with id: %v", err)
+	}
+}
+
+// The review events carry ids and enums only; the screen re-reads the review, so no text may travel.
+func TestRequestStream_ReviewEventsCarryIdsAndEnumsOnly(t *testing.T) {
+	bus := &fakeEphemeralSubscriber{events: map[string][]commoneventbus.Event{
+		"orca.request.review.generated":             {requestEvent("t1", streamNow, `{"request_id":"r1","review_id":"v1","phase":"delivered","inputs_digest":"d"}`)},
+		"orca.request.review.artifact_regenerated":  {requestEvent("t1", streamNow, `{"request_id":"r1","review_id":"v1","run_id":"u1","run_kind":"draw"}`)},
+		"orca.request.review.decided":               {requestEvent("t1", streamNow, `{"request_id":"r1","review_id":"v1","decision":"send_back","actor_id":"u1","note":"SECRET-NOTE"}`)},
+		"orca.request.review.progress":              {requestEvent("t1", streamNow, `{"request_id":"r1","review_id":"v1","run_id":"u1","run_kind":"context","run_status":"running"}`)},
+		"orca.request.review.generated.other-topic": {requestEvent("t1", streamNow, `{"request_id":"r2"}`)},
+	}}
+	frames, err := openRequestStream(t, bus, &fakeRequestClient{}, Identity{TenantID: "t1", UserID: "u1"}, `{"id":"r1"}`, requestEventRegistry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed, progress := 0, 0
+	for _, f := range frames {
+		switch f.EventType {
+		case "review.changed":
+			changed++
+			if f.ReviewID != "v1" {
+				t.Errorf("review.changed lost the review id: %+v", f)
+			}
+		case "review.progress":
+			progress++
+			if f.RunKind != "context" || f.RunStatus != "running" || f.RunID != "u1" {
+				t.Errorf("review.progress: %+v", f)
+			}
+		}
+		if b, _ := json.Marshal(f); strings.Contains(string(b), "SECRET") {
+			t.Errorf("a frame leaks content: %s", b)
+		}
+	}
+	if changed != 3 || progress != 1 {
+		t.Errorf("changed=%d progress=%d, want 3 and 1", changed, progress)
 	}
 }

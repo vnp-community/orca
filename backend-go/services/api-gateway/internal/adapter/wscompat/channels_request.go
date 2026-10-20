@@ -25,6 +25,7 @@ func registerRequestChannels(r *Registry, req requestv1.RequestServiceClient, ap
 	c.registerClarification(r)
 	c.registerClarificationAsk(r)
 	c.registerDecisions(r)
+	c.registerReview(r)
 	if streamEnabled {
 		registerRequestStreamChannel(r, bus, req)
 	}

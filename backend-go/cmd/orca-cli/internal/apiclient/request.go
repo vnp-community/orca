@@ -46,6 +46,27 @@ func (c *Client) SetEngineSettings(ctx context.Context, projectID string, body D
 	return c.putDoc(ctx, "/v1/projects/"+url.PathEscape(projectID)+"/request-engine", body)
 }
 
+// reviewProfilePath is the drawing profile of a project, or of the tenant when projectID is empty.
+func reviewProfilePath(projectID string) string {
+	if projectID == "" {
+		return "/v1/review-drawing-profile"
+	}
+	return "/v1/projects/" + url.PathEscape(projectID) + "/review-drawing-profile"
+}
+
+// GetReviewProfile reads the drawing profile layers of a project (or the tenant) and the profile in force.
+func (c *Client) GetReviewProfile(ctx context.Context, projectID string) (Document, error) {
+	return c.getDoc(ctx, reviewProfilePath(projectID), nil)
+}
+
+func (c *Client) SaveReviewProfile(ctx context.Context, projectID string, body Document) (Document, error) {
+	return c.putDoc(ctx, reviewProfilePath(projectID), body)
+}
+
+func (c *Client) ResetReviewProfile(ctx context.Context, projectID string, body Document) (Document, error) {
+	return c.postDoc(ctx, reviewProfilePath(projectID)+"/reset", body)
+}
+
 func requestPath(id string, rest string) string {
 	return "/v1/requests/" + url.PathEscape(id) + rest
 }

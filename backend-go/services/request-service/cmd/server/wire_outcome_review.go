@@ -41,6 +41,7 @@ func wireOutcomeReview(ctx context.Context, wg *sync.WaitGroup, log *slog.Logger
 	svc := &usecase.OutcomeReviewService{
 		Requests: stores.requests, Reviews: stores.outcomeReviews, Collector: collector, Settings: settings, Config: cfg,
 		Redact: usecase.RedactRaw, Audit: audit, Log: log, Artifacts: artifacts, Runs: stores.reviewRuns, Profiles: profiles, Decisions: stores.reviewDecisions,
+		Events: &usecase.ReviewEvents{Outbox: stores.outboxWriter, Log: log}, Observer: solution.observer,
 	}
 	cleanup := &usecase.ReviewArtifactCleanup{Repo: stores.reviewArtifacts, Tenants: stores.retention.ListTenants, Retention: cfg.ArtifactRetentionOrDefault(), Log: log}
 	wg.Add(1)

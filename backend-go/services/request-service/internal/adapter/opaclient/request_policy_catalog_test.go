@@ -109,6 +109,10 @@ func TestRequestPolicy_AgentNeverReachesForbiddenRPCs(t *testing.T) {
 	}{
 		{domain.GroupDecide, "Approve"}, {domain.GroupExecute, "StartPhase"}, {domain.GroupAdmin, "SetRequestFlowSettings"},
 		{domain.GroupPlan, "GeneratePlan"}, {domain.GroupLifecycle, "CancelRequest"},
+		// Outcome Review: an agent reads a review; it never builds, redraws, restores, decides or approves one, nor edits the profile.
+		{domain.GroupAnalyze, "GenerateOutcomeReview"}, {domain.GroupAnalyze, "RegenerateReviewArtifacts"}, {domain.GroupAnalyze, "RestoreReviewArtifactRevision"},
+		{domain.GroupDecide, "DecideOutcomeReviewItem"}, {domain.GroupDecide, "ApproveOutcomeReview"}, {domain.GroupDecide, "LinkOutcomeReviewChild"},
+		{domain.GroupAdmin, "SaveReviewDrawingProfile"}, {domain.GroupAdmin, "ResetReviewDrawingProfile"}, {domain.GroupAuthenticated, "GetReviewDrawingProfile"},
 	} {
 		ok, err := p.Allow(context.Background(), domain.AccessInput{Action: c.group, RPC: c.rpc, CallerGlobalRole: "admin", CallerProjectRole: "owner", ActorType: "agent"})
 		if err != nil || ok {

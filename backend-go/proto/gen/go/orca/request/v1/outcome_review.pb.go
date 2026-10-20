@@ -29,13 +29,17 @@ type OutcomeReview struct {
 	// design | delivered
 	Phase string `protobuf:"bytes,3,opt,name=phase,proto3" json:"phase,omitempty"`
 	// draft | ready | stale | approved | superseded
-	State         string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
-	HeadKey       string                 `protobuf:"bytes,5,opt,name=head_key,json=headKey,proto3" json:"head_key,omitempty"`
-	ModelJson     string                 `protobuf:"bytes,6,opt,name=model_json,json=modelJson,proto3" json:"model_json,omitempty"`
-	KgSnapshot    string                 `protobuf:"bytes,7,opt,name=kg_snapshot,json=kgSnapshot,proto3" json:"kg_snapshot,omitempty"`
-	Version       int64                  `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	State      string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
+	HeadKey    string                 `protobuf:"bytes,5,opt,name=head_key,json=headKey,proto3" json:"head_key,omitempty"`
+	ModelJson  string                 `protobuf:"bytes,6,opt,name=model_json,json=modelJson,proto3" json:"model_json,omitempty"`
+	KgSnapshot string                 `protobuf:"bytes,7,opt,name=kg_snapshot,json=kgSnapshot,proto3" json:"kg_snapshot,omitempty"`
+	Version    int64                  `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
+	CreatedAt  *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt  *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// Set while the review is approved (CR-OR-022).
+	ApprovedBy    string                 `protobuf:"bytes,11,opt,name=approved_by,json=approvedBy,proto3" json:"approved_by,omitempty"`
+	ApprovedAt    *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=approved_at,json=approvedAt,proto3" json:"approved_at,omitempty"`
+	ApprovalNote  string                 `protobuf:"bytes,13,opt,name=approval_note,json=approvalNote,proto3" json:"approval_note,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -138,6 +142,27 @@ func (x *OutcomeReview) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *OutcomeReview) GetApprovedBy() string {
+	if x != nil {
+		return x.ApprovedBy
+	}
+	return ""
+}
+
+func (x *OutcomeReview) GetApprovedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ApprovedAt
+	}
+	return nil
+}
+
+func (x *OutcomeReview) GetApprovalNote() string {
+	if x != nil {
+		return x.ApprovalNote
+	}
+	return ""
 }
 
 // EstimateOutcomeReview costs no agent run: it reads the database and git-gateway and says what GenerateOutcomeReview would do.
@@ -3042,7 +3067,7 @@ var File_orca_request_v1_outcome_review_proto protoreflect.FileDescriptor
 
 const file_orca_request_v1_outcome_review_proto_rawDesc = "" +
 	"\n" +
-	"$orca/request/v1/outcome_review.proto\x12\x0forca.request.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe2\x02\n" +
+	"$orca/request/v1/outcome_review.proto\x12\x0forca.request.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe5\x03\n" +
 	"\rOutcomeReview\x12\x1b\n" +
 	"\treview_id\x18\x01 \x01(\tR\breviewId\x12\x1d\n" +
 	"\n" +
@@ -3059,7 +3084,12 @@ const file_orca_request_v1_outcome_review_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"o\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1f\n" +
+	"\vapproved_by\x18\v \x01(\tR\n" +
+	"approvedBy\x12;\n" +
+	"\vapproved_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"approvedAt\x12#\n" +
+	"\rapproval_note\x18\r \x01(\tR\fapprovalNote\"o\n" +
 	"\x1cEstimateOutcomeReviewRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
@@ -3392,38 +3422,39 @@ var file_orca_request_v1_outcome_review_proto_goTypes = []any{
 var file_orca_request_v1_outcome_review_proto_depIdxs = []int32{
 	42, // 0: orca.request.v1.OutcomeReview.created_at:type_name -> google.protobuf.Timestamp
 	42, // 1: orca.request.v1.OutcomeReview.updated_at:type_name -> google.protobuf.Timestamp
-	3,  // 2: orca.request.v1.EstimateOutcomeReviewResponse.regeneration:type_name -> orca.request.v1.RegenerationEstimate
-	0,  // 3: orca.request.v1.GenerateOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
-	6,  // 4: orca.request.v1.GenerateOutcomeReviewResponse.run:type_name -> orca.request.v1.OutcomeReviewRun
-	6,  // 5: orca.request.v1.GenerateOutcomeReviewResponse.draw_run:type_name -> orca.request.v1.OutcomeReviewRun
-	42, // 6: orca.request.v1.OutcomeReviewRun.started_at:type_name -> google.protobuf.Timestamp
-	42, // 7: orca.request.v1.OutcomeReviewRun.finished_at:type_name -> google.protobuf.Timestamp
-	6,  // 8: orca.request.v1.ListOutcomeReviewRunsResponse.runs:type_name -> orca.request.v1.OutcomeReviewRun
-	0,  // 9: orca.request.v1.GetOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
-	0,  // 10: orca.request.v1.ListOutcomeReviewsResponse.reviews:type_name -> orca.request.v1.OutcomeReview
-	42, // 11: orca.request.v1.ReviewArtifactMeta.created_at:type_name -> google.protobuf.Timestamp
-	13, // 12: orca.request.v1.GetReviewArtifactResponse.artifact:type_name -> orca.request.v1.ReviewArtifactMeta
-	13, // 13: orca.request.v1.ListReviewArtifactRevisionsResponse.revisions:type_name -> orca.request.v1.ReviewArtifactMeta
-	42, // 14: orca.request.v1.OutcomeReviewDecision.decided_at:type_name -> google.protobuf.Timestamp
-	18, // 15: orca.request.v1.DecideOutcomeReviewItemResponse.decision:type_name -> orca.request.v1.OutcomeReviewDecision
-	0,  // 16: orca.request.v1.ApproveOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
-	18, // 17: orca.request.v1.ListOutcomeReviewDecisionsResponse.decisions:type_name -> orca.request.v1.OutcomeReviewDecision
-	6,  // 18: orca.request.v1.RegenerateReviewArtifactsResponse.context_run:type_name -> orca.request.v1.OutcomeReviewRun
-	6,  // 19: orca.request.v1.RegenerateReviewArtifactsResponse.draw_run:type_name -> orca.request.v1.OutcomeReviewRun
-	3,  // 20: orca.request.v1.RegenerateReviewArtifactsResponse.estimate:type_name -> orca.request.v1.RegenerationEstimate
-	13, // 21: orca.request.v1.RestoreReviewArtifactRevisionResponse.artifact:type_name -> orca.request.v1.ReviewArtifactMeta
-	29, // 22: orca.request.v1.RestoreReviewArtifactRevisionResponse.diff:type_name -> orca.request.v1.ModelDiff
-	29, // 23: orca.request.v1.CompareReviewArtifactRevisionsResponse.diff:type_name -> orca.request.v1.ModelDiff
-	42, // 24: orca.request.v1.ReviewDrawingProfileLayer.updated_at:type_name -> google.protobuf.Timestamp
-	34, // 25: orca.request.v1.GetReviewDrawingProfileResponse.tenant_layer:type_name -> orca.request.v1.ReviewDrawingProfileLayer
-	34, // 26: orca.request.v1.GetReviewDrawingProfileResponse.project_layer:type_name -> orca.request.v1.ReviewDrawingProfileLayer
-	41, // 27: orca.request.v1.GetReviewDrawingProfileResponse.sources:type_name -> orca.request.v1.GetReviewDrawingProfileResponse.SourcesEntry
-	34, // 28: orca.request.v1.SaveReviewDrawingProfileResponse.layer:type_name -> orca.request.v1.ReviewDrawingProfileLayer
-	29, // [29:29] is the sub-list for method output_type
-	29, // [29:29] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	42, // 2: orca.request.v1.OutcomeReview.approved_at:type_name -> google.protobuf.Timestamp
+	3,  // 3: orca.request.v1.EstimateOutcomeReviewResponse.regeneration:type_name -> orca.request.v1.RegenerationEstimate
+	0,  // 4: orca.request.v1.GenerateOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
+	6,  // 5: orca.request.v1.GenerateOutcomeReviewResponse.run:type_name -> orca.request.v1.OutcomeReviewRun
+	6,  // 6: orca.request.v1.GenerateOutcomeReviewResponse.draw_run:type_name -> orca.request.v1.OutcomeReviewRun
+	42, // 7: orca.request.v1.OutcomeReviewRun.started_at:type_name -> google.protobuf.Timestamp
+	42, // 8: orca.request.v1.OutcomeReviewRun.finished_at:type_name -> google.protobuf.Timestamp
+	6,  // 9: orca.request.v1.ListOutcomeReviewRunsResponse.runs:type_name -> orca.request.v1.OutcomeReviewRun
+	0,  // 10: orca.request.v1.GetOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
+	0,  // 11: orca.request.v1.ListOutcomeReviewsResponse.reviews:type_name -> orca.request.v1.OutcomeReview
+	42, // 12: orca.request.v1.ReviewArtifactMeta.created_at:type_name -> google.protobuf.Timestamp
+	13, // 13: orca.request.v1.GetReviewArtifactResponse.artifact:type_name -> orca.request.v1.ReviewArtifactMeta
+	13, // 14: orca.request.v1.ListReviewArtifactRevisionsResponse.revisions:type_name -> orca.request.v1.ReviewArtifactMeta
+	42, // 15: orca.request.v1.OutcomeReviewDecision.decided_at:type_name -> google.protobuf.Timestamp
+	18, // 16: orca.request.v1.DecideOutcomeReviewItemResponse.decision:type_name -> orca.request.v1.OutcomeReviewDecision
+	0,  // 17: orca.request.v1.ApproveOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
+	18, // 18: orca.request.v1.ListOutcomeReviewDecisionsResponse.decisions:type_name -> orca.request.v1.OutcomeReviewDecision
+	6,  // 19: orca.request.v1.RegenerateReviewArtifactsResponse.context_run:type_name -> orca.request.v1.OutcomeReviewRun
+	6,  // 20: orca.request.v1.RegenerateReviewArtifactsResponse.draw_run:type_name -> orca.request.v1.OutcomeReviewRun
+	3,  // 21: orca.request.v1.RegenerateReviewArtifactsResponse.estimate:type_name -> orca.request.v1.RegenerationEstimate
+	13, // 22: orca.request.v1.RestoreReviewArtifactRevisionResponse.artifact:type_name -> orca.request.v1.ReviewArtifactMeta
+	29, // 23: orca.request.v1.RestoreReviewArtifactRevisionResponse.diff:type_name -> orca.request.v1.ModelDiff
+	29, // 24: orca.request.v1.CompareReviewArtifactRevisionsResponse.diff:type_name -> orca.request.v1.ModelDiff
+	42, // 25: orca.request.v1.ReviewDrawingProfileLayer.updated_at:type_name -> google.protobuf.Timestamp
+	34, // 26: orca.request.v1.GetReviewDrawingProfileResponse.tenant_layer:type_name -> orca.request.v1.ReviewDrawingProfileLayer
+	34, // 27: orca.request.v1.GetReviewDrawingProfileResponse.project_layer:type_name -> orca.request.v1.ReviewDrawingProfileLayer
+	41, // 28: orca.request.v1.GetReviewDrawingProfileResponse.sources:type_name -> orca.request.v1.GetReviewDrawingProfileResponse.SourcesEntry
+	34, // 29: orca.request.v1.SaveReviewDrawingProfileResponse.layer:type_name -> orca.request.v1.ReviewDrawingProfileLayer
+	30, // [30:30] is the sub-list for method output_type
+	30, // [30:30] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_orca_request_v1_outcome_review_proto_init() }

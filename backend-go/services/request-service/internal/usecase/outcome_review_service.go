@@ -43,8 +43,12 @@ type OutcomeReviewService struct {
 	Runs      OutcomeReviewRunRepository
 	// Decisions is optional; with it a regeneration knows which items already have a decision.
 	Decisions OutcomeReviewDecisionRepository
-	Now       func() time.Time
-	Log       *slog.Logger
+	// Events is optional; it tells subscribers that a review changed.
+	Events *ReviewEvents
+	// Observer receives the numbers the review is judged by; nil observes nothing.
+	Observer EngineObserver
+	Now      func() time.Time
+	Log      *slog.Logger
 }
 
 func (s *OutcomeReviewService) now() time.Time {
@@ -139,6 +143,7 @@ type GenerateResult struct {
 // Generate builds the review from the facts Orca measures and stores it. The same inputs give the same stored review: asking
 // twice writes nothing the second time.
 func (s *OutcomeReviewService) Generate(ctx context.Context, in GenerateInput) (GenerateResult, error) {
+	started := s.now()
 	req, err := s.requireReadyRequest(ctx, in.RequestID)
 	if err != nil {
 		return GenerateResult{}, err
@@ -198,6 +203,9 @@ func (s *OutcomeReviewService) Generate(ctx context.Context, in GenerateInput) (
 		}
 	}
 	s.auditGenerate(ctx, req, stored, created)
+	if created {
+		reviewObserverOf(s.Observer).ReviewFirstFacts(s.now().Sub(started))
+	}
 	view, err := decodeReview(stored)
 	return GenerateResult{View: view, Created: created, Collected: col}, err
 }
@@ -222,6 +230,10 @@ func encodeReviewModel(built *domain.OutcomeReview) ([]byte, error) {
 }
 
 func (s *OutcomeReviewService) auditGenerate(ctx context.Context, req domain.Request, st StoredReview, created bool) {
+	logReviewAudit(ctx, s.logger(), domain.AuditReviewGenerate, req.ID, st.ID, st.InputsDigest)
+	if created {
+		s.Events.Publish(ctx, domain.SubjectReviewGenerated, ReviewEventPayload{RequestID: req.ID, ReviewID: st.ID, Phase: string(st.Phase), InputsHash: st.InputsDigest})
+	}
 	if s.Audit == nil {
 		return
 	}

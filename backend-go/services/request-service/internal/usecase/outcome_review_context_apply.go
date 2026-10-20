@@ -48,7 +48,29 @@ func (s *OutcomeReviewService) ApplyContext(ctx context.Context, req domain.Requ
 	if err != nil {
 		return ReviewView{}, err
 	}
+	s.observeContext(built)
 	return decodeReview(updated)
+}
+
+// observeContext reports how much of what the agent said could be checked, and how much of the design a person approved.
+func (s *OutcomeReviewService) observeContext(built domain.OutcomeReview) {
+	o := reviewObserverOf(s.Observer)
+	total, unverified := 0, 0
+	for _, it := range built.Items {
+		if it.Origin != domain.OriginAgent {
+			continue
+		}
+		total++
+		if it.Unverified {
+			unverified++
+		}
+	}
+	if total > 0 {
+		o.ReviewItems(total, unverified)
+	}
+	if built.Verdict.Architecture.DesignChecked {
+		o.ReviewDesignReviewed(built.Verdict.Architecture.ReviewedRatio)
+	}
 }
 
 // MarkContextFailed records that the context run did not produce a usable result. The review keeps the facts Orca measured.

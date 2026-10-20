@@ -96,7 +96,7 @@ func (r *ReviewRegenerator) estimateFor(ctx context.Context, view ReviewView, re
 	if req.Scope.RunsContext() {
 		est.AgentRuns++
 	}
-	if req.Scope.Draws() {
+	if req.Scope.Draws() && !r.Service.Config.DrawDisabled {
 		est.DiagramsToDraw = countDrawable(view.Review.Diagrams, profile, req.Sections)
 		est.AgentRuns += (est.DiagramsToDraw + domain.MaxDrawingsPerRun - 1) / domain.MaxDrawingsPerRun
 	}
@@ -271,6 +271,8 @@ func (r *ReviewRegenerator) start(ctx context.Context, in RegenerateInput, view 
 }
 
 func (r *ReviewRegenerator) audit(ctx context.Context, in RegenerateInput, view ReviewView) {
+	reviewObserverOf(r.Service.Observer).ReviewRegenerated(string(in.Reason))
+	logReviewAudit(ctx, r.Service.logger(), domain.AuditReviewRegenerate, in.RequestID, view.Stored.ID, view.Stored.InputsDigest)
 	if r.Service.Audit == nil {
 		return
 	}
@@ -316,6 +318,7 @@ func (r *ReviewRegenerator) Restore(ctx context.Context, requestID, artifactID, 
 			out.Diff = &d
 		}
 	}
+	logReviewAudit(ctx, r.Service.logger(), domain.AuditReviewRestore, requestID, "", "")
 	if r.Service.Audit != nil {
 		_ = r.Service.Audit.Record(ctx, AuditEvent{
 			Action: domain.AuditReviewRestore, TargetType: "request", TargetID: requestID, RequestID: requestID, Outcome: "allowed",

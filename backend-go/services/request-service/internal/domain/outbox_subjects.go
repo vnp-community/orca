@@ -25,3 +25,12 @@ const (
 
 // SubjectPlanGenerated is emitted when a Plan has been written to task-service and sent for approval.
 const SubjectPlanGenerated = "orca.request.plan.generated"
+
+// Outcome Review subjects. Payloads carry ids and enums only, never review text, so a subscriber cannot read content it has no right to.
+const (
+	SubjectReviewGenerated           = "orca.request.review.generated"
+	SubjectReviewArtifactRegenerated = "orca.request.review.artifact_regenerated"
+	SubjectReviewDecided             = "orca.request.review.decided"
+	// SubjectReviewProgress is a run starting or ending; it feeds the live progress line and nothing else.
+	SubjectReviewProgress = "orca.request.review.progress"
+)

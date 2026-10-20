@@ -474,6 +474,19 @@ services:
       # Language the AI writes analysis and Plan prose in: vi or en, for the whole deployment. Unlike the settings above, any other value
       # stops request-service at start with a clear message. Read once at start: redeploy-local.sh request-service after a change.
       REQUEST_DEFAULT_OUTPUT_LANGUAGE: ${REQUEST_DEFAULT_OUTPUT_LANGUAGE:-vi}
+      # Outcome Review (docs/guides/request/outcome-review-setup.md). Off by default: a review costs an agent run, so a project opts in.
+      # The kill switch closes every review RPC and hides the tab without deleting anything; DRAW_ENABLED=false keeps reviews to text and tables.
+      # The limits are optional: empty keeps the built-in value. Read once at start: redeploy-local.sh request-service after a change.
+      REQUEST_DEFAULT_OUTCOME_REVIEW: ${REQUEST_DEFAULT_OUTCOME_REVIEW:-off}
+      REQUEST_REVIEW_KILL_SWITCH: ${REQUEST_REVIEW_KILL_SWITCH:-false}
+      REQUEST_REVIEW_DRAW_ENABLED: ${REQUEST_REVIEW_DRAW_ENABLED:-true}
+      REQUEST_REVIEW_CONTEXT_TTL: ${REQUEST_REVIEW_CONTEXT_TTL:-}
+      REQUEST_REVIEW_CONTEXT_TIMEOUT: ${REQUEST_REVIEW_CONTEXT_TIMEOUT:-}
+      REQUEST_REVIEW_CONTEXT_MAX_FILES: ${REQUEST_REVIEW_CONTEXT_MAX_FILES:-}
+      REQUEST_REVIEW_ARTIFACT_RETENTION: ${REQUEST_REVIEW_ARTIFACT_RETENTION:-}
+      REQUEST_REVIEW_ARTIFACT_QUOTA_MB: ${REQUEST_REVIEW_ARTIFACT_QUOTA_MB:-}
+      REQUEST_REVIEW_REGEN_PER_DAY: ${REQUEST_REVIEW_REGEN_PER_DAY:-}
+      REQUEST_REVIEW_CONFIRM_COST: ${REQUEST_REVIEW_CONFIRM_COST:-}
       # Shared secret issue-status-sync presents for LookupRequestBySource; empty refuses the call.
       SERVICE_INTERNAL_TOKEN: ${REQUEST_SERVICE_INTERNAL_TOKEN:-}
       # Gateway presents the same value as REQUEST_INTERNAL_CALLER_TOKEN; empty makes every RPC refuse.

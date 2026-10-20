@@ -221,3 +221,21 @@ Kiểm tay nhanh trên giao diện (tài khoản admin):
 - Màn hình Project Settings chỉ có chế độ thực thi (4.3); engine và `solutionAgent` chưa có màn hình, cài bằng kênh WebSocket.
 - `.env.example` chưa liệt kê khối `JIRA_*`/`JR_*` (mục 4.5).
 - Một số lỗi có sẵn từ trước, không do bản này: test `infra-fleet` về đường dẫn socket SSH identity-agent quá dài, vài test frontend, và lỗi kiểu trong `agent/src/relay/pty-agent-bridge.test.ts` (`env` trên `{}`).
+
+## 9. Outcome Review (CR-OR-001..030): review cấp cao của một Request
+
+Tính năng mới, **tắt mặc định** (`REQUEST_DEFAULT_OUTCOME_REVIEW=off`): mỗi project phải được admin bật (`orca engine set --project <id> --outcome-review manual`). Hướng dẫn đầy đủ: [`docs/guides/request/outcome-review-setup.md`](../../docs/guides/request/outcome-review-setup.md).
+
+| Thành phần | Có đổi? | Lý do | Cách |
+|---|---|---|---|
+| `request-service` | **có** | RPC review, lượt context và lượt vẽ, quyết định, hồ sơ vẽ, **migration 0107–0109**, sự kiện outbox `orca.request.review.*` | `redeploy-local.sh request-service` (áp migration trước khi restart) |
+| `api-gateway` | **có** | 17 kênh `request.review.*`, 5 tool MCP chỉ đọc `request_review_*`, `request.event` thêm `review.changed|progress`, OPA `agent_rpcs` | `redeploy-local.sh api-gateway` |
+| CLI `orca` | có | `orca engine set --outcome-review`, `orca engine show --check` nêu lỗi review | build lại CLI |
+| Agent Orca (`agent/`) | có | báo khả năng cho skill review | `node agent/build.mjs`, restart agent |
+| `frontend` | **chưa** | màn hình Outcome review chưa làm trong bản này | |
+
+- **Migration** (Postgres và MySQL, đều có `.down.sql`): `0107_outcome_review_contexts`, `0108_review_artifacts`, `0109_review_decisions_profiles`. Cột/bảng mới, không đổi hành vi của project hiện có. `redeploy-local.sh` áp tự động.
+- **Biến môi trường mới** (đã có trong `.env.example` và `docker-compose.yml`): `REQUEST_DEFAULT_OUTCOME_REVIEW` (`off`), `REQUEST_REVIEW_KILL_SWITCH` (`false`), `REQUEST_REVIEW_DRAW_ENABLED` (`true`) và các giới hạn tuỳ chọn `REQUEST_REVIEW_CONTEXT_TTL`, `_CONTEXT_TIMEOUT`, `_CONTEXT_MAX_FILES`, `_ARTIFACT_RETENTION`, `_ARTIFACT_QUOTA_MB`, `_REGEN_PER_DAY`, `_CONFIRM_COST` (để trống là dùng mặc định trong mã).
+- **Kiểm sau triển khai (không tốn lượt AI):** `python3 tests/stages/e2e/orca-flows/run_acceptance.py --ai-stub devserver outcome_review` (`ORV-01..09`). Lượt Claude thật `ORV-20` chỉ chạy khi `ORCA_E2E_REVIEW_REAL=1`, không kèm `--ai-stub`, và tốn tiền.
+- **Quay lại:** đặt `REQUEST_REVIEW_KILL_SWITCH=true` rồi `redeploy-local.sh request-service`: tab ẩn, mọi RPC review trả `REQUEST_REVIEW_DISABLED`, dữ liệu giữ nguyên; bỏ công tắc là review trở lại. Binary cũ bỏ qua các bảng mới nên không bắt buộc chạy `.down`.
+- **Giới hạn đã biết:** skill `diagram-design` chưa được đưa vào `skills/` (hằng ghim đang rỗng), nên chưa có hình thật; chưa có lượt chạy agent thật nào; ngưỡng số của chỉ số chưa đặt (đo trên 10 Request thử trước).

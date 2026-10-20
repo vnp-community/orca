@@ -470,6 +470,10 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel", "clarification.request",
 		// The decision log: reading it, and a person confirming a high risk choice.
 		"decision.list", "decision.confirm",
+		// The Outcome Review (CR-OR-001 to 022).
+		"request.review.estimate", "request.review.generate", "request.review.get", "request.review.list", "request.review.runs", "request.review.artifact",
+		"request.review.revisions", "request.review.regenerate", "request.review.restore", "request.review.compare", "request.review.decide", "request.review.approve",
+		"request.review.decisions", "request.review.linkChild", "request.review.profile.get", "request.review.profile.save", "request.review.profile.reset",
 	}
 	got := map[string]ChannelKind{}
 	for _, ch := range r.Channels() {

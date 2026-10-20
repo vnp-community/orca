@@ -26,6 +26,7 @@ import suite_analysis_revision
 import suite_approve_run_all
 import suite_dev_server_agent
 import suite_not_found_contract
+import suite_outcome_review
 import suite_output_language
 import suite_plan_revision
 import suite_platform_health
@@ -75,9 +76,11 @@ SUITES = [
     ("request_auto_plan", "Automatic Plan generation after the Analysis is approved: job, retry, switch, old events (CR-REQ-044)", suite_request_auto_plan),
     # After aistub as well: it relies on fake claude triggers ([stub:fail-once], [stub:slow]) and plants rows that it removes again.
     ("plan_revision", "Revising a Plan by prompt and reading its documents: versions, approver, failure, planted OpenSpec change (CR-REQ-045)", suite_plan_revision),
+    # After aistub too: it drives a Request to its committed Plan with the fake claude and leaves it there.
+    ("outcome_review", "Outcome Review: gates, facts, cache, refusals, drawing profile; the real-Claude path is opt-in (CR-OR-001..030)", suite_outcome_review),
 ]
 STUB_ONLY = {"aistub"}
-AI_USING = {"request", "matrix", "exits", "ai", "plan", "analysis", "qa", "request_base_ref", "analysis_revision", "approve_run_all", "output_language", "request_auto_plan", "plan_revision"}  # suites whose requests go through classification
+AI_USING = {"request", "matrix", "exits", "ai", "plan", "analysis", "qa", "request_base_ref", "analysis_revision", "approve_run_all", "output_language", "request_auto_plan", "plan_revision", "outcome_review"}  # suites whose requests go through classification
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
 
 

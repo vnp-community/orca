@@ -1740,6 +1740,74 @@
     "kind": "unary"
   },
   {
+    "name": "request.review.approve",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.artifact",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.compare",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.decide",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.decisions",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.estimate",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.generate",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.get",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.linkChild",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.list",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.profile.get",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.profile.reset",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.profile.save",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.regenerate",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.restore",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.revisions",
+    "kind": "unary"
+  },
+  {
+    "name": "request.review.runs",
+    "kind": "unary"
+  },
+  {
     "name": "request.setBaseRef",
     "kind": "unary"
   },

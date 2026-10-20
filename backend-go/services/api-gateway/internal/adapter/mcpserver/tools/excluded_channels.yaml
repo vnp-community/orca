@@ -685,3 +685,43 @@
 - pattern: "devServer.subscribeStatus"
   category: stream
   reason: "Push-stream channels cannot answer tools/call; devServer.list reports the same state (status, busy, activeExecutions)."
+
+- pattern: "request.review.generate"
+  category: request_flow
+  reason: "Builds the Outcome Review and starts an agent run that costs money; a person asks for it. The RPC is AgentAllowed=false and absent from agent_rpcs in request.rego."
+
+- pattern: "request.review.regenerate"
+  category: request_flow
+  reason: "Regenerating a review replaces drawings and costs an agent run, with a daily limit and a cost confirmation a person gives. The RPC is AgentAllowed=false and absent from agent_rpcs in request.rego."
+
+- pattern: "request.review.restore"
+  category: request_flow
+  reason: "Puts an earlier drawing back in force; a person's choice of what the team sees. The RPC is AgentAllowed=false and absent from agent_rpcs in request.rego."
+
+- pattern: "request.review.decide"
+  category: request_flow
+  reason: "A decision on an item of a review (accept an exception, send back, dismiss) is the reviewer's own; the RPC is human only and must never be an MCP tool."
+
+- pattern: "request.review.approve"
+  category: request_flow
+  reason: "Approving a review says a person looked at the architecture and the flow; the RPC is human only and must never be an MCP tool."
+
+- pattern: "request.review.linkChild"
+  category: request_flow
+  reason: "Ties the sent-back items of a review to the child Request that took them, part of the reviewer's decision; the RPC is human only."
+
+- pattern: "request.review.artifact"
+  category: request_flow
+  reason: "Returns a drawing as a self-contained HTML page for a sandboxed frame; an agent reads the review model (request_review_get), not a picture. The RPC is allowed for agents in request.rego but no tool is decided."
+
+- pattern: "request.review.revisions"
+  category: request_flow
+  reason: "Lists the stored revisions of a drawing for the screen's history; the model an agent needs is in request_review_get."
+
+- pattern: "request.review.compare"
+  category: request_flow
+  reason: "Compares the models of two drawing revisions for the screen's history view; no agent use is decided."
+
+- pattern: "request.review.profile.*"
+  category: request_flow
+  reason: "The drawing profile is tenant and project configuration (read by anyone, written by an admin); an agent has no use for it and the write RPCs are human only."

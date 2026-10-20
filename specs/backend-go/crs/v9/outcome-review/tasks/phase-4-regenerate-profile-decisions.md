@@ -28,13 +28,13 @@
   Files: `adapter/{postgres,mysql}/review_drawing_profile.go`, `usecase/review_drawing_profile.go`. Verify: hai người lưu cùng lúc → người sau lỗi phiên bản.
 - [x] **BE-OR-T412** `preset_digest` theo mục từ hồ sơ hiệu lực; lưu hồ sơ không vẽ lại.
   Verify: đổi `flow` chỉ đổi digest của `flow`.
-- [ ] **BE-OR-T413** CLI `orca review profile show|set|reset`.
+- [x] **BE-OR-T413** CLI `orca review profile show|set|reset`.
   Files: `backend-go/cmd/orca-cli/internal/command/review_profile_cmd.go`. Verify: kết quả khớp RPC.
   Kết quả (2026-10-20): đã xong từ Phase 3 (`domain/review_drawing_profile.go`, 21 ca từ chối kèm đường dẫn, hợp nhất tenant→project, nguồn từng trường).
-  Kết quả (2026-10-20): migration 0109 `review_drawing_profiles` (hai dialect), `adapter/{postgres,mysql}/review_drawing_profile_repository.go` + hợp đồng `RunReviewProfileContract` (khoá lạc quan, hai writer tạo đồng thời chỉ một thắng, tách lớp tenant/project, cô lập tenant) PASS trên Postgres 16 và MySQL 8 thật; `usecase/review_drawing_profile.go` (`Get/Save/Reset/Resolve`, lớp lưu không còn hợp lệ bị bỏ qua có log chứ không làm hỏng việc vẽ); RPC `Get/Save/ResetReviewDrawingProfile` (đọc: người đã xác thực; ghi: nhóm `admin`); audit `request.review.profile.save` chỉ chứa digest cũ/mới (test). Đã nối `Resolve` vào `Draw runner` và vvào việc đánh dấu trạng thái hình khi đọc review.
+  Kết quả (2026-10-20): migration 0109 `review_drawing_profiles` (hai dialect), `adapter/{postgres,mysql}/review_drawing_profile_repository.go` + hợp đồng `RunReviewProfileContract` (khoá lạc quan, hai writer tạo đồng thời chỉ một thắng, tách lớp tenant/project, cô lập tenant) PASS trên Postgres 16 và MySQL 8 thật; `usecase/review_drawing_profile.go` (`Get/Save/Reset/Resolve`, lớp lưu không còn hợp lệ bị bỏ qua có log chứ không làm hỏng việc vẽ); RPC `Get/Save/ResetReviewDrawingProfile` (đọc: người đã xác thực; ghi: nhóm `admin`); audit `request.review.profile.save` chỉ chứa digest cũ/mới (test). Đã nối `Resolve` vào `Draw runner` và vào việc đánh dấu trạng thái hình khi đọc review.
   Kết quả (2026-10-20): `ResolvedProfile.PresetDigest` theo mục; test: đổi `flow` chỉ vẽ lại luồng, quay lại hồ sơ cũ miễn phí (hình `superseded` được đặt lại), tắt một mục thì không vẽ và không tính; lưu hồ sơ không gọi agent.
   Trạng thái (2026-10-20): chưa làm: CLI đi qua kênh gateway `request.review.profile.*` (xem Phase 5, BE-OR-T501), nên làm sau khi có kênh.
-
+  Kết quả (2026-10-20): `backend-go/cmd/orca-cli/internal/command/review_profile_cmd.go` (`orca review profile show|set|reset`, `--project` để chọn lớp dự án, bỏ trống là lớp tenant; `set` nhận `--spec` hoặc `--file` ("-" là stdin), kiểm JSON trước khi gọi; phiên bản lớp được đọc trước như `engine set`, `--expected-version` thắng) qua đường REST mới của gateway `/v1/projects/{id}/review-drawing-profile` và `/v1/review-drawing-profile`. 3 test với gateway giả: đúng đường dẫn, phiên bản gửi đi, spec là đối tượng JSON, đầu vào sai bị từ chối trước mọi lời gọi. PASS: `go test ./cmd/orca-cli/...`. Kết quả khớp RPC được kiểm ở tầng gateway (test REST→kênh→RPC).
 ## Quyết định và duyệt (CR-OR-022 backend)
 
 - [x] **BE-OR-T420** Migration `outcome_review_decisions`; repository hai dialect; một dòng hiệu lực mỗi `(review, item_key)`, lịch sử giữ.
@@ -53,4 +53,4 @@
 ## Hoàn tất
 
 - [~] **BE-OR-T499** Bộ kiểm chung + `-race` + hai dialect; ghi kết quả.
-  Trạng thái (2026-10-20): `go vet` sạch; `go test -race` PASS toàn bộ request-service; tích hợp Postgres 16 và MySQL 8 thật PASS (hợp đồng review/run/quyết định/hồ sơ/hình/ngữ cảnh, RLS, ẩn danh, lược đồ cột). Riêng `TestTwoRelaysConcurrentlyNoLoss` (relay outbox) fail chập chờn ở cả hai dialect với lỗi `nats: no servers available for connection`, tức máy chủ NATS nhúng của test không lên kịp; nó không dùng code của phần này và đã PASS ở các lần chạy khác, nên ghi nhận là test hạ tầng chập chờn có sẵn. T413 (CLI) chờ kênh gateway ở Phase 5.
+  Trạng thái (2026-10-20): `go vet` sạch; `go test -race` PASS toàn bộ request-service; tích hợp Postgres 16 và MySQL 8 thật PASS (hợp đồng review/run/quyết định/hồ sơ/hình/ngữ cảnh, RLS, ẩn danh, lược đồ cột). Riêng `TestTwoRelaysConcurrentlyNoLoss` (relay outbox) fail chập chờn ở cả hai dialect với lỗi `nats: no servers available for connection`, tức máy chủ NATS nhúng của test không lên kịp; nó không dùng code của phần này và đã PASS ở các lần chạy khác, nên ghi nhận là test hạ tầng chập chờn có sẵn. T413 (CLI) đã xong cùng Phase 5.

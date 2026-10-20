@@ -105,6 +105,8 @@ type contextPlan struct {
 	conn          AnalysisConnection
 	profile       domain.DevServerCapability
 	allowCodeOnly bool
+	// stats is what the agent reported over the whole run, kept so the end of the run can report tokens.
+	stats domain.RunStats
 }
 
 // contextCachePayload is a checked result as it is kept: the design digest it was made with travels along so applying it
@@ -175,6 +177,7 @@ func (r *ReviewContextRunner) Start(ctx context.Context, in StartContextInput) (
 		return res, err
 	}
 	res.Run = &run
+	r.Service.Events.runProgress(ctx, run, run.Status, "")
 	r.audit(ctx, plan, run)
 	detached := tenant.Detach(ctx)
 	spawn := r.Spawn
@@ -195,6 +198,9 @@ func (r *ReviewContextRunner) startRun(ctx context.Context, p *contextPlan) (Rev
 
 // startReviewRun takes the slot of a kind of run and ends a run that outlived maxAge, which only a restart can cause.
 func startReviewRun(ctx context.Context, runs OutcomeReviewRunRepository, in ReviewRun, now time.Time, maxAge time.Duration, log *slog.Logger) (ReviewRun, error) {
+	if in.CostEstimate == "" {
+		in.CostEstimate = predictedCost(ctx, runs, in.ReviewID, in.Kind)
+	}
 	run, err := runs.Start(ctx, in)
 	if err == nil || domainCode(err) != domain.CodeReviewRunInProgress {
 		return run, err
@@ -280,12 +286,16 @@ func (r *ReviewContextRunner) applyCached(ctx context.Context, p *contextPlan, c
 	}
 	p.digest = digest
 	rec, ok, err := r.Contexts.Get(ctx, p.req.ID, ReviewContextResult, digest, r.now())
-	if err != nil || !ok {
+	if err != nil {
 		return ReviewView{}, false, err
 	}
 	var payload contextCachePayload
-	if json.Unmarshal(rec.Payload, &payload) != nil {
-		return ReviewView{}, false, nil // an unreadable record is a miss, and the next run replaces it
+	if ok && json.Unmarshal(rec.Payload, &payload) != nil {
+		ok = false // an unreadable record is a miss, and the next run replaces it
+	}
+	reviewObserverOf(r.Observer).ReviewContextLookup(ok)
+	if !ok {
+		return ReviewView{}, false, nil
 	}
 	if p.stored.ContextDigest == digest {
 		view, derr := decodeReview(p.stored)
@@ -299,6 +309,7 @@ func (r *ReviewContextRunner) applyCached(ctx context.Context, p *contextPlan, c
 }
 
 func (r *ReviewContextRunner) audit(ctx context.Context, p *contextPlan, run ReviewRun) {
+	logReviewAudit(ctx, r.logger(), domain.AuditReviewContext, p.req.ID, p.stored.ID, p.stored.InputsDigest)
 	if r.Service.Audit == nil {
 		return
 	}
@@ -317,7 +328,9 @@ func (r *ReviewContextRunner) execute(ctx context.Context, p *contextPlan, run R
 		if err := r.Runs.Finish(ctx, run.ID, status, code, cost); err != nil {
 			r.logger().ErrorContext(ctx, "outcome review: could not end the run", slog.String("run_id", run.ID), slog.Any("error", err))
 		}
+		r.Service.Events.runFinished(ctx, run, status, code)
 		observerOrNoop(r.Observer).RunFinished("review", string(ReviewRunContext), string(status))
+		observeRunEnd(reviewObserverOf(r.Observer), run, status, r.now(), p.stats.Usage, cost)
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -386,6 +399,7 @@ func (r *ReviewContextRunner) drawAfter(ctx context.Context, requestID string, i
 func (r *ReviewContextRunner) runAgent(ctx context.Context, p *contextPlan) (domain.ValidatedContext, string, string, string) {
 	projectName, repoURL := projectFacts(ctx, r.Projects, p.req.ProjectID)
 	var stats domain.RunStats
+	defer func() { p.stats = stats }()
 	useKnowledge := p.useKnowledge
 	var violations []string
 	for attempt := 0; attempt < 2; attempt++ {

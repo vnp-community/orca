@@ -417,3 +417,160 @@ func (f *fakeRequestClient) Cancel(ctx context.Context, in *requestv1.ApprovalSe
 	}
 	return &requestv1.ApprovalServiceCancelResponse{Approval: fakeApprovalMsg()}, nil
 }
+
+// The Outcome Review RPCs. They answer what the channel tests below need and record the request like every other RPC.
+
+func (f *fakeRequestClient) EstimateOutcomeReview(ctx context.Context, in *requestv1.EstimateOutcomeReviewRequest, _ ...grpc.CallOption) (*requestv1.EstimateOutcomeReviewResponse, error) {
+	f.rec(ctx, "EstimateOutcomeReview", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := &requestv1.EstimateOutcomeReviewResponse{Phase: "design", ReviewExists: true, ReviewId: "rv1", CurrentInputsDigest: "d1", ContextRunnable: true}
+	if in.GetScope() != "" {
+		out.Regeneration = &requestv1.RegenerationEstimate{AgentRuns: 2, DiagramsToDraw: 3, CostKnown: true, CostUsd: 0.52, ConfirmRequired: true}
+	}
+	return out, nil
+}
+
+func (f *fakeRequestClient) GenerateOutcomeReview(ctx context.Context, in *requestv1.GenerateOutcomeReviewRequest, _ ...grpc.CallOption) (*requestv1.GenerateOutcomeReviewResponse, error) {
+	f.rec(ctx, "GenerateOutcomeReview", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GenerateOutcomeReviewResponse{
+		Review:  &requestv1.OutcomeReview{ReviewId: "rv1", RequestId: in.GetRequestId(), Phase: "design", State: "ready", ModelJson: `{"schemaVersion":1,"items":[]}`, Version: 1},
+		Created: true, Run: &requestv1.OutcomeReviewRun{RunId: "run1", Kind: "context", Status: "running"}, DrawingsPending: 2,
+	}, nil
+}
+
+func (f *fakeRequestClient) GetOutcomeReview(ctx context.Context, in *requestv1.GetOutcomeReviewRequest, _ ...grpc.CallOption) (*requestv1.GetOutcomeReviewResponse, error) {
+	f.rec(ctx, "GetOutcomeReview", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.empty {
+		return &requestv1.GetOutcomeReviewResponse{}, nil
+	}
+	return &requestv1.GetOutcomeReviewResponse{Found: true, Review: &requestv1.OutcomeReview{ReviewId: "rv1", ModelJson: `not json`, ApprovedBy: "u1"}}, nil
+}
+
+func (f *fakeRequestClient) ListOutcomeReviews(ctx context.Context, in *requestv1.ListOutcomeReviewsRequest, _ ...grpc.CallOption) (*requestv1.ListOutcomeReviewsResponse, error) {
+	f.rec(ctx, "ListOutcomeReviews", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.ListOutcomeReviewsResponse{Reviews: []*requestv1.OutcomeReview{{ReviewId: "rv1", ModelJson: `{}`}}, NextPageToken: "rv1"}, nil
+}
+
+func (f *fakeRequestClient) ListOutcomeReviewRuns(ctx context.Context, in *requestv1.ListOutcomeReviewRunsRequest, _ ...grpc.CallOption) (*requestv1.ListOutcomeReviewRunsResponse, error) {
+	f.rec(ctx, "ListOutcomeReviewRuns", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.ListOutcomeReviewRunsResponse{Runs: []*requestv1.OutcomeReviewRun{{RunId: "run1", Kind: "draw", Status: "succeeded", CostActual: "0.1000 USD"}}}, nil
+}
+
+func (f *fakeRequestClient) GetReviewArtifact(ctx context.Context, in *requestv1.GetReviewArtifactRequest, _ ...grpc.CallOption) (*requestv1.GetReviewArtifactResponse, error) {
+	f.rec(ctx, "GetReviewArtifact", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := &requestv1.GetReviewArtifactResponse{Artifact: &requestv1.ReviewArtifactMeta{ArtifactId: in.GetArtifactId(), Section: "flow", Variant: "design", Revision: 2, BlobDigest: "bd", ViewBox: "0 0 800 400"}}
+	if in.GetIfDigest() == "bd" {
+		out.NotModified = true
+		return out, nil
+	}
+	out.MediaType, out.Content = "text/html", "<svg></svg>"
+	return out, nil
+}
+
+func (f *fakeRequestClient) ListReviewArtifactRevisions(ctx context.Context, in *requestv1.ListReviewArtifactRevisionsRequest, _ ...grpc.CallOption) (*requestv1.ListReviewArtifactRevisionsResponse, error) {
+	f.rec(ctx, "ListReviewArtifactRevisions", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.ListReviewArtifactRevisionsResponse{Revisions: []*requestv1.ReviewArtifactMeta{{ArtifactId: "a2", Revision: 2, State: "active"}, {ArtifactId: "a1", Revision: 1, State: "superseded"}}}, nil
+}
+
+func (f *fakeRequestClient) RegenerateReviewArtifacts(ctx context.Context, in *requestv1.RegenerateReviewArtifactsRequest, _ ...grpc.CallOption) (*requestv1.RegenerateReviewArtifactsResponse, error) {
+	f.rec(ctx, "RegenerateReviewArtifacts", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.RegenerateReviewArtifactsResponse{DrawRun: &requestv1.OutcomeReviewRun{RunId: "run2", Kind: "draw", Status: "running"}, Replayed: in.GetClientRequestId() == "again"}, nil
+}
+
+func (f *fakeRequestClient) RestoreReviewArtifactRevision(ctx context.Context, in *requestv1.RestoreReviewArtifactRevisionRequest, _ ...grpc.CallOption) (*requestv1.RestoreReviewArtifactRevisionResponse, error) {
+	f.rec(ctx, "RestoreReviewArtifactRevision", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.RestoreReviewArtifactRevisionResponse{Artifact: &requestv1.ReviewArtifactMeta{ArtifactId: in.GetArtifactId(), State: "active"}, HasDiff: true, Diff: &requestv1.ModelDiff{AddedNodes: []string{"n"}}}, nil
+}
+
+func (f *fakeRequestClient) CompareReviewArtifactRevisions(ctx context.Context, in *requestv1.CompareReviewArtifactRevisionsRequest, _ ...grpc.CallOption) (*requestv1.CompareReviewArtifactRevisionsResponse, error) {
+	f.rec(ctx, "CompareReviewArtifactRevisions", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.CompareReviewArtifactRevisionsResponse{Diff: &requestv1.ModelDiff{}}, nil
+}
+
+func (f *fakeRequestClient) DecideOutcomeReviewItem(ctx context.Context, in *requestv1.DecideOutcomeReviewItemRequest, _ ...grpc.CallOption) (*requestv1.DecideOutcomeReviewItemResponse, error) {
+	f.rec(ctx, "DecideOutcomeReviewItem", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.DecideOutcomeReviewItemResponse{Decision: &requestv1.OutcomeReviewDecision{DecisionId: "d1", ItemKey: in.GetItemKey(), Decision: in.GetDecision(), Active: true}, ReviewVersion: in.GetExpectedVersion() + 1, ReviewState: "ready", OpenDecisions: 1}, nil
+}
+
+func (f *fakeRequestClient) ApproveOutcomeReview(ctx context.Context, in *requestv1.ApproveOutcomeReviewRequest, _ ...grpc.CallOption) (*requestv1.ApproveOutcomeReviewResponse, error) {
+	f.rec(ctx, "ApproveOutcomeReview", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.ApproveOutcomeReviewResponse{Review: &requestv1.OutcomeReview{ReviewId: in.GetReviewId(), State: "approved", ModelJson: `{}`, ApprovedBy: "u1", ApprovalNote: in.GetNote()}}, nil
+}
+
+func (f *fakeRequestClient) ListOutcomeReviewDecisions(ctx context.Context, in *requestv1.ListOutcomeReviewDecisionsRequest, _ ...grpc.CallOption) (*requestv1.ListOutcomeReviewDecisionsResponse, error) {
+	f.rec(ctx, "ListOutcomeReviewDecisions", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.ListOutcomeReviewDecisionsResponse{Decisions: []*requestv1.OutcomeReviewDecision{{DecisionId: "d1", ItemKey: "k", Decision: "send_back", Active: true, Orphaned: true}}, OpenDecisions: 2}, nil
+}
+
+func (f *fakeRequestClient) LinkOutcomeReviewChild(ctx context.Context, in *requestv1.LinkOutcomeReviewChildRequest, _ ...grpc.CallOption) (*requestv1.LinkOutcomeReviewChildResponse, error) {
+	f.rec(ctx, "LinkOutcomeReviewChild", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.LinkOutcomeReviewChildResponse{Linked: int32(len(in.GetItemKeys()))}, nil
+}
+
+func (f *fakeRequestClient) GetReviewDrawingProfile(ctx context.Context, in *requestv1.GetReviewDrawingProfileRequest, _ ...grpc.CallOption) (*requestv1.GetReviewDrawingProfileResponse, error) {
+	f.rec(ctx, "GetReviewDrawingProfile", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetReviewDrawingProfileResponse{
+		HasProjectLayer: in.GetProjectId() != "", ProjectLayer: &requestv1.ReviewDrawingProfileLayer{ProjectId: in.GetProjectId(), SpecJson: `{"schema":"review-drawing-profile/1"}`, Version: 3},
+		EffectiveJson: `{"style":{"detail":"balanced"}}`, Sources: map[string]string{"style.detail": "project"},
+	}, nil
+}
+
+func (f *fakeRequestClient) SaveReviewDrawingProfile(ctx context.Context, in *requestv1.SaveReviewDrawingProfileRequest, _ ...grpc.CallOption) (*requestv1.SaveReviewDrawingProfileResponse, error) {
+	f.rec(ctx, "SaveReviewDrawingProfile", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.SaveReviewDrawingProfileResponse{Layer: &requestv1.ReviewDrawingProfileLayer{ProjectId: in.GetProjectId(), SpecJson: in.GetSpecJson(), Version: in.GetExpectedVersion() + 1}}, nil
+}
+
+func (f *fakeRequestClient) ResetReviewDrawingProfile(ctx context.Context, in *requestv1.ResetReviewDrawingProfileRequest, _ ...grpc.CallOption) (*requestv1.ResetReviewDrawingProfileResponse, error) {
+	f.rec(ctx, "ResetReviewDrawingProfile", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.ResetReviewDrawingProfileResponse{}, nil
+}

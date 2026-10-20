@@ -39,6 +39,8 @@ type OutcomeReviewConfig struct {
 	RegenPerDay int
 	// ConfirmCostUSD is the estimated cost above which a regeneration needs the person to confirm. Zero means never ask.
 	ConfirmCostUSD float64
+	// DrawDisabled turns drawing off for the whole deployment (REQUEST_REVIEW_DRAW_ENABLED=false): the review is text and tables only.
+	DrawDisabled bool
 }
 
 const (
@@ -102,7 +104,7 @@ func (c OutcomeReviewConfig) ContextMaxFilesOrDefault() int {
 	return DefaultReviewContextMaxFiles
 }
 
-// OutcomeReviewConfigFromEnv reads REQUEST_DEFAULT_OUTCOME_REVIEW (off|manual) and REQUEST_REVIEW_KILL_SWITCH (true|false).
+// OutcomeReviewConfigFromEnv reads REQUEST_DEFAULT_OUTCOME_REVIEW (off|manual), REQUEST_REVIEW_KILL_SWITCH and REQUEST_REVIEW_DRAW_ENABLED (true|false).
 // An unreadable value keeps the safe answer (off, no kill) and says so.
 func OutcomeReviewConfigFromEnv(getenv func(string) string) (OutcomeReviewConfig, []string) {
 	c, warnings := OutcomeReviewConfig{Default: OutcomeReviewOff}, []string(nil)
@@ -120,6 +122,14 @@ func OutcomeReviewConfigFromEnv(getenv func(string) string) (OutcomeReviewConfig
 	case "false", "0", "no", "off":
 	default:
 		warnings = append(warnings, "REQUEST_REVIEW_KILL_SWITCH "+strconv.Quote(raw)+" is not true or false; the switch stays off")
+	}
+	switch raw := strings.ToLower(strings.TrimSpace(getenv("REQUEST_REVIEW_DRAW_ENABLED"))); raw {
+	case "":
+	case "true", "1", "yes", "on":
+	case "false", "0", "no", "off":
+		c.DrawDisabled = true
+	default:
+		warnings = append(warnings, "REQUEST_REVIEW_DRAW_ENABLED "+strconv.Quote(raw)+" is not true or false; drawing stays on")
 	}
 	if d, ok, w := envDuration(getenv, "REQUEST_REVIEW_CONTEXT_TTL", time.Hour, 90*24*time.Hour); w != "" {
 		warnings = append(warnings, w)

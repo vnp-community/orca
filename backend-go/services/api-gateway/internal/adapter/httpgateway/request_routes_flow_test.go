@@ -34,6 +34,30 @@ type fakeFlowClient struct {
 	cleanups   []*requestv1.CleanupRequestProposalRequest
 	engineGets []*requestv1.GetProjectEngineSettingsRequest
 	engineSets []*requestv1.SetProjectEngineSettingsRequest
+	profGets   []*requestv1.GetReviewDrawingProfileRequest
+	profSaves  []*requestv1.SaveReviewDrawingProfileRequest
+	profResets []*requestv1.ResetReviewDrawingProfileRequest
+}
+
+func (f *fakeFlowClient) GetReviewDrawingProfile(_ context.Context, in *requestv1.GetReviewDrawingProfileRequest, _ ...grpc.CallOption) (*requestv1.GetReviewDrawingProfileResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.profGets = append(f.profGets, in)
+	return &requestv1.GetReviewDrawingProfileResponse{EffectiveJson: `{"style":{"detail":"balanced"}}`, Sources: map[string]string{"style.detail": "default"}}, nil
+}
+
+func (f *fakeFlowClient) SaveReviewDrawingProfile(_ context.Context, in *requestv1.SaveReviewDrawingProfileRequest, _ ...grpc.CallOption) (*requestv1.SaveReviewDrawingProfileResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.profSaves = append(f.profSaves, in)
+	return &requestv1.SaveReviewDrawingProfileResponse{Layer: &requestv1.ReviewDrawingProfileLayer{ProjectId: in.GetProjectId(), SpecJson: in.GetSpecJson(), Version: in.GetExpectedVersion() + 1}}, nil
+}
+
+func (f *fakeFlowClient) ResetReviewDrawingProfile(_ context.Context, in *requestv1.ResetReviewDrawingProfileRequest, _ ...grpc.CallOption) (*requestv1.ResetReviewDrawingProfileResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.profResets = append(f.profResets, in)
+	return &requestv1.ResetReviewDrawingProfileResponse{}, nil
 }
 
 func (f *fakeFlowClient) CleanupRequestProposal(_ context.Context, in *requestv1.CleanupRequestProposalRequest, _ ...grpc.CallOption) (*requestv1.CleanupRequestProposalResponse, error) {
@@ -325,6 +349,43 @@ func TestRequestFlowRoutes_ProposalCleanupPostsTheRequestId(t *testing.T) {
 		t.Fatalf("a body must not redirect the cleanup to another Request: %+v", f.cleanups)
 	}
 	if rec := doRequestRoute(r, http.MethodPost, "/v1/requests/r1/proposal/cleanup", "", nil); rec.Code != http.StatusUnauthorized || len(f.cleanups) != 1 {
+		t.Fatalf("anonymous: %d", rec.Code)
+	}
+}
+
+func TestReviewProfileRoutes_ProjectAndTenantLayersAndOnlyAnAdminWrites(t *testing.T) {
+	f := &fakeFlowClient{}
+	r := flowRouter(f)
+	admin := *routesIdentity
+	admin.Role = "admin"
+
+	if rec := doRequestRoute(r, http.MethodGet, "/v1/projects/p1/review-drawing-profile", "", routesIdentity); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"detail":"balanced"`) {
+		t.Fatalf("project read: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doRequestRoute(r, http.MethodGet, "/v1/review-drawing-profile?projectId=OTHER", "", routesIdentity); rec.Code != http.StatusOK {
+		t.Fatalf("tenant read: %d %s", rec.Code, rec.Body.String())
+	}
+	if len(f.profGets) != 2 || f.profGets[0].GetProjectId() != "p1" || f.profGets[1].GetProjectId() != "" {
+		t.Fatalf("the URL decides the layer, a query cannot move the tenant route to a project: %+v", f.profGets)
+	}
+
+	body := `{"projectId":"OTHER","spec":{"schema":"review-drawing-profile/1"},"expectedVersion":2}`
+	if rec := doRequestRoute(r, http.MethodPut, "/v1/projects/p1/review-drawing-profile", body, routesIdentity); rec.Code != http.StatusForbidden || len(f.profSaves) != 0 {
+		t.Fatalf("member save: %d saves=%d %s", rec.Code, len(f.profSaves), rec.Body.String())
+	}
+	if rec := doRequestRoute(r, http.MethodPut, "/v1/projects/p1/review-drawing-profile", body, &admin); rec.Code != http.StatusOK || len(f.profSaves) != 1 {
+		t.Fatalf("admin save: %d %s", rec.Code, rec.Body.String())
+	}
+	if in := f.profSaves[0]; in.GetProjectId() != "p1" || in.GetExpectedVersion() != 2 || !strings.Contains(in.GetSpecJson(), "review-drawing-profile/1") {
+		t.Fatalf("a body must not redirect the route to another project: %+v", in)
+	}
+	if rec := doRequestRoute(r, http.MethodPut, "/v1/review-drawing-profile", body, &admin); rec.Code != http.StatusOK || f.profSaves[1].GetProjectId() != "" {
+		t.Fatalf("tenant save: %d %+v", rec.Code, f.profSaves)
+	}
+	if rec := doRequestRoute(r, http.MethodPost, "/v1/projects/p1/review-drawing-profile/reset", `{"expectedVersion":3}`, &admin); rec.Code != http.StatusOK || len(f.profResets) != 1 || f.profResets[0].GetProjectId() != "p1" {
+		t.Fatalf("reset: %d %+v", rec.Code, f.profResets)
+	}
+	if rec := doRequestRoute(r, http.MethodGet, "/v1/projects/p1/review-drawing-profile", "", nil); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("anonymous: %d", rec.Code)
 	}
 }

@@ -34,6 +34,10 @@ func (s *Server) outcomeReviewWired() error {
 	if s.outcomeReview.Service == nil {
 		return status.Error(codes.Unimplemented, "the outcome review is not wired")
 	}
+	// The kill switch closes every review RPC, reads included; nothing is deleted, so turning it off brings the reviews back.
+	if s.outcomeReview.Service.Config.KillSwitch {
+		return apperrors.ToGRPCStatus(domain.ErrReviewDisabled())
+	}
 	return nil
 }
 
@@ -165,11 +169,16 @@ func (s *Server) ListOutcomeReviews(ctx context.Context, req *requestv1.ListOutc
 }
 
 func toProtoOutcomeReview(st usecase.StoredReview) *requestv1.OutcomeReview {
-	return &requestv1.OutcomeReview{
+	out := &requestv1.OutcomeReview{
 		ReviewId: st.ID, RequestId: st.RequestID, Phase: string(st.Phase), State: string(st.State), HeadKey: st.HeadKey,
 		ModelJson: string(st.Model), KgSnapshot: st.KGSnapshot, Version: st.Version,
 		CreatedAt: timestamppb.New(st.CreatedAt), UpdatedAt: timestamppb.New(st.UpdatedAt),
+		ApprovedBy: st.ApprovedBy, ApprovalNote: st.ApprovalNote,
 	}
+	if st.ApprovedAt != nil {
+		out.ApprovedAt = timestamppb.New(*st.ApprovedAt)
+	}
+	return out
 }
 
 func (s *Server) ListOutcomeReviewRuns(ctx context.Context, req *requestv1.ListOutcomeReviewRunsRequest) (*requestv1.ListOutcomeReviewRunsResponse, error) {

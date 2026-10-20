@@ -102,6 +102,7 @@ func (d *ReviewDecider) Decide(ctx context.Context, in DecideInput) (DecideResul
 	if err != nil {
 		return DecideResult{}, err
 	}
+	d.Service.Events.Publish(ctx, domain.SubjectReviewDecided, ReviewEventPayload{RequestID: st.RequestID, ReviewID: st.ID, Phase: string(st.Phase), Decision: string(in.Decision), ActorID: in.DecidedBy})
 	d.audit(ctx, domain.AuditReviewDecide, st, map[string]any{"item_key": in.ItemKey, "decision": string(in.Decision), "has_note": strings.TrimSpace(in.Note) != ""})
 	return DecideResult{Decision: rec, Review: bumped, Open: len(domain.OpenDecisions(review, inForce))}, nil
 }
@@ -149,6 +150,7 @@ func (d *ReviewDecider) Approve(ctx context.Context, in ApproveInput) (StoredRev
 	if err != nil {
 		return StoredReview{}, err
 	}
+	d.Service.Events.Publish(ctx, domain.SubjectReviewDecided, ReviewEventPayload{RequestID: st.RequestID, ReviewID: st.ID, Phase: string(st.Phase), ActorID: in.ApprovedBy, Approved: true})
 	d.audit(ctx, domain.AuditReviewApprove, st, map[string]any{"has_note": note != "", "inputs_digest": st.InputsDigest})
 	return approved, nil
 }
@@ -213,6 +215,7 @@ func (d *ReviewDecider) LinkChild(ctx context.Context, requestID, reviewID strin
 }
 
 func (d *ReviewDecider) audit(ctx context.Context, action string, st StoredReview, meta map[string]any) {
+	logReviewAudit(ctx, d.Service.logger(), action, st.RequestID, st.ID, st.InputsDigest)
 	if d.Service.Audit == nil {
 		return
 	}

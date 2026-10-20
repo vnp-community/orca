@@ -27,6 +27,7 @@ Docker thật; "chỉ có mã" nghĩa là handler đã nối và có test đơn 
 | Quyết định (Decision), artifact, tuyên bố nguồn (provenance), kiểm tra bao phủ AC | có | gián tiếp (Solution của `AIS-02`/`PLN-08` qua kiểm tra bao phủ) | |
 | Impact, rủi ro (`AcceptRisk`, `GetRiskPolicy`), kiểm tra readiness (`CheckReadiness`, `GetReadinessReport`), nguồn ngữ cảnh (`ListContextSources`...), evidence, `ExportTenantRequests`, `AiBudgetAdminService` | **chưa có**: không có handler, trả `Unimplemented` | không | CR tương ứng chưa làm |
 | Cờ theo project: engine `openspec` cho Plan và Solution bằng agent có tri thức (`GetProjectEngineSettings`, `SetProjectEngineSettings`; `orca engine show|set`) | có, mặc định tắt; chỉ admin đổi; kiểm dev server (`--check`) không chặn việc lưu | **chưa** (chưa chạy qua stack Docker) | [knowledge-hub-setup.md](knowledge-hub-setup.md) |
+| Outcome Review (`GenerateOutcomeReview`, `GetOutcomeReview`, quyết định, duyệt, sinh lại hình, hồ sơ vẽ; kênh `request.review.*`; `orca engine set --outcome-review`) | có, mặc định tắt; admin bật theo project; agent MCP chỉ đọc | bộ `outcome_review` (`ORV-01..09`, `ORV-20` tốn tiền) **chưa chạy trên stack**, xem hướng dẫn | [outcome-review-setup.md](outcome-review-setup.md) |
 
 AI khi không dùng được trả mã có cấu trúc (`REQUEST_AI_NOT_CONFIGURED`, `REQUEST_AI_AGENT_UNAVAILABLE`, `REQUEST_AI_SESSION_EXPIRED`,
 `REQUEST_AI_QUOTA_EXHAUSTED`, `REQUEST_AI_BUSY`); Request đứng yên ở trạng thái hiện tại (`AIS-01`, `AIS-03`).
