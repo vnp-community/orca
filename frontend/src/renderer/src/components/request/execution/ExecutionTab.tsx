@@ -23,7 +23,9 @@ import { ExecutionSummaryStrip } from './ExecutionSummaryStrip'
 import { ExecutionTaskSheet, useExecutionTaskSheet } from './ExecutionTaskSheet'
 import { HandoverRow } from './HandoverRow'
 import { buildExecutionSteps } from './execution-step-model'
+import { runModeLabelOf } from './execution-run-mode-model'
 import { listPlanWorkTasks } from '../plan/plan-approval-model'
+import type { RequestFlowView } from '../../../../../shared/request-execution-types'
 import type { UseExecutionSummaryResult } from '../../../hooks/useExecutionSummary'
 import type { OrcaRequest, RequestStatus } from '../../../../../shared/request-types'
 
@@ -42,6 +44,8 @@ const NOT_STARTED: ReadonlySet<RequestStatus> = new Set([
 
 export type ExecutionTabProps = {
   request: OrcaRequest
+  /** The flow of the request's type; its phases decide whether "asks before each step" is worth saying. */
+  flow?: RequestFlowView | null
   execution: UseExecutionSummaryResult
   busy: boolean
   /** Call after any mutation so the pane refetches the request. */
@@ -55,6 +59,7 @@ export type ExecutionTabProps = {
 
 export function ExecutionTab({
   request,
+  flow = null,
   execution,
   busy,
   onChanged,
@@ -144,6 +149,7 @@ export function ExecutionTab({
               status={request.status}
               summary={summary}
               onStop={request.status === 'executing' ? onStop : undefined}
+              runMode={runModeLabelOf(summary.executionMode, flow?.hasPhases)}
             />
           )}
           {tree && (

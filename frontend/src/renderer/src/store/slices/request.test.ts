@@ -4,7 +4,13 @@
 
 import { describe, it, expect } from 'vitest'
 import { createStore } from 'zustand'
-import { createRequestSlice, supportsBaseRef } from './request'
+import {
+  createRequestSlice,
+  supportsApproveRunAll,
+  supportsBaseRef,
+  supportsPlanAuto,
+  supportsPlanRevisions
+} from './request'
 import type { RequestSlice } from './request'
 import type { OrcaRequest } from '../../../../shared/request-types'
 
@@ -124,6 +130,33 @@ describe('RequestSlice — defaults', () => {
     expect(supportsBaseRef(store.getState())).toBe(true)
     store.getState().setRequestFlowFeatures([])
     expect(supportsBaseRef(store.getState())).toBe(false)
+  })
+
+  it('reports approval.runAll only when the gateway lists it', () => {
+    const store = makeStore()
+    expect(supportsApproveRunAll(store.getState())).toBe(false)
+    store.getState().setRequestFlowFeatures(['request.baseRef'])
+    expect(supportsApproveRunAll(store.getState())).toBe(false)
+    store.getState().setRequestFlowFeatures(['request.baseRef', 'approval.runAll'])
+    expect(supportsApproveRunAll(store.getState())).toBe(true)
+  })
+
+  it('reports request.planAuto only when the gateway lists it', () => {
+    const store = makeStore()
+    expect(supportsPlanAuto(store.getState())).toBe(false)
+    store.getState().setRequestFlowFeatures(['request.baseRef', 'approval.runAll'])
+    expect(supportsPlanAuto(store.getState())).toBe(false)
+    store.getState().setRequestFlowFeatures(['request.baseRef', 'request.planAuto'])
+    expect(supportsPlanAuto(store.getState())).toBe(true)
+  })
+
+  it('reports request.planRevisions only when the gateway lists it', () => {
+    const store = makeStore()
+    expect(supportsPlanRevisions(store.getState())).toBe(false)
+    store.getState().setRequestFlowFeatures(['request.baseRef', 'request.planAuto'])
+    expect(supportsPlanRevisions(store.getState())).toBe(false)
+    store.getState().setRequestFlowFeatures(['request.planRevisions'])
+    expect(supportsPlanRevisions(store.getState())).toBe(true)
   })
 
   it('starts with empty requestsById', () => {

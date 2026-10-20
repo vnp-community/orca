@@ -17,9 +17,15 @@ import { RequestAiSetupBanner } from '../RequestAiSetupBanner'
 import type { AiSetupCode } from '../request-ai-setup'
 import { requestErrorMessage } from '../request-error-message'
 import { RequestUnsupportedNotice } from '../RequestUnsupportedNotice'
+import { PlanAutoSkippedNote } from './PlanAutoSkippedNote'
+import { PlanAutoWriting } from './PlanAutoWriting'
+import { PlanRunFailedCard } from './PlanRunFailedCard'
+import type { PlanAutoDisplay } from './plan-auto-display'
 import type { PlanViewState } from './plan-view-state'
 
 const P = 'auto.components.request.plan.PlanStates.'
+
+const NO_AUTO_DISPLAY: PlanAutoDisplay = { kind: 'none' }
 
 type Props = {
   state: Exclude<PlanViewState, 'ready'>
@@ -31,8 +37,16 @@ type Props = {
   generateError?: string | null
   /** Set when the last generate attempt failed because the dev server's AI cannot run. */
   generateAiCode?: AiSetupCode | null
+  /** Backend code of that failure, to tell it apart from the one the failed-run card already shows. */
+  generateErrorCode?: string | null
   onGenerate: () => void
   onRetry: () => void
+  /** What the server is doing about the Plan (CR-REQ-044); absent means nothing to say. */
+  autoDisplay?: PlanAutoDisplay
+  /** Retry of a failed Plan run; separate from `onRetry`, which reloads the tab. */
+  onRetryRun?: () => void
+  retryingRun?: boolean
+  retryRunError?: string | null
   /** RequestRpcErrorKind of a failed load. */
   loadErrorKind?: string | null
 }
@@ -44,8 +58,13 @@ export function PlanStates({
   generating,
   generateError,
   generateAiCode,
+  generateErrorCode,
   onGenerate,
   onRetry,
+  autoDisplay = NO_AUTO_DISPLAY,
+  onRetryRun,
+  retryingRun = false,
+  retryRunError,
   loadErrorKind
 }: Props): React.JSX.Element {
   const aiCooldown = useRequestCooldown('ai')
@@ -53,9 +72,13 @@ export function PlanStates({
     return <RequestUnsupportedNotice />
   }
 
-  const generateButton = canGenerate && (
+  const writing = autoDisplay.kind === 'writing'
+  const failed = autoDisplay.kind === 'failed'
+  // Why: while Orca writes the Plan a second Generate would only compete with the run; after a failure it is the way around Retry.
+  const generateButton = canGenerate && !writing && (
     <Button
       size="sm"
+      variant={failed ? 'ghost' : 'default'}
       disabled={generating || aiCooldown.coolingDown}
       onClick={onGenerate}
       data-testid="plan-generate"
@@ -65,10 +88,18 @@ export function PlanStates({
       ) : (
         <Sparkles className="size-3.5" aria-hidden />
       )}
-      {translate(`${P}generate`, 'Generate plan')}
+      {failed
+        ? translate(
+            'auto.components.request.plan.PlanRunFailedCard.generateManually',
+            'Generate manually'
+          )
+        : translate(`${P}generate`, 'Generate plan')}
     </Button>
   )
-  const generateFailure = generateAiCode ? (
+  // Why: a failed run already shows its own card; a second message for the same failure would only confuse, but a refusal to
+  // even start (another code) still has to be seen.
+  const sameAsCard = autoDisplay.kind === 'failed' && generateErrorCode === autoDisplay.code
+  const generateFailure = sameAsCard ? null : generateAiCode ? (
     <RequestAiSetupBanner
       code={generateAiCode}
       onRetry={canGenerate ? onGenerate : undefined}
@@ -98,13 +129,36 @@ export function PlanStates({
         className="flex flex-col items-center gap-3 p-6 text-center"
         data-testid="plan-generating"
       >
-        <div className="flex w-full max-w-md flex-col gap-2" aria-busy="true">
-          <Skeleton className="h-5 w-1/2" />
-          <Skeleton className="h-14 w-full" />
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {translate(`${P}generating`, 'AI is drafting the plan...')}
-        </p>
+        {autoDisplay.kind === 'writing' && (
+          <PlanAutoWriting
+            attempt={autoDisplay.attempt}
+            maxAttempts={autoDisplay.maxAttempts}
+            waiting={autoDisplay.waiting}
+            starting={autoDisplay.starting}
+          />
+        )}
+        {autoDisplay.kind === 'failed' && (
+          <PlanRunFailedCard
+            code={autoDisplay.code}
+            onRetry={onRetryRun ?? onGenerate}
+            retrying={retryingRun}
+            retryError={retryRunError}
+          />
+        )}
+        {autoDisplay.kind === 'skipped' && (
+          <PlanAutoSkippedNote reasonCode={autoDisplay.reasonCode} />
+        )}
+        {autoDisplay.kind === 'none' && (
+          <>
+            <div className="flex w-full max-w-md flex-col gap-2" aria-busy="true">
+              <Skeleton className="h-5 w-1/2" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {translate(`${P}generating`, 'AI is drafting the plan...')}
+            </p>
+          </>
+        )}
         {generateButton}
         {generateFailure}
       </div>

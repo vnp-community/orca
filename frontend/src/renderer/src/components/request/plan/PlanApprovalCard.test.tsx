@@ -81,6 +81,17 @@ describe('PlanApprovalCard', () => {
     )
   })
 
+  it('the main button states continuous itself and there is no second button', async () => {
+    render(<Harness type="change_request" steps={7} tasks={28} />)
+    expect(screen.queryByTestId('plan-approve-run-all')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve and start execution' }))
+    await waitFor(() => expect(settled).toHaveBeenCalled())
+    expect(callRequestRpc).toHaveBeenCalledWith(
+      'approval.approve',
+      expect.objectContaining({ id: 'ap1', executionMode: 'continuous' })
+    )
+  })
+
   it('a task-list approval says "task list" (BUG-QA-06: subjectType is folded to plan, rawSubjectType keeps the kind)', () => {
     function TaskListHarness(): React.JSX.Element {
       const d = usePlanDecision({ id: 'r1' }, settled)

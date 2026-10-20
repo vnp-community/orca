@@ -5,15 +5,17 @@
  */
 
 import React from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
-import { Button } from '@/components/ui/button'
+import { useAppStore } from '../../../store'
+import { supportsApproveRunAll } from '../../../store/slices/request'
 import { ApprovalRiskGateSection, useApprovalRiskGate } from '../impact/ApprovalRiskGate'
 import { planDecisionErrorMessage } from './plan-decision-error-message'
 import { PlanDecisionButtons } from './PlanDecisionButtons'
 import { PlanUnconfirmedAssumptionsNotice } from './PlanUnconfirmedAssumptionsNotice'
+import { canOfferRunAll, runAllDialogModel } from './plan-run-all-model'
 import type { PlanDecision } from '../../../hooks/usePlanDecision'
-import type { Approval } from '../../../../../shared/request-types'
+import type { RequestFlowView } from '../../../../../shared/request-execution-types'
+import type { Approval, OrcaRequest } from '../../../../../shared/request-types'
 
 const P = 'auto.components.request.plan.PlanApprovalBar.'
 
@@ -26,6 +28,14 @@ type Props = {
   /** The continuous plan card words the decision as starting the run. */
   approveLabel?: string
   rejectLabel?: string
+  /** The continuous plan card commits to running everything: Approve states `continuous` itself. */
+  approveExecutionMode?: 'continuous'
+  /** What "Approve and run all steps" needs; omitted where the choice makes no sense (the card, the Inbox). */
+  runAll?: {
+    request: Pick<OrcaRequest, 'executionMode'>
+    flow: RequestFlowView | null
+    stepCount: number
+  }
 }
 
 export function PlanApprovalBar({
@@ -33,41 +43,38 @@ export function PlanApprovalBar({
   decision,
   approveBlockedReason = null,
   approveLabel,
-  rejectLabel
+  rejectLabel,
+  approveExecutionMode,
+  runAll
 }: Props): React.JSX.Element | null {
   const failure =
     decision.failure &&
     (decision.failure.scope === approval?.id || decision.failure.scope === 'plan')
       ? decision.failure
       : null
-  const regenerating = decision.isBusy('generatePlan')
   // Why: the wire parser folds task_list into plan; the original kind survives in rawSubjectType.
   const isTaskList =
     approval?.rawSubjectType === 'task_list' ||
     (approval?.subjectType as string | undefined) === 'task_list'
   const risk = useApprovalRiskGate(approval, failure?.error ?? null)
+  const runAllSupported = useAppStore(supportsApproveRunAll)
+  // Why: no step count means no honest "Run all N steps" question, so the choice stays hidden.
+  const offerRunAll =
+    runAll !== undefined &&
+    runAll.stepCount > 0 &&
+    canOfferRunAll({
+      request: runAll.request,
+      approval,
+      flow: runAll.flow,
+      supported: runAllSupported,
+      approverHidden: risk.approverNotAllowed,
+      alreadyPinned: decision.runAllPinned
+    })
 
   // Approved plans are read-only: changing one means regenerating, which needs a new approval.
   if (approval?.status === 'approved') {
     return null
   }
-
-  const regenerate = (
-    <Button
-      size="sm"
-      variant="outline"
-      disabled={regenerating || decision.generateCoolingDown}
-      onClick={() => void decision.regeneratePlan()}
-      data-testid="plan-regenerate"
-    >
-      {regenerating ? (
-        <Loader2 className="size-3.5 animate-spin" aria-hidden />
-      ) : (
-        <RefreshCw className="size-3.5" aria-hidden />
-      )}
-      {translate(`${P}regenerate`, 'Regenerate plan')}
-    </Button>
-  )
 
   return (
     <div
@@ -101,6 +108,12 @@ export function PlanApprovalBar({
             approveBlockedReason={approveBlockedReason ?? risk.blockedReason}
             approveExtras={risk.gate.approveExtras}
             hideApprove={risk.approverNotAllowed}
+            approveExecutionMode={approveExecutionMode}
+            runAll={
+              offerRunAll
+                ? runAllDialogModel({ stepCount: runAll.stepCount, flow: runAll.flow })
+                : undefined
+            }
             approveLabel={
               approveLabel ??
               (isTaskList
@@ -109,10 +122,8 @@ export function PlanApprovalBar({
             }
             rejectLabel={rejectLabel ?? translate(`${P}reject`, 'Reject')}
             rejectTitle={translate(`${P}rejectTitle`, 'Reject plan')}
-            offerRegenerate
           />
         )}
-        {(approval?.status === 'pending' || approval?.status === 'rejected') && regenerate}
       </div>
       {decision.isDenied(approval?.id) && !failure && (
         <p role="alert" className="text-xs text-destructive">

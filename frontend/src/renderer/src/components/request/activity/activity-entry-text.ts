@@ -113,6 +113,8 @@ export function activityTitle(entry: RequestActivityEntry): string {
     // Why: the reviewer's text is never in the line (CONTRACT C9); it is read from the version it produced.
     case 'analysis.revision_requested':
       return translate(`${T}title.analysisRevisionRequested`, 'Requested changes to the analysis')
+    case 'plan.revision_requested':
+      return translate(`${T}title.planRevisionRequested`, 'Requested changes to the plan')
     case 'clarification.asked':
       return translate(`${T}title.clarificationAsked`, 'Clarification asked')
     case 'clarification.answered':

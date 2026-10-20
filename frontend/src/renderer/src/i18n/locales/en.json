@@ -13199,6 +13199,23 @@
         },
         "CreateProjectDialog": {
           "repoAddFailed": "Project created, but its repo could not be added: {{message}}. Try again."
+        },
+        "ProjectRequestExecutionSection": {
+          "title": "Request execution",
+          "description": "Applies to requests that start running from now on. Requests already running keep their mode.",
+          "stepByStep": "Ask before each step",
+          "continuous": "Run all steps after one approval",
+          "accessNote": "Orca will start each step with the access of the person who approves the plan.",
+          "adminOnly": "Only an administrator can change this.",
+          "firstSave": "Saving also stores this project's current engine settings.",
+          "save": "Save",
+          "saving": "Saving…",
+          "saved": "Request execution updated",
+          "saveFailed": "Couldn't save the execution settings.",
+          "conflict": "Someone else changed these settings. The latest values were loaded.",
+          "loadFailed": "Couldn't load the execution settings.",
+          "noAccess": "You don't have permission to see these settings.",
+          "retry": "Retry"
         }
       },
       "request": {
@@ -13368,7 +13385,9 @@
         },
         "RequestMarkdownContent": {
           "viewFull": "View full",
-          "fullTitle": "Full content"
+          "fullTitle": "Full content",
+          "taskDone": "Done",
+          "taskOpen": "Not done"
         },
         "SolutionComparisonTable": {
           "criterion": "Criterion",
@@ -13695,7 +13714,9 @@
             "conflict": "This changed while you were reviewing it. The latest version was loaded; review it again.",
             "alreadyDecided": "This was already decided.",
             "expired": "This approval expired. The latest version was loaded.",
-            "executionNotAllowed": "You can approve plans only if you are allowed to run their execution. Ask someone who is, or request access."
+            "executionNotAllowed": "You can approve plans only if you are allowed to run their execution. Ask someone who is, or request access.",
+            "runAllAlreadyPinned": "This request already runs step by step because it was started that way before. Approve it normally.",
+            "runAllNotPossible": "Couldn't start the run this way. Approve it normally."
           },
           "PlanGateChips": {
             "plan": "Plan",
@@ -13759,6 +13780,159 @@
             "done": "Done",
             "step": "{{index}}. {{title}}",
             "taskCount": "{{count}} tasks"
+          },
+          "PlanRunAllButton": {
+            "label": "Approve and run all steps",
+            "notApplied": "This server didn't run the plan on its own. Approve each step as usual."
+          },
+          "RunAllStepsConfirmDialog": {
+            "title": "Run all {{n}} steps without asking again?",
+            "bodyStart": "Orca starts each step as soon as the previous one finishes, using your access.",
+            "bodyStops": "It stops only when the agent needs information from you, a task keeps failing (the request then goes back to the backlog), a change drifts from the plan and needs a review{{preDeploy}}. You can stop the run at any time.",
+            "preDeploy": ", or it reaches the pre-deploy approval",
+            "cancel": "Not now",
+            "confirm": "Run all steps"
+          },
+          "PlanAutoWriting": {
+            "title": "Orca is writing the plan...",
+            "starting": "Orca is starting the plan...",
+            "attempt": "Attempt {{attempt}} of {{max}}",
+            "retrying": "Trying again shortly"
+          },
+          "PlanRunFailedCard": {
+            "title": "Plan generation failed ({{code}})",
+            "retry": "Retry",
+            "generateManually": "Generate manually",
+            "hint": {
+              "timeout": "The AI took too long to answer.",
+              "interrupted": "The run was interrupted before it finished.",
+              "invalidOutput": "The AI answered in a form that is not a valid plan.",
+              "busy": "The AI is busy with other work.",
+              "commit": "The plan was written but could not be saved.",
+              "generic": "Something went wrong while writing the plan.",
+              "noChange": "The agent did not change any document. Say more precisely what to change.",
+              "baseRefGone": "The branch this request starts from no longer exists."
+            },
+            "titleRevise": "The plan could not be revised ({{code}})",
+            "tryAgain": "Try again",
+            "writeNew": "Or write a new request below."
+          },
+          "PlanAutoSkippedNote": {
+            "text": "Orca could not start the plan on its own ({{reason}}). Generate it when you are ready.",
+            "reason": {
+              "noDevServer": "no dev server is connected",
+              "noRepoPath": "the project has no repository path",
+              "engineUnavailable": "the planning engine is not available"
+            }
+          },
+          "PlanRewriteStrip": {
+            "text": "Orca is rewriting the plan..."
+          },
+          "documents": {
+            "proposal": {
+              "irreversible": "Irreversible",
+              "dependsOn": "Depends on {{tasks}}",
+              "prompt": "Agent prompt",
+              "writing": "A new version is being written...",
+              "runFailed": "The latest run failed ({{code}}), so there is no proposal to show.",
+              "none": "There is no proposal to show yet.",
+              "notSaved": "This is the latest proposal. It is not saved as the plan yet.",
+              "notes": "Notes",
+              "noTasks": "The proposal has no tasks.",
+              "phase": "Phase {{n}}: {{title}}",
+              "phaseDependsOn": "Depends on phase {{phases}}",
+              "hours": "{{hours}} h"
+            },
+            "tryAgain": "Try again",
+            "change": {
+              "added": "New",
+              "changed": "Changed",
+              "removed": "Removed"
+            },
+            "tabsLabel": "Documents",
+            "tooLargeTitle": "Too large to display",
+            "tab": {
+              "proposal": "Proposal",
+              "design": "Design",
+              "tasks": "Tasks"
+            },
+            "pruned": "The text of this version is no longer kept.",
+            "removed": "This file was removed in this version.",
+            "omitted": "This file is too large to display ({{size}}). It is on the proposal branch {{branch}}.",
+            "notFound": "This file is not in this version.",
+            "modeLabel": "Document view",
+            "modeRendered": "Rendered",
+            "modeSource": "Source",
+            "copySource": "Copy document source",
+            "emptyFile": "This file is empty.",
+            "checks": {
+              "severityWarning": "Warning",
+              "severityError": "Error",
+              "severityInfo": "Info",
+              "currentOnly": "Checks are shown for the current version only.",
+              "title": "Checks",
+              "warningCount": "{{count}} to review"
+            },
+            "knowledge": {
+              "title": "Reported by the authoring agent",
+              "available": "Design knowledge was available.",
+              "unavailable": "Design knowledge was not available.",
+              "snapshot": "Snapshot {{snapshot}}.",
+              "read": "Elements read: {{count}}",
+              "gaps": "Gaps",
+              "conflicts": "Conflicts",
+              "disclaimer": "This is the agent's own report; Orca did not verify it."
+            },
+            "empty": "This change has no documents yet.",
+            "viewDocuments": "Documents",
+            "viewProposal": "Proposal"
+          },
+          "revision": {
+            "treeIsCurrent": "The tree shows the current version.",
+            "newerAvailable": "A newer version is available.",
+            "showNewer": "Show it",
+            "versionsCount": "Versions ({{count}})",
+            "askedFor": "What was asked for this version",
+            "busy": "Writing version {{n}}…",
+            "busyNext": "Writing the next version…",
+            "title": "Request changes to this plan",
+            "hint": "The AI revises the documents. You approve the new version afterwards.",
+            "fieldLabel": "What should change?",
+            "placeholder": "For example: split the migration into its own task and add a rollback step.",
+            "submit": "Revise plan",
+            "slow": "Taking longer than expected. You can keep waiting; if it fails you can try again.",
+            "suggestion": {
+              "openspec": {
+                "tests": "Add a task for tests.",
+                "splitBiggest": "Split the biggest task.",
+                "tightenDesign": "Tighten the design.",
+                "edgeScenario": "Add a scenario for the edge case."
+              },
+              "native": {
+                "splitLargest": "Split the largest task.",
+                "rollback": "Add a rollback task.",
+                "riskyFirst": "Reorder to ship the risky part first.",
+                "mergeTiny": "Merge tiny tasks."
+              }
+            },
+            "badgeCurrent": "Current",
+            "badgeSuperseded": "Superseded",
+            "versions": "Versions",
+            "versionN": "Version {{n}}",
+            "textPruned": "The text of this version is no longer kept.",
+            "showOlder": "Show older",
+            "firstProposal": "First proposal",
+            "revised": "Revised",
+            "filesChanged": "{{count}} files changed",
+            "errorEmpty": "Describe what should change before you send it.",
+            "errorTooLong": "Keep the request to {{max}} characters or fewer.",
+            "errorForbidden": "Only the approvers of this plan can request changes. Your text is kept.",
+            "errorForbiddenReporter": "Only the person who reported this request or a project admin can request changes to the plan. Your text is kept.",
+            "errorWrongState": "Someone else is already revising this plan or has decided. It was refreshed; your text is kept.",
+            "errorNoConnection": "No dev server is connected, so the plan cannot be revised right now. The current plan and its approval are unchanged and your text is kept.",
+            "errorNotApplicable": "This kind of plan cannot be revised with a request.",
+            "errorNoChange": "The agent did not change any document. Say more precisely what to change.",
+            "errorBaseRefGone": "The branch this request starts from no longer exists, so the plan cannot be revised. Your text is kept."
           }
         },
         "approval": {
@@ -14255,6 +14429,11 @@
             "adviceUnknown": "Read the log to see what happened, then rerun.",
             "baseRefNotFound": "Starting branch not found",
             "adviceBaseRefNotFound": "The branch this request starts from no longer exists in the repository. Choose another starting branch, then rerun."
+          },
+          "ExecutionRunModeLabel": {
+            "continuous": "Runs all steps on its own",
+            "stepByStep": "Asks before each step",
+            "tooltip": "Steps run with the access of the person who approved the plan."
           }
         },
         "aiSetup": {
@@ -14384,7 +14563,8 @@
             "requestReturned": "Returned to backlog",
             "requestReopened": "Reopened",
             "requestCancelled": "Cancelled",
-            "analysisRevisionRequested": "Requested changes to the analysis"
+            "analysisRevisionRequested": "Requested changes to the analysis",
+            "planRevisionRequested": "Requested changes to the plan"
           },
           "analysis": {
             "generic": "Analysis"

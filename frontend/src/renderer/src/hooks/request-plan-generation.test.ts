@@ -9,6 +9,7 @@ import {
   PLAN_RUN_POLL_INTERVAL_MS,
   PLAN_RUN_OPENSPEC_TIMEOUT_MS,
   PLAN_RUN_TIMEOUT_MS,
+  generatePlanPropose,
   generatePlanProposeCommit
 } from './request-plan-generation'
 
@@ -182,5 +183,58 @@ describe('generatePlanProposeCommit', () => {
     })
     const res = await generatePlanProposeCommit('r1', { sleep: instantSleep })
     expect(res).toMatchObject({ ok: false, error: { backendCode: 'REQUEST_PLAN_AI_INVALID_JSON' } })
+  })
+})
+
+describe('generatePlanPropose', () => {
+  it('starts the run with feedback and a key and does not commit or poll', async () => {
+    callRequestRpc.mockResolvedValue(ok({ runId: 'run9', proposal: null }))
+    const res = await generatePlanPropose('r1', { feedback: 'split it', idempotencyKey: 'k1' })
+    expect(res).toEqual({ ok: true, value: { runId: 'run9' } })
+    expect(callRequestRpc).toHaveBeenCalledTimes(1)
+    expect(callRequestRpc).toHaveBeenCalledWith(
+      'request.generatePlan',
+      { id: 'r1', mode: 'propose', feedback: 'split it', idempotencyKey: 'k1' },
+      { idempotent: true }
+    )
+  })
+
+  it('leaves an empty feedback and a missing key out of the payload', async () => {
+    callRequestRpc.mockResolvedValue(ok({ runId: 'run9' }))
+    await generatePlanPropose('r1', { feedback: '' })
+    expect(callRequestRpc).toHaveBeenCalledWith('request.generatePlan', {
+      id: 'r1',
+      mode: 'propose'
+    })
+  })
+
+  it('answers an empty run id when an older server returns none', async () => {
+    callRequestRpc.mockResolvedValue(ok({ proposal: { title: 'x' } }))
+    expect(await generatePlanPropose('r1', {})).toEqual({ ok: true, value: { runId: '' } })
+  })
+
+  it('returns the failure as it is', async () => {
+    callRequestRpc.mockResolvedValue(netFail)
+    expect(await generatePlanPropose('r1', { feedback: 'x' })).toEqual(netFail)
+  })
+})
+
+describe('generatePlanProposeCommit with a key', () => {
+  it('sends the key on the propose call only', async () => {
+    script({
+      'request.generatePlan:propose': [
+        ok({ runId: 'run1', proposal: PROPOSAL, rawAiResponse: '' })
+      ],
+      'request.generatePlan:commit': [ok({ planTaskId: 'p1' })]
+    })
+    await generatePlanProposeCommit('r1', { feedback: 'f', idempotencyKey: 'k' })
+    expect(callRequestRpc).toHaveBeenNthCalledWith(
+      1,
+      'request.generatePlan',
+      { id: 'r1', mode: 'propose', feedback: 'f', idempotencyKey: 'k' },
+      { idempotent: true }
+    )
+    const commit = callRequestRpc.mock.calls[1][1] as Record<string, unknown>
+    expect(commit).not.toHaveProperty('idempotencyKey')
   })
 })

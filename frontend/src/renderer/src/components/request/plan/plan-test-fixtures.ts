@@ -1,6 +1,8 @@
+import { fallbackRequestFlow } from '../../../../../shared/request-flow-view'
 import type { OrcaTask } from '../../../../../shared/task-types'
-import type { Approval } from '../../../../../shared/request-types'
+import type { Approval, RequestSize, RequestType } from '../../../../../shared/request-types'
 import type { PlanSubtree } from '../../../../../shared/task-hierarchy'
+import type { RequestFlowView } from '../../../../../shared/request-execution-types'
 
 export function planTask(id: string, o: Partial<OrcaTask> = {}): OrcaTask {
   return {
@@ -57,4 +59,13 @@ export function twoPhaseTree(): PlanSubtree {
     },
     flatTasks: []
   }
+}
+
+/** A flow as `request.flow` answers it (the built-in table only answers 'fallback'). */
+export function backendFlowOf(
+  type: Exclude<RequestType, 'unknown'>,
+  size: RequestSize | undefined = 'L',
+  overrides: Partial<RequestFlowView> = {}
+): RequestFlowView {
+  return { ...fallbackRequestFlow(type, size)!, source: 'backend', ...overrides }
 }

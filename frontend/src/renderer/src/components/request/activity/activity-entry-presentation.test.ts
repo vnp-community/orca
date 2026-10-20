@@ -36,6 +36,7 @@ describe('groupOfKind', () => {
     ['request.classified', 'changes'],
     ['analysis.generated', 'changes'],
     ['analysis.revision_requested', 'changes'],
+    ['plan.revision_requested', 'changes'],
     ['request.returned', 'changes'],
     ['request.created', null],
     ['something.new', null]
@@ -61,6 +62,7 @@ describe('activityTone', () => {
     ['approval.decided', 'attention', { result: 'rejected' }, 'attention'],
     ['task.started', 'info', {}, 'neutral'],
     ['analysis.revision_requested', 'info', {}, 'neutral'],
+    ['plan.revision_requested', 'info', {}, 'neutral'],
     ['something.new', 'info', {}, 'neutral']
   ])('%s/%s %j -> %s', (kind, severity, details, tone) => {
     expect(
@@ -94,12 +96,30 @@ describe('activityIcon', () => {
     expect(isKnownActivityKind('task.failed')).toBe(true)
     expect(isKnownActivityKind('task.exploded')).toBe(false)
     expect(isKnownActivityKind('analysis.revision_requested')).toBe(true)
+    expect(isKnownActivityKind('plan.revision_requested')).toBe(true)
   })
 
   it('gives a revision request its own icon, not the neutral one of an unknown kind', () => {
     expect(activityIcon(entry({ kind: 'analysis.revision_requested' }))).not.toBe(
       activityIcon(entry({ kind: 'something.new' }))
     )
+  })
+})
+
+describe('plan.revision_requested', () => {
+  it('has an icon that is neither the neutral one, the analysis one, nor the one of a finished plan', () => {
+    const icon = activityIcon(entry({ kind: 'plan.revision_requested' }))
+    expect(icon).not.toBe(activityIcon(entry({ kind: 'something.new' })))
+    expect(icon).not.toBe(activityIcon(entry({ kind: 'analysis.revision_requested' })))
+    expect(icon).not.toBe(activityIcon(entry({ kind: 'plan.done' })))
+  })
+
+  it('opens the Plan tab whatever the subject says, and not the execution tab like plan.done', () => {
+    expect(activityTargetTab({ kind: 'plan.revision_requested', subjectType: 'plan' })).toBe('plan')
+    expect(activityTargetTab({ kind: 'plan.revision_requested', subjectType: undefined })).toBe(
+      'plan'
+    )
+    expect(activityTargetTab({ kind: 'plan.done', subjectType: 'plan' })).toBe('execution')
   })
 })
 
@@ -142,6 +162,7 @@ describe('activityTargetTab', () => {
     ['approval.decided', 'solution', 'analysis'],
     ['analysis.generated', 'solution', 'analysis'],
     ['analysis.revision_requested', 'solution', 'analysis'],
+    ['plan.revision_requested', 'plan', 'plan'],
     ['clarification.asked', 'clarification', 'overview']
   ] as const)('%s on %s opens %s', (kind, subjectType, tab) => {
     expect(activityTargetTab({ kind, subjectType })).toBe(tab)

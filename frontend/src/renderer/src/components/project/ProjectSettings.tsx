@@ -12,6 +12,7 @@ import { ProjectDevServerFilterSection } from './ProjectDevServerFilterSection'
 import { ProjectRepoCandidatesSection } from './ProjectRepoCandidatesSection'
 import { ProjectMobileEmulatorAgentSection } from './ProjectMobileEmulatorAgentSection'
 import { ProjectJiraMappingSection } from './ProjectJiraMappingSection'
+import { ProjectRequestExecutionSection } from './ProjectRequestExecutionSection'
 import { useConfirmationDialog } from '../confirmation-dialog'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { useAppStore } from '../../store'
@@ -173,6 +174,7 @@ export function ProjectSettings({ projectId, open, onClose, onDeleted }: Project
               <ProjectDevServerSection projectId={projectId} />
               <ProjectMobileEmulatorAgentSection projectId={projectId} />
               <ProjectJiraMappingSection projectId={projectId} />
+              <ProjectRequestExecutionSection projectId={projectId} />
               {currentUserRole === 'owner' ? (
                 <div className="space-y-2 border-t border-destructive/30 pt-4">
                   <p className="text-xs font-medium text-destructive">Danger zone</p>

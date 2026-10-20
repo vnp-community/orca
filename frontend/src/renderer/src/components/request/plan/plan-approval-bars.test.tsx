@@ -123,15 +123,24 @@ describe('PlanApprovalBar', () => {
     await waitFor(() => expect(callRequestRpc).toHaveBeenCalled())
   })
 
-  it('regenerate calls request.generatePlan {id, mode: propose}', async () => {
+  // CR-REQ-045: both old ways to write the plan again failed on the Request's state; the revision panel replaces them.
+  it('has no Regenerate button, and the reject dialog offers no regenerate option', async () => {
     render(<PlanHarness approval={planApproval('ap1')} />)
-    fireEvent.click(screen.getByTestId('plan-regenerate'))
-    await waitFor(() =>
-      expect(callRequestRpc).toHaveBeenCalledWith('request.generatePlan', {
-        id: 'r1',
-        mode: 'propose'
-      })
-    )
+    expect(screen.queryByTestId('plan-regenerate')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Regenerate plan' })).toBeNull()
+    fireEvent.click(screen.getByTestId('plan-reject'))
+    await screen.findByRole('textbox')
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
+  it('rejects with the reason only and never writes the plan again', async () => {
+    render(<PlanHarness approval={planApproval('ap1')} />)
+    fireEvent.click(screen.getByTestId('plan-reject'))
+    const box = await screen.findByRole('textbox')
+    fireEvent.change(box, { target: { value: 'The scope is far too large.' } })
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
+    await waitFor(() => expect(settled).toHaveBeenCalled())
+    expect(callRequestRpc.mock.calls.map(([m]) => m)).toEqual(['approval.reject'])
   })
 
   it('shows the not-approver message and locks approve on forbidden', async () => {
@@ -196,7 +205,7 @@ describe('PlanApprovalBar', () => {
       />
     )
     expect(screen.getByTestId('plan-rejected-notice')).toHaveTextContent('Needs smaller scope')
-    expect(screen.getByTestId('plan-regenerate')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-regenerate')).toBeNull()
     expect(screen.queryByTestId('plan-approve')).toBeNull()
   })
 

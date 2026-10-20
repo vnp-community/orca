@@ -200,6 +200,32 @@ describe('RequestActivityTab', () => {
     expect(within(row).queryByTestId('activity-entry-severity')).toBeNull()
   })
 
+  it('renders a plan change request as one plain line, with who asked, no severity and no text', () => {
+    hook.mockReturnValue(
+      state({
+        entries: [
+          entry({
+            id: 'run-3:revision',
+            kind: 'plan.revision_requested',
+            actorKind: 'user',
+            severity: 'info',
+            subjectType: 'plan',
+            subjectId: 'plan-1',
+            summary: 'Requested changes to the plan',
+            attempt: undefined,
+            details: { feedback: 'secret reviewer text' }
+          })
+        ]
+      })
+    )
+    renderTab()
+    const row = screen.getByTestId('activity-entry')
+    expect(row).toHaveTextContent('Requested changes to the plan')
+    expect(row).toHaveTextContent('User')
+    expect(row).not.toHaveTextContent('secret reviewer text')
+    expect(within(row).queryByTestId('activity-entry-severity')).toBeNull()
+  })
+
   it('passes filter changes to the hook', () => {
     renderTab()
     expect(lastCall()[1].filter).toEqual({})

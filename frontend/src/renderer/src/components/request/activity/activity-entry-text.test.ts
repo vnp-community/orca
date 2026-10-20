@@ -66,6 +66,11 @@ describe('activityTitle', () => {
       'Requested changes to the analysis'
     ],
     [
+      'plan revision requested',
+      { kind: 'plan.revision_requested', details: { runId: 'run-3' } },
+      'Requested changes to the plan'
+    ],
+    [
       'unknown kind uses the summary',
       { kind: 'thing.happened', summary: 'Something happened' },
       'Something happened'
@@ -134,8 +139,26 @@ describe('activityDetailText', () => {
         details: { solutionId: 's-1', feedback: 'secret reviewer text', reason: 'also hidden' }
       },
       null
+    ],
+    [
+      'a plan revision request never shows text either',
+      {
+        kind: 'plan.revision_requested',
+        details: { feedback: 'secret text', reason: 'also hidden', comment: 'and this' }
+      },
+      null
     ]
   ])('%s', (_name, over, expected) => {
     expect(activityDetailText(entry(over))).toBe(expected)
+  })
+
+  it('shows the reviewer text of a plan revision on no line at all', () => {
+    const e = entry({
+      kind: 'plan.revision_requested',
+      summary: 'Requested changes to the plan',
+      details: { feedback: 'secret text', reason: 'secret text', error: 'secret text' }
+    })
+    const lines = [activityTitle(e), activityDetailText(e), activityAttemptLabel(e)]
+    expect(lines.join('|')).not.toContain('secret text')
   })
 })

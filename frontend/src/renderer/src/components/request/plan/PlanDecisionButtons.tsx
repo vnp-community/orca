@@ -11,6 +11,8 @@ import React, { useState } from 'react'
 import { Check, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { RejectReasonDialog } from '../solution/RejectReasonDialog'
+import { PlanRunAllButton } from './PlanRunAllButton'
+import type { RunAllDialogModel } from './plan-run-all-model'
 import type { PlanDecision } from '../../../hooks/usePlanDecision'
 import type { Approval } from '../../../../../shared/request-types'
 
@@ -20,8 +22,6 @@ type Props = {
   approveLabel: string
   rejectLabel: string
   rejectTitle: string
-  /** Offer "regenerate from this feedback" in the reject dialog. */
-  offerRegenerate?: boolean
   testIdPrefix: string
   /** When set, Approve is locked and this text explains why (CR-REQ-028 decision gate). */
   approveBlockedReason?: string | null
@@ -29,6 +29,10 @@ type Props = {
   approveExtras?: { viewedImpactDigest?: string; acceptedFindingIds?: string[] }
   /** REQUEST_RISK_APPROVER_NOT_ALLOWED: hide Approve, keep Reject. */
   hideApprove?: boolean
+  /** CR-REQ-043: the main Approve states the mode explicitly instead of leaving it to the project setting. */
+  approveExecutionMode?: 'continuous'
+  /** Adds "Approve and run all steps" between Approve and Reject; the caller already decided it may be offered. */
+  runAll?: RunAllDialogModel
 }
 
 export function PlanDecisionButtons({
@@ -37,11 +41,12 @@ export function PlanDecisionButtons({
   approveLabel,
   rejectLabel,
   rejectTitle,
-  offerRegenerate = false,
   testIdPrefix,
   approveBlockedReason = null,
   approveExtras,
-  hideApprove = false
+  hideApprove = false,
+  approveExecutionMode,
+  runAll
 }: Props): React.JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false)
   const approving = decision.isBusy(`approve:${approval.id}`)
@@ -49,13 +54,20 @@ export function PlanDecisionButtons({
   const locked = approving || rejecting || decision.isDenied(approval.id) || decision.coolingDown
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {hideApprove ? null : (
         <Button
           size="sm"
           disabled={locked || approveBlockedReason !== null}
           title={approveBlockedReason ?? undefined}
-          onClick={() => void decision.approve(approval, undefined, approveExtras)}
+          onClick={() =>
+            void decision.approve(
+              approval,
+              undefined,
+              approveExtras,
+              approveExecutionMode ? { executionMode: approveExecutionMode } : undefined
+            )
+          }
           data-testid={`${testIdPrefix}-approve`}
         >
           {approving ? (
@@ -65,6 +77,16 @@ export function PlanDecisionButtons({
           )}
           {approveLabel}
         </Button>
+      )}
+      {runAll && !hideApprove && (
+        <PlanRunAllButton
+          {...runAll}
+          locked={locked}
+          blockedReason={approveBlockedReason}
+          onConfirm={() =>
+            decision.approve(approval, undefined, approveExtras, { executionMode: 'continuous' })
+          }
+        />
       )}
       <Button
         size="sm"
@@ -81,10 +103,7 @@ export function PlanDecisionButtons({
         onOpenChange={setDialogOpen}
         title={rejectTitle}
         submitting={rejecting}
-        offerRegenerate={offerRegenerate}
-        onSubmit={(comment, options) =>
-          decision.reject(approval, comment, { regenerate: options?.regenerate })
-        }
+        onSubmit={(comment) => decision.reject(approval, comment)}
       />
     </div>
   )

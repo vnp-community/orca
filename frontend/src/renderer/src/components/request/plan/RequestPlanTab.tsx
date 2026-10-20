@@ -13,12 +13,13 @@ import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '../../../store'
 import { usePlanTree } from '../../../hooks/usePlanTree'
-import { usePlanRunInFlight } from '../../../hooks/usePlanRunInFlight'
+import { usePlanAutoGeneration } from '../../../hooks/usePlanAutoGeneration'
 import { usePlanDecision } from '../../../hooks/usePlanDecision'
+import { supportsPlanAuto } from '../../../store/slices/request'
 import { REQUEST_FLOW_REGISTRY } from '../../../../../shared/request-flow-registry'
 import { buildStageTimeline } from '../request-stage-timeline-model'
 import { attachApprovals, computeExecutionGates, listPlanWorkTasks } from './plan-approval-model'
-import { canGeneratePlan, derivePlanViewState } from './plan-view-state'
+import { canGeneratePlan, derivePlanViewState, type PlanDisplayView } from './plan-view-state'
 import { planDecisionErrorMessage } from './plan-decision-error-message'
 import { firstAiSetupCode } from '../request-ai-setup'
 import { PhaseApprovalBar } from './PhaseApprovalBar'
@@ -29,6 +30,11 @@ import { PlanSummaryHeader } from './PlanSummaryHeader'
 import { PlanTree } from './PlanTree'
 import { PlanApprovalCard } from './PlanApprovalCard'
 import { PlanOutline } from './PlanOutline'
+import { PlanDocumentsPane } from './documents/PlanDocumentsPane'
+import { PlanRevisionSection } from './revision/PlanRevisionSection'
+import { PlanVersionBar } from './revision/PlanVersionBar'
+import { usePlanRevision } from './revision/usePlanRevision'
+import { usePlanVersions } from './revision/usePlanVersions'
 import { formatRequestRelativeTime } from '@/lib/request-relative-time'
 import { PlanDriftSection } from '../readiness/PlanDriftSection'
 import { useDecisions } from '../../../hooks/useDecisions'
@@ -61,7 +67,7 @@ export function RequestPlanTab({
   const setTaskExecutionGates = useAppStore((s) => s.setTaskExecutionGates)
   const { tree, approvals, isLoading, error, truncated, refetch } = usePlanTree(request)
   // Why: view choice lives in component state only (no localStorage) per CR-REQ-032.
-  const [planView, setPlanView] = useState<'tree' | 'graph'>('tree')
+  const [planView, setPlanView] = useState<PlanDisplayView>('tree')
 
   const onSettled = useCallback(() => {
     refetch()
@@ -69,8 +75,9 @@ export function RequestPlanTab({
   }, [refetch, onChanged])
   const decision = usePlanDecision(request, onSettled)
   // Why: a refreshed tab has lost its local busy state, but the server run goes on and a second click must not look possible.
-  const planRunning = usePlanRunInFlight(request, onSettled)
+  const auto = usePlanAutoGeneration(request, onSettled, decision.regeneratePlan)
   const requestDecisions = useDecisions(request.id)
+  const versions = usePlanVersions(request)
 
   const approvalMap = useMemo(
     () => (tree ? attachApprovals(tree, approvals) : null),
@@ -82,6 +89,30 @@ export function RequestPlanTab({
     ? flowView.startGate === 'plan' || flowView.startGate === 'task_list'
     : (flow?.gates.planApproval ?? false)
   const hasNoPlan = flowView ? flowView.planKind === 'none' : flow?.plan === 'none'
+  const flowPlanKind = flowView?.planKind ?? flow?.plan
+  const serverCommit = useAppStore(supportsPlanAuto)
+  const revision = usePlanRevision({
+    request,
+    flowPlanKind,
+    serverCommit,
+    runState: auto,
+    currentRevision: versions.list.current?.revision,
+    viewingCurrent: !versions.viewingOlder,
+    onSettled
+  })
+  // Why: a hotfix plan is one task made from the diagnosis; only an authored plan has documents or a proposal to read.
+  const documentsView =
+    flowPlanKind === 'single_task'
+      ? undefined
+      : request.engine === 'openspec'
+        ? 'documents'
+        : 'proposal'
+  const selectVersion = (n: number): void => {
+    versions.select(n)
+    if (documentsView && n !== versions.list.current?.revision) {
+      setPlanView('documents')
+    }
+  }
 
   // Gates only exist while this tab is mounted; the backend re-checks on execute anyway.
   useEffect(() => {
@@ -126,11 +157,16 @@ export function RequestPlanTab({
           state={state === 'ready' ? 'error' : state}
           currentStepLabel={current ? translate(current.labelKey, current.id) : undefined}
           canGenerate={canGeneratePlan(request.status)}
-          generating={decision.isBusy('generatePlan') || planRunning}
+          generating={decision.isBusy('generatePlan') || auto.busy}
           generateError={generateFailure ? planDecisionErrorMessage(generateFailure) : null}
           generateAiCode={firstAiSetupCode(generateFailure?.error.backendCode)}
+          generateErrorCode={generateFailure?.error.backendCode}
           onGenerate={() => void decision.regeneratePlan()}
           onRetry={refetch}
+          autoDisplay={auto.display}
+          onRetryRun={() => void auto.retry.retry()}
+          retryingRun={auto.retry.retrying}
+          retryRunError={auto.retry.error}
           loadErrorKind={error}
         />
       </div>
@@ -155,6 +191,7 @@ export function RequestPlanTab({
         approval={planApproval}
         view={planView}
         onViewChange={setPlanView}
+        documentsView={documentsView}
       />
       {truncated && (
         <div
@@ -178,7 +215,7 @@ export function RequestPlanTab({
         phases={tree.phases}
         onChanged={onSettled}
       />
-      {continuous && planApproval?.status === 'pending' ? (
+      {revision.busy ? null : continuous && planApproval?.status === 'pending' ? (
         <PlanApprovalCard
           approval={planApproval}
           decision={decision}
@@ -192,8 +229,11 @@ export function RequestPlanTab({
           approval={planApproval}
           decision={decision}
           approveBlockedReason={decisionBlock}
+          runAll={{ request, flow: flowView, stepCount: tree.phases.length }}
         />
       )}
+      <PlanRevisionSection revision={revision} display={auto.display} engine={request.engine} />
+      <PlanVersionBar versions={versions} view={planView} onSelect={selectVersion} />
       {approvedReadonly && (
         <div
           className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs text-muted-foreground"
@@ -223,7 +263,9 @@ export function RequestPlanTab({
           )}
         </div>
       )}
-      {planView === 'graph' ? (
+      {planView === 'documents' && documentsView ? (
+        <PlanDocumentsPane request={request} versions={versions} />
+      ) : planView === 'graph' ? (
         <Suspense fallback={<GraphSkeleton />}>
           <GraphPanel
             request={request}

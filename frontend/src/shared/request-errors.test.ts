@@ -145,6 +145,13 @@ describe('code table (SOL-FE-E2E-003, CONTRACT section 5)', () => {
     ['REQUEST_SOLUTION_WRONG_STATE', 'invalid_state'],
     ['REQUEST_PLAN_SOLUTION_NOT_APPROVED', 'invalid_state'],
     ['REQUEST_PLAN_AI_UNAVAILABLE', 'unavailable'],
+    ['REQUEST_PLAN_REVISION_IN_PROGRESS', 'conflict'],
+    ['REQUEST_PLAN_REVISION_NOT_APPLICABLE', 'invalid_state'],
+    ['REQUEST_PLAN_REVISION_NO_CHANGE', 'invalid_state'],
+    ['REQUEST_PLAN_REVISION_TEXT_PRUNED', 'invalid_state'],
+    ['REQUEST_PLAN_REVISION_NOT_FOUND', 'not_found'],
+    ['REQUEST_PLAN_BUNDLE_NOT_FOUND', 'not_found'],
+    ['REQUEST_PLAN_BUNDLE_FILE_NOT_FOUND', 'not_found'],
     ['REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE', 'unavailable'],
     // Existing short spellings stay mapped.
     ['APPROVAL_NOT_FOUND', 'not_found'],

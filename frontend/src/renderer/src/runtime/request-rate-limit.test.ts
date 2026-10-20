@@ -18,6 +18,7 @@ describe('classes and retry safety', () => {
   it('puts AI starts in ai, state changes in write, everything else in read', () => {
     expect(rateLimitClassOf('solution.generate')).toBe('ai')
     expect(rateLimitClassOf('request.generatePlan')).toBe('ai')
+    expect(rateLimitClassOf('request.retryPlan')).toBe('ai')
     expect(rateLimitClassOf('request.classify')).toBe('ai')
     expect(rateLimitClassOf('request.cancel')).toBe('write')
     expect(rateLimitClassOf('request.setBaseRef')).toBe('write')

@@ -32,6 +32,9 @@ const BEFORE_PLAN: ReadonlySet<RequestStatus> = new Set([
   'request_backlog'
 ])
 
+/** What the ready Plan tab shows: the task tree, the graph, or the documents the AI wrote (CR-REQ-045). */
+export type PlanDisplayView = 'tree' | 'graph' | 'documents'
+
 export type PlanViewInput = {
   request: Pick<OrcaRequest, 'status' | 'planTaskId'>
   tree: PlanSubtree | null

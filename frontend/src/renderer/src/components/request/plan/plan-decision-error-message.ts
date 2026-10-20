@@ -7,6 +7,10 @@
 import { translate } from '@/i18n/i18n'
 import { requestErrorMessage, requestErrorMessageForError } from '../request-error-message'
 import { splitErrorCode } from '../../../../../shared/request-errors'
+import {
+  isRunAllAlreadyPinned,
+  isRunAllProgrammingError
+} from '../../../../../shared/request-run-all'
 import { backendErrorCode } from '../solution/solution-error-classification'
 import type { PlanDecisionFailure } from '../../../hooks/usePlanDecision'
 
@@ -24,6 +28,19 @@ export function planDecisionErrorMessage(failure: PlanDecisionFailure): string {
     return translate(
       `${P}PlanApprovalBar.executionNotAllowed`,
       'You can approve plans only if you are allowed to run their execution. Ask someone who is, or request access.'
+    )
+  }
+  // Why: the Request was pinned to step by step on an earlier run; "run all" cannot apply, a normal approval still can.
+  if (isRunAllAlreadyPinned(failure.error)) {
+    return translate(
+      `${P}PlanApprovalBar.runAllAlreadyPinned`,
+      'This request already runs step by step because it was started that way before. Approve it normally.'
+    )
+  }
+  if (isRunAllProgrammingError(failure.error)) {
+    return translate(
+      `${P}PlanApprovalBar.runAllNotPossible`,
+      "Couldn't start the run this way. Approve it normally."
     )
   }
   if (failure.errorClass === 'notApprover' || failure.errorClass === 'forbidden') {

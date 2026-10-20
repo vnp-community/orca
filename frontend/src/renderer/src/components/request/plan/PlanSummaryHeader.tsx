@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { ApprovalStatusBadge } from '../ApprovalStatusBadge'
 import { listPlanWorkTasks, resolveProgress } from './plan-approval-model'
+import type { PlanDisplayView } from './plan-view-state'
 import type { PlanSubtree } from '../../../../../shared/task-hierarchy'
 import type { Approval } from '../../../../../shared/request-types'
 
@@ -17,12 +18,20 @@ type Props = {
   tree: PlanSubtree
   /** Latest plan / task_list approval, if any. */
   approval: Approval | null
-  /** Optional tree/graph switch; omitted = no toggle (graph entry point, CR-REQ-032). */
-  view?: 'tree' | 'graph'
-  onViewChange?: (view: 'tree' | 'graph') => void
+  /** Optional tree/graph/documents switch; omitted = no toggle (graph entry point, CR-REQ-032). */
+  view?: PlanDisplayView
+  onViewChange?: (view: PlanDisplayView) => void
+  /** Adds the third entry: "Documents" for an OpenSpec change, "Proposal" for a native Plan; omitted hides it (CR-REQ-045). */
+  documentsView?: 'documents' | 'proposal'
 }
 
-export function PlanSummaryHeader({ tree, approval, view, onViewChange }: Props): React.JSX.Element | null {
+export function PlanSummaryHeader({
+  tree,
+  approval,
+  view,
+  onViewChange,
+  documentsView
+}: Props): React.JSX.Element | null {
   if (!tree.plan) {
     return null
   }
@@ -43,12 +52,25 @@ export function PlanSummaryHeader({ tree, approval, view, onViewChange }: Props)
             variant="outline"
             value={view}
             onValueChange={(v) => {
-              if (v) {onViewChange(v as 'tree' | 'graph')}
+              if (v === 'tree' || v === 'graph' || v === 'documents') {
+                onViewChange(v)
+              }
             }}
             aria-label={translate('auto.components.graph.Entry.planView', 'Plan view')}
           >
-            <ToggleGroupItem value="tree">{translate('auto.components.graph.Entry.tree', 'Tree')}</ToggleGroupItem>
-            <ToggleGroupItem value="graph">{translate('auto.components.graph.Entry.planGraph', 'Graph')}</ToggleGroupItem>
+            <ToggleGroupItem value="tree">
+              {translate('auto.components.graph.Entry.tree', 'Tree')}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="graph">
+              {translate('auto.components.graph.Entry.planGraph', 'Graph')}
+            </ToggleGroupItem>
+            {documentsView && (
+              <ToggleGroupItem value="documents" data-testid="plan-view-documents">
+                {documentsView === 'documents'
+                  ? translate('auto.components.request.plan.documents.viewDocuments', 'Documents')
+                  : translate('auto.components.request.plan.documents.viewProposal', 'Proposal')}
+              </ToggleGroupItem>
+            )}
           </ToggleGroup>
         )}
       </div>

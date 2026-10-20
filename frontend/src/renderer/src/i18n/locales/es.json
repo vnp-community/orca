@@ -13199,6 +13199,23 @@
         },
         "CreateProjectDialog": {
           "repoAddFailed": "Proyecto creado, pero no se pudo agregar su repositorio: {{message}}. Inténtelo de nuevo."
+        },
+        "ProjectRequestExecutionSection": {
+          "title": "Ejecución de solicitudes",
+          "description": "Se aplica a las solicitudes que empiecen a ejecutarse a partir de ahora. Las que ya están en ejecución conservan su modo.",
+          "stepByStep": "Preguntar antes de cada paso",
+          "continuous": "Ejecutar todos los pasos tras una aprobación",
+          "accessNote": "Orca iniciará cada paso con el acceso de la persona que apruebe el plan.",
+          "adminOnly": "Solo un administrador puede cambiar esto.",
+          "firstSave": "Al guardar también se almacenan los ajustes de motor actuales de este proyecto.",
+          "save": "Guardar",
+          "saving": "Guardando…",
+          "saved": "Ejecución de solicitudes actualizada",
+          "saveFailed": "No se pudieron guardar los ajustes de ejecución.",
+          "conflict": "Otra persona cambió estos ajustes. Se cargaron los valores más recientes.",
+          "loadFailed": "No se pudieron cargar los ajustes de ejecución.",
+          "noAccess": "No tienes permiso para ver estos ajustes.",
+          "retry": "Reintentar"
         }
       },
       "request": {
@@ -13368,7 +13385,9 @@
         },
         "RequestMarkdownContent": {
           "viewFull": "Ver completo",
-          "fullTitle": "Contenido completo"
+          "fullTitle": "Contenido completo",
+          "taskDone": "Hecha",
+          "taskOpen": "Sin hacer"
         },
         "SolutionComparisonTable": {
           "criterion": "Criterio",
@@ -13695,7 +13714,9 @@
             "conflict": "Esto cambió mientras lo revisabas. Se cargó la última versión; revísala de nuevo.",
             "alreadyDecided": "Esto ya fue decidido.",
             "expired": "Esta aprobación caducó. Se cargó la última versión.",
-            "executionNotAllowed": "Solo puedes aprobar planes si tienes permiso para ejecutarlos. Pide a alguien que lo tenga o solicita acceso."
+            "executionNotAllowed": "Solo puedes aprobar planes si tienes permiso para ejecutarlos. Pide a alguien que lo tenga o solicita acceso.",
+            "runAllAlreadyPinned": "Esta solicitud ya se ejecuta paso a paso porque se inició así antes. Apruébala de forma normal.",
+            "runAllNotPossible": "No se pudo iniciar la ejecución de esta forma. Apruébala de forma normal."
           },
           "PlanGateChips": {
             "plan": "Plan",
@@ -13759,6 +13780,159 @@
             "done": "Hecho",
             "step": "{{index}}. {{title}}",
             "taskCount": "{{count}} tareas"
+          },
+          "PlanRunAllButton": {
+            "label": "Aprobar y ejecutar todos los pasos",
+            "notApplied": "Este servidor no ejecutó el plan por sí solo. Aprueba cada paso como de costumbre."
+          },
+          "RunAllStepsConfirmDialog": {
+            "title": "¿Ejecutar los {{n}} pasos sin volver a preguntar?",
+            "bodyStart": "Orca inicia cada paso en cuanto termina el anterior, con tu acceso.",
+            "bodyStops": "Solo se detiene cuando el agente necesita información tuya, una tarea sigue fallando (la solicitud vuelve entonces al backlog) o un cambio se desvía del plan y necesita revisión{{preDeploy}}. Puedes detener la ejecución en cualquier momento.",
+            "preDeploy": " o llega a la aprobación previa al despliegue",
+            "cancel": "Ahora no",
+            "confirm": "Ejecutar todos los pasos"
+          },
+          "PlanAutoWriting": {
+            "title": "Orca está escribiendo el plan...",
+            "starting": "Orca está empezando el plan...",
+            "attempt": "Intento {{attempt}} de {{max}}",
+            "retrying": "Se volverá a intentar en breve"
+          },
+          "PlanRunFailedCard": {
+            "title": "Falló la generación del plan ({{code}})",
+            "retry": "Reintentar",
+            "generateManually": "Generar manualmente",
+            "hint": {
+              "timeout": "La IA tardó demasiado en responder.",
+              "interrupted": "La ejecución se interrumpió antes de terminar.",
+              "invalidOutput": "La IA respondió con un formato que no es un plan válido.",
+              "busy": "La IA está ocupada con otro trabajo.",
+              "commit": "El plan se escribió, pero no se pudo guardar.",
+              "generic": "Algo salió mal al escribir el plan.",
+              "noChange": "El agente no cambió ningún documento. Indique con más precisión qué debe cambiar.",
+              "baseRefGone": "La rama desde la que parte esta solicitud ya no existe."
+            },
+            "titleRevise": "No se pudo revisar el plan ({{code}})",
+            "tryAgain": "Reintentar",
+            "writeNew": "O escriba una petición nueva más abajo."
+          },
+          "PlanAutoSkippedNote": {
+            "text": "Orca no pudo iniciar el plan por sí solo ({{reason}}). Genéralo cuando estés listo.",
+            "reason": {
+              "noDevServer": "no hay ningún servidor de desarrollo conectado",
+              "noRepoPath": "el proyecto no tiene ruta de repositorio",
+              "engineUnavailable": "el motor de planificación no está disponible"
+            }
+          },
+          "PlanRewriteStrip": {
+            "text": "Orca está reescribiendo el plan..."
+          },
+          "documents": {
+            "proposal": {
+              "irreversible": "Irreversible",
+              "dependsOn": "Depende de {{tasks}}",
+              "prompt": "Prompt del agente",
+              "writing": "Se está escribiendo una versión nueva...",
+              "runFailed": "La última ejecución falló ({{code}}), así que no hay propuesta que mostrar.",
+              "none": "Todavía no hay propuesta que mostrar.",
+              "notSaved": "Esta es la propuesta más reciente. Todavía no está guardada como plan.",
+              "notes": "Notas",
+              "noTasks": "La propuesta no tiene tareas.",
+              "phase": "Fase {{n}}: {{title}}",
+              "phaseDependsOn": "Depende de la fase {{phases}}",
+              "hours": "{{hours}} h"
+            },
+            "tryAgain": "Reintentar",
+            "change": {
+              "added": "Nuevo",
+              "changed": "Modificado",
+              "removed": "Eliminado"
+            },
+            "tabsLabel": "Documentos",
+            "tooLargeTitle": "Demasiado grande para mostrar",
+            "tab": {
+              "proposal": "Propuesta",
+              "design": "Diseño",
+              "tasks": "Tareas"
+            },
+            "pruned": "El texto de esta versión ya no se conserva.",
+            "removed": "Este archivo se eliminó en esta versión.",
+            "omitted": "Este archivo es demasiado grande para mostrarse ({{size}}). Está en la rama de la propuesta {{branch}}.",
+            "notFound": "Este archivo no está en esta versión.",
+            "modeLabel": "Vista del documento",
+            "modeRendered": "Renderizado",
+            "modeSource": "Fuente",
+            "copySource": "Copiar el texto fuente del documento",
+            "emptyFile": "Este archivo está vacío.",
+            "checks": {
+              "severityWarning": "Advertencia",
+              "severityError": "Error",
+              "severityInfo": "Información",
+              "currentOnly": "Las comprobaciones solo se muestran para la versión actual.",
+              "title": "Comprobaciones",
+              "warningCount": "{{count}} por revisar"
+            },
+            "knowledge": {
+              "title": "Informado por el agente autor",
+              "available": "El conocimiento de diseño estaba disponible.",
+              "unavailable": "El conocimiento de diseño no estaba disponible.",
+              "snapshot": "Instantánea {{snapshot}}.",
+              "read": "Elementos leídos: {{count}}",
+              "gaps": "Lagunas",
+              "conflicts": "Conflictos",
+              "disclaimer": "Es el informe propio del agente; Orca no lo verificó."
+            },
+            "empty": "Este cambio todavía no tiene documentos.",
+            "viewDocuments": "Documentos",
+            "viewProposal": "Propuesta"
+          },
+          "revision": {
+            "treeIsCurrent": "El árbol muestra la versión actual.",
+            "newerAvailable": "Hay una versión más reciente.",
+            "showNewer": "Mostrarla",
+            "versionsCount": "Versiones ({{count}})",
+            "askedFor": "Lo que se pidió para esta versión",
+            "busy": "Escribiendo la versión {{n}}…",
+            "busyNext": "Escribiendo la siguiente versión…",
+            "title": "Pedir cambios en este plan",
+            "hint": "La IA revisa los documentos. Usted aprueba la versión nueva después.",
+            "fieldLabel": "¿Qué debe cambiar?",
+            "placeholder": "Por ejemplo: separa la migración en su propia tarea y añade un paso de reversión.",
+            "submit": "Revisar plan",
+            "slow": "Está tardando más de lo esperado. Puede seguir esperando; si falla, podrá volver a intentarlo.",
+            "suggestion": {
+              "openspec": {
+                "tests": "Añade una tarea para las pruebas.",
+                "splitBiggest": "Divide la tarea más grande.",
+                "tightenDesign": "Ajusta el diseño.",
+                "edgeScenario": "Añade un escenario para el caso límite."
+              },
+              "native": {
+                "splitLargest": "Divide la tarea más grande.",
+                "rollback": "Añade una tarea de reversión.",
+                "riskyFirst": "Reordena para entregar primero la parte arriesgada.",
+                "mergeTiny": "Une las tareas muy pequeñas."
+              }
+            },
+            "badgeCurrent": "Actual",
+            "badgeSuperseded": "Reemplazada",
+            "versions": "Versiones",
+            "versionN": "Versión {{n}}",
+            "textPruned": "El texto de esta versión ya no se conserva.",
+            "showOlder": "Mostrar anteriores",
+            "firstProposal": "Primera propuesta",
+            "revised": "Revisada",
+            "filesChanged": "{{count}} archivos modificados",
+            "errorEmpty": "Describa qué debe cambiar antes de enviarlo.",
+            "errorTooLong": "Limite la petición a {{max}} caracteres o menos.",
+            "errorForbidden": "Solo los aprobadores de este plan pueden pedir cambios. Se conserva su texto.",
+            "errorForbiddenReporter": "Solo quien informó de esta solicitud o un administrador del proyecto puede pedir cambios en el plan. Se conserva su texto.",
+            "errorWrongState": "Otra persona ya está revisando este plan o ya ha decidido. Se actualizó; se conserva su texto.",
+            "errorNoConnection": "No hay ningún servidor de desarrollo conectado, así que el plan no se puede revisar ahora. El plan actual y su aprobación no han cambiado y se conserva su texto.",
+            "errorNotApplicable": "Este tipo de plan no se puede revisar con una petición.",
+            "errorNoChange": "El agente no cambió ningún documento. Indique con más precisión qué debe cambiar.",
+            "errorBaseRefGone": "La rama desde la que parte esta solicitud ya no existe, así que el plan no se puede revisar. Se conserva su texto."
           }
         },
         "approval": {
@@ -14255,6 +14429,11 @@
             "adviceUnknown": "Lee el registro para ver qué pasó y vuelve a ejecutar.",
             "baseRefNotFound": "Rama de inicio no encontrada",
             "adviceBaseRefNotFound": "La rama de la que parte esta solicitud ya no existe en el repositorio. Elige otra rama de inicio y vuelve a ejecutar."
+          },
+          "ExecutionRunModeLabel": {
+            "continuous": "Ejecuta todos los pasos por sí sola",
+            "stepByStep": "Pregunta antes de cada paso",
+            "tooltip": "Los pasos se ejecutan con el acceso de la persona que aprobó el plan."
           }
         },
         "aiSetup": {
@@ -14384,7 +14563,8 @@
             "requestReturned": "Devuelta al backlog",
             "requestReopened": "Reabierta",
             "requestCancelled": "Cancelado",
-            "analysisRevisionRequested": "Se pidieron cambios en el análisis"
+            "analysisRevisionRequested": "Se pidieron cambios en el análisis",
+            "planRevisionRequested": "Se pidieron cambios en el plan"
           },
           "analysis": {
             "generic": "Análisis"

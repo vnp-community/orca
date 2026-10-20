@@ -306,6 +306,7 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
             <TabsContent value="execution">
               <ExecutionTab
                 request={request}
+                flow={flow}
                 execution={execution}
                 busy={busy}
                 onChanged={refetch}

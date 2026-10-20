@@ -13199,6 +13199,23 @@
         },
         "CreateProjectDialog": {
           "repoAddFailed": "项目已创建，但无法添加其仓库：{{message}}。请重试。"
+        },
+        "ProjectRequestExecutionSection": {
+          "title": "请求执行",
+          "description": "适用于从现在起开始运行的请求。已在运行的请求保持其原有模式。",
+          "stepByStep": "每步之前先询问",
+          "continuous": "一次批准后运行全部步骤",
+          "accessNote": "Orca 将使用批准该计划的人的访问权限开始每个步骤。",
+          "adminOnly": "只有管理员可以更改此项。",
+          "firstSave": "保存时也会一并保存该项目当前的引擎设置。",
+          "save": "保存",
+          "saving": "保存中…",
+          "saved": "请求执行设置已更新",
+          "saveFailed": "无法保存执行设置。",
+          "conflict": "其他人更改了这些设置。已加载最新值。",
+          "loadFailed": "无法加载执行设置。",
+          "noAccess": "你无权查看这些设置。",
+          "retry": "重试"
         }
       },
       "request": {
@@ -13368,7 +13385,9 @@
         },
         "RequestMarkdownContent": {
           "viewFull": "查看全文",
-          "fullTitle": "完整内容"
+          "fullTitle": "完整内容",
+          "taskDone": "已完成",
+          "taskOpen": "未完成"
         },
         "SolutionComparisonTable": {
           "criterion": "标准",
@@ -13695,7 +13714,9 @@
             "conflict": "您审阅期间内容已变更。已加载最新版本,请重新审阅。",
             "alreadyDecided": "此项已有决定。",
             "expired": "此审批已过期。已加载最新版本。",
-            "executionNotAllowed": "只有具备执行权限的人才能批准计划。请联系有权限的人，或申请访问权限。"
+            "executionNotAllowed": "只有具备执行权限的人才能批准计划。请联系有权限的人，或申请访问权限。",
+            "runAllAlreadyPinned": "此请求之前已按逐步方式启动，因此仍会逐步运行。请按常规方式批准。",
+            "runAllNotPossible": "无法以这种方式开始运行。请按常规方式批准。"
           },
           "PlanGateChips": {
             "plan": "计划",
@@ -13759,6 +13780,159 @@
             "done": "已完成",
             "step": "{{index}}. {{title}}",
             "taskCount": "{{count}} 个任务"
+          },
+          "PlanRunAllButton": {
+            "label": "批准并运行全部步骤",
+            "notApplied": "此服务器没有自动运行该计划。请照常逐步批准每个步骤。"
+          },
+          "RunAllStepsConfirmDialog": {
+            "title": "要不再询问地运行全部 {{n}} 个步骤吗？",
+            "bodyStart": "上一步完成后，Orca 会立即使用你的访问权限开始下一步。",
+            "bodyStops": "仅在以下情况才会停止：智能体需要你提供信息、某个任务持续失败（请求随后退回待办）、变更偏离计划需要审阅{{preDeploy}}。你可以随时停止运行。",
+            "preDeploy": "，或到达部署前审批",
+            "cancel": "暂不",
+            "confirm": "运行全部步骤"
+          },
+          "PlanAutoWriting": {
+            "title": "Orca 正在编写计划...",
+            "starting": "Orca 正在开始编写计划...",
+            "attempt": "第 {{attempt}} 次尝试，共 {{max}} 次",
+            "retrying": "稍后将再次尝试"
+          },
+          "PlanRunFailedCard": {
+            "title": "计划生成失败（{{code}}）",
+            "retry": "重试",
+            "generateManually": "手动生成",
+            "hint": {
+              "timeout": "AI 响应时间过长。",
+              "interrupted": "运行在完成前被中断。",
+              "invalidOutput": "AI 返回的内容不是有效的计划格式。",
+              "busy": "AI 正忙于其他工作。",
+              "commit": "计划已编写，但未能保存。",
+              "generic": "编写计划时出了问题。",
+              "noChange": "智能体没有修改任何文档。请更准确地说明需要修改什么。",
+              "baseRefGone": "此请求的起始分支已不存在。"
+            },
+            "titleRevise": "无法修订计划（{{code}}）",
+            "tryAgain": "重试",
+            "writeNew": "或者在下方写一个新的请求。"
+          },
+          "PlanAutoSkippedNote": {
+            "text": "Orca 无法自行开始编写计划（{{reason}}）。准备好后请手动生成。",
+            "reason": {
+              "noDevServer": "没有连接开发服务器",
+              "noRepoPath": "项目没有仓库路径",
+              "engineUnavailable": "规划引擎不可用"
+            }
+          },
+          "PlanRewriteStrip": {
+            "text": "Orca 正在重写计划..."
+          },
+          "documents": {
+            "proposal": {
+              "irreversible": "不可撤销",
+              "dependsOn": "依赖 {{tasks}}",
+              "prompt": "智能体提示词",
+              "writing": "正在编写新版本...",
+              "runFailed": "最近一次运行失败（{{code}}），因此没有可显示的方案。",
+              "none": "暂无可显示的方案。",
+              "notSaved": "这是最新的方案，尚未保存为计划。",
+              "notes": "备注",
+              "noTasks": "该方案没有任务。",
+              "phase": "阶段 {{n}}：{{title}}",
+              "phaseDependsOn": "依赖阶段 {{phases}}",
+              "hours": "{{hours}} 小时"
+            },
+            "tryAgain": "重试",
+            "change": {
+              "added": "新增",
+              "changed": "已修改",
+              "removed": "已删除"
+            },
+            "tabsLabel": "文档",
+            "tooLargeTitle": "文件过大，无法显示",
+            "tab": {
+              "proposal": "提案",
+              "design": "设计",
+              "tasks": "任务"
+            },
+            "pruned": "此版本的文本已不再保留。",
+            "removed": "此文件已在该版本中删除。",
+            "omitted": "此文件过大，无法显示（{{size}}）。它位于提案分支 {{branch}} 上。",
+            "notFound": "此文件不在该版本中。",
+            "modeLabel": "文档视图",
+            "modeRendered": "渲染",
+            "modeSource": "源码",
+            "copySource": "复制文档源码",
+            "emptyFile": "此文件为空。",
+            "checks": {
+              "severityWarning": "警告",
+              "severityError": "错误",
+              "severityInfo": "信息",
+              "currentOnly": "检查结果仅对当前版本显示。",
+              "title": "检查",
+              "warningCount": "{{count}} 项待查看"
+            },
+            "knowledge": {
+              "title": "由撰写智能体报告",
+              "available": "设计知识可用。",
+              "unavailable": "设计知识不可用。",
+              "snapshot": "快照 {{snapshot}}。",
+              "read": "已读取的元素：{{count}}",
+              "gaps": "缺口",
+              "conflicts": "冲突",
+              "disclaimer": "这是智能体自己的报告，Orca 未对其进行验证。"
+            },
+            "empty": "此变更还没有文档。",
+            "viewDocuments": "文档",
+            "viewProposal": "提案"
+          },
+          "revision": {
+            "treeIsCurrent": "树视图显示的是当前版本。",
+            "newerAvailable": "有更新的版本。",
+            "showNewer": "显示",
+            "versionsCount": "版本（{{count}}）",
+            "askedFor": "此版本所提出的要求",
+            "busy": "正在编写版本 {{n}}…",
+            "busyNext": "正在编写下一版本…",
+            "title": "请求修改此计划",
+            "hint": "AI 会修订文档，您随后再批准新版本。",
+            "fieldLabel": "需要修改什么?",
+            "placeholder": "例如：将迁移拆分为单独的任务，并增加回滚步骤。",
+            "submit": "修订计划",
+            "slow": "耗时超出预期。您可以继续等待；若失败，可以重试。",
+            "suggestion": {
+              "openspec": {
+                "tests": "增加一个测试任务。",
+                "splitBiggest": "拆分最大的任务。",
+                "tightenDesign": "收紧设计。",
+                "edgeScenario": "为边界情况增加一个场景。"
+              },
+              "native": {
+                "splitLargest": "拆分最大的任务。",
+                "rollback": "增加一个回滚任务。",
+                "riskyFirst": "调整顺序，先交付风险较高的部分。",
+                "mergeTiny": "合并过小的任务。"
+              }
+            },
+            "badgeCurrent": "当前",
+            "badgeSuperseded": "已被取代",
+            "versions": "版本",
+            "versionN": "版本 {{n}}",
+            "textPruned": "此版本的文本已不再保留。",
+            "showOlder": "显示更早的版本",
+            "firstProposal": "首个方案",
+            "revised": "已修订",
+            "filesChanged": "修改了 {{count}} 个文件",
+            "errorEmpty": "发送前请描述需要修改的内容。",
+            "errorTooLong": "请将内容控制在 {{max}} 个字符以内。",
+            "errorForbidden": "只有此计划的审批人可以请求修改。您输入的内容已保留。",
+            "errorForbiddenReporter": "只有提交此请求的人或项目管理员可以请求修改计划。您输入的内容已保留。",
+            "errorWrongState": "其他人已在修订此计划，或已做出决定。页面已刷新；您输入的内容已保留。",
+            "errorNoConnection": "没有已连接的开发服务器，因此目前无法修订计划。当前计划及其审批保持不变，您输入的内容已保留。",
+            "errorNotApplicable": "这类计划无法通过请求来修订。",
+            "errorNoChange": "智能体没有修改任何文档。请更准确地说明需要修改什么。",
+            "errorBaseRefGone": "此请求的起始分支已不存在，因此无法修订计划。您输入的内容已保留。"
           }
         },
         "approval": {
@@ -14255,6 +14429,11 @@
             "adviceUnknown": "请查看日志了解情况后重试。",
             "baseRefNotFound": "找不到起始分支",
             "adviceBaseRefNotFound": "此请求所基于的分支在仓库中已不存在。请选择其他起始分支后重试。"
+          },
+          "ExecutionRunModeLabel": {
+            "continuous": "自动运行全部步骤",
+            "stepByStep": "每步之前先询问",
+            "tooltip": "各步骤使用批准该计划的人的访问权限运行。"
           }
         },
         "aiSetup": {
@@ -14384,7 +14563,8 @@
             "requestReturned": "已退回待办",
             "requestReopened": "已重新打开",
             "requestCancelled": "已取消",
-            "analysisRevisionRequested": "已请求修改分析"
+            "analysisRevisionRequested": "已请求修改分析",
+            "planRevisionRequested": "已请求修改计划"
           },
           "analysis": {
             "generic": "分析"

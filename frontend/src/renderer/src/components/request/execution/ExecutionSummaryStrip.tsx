@@ -13,6 +13,8 @@ import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+import { ExecutionRunModeLabel } from './ExecutionRunModeLabel'
+import type { RunModeLabel } from './execution-run-mode-model'
 import type { ExecutionSummary } from '../../../../../shared/request-execution-types'
 import type { RequestStatus } from '../../../../../shared/request-types'
 
@@ -83,6 +85,8 @@ type Props = {
   summary: ExecutionSummary
   /** Offered while the run can still be stopped. */
   onStop?: () => void
+  /** How the run goes on (CR-REQ-043); null or omitted shows nothing. */
+  runMode?: RunModeLabel | null
   now?: number
 }
 
@@ -90,6 +94,7 @@ export function ExecutionSummaryStrip({
   status,
   summary,
   onStop,
+  runMode = null,
   now = Date.now()
 }: Props): React.JSX.Element {
   const { progress } = summary
@@ -112,6 +117,7 @@ export function ExecutionSummaryStrip({
           <Icon className={cn('size-4', label === 'running' && 'animate-spin')} aria-hidden />
           {labelText(label)}
         </span>
+        {runMode && <ExecutionRunModeLabel mode={runMode} />}
         <span data-testid="execution-progress-text">
           {progress.phasesTotal > 0
             ? translate(`${T}progressSteps`, '{{done}}/{{total}} tasks · step {{step}}/{{steps}}', {

@@ -19,6 +19,9 @@ import type {
   RequestType
 } from '../../../../shared/request-types'
 import { REQUEST_BASE_REF_FEATURE } from '../../../../shared/request-base-ref'
+import { APPROVAL_RUN_ALL_FEATURE } from '../../../../shared/request-run-all'
+import { REQUEST_PLAN_AUTO_FEATURE } from '../../../../shared/request-plan-auto'
+import { isPlanRevisionsSupported } from '../../../../shared/request-plan-revision'
 
 // ---------------------------------------------------------------------------
 // Slice state types
@@ -77,6 +80,21 @@ export type RequestSlice = {
 /** True when the connected gateway stores and enforces `Request.baseRef`; false means hide the picker, never send the field. */
 export function supportsBaseRef(state: Pick<RequestSlice, 'requestFlowFeatures'>): boolean {
   return state.requestFlowFeatures.has(REQUEST_BASE_REF_FEATURE)
+}
+
+/** True when the connected gateway forwards `executionMode` on `approval.approve`; false means never offer "run all steps". */
+export function supportsApproveRunAll(state: Pick<RequestSlice, 'requestFlowFeatures'>): boolean {
+  return state.requestFlowFeatures.has(APPROVAL_RUN_ALL_FEATURE)
+}
+
+/** True when the connected gateway writes the Plan on its own and serves `request.retryPlan`; false keeps the manual Generate flow. */
+export function supportsPlanAuto(state: Pick<RequestSlice, 'requestFlowFeatures'>): boolean {
+  return state.requestFlowFeatures.has(REQUEST_PLAN_AUTO_FEATURE)
+}
+
+/** True when the connected gateway lists Plan versions and reads their documents; false hides the version list. */
+export function supportsPlanRevisions(state: Pick<RequestSlice, 'requestFlowFeatures'>): boolean {
+  return isPlanRevisionsSupported(state.requestFlowFeatures)
 }
 
 export const createRequestSlice: StateCreator<AppState, [], [], RequestSlice> = (set) => ({

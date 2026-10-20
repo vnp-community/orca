@@ -60,6 +60,15 @@ vi.mock('../ProjectJiraMappingSection', () => ({
   ProjectJiraMappingSection: () => <div data-testid="project-jira-mapping-section" />
 }))
 
+vi.mock('../ProjectRequestExecutionSection', () => ({
+  ProjectRequestExecutionSection: ({ projectId }: { projectId: string }) => (
+    <div data-testid="project-request-execution-section">execution for {projectId}</div>
+  )
+}))
+
+// Why: the dialog's delete flow reads the confirmation provider, which this isolated render has no parent for.
+vi.mock('../../confirmation-dialog', () => ({ useConfirmationDialog: () => vi.fn() }))
+
 vi.mock('../ProjectDevServerFilterSection', () => ({
   ProjectDevServerFilterSection: () => <div data-testid="project-dev-server-filter-section" />
 }))
@@ -120,6 +129,14 @@ describe('ProjectSettings', () => {
     expect(screen.getByTestId('tab-members')).toBeInTheDocument()
     expect(screen.getByTestId('tab-repos')).toBeInTheDocument()
     expect(screen.getByTestId('tab-linked')).toBeInTheDocument()
+  })
+
+  it('embeds the request execution section in the General tab, after the Jira mapping', () => {
+    render(<ProjectSettings projectId="p1" open={true} onClose={vi.fn()} />)
+    const jira = screen.getByTestId('project-jira-mapping-section')
+    const execution = screen.getByTestId('project-request-execution-section')
+    expect(execution).toHaveTextContent('execution for p1')
+    expect(jira.compareDocumentPosition(execution) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   // BUG-FE-PW-002 fix: the Linked Projects tab needs to know the viewer's own

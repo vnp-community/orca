@@ -14,6 +14,7 @@ import {
   CircleCheck,
   CirclePlay,
   CircleX,
+  ClipboardPen,
   FilePenLine,
   FilePlus2,
   FileText,
@@ -54,6 +55,7 @@ export const ACTIVITY_GROUP_KINDS: Record<Exclude<ActivityKindGroup, 'all'>, rea
     'request.type_changed',
     'analysis.generated',
     'analysis.revision_requested',
+    'plan.revision_requested',
     'request.returned',
     'request.reopened',
     'request.cancelled'
@@ -70,6 +72,8 @@ const KIND_FACTS: Record<string, KindFacts> = {
   'request.type_changed': { icon: ArrowLeftRight },
   'analysis.generated': { icon: FileText },
   'analysis.revision_requested': { icon: FilePenLine },
+  // Why: its own shape, so a change request on the plan is not mistaken for one on the analysis (FilePenLine) or for plan.done.
+  'plan.revision_requested': { icon: ClipboardPen },
   'clarification.asked': { icon: MessageCircleQuestion },
   'clarification.answered': { icon: MessageSquareReply },
   'approval.requested': { icon: ShieldQuestion },
@@ -191,6 +195,9 @@ export function activityTargetTab(
   }
   if (kind === 'analysis.generated' || kind === 'analysis.revision_requested') {
     return 'analysis'
+  }
+  if (kind === 'plan.revision_requested') {
+    return 'plan'
   }
   if (kind.startsWith('clarification.')) {
     return 'overview'

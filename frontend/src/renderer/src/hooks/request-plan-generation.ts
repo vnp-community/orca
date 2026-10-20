@@ -32,6 +32,8 @@ const MAX_CONSECUTIVE_POLL_FAILURES = 3
 
 export type PlanGenerationOptions = {
   feedback?: string
+  /** A fresh key per submit: the server hands the same run back for a repeat and refuses a second reviewer (CR-REQ-045). */
+  idempotencyKey?: string
   /** Called once the server says which engine writes the plan (the first poll). */
   onEngine?: (engine: string) => void
   /** Seam for tests; defaults to a real timer. */
@@ -108,17 +110,45 @@ async function waitForProposal(
   }
 }
 
+function callPropose(
+  id: string,
+  options: Pick<PlanGenerationOptions, 'feedback' | 'idempotencyKey'>
+): Promise<Result<ProposeValue>> {
+  const params = {
+    id,
+    mode: 'propose',
+    ...(options.feedback ? { feedback: options.feedback } : {}),
+    ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {})
+  }
+  // Why: with a key the server answers a repeat with the same run, so one retry after a throttle cannot start a second one.
+  return options.idempotencyKey
+    ? callRequestRpc<ProposeValue>(REQUEST_RPC_METHODS.GENERATE_PLAN, params, { idempotent: true })
+    : callRequestRpc<ProposeValue>(REQUEST_RPC_METHODS.GENERATE_PLAN, params)
+}
+
+/**
+ * Starts a Plan run and returns its id; nothing is committed here. For a change request on a Plan that exists, the server saves
+ * the result itself (CR-REQ-044/045), so closing the tab cannot leave the Request half-way.
+ */
+export async function generatePlanPropose(
+  id: string,
+  options: Pick<PlanGenerationOptions, 'feedback' | 'idempotencyKey'> = {}
+): Promise<Result<{ runId: string }>> {
+  const proposed = await callPropose(id, options)
+  if (!proposed.ok) {
+    return proposed
+  }
+  const runId = proposed.value?.runId
+  return { ok: true, value: { runId: typeof runId === 'string' ? runId : '' } }
+}
+
 // Why: `propose` writes nothing and `commit` requires the proposal, so a one-click
 // "generate plan" must run both; an existing plan or a failed run stops after propose.
 export async function generatePlanProposeCommit(
   id: string,
   options: PlanGenerationOptions = {}
 ): Promise<Result<unknown>> {
-  const proposed = await callRequestRpc<ProposeValue>(REQUEST_RPC_METHODS.GENERATE_PLAN, {
-    id,
-    mode: 'propose',
-    ...(options.feedback ? { feedback: options.feedback } : {})
-  })
+  const proposed = await callPropose(id, options)
   if (!proposed.ok || proposed.value?.alreadyExists) {
     return proposed
   }

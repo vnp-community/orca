@@ -38,6 +38,12 @@ export const REQUEST_RPC_METHODS = {
   GENERATE_PLAN: 'request.generatePlan',
   // Result of a background `generatePlan` propose run (CONTRACT Q2, option a)
   PLAN_PROPOSAL: 'request.planProposal',
+  /** CR-REQ-045: one file of the OpenSpec change behind a Plan version. */
+  PLAN_BUNDLE_FILE: 'request.planBundleFile',
+  /** CR-REQ-045: the versions of a Plan, newest first, with what was asked for each. */
+  PLAN_REVISIONS: 'request.planRevisions',
+  /** CR-REQ-044: start the server-side Plan generation again after it gave up (or commit a Plan that was written but not saved). */
+  RETRY_PLAN: 'request.retryPlan',
   START_PHASE: 'request.startPhase',
 
   // Subscriptions
@@ -86,6 +92,10 @@ export const REQUEST_RPC_METHODS = {
   READINESS_GET: 'readiness.get',
   READINESS_LIST: 'readiness.list',
   EXECUTION_GET: 'execution.get',
+
+  // Per-project engine and execution-mode switches (admin writes); CR-REQ-043 reads and writes the whole set
+  ENGINE_SETTINGS: 'request.engineSettings',
+  ENGINE_SETTINGS_SET: 'request.engineSettingsSet',
 
   // Request detail read models (CR-REQ-038)
   ACTIVITY: 'request.activity',

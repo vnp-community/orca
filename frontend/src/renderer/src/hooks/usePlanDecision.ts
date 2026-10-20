@@ -1,8 +1,8 @@
 /**
  * usePlanDecision — CR-REQ-021-04
  *
- * Approve / reject Plan, Phase and pre_deploy gates, regenerate the Plan and start a
- * Phase. Double-submit is blocked per approval id / phase id.
+ * Approve / reject Plan, Phase and pre_deploy gates, generate the first Plan and start a
+ * Phase. Changing a Plan that exists is usePlanRevision's job (CR-REQ-045), not a rejection. Double-submit is blocked per approval id / phase id.
  *
  * @module hooks/usePlanDecision
  */
@@ -13,6 +13,13 @@ import { generatePlanProposeCommit } from './request-plan-generation'
 import { useRequestCooldown } from './useRequestCooldown'
 import { REQUEST_RPC_METHODS } from '../../../shared/request-rpc-methods'
 import {
+  isRunAllAlreadyPinned,
+  isRunAllProgrammingError,
+  parseApproveResult,
+  RUN_ALL_EXECUTION_MODE
+} from '../../../shared/request-run-all'
+import {
+  backendErrorCode,
   classifySolutionError,
   type SolutionErrorClass
 } from '../components/request/solution/solution-error-classification'
@@ -28,7 +35,14 @@ export type PlanDecisionFailure = {
   error: RequestRpcError
 }
 
-export type PlanDecisionOutcome = { ok: boolean; error?: RequestRpcError }
+export type PlanDecisionOutcome = {
+  ok: boolean
+  error?: RequestRpcError
+  /** Only when run-all was asked for: whether the server pinned `continuous`. False = a gateway that dropped the field. */
+  runAllApplied?: boolean
+}
+
+export type ApproveOptions = { executionMode?: typeof RUN_ALL_EXECUTION_MODE }
 
 const IN_FLIGHT: RequestRpcError = { kind: 'unknown', code: 'IN_FLIGHT', message: 'In flight' }
 
@@ -36,6 +50,8 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
   const [busyKeys, setBusyKeys] = useState<ReadonlySet<string>>(new Set())
   const [failure, setFailure] = useState<PlanDecisionFailure | null>(null)
   const [deniedApprovalIds, setDeniedApprovalIds] = useState<ReadonlySet<string>>(new Set())
+  // Why: a refused run-all means the Request is pinned to step by step; remember it across refreshes so the choice stays hidden.
+  const [runAllPinnedIds, setRunAllPinnedIds] = useState<ReadonlySet<string>>(new Set())
   const inFlight = useRef(new Set<string>())
   // Why: the limiter told us to wait; gate buttons read these instead of firing into it.
   const writeCooldown = useRequestCooldown('write')
@@ -46,7 +62,8 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
       key: string,
       scope: string,
       call: () => Promise<Result<unknown>>,
-      forApproval?: Approval
+      forApproval?: Approval,
+      outcomeOf?: (value: unknown) => Partial<PlanDecisionOutcome>
     ) => {
       // Why: refs block a second click synchronously; state lags one render behind.
       if (inFlight.current.has(key)) {
@@ -59,6 +76,13 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
         const res = await call()
         if (!res.ok) {
           const errorClass = classifySolutionError(res.error)
+          if (isRunAllAlreadyPinned(res.error)) {
+            setRunAllPinnedIds((prev) => new Set(prev).add(request.id))
+          }
+          if (isRunAllProgrammingError(res.error)) {
+            // Why: the UI offered run-all where it does not apply; log the code only, never request content.
+            console.warn('[plan-decision] run-all refused:', backendErrorCode(res.error))
+          }
           setFailure({ scope, errorClass, error: res.error })
           if ((errorClass === 'notApprover' || errorClass === 'forbidden') && forApproval) {
             setDeniedApprovalIds((prev) => new Set(prev).add(forApproval.id))
@@ -73,20 +97,21 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
           return { ok: false, error: res.error } as PlanDecisionOutcome
         }
         onSettled()
-        return { ok: true } as PlanDecisionOutcome
+        return { ok: true, ...outcomeOf?.(res.value) } as PlanDecisionOutcome
       } finally {
         inFlight.current.delete(key)
         setBusyKeys(new Set(inFlight.current))
       }
     },
-    [onSettled]
+    [onSettled, request.id]
   )
 
   const approve = useCallback(
     (
       approval: Approval,
       comment?: string,
-      risk?: { viewedImpactDigest?: string; acceptedFindingIds?: string[] }
+      risk?: { viewedImpactDigest?: string; acceptedFindingIds?: string[] },
+      options?: ApproveOptions
     ) =>
       run(
         `approve:${approval.id}`,
@@ -103,9 +128,16 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
             ...(risk?.viewedImpactDigest ? { viewedImpactDigest: risk.viewedImpactDigest } : {}),
             ...(risk?.acceptedFindingIds?.length
               ? { acceptedFindingIds: risk.acceptedFindingIds }
-              : {})
+              : {}),
+            // Why: CR-REQ-043; sent only when asked, so a plain approval keeps its exact arguments.
+            ...(options?.executionMode ? { executionMode: options.executionMode } : {})
           }),
-        approval
+        approval,
+        options?.executionMode
+          ? (value) => ({
+              runAllApplied: parseApproveResult(value).executionMode === RUN_ALL_EXECUTION_MODE
+            })
+          : undefined
       ),
     [run]
   )
@@ -116,11 +148,7 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
   )
 
   const reject = useCallback(
-    async (
-      approval: Approval,
-      comment: string,
-      options?: { regenerate?: boolean }
-    ): Promise<PlanDecisionOutcome> => {
+    async (approval: Approval, comment: string): Promise<PlanDecisionOutcome> => {
       // Why: a rejection without a reason must never reach the backend.
       if (!validateRejectReason(comment).ok) {
         return {
@@ -132,7 +160,7 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
           }
         }
       }
-      const res = await run(
+      return run(
         `reject:${approval.id}`,
         approval.id,
         () =>
@@ -145,13 +173,8 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
           }),
         approval
       )
-      // Regenerate failure must not reopen the dialog: the rejection itself succeeded.
-      if (res.ok && options?.regenerate) {
-        await regeneratePlan()
-      }
-      return res
     },
-    [run, regeneratePlan]
+    [run]
   )
 
   const startPhase = useCallback(
@@ -171,6 +194,8 @@ export function usePlanDecision(request: Pick<OrcaRequest, 'id'>, onSettled: () 
     isBusy: (key: string) => busyKeys.has(key),
     failure,
     clearFailure: () => setFailure(null),
+    /** True once a run-all approval of this Request was refused because it is pinned to step by step. */
+    runAllPinned: runAllPinnedIds.has(request.id),
     isDenied: (approvalId: string | undefined) =>
       approvalId ? deniedApprovalIds.has(approvalId) : false,
     approve,

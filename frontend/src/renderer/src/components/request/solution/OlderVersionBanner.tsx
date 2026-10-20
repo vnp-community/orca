@@ -11,11 +11,22 @@ import { History } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 
-export function OlderVersionBanner({ onBack }: { onBack: () => void }): React.JSX.Element {
+type Props = {
+  onBack: () => void
+  /** Test ids of the banner and of its button; the defaults are the analysis ones (the Plan tab passes its own). */
+  testId?: string
+  backTestId?: string
+}
+
+export function OlderVersionBanner({
+  onBack,
+  testId = 'solution-older-version-banner',
+  backTestId = 'solution-back-to-current'
+}: Props): React.JSX.Element {
   return (
     <div
       role="status"
-      data-testid="solution-older-version-banner"
+      data-testid={testId}
       className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
     >
       <History className="size-4 shrink-0" aria-hidden />
@@ -30,7 +41,7 @@ export function OlderVersionBanner({ onBack }: { onBack: () => void }): React.JS
         variant="outline"
         className="ml-auto"
         onClick={onBack}
-        data-testid="solution-back-to-current"
+        data-testid={backTestId}
       >
         {translate(
           'auto.components.request.SolutionVersionSwitcher.backToCurrent',

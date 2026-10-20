@@ -91,6 +91,7 @@ export function PlanApprovalCard({
         approval={approval}
         decision={decision}
         approveBlockedReason={approveBlockedReason}
+        approveExecutionMode="continuous"
         approveLabel={translate(`${T}approve`, 'Approve and start execution')}
         rejectLabel={translate(`${T}requestChanges`, 'Request changes')}
       />

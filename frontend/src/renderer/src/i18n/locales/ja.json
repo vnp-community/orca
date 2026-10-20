@@ -13199,6 +13199,23 @@
         },
         "CreateProjectDialog": {
           "repoAddFailed": "プロジェクトは作成されましたが、リポジトリを追加できませんでした: {{message}}。もう一度お試しください。"
+        },
+        "ProjectRequestExecutionSection": {
+          "title": "リクエストの実行",
+          "description": "これから実行が始まるリクエストに適用されます。すでに実行中のリクエストは現在のモードのままです。",
+          "stepByStep": "各ステップの前に確認する",
+          "continuous": "1 回の承認ですべてのステップを実行する",
+          "accessNote": "Orca は、プランを承認した人のアクセス権限で各ステップを開始します。",
+          "adminOnly": "これを変更できるのは管理者のみです。",
+          "firstSave": "保存すると、このプロジェクトの現在のエンジン設定も一緒に保存されます。",
+          "save": "保存",
+          "saving": "保存中…",
+          "saved": "リクエストの実行設定を更新しました",
+          "saveFailed": "実行設定を保存できませんでした。",
+          "conflict": "他のユーザーがこの設定を変更しました。最新の値を読み込みました。",
+          "loadFailed": "実行設定を読み込めませんでした。",
+          "noAccess": "この設定を表示する権限がありません。",
+          "retry": "再試行"
         }
       },
       "request": {
@@ -13368,7 +13385,9 @@
         },
         "RequestMarkdownContent": {
           "viewFull": "全文を表示",
-          "fullTitle": "全内容"
+          "fullTitle": "全内容",
+          "taskDone": "完了",
+          "taskOpen": "未完了"
         },
         "SolutionComparisonTable": {
           "criterion": "基準",
@@ -13695,7 +13714,9 @@
             "conflict": "確認中に内容が変更されました。最新版を読み込んだので、もう一度確認してください。",
             "alreadyDecided": "これはすでに決定済みです。",
             "expired": "この承認は期限切れです。最新版を読み込みました。",
-            "executionNotAllowed": "プランを承認できるのは、その実行権限を持つ人のみです。権限のある人に依頼するか、アクセスを申請してください。"
+            "executionNotAllowed": "プランを承認できるのは、その実行権限を持つ人のみです。権限のある人に依頼するか、アクセスを申請してください。",
+            "runAllAlreadyPinned": "このリクエストは以前にステップごとの実行で開始されたため、引き続きステップごとに実行されます。通常どおり承認してください。",
+            "runAllNotPossible": "この方法では実行を開始できませんでした。通常どおり承認してください。"
           },
           "PlanGateChips": {
             "plan": "プラン",
@@ -13759,6 +13780,159 @@
             "done": "完了",
             "step": "{{index}}. {{title}}",
             "taskCount": "{{count}} タスク"
+          },
+          "PlanRunAllButton": {
+            "label": "承認してすべてのステップを実行",
+            "notApplied": "このサーバーではプランが自動実行されませんでした。各ステップをこれまでどおり承認してください。"
+          },
+          "RunAllStepsConfirmDialog": {
+            "title": "{{n}} 個のステップをすべて、再確認なしで実行しますか？",
+            "bodyStart": "Orca は前のステップが終わるたびに、あなたのアクセス権限で次のステップを開始します。",
+            "bodyStops": "停止するのは、エージェントがあなたの情報を必要とするとき、タスクが失敗し続けるとき (リクエストはバックログに戻ります)、変更がプランから逸脱してレビューが必要になったとき{{preDeploy}}に限られます。実行はいつでも停止できます。",
+            "preDeploy": "、またはデプロイ前の承認に到達したとき",
+            "cancel": "今はしない",
+            "confirm": "すべてのステップを実行"
+          },
+          "PlanAutoWriting": {
+            "title": "Orca がプランを作成しています...",
+            "starting": "Orca がプランの作成を開始しています...",
+            "attempt": "{{max}} 回中 {{attempt}} 回目の試行",
+            "retrying": "まもなく再試行します"
+          },
+          "PlanRunFailedCard": {
+            "title": "プランの生成に失敗しました（{{code}}）",
+            "retry": "再試行",
+            "generateManually": "手動で生成",
+            "hint": {
+              "timeout": "AI の応答に時間がかかりすぎました。",
+              "interrupted": "実行が完了する前に中断されました。",
+              "invalidOutput": "AI の応答が有効なプランの形式ではありませんでした。",
+              "busy": "AI は他の処理で使用中です。",
+              "commit": "プランは作成されましたが、保存できませんでした。",
+              "generic": "プランの作成中に問題が発生しました。",
+              "noChange": "エージェントはどのドキュメントも変更しませんでした。変更したい点をもっと具体的に伝えてください。",
+              "baseRefGone": "このリクエストの開始元ブランチが存在しません。"
+            },
+            "titleRevise": "プランを修正できませんでした（{{code}}）",
+            "tryAgain": "再試行",
+            "writeNew": "または、下に新しい依頼を書いてください。"
+          },
+          "PlanAutoSkippedNote": {
+            "text": "Orca は自動でプランを開始できませんでした（{{reason}}）。準備ができたら生成してください。",
+            "reason": {
+              "noDevServer": "開発サーバーが接続されていません",
+              "noRepoPath": "プロジェクトにリポジトリのパスがありません",
+              "engineUnavailable": "プランニングエンジンを利用できません"
+            }
+          },
+          "PlanRewriteStrip": {
+            "text": "Orca がプランを書き直しています..."
+          },
+          "documents": {
+            "proposal": {
+              "irreversible": "元に戻せない",
+              "dependsOn": "{{tasks}} に依存",
+              "prompt": "エージェントのプロンプト",
+              "writing": "新しいバージョンを作成中です...",
+              "runFailed": "直近の実行が失敗した（{{code}}）ため、表示できる提案がありません。",
+              "none": "表示できる提案はまだありません。",
+              "notSaved": "これは最新の提案です。まだプランとして保存されていません。",
+              "notes": "メモ",
+              "noTasks": "この提案にはタスクがありません。",
+              "phase": "フェーズ {{n}}: {{title}}",
+              "phaseDependsOn": "フェーズ {{phases}} に依存",
+              "hours": "{{hours}} 時間"
+            },
+            "tryAgain": "再試行",
+            "change": {
+              "added": "新規",
+              "changed": "変更あり",
+              "removed": "削除"
+            },
+            "tabsLabel": "ドキュメント",
+            "tooLargeTitle": "大きすぎて表示できません",
+            "tab": {
+              "proposal": "提案",
+              "design": "設計",
+              "tasks": "タスク"
+            },
+            "pruned": "このバージョンの本文は保持されていません。",
+            "removed": "このファイルはこのバージョンで削除されました。",
+            "omitted": "このファイルは大きすぎて表示できません（{{size}}）。提案ブランチ {{branch}} にあります。",
+            "notFound": "このファイルはこのバージョンにありません。",
+            "modeLabel": "ドキュメントの表示",
+            "modeRendered": "レンダリング表示",
+            "modeSource": "ソース",
+            "copySource": "ドキュメントのソースをコピー",
+            "emptyFile": "このファイルは空です。",
+            "checks": {
+              "severityWarning": "警告",
+              "severityError": "エラー",
+              "severityInfo": "情報",
+              "currentOnly": "チェック結果は現在のバージョンのみ表示されます。",
+              "title": "チェック",
+              "warningCount": "{{count}} 件を要確認"
+            },
+            "knowledge": {
+              "title": "作成エージェントによる報告",
+              "available": "設計ナレッジを利用できました。",
+              "unavailable": "設計ナレッジを利用できませんでした。",
+              "snapshot": "スナップショット {{snapshot}}。",
+              "read": "読み取った要素: {{count}}",
+              "gaps": "不足している点",
+              "conflicts": "矛盾",
+              "disclaimer": "これはエージェント自身の報告であり、Orca は検証していません。"
+            },
+            "empty": "この変更にはまだドキュメントがありません。",
+            "viewDocuments": "ドキュメント",
+            "viewProposal": "提案"
+          },
+          "revision": {
+            "treeIsCurrent": "ツリーには現在のバージョンが表示されています。",
+            "newerAvailable": "新しいバージョンがあります。",
+            "showNewer": "表示する",
+            "versionsCount": "バージョン ({{count}})",
+            "askedFor": "このバージョンで依頼された内容",
+            "busy": "バージョン {{n}} を作成中…",
+            "busyNext": "次のバージョンを作成中…",
+            "title": "このプランの変更を依頼",
+            "hint": "AI がドキュメントを修正します。新しいバージョンは後で承認してください。",
+            "fieldLabel": "何を変更しますか?",
+            "placeholder": "例: 移行を独立したタスクに分け、ロールバック手順を追加してください。",
+            "submit": "プランを修正",
+            "slow": "想定より時間がかかっています。このままお待ちいただけます。失敗した場合は再試行できます。",
+            "suggestion": {
+              "openspec": {
+                "tests": "テスト用のタスクを追加してください。",
+                "splitBiggest": "最も大きなタスクを分割してください。",
+                "tightenDesign": "設計を引き締めてください。",
+                "edgeScenario": "エッジケースのシナリオを追加してください。"
+              },
+              "native": {
+                "splitLargest": "最も大きなタスクを分割してください。",
+                "rollback": "ロールバック用のタスクを追加してください。",
+                "riskyFirst": "リスクの高い部分を先に出荷できるよう順序を入れ替えてください。",
+                "mergeTiny": "小さすぎるタスクを統合してください。"
+              }
+            },
+            "badgeCurrent": "現在",
+            "badgeSuperseded": "置き換え済み",
+            "versions": "バージョン",
+            "versionN": "バージョン {{n}}",
+            "textPruned": "このバージョンの本文は保持されていません。",
+            "showOlder": "古いバージョンを表示",
+            "firstProposal": "最初の提案",
+            "revised": "修正版",
+            "filesChanged": "{{count}} 個のファイルを変更",
+            "errorEmpty": "送信する前に、何を変更すべきか記述してください。",
+            "errorTooLong": "依頼は{{max}}文字以内にしてください。",
+            "errorForbidden": "このプランの変更を依頼できるのは承認者のみです。入力した内容は保持されます。",
+            "errorForbiddenReporter": "プランの変更を依頼できるのは、このリクエストの報告者またはプロジェクト管理者のみです。入力した内容は保持されます。",
+            "errorWrongState": "他の人がすでにこのプランを修正中か、決定済みです。内容を更新しました。入力した内容は保持されます。",
+            "errorNoConnection": "開発サーバーが接続されていないため、今はプランを修正できません。現在のプランとその承認は変更されず、入力した内容は保持されます。",
+            "errorNotApplicable": "この種類のプランは依頼による修正ができません。",
+            "errorNoChange": "エージェントはどのドキュメントも変更しませんでした。変更したい点をもっと具体的に伝えてください。",
+            "errorBaseRefGone": "このリクエストの開始元ブランチが存在しないため、プランを修正できません。入力した内容は保持されます。"
           }
         },
         "approval": {
@@ -14255,6 +14429,11 @@
             "adviceUnknown": "ログで状況を確認してから再実行してください。",
             "baseRefNotFound": "開始ブランチが見つかりません",
             "adviceBaseRefNotFound": "このリクエストの開始元ブランチはリポジトリに存在しなくなりました。別の開始ブランチを選んで再実行してください。"
+          },
+          "ExecutionRunModeLabel": {
+            "continuous": "すべてのステップを自動で実行",
+            "stepByStep": "各ステップの前に確認",
+            "tooltip": "各ステップは、プランを承認した人のアクセス権限で実行されます。"
           }
         },
         "aiSetup": {
@@ -14384,7 +14563,8 @@
             "requestReturned": "バックログに戻しました",
             "requestReopened": "再開しました",
             "requestCancelled": "キャンセル済み",
-            "analysisRevisionRequested": "分析への変更が依頼されました"
+            "analysisRevisionRequested": "分析への変更が依頼されました",
+            "planRevisionRequested": "プランへの変更が依頼されました"
           },
           "analysis": {
             "generic": "分析"
