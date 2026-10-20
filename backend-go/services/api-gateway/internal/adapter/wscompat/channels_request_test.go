@@ -352,6 +352,25 @@ func requestChannelCases() []requestChannelCase {
 				mustEqual(t, s["handover"].(map[string]any)["state"], "none")
 				mustEqual(t, len(s["running"].([]any)), 0)
 			}},
+		{channel: "request.testSpecs", args: `{"id":"r1"}`, rpc: "GetTestSpecs", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, _ proto.Message) {
+				mustEqual(t, res["enabled"], true)
+				cur := res["current"].(map[string]any)
+				mustEqual(t, cur["status"], "completed")
+				mustEqual(t, cur["contextMode"], "solution")
+				mustEqual(t, cur["summary"].(map[string]any)["feature"], "TDD-NOTES")
+				mustEqual(t, len(res["history"].([]any)), 0)
+			}},
+		{channel: "request.testSpecsStart", args: `{"id":"r1"}`, rpc: "StartTestSpecs", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, _ proto.Message) {
+				mustEqual(t, res["run"].(map[string]any)["status"], "starting")
+			}},
+		{channel: "request.testSpecDocument", args: `{"id":"r1","document":"cases","offset":10}`, rpc: "GetTestSpecDocument", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, in proto.Message) {
+				mustEqual(t, in.(*requestv1.GetTestSpecDocumentRequest).GetOffset(), int32(10))
+				mustEqual(t, res["text"], "TC-1")
+				mustEqual(t, res["hasNext"], false)
+			}},
 		{channel: "request.flow", args: `{"type":"bug","size":"S"}`, rpc: "GetRequestFlow", lo: short[0], hi: short[1],
 			check: func(t *testing.T, res map[string]any, _ proto.Message) {
 				mustEqual(t, res["hasPhases"], true)
@@ -465,8 +484,7 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"approval.get", "approval.list", "approval.listPending", "approval.approve", "approval.reject", "approval.cancel",
 		"backlog.requests", "backlog.tasks", "backlog.execute",
 		// CONTRACT 2.5 and the plan proposal reader.
-		"request.links", "request.activity", "request.executionSummary", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal", "request.retryPlan", "request.planRevisions",
-		// CR-REQ-028: the channels useClarifications.ts calls.
+		"request.links", "request.activity", "request.executionSummary", "request.testSpecs", "request.testSpecsStart", "request.testSpecDocument", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal", "request.retryPlan", "request.planRevisions",		// CR-REQ-028: the channels useClarifications.ts calls.
 		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel", "clarification.request",
 		// The decision log: reading it, and a person confirming a high risk choice.
 		"decision.list", "decision.confirm",

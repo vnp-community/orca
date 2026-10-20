@@ -73,6 +73,9 @@ var requestServiceRPCChannels = map[string]rpcDisposition{
 	"ReportTaskOutcome":              internalRPC("task-service reports phase outcomes"),
 	"RecordRequestCheck":             internalRPC("verification runners record checks"),
 	"ListRequestChecks":              viaChannel("request.checks"),
+	"GetTestSpecs":             viaChannel("request.testSpecs"),
+	"StartTestSpecs":           viaChannel("request.testSpecsStart"),
+	"GetTestSpecDocument":      viaChannel("request.testSpecDocument"),
 
 	"GetRequestReadiness":              deferredRPC("CR-REQ-028 readiness panel"),
 	"RequestClarification":             viaChannel("clarification.request"),

@@ -217,6 +217,9 @@ describe('bridge config and helpers', () => {
       'stdio'
     ])
     expect(cfg.servers['tdd-agent'].tools).toContain('run_dispatch')
+    expect(cfg.servers['tdd-agent'].tools).toEqual(
+      expect.arrayContaining(['testspec_start', 'testspec_get'])
+    )
     expect(cfg.servers['tdd-agent'].tools).not.toContain('changeset_propose')
     expect(
       loadBridgeConfig({ ORCA_MCP_BRIDGE_ROOTS: ['/a', '/b'].join(path.delimiter) }, '/w').roots

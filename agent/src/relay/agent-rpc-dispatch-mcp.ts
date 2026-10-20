@@ -32,7 +32,9 @@ const TDD_AGENT_TOOLS = [
   'change_start',
   'approval_submit',
   'trace_get',
-  'kg_snapshots'
+  'kg_snapshots',
+  'testspec_start',
+  'testspec_get'
 ]
 
 export function defaultBridgeConfig(workDir: string): McpBridgeConfig {

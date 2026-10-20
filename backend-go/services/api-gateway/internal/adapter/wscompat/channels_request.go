@@ -22,6 +22,7 @@ func registerRequestChannels(r *Registry, req requestv1.RequestServiceClient, ap
 	c.registerExtras(r)
 	c.registerBaseRef(r)
 	c.registerActivity(r)
+	c.registerTestSpecs(r)
 	c.registerClarification(r)
 	c.registerClarificationAsk(r)
 	c.registerDecisions(r)

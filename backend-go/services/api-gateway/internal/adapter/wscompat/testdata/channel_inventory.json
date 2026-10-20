@@ -1824,6 +1824,18 @@
     "kind": "stream"
   },
   {
+    "name": "request.testSpecDocument",
+    "kind": "unary"
+  },
+  {
+    "name": "request.testSpecs",
+    "kind": "unary"
+  },
+  {
+    "name": "request.testSpecsStart",
+    "kind": "unary"
+  },
+  {
     "name": "request.typeHistory",
     "kind": "unary"
   },

@@ -114,7 +114,11 @@ export const REQUEST_RPC_METHODS = {
   REVIEW_DECIDE: 'request.review.decide',
   REVIEW_APPROVE: 'request.review.approve',
   REVIEW_DECISIONS: 'request.review.decisions',
-  REVIEW_LINK_CHILD: 'request.review.linkChild'
+  REVIEW_LINK_CHILD: 'request.review.linkChild',
+  // Test specs generated next to the code (docs/integrate/TDD-REQ-TESTSPEC-001)
+  TEST_SPECS: 'request.testSpecs',
+  TEST_SPECS_START: 'request.testSpecsStart',
+  TEST_SPEC_DOCUMENT: 'request.testSpecDocument'
 } as const
 
 export type RequestRpcMethod = (typeof REQUEST_RPC_METHODS)[keyof typeof REQUEST_RPC_METHODS]

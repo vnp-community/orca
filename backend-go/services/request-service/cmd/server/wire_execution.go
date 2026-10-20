@@ -98,7 +98,9 @@ type executionWiring struct {
 	Policies *domain.PolicyRegistry
 	// taskSync is filled by wirePlan, which owns the workspace the sync writes in; until then a succeeded task is only recorded.
 	taskSync *taskSyncSlot
-	closers  []func()
+	// Actors picks the user an unattended action runs as (the Phase's starter, else the approver of the Plan); the test-spec lane uses the same one.
+	Actors  usecase.ExecutionActors
+	closers []func()
 }
 
 func (w *executionWiring) close() {
@@ -151,6 +153,7 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 		}
 	}
 	actors := &usecase.ApprovalExecutionActors{Approvals: ex.gateApprovals, PhaseStarts: ex.phaseStarts, Access: access}
+	w.Actors = actors
 	advance := &usecase.AdvanceExecution{
 		Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Policies: policies,
 		Approvals: opener, Settings: settings, Contract: contractRuns, Log: log,
