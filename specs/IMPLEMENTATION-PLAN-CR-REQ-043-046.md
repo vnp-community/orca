@@ -90,5 +90,5 @@ Giống kế hoạch 039–042: mọi ô "Tiêu chí hoàn thành" được tick
 
 Kết quả cuối: acceptance 158 đạt, 1 lỗi đã sửa (BRF-08, kỳ vọng cũ của harness), 4 chặn, 8 bỏ qua; UI 27 spec: 23 đạt, 1 lỗi chập chờn (auto-plan ca (c), 5/5 khi chạy lặp), 3 bỏ qua. Lỗi thật tìm thấy và sửa khi chạy: outbox task-service kẹt (`task.grant_received`), consumer tự sinh Plan phát lại sự kiện cũ (chặn sự kiện quá 30 phút), hotfix bị kẹt khi chỉnh Plan (PRV-08), UI không mở luồng sự kiện ở khoảng 30% lần tải trang.
 
-Câu hỏi mới cần bạn chốt: Request `task`/`docs`/`ops_request` phải trả lời Clarification sẵn sàng sẽ không được tự sinh Plan (trả lời kích hoạt `information_provided`, thiết kế D3 không tự sinh). Có cho `information_provided → planning` cũng tự sinh Plan không?
+**Đã chốt 2026-10-20: không** (giữ D3, người dùng bấm Generate). Ghi nhận: Request `task`/`docs`/`ops_request` phải trả lời Clarification sẵn sàng sẽ không được tự sinh Plan (trả lời kích hoạt `information_provided`, thiết kế D3 không tự sinh). 
 

@@ -250,6 +250,8 @@ CR này **không** tự commit lượt có `feedback` do người bấm tay ở 
 
 ## 5. Câu hỏi còn mở
 
+> **Đã chốt 2026-10-20 (sau triển khai):** trả lời Clarification sẵn sàng (trigger `information_provided`) KHÔNG tự sinh Plan, giữ nguyên thiết kế D3; người dùng bấm Generate. Hệ quả đã biết: Request `task`, `docs`, `ops_request` phải trả lời Clarification thì chỉ tự sinh Plan khi đã có tiêu chí chấp nhận lúc xác nhận loại (APG-09 và APG-09b kiểm cả hai trường hợp).
+
 > **Đã chốt 2026-10-20:** câu 1 và 2 theo đề xuất (không làm giao diện cài đặt công tắc theo dự án trong CR này, ghi rõ trong tài liệu vận hành; `REQUEST_PLAN_AI_UNAVAILABLE` ở cấp run là lỗi tạm). Câu 3 và 4 chưa được hỏi riêng: lấy theo mặc định ghi ở từng câu.
 
 1. **Giao diện cho công tắc dự án.** Hiện không có trang cài đặt engine trong frontend; admin đổi qua `request.engineSettingsSet`/`orca-cli`. Mặc định đề xuất: không làm giao diện trong CR này (người dùng đã chốt công tắc "theo dự án" mà không nói nơi đặt), ghi rõ trong tài liệu vận hành. Nếu muốn có nút trong giao diện thì cần một CR frontend riêng về trang cài đặt engine.
