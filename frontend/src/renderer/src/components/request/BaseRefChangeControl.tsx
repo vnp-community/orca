@@ -61,6 +61,7 @@ function ChangeForRepo({
     <BaseRefPickerPopover
       repoId={repoId}
       value={current}
+      defaultName={defaultName}
       offline={defaultBranch.status === 'failed'}
       open={open}
       onOpenChange={(next) => {

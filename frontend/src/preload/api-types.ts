@@ -61,6 +61,7 @@ import type {
 } from '../shared/folder-workspace-path-status'
 import type {
   BaseRefDefaultResult,
+  RepoBranchListResult,
   BaseRefSearchResult,
   BrowserCookieImportResult,
   BrowserLoadError,
@@ -1064,6 +1065,8 @@ export type PreloadApi = {
     getGitUsername: (args: { repoId: string }) => Promise<string>
     getBaseRefDefault: (args: { repoId: string }) => Promise<BaseRefDefaultResult>
     searchBaseRefs: (args: { repoId: string; query: string; limit?: number }) => Promise<string[]>
+    /** Absent on hosts that cannot list branches (Electron IPC has no equivalent); callers fall back to searching. */
+    listBranches?: (args: { repoId: string }) => Promise<RepoBranchListResult>
     searchBaseRefDetails: (args: {
       repoId: string
       query: string

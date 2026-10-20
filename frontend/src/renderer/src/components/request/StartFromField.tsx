@@ -10,11 +10,13 @@
 
 import React, { useEffect, useId, useState } from 'react'
 import { ChevronDown, GitBranch } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { supportsBaseRef } from '@/store/slices/request'
+import { MiddleTruncatedRef } from '../git-ref-picker/MiddleTruncatedRef'
 import { BaseRefPickerPopover } from './BaseRefPickerPopover'
 import { useRepoDefaultBaseRef } from './use-repo-default-base-ref'
 import { useRequestProjectRepos } from './use-request-project-repos'
@@ -86,6 +88,8 @@ function StartFromControl({
     ? translate(`${T}defaultNamed`, 'Default branch ({{name}})', { name: defaultName })
     : translate(`${T}defaultUnnamed`, 'Default branch')
   const label = state.ref ?? defaultLabel
+  // Until the user picks, the button names the real default branch; only an unresolved default gets the generic words.
+  const shownRef = state.ref ?? defaultName
 
   const pick = (ref: string): void => {
     // Picking the default by name is "no choice": nothing is sent and the repo default keeps applying.
@@ -100,6 +104,7 @@ function StartFromControl({
         <BaseRefPickerPopover
           repoId={repoId}
           value={state.ref ?? undefined}
+          defaultName={defaultName}
           offline={state.hostOffline}
           open={open}
           onOpenChange={(next) => {
@@ -128,28 +133,52 @@ function StartFromControl({
             className="max-w-full justify-start"
           >
             <GitBranch className="size-3.5 shrink-0" aria-hidden="true" />
-            <span className="min-w-0 truncate" title={label}>
-              {label}
-            </span>
+            {shownRef === null ? (
+              <span className="min-w-0 truncate">{label}</span>
+            ) : (
+              <span className="flex min-w-0 font-mono text-xs">
+                <MiddleTruncatedRef value={shownRef} />
+              </span>
+            )}
+            {state.ref === null && defaultName !== null && (
+              <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px] font-normal">
+                {translate(`${T}defaultTag`, 'default')}
+              </Badge>
+            )}
             <ChevronDown className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
           </Button>
         </BaseRefPickerPopover>
         {state.ref !== null && (
           <Button
             type="button"
-            variant="ghost"
+            variant="link"
             size="sm"
             disabled={disabled}
             onClick={() => dispatch({ type: 'useDefault' })}
           >
-            {translate(`${T}useDefault`, 'Use default branch')}
+            {defaultName
+              ? translate(`${T}useDefaultNamed`, 'Use default ({{name}})', { name: defaultName })
+              : translate(`${T}useDefault`, 'Use default branch')}
           </Button>
         )}
       </div>
       <p id={hintId} className="text-xs text-muted-foreground">
-        {translate(`${T}hint`, 'Worktrees for this request start from this branch of {{repo}}.', {
-          repo: repoName
-        })}
+        {state.ref === null
+          ? translate(
+              `${T}hint`,
+              'Worktrees for this request start from this branch of {{repo}}.',
+              {
+                repo: repoName
+              }
+            )
+          : translate(
+              `${T}hintPicked`,
+              'Worktrees for this request start from {{branch}} of {{repo}}.',
+              {
+                branch: state.ref,
+                repo: repoName
+              }
+            )}
       </p>
       <div id={errorId} role="alert" className="flex flex-col items-start gap-1.5 text-xs">
         {error && (

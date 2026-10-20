@@ -24,11 +24,14 @@ vi.mock('@/runtime/runtime-repo-client', () => ({
     defaultBaseRef: 'origin/main',
     remoteCount: 1
   })),
-  searchRuntimeRepoBaseRefs: vi.fn(async () => ['release/1.2', 'origin/main'])
+  searchRuntimeRepoBaseRefs: vi.fn(async () => ['release/1.2', 'origin/main']),
+  // A gateway without repo.listBranches: the picker searches, as these tests expect.
+  listRuntimeRepoBranches: vi.fn(async () => ({ status: 'unsupported' }))
 }))
 vi.mock('sonner', () => ({ toast: Object.assign((...a: unknown[]) => toasts.base(...a), toasts) }))
 
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { listRuntimeRepoBranches } from '@/runtime/runtime-repo-client'
 import { useAppStore } from '@/store'
 import { resetRequestFlowCache } from '../../hooks/useRequestFlow'
 import { resetRequestCooldowns } from '../../runtime/request-rate-limit'
@@ -272,6 +275,54 @@ describe('saving', () => {
     await chooseRef('release/1.2')
     await waitFor(() => expect(setCalls()).toHaveLength(1))
     expect(setCalls()[0][1]).toEqual({ id: 'r1', baseRef: 'release/1.2' })
+  })
+})
+
+describe('branch list in the edit popover', () => {
+  const list = {
+    status: 'ok' as const,
+    branches: [
+      { name: 'main', remote: false },
+      { name: 'release/1.0', remote: false },
+      { name: 'release/1.2', remote: false },
+      { name: 'origin/hotfix/x', remote: true }
+    ],
+    truncated: false
+  }
+
+  it('opens on the list with the current branch ticked and saves the picked one', async () => {
+    vi.mocked(listRuntimeRepoBranches).mockResolvedValueOnce(list)
+    mount()
+    fireEvent.click(await screen.findByTestId('base-ref-edit'))
+    await screen.findByRole('listbox')
+    expect(screen.getAllByRole('option').map((o) => o.getAttribute('aria-label'))).toEqual([
+      'origin/main (default)',
+      'main',
+      'release/1.0',
+      'release/1.2',
+      'origin/hotfix/x (remote only)'
+    ])
+    expect(screen.getByRole('option', { name: 'release/1.0' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    fireEvent.click(screen.getByRole('option', { name: 'release/1.2' }))
+    await waitFor(() => expect(setCalls()).toHaveLength(1))
+    expect(setCalls()[0][1]).toMatchObject({ baseRef: 'release/1.2' })
+  })
+
+  it('choosing the pinned default stores the empty ref', async () => {
+    vi.mocked(listRuntimeRepoBranches).mockResolvedValueOnce(list)
+    rpc.mockImplementation((method) =>
+      method === 'request.setBaseRef'
+        ? wire({ baseRef: '' })
+        : { repos: [{ id: 'repo-1', url: '/w', displayName: 'ledger', devServerId: '' }] }
+    )
+    mount()
+    fireEvent.click(await screen.findByTestId('base-ref-edit'))
+    fireEvent.click(await screen.findByRole('option', { name: 'origin/main (default)' }))
+    await waitFor(() => expect(setCalls()).toHaveLength(1))
+    expect(setCalls()[0][1]).toMatchObject({ baseRef: '' })
   })
 })
 

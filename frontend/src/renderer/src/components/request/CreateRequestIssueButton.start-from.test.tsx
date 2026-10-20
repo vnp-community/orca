@@ -16,7 +16,9 @@ vi.mock('@/runtime/runtime-repo-client', () => ({
     defaultBaseRef: 'origin/main',
     remoteCount: 1
   })),
-  searchRuntimeRepoBaseRefs: vi.fn(async () => ['release/1.2'])
+  searchRuntimeRepoBaseRefs: vi.fn(async () => ['release/1.2']),
+  // A gateway without repo.listBranches: the picker searches, as these tests expect.
+  listRuntimeRepoBranches: vi.fn(async () => ({ status: 'unsupported' }))
 }))
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), {

@@ -1,4 +1,9 @@
-import type { BaseRefSearchResult, GlobalSettings, Repo } from '../../../shared/types'
+import type {
+  BaseRefSearchResult,
+  GlobalSettings,
+  Repo,
+  RepoBranchListResult
+} from '../../../shared/types'
 import { legacyBaseRefSearchResult } from '../../../shared/base-ref-search-result'
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
 import { isRuntimeRepoRefSearchQueryWithinLimit } from './runtime-repo-search-bounds'
@@ -51,6 +56,51 @@ export async function searchRuntimeRepoBaseRefs(
     { timeoutMs: 15_000 }
   )
   return result.refs
+}
+
+/** `unsupported`: this gateway or host has no `repo.listBranches`, so callers search instead of listing. */
+export type RuntimeRepoBranchListOutcome =
+  | ({ status: 'ok' } & RepoBranchListResult)
+  | { status: 'unsupported' }
+
+// An unregistered gateway channel answers code 'internal' with this sentence, not 'method_not_found'; a repo that does not
+// exist (WORKTREE_REPO_NOT_FOUND) or an unreachable host must stay real errors.
+const UNKNOWN_CHANNEL_MESSAGE = /is not yet implemented|unknown (?:method|channel)/i
+
+function isBranchListChannelMissing(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code
+  if (code === 'method_not_found' || code === '-32601') {
+    return true
+  }
+  return UNKNOWN_CHANNEL_MESSAGE.test(error instanceof Error ? error.message : String(error))
+}
+
+export async function listRuntimeRepoBranches(
+  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
+  repoId: string
+): Promise<RuntimeRepoBranchListOutcome> {
+  const target = getActiveRuntimeTarget(settings)
+  try {
+    if (target.kind !== 'environment') {
+      // Electron IPC has no branch listing; saying so keeps the picker on search instead of inventing a channel.
+      if (!window.api.repos.listBranches) {
+        return { status: 'unsupported' }
+      }
+      return { status: 'ok', ...(await window.api.repos.listBranches({ repoId })) }
+    }
+    const result = await callRuntimeRpc<RepoBranchListResult>(
+      target,
+      'repo.listBranches',
+      { repoId },
+      { timeoutMs: 15_000 }
+    )
+    return { status: 'ok', branches: result.branches ?? [], truncated: result.truncated === true }
+  } catch (err) {
+    if (isBranchListChannelMissing(err)) {
+      return { status: 'unsupported' }
+    }
+    throw err
+  }
 }
 
 export async function searchRuntimeRepoBaseRefDetails(

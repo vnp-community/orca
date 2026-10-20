@@ -63,11 +63,21 @@ export type RepoRefSearch = {
   retry: () => void
 }
 
+export type RepoRefSearchOptions = {
+  /** False keeps the query but never asks the host to search (the caller already holds the whole list). Default true. */
+  searchEnabled?: boolean
+  /** False skips the default-branch lookup for a caller that already knows the default. Default true. */
+  lookupDefault?: boolean
+}
+
 /**
  * Branch search and default-branch lookup of one repo, shared by every ref picker. All state is tagged with the repo and
  * runtime owner it was loaded for, so switching repo can never show the previous repo's default, query or results.
  */
-export function useRepoRefSearch(repoId: string): RepoRefSearch {
+export function useRepoRefSearch(
+  repoId: string,
+  { searchEnabled = true, lookupDefault = true }: RepoRefSearchOptions = {}
+): RepoRefSearch {
   const activeRuntimeEnvironmentId = useAppStore((state) =>
     getRuntimeEnvironmentIdForRepo(state, repoId)
   )
@@ -80,10 +90,14 @@ export function useRepoRefSearch(repoId: string): RepoRefSearch {
   const query = queryState?.scope === scope ? queryState.text : ''
   const trimmedQuery = query.trim()
   const withinLimit = isRuntimeRepoRefSearchQueryWithinLimit(query)
-  const searchable = withinLimit && trimmedQuery.length >= REPO_REF_SEARCH_MIN_QUERY_LENGTH
+  const searchable =
+    searchEnabled && withinLimit && trimmedQuery.length >= REPO_REF_SEARCH_MIN_QUERY_LENGTH
   const searchKey = `${scope}\u0000${attempt}\u0000${trimmedQuery}`
 
   useEffect(() => {
+    if (!lookupDefault) {
+      return
+    }
     let stale = false
     getRuntimeRepoBaseRefDefault({ activeRuntimeEnvironmentId }, repoId)
       .then((result) => {
@@ -105,7 +119,7 @@ export function useRepoRefSearch(repoId: string): RepoRefSearch {
     return () => {
       stale = true
     }
-  }, [activeRuntimeEnvironmentId, repoId, scope, attempt])
+  }, [activeRuntimeEnvironmentId, repoId, scope, attempt, lookupDefault])
 
   useEffect(() => {
     if (!searchable) {
@@ -152,7 +166,7 @@ export function useRepoRefSearch(repoId: string): RepoRefSearch {
   const scopedDefaults = defaults?.scope === scope ? defaults : null
   let status: RepoRefSearchStatus = 'idle'
   let results: readonly string[] = []
-  if (!withinLimit && trimmedQuery.length >= REPO_REF_SEARCH_MIN_QUERY_LENGTH) {
+  if (searchEnabled && !withinLimit && trimmedQuery.length >= REPO_REF_SEARCH_MIN_QUERY_LENGTH) {
     // A query past the byte limit is never sent; it matches nothing.
     status = 'empty'
   } else if (searchable) {

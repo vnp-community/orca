@@ -7,6 +7,7 @@ type Rpc = (method: string, params: Record<string, unknown>) => unknown
 const rpc = vi.fn<Rpc>()
 const getDefault = vi.fn()
 const searchRefs = vi.fn()
+const listBranches = vi.fn()
 const toasts = vi.hoisted(() => ({
   base: vi.fn(),
   warning: vi.fn(),
@@ -23,7 +24,8 @@ vi.mock('../../runtime/runtime-rpc-client', () => ({
 }))
 vi.mock('@/runtime/runtime-repo-client', () => ({
   getRuntimeRepoBaseRefDefault: (...args: unknown[]) => getDefault(...args),
-  searchRuntimeRepoBaseRefs: (...args: unknown[]) => searchRefs(...args)
+  searchRuntimeRepoBaseRefs: (...args: unknown[]) => searchRefs(...args),
+  listRuntimeRepoBranches: (...args: unknown[]) => listBranches(...args)
 }))
 vi.mock('sonner', () => ({
   toast: Object.assign((...args: unknown[]) => toasts.base(...args), toasts)
@@ -146,6 +148,8 @@ beforeEach(() => {
   rpc.mockReset().mockImplementation(baseRpc)
   getDefault.mockReset().mockResolvedValue({ defaultBaseRef: 'origin/main', remoteCount: 1 })
   searchRefs.mockReset().mockResolvedValue(['release/1.2', 'release/1.3'])
+  // A gateway without repo.listBranches: the search flows below are the ones under test.
+  listBranches.mockReset().mockResolvedValue({ status: 'unsupported' })
   Object.values(toasts).forEach((fn) => fn.mockReset())
   useAppStore.setState({
     requestFlowFeatures: new Set([REQUEST_BASE_REF_FEATURE]),
@@ -199,7 +203,7 @@ describe('Start from field in the create dialog', () => {
   it('Use default branch drops a picked branch again', async () => {
     await mount()
     await pick('rel', 'release/1.2')
-    fireEvent.click(await screen.findByRole('button', { name: 'Use default branch' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Use default (origin/main)' }))
     expect(
       await screen.findByRole('button', { name: /^Starting branch: Default branch/ })
     ).toBeInTheDocument()

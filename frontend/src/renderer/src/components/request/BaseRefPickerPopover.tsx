@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { translate } from '@/i18n/i18n'
-import { RepoRefPicker } from '../git-ref-picker/RepoRefPicker'
+import { RepoBranchPicker } from '../git-ref-picker/RepoBranchPicker'
 import { StartFromManualEntry } from './StartFromManualEntry'
 
 const T = 'auto.components.request.StartFromField.'
@@ -11,6 +11,8 @@ type Props = {
   repoId: string
   /** The ref in effect; empty or undefined means the repository default. */
   value?: string
+  /** The repository default as `repo.baseRefDefault` names it, pinned on top of the list; null when it cannot be named. */
+  defaultName?: string | null
   /** The host could not be asked for branches: only typing a name is offered. */
   offline: boolean
   open: boolean
@@ -23,12 +25,13 @@ type Props = {
 }
 
 /**
- * Branch chooser shared by the create dialog, the Overview row and the failure card: search the repo's branches, fall back to
- * the repository default, or type a name when the host is out of reach.
+ * Branch chooser shared by the create dialog, the Overview row and the failure card: pick from the repo's branches (or search
+ * them on a gateway that cannot list), fall back to the repository default, or type a name when the host is out of reach.
  */
 export function BaseRefPickerPopover({
   repoId,
   value,
+  defaultName = null,
   offline,
   open,
   onOpenChange,
@@ -76,9 +79,10 @@ export function BaseRefPickerPopover({
             )}
           </p>
         ) : (
-          <RepoRefPicker
+          <RepoBranchPicker
             repoId={repoId}
             value={value || undefined}
+            defaultName={defaultName}
             onSelect={onPick}
             onUseDefault={onUseDefault}
           />

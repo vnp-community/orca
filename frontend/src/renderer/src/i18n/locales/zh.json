@@ -10818,6 +10818,19 @@
           "listLabel": "匹配的分支",
           "defaultNamed": "默认分支（{{value0}}）",
           "defaultUnnamed": "默认分支"
+        },
+        "RepoBranchPicker": {
+          "localHeading": "本地分支",
+          "remoteHeading": "远程分支",
+          "moreHeading": "更多匹配",
+          "defaultTag": "默认",
+          "remoteOnly": "仅远程",
+          "optionDefault": "{{name}}（默认）",
+          "optionRemote": "{{name}}（仅远程）",
+          "noBranches": "未找到分支",
+          "loading": "正在加载分支...",
+          "loadFailed": "无法加载分支，请重试。",
+          "listLabel": "分支"
         }
       },
       "floating": {
@@ -14461,7 +14474,10 @@
           "manualPlaceholder": "例如 release/1.2",
           "manualUse": "使用此分支",
           "offline": "无法连接到主机以列出分支。请输入分支名称，创建工作树时会进行检查。",
-          "typeInstead": "改为输入分支名称"
+          "typeInstead": "改为输入分支名称",
+          "defaultTag": "默认",
+          "useDefaultNamed": "使用默认分支（{{name}}）",
+          "hintPicked": "此请求的工作树将从 {{repo}} 的 {{branch}} 开始。"
         },
         "RequestBaseRefRow": {
           "suggestions": "你是不是想选：",

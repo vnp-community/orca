@@ -441,6 +441,18 @@ export type BaseRefDefaultResult = {
   remoteCount: number
 }
 
+/** One branch of `repo.listBranches`: a local name, or `origin/x` for a remote branch with no local copy (`remote: true`). */
+export type RepoBranchEntry = {
+  name: string
+  remote: boolean
+}
+
+export type RepoBranchListResult = {
+  branches: RepoBranchEntry[]
+  /** The host cut the list; the rest is still reachable by searching. */
+  truncated: boolean
+}
+
 export type BaseRefSearchResult = {
   refName: string
   localBranchName: string

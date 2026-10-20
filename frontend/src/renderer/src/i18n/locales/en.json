@@ -10818,6 +10818,19 @@
           "listLabel": "Matching branches",
           "defaultNamed": "Default branch ({{value0}})",
           "defaultUnnamed": "Default branch"
+        },
+        "RepoBranchPicker": {
+          "localHeading": "Local branches",
+          "remoteHeading": "Remote branches",
+          "moreHeading": "More matches",
+          "defaultTag": "default",
+          "remoteOnly": "remote only",
+          "optionDefault": "{{name}} (default)",
+          "optionRemote": "{{name}} (remote only)",
+          "noBranches": "No branches found",
+          "loading": "Loading branches...",
+          "loadFailed": "Could not load the branches. Try again.",
+          "listLabel": "Branches"
         }
       },
       "floating": {
@@ -14461,7 +14474,10 @@
           "manualPlaceholder": "e.g. release/1.2",
           "manualUse": "Use this branch",
           "offline": "Cannot reach the host to list branches. Type the branch name; it is checked when the worktree is created.",
-          "typeInstead": "Type a branch name instead"
+          "typeInstead": "Type a branch name instead",
+          "defaultTag": "default",
+          "useDefaultNamed": "Use default ({{name}})",
+          "hintPicked": "Worktrees for this request start from {{branch}} of {{repo}}."
         },
         "RequestBaseRefRow": {
           "suggestions": "Did you mean:",

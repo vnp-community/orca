@@ -10818,6 +10818,19 @@
           "listLabel": "Ramas coincidentes",
           "defaultNamed": "Rama predeterminada ({{value0}})",
           "defaultUnnamed": "Rama predeterminada"
+        },
+        "RepoBranchPicker": {
+          "localHeading": "Ramas locales",
+          "remoteHeading": "Ramas remotas",
+          "moreHeading": "Más coincidencias",
+          "defaultTag": "predeterminada",
+          "remoteOnly": "solo remota",
+          "optionDefault": "{{name}} (predeterminada)",
+          "optionRemote": "{{name}} (solo remota)",
+          "noBranches": "No se encontraron ramas",
+          "loading": "Cargando ramas...",
+          "loadFailed": "No se pudieron cargar las ramas. Inténtalo de nuevo.",
+          "listLabel": "Ramas"
         }
       },
       "floating": {
@@ -14461,7 +14474,10 @@
           "manualPlaceholder": "p. ej. release/1.2",
           "manualUse": "Usar esta rama",
           "offline": "No se puede conectar con el host para listar las ramas. Escribe el nombre de la rama; se comprobará al crear el worktree.",
-          "typeInstead": "Escribir el nombre de una rama"
+          "typeInstead": "Escribir el nombre de una rama",
+          "defaultTag": "predeterminada",
+          "useDefaultNamed": "Usar la predeterminada ({{name}})",
+          "hintPicked": "Los worktrees de esta solicitud parten de {{branch}} de {{repo}}."
         },
         "RequestBaseRefRow": {
           "suggestions": "¿Quisiste decir:",

@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- Why: the web preload adapter is the browser-side
    replacement for Electron preload, so the compatibility surface is necessarily
    centralized at this boundary. */
+import { baseRefDefaultFromWire } from './base-ref-default-wire'
 import type {
   PreloadApi,
   PreflightStatus,
@@ -1667,7 +1668,9 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
     },
     onCloneProgress: () => noopUnsubscribe,
     getGitUsername: () => Promise.resolve(''),
-    getBaseRefDefault: async ({ repoId }) => callRuntimeResult('repo.baseRefDefault', { repoId }),
+    getBaseRefDefault: async ({ repoId }) =>
+      baseRefDefaultFromWire(await callRuntimeResult('repo.baseRefDefault', { repoId })),
+    listBranches: async ({ repoId }) => callRuntimeResult('repo.listBranches', { repoId }),
     searchBaseRefs: async ({ repoId, query, limit }) =>
       (
         await callRuntimeResult<{ refs: string[] }>('repo.searchRefs', {

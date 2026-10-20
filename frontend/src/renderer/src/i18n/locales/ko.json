@@ -10818,6 +10818,19 @@
           "listLabel": "일치하는 브랜치",
           "defaultNamed": "기본 브랜치 ({{value0}})",
           "defaultUnnamed": "기본 브랜치"
+        },
+        "RepoBranchPicker": {
+          "localHeading": "로컬 브랜치",
+          "remoteHeading": "원격 브랜치",
+          "moreHeading": "추가 일치 항목",
+          "defaultTag": "기본",
+          "remoteOnly": "원격 전용",
+          "optionDefault": "{{name}}(기본)",
+          "optionRemote": "{{name}}(원격 전용)",
+          "noBranches": "브랜치를 찾을 수 없습니다",
+          "loading": "브랜치를 불러오는 중...",
+          "loadFailed": "브랜치를 불러오지 못했습니다. 다시 시도해 주세요.",
+          "listLabel": "브랜치"
         }
       },
       "floating": {
@@ -14461,7 +14474,10 @@
           "manualPlaceholder": "예: release/1.2",
           "manualUse": "이 브랜치 사용",
           "offline": "브랜치를 나열할 호스트에 연결할 수 없습니다. 브랜치 이름을 입력하세요. 워크트리를 만들 때 확인됩니다.",
-          "typeInstead": "브랜치 이름 직접 입력"
+          "typeInstead": "브랜치 이름 직접 입력",
+          "defaultTag": "기본",
+          "useDefaultNamed": "기본 브랜치 사용({{name}})",
+          "hintPicked": "이 요청의 워크트리는 {{repo}}의 {{branch}}에서 시작됩니다."
         },
         "RequestBaseRefRow": {
           "suggestions": "혹시 다음인가요:",
