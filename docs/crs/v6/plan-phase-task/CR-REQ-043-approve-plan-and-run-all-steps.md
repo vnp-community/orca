@@ -228,6 +228,8 @@ Lựa chọn "chạy hết" áp cho Plan **đúng như đã duyệt** (digest tr
 
 ## 7. Câu hỏi còn mở
 
+> **Đã chốt 2026-10-20:** câu 1 và 2 theo đề xuất (Request đã ghim `step_by_step` tiếp tục từng bước, CR đổi chế độ cho Request đang chạy làm sau; công tắc dự án vẫn chỉ admin hệ thống đổi). Câu 3 đến 5 chưa được hỏi riêng: lấy theo mặc định ghi ở từng câu.
+
 1. Có chấp nhận để Request #1771 (và mọi Request đã ghim `step_by_step`) tiếp tục từng bước sau CR này không, hay CR "đổi chế độ cho Request đang chạy" (2.10) phải làm trước? Đề xuất: chấp nhận, vì lý do 2.10.
 2. Approval Inbox có cần lựa chọn "chạy hết" không? Mặc định: không (D9).
 3. Có cần ghi nhận lựa chọn "chạy hết" vào History (Activity), ngoài audit? Muốn vậy phải lưu vào bảng `approvals` (migration) hoặc đọc từ outbox; hôm nay History dựng từ bảng. Mặc định: không trong CR này.

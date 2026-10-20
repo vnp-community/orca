@@ -60,15 +60,15 @@ CR-044 (job + worker + commit server) ─▶ CR-045 (dùng lại CommitPlan.Exec
 4. **Request đang chạy `step_by_step` (ví dụ #1771)** không đổi được chế độ (ghim vĩnh viễn); CR-043 để việc "chuyển Request đang chạy" sang CR riêng.
 5. **Quyền**: approver chỉ chỉnh được nếu là thành viên dự án (đọc được repo); người ngoài dự án bị cổng OPA chặn.
 
-## 6. Câu hỏi còn mở cần người dùng trả lời (không chặn đợt A)
+## 6. Câu hỏi còn mở (4 câu đã chốt 2026-10-20 theo đề xuất; các câu chưa hỏi lấy theo mặc định)
 
 | CR | Câu hỏi | Mặc định đề xuất |
 |---|---|---|
-| 043 | Request đã ghim `step_by_step` có cần CR "đổi chế độ cho Request đang chạy" ngay không | Không, CR riêng sau |
+| 043 | Request đã ghim `step_by_step` có cần CR "đổi chế độ cho Request đang chạy" ngay không | ✅ Chốt: không, CR riêng sau |
 | 043 | Lựa chọn "chạy hết" ở Approval Inbox | Không |
 | 043 | Chủ dự án (không phải admin) có được đổi công tắc chế độ | Không trong CR này (backend chặn bằng quyền admin) |
-| 044 | Giao diện cài đặt cho công tắc tự sinh Plan theo dự án | Chưa có trang; đổi qua kênh admin hoặc CLI |
-| 044 | Coi `REQUEST_PLAN_AI_UNAVAILABLE` ở cấp run là lỗi tạm | Có |
+| 044 | Giao diện cài đặt cho công tắc tự sinh Plan theo dự án | ✅ Chốt: không làm trong CR này; đổi qua kênh admin hoặc CLI |
+| 044 | Coi `REQUEST_PLAN_AI_UNAVAILABLE` ở cấp run là lỗi tạm | ✅ Chốt: có |
 | 045 | "Keep the previous version" sau khi lượt chỉnh thất bại; lượt chỉnh không đổi gì là lỗi hay tạo bản trùng | Không làm; lỗi `NO_CHANGE` |
 | 046 | Mở rộng chỉ thị sang kết quả task, commit message, PR; ghi ngôn ngữ lên run; dòng nhắc cuối prompt; ngôn ngữ thứ ba | Sau khi xem kết quả `--real`; không thêm ngôn ngữ |
 
