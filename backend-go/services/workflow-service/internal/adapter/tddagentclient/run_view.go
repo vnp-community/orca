@@ -1,103 +1,41 @@
 package tddagentclient
 
 import (
-	"sort"
 	"time"
+
+	"github.com/stablyai/orca-go/common/tddagent"
 )
 
-// Run statuses of tdd-agent (orchestrator/engine.py).
+// Run statuses of tdd-agent (orchestrator/engine.py), shared with request-service in common/tddagent.
 const (
-	RunRunning          = "running"
-	RunAwaitingApproval = "awaiting_approval"
-	RunAwaitingEvidence = "awaiting_evidence"
-	RunBlocked          = "blocked"
-	RunCompleted        = "completed"
-	RunFailed           = "failed"
+	RunRunning          = tddagent.RunRunning
+	RunAwaitingApproval = tddagent.RunAwaitingApproval
+	RunAwaitingEvidence = tddagent.RunAwaitingEvidence
+	RunBlocked          = tddagent.RunBlocked
+	RunCompleted        = tddagent.RunCompleted
+	RunFailed           = tddagent.RunFailed
 )
 
-// runView is the part of tdd-agent's run_get result the handlers read.
+// runView is the part of tdd-agent's run_get result the handlers read: the shared reading of the reply
+// (common/tddagent.RunView) plus what only workflow steps need (the step output of contracts/tdd-agent-step-output.schema.json).
 type runView struct {
-	Run struct {
-		RunID       string `json:"run_id"`
-		Flow        string `json:"flow"`
-		Status      string `json:"status"`
-		ParentRunID string `json:"parent_run_id"`
-		Result      struct {
-			Blockers    []string `json:"blockers"`
-			PendingGate string   `json:"pending_gate"`
-			BlockedGate string   `json:"blocked_gate"`
-		} `json:"result"`
-	} `json:"run"`
-	Tasks    map[string]taskView `json:"tasks"`
-	Children []childView         `json:"children"`
-	Process  *processView        `json:"process"`
+	tddagent.RunView
 }
 
-type taskView struct {
-	Status       string         `json:"status"`
-	Decision     any            `json:"decision,omitempty"`
-	DecisionHash string         `json:"decision_hash,omitempty"`
-	ApprovalRole string         `json:"approval_role,omitempty"`
-	Blockers     []string       `json:"blockers,omitempty"`
-	Output       map[string]any `json:"output,omitempty"`
-}
+func (v runView) status() string { return v.Status() }
 
-type childView struct {
-	RunID     string `json:"run_id"`
-	Flow      string `json:"flow"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
-}
-
-type processView struct {
-	PID                int     `json:"pid"`
-	Alive              bool    `json:"alive"`
-	HeartbeatAt        *string `json:"heartbeat_at"`
-	FinishedAt         *string `json:"finished_at"`
-	HeartbeatIntervalS float64 `json:"heartbeat_interval_s"`
-}
-
-func (v runView) status() string { return v.Run.Status }
-
-func (v runView) terminal() bool { return v.Run.Status == RunCompleted || v.Run.Status == RunFailed }
+func (v runView) terminal() bool { return v.Terminal() }
 
 // processAlive reports whether a background advance of the run is running on the dev server.
-func (v runView) processAlive() bool { return v.Process != nil && v.Process.Alive }
+func (v runView) processAlive() bool { return v.ProcessAlive() }
 
 // heartbeatStale is true when a live advance has not beaten for three intervals (hung, not dead).
-func (v runView) heartbeatStale(now time.Time) bool {
-	if !v.processAlive() || v.Process.HeartbeatAt == nil || v.Process.HeartbeatIntervalS <= 0 {
-		return false
-	}
-	at, err := time.Parse(time.RFC3339Nano, *v.Process.HeartbeatAt)
-	if err != nil {
-		return false
-	}
-	return now.Sub(at) > time.Duration(3*v.Process.HeartbeatIntervalS*float64(time.Second))
-}
+func (v runView) heartbeatStale(now time.Time) bool { return v.HeartbeatStale(now) }
 
-func (v runView) gateStatuses() map[string]string {
-	out := make(map[string]string, len(v.Tasks))
-	for name, t := range v.Tasks {
-		out[name] = t.Status
-	}
-	return out
-}
+func (v runView) gateStatuses() map[string]string { return v.GateStatuses() }
 
 // newestChild returns the latest child run of flow (GT starts a new one when it re-runs).
-func (v runView) newestChild(flow string) (childView, bool) {
-	var matches []childView
-	for _, c := range v.Children {
-		if flow == "" || c.Flow == flow {
-			matches = append(matches, c)
-		}
-	}
-	if len(matches) == 0 {
-		return childView{}, false
-	}
-	sort.Slice(matches, func(i, j int) bool { return matches[i].CreatedAt > matches[j].CreatedAt })
-	return matches[0], true
-}
+func (v runView) newestChild(flow string) (tddagent.ChildView, bool) { return v.NewestChild(flow) }
 
 // output is the step output shared by every handler (contracts/tdd-agent-step-output.schema.json).
 func (v runView) output(action, projectDir string) map[string]any {

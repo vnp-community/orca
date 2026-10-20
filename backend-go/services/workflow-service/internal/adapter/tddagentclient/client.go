@@ -8,8 +8,6 @@ package tddagentclient
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -18,6 +16,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
+	"github.com/stablyai/orca-go/common/tddagent"
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -25,9 +24,19 @@ import (
 )
 
 // MCPServer is the name of the tdd-agent server in the agent's mcp.callTool allowlist.
-const MCPServer = "tdd-agent"
+const MCPServer = tddagent.Server
 
-const callToolMethod = "mcp.callTool"
+// The wire side of the call (the mcp.callTool message, how a reply is classified) is shared with request-service in
+// backend-go/common/tddagent; these names keep this package's own API and tests as they were.
+type (
+	// ToolError is a refusal or failure reported by the tool itself (tdd-agent's {error:{code,message}}).
+	ToolError = tddagent.ToolError
+	// BridgeError is a refusal of the dev server's MCP bridge (MCP_* codes): not retried.
+	BridgeError = tddagent.BridgeError
+)
+
+// ErrTransport marks a failure to reach the dev server at all (relay or agent down): worth retrying.
+var ErrTransport = tddagent.ErrTransport
 
 // Relayer is the slice of infra-fleet's client this package uses.
 type Relayer interface {
@@ -37,41 +46,6 @@ type Relayer interface {
 // RepoLister is the slice of project-service's client this package uses.
 type RepoLister interface {
 	ListRepos(ctx context.Context, in *projectv1.ListReposRequest, opts ...grpc.CallOption) (*projectv1.ListReposResponse, error)
-}
-
-// ToolError is a refusal or failure reported by the tool itself (tdd-agent's {error:{code,message}}).
-type ToolError struct {
-	Code    string          `json:"code"`
-	Message string          `json:"message"`
-	Details json.RawMessage `json:"details,omitempty"`
-}
-
-func (e *ToolError) Error() string { return e.Code + ": " + e.Message }
-
-// BridgeError is a refusal of the dev server's MCP bridge (MCP_* codes): not retried.
-type BridgeError struct {
-	Code    string
-	Message string
-}
-
-func (e *BridgeError) Error() string { return e.Code + ": " + e.Message }
-
-// ErrTransport marks a failure to reach the dev server at all (relay or agent down): worth retrying.
-var ErrTransport = errors.New("tddagentclient: dev server unreachable")
-
-type callToolParams struct {
-	Server     string         `json:"server"`
-	ProjectDir string         `json:"projectDir"`
-	Tool       string         `json:"tool"`
-	Arguments  map[string]any `json:"arguments"`
-	TimeoutMs  int            `json:"timeoutMs,omitempty"`
-}
-
-type callToolResult struct {
-	OK      bool            `json:"ok"`
-	IsError bool            `json:"isError"`
-	Result  json.RawMessage `json:"result"`
-	Error   *ToolError      `json:"error"`
 }
 
 // Client calls tdd-agent tools on the dev server of a project.
@@ -96,44 +70,15 @@ func (c *Client) CallTool(ctx context.Context, target, projectDir, tool string, 
 	if err != nil {
 		return fmt.Errorf("%w: resolve %s: %v", ErrTransport, target, err)
 	}
-	if args == nil {
-		args = map[string]any{}
-	}
-	raw, err := json.Marshal(callToolParams{Server: MCPServer, ProjectDir: projectDir, Tool: tool, Arguments: args})
-	if err != nil {
-		return fmt.Errorf("tddagentclient: marshal %s: %w", tool, err)
-	}
-	outCtx := metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataTenantID, tenantID)
-	resp, err := c.relay.Relay(outCtx, &infrafleetv1.RelayRequest{ConnectionId: connectionID, Method: callToolMethod, ParamsJson: string(raw)})
-	if err != nil {
-		return fmt.Errorf("%w: %s: %v", ErrTransport, tool, err)
-	}
-	var res callToolResult
-	if err := json.Unmarshal([]byte(resp.GetResultJson()), &res); err != nil {
-		return fmt.Errorf("tddagentclient: %s: agent without mcp.callTool or bad result: %w", tool, err)
-	}
-	if !res.OK {
-		if res.Error == nil {
-			return &BridgeError{Code: "MCP_BRIDGE_FAILED", Message: "bridge refused the call without a reason"}
+	relay := func(rctx context.Context, method, paramsJSON string) (string, error) {
+		outCtx := metadata.AppendToOutgoingContext(rctx, grpcmw.MetadataTenantID, tenantID)
+		resp, err := c.relay.Relay(outCtx, &infrafleetv1.RelayRequest{ConnectionId: connectionID, Method: method, ParamsJson: paramsJSON})
+		if err != nil {
+			return "", err
 		}
-		// Server crashes and timeouts are transient on the dev server's side; refusals are not.
-		if res.Error.Code == "MCP_SERVER_FAILED" || res.Error.Code == "MCP_TIMEOUT" {
-			return fmt.Errorf("%w: %s: %s", ErrTransport, res.Error.Code, res.Error.Message)
-		}
-		return &BridgeError{Code: res.Error.Code, Message: res.Error.Message}
+		return resp.GetResultJson(), nil
 	}
-	if res.IsError {
-		if res.Error == nil {
-			return &ToolError{Code: "TDD_AGENT_TOOL_ERROR", Message: "tool failed without a reason"}
-		}
-		return res.Error
-	}
-	if out != nil && len(res.Result) > 0 {
-		if err := json.Unmarshal(res.Result, out); err != nil {
-			return fmt.Errorf("tddagentclient: decode %s result: %w", tool, err)
-		}
-	}
-	return nil
+	return tddagent.Call(ctx, relay, projectDir, tool, args, out)
 }
 
 // ResolveProjectDir returns the tdd-agent project directory for a step: the

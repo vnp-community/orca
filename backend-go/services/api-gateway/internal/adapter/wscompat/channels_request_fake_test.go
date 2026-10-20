@@ -574,3 +574,30 @@ func (f *fakeRequestClient) ResetReviewDrawingProfile(ctx context.Context, in *r
 	}
 	return &requestv1.ResetReviewDrawingProfileResponse{}, nil
 }
+
+func (f *fakeRequestClient) GetTestSpecs(ctx context.Context, in *requestv1.GetTestSpecsRequest, _ ...grpc.CallOption) (*requestv1.GetTestSpecsResponse, error) {
+	f.rec(ctx, "GetTestSpecs", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetTestSpecsResponse{RequestId: in.GetRequestId(), Enabled: true, Current: &requestv1.TestSpecRun{
+		Id: "ts1", Attempt: 1, Status: "completed", ContextMode: "solution", ContextRef: "REQ-1", Feature: "TDD-NOTES",
+		SummaryJson: `{"feature":"TDD-NOTES"}`,
+	}}, nil
+}
+
+func (f *fakeRequestClient) StartTestSpecs(ctx context.Context, in *requestv1.StartTestSpecsRequest, _ ...grpc.CallOption) (*requestv1.StartTestSpecsResponse, error) {
+	f.rec(ctx, "StartTestSpecs", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.StartTestSpecsResponse{Run: &requestv1.TestSpecRun{Id: "ts2", Attempt: 2, Status: "starting"}}, nil
+}
+
+func (f *fakeRequestClient) GetTestSpecDocument(ctx context.Context, in *requestv1.GetTestSpecDocumentRequest, _ ...grpc.CallOption) (*requestv1.GetTestSpecDocumentResponse, error) {
+	f.rec(ctx, "GetTestSpecDocument", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetTestSpecDocumentResponse{Document: in.GetDocument(), Version: 1, Status: "Draft", Length: 4, Text: "TC-1"}, nil
+}

@@ -194,6 +194,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 	defer execution.close()
+	testSpecs := wireTestSpecs(lifecycleCtx, &lifecycleWG, cfg, log, stores, solution, execution, busConsumer)
 	plan, err := wirePlan(log, stores, lifecycle, solution, approval, execution, execTasks, dirs)
 	if err != nil {
 		return err
@@ -240,6 +241,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		WithPlan(plan).
 		WithOutcomeReview(wireOutcomeReview(lifecycleCtx, &lifecycleWG, log, reviewCfg, stores, execTasks, solution, usecase.EngineSettingsReviewReader{Repo: stores.engineSettings}, security.audit)).
 		WithEngineSettings(usecase.NewManageProjectEngineSettings(stores.engineSettings).WithReadiness(solution.gate).WithOutcomeReviewConfig(reviewCfg).WithAudit(security.audit, stores.tx)).
+		WithTestSpecs(testSpecs).
 		WithCompliance(security.compliance))
 	if approval.Enabled {
 		requestv1.RegisterApprovalServiceServer(grpcServer, requestgrpc.NewApprovalServer(approval.Server))

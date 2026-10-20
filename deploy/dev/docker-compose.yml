@@ -489,6 +489,8 @@ services:
       REQUEST_REVIEW_ARTIFACT_QUOTA_MB: ${REQUEST_REVIEW_ARTIFACT_QUOTA_MB:-}
       REQUEST_REVIEW_REGEN_PER_DAY: ${REQUEST_REVIEW_REGEN_PER_DAY:-}
       REQUEST_REVIEW_CONFIRM_COST: ${REQUEST_REVIEW_CONFIRM_COST:-}
+      # Generates test specs with tdd-agent next to the code of an executing Request (docs/integrate/TDD-REQ-TESTSPEC-001); advisory, never blocks the Request.
+      REQUEST_TESTSPEC_ENABLED: ${REQUEST_TESTSPEC_ENABLED:-false}
       # Shared secret issue-status-sync presents for LookupRequestBySource; empty refuses the call.
       SERVICE_INTERNAL_TOKEN: ${REQUEST_SERVICE_INTERNAL_TOKEN:-}
       # Gateway presents the same value as REQUEST_INTERNAL_CALLER_TOKEN; empty makes every RPC refuse.

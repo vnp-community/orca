@@ -1,5 +1,6 @@
 # Real secrets — never commit
 .env
+.env.*.bak
 
 # Build output (scripts/build-local.sh) — binaries + frontend bundle,
 # rebuilt on every deploy, not source

@@ -23,6 +23,7 @@ type Server struct {
 	engineSettings *usecase.ManageProjectEngineSettings
 	compliance     ComplianceUseCases
 	execution      ExecutionUseCases
+	testSpecs      TestSpecUseCases
 	plan           PlanUseCases
 	baseRef        BaseRefUseCases
 	outcomeReview  OutcomeReviewUseCases
