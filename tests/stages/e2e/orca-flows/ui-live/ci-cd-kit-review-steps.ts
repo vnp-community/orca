@@ -122,16 +122,19 @@ export async function reviewTheDesign(f: LiveFlow, r: RequestUnderTest): Promise
     expect(at, 'the Request has an Execution tab').toBeGreaterThan(-1)
     expect(names[at + 1]).toBe('Outcome review')
     await openOutcomeReviewTab(f.page)
-    if ((await reviewTab(f.page).count()) === 0) {
-      await expect(reviewInvite(f.page)).toHaveAttribute('data-kind', 'design')
-    }
+    // Why: the invitation sits inside the same `outcome-review-tab` wrapper as a review, so only the invite id tells them apart.
+    await expect(reviewInvite(f.page)).toHaveAttribute('data-kind', 'design')
     await f.shots.take('review-design-invitation')
   })
 
   await f.step("design review: the agent's reading (real Claude)", async () => {
-    if ((await reviewTab(f.page).count()) === 0) {
-      await f.page.getByTestId('outcome-review-generate').click()
-    }
+    await f.page.getByTestId('outcome-review-generate').click()
+    await expect
+      .poll(async () => (await readRuns(f, r)).length, {
+        timeout: 60_000,
+        message: 'the click started no run'
+      })
+      .toBeGreaterThan(0)
     const runs = await waitForRuns(f, r, 'design', 25 * MINUTE)
     for (const run of runs) {
       expect(
@@ -142,6 +145,7 @@ export async function reviewTheDesign(f: LiveFlow, r: RequestUnderTest): Promise
     await reloadAndReopen(f.page, r.title)
     await outcomeReviewTab(f.page).click()
     await expect(reviewTab(f.page)).toBeVisible({ timeout: 60_000 })
+    await expect(reviewInvite(f.page)).toHaveCount(0)
     await f.shots.take('review-design-ready')
   })
 
