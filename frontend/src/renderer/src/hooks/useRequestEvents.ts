@@ -32,7 +32,9 @@ async function refreshPendingApprovalCount(): Promise<void> {
     // Why: no total in the contract; one page of 100 gives an exact count up to the sidebar's 99+ cap.
     { pageSize: 100 }
   )
-  if (!result.ok) {return}
+  if (!result.ok) {
+    return
+  }
   const count = result.value.totalCount ?? result.value.approvals?.length ?? 0
   useAppStore.getState().setPendingApprovalCount(count)
 }
@@ -40,19 +42,34 @@ async function refreshPendingApprovalCount(): Promise<void> {
 export function useRequestEvents(): void {
   useRequestFlowSupport()
   const support = useAppStore((s) => s.requestFlowSupport)
+  // Why: settings can arrive after the support probe answered; until they do the target is "local", which only polls. The stream
+  // must be opened again once the gateway target is known, or the screen never gets a pushed event in that session.
+  const activeEnvironmentId = useAppStore(
+    (s) => s.settings?.activeRuntimeEnvironmentId?.trim() ?? ''
+  )
 
   useEffect(() => {
-    if (support !== 'supported') {return}
+    if (support !== 'supported') {
+      return
+    }
 
     let listTimer: ReturnType<typeof setInterval> | null = null
     let approvalTimer: ReturnType<typeof setInterval> | null = null
 
     function startPolling(): void {
-      if (listTimer !== null) {return}
+      if (listTimer !== null) {
+        return
+      }
       // Why: list polling only matters while the Requests page is on screen.
       listTimer = setInterval(() => {
-        if (!isVisible() || useAppStore.getState().activeView !== 'requests') {return}
-        emitRequestEvent({ requestId: '', eventType: REQUEST_POLL_EVENT_TYPE, occurredAt: new Date().toISOString() })
+        if (!isVisible() || useAppStore.getState().activeView !== 'requests') {
+          return
+        }
+        emitRequestEvent({
+          requestId: '',
+          eventType: REQUEST_POLL_EVENT_TYPE,
+          occurredAt: new Date().toISOString()
+        })
       }, REQUEST_LIST_POLL_MS)
     }
 
@@ -71,20 +88,28 @@ export function useRequestEvents(): void {
           } as OrcaRequest
         ])
       }
-      if (event.eventType.includes('approval')) {void refreshPendingApprovalCount()}
+      if (event.eventType.includes('approval')) {
+        void refreshPendingApprovalCount()
+      }
     }
 
     void refreshPendingApprovalCount()
     approvalTimer = setInterval(() => {
-      if (isVisible()) {void refreshPendingApprovalCount()}
+      if (isVisible()) {
+        void refreshPendingApprovalCount()
+      }
     }, PENDING_APPROVAL_POLL_MS)
 
     const unsubscribe = subscribeRequestEvents({ onEvent, onFallback: startPolling })
 
     return () => {
       unsubscribe()
-      if (listTimer !== null) {clearInterval(listTimer)}
-      if (approvalTimer !== null) {clearInterval(approvalTimer)}
+      if (listTimer !== null) {
+        clearInterval(listTimer)
+      }
+      if (approvalTimer !== null) {
+        clearInterval(approvalTimer)
+      }
     }
-  }, [support])
+  }, [support, activeEnvironmentId])
 }

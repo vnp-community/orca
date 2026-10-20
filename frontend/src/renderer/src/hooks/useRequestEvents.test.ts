@@ -25,7 +25,12 @@ beforeEach(() => {
   callRequestRpc.mockResolvedValue({ ok: true, value: { approvals: [{}, {}], totalCount: 7 } })
   subscribeRequestEvents.mockReset()
   subscribeRequestEvents.mockReturnValue(vi.fn())
-  useAppStore.setState({ requestFlowSupport: 'supported', pendingApprovalCount: 0, activeView: 'requests' })
+  useAppStore.setState({
+    requestFlowSupport: 'supported',
+    pendingApprovalCount: 0,
+    activeView: 'requests',
+    settings: null
+  })
 })
 afterEach(() => {
   cleanup()
@@ -67,7 +72,9 @@ describe('useRequestEvents', () => {
     renderHook(() => useRequestEvents())
     subscribeRequestEvents.mock.calls[0][0].onFallback()
     vi.advanceTimersByTime(REQUEST_LIST_POLL_MS)
-    expect(seen).toHaveBeenCalledWith(expect.objectContaining({ eventType: REQUEST_POLL_EVENT_TYPE }))
+    expect(seen).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: REQUEST_POLL_EVENT_TYPE })
+    )
 
     seen.mockClear()
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
@@ -78,5 +85,34 @@ describe('useRequestEvents', () => {
     expect(callRequestRpc).not.toHaveBeenCalled()
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
     unsubBus()
+  })
+
+  it('opens the stream again when the settings that name the gateway arrive after the support probe', async () => {
+    const offLocal = vi.fn()
+    const offGateway = vi.fn()
+    subscribeRequestEvents.mockReturnValueOnce(offLocal).mockReturnValueOnce(offGateway)
+    renderHook(() => useRequestEvents())
+    expect(subscribeRequestEvents).toHaveBeenCalledTimes(1) // no settings yet: the client target is local and only polls
+
+    act(() => {
+      useAppStore.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
+    })
+    expect(offLocal).toHaveBeenCalledTimes(1)
+    expect(subscribeRequestEvents).toHaveBeenCalledTimes(2)
+    await act(async () => {})
+  })
+
+  it('keeps the stream when a setting that is not the gateway changes', () => {
+    useAppStore.setState({
+      settings: { activeRuntimeEnvironmentId: 'env-1', theme: 'light' } as never
+    })
+    renderHook(() => useRequestEvents())
+    expect(subscribeRequestEvents).toHaveBeenCalledTimes(1)
+    act(() => {
+      useAppStore.setState({
+        settings: { activeRuntimeEnvironmentId: 'env-1', theme: 'dark' } as never
+      })
+    })
+    expect(subscribeRequestEvents).toHaveBeenCalledTimes(1)
   })
 })
