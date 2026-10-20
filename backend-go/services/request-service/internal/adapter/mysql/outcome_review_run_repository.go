@@ -21,13 +21,13 @@ func NewOutcomeReviewRunRepository(r *Repository) *OutcomeReviewRunRepository {
 
 var _ usecase.OutcomeReviewRunRepository = (*OutcomeReviewRunRepository)(nil)
 
-const runColumns = `id, review_id, request_id, kind, status, scope, agent_run_ref, cost_estimate, cost_actual, error_code, started_at, finished_at`
+const runColumns = `id, review_id, request_id, kind, status, scope, agent_run_ref, cost_estimate, cost_actual, error_code, started_at, finished_at, reason, COALESCE(client_key, ''), COALESCE(created_by, '')`
 
 func scanRun(row interface{ Scan(dest ...any) error }, tenantID string) (usecase.ReviewRun, error) {
 	var r usecase.ReviewRun
 	var kind, status string
 	var finished sql.NullTime
-	if err := row.Scan(&r.ID, &r.ReviewID, &r.RequestID, &kind, &status, &r.Scope, &r.AgentRunRef, &r.CostEstimate, &r.CostActual, &r.ErrorCode, &r.StartedAt, &finished); err != nil {
+	if err := row.Scan(&r.ID, &r.ReviewID, &r.RequestID, &kind, &status, &r.Scope, &r.AgentRunRef, &r.CostEstimate, &r.CostActual, &r.ErrorCode, &r.StartedAt, &finished, &r.Reason, &r.ClientKey, &r.CreatedBy); err != nil {
 		return usecase.ReviewRun{}, err
 	}
 	r.TenantID, r.Kind, r.Status, r.StartedAt = tenantID, usecase.ReviewRunKind(kind), usecase.ReviewRunStatus(status), r.StartedAt.UTC()
@@ -53,8 +53,12 @@ func (r *OutcomeReviewRunRepository) Start(ctx context.Context, in usecase.Revie
 		if status.Active() {
 			key = activeKey(tenantID, in.RequestID, in.Kind)
 		}
-		if _, err := db.ExecContext(ctx, `INSERT INTO outcome_review_runs (id, tenant_id, review_id, request_id, kind, status, scope, cost_estimate, active_key)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, in.ID, tenantID, in.ReviewID, in.RequestID, string(in.Kind), string(status), in.Scope, in.CostEstimate, key); err != nil {
+		if _, err := db.ExecContext(ctx, `INSERT INTO outcome_review_runs (id, tenant_id, review_id, request_id, kind, status, scope, cost_estimate, active_key, reason, client_key, created_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, in.ID, tenantID, in.ReviewID, in.RequestID, string(in.Kind), string(status), in.Scope, in.CostEstimate, key,
+			in.Reason, nullIfEmpty(in.ClientKey), nullIfEmpty(in.CreatedBy)); err != nil {
+			if isDuplicateKey(err, "uq_outcome_review_runs_client") {
+				return domain.ErrReviewDuplicateRequest()
+			}
 			if isDuplicateKey(err, "uq_outcome_review_runs_active") {
 				cur, ok, qerr := r.activeIn(ctx, db, tenantID, in.RequestID, in.Kind)
 				if qerr == nil && ok {
@@ -160,4 +164,42 @@ func (r *OutcomeReviewRunRepository) CountSince(ctx context.Context, requestID s
 			tenantID, requestID, string(kind), since.UTC()).Scan(&n)
 	})
 	return n, err
+}
+
+func (r *OutcomeReviewRunRepository) CountRegenerations(ctx context.Context, requestID string, since time.Time) (int, error) {
+	n := 0
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(requestID) {
+			return nil
+		}
+		return db.QueryRowContext(ctx, `SELECT COUNT(*) FROM outcome_review_runs WHERE tenant_id = ? AND request_id = ? AND reason <> '' AND started_at >= ?`,
+			tenantID, requestID, since.UTC()).Scan(&n)
+	})
+	return n, err
+}
+
+func (r *OutcomeReviewRunRepository) CountActive(ctx context.Context) (int, error) {
+	n := 0
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		return db.QueryRowContext(ctx, `SELECT COUNT(*) FROM outcome_review_runs WHERE tenant_id = ? AND active_key IS NOT NULL`, tenantID).Scan(&n)
+	})
+	return n, err
+}
+
+func (r *OutcomeReviewRunRepository) FindByClientKey(ctx context.Context, requestID, clientKey string) (usecase.ReviewRun, bool, error) {
+	var out usecase.ReviewRun
+	found := false
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(requestID) || clientKey == "" {
+			return nil
+		}
+		var err error
+		out, err = scanRun(db.QueryRowContext(ctx, `SELECT `+runColumns+` FROM outcome_review_runs WHERE tenant_id = ? AND request_id = ? AND client_key = ?`, tenantID, requestID, clientKey), tenantID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		found = err == nil
+		return err
+	})
+	return out, found, err
 }

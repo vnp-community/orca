@@ -112,3 +112,19 @@ func ErrReviewKnowledgeRequired() error {
 	return apperrors.New(apperrors.KindFailedPrecondition, CodeReviewKnowledgeRequired,
 		"the design review needs the project's knowledge graph, which is not available", nil)
 }
+
+// ErrReviewDuplicateRequest is a run request whose client key was used before; the caller reads the run it started.
+func ErrReviewDuplicateRequest() error {
+	return apperrors.New(apperrors.KindAlreadyExists, "REQUEST_REVIEW_DUPLICATE_REQUEST", "this request was already made; the run it started is the answer", nil)
+}
+
+// ErrReviewConfirmCost is a regeneration that is expected to cost more than the deployment lets run without a yes.
+func ErrReviewConfirmCost(estimate string) error {
+	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_REVIEW_CONFIRM_COST_REQUIRED",
+		"this regeneration is expected to cost about "+estimate+"; confirm to run it", nil)
+}
+
+// ErrReviewForbidden is a decision or an approval by someone who is not the reporter of the Request or an admin of the tenant.
+func ErrReviewForbidden() error {
+	return apperrors.New(apperrors.KindPermissionDenied, "REQUEST_REVIEW_FORBIDDEN", "only the reporter of the Request or an admin can decide on or approve its review", nil)
+}

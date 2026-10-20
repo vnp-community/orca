@@ -67,6 +67,11 @@ type StartContextInput struct {
 	Force         bool
 	AllowCodeOnly bool
 	CreatedBy     string
+	// Regeneration: Reason marks the run as one a person asked for (it counts against the daily limit), ClientKey makes a repeated
+	// request one run, and ForceDraw draws every diagram again afterwards instead of only those without a drawing.
+	Reason    string
+	ClientKey string
+	ForceDraw bool
 }
 
 // StartContextResult says what happened: the review as it stands now, and either a run that was started, a cached context that
@@ -94,6 +99,7 @@ type contextPlan struct {
 	codeOnly      bool
 	useKnowledge  bool
 	req           domain.Request
+	input         StartContextInput
 	collected     Collected
 	stored        StoredReview
 	conn          AnalysisConnection
@@ -119,7 +125,7 @@ func (r *ReviewContextRunner) Start(ctx context.Context, in StartContextInput) (
 	if err != nil {
 		return res, err
 	}
-	plan := &contextPlan{mode: domain.ContextMode(gen.View.Stored.Phase), req: req, collected: gen.Collected, stored: gen.View.Stored, allowCodeOnly: in.AllowCodeOnly}
+	plan := &contextPlan{mode: domain.ContextMode(gen.View.Stored.Phase), req: req, input: in, collected: gen.Collected, stored: gen.View.Stored, allowCodeOnly: in.AllowCodeOnly}
 	if plan.mode == domain.ContextModeDelivered && !in.Force {
 		if l, ok, lerr := r.lock().Load(ctx, req.ID); lerr != nil {
 			return res, lerr
@@ -133,7 +139,7 @@ func (r *ReviewContextRunner) Start(ctx context.Context, in StartContextInput) (
 			return res, cerr
 		} else if ok {
 			res.View, res.ContextCached = applied, true
-			res.Draw, res.DrawError = r.drawAfter(ctx, req.ID, in.CreatedBy)
+			res.Draw, res.DrawError = r.drawAfter(ctx, req.ID, in)
 			return res, nil
 		}
 	}
@@ -159,7 +165,7 @@ func (r *ReviewContextRunner) Start(ctx context.Context, in StartContextInput) (
 			return res, cerr
 		} else if ok {
 			res.View, res.ContextCached = applied, true
-			res.Draw, res.DrawError = r.drawAfter(ctx, req.ID, in.CreatedBy)
+			res.Draw, res.DrawError = r.drawAfter(ctx, req.ID, in)
 			return res, nil
 		}
 	}
@@ -182,7 +188,8 @@ func (r *ReviewContextRunner) Start(ctx context.Context, in StartContextInput) (
 // startRun takes the one slot a Request has for a context run. A run that has been active for longer than any run can last was
 // cut off by a restart: it is ended as interrupted so it does not block the Request for good.
 func (r *ReviewContextRunner) startRun(ctx context.Context, p *contextPlan) (ReviewRun, error) {
-	return startReviewRun(ctx, r.Runs, ReviewRun{ID: uuid.NewString(), ReviewID: p.stored.ID, RequestID: p.req.ID, Kind: ReviewRunContext, Status: ReviewRunRunning, Scope: string(p.mode)},
+	return startReviewRun(ctx, r.Runs, ReviewRun{ID: uuid.NewString(), ReviewID: p.stored.ID, RequestID: p.req.ID, Kind: ReviewRunContext, Status: ReviewRunRunning, Scope: string(p.mode),
+		Reason: p.input.Reason, ClientKey: p.input.ClientKey, CreatedBy: p.input.CreatedBy},
 		r.now(), time.Duration(r.Config.ContextTimeoutMS())*time.Millisecond+2*time.Minute, r.logger())
 }
 
@@ -352,16 +359,20 @@ func (r *ReviewContextRunner) execute(ctx context.Context, p *contextPlan, run R
 		return
 	}
 	finish(ReviewRunSucceeded, "")
-	r.drawAfter(ctx, p.req.ID, "")
+	r.drawAfter(ctx, p.req.ID, p.input)
 }
 
 // drawAfter hands the review to the draw runner. A drawing that cannot start (no skill, no dev server) leaves the diagrams missing,
 // which the review shows; it never fails the context run that came before.
-func (r *ReviewContextRunner) drawAfter(ctx context.Context, requestID, createdBy string) (*StartDrawResult, string) {
+func (r *ReviewContextRunner) drawAfter(ctx context.Context, requestID string, in StartContextInput) (*StartDrawResult, string) {
 	if r.Draw == nil {
 		return nil, ""
 	}
-	res, err := r.Draw.Start(ctx, StartDrawInput{RequestID: requestID, CreatedBy: createdBy, Origin: domain.ArtifactOriginAuto})
+	draw := StartDrawInput{RequestID: requestID, CreatedBy: in.CreatedBy, Origin: domain.ArtifactOriginAuto, Force: in.ForceDraw}
+	if in.ForceDraw {
+		draw.Origin, draw.Reason = domain.ArtifactOriginRegenerated, in.Reason
+	}
+	res, err := r.Draw.Start(ctx, draw)
 	if err != nil {
 		code := domainCode(err)
 		r.logger().InfoContext(ctx, "outcome review: the drawings did not start", slog.String("request_id", requestID), slog.String("code", code))

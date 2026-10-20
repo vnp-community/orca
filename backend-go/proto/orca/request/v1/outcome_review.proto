@@ -28,6 +28,10 @@ message OutcomeReview {
 // EstimateOutcomeReview costs no agent run: it reads the database and git-gateway and says what GenerateOutcomeReview would do.
 message EstimateOutcomeReviewRequest {
   string request_id = 1;
+  // Ask what a regeneration would do (CR-OR-012): artifact | context | all, and the sections to draw for artifact. Empty scope asks
+  // only about building the review.
+  string scope = 2;
+  repeated string sections = 3;
 }
 
 message EstimateOutcomeReviewResponse {
@@ -44,6 +48,21 @@ message EstimateOutcomeReviewResponse {
   bool design_locked = 9;
   bool context_runnable = 10;
   repeated string context_gaps = 11;
+  RegenerationEstimate regeneration = 12;
+}
+
+// RegenerationEstimate is what a regeneration is expected to do and cost. Nothing is invented: without an earlier run that reported a
+// cost, cost_known is false and cost_usd is 0.
+message RegenerationEstimate {
+  int32 agent_runs = 1;
+  int32 diagrams_to_draw = 2;
+  bool cost_known = 3;
+  double cost_usd = 4;
+  string last_context_cost = 5;
+  string last_draw_cost = 6;
+  bool confirm_required = 7;
+  // True for a context regeneration: how many diagrams change is known only after the run.
+  bool drawings_depend_on_result = 8;
 }
 
 message GenerateOutcomeReviewRequest {
@@ -102,7 +121,7 @@ message ListOutcomeReviewRunsRequest {
 }
 
 message ListOutcomeReviewRunsResponse {
-  // Oldest first.
+  // Newest first.
   repeated OutcomeReviewRun runs = 1;
 }
 
@@ -181,3 +200,172 @@ message ListReviewArtifactRevisionsResponse {
   // Newest first.
   repeated ReviewArtifactMeta revisions = 1;
 }
+
+// Decisions (CR-OR-022). They exist only for an after-code review.
+message OutcomeReviewDecision {
+  string decision_id = 1;
+  string review_id = 2;
+  string item_key = 3;
+  // accept_exception | send_back | dismiss
+  string decision = 4;
+  string note = 5;
+  string child_request_id = 6;
+  string decided_by = 7;
+  google.protobuf.Timestamp decided_at = 8;
+  // False for a decision that a later one replaced.
+  bool active = 9;
+  // True when the item the decision was about is no longer in the review after a regeneration.
+  bool orphaned = 10;
+}
+
+message DecideOutcomeReviewItemRequest {
+  string request_id = 1;
+  string review_id = 2;
+  string item_key = 3;
+  string decision = 4;
+  // Required for accept_exception and dismiss, at most 500 characters.
+  string note = 5;
+  // The version of the review the person was looking at.
+  int64 expected_version = 6;
+}
+
+message DecideOutcomeReviewItemResponse {
+  OutcomeReviewDecision decision = 1;
+  int64 review_version = 2;
+  string review_state = 3;
+  int32 open_decisions = 4;
+}
+
+message ApproveOutcomeReviewRequest {
+  string request_id = 1;
+  string review_id = 2;
+  string note = 3;
+  int64 expected_version = 4;
+}
+
+message ApproveOutcomeReviewResponse {
+  OutcomeReview review = 1;
+}
+
+message ListOutcomeReviewDecisionsRequest {
+  string request_id = 1;
+  string review_id = 2;
+  // When set, the history of this item (every decision, newest first) instead of the decisions in force.
+  string item_key = 3;
+}
+
+message ListOutcomeReviewDecisionsResponse {
+  repeated OutcomeReviewDecision decisions = 1;
+  // Items that ask for a decision and have none yet (after-code reviews only).
+  int32 open_decisions = 2;
+}
+
+// LinkOutcomeReviewChildRequest records which child Request took the sent-back items. The Request must be a child of the review's.
+message LinkOutcomeReviewChildRequest {
+  string request_id = 1;
+  string review_id = 2;
+  repeated string item_keys = 3;
+  string child_request_id = 4;
+}
+
+message LinkOutcomeReviewChildResponse {
+  int32 linked = 1;
+}
+
+// Regeneration (CR-OR-012).
+message RegenerateReviewArtifactsRequest {
+  string request_id = 1;
+  // artifact | context | all
+  string scope = 2;
+  repeated string sections = 3;
+  // looks_wrong | kg_changed | code_changed | style_changed | retry_failed | other
+  string reason = 4;
+  string note = 5;
+  bool confirm_cost = 6;
+  // Makes a repeated request one run.
+  string client_request_id = 7;
+  // The version of the review the person was looking at; 0 skips the check.
+  int64 expected_version = 8;
+}
+
+message RegenerateReviewArtifactsResponse {
+  OutcomeReviewRun context_run = 1;
+  OutcomeReviewRun draw_run = 2;
+  bool replayed = 3;
+  RegenerationEstimate estimate = 4;
+  string skipped = 5;
+}
+
+message ModelDiff {
+  repeated string added_nodes = 1;
+  repeated string removed_nodes = 2;
+  repeated string changed_nodes = 3;
+  repeated string added_edges = 4;
+  repeated string removed_edges = 5;
+  repeated string changed_edges = 6;
+}
+
+message RestoreReviewArtifactRevisionRequest {
+  string request_id = 1;
+  string artifact_id = 2;
+  string note = 3;
+}
+
+message RestoreReviewArtifactRevisionResponse {
+  ReviewArtifactMeta artifact = 1;
+  // What differs between the model of the drawing that was replaced and the one put back; absent when there was none.
+  ModelDiff diff = 2;
+  bool has_diff = 3;
+}
+
+message CompareReviewArtifactRevisionsRequest {
+  string request_id = 1;
+  string from_artifact_id = 2;
+  string to_artifact_id = 3;
+}
+
+message CompareReviewArtifactRevisionsResponse {
+  ModelDiff diff = 1;
+}
+
+// Drawing profile (CR-OR-013). project_id empty means the tenant layer.
+message ReviewDrawingProfileLayer {
+  string project_id = 1;
+  string spec_json = 2;
+  string spec_digest = 3;
+  int64 version = 4;
+  string updated_by = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message GetReviewDrawingProfileRequest {
+  string project_id = 1;
+}
+
+message GetReviewDrawingProfileResponse {
+  ReviewDrawingProfileLayer tenant_layer = 1;
+  bool has_tenant_layer = 2;
+  ReviewDrawingProfileLayer project_layer = 3;
+  bool has_project_layer = 4;
+  // The profile in force, as JSON, and the layer that decided each field (default | tenant | project).
+  string effective_json = 5;
+  map<string, string> sources = 6;
+}
+
+message SaveReviewDrawingProfileRequest {
+  string project_id = 1;
+  string spec_json = 2;
+  // 0 creates the layer.
+  int64 expected_version = 3;
+}
+
+message SaveReviewDrawingProfileResponse {
+  ReviewDrawingProfileLayer layer = 1;
+}
+
+message ResetReviewDrawingProfileRequest {
+  string project_id = 1;
+  int64 expected_version = 2;
+}
+
+message ResetReviewDrawingProfileResponse {}

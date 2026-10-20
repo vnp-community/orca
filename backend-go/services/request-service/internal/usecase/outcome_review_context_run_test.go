@@ -36,6 +36,13 @@ func (m *memRuns) Start(_ context.Context, r ReviewRun) (ReviewRun, error) {
 			return ReviewRun{}, domain.ErrReviewRunInProgress(x.ID)
 		}
 	}
+	if r.ClientKey != "" {
+		for _, x := range m.rows {
+			if x.RequestID == r.RequestID && x.ClientKey == r.ClientKey {
+				return ReviewRun{}, domain.ErrReviewDuplicateRequest()
+			}
+		}
+	}
 	if r.Status == "" {
 		r.Status = ReviewRunRunning
 	}
@@ -75,9 +82,9 @@ func (m *memRuns) ListByReview(_ context.Context, id string) ([]ReviewRun, error
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []ReviewRun
-	for _, i := range m.ord {
-		if m.rows[i].ReviewID == id {
-			out = append(out, m.rows[i])
+	for i := len(m.ord) - 1; i >= 0; i-- { // newest first, as the real repositories answer
+		if m.rows[m.ord[i]].ReviewID == id {
+			out = append(out, m.rows[m.ord[i]])
 		}
 	}
 	return out, nil
@@ -92,6 +99,38 @@ func (m *memRuns) CountSince(_ context.Context, req string, kind ReviewRunKind, 
 		}
 	}
 	return n, nil
+}
+func (m *memRuns) CountRegenerations(_ context.Context, req string, since time.Time) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, x := range m.rows {
+		if x.RequestID == req && x.Reason != "" && !x.StartedAt.Before(since) {
+			n++
+		}
+	}
+	return n, nil
+}
+func (m *memRuns) CountActive(context.Context) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, x := range m.rows {
+		if x.Status.Active() {
+			n++
+		}
+	}
+	return n, nil
+}
+func (m *memRuns) FindByClientKey(_ context.Context, req, key string) (ReviewRun, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, x := range m.rows {
+		if x.RequestID == req && key != "" && x.ClientKey == key {
+			return x, true, nil
+		}
+	}
+	return ReviewRun{}, false, nil
 }
 func (m *memRuns) last() ReviewRun {
 	m.mu.Lock()

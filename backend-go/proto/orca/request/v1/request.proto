@@ -427,6 +427,16 @@ service RequestService {
   rpc ListOutcomeReviewRuns(ListOutcomeReviewRunsRequest) returns (ListOutcomeReviewRunsResponse);
   rpc GetReviewArtifact(GetReviewArtifactRequest) returns (GetReviewArtifactResponse);
   rpc ListReviewArtifactRevisions(ListReviewArtifactRevisionsRequest) returns (ListReviewArtifactRevisionsResponse);
+  rpc DecideOutcomeReviewItem(DecideOutcomeReviewItemRequest) returns (DecideOutcomeReviewItemResponse);
+  rpc ApproveOutcomeReview(ApproveOutcomeReviewRequest) returns (ApproveOutcomeReviewResponse);
+  rpc ListOutcomeReviewDecisions(ListOutcomeReviewDecisionsRequest) returns (ListOutcomeReviewDecisionsResponse);
+  rpc LinkOutcomeReviewChild(LinkOutcomeReviewChildRequest) returns (LinkOutcomeReviewChildResponse);
+  rpc RegenerateReviewArtifacts(RegenerateReviewArtifactsRequest) returns (RegenerateReviewArtifactsResponse);
+  rpc RestoreReviewArtifactRevision(RestoreReviewArtifactRevisionRequest) returns (RestoreReviewArtifactRevisionResponse);
+  rpc CompareReviewArtifactRevisions(CompareReviewArtifactRevisionsRequest) returns (CompareReviewArtifactRevisionsResponse);
+  rpc GetReviewDrawingProfile(GetReviewDrawingProfileRequest) returns (GetReviewDrawingProfileResponse);
+  rpc SaveReviewDrawingProfile(SaveReviewDrawingProfileRequest) returns (SaveReviewDrawingProfileResponse);
+  rpc ResetReviewDrawingProfile(ResetReviewDrawingProfileRequest) returns (ResetReviewDrawingProfileResponse);
 
   // Security and compliance (CR-REQ-035), admin only.
   rpc EraseRequest(EraseRequestRequest) returns (EraseRequestResponse);

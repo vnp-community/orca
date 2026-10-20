@@ -151,6 +151,8 @@ var isolationFixtures = map[string]string{
 	"outcome_review_contexts":   `INSERT INTO request.outcome_review_contexts (id, tenant_id, request_id, kind, digest, payload, expires_at) VALUES (gen_random_uuid(), {tenant}, {req}, 'design', 'd', '{}', now() + interval '1 day')`,
 	"review_artifact_blobs":     `INSERT INTO request.review_artifact_blobs (tenant_id, request_id, digest, media_type, size_bytes, content) VALUES ({tenant}, {req}, 'd', 'text/html', 1, 'x')`,
 	"review_artifacts":          `INSERT INTO request.review_artifacts (id, tenant_id, request_id, section, variant, diagram_type, input_digest, preset_digest, skill_version, revision, state, origin) VALUES (gen_random_uuid(), {tenant}, {req}, 'flow', 'delta', 'sequence', 'i', 'p', 's', 1, 'failed', 'auto')`,
+	"outcome_review_decisions":  `INSERT INTO request.outcome_review_decisions (id, tenant_id, review_id, request_id, item_key, decision, decided_by) VALUES (gen_random_uuid(), {tenant}, gen_random_uuid(), {req}, 'k', 'send_back', gen_random_uuid())`,
+	"review_drawing_profiles":   `INSERT INTO request.review_drawing_profiles (id, tenant_id, project_key, spec, spec_digest, updated_by) VALUES (gen_random_uuid(), {tenant}, '', '{}', 'd', gen_random_uuid())`,
 	"tenant_settings":           `INSERT INTO request.tenant_settings (tenant_id) VALUES ({tenant})`,
 	"tenant_security_settings":  `INSERT INTO request.tenant_security_settings (tenant_id) VALUES ({tenant})`,
 }

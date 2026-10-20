@@ -23,7 +23,7 @@ func NewOutcomeReviewRepository(r *Repository) *OutcomeReviewRepository {
 var _ usecase.OutcomeReviewRepository = (*OutcomeReviewRepository)(nil)
 
 const reviewColumns = `id, request_id, phase, head_key, head_commit, base_commit, inputs_digest, state, model, kg_snapshot,
-	design_digest, context_digest, COALESCE(created_by, ''), created_at, updated_at, version`
+	design_digest, context_digest, COALESCE(created_by, ''), created_at, updated_at, version, COALESCE(approved_by, ''), approved_at, approval_note`
 
 func notUUID(id string) bool {
 	_, err := uuid.Parse(id)
@@ -33,12 +33,17 @@ func notUUID(id string) bool {
 func scanReview(row interface{ Scan(dest ...any) error }, tenantID string) (usecase.StoredReview, error) {
 	var r usecase.StoredReview
 	var phase, state string
+	var approvedAt sql.NullTime
 	if err := row.Scan(&r.ID, &r.RequestID, &phase, &r.HeadKey, &r.HeadCommit, &r.BaseCommit, &r.InputsDigest, &state, &r.Model,
-		&r.KGSnapshot, &r.DesignDigest, &r.ContextDigest, &r.CreatedBy, &r.CreatedAt, &r.UpdatedAt, &r.Version); err != nil {
+		&r.KGSnapshot, &r.DesignDigest, &r.ContextDigest, &r.CreatedBy, &r.CreatedAt, &r.UpdatedAt, &r.Version, &r.ApprovedBy, &approvedAt, &r.ApprovalNote); err != nil {
 		return usecase.StoredReview{}, err
 	}
 	r.TenantID, r.Phase, r.State = tenantID, domain.ReviewPhase(phase), domain.ReviewState(state)
 	r.CreatedAt, r.UpdatedAt = r.CreatedAt.UTC(), r.UpdatedAt.UTC()
+	if approvedAt.Valid {
+		t := approvedAt.Time.UTC()
+		r.ApprovedAt = &t
+	}
 	return r, nil
 }
 
@@ -156,7 +161,8 @@ func (r *OutcomeReviewRepository) Update(ctx context.Context, in usecase.StoredR
 			return domain.ErrReviewNotFound(in.ID)
 		}
 		res, err := db.ExecContext(ctx, `UPDATE outcome_reviews SET head_commit = ?, base_commit = ?, inputs_digest = ?, state = ?, model = ?, kg_snapshot = ?,
-			design_digest = ?, context_digest = ?, updated_at = CURRENT_TIMESTAMP(6), version = version + 1
+			design_digest = ?, context_digest = ?, updated_at = CURRENT_TIMESTAMP(6), version = version + 1,
+			approved_by = IF(state = 'approved', approved_by, NULL), approved_at = IF(state = 'approved', approved_at, NULL), approval_note = IF(state = 'approved', approval_note, '')
 			WHERE tenant_id = ? AND id = ? AND version = ?`,
 			in.HeadCommit, in.BaseCommit, in.InputsDigest, string(in.State), string(in.Model), in.KGSnapshot, in.DesignDigest, in.ContextDigest,
 			tenantID, in.ID, expectedVersion)
@@ -168,13 +174,30 @@ func (r *OutcomeReviewRepository) Update(ctx context.Context, in usecase.StoredR
 	return out, err
 }
 
+func (r *OutcomeReviewRepository) Approve(ctx context.Context, id, by, note string, expectedVersion int64) (usecase.StoredReview, error) {
+	var out usecase.StoredReview
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return domain.ErrReviewNotFound(id)
+		}
+		res, err := db.ExecContext(ctx, `UPDATE outcome_reviews SET state = 'approved', approved_by = ?, approved_at = CURRENT_TIMESTAMP(6), approval_note = ?,
+			updated_at = CURRENT_TIMESTAMP(6), version = version + 1 WHERE tenant_id = ? AND id = ? AND version = ?`, by, note, tenantID, id, expectedVersion)
+		if err != nil {
+			return err
+		}
+		return r.afterVersionedWrite(ctx, db, tenantID, id, res, &out)
+	})
+	return out, err
+}
+
 func (r *OutcomeReviewRepository) SetState(ctx context.Context, id string, state domain.ReviewState, expectedVersion int64) (usecase.StoredReview, error) {
 	var out usecase.StoredReview
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
 		if notUUID(id) {
 			return domain.ErrReviewNotFound(id)
 		}
-		res, err := db.ExecContext(ctx, `UPDATE outcome_reviews SET state = ?, updated_at = CURRENT_TIMESTAMP(6), version = version + 1
+		res, err := db.ExecContext(ctx, `UPDATE outcome_reviews SET state = ?, updated_at = CURRENT_TIMESTAMP(6), version = version + 1,
+			approved_by = IF(state = 'approved', approved_by, NULL), approved_at = IF(state = 'approved', approved_at, NULL), approval_note = IF(state = 'approved', approval_note, '')
 			WHERE tenant_id = ? AND id = ? AND version = ?`, string(state), tenantID, id, expectedVersion)
 		if err != nil {
 			return err

@@ -22,17 +22,21 @@ func NewOutcomeReviewRepository(r *Repository) *OutcomeReviewRepository {
 var _ usecase.OutcomeReviewRepository = (*OutcomeReviewRepository)(nil)
 
 const reviewColumns = `id::text, request_id::text, phase, head_key, head_commit, base_commit, inputs_digest, state, model, kg_snapshot,
-	design_digest, context_digest, COALESCE(created_by::text, ''), created_at, updated_at, version`
+	design_digest, context_digest, COALESCE(created_by::text, ''), created_at, updated_at, version, COALESCE(approved_by::text, ''), approved_at, approval_note`
 
 func scanReview(row pgx.Row, tenantID string) (usecase.StoredReview, error) {
 	var r usecase.StoredReview
 	var phase, state string
 	if err := row.Scan(&r.ID, &r.RequestID, &phase, &r.HeadKey, &r.HeadCommit, &r.BaseCommit, &r.InputsDigest, &state, &r.Model,
-		&r.KGSnapshot, &r.DesignDigest, &r.ContextDigest, &r.CreatedBy, &r.CreatedAt, &r.UpdatedAt, &r.Version); err != nil {
+		&r.KGSnapshot, &r.DesignDigest, &r.ContextDigest, &r.CreatedBy, &r.CreatedAt, &r.UpdatedAt, &r.Version, &r.ApprovedBy, &r.ApprovedAt, &r.ApprovalNote); err != nil {
 		return usecase.StoredReview{}, err
 	}
 	r.TenantID, r.Phase, r.State = tenantID, domain.ReviewPhase(phase), domain.ReviewState(state)
 	r.CreatedAt, r.UpdatedAt = r.CreatedAt.UTC(), r.UpdatedAt.UTC()
+	if r.ApprovedAt != nil {
+		t := r.ApprovedAt.UTC()
+		r.ApprovedAt = &t
+	}
 	return r, nil
 }
 
@@ -152,7 +156,8 @@ func (r *OutcomeReviewRepository) Update(ctx context.Context, in usecase.StoredR
 		}
 		var err error
 		out, err = scanReview(db.QueryRow(ctx, `UPDATE request.outcome_reviews SET head_commit = $4, base_commit = $5, inputs_digest = $6, state = $7,
-			model = $8::jsonb, kg_snapshot = $9, design_digest = $10, context_digest = $11, updated_at = clock_timestamp(), version = version + 1
+			model = $8::jsonb, kg_snapshot = $9, design_digest = $10, context_digest = $11, updated_at = clock_timestamp(), version = version + 1,
+			approved_by = CASE WHEN $7 = 'approved' THEN approved_by END, approved_at = CASE WHEN $7 = 'approved' THEN approved_at END, approval_note = CASE WHEN $7 = 'approved' THEN approval_note ELSE '' END
 			WHERE tenant_id = $1 AND id = $2 AND version = $3 RETURNING `+reviewColumns,
 			tenantID, in.ID, expectedVersion, in.HeadCommit, in.BaseCommit, in.InputsDigest, string(in.State), string(in.Model),
 			in.KGSnapshot, in.DesignDigest, in.ContextDigest), tenantID)
@@ -171,8 +176,27 @@ func (r *OutcomeReviewRepository) SetState(ctx context.Context, id string, state
 			return domain.ErrReviewNotFound(id)
 		}
 		var err error
-		out, err = scanReview(db.QueryRow(ctx, `UPDATE request.outcome_reviews SET state = $4, updated_at = clock_timestamp(), version = version + 1
+		out, err = scanReview(db.QueryRow(ctx, `UPDATE request.outcome_reviews SET state = $4, updated_at = clock_timestamp(), version = version + 1,
+			approved_by = CASE WHEN $4 = 'approved' THEN approved_by END, approved_at = CASE WHEN $4 = 'approved' THEN approved_at END, approval_note = CASE WHEN $4 = 'approved' THEN approval_note ELSE '' END
 			WHERE tenant_id = $1 AND id = $2 AND version = $3 RETURNING `+reviewColumns, tenantID, id, expectedVersion, string(state)), tenantID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return r.versionOrMissing(ctx, db, tenantID, id)
+		}
+		return err
+	})
+	return out, err
+}
+
+func (r *OutcomeReviewRepository) Approve(ctx context.Context, id, by, note string, expectedVersion int64) (usecase.StoredReview, error) {
+	var out usecase.StoredReview
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(id) {
+			return domain.ErrReviewNotFound(id)
+		}
+		var err error
+		out, err = scanReview(db.QueryRow(ctx, `UPDATE request.outcome_reviews SET state = 'approved', approved_by = $4, approved_at = clock_timestamp(), approval_note = $5,
+			updated_at = clock_timestamp(), version = version + 1 WHERE tenant_id = $1 AND id = $2 AND version = $3 RETURNING `+reviewColumns,
+			tenantID, id, expectedVersion, by, note), tenantID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return r.versionOrMissing(ctx, db, tenantID, id)
 		}

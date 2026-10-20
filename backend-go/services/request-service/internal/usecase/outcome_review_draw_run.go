@@ -81,6 +81,9 @@ type StartDrawInput struct {
 	Reason    string
 	Origin    domain.ReviewArtifactOrigin
 	CreatedBy string
+	// RunReason and ClientKey mark the run as one a person asked for and make a repeated request one run (see StartContextInput).
+	RunReason string
+	ClientKey string
 }
 
 // StartDrawResult says what happened to the diagrams the profile wants drawn.
@@ -179,7 +182,8 @@ func (r *ReviewDrawRunner) Start(ctx context.Context, in StartDrawInput) (StartD
 		return res, nil
 	}
 
-	run, err := startReviewRun(ctx, r.Runs, ReviewRun{ID: uuid.NewString(), ReviewID: review.ID, RequestID: req.ID, Kind: ReviewRunDraw, Status: ReviewRunRunning, Scope: string(review.Phase)},
+	run, err := startReviewRun(ctx, r.Runs, ReviewRun{ID: uuid.NewString(), ReviewID: review.ID, RequestID: req.ID, Kind: ReviewRunDraw, Status: ReviewRunRunning, Scope: string(review.Phase),
+		Reason: in.RunReason, ClientKey: in.ClientKey, CreatedBy: in.CreatedBy},
 		r.now(), time.Duration(r.Config.ContextTimeoutMS())*time.Millisecond*time.Duration(1+len(pending)/domain.MaxDrawingsPerRun)+2*time.Minute, r.logger())
 	if err != nil {
 		return StartDrawResult{}, err

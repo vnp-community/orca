@@ -35,6 +35,23 @@ type OutcomeReviewConfig struct {
 	ArtifactRetention time.Duration
 	// ArtifactQuotaMB is the most drawings a tenant keeps. Zero means the default.
 	ArtifactQuotaMB int
+	// RegenPerDay is how many times a person may regenerate for one Request in a day. Zero means the default.
+	RegenPerDay int
+	// ConfirmCostUSD is the estimated cost above which a regeneration needs the person to confirm. Zero means never ask.
+	ConfirmCostUSD float64
+}
+
+const (
+	DefaultRegenPerDay      = 5
+	MaxConcurrentReviewRuns = 2
+	maxRegenPerDay          = 1000
+)
+
+func (c OutcomeReviewConfig) RegenPerDayOrDefault() int {
+	if c.RegenPerDay > 0 {
+		return c.RegenPerDay
+	}
+	return DefaultRegenPerDay
 }
 
 const (
@@ -131,6 +148,20 @@ func OutcomeReviewConfigFromEnv(getenv func(string) string) (OutcomeReviewConfig
 			warnings = append(warnings, "REQUEST_REVIEW_ARTIFACT_QUOTA_MB "+strconv.Quote(raw)+" is not a number from 1 to 100000; the default applies")
 		} else {
 			c.ArtifactQuotaMB = n
+		}
+	}
+	if raw := strings.TrimSpace(getenv("REQUEST_REVIEW_REGEN_PER_DAY")); raw != "" {
+		if n, err := strconv.Atoi(raw); err != nil || n < 1 || n > maxRegenPerDay {
+			warnings = append(warnings, "REQUEST_REVIEW_REGEN_PER_DAY "+strconv.Quote(raw)+" is not a number from 1 to "+strconv.Itoa(maxRegenPerDay)+"; the default applies")
+		} else {
+			c.RegenPerDay = n
+		}
+	}
+	if raw := strings.TrimSpace(getenv("REQUEST_REVIEW_CONFIRM_COST")); raw != "" {
+		if f, err := strconv.ParseFloat(raw, 64); err != nil || f < 0 || f > 10000 {
+			warnings = append(warnings, "REQUEST_REVIEW_CONFIRM_COST "+strconv.Quote(raw)+" is not an amount in USD from 0 to 10000; no confirmation is asked")
+		} else {
+			c.ConfirmCostUSD = f
 		}
 	}
 	return c, warnings

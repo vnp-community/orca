@@ -71,6 +71,9 @@ type requestStores struct {
 	reviewContexts usecase.ReviewContextStore
 	// reviewArtifacts keeps the drawings of reviews and their content (CR-OR-011).
 	reviewArtifacts usecase.ReviewArtifactRepository
+	// reviewDecisions and reviewProfiles keep what people decided about a review and the drawing profile layers (CR-OR-022, CR-OR-013).
+	reviewDecisions usecase.OutcomeReviewDecisionRepository
+	reviewProfiles  usecase.ReviewDrawingProfileRepository
 	close           func()
 }
 
@@ -122,6 +125,8 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			reviewRuns:        postgresadapter.NewOutcomeReviewRunRepository(base),
 			reviewContexts:    postgresadapter.NewOutcomeReviewContextRepository(base),
 			reviewArtifacts:   postgresadapter.NewReviewArtifactRepository(base),
+			reviewDecisions:   postgresadapter.NewOutcomeReviewDecisionRepository(base),
+			reviewProfiles:    postgresadapter.NewReviewDrawingProfileRepository(base),
 			close:             pool.Close,
 		}, nil
 	case dbcapability.DialectMySQL:
@@ -177,6 +182,8 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			reviewRuns:        mysqladapter.NewOutcomeReviewRunRepository(base),
 			reviewContexts:    mysqladapter.NewOutcomeReviewContextRepository(base),
 			reviewArtifacts:   mysqladapter.NewReviewArtifactRepository(base),
+			reviewDecisions:   mysqladapter.NewOutcomeReviewDecisionRepository(base),
+			reviewProfiles:    mysqladapter.NewReviewDrawingProfileRepository(base),
 			close:             func() { _ = db.Close() },
 		}, nil
 	default:

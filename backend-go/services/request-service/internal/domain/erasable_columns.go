@@ -69,6 +69,9 @@ var ErasableColumns = []ErasableColumn{
 	{"request_checks", "metrics", "request_id", EraseClearJSONObject, ""},
 	// The review model quotes acceptance criteria and plan task titles, so it is customer content.
 	{"outcome_reviews", "model", "request_id", EraseClearJSONObject, ""},
+	// A decision note and an approval note are written by a person about the content of the review.
+	{"outcome_review_decisions", "note", "request_id", EraseClearText, ""},
+	{"outcome_reviews", "approval_note", "request_id", EraseClearText, ""},
 	// The cached design and context results quote the same text as the review model.
 	{"outcome_review_contexts", "payload", "request_id", EraseClearJSONObject, ""},
 	// A drawing shows the labels of the review model, so its content, text and model are cleared with the Request.
@@ -151,6 +154,8 @@ var ExemptTextColumns = mergeExempt(
 		"outcome_review_runs.agent_run_ref", "outcome_review_runs.cost_estimate", "outcome_review_runs.cost_actual",
 		"outcome_review_runs.error_code", "outcome_review_runs.active_key", "outcome_review_contexts.kind", "outcome_review_contexts.digest",
 		"outcome_review_contexts.prompt_version",
+		"outcome_review_decisions.item_key", "outcome_review_decisions.decision", "outcome_review_decisions.active_key", "outcome_review_runs.reason", "outcome_review_runs.client_key",
+		"review_drawing_profiles.project_key", "review_drawing_profiles.spec", "review_drawing_profiles.spec_digest",
 		"review_artifact_blobs.digest", "review_artifact_blobs.media_type", "review_artifacts.section", "review_artifacts.variant", "review_artifacts.name",
 		"review_artifacts.diagram_type", "review_artifacts.input_digest", "review_artifacts.preset_digest", "review_artifacts.skill_version",
 		"review_artifacts.state", "review_artifacts.origin", "review_artifacts.error_code", "review_artifacts.blob_digest", "review_artifacts.view_box",

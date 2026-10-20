@@ -23,12 +23,26 @@ func (s *OutcomeReviewService) ApplyContext(ctx context.Context, req domain.Requ
 	if err != nil {
 		return ReviewView{}, err
 	}
+	// An approved review stays approved when every item that asks for a decision already has one; otherwise it goes back to ready,
+	// because the person approved something that no longer is what the review says.
+	state := domain.ReviewStateReady
+	if st.State == domain.ReviewStateApproved && s.Decisions != nil {
+		inForce, derr := s.Decisions.InForce(ctx, st.ID)
+		switch {
+		case derr != nil:
+			return ReviewView{}, derr
+		case domain.NewDecisionsRequired(built, inForce):
+			built.Warnings = dedupeSortedStrings(append(built.Warnings, "new_decisions_required"))
+		default:
+			state = domain.ReviewStateApproved
+		}
+	}
 	model, err := encodeReviewModel(&built)
 	if err != nil {
 		return ReviewView{}, err
 	}
 	row := st
-	row.Model, row.InputsDigest, row.State = model, built.InputsDigest, domain.ReviewStateReady
+	row.Model, row.InputsDigest, row.State = model, built.InputsDigest, state
 	row.KGSnapshot, row.DesignDigest, row.ContextDigest = vc.KG.Snapshot, designDigest, contextDigest
 	updated, err := s.updateWithReload(ctx, row)
 	if err != nil {

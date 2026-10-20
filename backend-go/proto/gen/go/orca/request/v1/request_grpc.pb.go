@@ -101,6 +101,16 @@ const (
 	RequestService_ListOutcomeReviewRuns_FullMethodName            = "/orca.request.v1.RequestService/ListOutcomeReviewRuns"
 	RequestService_GetReviewArtifact_FullMethodName                = "/orca.request.v1.RequestService/GetReviewArtifact"
 	RequestService_ListReviewArtifactRevisions_FullMethodName      = "/orca.request.v1.RequestService/ListReviewArtifactRevisions"
+	RequestService_DecideOutcomeReviewItem_FullMethodName          = "/orca.request.v1.RequestService/DecideOutcomeReviewItem"
+	RequestService_ApproveOutcomeReview_FullMethodName             = "/orca.request.v1.RequestService/ApproveOutcomeReview"
+	RequestService_ListOutcomeReviewDecisions_FullMethodName       = "/orca.request.v1.RequestService/ListOutcomeReviewDecisions"
+	RequestService_LinkOutcomeReviewChild_FullMethodName           = "/orca.request.v1.RequestService/LinkOutcomeReviewChild"
+	RequestService_RegenerateReviewArtifacts_FullMethodName        = "/orca.request.v1.RequestService/RegenerateReviewArtifacts"
+	RequestService_RestoreReviewArtifactRevision_FullMethodName    = "/orca.request.v1.RequestService/RestoreReviewArtifactRevision"
+	RequestService_CompareReviewArtifactRevisions_FullMethodName   = "/orca.request.v1.RequestService/CompareReviewArtifactRevisions"
+	RequestService_GetReviewDrawingProfile_FullMethodName          = "/orca.request.v1.RequestService/GetReviewDrawingProfile"
+	RequestService_SaveReviewDrawingProfile_FullMethodName         = "/orca.request.v1.RequestService/SaveReviewDrawingProfile"
+	RequestService_ResetReviewDrawingProfile_FullMethodName        = "/orca.request.v1.RequestService/ResetReviewDrawingProfile"
 	RequestService_EraseRequest_FullMethodName                     = "/orca.request.v1.RequestService/EraseRequest"
 	RequestService_ExportRequest_FullMethodName                    = "/orca.request.v1.RequestService/ExportRequest"
 	RequestService_ExportTenantRequests_FullMethodName             = "/orca.request.v1.RequestService/ExportTenantRequests"
@@ -209,6 +219,16 @@ type RequestServiceClient interface {
 	ListOutcomeReviewRuns(ctx context.Context, in *ListOutcomeReviewRunsRequest, opts ...grpc.CallOption) (*ListOutcomeReviewRunsResponse, error)
 	GetReviewArtifact(ctx context.Context, in *GetReviewArtifactRequest, opts ...grpc.CallOption) (*GetReviewArtifactResponse, error)
 	ListReviewArtifactRevisions(ctx context.Context, in *ListReviewArtifactRevisionsRequest, opts ...grpc.CallOption) (*ListReviewArtifactRevisionsResponse, error)
+	DecideOutcomeReviewItem(ctx context.Context, in *DecideOutcomeReviewItemRequest, opts ...grpc.CallOption) (*DecideOutcomeReviewItemResponse, error)
+	ApproveOutcomeReview(ctx context.Context, in *ApproveOutcomeReviewRequest, opts ...grpc.CallOption) (*ApproveOutcomeReviewResponse, error)
+	ListOutcomeReviewDecisions(ctx context.Context, in *ListOutcomeReviewDecisionsRequest, opts ...grpc.CallOption) (*ListOutcomeReviewDecisionsResponse, error)
+	LinkOutcomeReviewChild(ctx context.Context, in *LinkOutcomeReviewChildRequest, opts ...grpc.CallOption) (*LinkOutcomeReviewChildResponse, error)
+	RegenerateReviewArtifacts(ctx context.Context, in *RegenerateReviewArtifactsRequest, opts ...grpc.CallOption) (*RegenerateReviewArtifactsResponse, error)
+	RestoreReviewArtifactRevision(ctx context.Context, in *RestoreReviewArtifactRevisionRequest, opts ...grpc.CallOption) (*RestoreReviewArtifactRevisionResponse, error)
+	CompareReviewArtifactRevisions(ctx context.Context, in *CompareReviewArtifactRevisionsRequest, opts ...grpc.CallOption) (*CompareReviewArtifactRevisionsResponse, error)
+	GetReviewDrawingProfile(ctx context.Context, in *GetReviewDrawingProfileRequest, opts ...grpc.CallOption) (*GetReviewDrawingProfileResponse, error)
+	SaveReviewDrawingProfile(ctx context.Context, in *SaveReviewDrawingProfileRequest, opts ...grpc.CallOption) (*SaveReviewDrawingProfileResponse, error)
+	ResetReviewDrawingProfile(ctx context.Context, in *ResetReviewDrawingProfileRequest, opts ...grpc.CallOption) (*ResetReviewDrawingProfileResponse, error)
 	// Security and compliance (CR-REQ-035), admin only.
 	EraseRequest(ctx context.Context, in *EraseRequestRequest, opts ...grpc.CallOption) (*EraseRequestResponse, error)
 	ExportRequest(ctx context.Context, in *ExportRequestRequest, opts ...grpc.CallOption) (*ExportRequestResponse, error)
@@ -1043,6 +1063,106 @@ func (c *requestServiceClient) ListReviewArtifactRevisions(ctx context.Context, 
 	return out, nil
 }
 
+func (c *requestServiceClient) DecideOutcomeReviewItem(ctx context.Context, in *DecideOutcomeReviewItemRequest, opts ...grpc.CallOption) (*DecideOutcomeReviewItemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DecideOutcomeReviewItemResponse)
+	err := c.cc.Invoke(ctx, RequestService_DecideOutcomeReviewItem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) ApproveOutcomeReview(ctx context.Context, in *ApproveOutcomeReviewRequest, opts ...grpc.CallOption) (*ApproveOutcomeReviewResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApproveOutcomeReviewResponse)
+	err := c.cc.Invoke(ctx, RequestService_ApproveOutcomeReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) ListOutcomeReviewDecisions(ctx context.Context, in *ListOutcomeReviewDecisionsRequest, opts ...grpc.CallOption) (*ListOutcomeReviewDecisionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListOutcomeReviewDecisionsResponse)
+	err := c.cc.Invoke(ctx, RequestService_ListOutcomeReviewDecisions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) LinkOutcomeReviewChild(ctx context.Context, in *LinkOutcomeReviewChildRequest, opts ...grpc.CallOption) (*LinkOutcomeReviewChildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LinkOutcomeReviewChildResponse)
+	err := c.cc.Invoke(ctx, RequestService_LinkOutcomeReviewChild_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) RegenerateReviewArtifacts(ctx context.Context, in *RegenerateReviewArtifactsRequest, opts ...grpc.CallOption) (*RegenerateReviewArtifactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegenerateReviewArtifactsResponse)
+	err := c.cc.Invoke(ctx, RequestService_RegenerateReviewArtifacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) RestoreReviewArtifactRevision(ctx context.Context, in *RestoreReviewArtifactRevisionRequest, opts ...grpc.CallOption) (*RestoreReviewArtifactRevisionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RestoreReviewArtifactRevisionResponse)
+	err := c.cc.Invoke(ctx, RequestService_RestoreReviewArtifactRevision_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) CompareReviewArtifactRevisions(ctx context.Context, in *CompareReviewArtifactRevisionsRequest, opts ...grpc.CallOption) (*CompareReviewArtifactRevisionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompareReviewArtifactRevisionsResponse)
+	err := c.cc.Invoke(ctx, RequestService_CompareReviewArtifactRevisions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) GetReviewDrawingProfile(ctx context.Context, in *GetReviewDrawingProfileRequest, opts ...grpc.CallOption) (*GetReviewDrawingProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetReviewDrawingProfileResponse)
+	err := c.cc.Invoke(ctx, RequestService_GetReviewDrawingProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) SaveReviewDrawingProfile(ctx context.Context, in *SaveReviewDrawingProfileRequest, opts ...grpc.CallOption) (*SaveReviewDrawingProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SaveReviewDrawingProfileResponse)
+	err := c.cc.Invoke(ctx, RequestService_SaveReviewDrawingProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) ResetReviewDrawingProfile(ctx context.Context, in *ResetReviewDrawingProfileRequest, opts ...grpc.CallOption) (*ResetReviewDrawingProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResetReviewDrawingProfileResponse)
+	err := c.cc.Invoke(ctx, RequestService_ResetReviewDrawingProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *requestServiceClient) EraseRequest(ctx context.Context, in *EraseRequestRequest, opts ...grpc.CallOption) (*EraseRequestResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EraseRequestResponse)
@@ -1185,6 +1305,16 @@ type RequestServiceServer interface {
 	ListOutcomeReviewRuns(context.Context, *ListOutcomeReviewRunsRequest) (*ListOutcomeReviewRunsResponse, error)
 	GetReviewArtifact(context.Context, *GetReviewArtifactRequest) (*GetReviewArtifactResponse, error)
 	ListReviewArtifactRevisions(context.Context, *ListReviewArtifactRevisionsRequest) (*ListReviewArtifactRevisionsResponse, error)
+	DecideOutcomeReviewItem(context.Context, *DecideOutcomeReviewItemRequest) (*DecideOutcomeReviewItemResponse, error)
+	ApproveOutcomeReview(context.Context, *ApproveOutcomeReviewRequest) (*ApproveOutcomeReviewResponse, error)
+	ListOutcomeReviewDecisions(context.Context, *ListOutcomeReviewDecisionsRequest) (*ListOutcomeReviewDecisionsResponse, error)
+	LinkOutcomeReviewChild(context.Context, *LinkOutcomeReviewChildRequest) (*LinkOutcomeReviewChildResponse, error)
+	RegenerateReviewArtifacts(context.Context, *RegenerateReviewArtifactsRequest) (*RegenerateReviewArtifactsResponse, error)
+	RestoreReviewArtifactRevision(context.Context, *RestoreReviewArtifactRevisionRequest) (*RestoreReviewArtifactRevisionResponse, error)
+	CompareReviewArtifactRevisions(context.Context, *CompareReviewArtifactRevisionsRequest) (*CompareReviewArtifactRevisionsResponse, error)
+	GetReviewDrawingProfile(context.Context, *GetReviewDrawingProfileRequest) (*GetReviewDrawingProfileResponse, error)
+	SaveReviewDrawingProfile(context.Context, *SaveReviewDrawingProfileRequest) (*SaveReviewDrawingProfileResponse, error)
+	ResetReviewDrawingProfile(context.Context, *ResetReviewDrawingProfileRequest) (*ResetReviewDrawingProfileResponse, error)
 	// Security and compliance (CR-REQ-035), admin only.
 	EraseRequest(context.Context, *EraseRequestRequest) (*EraseRequestResponse, error)
 	ExportRequest(context.Context, *ExportRequestRequest) (*ExportRequestResponse, error)
@@ -1444,6 +1574,36 @@ func (UnimplementedRequestServiceServer) GetReviewArtifact(context.Context, *Get
 }
 func (UnimplementedRequestServiceServer) ListReviewArtifactRevisions(context.Context, *ListReviewArtifactRevisionsRequest) (*ListReviewArtifactRevisionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListReviewArtifactRevisions not implemented")
+}
+func (UnimplementedRequestServiceServer) DecideOutcomeReviewItem(context.Context, *DecideOutcomeReviewItemRequest) (*DecideOutcomeReviewItemResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DecideOutcomeReviewItem not implemented")
+}
+func (UnimplementedRequestServiceServer) ApproveOutcomeReview(context.Context, *ApproveOutcomeReviewRequest) (*ApproveOutcomeReviewResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ApproveOutcomeReview not implemented")
+}
+func (UnimplementedRequestServiceServer) ListOutcomeReviewDecisions(context.Context, *ListOutcomeReviewDecisionsRequest) (*ListOutcomeReviewDecisionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOutcomeReviewDecisions not implemented")
+}
+func (UnimplementedRequestServiceServer) LinkOutcomeReviewChild(context.Context, *LinkOutcomeReviewChildRequest) (*LinkOutcomeReviewChildResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LinkOutcomeReviewChild not implemented")
+}
+func (UnimplementedRequestServiceServer) RegenerateReviewArtifacts(context.Context, *RegenerateReviewArtifactsRequest) (*RegenerateReviewArtifactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegenerateReviewArtifacts not implemented")
+}
+func (UnimplementedRequestServiceServer) RestoreReviewArtifactRevision(context.Context, *RestoreReviewArtifactRevisionRequest) (*RestoreReviewArtifactRevisionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RestoreReviewArtifactRevision not implemented")
+}
+func (UnimplementedRequestServiceServer) CompareReviewArtifactRevisions(context.Context, *CompareReviewArtifactRevisionsRequest) (*CompareReviewArtifactRevisionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompareReviewArtifactRevisions not implemented")
+}
+func (UnimplementedRequestServiceServer) GetReviewDrawingProfile(context.Context, *GetReviewDrawingProfileRequest) (*GetReviewDrawingProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReviewDrawingProfile not implemented")
+}
+func (UnimplementedRequestServiceServer) SaveReviewDrawingProfile(context.Context, *SaveReviewDrawingProfileRequest) (*SaveReviewDrawingProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveReviewDrawingProfile not implemented")
+}
+func (UnimplementedRequestServiceServer) ResetReviewDrawingProfile(context.Context, *ResetReviewDrawingProfileRequest) (*ResetReviewDrawingProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResetReviewDrawingProfile not implemented")
 }
 func (UnimplementedRequestServiceServer) EraseRequest(context.Context, *EraseRequestRequest) (*EraseRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EraseRequest not implemented")
@@ -2951,6 +3111,186 @@ func _RequestService_ListReviewArtifactRevisions_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RequestService_DecideOutcomeReviewItem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DecideOutcomeReviewItemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).DecideOutcomeReviewItem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_DecideOutcomeReviewItem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).DecideOutcomeReviewItem(ctx, req.(*DecideOutcomeReviewItemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_ApproveOutcomeReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApproveOutcomeReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).ApproveOutcomeReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_ApproveOutcomeReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).ApproveOutcomeReview(ctx, req.(*ApproveOutcomeReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_ListOutcomeReviewDecisions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOutcomeReviewDecisionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).ListOutcomeReviewDecisions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_ListOutcomeReviewDecisions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).ListOutcomeReviewDecisions(ctx, req.(*ListOutcomeReviewDecisionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_LinkOutcomeReviewChild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LinkOutcomeReviewChildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).LinkOutcomeReviewChild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_LinkOutcomeReviewChild_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).LinkOutcomeReviewChild(ctx, req.(*LinkOutcomeReviewChildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_RegenerateReviewArtifacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegenerateReviewArtifactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).RegenerateReviewArtifacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_RegenerateReviewArtifacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).RegenerateReviewArtifacts(ctx, req.(*RegenerateReviewArtifactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_RestoreReviewArtifactRevision_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestoreReviewArtifactRevisionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).RestoreReviewArtifactRevision(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_RestoreReviewArtifactRevision_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).RestoreReviewArtifactRevision(ctx, req.(*RestoreReviewArtifactRevisionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_CompareReviewArtifactRevisions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompareReviewArtifactRevisionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).CompareReviewArtifactRevisions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_CompareReviewArtifactRevisions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).CompareReviewArtifactRevisions(ctx, req.(*CompareReviewArtifactRevisionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_GetReviewDrawingProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReviewDrawingProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).GetReviewDrawingProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_GetReviewDrawingProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).GetReviewDrawingProfile(ctx, req.(*GetReviewDrawingProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_SaveReviewDrawingProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveReviewDrawingProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).SaveReviewDrawingProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_SaveReviewDrawingProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).SaveReviewDrawingProfile(ctx, req.(*SaveReviewDrawingProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_ResetReviewDrawingProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetReviewDrawingProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).ResetReviewDrawingProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_ResetReviewDrawingProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).ResetReviewDrawingProfile(ctx, req.(*ResetReviewDrawingProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RequestService_EraseRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EraseRequestRequest)
 	if err := dec(in); err != nil {
@@ -3332,6 +3672,46 @@ var RequestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListReviewArtifactRevisions",
 			Handler:    _RequestService_ListReviewArtifactRevisions_Handler,
+		},
+		{
+			MethodName: "DecideOutcomeReviewItem",
+			Handler:    _RequestService_DecideOutcomeReviewItem_Handler,
+		},
+		{
+			MethodName: "ApproveOutcomeReview",
+			Handler:    _RequestService_ApproveOutcomeReview_Handler,
+		},
+		{
+			MethodName: "ListOutcomeReviewDecisions",
+			Handler:    _RequestService_ListOutcomeReviewDecisions_Handler,
+		},
+		{
+			MethodName: "LinkOutcomeReviewChild",
+			Handler:    _RequestService_LinkOutcomeReviewChild_Handler,
+		},
+		{
+			MethodName: "RegenerateReviewArtifacts",
+			Handler:    _RequestService_RegenerateReviewArtifacts_Handler,
+		},
+		{
+			MethodName: "RestoreReviewArtifactRevision",
+			Handler:    _RequestService_RestoreReviewArtifactRevision_Handler,
+		},
+		{
+			MethodName: "CompareReviewArtifactRevisions",
+			Handler:    _RequestService_CompareReviewArtifactRevisions_Handler,
+		},
+		{
+			MethodName: "GetReviewDrawingProfile",
+			Handler:    _RequestService_GetReviewDrawingProfile_Handler,
+		},
+		{
+			MethodName: "SaveReviewDrawingProfile",
+			Handler:    _RequestService_SaveReviewDrawingProfile_Handler,
+		},
+		{
+			MethodName: "ResetReviewDrawingProfile",
+			Handler:    _RequestService_ResetReviewDrawingProfile_Handler,
 		},
 		{
 			MethodName: "EraseRequest",

@@ -23,3 +23,13 @@ func TestPostgres_ReviewArtifactContract(t *testing.T) {
 	f := newMigratedPostgres(t)
 	contracttest.RunReviewArtifactContract(t, NewReviewArtifactRepository(New(f.app)))
 }
+
+func TestPostgres_ReviewDecisionContract(t *testing.T) {
+	f := newMigratedPostgres(t)
+	contracttest.RunReviewDecisionContract(t, NewOutcomeReviewDecisionRepository(New(f.app)))
+}
+
+func TestPostgres_ReviewProfileContract(t *testing.T) {
+	f := newMigratedPostgres(t)
+	contracttest.RunReviewProfileContract(t, NewReviewDrawingProfileRepository(New(f.app)))
+}

@@ -41,6 +41,8 @@ type OutcomeReviewService struct {
 	Artifacts *ReviewArtifactStore
 	Profiles  DrawingProfiles
 	Runs      OutcomeReviewRunRepository
+	// Decisions is optional; with it a regeneration knows which items already have a decision.
+	Decisions OutcomeReviewDecisionRepository
 	Now       func() time.Time
 	Log       *slog.Logger
 }

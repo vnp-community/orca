@@ -89,9 +89,30 @@ func (m *memReviews) Update(_ context.Context, r StoredReview, v int64) (StoredR
 		return StoredReview{}, domain.ErrReviewStaleRevision()
 	}
 	r.TenantID, r.RequestID, r.Phase, r.HeadKey, r.CreatedAt, r.Version = cur.TenantID, cur.RequestID, cur.Phase, cur.HeadKey, cur.CreatedAt, v+1
+	if r.State == domain.ReviewStateApproved {
+		r.ApprovedBy, r.ApprovedAt, r.ApprovalNote = cur.ApprovedBy, cur.ApprovedAt, cur.ApprovalNote
+	} else {
+		r.ApprovedBy, r.ApprovedAt, r.ApprovalNote = "", nil, ""
+	}
 	m.rows[r.ID] = r
 	m.writes++
 	return r, nil
+}
+func (m *memReviews) Approve(_ context.Context, id, by, note string, v int64) (StoredReview, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cur, ok := m.rows[id]
+	if !ok {
+		return StoredReview{}, domain.ErrReviewNotFound(id)
+	}
+	if cur.Version != v {
+		return StoredReview{}, domain.ErrReviewStaleRevision()
+	}
+	now := time.Now().UTC()
+	cur.State, cur.ApprovedBy, cur.ApprovedAt, cur.ApprovalNote, cur.Version = domain.ReviewStateApproved, by, &now, note, v+1
+	m.rows[id] = cur
+	m.writes++
+	return cur, nil
 }
 func (m *memReviews) SetState(_ context.Context, id string, st domain.ReviewState, v int64) (StoredReview, error) {
 	m.mu.Lock()
@@ -104,6 +125,9 @@ func (m *memReviews) SetState(_ context.Context, id string, st domain.ReviewStat
 		return StoredReview{}, domain.ErrReviewStaleRevision()
 	}
 	cur.State, cur.Version = st, v+1
+	if st != domain.ReviewStateApproved {
+		cur.ApprovedBy, cur.ApprovedAt, cur.ApprovalNote = "", nil, ""
+	}
 	m.rows[id] = cur
 	m.writes++
 	return cur, nil

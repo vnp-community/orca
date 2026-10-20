@@ -21,12 +21,12 @@ func NewOutcomeReviewRunRepository(r *Repository) *OutcomeReviewRunRepository {
 
 var _ usecase.OutcomeReviewRunRepository = (*OutcomeReviewRunRepository)(nil)
 
-const runColumns = `id::text, review_id::text, request_id::text, kind, status, scope, agent_run_ref, cost_estimate, cost_actual, error_code, started_at, finished_at`
+const runColumns = `id::text, review_id::text, request_id::text, kind, status, scope, agent_run_ref, cost_estimate, cost_actual, error_code, started_at, finished_at, reason, COALESCE(client_key, ''), COALESCE(created_by::text, '')`
 
 func scanRun(row pgx.Row, tenantID string) (usecase.ReviewRun, error) {
 	var r usecase.ReviewRun
 	var kind, status string
-	if err := row.Scan(&r.ID, &r.ReviewID, &r.RequestID, &kind, &status, &r.Scope, &r.AgentRunRef, &r.CostEstimate, &r.CostActual, &r.ErrorCode, &r.StartedAt, &r.FinishedAt); err != nil {
+	if err := row.Scan(&r.ID, &r.ReviewID, &r.RequestID, &kind, &status, &r.Scope, &r.AgentRunRef, &r.CostEstimate, &r.CostActual, &r.ErrorCode, &r.StartedAt, &r.FinishedAt, &r.Reason, &r.ClientKey, &r.CreatedBy); err != nil {
 		return usecase.ReviewRun{}, err
 	}
 	r.TenantID, r.Kind, r.Status, r.StartedAt = tenantID, usecase.ReviewRunKind(kind), usecase.ReviewRunStatus(status), r.StartedAt.UTC()
@@ -53,11 +53,14 @@ func (r *OutcomeReviewRunRepository) Start(ctx context.Context, in usecase.Revie
 			key = activeKey(tenantID, in.RequestID, in.Kind)
 		}
 		// ON CONFLICT keeps the transaction usable: a unique violation would abort it and the active run could not be read back.
-		row := db.QueryRow(ctx, `INSERT INTO request.outcome_review_runs (id, tenant_id, review_id, request_id, kind, status, scope, cost_estimate, active_key)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (active_key) DO NOTHING RETURNING `+runColumns,
-			in.ID, tenantID, in.ReviewID, in.RequestID, string(in.Kind), string(status), in.Scope, in.CostEstimate, key)
+		row := db.QueryRow(ctx, `INSERT INTO request.outcome_review_runs (id, tenant_id, review_id, request_id, kind, status, scope, cost_estimate, active_key, reason, client_key, created_by)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT (active_key) DO NOTHING RETURNING `+runColumns,
+			in.ID, tenantID, in.ReviewID, in.RequestID, string(in.Kind), string(status), in.Scope, in.CostEstimate, key, in.Reason, nullIfEmpty(in.ClientKey), nullIfEmpty(in.CreatedBy))
 		var err error
 		out, err = scanRun(row, tenantID)
+		if isUniqueViolation(err, "uq_outcome_review_runs_client") {
+			return domain.ErrReviewDuplicateRequest()
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			cur, ok, qerr := r.activeIn(ctx, db, tenantID, in.RequestID, in.Kind)
 			if qerr == nil && ok {
@@ -159,4 +162,42 @@ func (r *OutcomeReviewRunRepository) CountSince(ctx context.Context, requestID s
 			tenantID, requestID, string(kind), since.UTC()).Scan(&n)
 	})
 	return n, err
+}
+
+func (r *OutcomeReviewRunRepository) CountRegenerations(ctx context.Context, requestID string, since time.Time) (int, error) {
+	n := 0
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(requestID) {
+			return nil
+		}
+		return db.QueryRow(ctx, `SELECT COUNT(*) FROM request.outcome_review_runs WHERE tenant_id = $1 AND request_id = $2 AND reason <> '' AND started_at >= $3`,
+			tenantID, requestID, since.UTC()).Scan(&n)
+	})
+	return n, err
+}
+
+func (r *OutcomeReviewRunRepository) CountActive(ctx context.Context) (int, error) {
+	n := 0
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		return db.QueryRow(ctx, `SELECT COUNT(*) FROM request.outcome_review_runs WHERE tenant_id = $1 AND active_key IS NOT NULL`, tenantID).Scan(&n)
+	})
+	return n, err
+}
+
+func (r *OutcomeReviewRunRepository) FindByClientKey(ctx context.Context, requestID, clientKey string) (usecase.ReviewRun, bool, error) {
+	var out usecase.ReviewRun
+	found := false
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		if notUUID(requestID) || clientKey == "" {
+			return nil
+		}
+		var err error
+		out, err = scanRun(db.QueryRow(ctx, `SELECT `+runColumns+` FROM request.outcome_review_runs WHERE tenant_id = $1 AND request_id = $2 AND client_key = $3`, tenantID, requestID, clientKey), tenantID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		found = err == nil
+		return err
+	})
+	return out, found, err
 }

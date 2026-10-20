@@ -2,8 +2,10 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
 	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
@@ -19,6 +21,10 @@ type OutcomeReviewUseCases struct {
 	Context *usecase.ReviewContextRunner
 	// Artifacts may be nil; the drawings are then not served.
 	Artifacts *usecase.ReviewArtifactStore
+	// Decider, Regenerator and Profiles may be nil; the matching RPCs then answer Unimplemented.
+	Decider     *usecase.ReviewDecider
+	Regenerator *usecase.ReviewRegenerator
+	Profiles    *usecase.ReviewDrawingProfiles
 }
 
 // WithOutcomeReview attaches the review handlers; without it those RPCs stay Unimplemented.
@@ -49,6 +55,17 @@ func (s *Server) EstimateOutcomeReview(ctx context.Context, req *requestv1.Estim
 			return nil, apperrors.ToGRPCStatus(cerr)
 		}
 		out.ContextCached, out.DesignLocked, out.ContextRunnable, out.ContextGaps = ce.Cached, ce.DesignLocked, ce.Runnable, ce.Gaps
+	}
+	if req.GetScope() != "" && s.outcomeReview.Regenerator != nil {
+		sections := make([]domain.ReviewSection, 0, len(req.GetSections()))
+		for _, sec := range req.GetSections() {
+			sections = append(sections, domain.ReviewSection(sec))
+		}
+		re, rerr := s.outcomeReview.Regenerator.Estimate(ctx, req.GetRequestId(), domain.RegenRequest{Scope: domain.RegenScope(req.GetScope()), Sections: sections, Reason: domain.RegenOther})
+		if rerr != nil {
+			return nil, apperrors.ToGRPCStatus(rerr)
+		}
+		out.Regeneration = toProtoRegenEstimate(re)
 	}
 	return out, nil
 }
@@ -233,5 +250,245 @@ func toProtoArtifactMeta(a domain.ReviewArtifact) *requestv1.ReviewArtifactMeta 
 		InputDigest: a.Key.InputDigest, PresetDigest: a.Key.PresetDigest, SkillVersion: a.Key.SkillVersion, Revision: int32(a.Revision), State: string(a.State),
 		Origin: string(a.Origin), Reason: a.Reason, ErrorCode: a.ErrorCode, BlobDigest: a.BlobDigest, SizeBytes: int32(a.SizeBytes), ViewBox: a.ViewBox,
 		Title: a.Title, Desc: a.Desc, CreatedAt: timestamppb.New(a.CreatedAt),
+	}
+}
+
+func toProtoRegenEstimate(e usecase.RegenEstimate) *requestv1.RegenerationEstimate {
+	return &requestv1.RegenerationEstimate{
+		AgentRuns: int32(e.AgentRuns), DiagramsToDraw: int32(e.DiagramsToDraw), CostKnown: e.CostKnown, CostUsd: e.CostUSD,
+		LastContextCost: e.LastContextCost, LastDrawCost: e.LastDrawCost, ConfirmRequired: e.ConfirmRequired, DrawingsDependOnResult: e.DrawingsDependOnResult,
+	}
+}
+
+func (s *Server) deciderOrUnimplemented() (*usecase.ReviewDecider, error) {
+	if err := s.outcomeReviewWired(); err != nil {
+		return nil, err
+	}
+	if s.outcomeReview.Decider == nil {
+		return nil, status.Error(codes.Unimplemented, "review decisions are not wired")
+	}
+	return s.outcomeReview.Decider, nil
+}
+
+func (s *Server) DecideOutcomeReviewItem(ctx context.Context, req *requestv1.DecideOutcomeReviewItemRequest) (*requestv1.DecideOutcomeReviewItemResponse, error) {
+	d, err := s.deciderOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := actorFromContext(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	res, err := d.Decide(ctx, usecase.DecideInput{
+		RequestID: req.GetRequestId(), ReviewID: req.GetReviewId(), ItemKey: req.GetItemKey(), Decision: domain.ReviewDecision(req.GetDecision()), Note: req.GetNote(),
+		ExpectedVersion: req.GetExpectedVersion(), DecidedBy: actor,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &requestv1.DecideOutcomeReviewItemResponse{
+		Decision: toProtoReviewDecision(res.Decision), ReviewVersion: res.Review.Version, ReviewState: string(res.Review.State), OpenDecisions: int32(res.Open),
+	}, nil
+}
+
+func (s *Server) ApproveOutcomeReview(ctx context.Context, req *requestv1.ApproveOutcomeReviewRequest) (*requestv1.ApproveOutcomeReviewResponse, error) {
+	d, err := s.deciderOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := actorFromContext(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	st, err := d.Approve(ctx, usecase.ApproveInput{RequestID: req.GetRequestId(), ReviewID: req.GetReviewId(), Note: req.GetNote(), ExpectedVersion: req.GetExpectedVersion(), ApprovedBy: actor})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &requestv1.ApproveOutcomeReviewResponse{Review: toProtoOutcomeReview(st)}, nil
+}
+
+func (s *Server) ListOutcomeReviewDecisions(ctx context.Context, req *requestv1.ListOutcomeReviewDecisionsRequest) (*requestv1.ListOutcomeReviewDecisionsResponse, error) {
+	d, err := s.deciderOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	out := &requestv1.ListOutcomeReviewDecisionsResponse{}
+	if req.GetItemKey() != "" {
+		hist, err := d.History(ctx, req.GetRequestId(), req.GetReviewId(), req.GetItemKey())
+		if err != nil {
+			return nil, apperrors.ToGRPCStatus(err)
+		}
+		for _, h := range hist {
+			out.Decisions = append(out.Decisions, toProtoReviewDecision(h))
+		}
+		return out, nil
+	}
+	list, err := d.List(ctx, req.GetRequestId(), req.GetReviewId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	for _, h := range list.InForce {
+		out.Decisions = append(out.Decisions, toProtoReviewDecision(h))
+	}
+	out.OpenDecisions = int32(list.Open)
+	return out, nil
+}
+
+func (s *Server) LinkOutcomeReviewChild(ctx context.Context, req *requestv1.LinkOutcomeReviewChildRequest) (*requestv1.LinkOutcomeReviewChildResponse, error) {
+	d, err := s.deciderOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	n, err := d.LinkChild(ctx, req.GetRequestId(), req.GetReviewId(), req.GetItemKeys(), req.GetChildRequestId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &requestv1.LinkOutcomeReviewChildResponse{Linked: int32(n)}, nil
+}
+
+func toProtoReviewDecision(d domain.ItemDecision) *requestv1.OutcomeReviewDecision {
+	return &requestv1.OutcomeReviewDecision{
+		DecisionId: d.ID, ReviewId: d.ReviewID, ItemKey: d.ItemKey, Decision: string(d.Decision), Note: d.Note, ChildRequestId: d.ChildRequestID,
+		DecidedBy: d.DecidedBy, DecidedAt: timestamppb.New(d.DecidedAt), Active: d.Active, Orphaned: d.Orphaned,
+	}
+}
+
+func (s *Server) regeneratorOrUnimplemented() (*usecase.ReviewRegenerator, error) {
+	if err := s.outcomeReviewWired(); err != nil {
+		return nil, err
+	}
+	if s.outcomeReview.Regenerator == nil {
+		return nil, status.Error(codes.Unimplemented, "regeneration is not wired")
+	}
+	return s.outcomeReview.Regenerator, nil
+}
+
+func (s *Server) RegenerateReviewArtifacts(ctx context.Context, req *requestv1.RegenerateReviewArtifactsRequest) (*requestv1.RegenerateReviewArtifactsResponse, error) {
+	rg, err := s.regeneratorOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := actorFromContext(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	sections := make([]domain.ReviewSection, 0, len(req.GetSections()))
+	for _, sec := range req.GetSections() {
+		sections = append(sections, domain.ReviewSection(sec))
+	}
+	res, err := rg.Regenerate(ctx, usecase.RegenerateInput{
+		RequestID:    req.GetRequestId(),
+		RegenRequest: domain.RegenRequest{Scope: domain.RegenScope(req.GetScope()), Sections: sections, Reason: domain.RegenReason(req.GetReason()), Note: req.GetNote()},
+		ConfirmCost:  req.GetConfirmCost(), ClientRequestID: req.GetClientRequestId(), ExpectedVersion: req.GetExpectedVersion(), By: actor,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := &requestv1.RegenerateReviewArtifactsResponse{Replayed: res.Replayed, Estimate: toProtoRegenEstimate(res.Estimate), Skipped: res.Skipped}
+	if res.ContextRun != nil {
+		out.ContextRun = toProtoOutcomeReviewRun(*res.ContextRun)
+	}
+	if res.DrawRun != nil {
+		out.DrawRun = toProtoOutcomeReviewRun(*res.DrawRun)
+	}
+	return out, nil
+}
+
+func (s *Server) RestoreReviewArtifactRevision(ctx context.Context, req *requestv1.RestoreReviewArtifactRevisionRequest) (*requestv1.RestoreReviewArtifactRevisionResponse, error) {
+	rg, err := s.regeneratorOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	actor, _ := tenant.UserID(ctx)
+	res, err := rg.Restore(ctx, req.GetRequestId(), req.GetArtifactId(), req.GetNote(), actor)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := &requestv1.RestoreReviewArtifactRevisionResponse{Artifact: toProtoArtifactMeta(res.Artifact)}
+	if res.Diff != nil {
+		out.Diff, out.HasDiff = toProtoModelDiff(*res.Diff), true
+	}
+	return out, nil
+}
+
+func (s *Server) CompareReviewArtifactRevisions(ctx context.Context, req *requestv1.CompareReviewArtifactRevisionsRequest) (*requestv1.CompareReviewArtifactRevisionsResponse, error) {
+	rg, err := s.regeneratorOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	diff, err := rg.Compare(ctx, req.GetRequestId(), req.GetFromArtifactId(), req.GetToArtifactId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &requestv1.CompareReviewArtifactRevisionsResponse{Diff: toProtoModelDiff(diff)}, nil
+}
+
+func toProtoModelDiff(d domain.ModelDiff) *requestv1.ModelDiff {
+	return &requestv1.ModelDiff{AddedNodes: d.AddedNodes, RemovedNodes: d.RemovedNodes, ChangedNodes: d.ChangedNodes, AddedEdges: d.AddedEdges, RemovedEdges: d.RemovedEdges, ChangedEdges: d.ChangedEdges}
+}
+
+func (s *Server) profilesOrUnimplemented() (*usecase.ReviewDrawingProfiles, error) {
+	if err := s.outcomeReviewWired(); err != nil {
+		return nil, err
+	}
+	if s.outcomeReview.Profiles == nil {
+		return nil, status.Error(codes.Unimplemented, "drawing profiles are not wired")
+	}
+	return s.outcomeReview.Profiles, nil
+}
+
+func (s *Server) GetReviewDrawingProfile(ctx context.Context, req *requestv1.GetReviewDrawingProfileRequest) (*requestv1.GetReviewDrawingProfileResponse, error) {
+	p, err := s.profilesOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	view, err := p.Get(ctx, req.GetProjectId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	effective, err := json.Marshal(view.Effective)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "the profile in force could not be written")
+	}
+	out := &requestv1.GetReviewDrawingProfileResponse{EffectiveJson: string(effective), Sources: view.Effective.Sources}
+	if view.Tenant != nil {
+		out.TenantLayer, out.HasTenantLayer = toProtoProfileLayer(*view.Tenant), true
+	}
+	if view.Project != nil {
+		out.ProjectLayer, out.HasProjectLayer = toProtoProfileLayer(*view.Project), true
+	}
+	return out, nil
+}
+
+func (s *Server) SaveReviewDrawingProfile(ctx context.Context, req *requestv1.SaveReviewDrawingProfileRequest) (*requestv1.SaveReviewDrawingProfileResponse, error) {
+	p, err := s.profilesOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := actorFromContext(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	saved, err := p.Save(ctx, req.GetProjectId(), []byte(req.GetSpecJson()), req.GetExpectedVersion(), actor)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &requestv1.SaveReviewDrawingProfileResponse{Layer: toProtoProfileLayer(saved)}, nil
+}
+
+func (s *Server) ResetReviewDrawingProfile(ctx context.Context, req *requestv1.ResetReviewDrawingProfileRequest) (*requestv1.ResetReviewDrawingProfileResponse, error) {
+	p, err := s.profilesOrUnimplemented()
+	if err != nil {
+		return nil, err
+	}
+	if err := p.Reset(ctx, req.GetProjectId(), req.GetExpectedVersion()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &requestv1.ResetReviewDrawingProfileResponse{}, nil
+}
+
+func toProtoProfileLayer(p usecase.StoredDrawingProfile) *requestv1.ReviewDrawingProfileLayer {
+	return &requestv1.ReviewDrawingProfileLayer{
+		ProjectId: p.ProjectKey, SpecJson: string(p.Spec), SpecDigest: p.SpecDigest, Version: p.Version, UpdatedBy: p.UpdatedBy, UpdatedAt: timestamppb.New(p.UpdatedAt),
 	}
 }

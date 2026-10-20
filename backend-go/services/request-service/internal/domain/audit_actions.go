@@ -17,6 +17,12 @@ const (
 	AuditReviewGenerate = "request.review.generate"
 	// AuditReviewContext records a context run being started for a review: it costs an agent run, so it is audited apart from the build.
 	AuditReviewContext = "request.review.context"
+	// The review actions below name what was done and to which review, never the notes or the content (CR-OR-022, CR-OR-012, CR-OR-013).
+	AuditReviewDecide     = "request.review.decide"
+	AuditReviewApprove    = "request.review.approve"
+	AuditReviewRegenerate = "request.review.regenerate"
+	AuditReviewRestore    = "request.review.restore"
+	AuditReviewProfile    = "request.review.profile.save"
 )
 
 // DurableAuditActions must survive an auth-service outage: they are written to the audit outbox in the
