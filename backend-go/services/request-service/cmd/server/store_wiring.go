@@ -42,11 +42,13 @@ type requestStores struct {
 	engineSettings usecase.EngineSettingsRepository
 	// openspecChanges is the authored OpenSpec change of a Request: its files, branch, commit and what it was built from.
 	openspecChanges usecase.OpenSpecChangeRepository
-	links           usecase.RequestLinkRepository
-	idempotency     usecase.RequestIdempotencyRepository
-	processed       usecase.ProcessedEventRepository
-	classRuns       usecase.ClassificationRunRepository
-	artifact        artifactStores
+	// testSpecRuns holds the attempts to generate test specs next to the code of an executing Request (ORC-TS-T1); its own table.
+	testSpecRuns usecase.TestSpecRunRepository
+	links        usecase.RequestLinkRepository
+	idempotency  usecase.RequestIdempotencyRepository
+	processed    usecase.ProcessedEventRepository
+	classRuns    usecase.ClassificationRunRepository
+	artifact     artifactStores
 	// Rollout (CR-REQ-024/025): flag row, active-source lookup, cross-tenant gauge counts.
 	flowSettings usecase.FlowSettingsRepository
 	sourceFinder usecase.ActiveSourceFinder
@@ -87,6 +89,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			analysisRuns:    postgresadapter.NewAnalysisRunRepository(base),
 			engineSettings:  postgresadapter.NewProjectEngineSettingsRepository(base),
 			openspecChanges: postgresadapter.NewOpenSpecChangeRepository(base),
+			testSpecRuns:    postgresadapter.NewTestSpecRunRepository(base),
 			links:           postgresadapter.NewRequestLinkRepository(base),
 			idempotency:     postgresadapter.NewRequestIdempotencyRepository(base),
 			processed:       postgresadapter.NewProcessedEventRepository(base),
@@ -134,6 +137,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			analysisRuns:    mysqladapter.NewAnalysisRunRepository(base),
 			engineSettings:  mysqladapter.NewProjectEngineSettingsRepository(base),
 			openspecChanges: mysqladapter.NewOpenSpecChangeRepository(base),
+			testSpecRuns:    mysqladapter.NewTestSpecRunRepository(base),
 			links:           mysqladapter.NewRequestLinkRepository(base),
 			idempotency:     mysqladapter.NewRequestIdempotencyRepository(base),
 			processed:       mysqladapter.NewProcessedEventRepository(base),

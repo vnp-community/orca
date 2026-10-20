@@ -471,6 +471,8 @@ services:
       REQUEST_DEFAULT_SOLUTION_AGENT: ${REQUEST_DEFAULT_SOLUTION_AGENT:-true}
       # step_by_step (a person releases every Phase) or continuous (one approval of the plan runs every Phase); a project setting wins.
       REQUEST_DEFAULT_EXECUTION_MODE: ${REQUEST_DEFAULT_EXECUTION_MODE:-step_by_step}
+      # Generates test specs with tdd-agent next to the code of an executing Request (docs/integrate/TDD-REQ-TESTSPEC-001); advisory, never blocks the Request.
+      REQUEST_TESTSPEC_ENABLED: ${REQUEST_TESTSPEC_ENABLED:-false}
       # Shared secret issue-status-sync presents for LookupRequestBySource; empty refuses the call.
       SERVICE_INTERNAL_TOKEN: ${REQUEST_SERVICE_INTERNAL_TOKEN:-}
       # Gateway presents the same value as REQUEST_INTERNAL_CALLER_TOKEN; empty makes every RPC refuse.

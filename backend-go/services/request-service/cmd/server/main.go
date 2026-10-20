@@ -181,6 +181,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 	defer execution.close()
+	testSpecs := wireTestSpecs(lifecycleCtx, &lifecycleWG, cfg, log, stores, solution, execution, busConsumer)
 	plan, err := wirePlan(log, stores, lifecycle, solution, approval, execution, execTasks, dirs)
 	if err != nil {
 		return err
@@ -221,6 +222,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		WithLifecycle(requestgrpc.LifecycleUseCases{Flow: lifecycle.GetFlow, Return: lifecycle.Return, Reopen: lifecycle.Reopen, Cancel: lifecycle.Cancel, SpawnChild: lifecycle.SpawnChild, Links: lifecycle.ListLinks}).
 		WithSolution(solution.useCases()).
 		WithPlan(plan).
+		WithTestSpecs(testSpecs).
 		WithEngineSettings(usecase.NewManageProjectEngineSettings(stores.engineSettings).WithReadiness(solution.gate).WithAudit(security.audit, stores.tx)).
 		WithCompliance(security.compliance))
 	if approval.Enabled {

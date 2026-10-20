@@ -650,6 +650,18 @@
   category: request_flow
   reason: "Administrator configuration that switches agents on for a project; an MCP caller must not change it, add a ToolSpec with admin gating before exposing it."
 
+- pattern: "request.testSpecs"
+  category: request_flow
+  reason: "Test specs of the Execution tab (docs/integrate/TDD-REQ-TESTSPEC-001); no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "request.testSpecsStart"
+  category: request_flow
+  reason: "Re-runs test-spec generation on the dev server for the screen's Re-run button; no MCP tool is decided yet."
+
+- pattern: "request.testSpecDocument"
+  category: request_flow
+  reason: "Reads one agent-written test-spec document for the screen's viewer; no MCP tool is decided yet."
+
 - pattern: "request.cleanupProposal"
   category: request_flow
   reason: "Removes a git worktree on a dev server; a person or the CLI does that, no MCP tool is decided yet."
