@@ -65,7 +65,9 @@ describe('openReviewFromEntryPoint', () => {
     ['source-control', 'source_control'],
     ['cmd-k', 'cmd_k'],
     ['right-sidebar', 'right_sidebar'],
-    ['notification', 'notification']
+    ['notification', 'notification'],
+    // Counted with the panel entry until the telemetry schema (six identical copies) has a value of its own.
+    ['request-outcome', 'right_sidebar']
   ] as const)('records %s as the telemetry open source before the tab mounts', (entry, source) => {
     ensure.mockImplementationOnce((id: string) => {
       // The origin is already pending when the tab is created.

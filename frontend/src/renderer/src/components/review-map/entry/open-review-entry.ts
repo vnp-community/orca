@@ -20,6 +20,7 @@ export type ReviewEntrySource =
   | 'cmd-k'
   | 'right-sidebar'
   | 'notification'
+  | 'request-outcome'
 
 export type OpenReviewEntryOptions = {
   lens?: string
@@ -32,7 +33,10 @@ const TELEMETRY_SOURCE: Record<ReviewEntrySource, ReviewOpenSource> = {
   'source-control': 'source_control',
   'cmd-k': 'cmd_k',
   'right-sidebar': 'right_sidebar',
-  notification: 'notification'
+  notification: 'notification',
+  // Why: the telemetry schema has six byte-identical copies (telemetry-shared-copies-parity); a value of its own is a change to all
+  // of them, so an open from a Request's Outcome review is counted with the other panel entry until that change is made.
+  'request-outcome': 'right_sidebar'
 }
 
 export function openReviewFromEntryPoint(

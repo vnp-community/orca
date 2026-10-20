@@ -14,7 +14,7 @@ import type { OrcaRequest } from '../../../../shared/request-types'
 const T = 'auto.components.request.NextAction.'
 
 export type NextActionKind = 'failed' | 'needs_you' | 'running' | 'waiting' | 'done' | 'none'
-export type DetailTabId = 'overview' | 'analysis' | 'plan' | 'execution'
+export type DetailTabId = 'overview' | 'analysis' | 'plan' | 'execution' | 'outcome-review'
 export type NextActionCommand = 'open_tab' | 'reopen' | 'answer'
 
 export type NextAction = {
@@ -24,6 +24,8 @@ export type NextAction = {
   /** The tab that holds the thing; the bar's button goes there. */
   tab?: DetailTabId
   primary?: { label: string; command: NextActionCommand }
+  /** When the button goes to another tab than `tab` (a soft hint about the Outcome Review beside the main message). */
+  primaryTab?: DetailTabId
 }
 
 export type NextActionInput = {

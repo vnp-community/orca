@@ -13527,7 +13527,8 @@
             "history": "기록",
             "related": "관련",
             "needsAttention": "확인 필요",
-            "execution": "실행"
+            "execution": "실행",
+            "outcomeReview": "결과 리뷰"
           }
         },
         "RequestOverviewTab": {
@@ -13549,7 +13550,8 @@
             "phase": "단계",
             "execution": "실행",
             "handover": "인계",
-            "taskList": "작업 목록"
+            "taskList": "작업 목록",
+            "review": "결과 리뷰"
           },
           "state": {
             "done": "완료",
@@ -14704,6 +14706,406 @@
           "invalid": "올바른 브랜치 또는 태그 이름이 아닙니다. 확인한 뒤 다시 시도하세요.",
           "notFound": "저장소에서 이 브랜치 또는 태그를 찾을 수 없습니다. 다른 것을 선택하세요.",
           "checkNotConfigured": "이 서버는 아직 브랜치를 확인할 수 없어 브랜치가 저장되지 않았습니다. 관리자에게 문의하세요."
+        },
+        "outcomeReview": {
+          "OutcomeAgentRunFacts": {
+            "cost": "보고된 비용",
+            "costValue": "{{usd}} USD",
+            "reviewRuns": "리뷰 실행",
+            "reviewRunsValue": "{{count}} (실패 {{failed}})",
+            "tasks": "완료된 작업",
+            "tasksValue": "{{total}}개 중 {{done}}개",
+            "time": "소요 시간",
+            "title": "에이전트 실행"
+          },
+          "OutcomeDesignControl": {
+            "checked": "설계와 대조함 (스냅샷 {{snapshot}})",
+            "designNotAvailable": "설계를 사용할 수 없음",
+            "fromDesign": "설계 기준 (스냅샷 {{snapshot}})",
+            "open": "{{section}} 상세 열기"
+          },
+          "OutcomeNeedsDecision": {
+            "none": "결정이 필요한 항목이 없습니다.",
+            "title": "결정이 필요합니다"
+          },
+          "OutcomeReleaseReadiness": {
+            "title": "릴리스 준비 상태"
+          },
+          "OutcomeReviewHeader": {
+            "generated": "{{when}}에 생성됨",
+            "kgSnapshot": "KG 스냅샷 {{snapshot}}",
+            "kgUnavailable": "KG를 사용할 수 없음",
+            "regenerate": "다시 생성…"
+          },
+          "OutcomeReviewTab": {
+            "pending": "아키텍처와 흐름을 읽는 중입니다"
+          },
+          "OutcomeVerdictCards": {
+            "architecture": {
+              "deviations": "보고된 이탈 {{count}}건"
+            },
+            "flag": {
+              "breaking": "호환성을 깨는 변경",
+              "config": "설정 변경",
+              "migration": "마이그레이션"
+            },
+            "quality": {
+              "title": "품질 게이트"
+            },
+            "release": {
+              "title": "릴리스 위험"
+            },
+            "requirements": {
+              "all": "이 기준에 연결된 작업이 모두 완료되었습니다",
+              "count": "{{total}}개 중 {{delivered}}개",
+              "noData": "결론을 내리기에 데이터가 부족합니다",
+              "rest": "일부 {{partial}} · 미충족 {{notCovered}} · 알 수 없음 {{unknown}}"
+            }
+          },
+          "advisory": "참고용",
+          "agentReported": "에이전트 보고",
+          "artifact": {
+            "RegeneratePanel": {
+              "cancel": "취소",
+              "confirm": "비용이 한도를 넘습니다. 그래도 진행합니다.",
+              "description": "에이전트를 한 번 실행하며, 다른 사람이 본 내용을 대체합니다.",
+              "estimating": "실행 내용을 계산하는 중…",
+              "note": "메모 (선택)",
+              "reason": "이유",
+              "reasonPlaceholder": "이유 선택",
+              "replayed": "해당 요청은 이미 접수되었습니다",
+              "scope": "수행할 작업",
+              "started": "다시 생성을 시작했습니다",
+              "submit": "다시 생성",
+              "title": "다시 생성"
+            },
+            "action": {
+              "close": "닫기",
+              "compare": "비교",
+              "openLarger": "크게 열기",
+              "regenerate": "다시 생성…",
+              "restore": "이것 사용",
+              "retry": "다시 시도",
+              "revisions": "리비전",
+              "zoomIn": "확대",
+              "zoomOut": "축소"
+            },
+            "compare": {
+              "addedEdges": "추가된 화살표",
+              "addedNodes": "추가된 상자",
+              "changedEdges": "변경된 화살표",
+              "changedNodes": "변경된 상자",
+              "none": "두 리비전은 같은 모델로 그려졌습니다.",
+              "removedEdges": "제거된 화살표",
+              "removedNodes": "제거된 상자",
+              "title": "두 리비전 비교"
+            },
+            "disabled": "그리기가 꺼져 있어 표를 표시합니다",
+            "drawing": "그리는 중…",
+            "drawnByAgent": "위의 모델을 바탕으로 에이전트가 그렸습니다. 틀릴 수 있습니다.",
+            "estimate": {
+              "cost": "최근 실행 기준 약 {{usd}} USD",
+              "noCost": "아직 비용 수치가 측정되지 않았습니다",
+              "runs": "에이전트 실행 {{runs}}회, 그릴 다이어그램 {{diagrams}}개"
+            },
+            "failed": "그리기에 실패했습니다",
+            "gone": "이 그림은 교체되었습니다. 리뷰를 다시 불러오세요.",
+            "info": "{{type}} · 스킬 {{skill}} · 리비전 {{revision}} · {{when}} · {{origin}}",
+            "missing": "이 변경에 대한 다이어그램이 없습니다",
+            "origin": {
+              "auto": "자동으로 그림",
+              "regenerated": "다시 생성됨",
+              "restored": "복원됨",
+              "unknown": "출처 알 수 없음"
+            },
+            "reason": {
+              "codeChanged": "코드가 바뀌었음",
+              "kgChanged": "지식 그래프가 바뀌었음",
+              "looksWrong": "잘못된 것 같음",
+              "other": "다른 이유",
+              "retryFailed": "그림이 실패했음",
+              "styleChanged": "그림 스타일이 바뀌었음"
+            },
+            "revisions": {
+              "inForce": "(적용 중)",
+              "loading": "리비전을 불러오는 중…",
+              "restored": "리비전 {{revision}}이(가) 다시 적용되었습니다",
+              "row": "리비전 {{revision}} · {{origin}}"
+            },
+            "scope": {
+              "all": "다시 읽고 다시 그리기",
+              "artifact": "다이어그램 다시 그리기",
+              "context": "설계와 코드 다시 읽기"
+            },
+            "skillUnknown": "알 수 없음",
+            "typeUnknown": "다이어그램",
+            "unreadable": "그림을 불러올 수 없습니다"
+          },
+          "banner": {
+            "designNotReviewed": "설계가 검토되지 않음: 읽은 설계 요소 중 {{percent}}%만 승인되었습니다. 이를 근거로 한 발견은 참고용입니다.",
+            "designPhase": "설계 리뷰입니다. 코드 이후 보기는 실행이 끝나면 나타납니다.",
+            "drawingFailed": "그리기에 실패하여 표를 표시합니다.",
+            "executionFinished": "실행이 끝났습니다. 코드 이후 리뷰를 생성하세요.",
+            "kgUnavailable": "설계 지식을 사용할 수 없어 아키텍처 점검이 제한됩니다.",
+            "rebuild": "리뷰 다시 만들기",
+            "runFailed": "마지막 에이전트 실행이 실패했습니다 ({{reason}}). Orca가 측정한 사실을 표시합니다.",
+            "stale": "이 리뷰는 요청이 바뀌기 전에 만들어졌습니다.",
+            "truncated": "크기 제한에 맞추기 위해 리뷰를 줄였습니다."
+          },
+          "change": {
+            "added": "추가됨",
+            "missing": "누락",
+            "modified": "변경됨",
+            "removed": "제거됨",
+            "unchanged": "변경 없음"
+          },
+          "decision": {
+            "action": {
+              "accept": "예외로 수락",
+              "cancel": "취소",
+              "change": "결정 변경",
+              "confirmAccept": "수락",
+              "confirmDismiss": "기각",
+              "dismiss": "주장 기각",
+              "sendBack": "되돌리기"
+            },
+            "bar": {
+              "approve": "승인",
+              "approved": "{{who}}이(가) 리뷰를 승인했습니다. 릴리스 승인이 아닙니다.",
+              "note": "승인 메모 (선택)",
+              "openDecisions": "먼저 열린 결정 {{count}}건을 해결하세요",
+              "requestChanges": "변경 요청",
+              "requestChangesCount": "변경 요청 ({{count}})"
+            },
+            "codeReview": {
+              "choose": "어느 워크트리를 열까요?",
+              "noLens": "이 부분은 코드 리뷰에 해당 보기가 없습니다.",
+              "noWorktree": "이 요청에서는 코드 리뷰를 사용할 수 없습니다: 리뷰에 열 수 있는 워크트리가 없습니다.",
+              "open": "코드 리뷰에서 열기",
+              "unsupported": "여기서는 코드 리뷰를 사용할 수 없습니다."
+            },
+            "decided": {
+              "accept": "{{who}}이(가) 예외로 수락함",
+              "dismiss": "{{who}}이(가) 주장을 기각함",
+              "sendBack": "{{who}}이(가) 되돌림",
+              "unknown": "{{who}}이(가) 결정함"
+            },
+            "dialog": {
+              "continue": "계속",
+              "description": "되돌릴 발견을 선택하세요. 그 내용으로 후속 요청이 만들어지며, 이 요청은 그대로 유지됩니다.",
+              "noteLabel": "후속 요청 메모 (선택)",
+              "nothing": "발견을 하나 이상 선택하세요.",
+              "title": "변경 요청",
+              "working": "기록하는 중…"
+            },
+            "followUpFinished": "후속 요청이 끝났습니다. 확인하려면 이 리뷰를 다시 생성하세요.",
+            "note": {
+              "errorRequired": "메모가 필요합니다.",
+              "errorTooLong": "최대 {{max}}자까지 가능합니다.",
+              "optional": "메모 (선택)",
+              "required": "이유 (필수)"
+            },
+            "openChild": "열기",
+            "sentBackIn": "후속 요청으로 되돌림",
+            "who": {
+              "teammate": "팀원",
+              "you": "나"
+            }
+          },
+          "designRow": {
+            "containers_changed": "변경된 컨테이너",
+            "design_items": "보고된 설계 항목",
+            "drawings": "설계 다이어그램",
+            "new_calls": "새 호출",
+            "new_edges": "새 연결",
+            "removed_calls": "제거된 호출",
+            "removed_edges": "제거된 연결",
+            "reordered": "순서가 바뀐 호출",
+            "unplanned_calls": "설계에 없음",
+            "unplanned_edges": "설계에 없음"
+          },
+          "diff": {
+            "containers": {
+              "items": "{{count}}개 항목",
+              "title": "컨테이너 내부"
+            },
+            "copied": "복사됨",
+            "copy": "{{id}} 복사",
+            "diagram": {
+              "afterCode": "코드 이후",
+              "design": "설계"
+            },
+            "dot": {
+              "base": "베이스에 있음",
+              "design": "설계에 있음",
+              "head": "헤드에 있음",
+              "no": "아니요",
+              "unknown": "알 수 없음",
+              "yes": "예"
+            },
+            "empty": "여기에는 아무것도 없습니다.",
+            "evidence": {
+              "kgSnapshot": "{{id}} · {{snapshot}}",
+              "unknown": "알 수 없음"
+            },
+            "flag": {
+              "advisory": "참고용",
+              "breaking": "호환성 깨짐",
+              "deviates": "설계에서 벗어남",
+              "missingFromCode": "코드에 없음",
+              "notInDesign": "설계에 없음",
+              "regression": "회귀",
+              "sadTextOnly": "SAD 본문에만 있음",
+              "unverified": "미검증"
+            },
+            "later": "실행이 끝나면 나타납니다.",
+            "mode": {
+              "afterCode": "코드 이후",
+              "design": "설계",
+              "sideBySide": "나란히"
+            },
+            "modeReason": {
+              "designUnavailable": "설계를 사용할 수 없음",
+              "executionNotFinished": "실행이 끝나면 사용할 수 있음",
+              "generateFirst": "먼저 코드 이후 리뷰를 생성하세요"
+            },
+            "openFile": "{{path}}의 diff 열기",
+            "req": {
+              "after": "이후",
+              "before": "이전",
+              "delivered": "완료",
+              "evidence": "근거",
+              "notCovered": "미충족",
+              "other": "알 수 없음",
+              "partial": "일부",
+              "planned": "계획됨",
+              "requirement": "요구사항",
+              "unknown": "알 수 없음"
+            },
+            "seen": "확인함",
+            "showUnchanged": "변경 없는 항목 표시",
+            "side": {
+              "afterCode": "코드 이후",
+              "design": "설계"
+            },
+            "tab": {
+              "unplanned": "설계 외 {{count}}건",
+              "unseen": "새 항목 {{count}}건"
+            }
+          },
+          "error": {
+            "agentTooOld": "개발 서버의 에이전트가 리뷰를 지원하기에는 너무 오래되었습니다. 업데이트한 뒤 다시 시도하세요.",
+            "budgetExceeded": "리뷰용 AI 예산을 모두 사용했습니다.",
+            "confirmCost": "비용이 한도를 넘습니다. 계속하려면 확인하세요.",
+            "decisionInvalid": "해당 결정을 기록할 수 없습니다.",
+            "decisionsOpen": "아직 열려 있는 결정이 있습니다.",
+            "disabled": "이 프로젝트에서는 결과 리뷰가 꺼져 있습니다.",
+            "duplicate": "같은 요청이 두 번 전송되었습니다. 첫 번째 요청을 처리 중입니다.",
+            "forbidden": "요청을 보고한 사람이나 관리자만 할 수 있습니다.",
+            "general": "리뷰를 불러올 수 없습니다. 다시 시도하세요.",
+            "knowledgeRequired": "설계 리뷰에는 프로젝트의 지식 그래프가 필요하지만 불러올 수 없었습니다.",
+            "noDevServer": "이 프로젝트에 연결된 개발 서버가 없습니다.",
+            "notFound": "리뷰를 찾을 수 없습니다. 교체되었을 수 있습니다.",
+            "notReady": "요청에 계획이 생기면 리뷰를 열 수 있습니다.",
+            "resultInvalid": "에이전트의 답을 사용할 수 없었습니다. 다시 시도하세요.",
+            "runInProgress": "이미 리뷰 실행이 진행 중입니다. 끝날 때까지 기다리세요.",
+            "skillMissing": "리뷰에 필요한 스킬이 개발 서버에 설치되어 있지 않습니다.",
+            "staleRevision": "다른 사람이 이 리뷰를 변경했습니다. 다시 불러왔으니 다시 시도하세요."
+          },
+          "estimate": {
+            "cached": "확인된 결과가 보관되어 있어 에이전트를 새로 실행할 필요가 없습니다.",
+            "cannotRun": "에이전트 실행을 아직 시작할 수 없습니다: {{gaps}}.",
+            "codeRun": "코드를 읽으려면 에이전트를 한 번 실행합니다.",
+            "drawings": "다이어그램은 리뷰가 만들어진 뒤 개발 서버가 그릴 수 있을 때 그려집니다.",
+            "noCostFigures": "아직 비용 수치가 측정되지 않았습니다.",
+            "oneRun": "설계를 읽으려면 에이전트를 한 번 실행합니다."
+          },
+          "gap": {
+            "kgUnavailable": "프로젝트의 지식 그래프가 설정되지 않았습니다",
+            "noDevServer": "연결된 개발 서버가 없습니다",
+            "noRepoPath": "프로젝트 저장소에 개발 서버의 폴더가 없습니다",
+            "other": "충족되지 않은 요건이 있습니다"
+          },
+          "gate": {
+            "absent": "품질 게이트가 설정되지 않았습니다",
+            "fail": "검사가 실패했습니다",
+            "pass": "검사를 통과했습니다",
+            "unknown": "결론을 내리기에 데이터가 부족합니다",
+            "warn": "검사에서 경고가 나왔습니다"
+          },
+          "hint": {
+            "decide": "리뷰 결정 {{count}}건이 기다리고 있습니다",
+            "generateDelivered": "코드 이후 리뷰 생성",
+            "openReview": "리뷰 열기",
+            "reviewDesign": "설계 리뷰"
+          },
+          "invite": {
+            "deliveredBody": "설계 부분은 이미 읽었으므로 코드만 읽으면 됩니다. 설계 그림은 재사용됩니다.",
+            "deliveredTitle": "실행이 끝났습니다. 코드 이후 리뷰를 생성하세요.",
+            "designBody": "코드가 생기기 전에, 프로젝트 설계를 기준으로 이 요청이 아키텍처와 흐름을 어떻게 바꾸는지 확인합니다.",
+            "designTitle": "설계 리뷰",
+            "factsOnly": "사실만, 에이전트 실행 없음",
+            "generateDelivered": "코드 이후 리뷰 생성",
+            "generateDesign": "리뷰 생성"
+          },
+          "phase": {
+            "delivered": "코드 이후 리뷰",
+            "design": "설계 리뷰"
+          },
+          "readiness": {
+            "breaking": "호환성을 깨는 변경",
+            "config": "설정 변경",
+            "migration": "데이터베이스 마이그레이션",
+            "noneFound": "발견되지 않음",
+            "present": "있음: 릴리스 전에 확인하세요"
+          },
+          "risk": {
+            "critical": "치명적",
+            "high": "높음",
+            "low": "낮음",
+            "medium": "보통",
+            "unknown": "위험을 측정할 수 없었습니다"
+          },
+          "section": {
+            "architecture": "아키텍처",
+            "behavior": "동작",
+            "config": "설정",
+            "contracts": "계약",
+            "data": "데이터",
+            "flow": "흐름",
+            "requirements": "요구사항"
+          },
+          "severity": {
+            "breaking": "호환성 깨짐",
+            "deviation": "설계에서 벗어남",
+            "info": "정보",
+            "regression": "회귀",
+            "warning": "경고"
+          },
+          "state": {
+            "approved": "승인됨",
+            "decisionsLater": "결정은 실행이 끝난 뒤에 열립니다.",
+            "draft": "초안",
+            "generatingDelivered": "설계와 코드를 읽는 중…",
+            "generatingDesign": "설계를 읽는 중…",
+            "loading": "리뷰를 불러오는 중…",
+            "ready": "준비됨",
+            "stale": "오래됨",
+            "superseded": "교체됨",
+            "unavailable": "여기서는 결과 리뷰를 사용할 수 없습니다."
+          },
+          "timeline": {
+            "approved": "승인됨",
+            "decisions": "열린 결정 {{count}}건",
+            "delivered": "코드 이후 리뷰",
+            "design": "설계 리뷰",
+            "none": "생성되지 않음",
+            "stale": "오래됨",
+            "unknown": "알 수 없음"
+          },
+          "title": "결과 리뷰",
+          "unknown": "알 수 없음",
+          "unverified": "미검증"
         }
       },
       "reviewMap": {

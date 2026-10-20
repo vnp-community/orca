@@ -99,7 +99,22 @@ export const REQUEST_RPC_METHODS = {
 
   // Request detail read models (CR-REQ-038)
   ACTIVITY: 'request.activity',
-  EXECUTION_SUMMARY: 'request.executionSummary'
+  EXECUTION_SUMMARY: 'request.executionSummary',
+
+  // Outcome Review (CR-OR-001..030): a review is always read through its Request
+  REVIEW_ESTIMATE: 'request.review.estimate',
+  REVIEW_GENERATE: 'request.review.generate',
+  REVIEW_GET: 'request.review.get',
+  REVIEW_RUNS: 'request.review.runs',
+  REVIEW_ARTIFACT: 'request.review.artifact',
+  REVIEW_REVISIONS: 'request.review.revisions',
+  REVIEW_REGENERATE: 'request.review.regenerate',
+  REVIEW_RESTORE: 'request.review.restore',
+  REVIEW_COMPARE: 'request.review.compare',
+  REVIEW_DECIDE: 'request.review.decide',
+  REVIEW_APPROVE: 'request.review.approve',
+  REVIEW_DECISIONS: 'request.review.decisions',
+  REVIEW_LINK_CHILD: 'request.review.linkChild'
 } as const
 
 export type RequestRpcMethod = (typeof REQUEST_RPC_METHODS)[keyof typeof REQUEST_RPC_METHODS]

@@ -19,41 +19,25 @@ import type {
   ReturnedFromStage,
   RequestLinkReason
 } from '../../../../shared/request-types'
+import {
+  RUNNING_STATUSES,
+  progressCaption,
+  stepIdForResume,
+  stepIdForReturnedStage,
+  stepIdForStatus,
+  stepsOf
+} from './request-stage-timeline-steps'
+import { withReviewStep, type ReviewTimelineInput } from './request-stage-timeline-review'
+import type { StageTimeline, StepId } from './request-stage-timeline-steps'
 
-// ---------------------------------------------------------------------------
-// Step types
-// ---------------------------------------------------------------------------
-
-export type StepId = 'classification' | 'analysis' | 'plan' | 'execution' | 'handover'
-
-/**
- * done: finished. running: Orca or an agent is working on it. waiting: a person has to act. stopped: the request left the
- * flow here (back to the backlog, or cancelled). pending: not reached.
- */
-export type StepState = 'done' | 'running' | 'waiting' | 'stopped' | 'pending'
-
-/** A short line under a step; the component translates it. */
-export type StepCaption =
-  | { kind: 'progress'; phase?: number; phases?: number; tasksDone: number; tasksTotal: number }
-  | { kind: 'stopped_progress'; tasksDone: number; tasksTotal: number }
-  | { kind: 'waiting_approval' }
-  | { kind: 'waiting_you' }
-  | { kind: 'archiving' }
-  | { kind: 'handover_failed' }
-
-export type Step = {
-  id: StepId
-  labelKey: string
-  state: StepState
-  /** analysisKind ('solution'|'diagnosis'|...) for the analysis step, planKind for the plan step */
-  variant?: string
-  caption?: StepCaption
-}
-
-export type StageTimeline = {
-  steps: Step[]
-  current: StepId | null
-}
+export type {
+  ReviewRowCaption,
+  StageTimeline,
+  Step,
+  StepCaption,
+  StepId,
+  StepState
+} from './request-stage-timeline-steps'
 
 // ---------------------------------------------------------------------------
 // Child request rules
@@ -101,115 +85,11 @@ export type BuildInput = {
   flow?: RequestFlowView | null
   engine?: RequestEngine
   summary?: ExecutionSummary | null
+  /** The Outcome Review row (CR-OR-020); absent or disabled adds nothing. */
+  review?: ReviewTimelineInput
 }
 
-const STEP_LABEL = 'auto.components.request.StageTimeline.step.'
-
-function stepsOf(flow: RequestFlowView, engine: RequestEngine | undefined): Step[] {
-  const steps: Step[] = [
-    { id: 'classification', labelKey: `${STEP_LABEL}classification`, state: 'pending' }
-  ]
-  if (flow.analysisKind !== null) {
-    steps.push({
-      id: 'analysis',
-      labelKey: `${STEP_LABEL}analysis`,
-      state: 'pending',
-      variant: flow.analysisKind
-    })
-  }
-  if (flow.planKind === 'plan' || flow.planKind === 'task_list') {
-    steps.push({
-      id: 'plan',
-      labelKey: `${STEP_LABEL}${flow.planKind === 'task_list' ? 'taskList' : 'plan'}`,
-      state: 'pending',
-      variant: flow.planKind
-    })
-  }
-  if (flow.planKind !== 'none') {
-    steps.push({ id: 'execution', labelKey: `${STEP_LABEL}execution`, state: 'pending' })
-    if (engine === 'openspec') {
-      steps.push({ id: 'handover', labelKey: `${STEP_LABEL}handover`, state: 'pending' })
-    }
-  }
-  return steps
-}
-
-function stepIdForStatus(status: RequestStatus, has: (id: StepId) => boolean): StepId {
-  switch (status) {
-    case 'submitted':
-    case 'classifying':
-    case 'awaiting_type_confirmation':
-      return 'classification'
-    case 'analyzing':
-    case 'awaiting_analysis_approval':
-      return 'analysis'
-    case 'planning':
-    case 'awaiting_plan_approval':
-      // A single-task flow (hotfix) has no Plan stage: its pre-deploy approval holds the Execution stage.
-      return has('plan') ? 'plan' : 'execution'
-    case 'executing':
-    case 'completed':
-      return 'execution'
-    default:
-      return 'classification'
-  }
-}
-
-function stepIdForReturnedStage(
-  stage: ReturnedFromStage | undefined,
-  has: (id: StepId) => boolean
-): StepId {
-  switch (stage) {
-    case 'analysis':
-      return has('analysis') ? 'analysis' : 'classification'
-    case 'plan':
-      return has('plan') ? 'plan' : has('execution') ? 'execution' : 'classification'
-    case 'phase':
-    case 'task':
-      return has('execution') ? 'execution' : 'classification'
-    default:
-      return 'classification'
-  }
-}
-
-function stepIdForResume(resume: string | undefined, has: (id: StepId) => boolean): StepId {
-  switch (resume) {
-    case 'planning':
-      return has('plan') ? 'plan' : 'execution'
-    case 'executing':
-      return 'execution'
-    default:
-      return has('analysis') ? 'analysis' : 'classification'
-  }
-}
-
-const RUNNING_STATUSES: ReadonlySet<RequestStatus> = new Set([
-  'submitted',
-  'classifying',
-  'analyzing',
-  'planning',
-  'executing'
-])
-
-function progressCaption(
-  summary: ExecutionSummary | null | undefined,
-  stopped: boolean
-): StepCaption | undefined {
-  if (!summary || summary.progress.tasksTotal === 0) {
-    return undefined
-  }
-  const { tasksDone, tasksTotal, phasesTotal, phasesDone } = summary.progress
-  if (stopped) {
-    return { kind: 'stopped_progress', tasksDone, tasksTotal }
-  }
-  if (phasesTotal > 0) {
-    const current = Math.min(phasesTotal, phasesDone + (phasesDone < phasesTotal ? 1 : 0))
-    return { kind: 'progress', phase: current, phases: phasesTotal, tasksDone, tasksTotal }
-  }
-  return { kind: 'progress', tasksDone, tasksTotal }
-}
-
-export function buildStageTimeline(input: BuildInput): StageTimeline {
+function buildCoreTimeline(input: BuildInput): StageTimeline {
   const { type, size, status, returnedFromStage, resumeStatus, engine, summary } = input
   // Gracefully handle unknown type/status
   if (type === 'unknown' || status === 'unknown') {
@@ -296,4 +176,8 @@ export function buildStageTimeline(input: BuildInput): StageTimeline {
   }
 
   return { steps, current: current.id }
+}
+
+export function buildStageTimeline(input: BuildInput): StageTimeline {
+  return withReviewStep(buildCoreTimeline(input), input.review)
 }

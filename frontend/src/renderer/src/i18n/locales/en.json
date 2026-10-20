@@ -13527,7 +13527,8 @@
             "history": "History",
             "related": "Related",
             "needsAttention": "Needs attention",
-            "execution": "Execution"
+            "execution": "Execution",
+            "outcomeReview": "Outcome review"
           }
         },
         "RequestOverviewTab": {
@@ -13549,7 +13550,8 @@
             "phase": "Phases",
             "execution": "Execution",
             "handover": "Handover",
-            "taskList": "Task list"
+            "taskList": "Task list",
+            "review": "Outcome review"
           },
           "state": {
             "done": "done",
@@ -14704,6 +14706,406 @@
           "invalid": "This is not a valid branch or tag name. Check it and try again.",
           "notFound": "This branch or tag was not found in the repository. Pick another one.",
           "checkNotConfigured": "This server cannot check branches yet, so the branch was not saved. Ask an administrator."
+        },
+        "outcomeReview": {
+          "OutcomeAgentRunFacts": {
+            "cost": "Cost reported",
+            "costValue": "{{usd}} USD",
+            "reviewRuns": "Review runs",
+            "reviewRunsValue": "{{count}} ({{failed}} failed)",
+            "tasks": "Tasks done",
+            "tasksValue": "{{done}} of {{total}}",
+            "time": "Time",
+            "title": "Agent run"
+          },
+          "OutcomeDesignControl": {
+            "checked": "Checked against design (snapshot {{snapshot}})",
+            "designNotAvailable": "Design not available",
+            "fromDesign": "From the design (snapshot {{snapshot}})",
+            "open": "Open {{section}} details"
+          },
+          "OutcomeNeedsDecision": {
+            "none": "Nothing asks for a decision.",
+            "title": "Needs your decision"
+          },
+          "OutcomeReleaseReadiness": {
+            "title": "Release readiness"
+          },
+          "OutcomeReviewHeader": {
+            "generated": "Generated {{when}}",
+            "kgSnapshot": "KG snapshot {{snapshot}}",
+            "kgUnavailable": "KG unavailable",
+            "regenerate": "Regenerate…"
+          },
+          "OutcomeReviewTab": {
+            "pending": "The architecture and flow are being read"
+          },
+          "OutcomeVerdictCards": {
+            "architecture": {
+              "deviations": "{{count}} reported deviations"
+            },
+            "flag": {
+              "breaking": "Breaking change",
+              "config": "Config change",
+              "migration": "Migration"
+            },
+            "quality": {
+              "title": "Quality gate"
+            },
+            "release": {
+              "title": "Release risk"
+            },
+            "requirements": {
+              "all": "Every task tied to these criteria is done",
+              "count": "{{delivered}} of {{total}}",
+              "noData": "Not enough data to conclude",
+              "rest": "{{partial}} partial · {{notCovered}} not covered · {{unknown}} unknown"
+            }
+          },
+          "advisory": "Advisory",
+          "agentReported": "Agent reported",
+          "artifact": {
+            "RegeneratePanel": {
+              "cancel": "Cancel",
+              "confirm": "This costs more than the limit. Go ahead anyway.",
+              "description": "This costs an agent run and replaces what others may have looked at.",
+              "estimating": "Working out what this would do…",
+              "note": "Note (optional)",
+              "reason": "Why",
+              "reasonPlaceholder": "Choose a reason",
+              "replayed": "That request was already received",
+              "scope": "What to do",
+              "started": "Regeneration started",
+              "submit": "Regenerate",
+              "title": "Regenerate"
+            },
+            "action": {
+              "close": "Close",
+              "compare": "Compare",
+              "openLarger": "Open larger",
+              "regenerate": "Regenerate…",
+              "restore": "Use this one",
+              "retry": "Try again",
+              "revisions": "Revisions",
+              "zoomIn": "Zoom in",
+              "zoomOut": "Zoom out"
+            },
+            "compare": {
+              "addedEdges": "Arrows added",
+              "addedNodes": "Boxes added",
+              "changedEdges": "Arrows changed",
+              "changedNodes": "Boxes changed",
+              "none": "The two revisions are drawn from the same model.",
+              "removedEdges": "Arrows removed",
+              "removedNodes": "Boxes removed",
+              "title": "Compare two revisions"
+            },
+            "disabled": "Drawing is turned off, showing the table",
+            "drawing": "Drawing…",
+            "drawnByAgent": "Drawn by an agent from the model above. It may be wrong.",
+            "estimate": {
+              "cost": "About {{usd}} USD, from the last runs",
+              "noCost": "No cost figures have been measured yet",
+              "runs": "{{runs}} agent run(s), {{diagrams}} diagram(s) to draw"
+            },
+            "failed": "Drawing failed",
+            "gone": "This drawing was replaced. Reload the review.",
+            "info": "{{type}} · skill {{skill}} · revision {{revision}} · {{when}} · {{origin}}",
+            "missing": "No diagram for this change",
+            "origin": {
+              "auto": "drawn automatically",
+              "regenerated": "regenerated",
+              "restored": "restored",
+              "unknown": "unknown origin"
+            },
+            "reason": {
+              "codeChanged": "The code changed",
+              "kgChanged": "The knowledge graph changed",
+              "looksWrong": "It looks wrong",
+              "other": "Another reason",
+              "retryFailed": "A drawing failed",
+              "styleChanged": "The drawing style changed"
+            },
+            "revisions": {
+              "inForce": "(in force)",
+              "loading": "Loading revisions…",
+              "restored": "Revision {{revision}} is in force again",
+              "row": "Revision {{revision}} · {{origin}}"
+            },
+            "scope": {
+              "all": "Read again and draw again",
+              "artifact": "Draw the diagrams again",
+              "context": "Read the design and the code again"
+            },
+            "skillUnknown": "unknown",
+            "typeUnknown": "diagram",
+            "unreadable": "The drawing could not be loaded"
+          },
+          "banner": {
+            "designNotReviewed": "Design not reviewed: {{percent}}% of the design elements read are approved. Findings based on them are advisory.",
+            "designPhase": "Design review. The after-code view appears when execution completes.",
+            "drawingFailed": "Drawing failed, showing the table.",
+            "executionFinished": "Execution finished. Generate the after-code review.",
+            "kgUnavailable": "Design knowledge was not available, so architecture checks are limited.",
+            "rebuild": "Rebuild the review",
+            "runFailed": "The last agent run failed ({{reason}}). The facts Orca measured are shown.",
+            "stale": "This review was made before the Request changed.",
+            "truncated": "The review was cut to fit its size limit."
+          },
+          "change": {
+            "added": "Added",
+            "missing": "Missing",
+            "modified": "Changed",
+            "removed": "Removed",
+            "unchanged": "Unchanged"
+          },
+          "decision": {
+            "action": {
+              "accept": "Accept as exception",
+              "cancel": "Cancel",
+              "change": "Change decision",
+              "confirmAccept": "Accept",
+              "confirmDismiss": "Dismiss",
+              "dismiss": "Dismiss claim",
+              "sendBack": "Send back"
+            },
+            "bar": {
+              "approve": "Approve",
+              "approved": "Review approved by {{who}}. This is not a release sign-off.",
+              "note": "Note for the approval (optional)",
+              "openDecisions": "Resolve {{count}} open decisions first",
+              "requestChanges": "Request changes",
+              "requestChangesCount": "Request changes ({{count}})"
+            },
+            "codeReview": {
+              "choose": "Open which worktree?",
+              "noLens": "This part has no view in the code review.",
+              "noWorktree": "Code review is not available for this Request: the review has no worktree to open.",
+              "open": "Open in code review",
+              "unsupported": "Code review is not available here."
+            },
+            "decided": {
+              "accept": "Accepted as an exception by {{who}}",
+              "dismiss": "Claim dismissed by {{who}}",
+              "sendBack": "Sent back by {{who}}",
+              "unknown": "Decided by {{who}}"
+            },
+            "dialog": {
+              "continue": "Continue",
+              "description": "Choose the findings to send back. A follow-up request is created with their text, and this request stays as it is.",
+              "noteLabel": "Note for the follow-up (optional)",
+              "nothing": "Choose at least one finding.",
+              "title": "Request changes",
+              "working": "Recording…"
+            },
+            "followUpFinished": "A follow-up Request finished. Regenerate this review to check.",
+            "note": {
+              "errorRequired": "A note is required.",
+              "errorTooLong": "At most {{max}} characters.",
+              "optional": "Note (optional)",
+              "required": "Why (required)"
+            },
+            "openChild": "Open it",
+            "sentBackIn": "Sent back in a follow-up request",
+            "who": {
+              "teammate": "a teammate",
+              "you": "you"
+            }
+          },
+          "designRow": {
+            "containers_changed": "Containers changed",
+            "design_items": "Reported design items",
+            "drawings": "Design diagrams",
+            "new_calls": "New calls",
+            "new_edges": "New connections",
+            "removed_calls": "Removed calls",
+            "removed_edges": "Removed connections",
+            "reordered": "Reordered calls",
+            "unplanned_calls": "Not in design",
+            "unplanned_edges": "Not in design"
+          },
+          "diff": {
+            "containers": {
+              "items": "{{count}} item(s)",
+              "title": "Inside containers"
+            },
+            "copied": "Copied",
+            "copy": "Copy {{id}}",
+            "diagram": {
+              "afterCode": "after code",
+              "design": "design"
+            },
+            "dot": {
+              "base": "On the base",
+              "design": "In the design",
+              "head": "On the head",
+              "no": "no",
+              "unknown": "unknown",
+              "yes": "yes"
+            },
+            "empty": "Nothing here.",
+            "evidence": {
+              "kgSnapshot": "{{id}} · {{snapshot}}",
+              "unknown": "Unknown"
+            },
+            "flag": {
+              "advisory": "Advisory",
+              "breaking": "Breaking",
+              "deviates": "Deviates from design",
+              "missingFromCode": "Missing from code",
+              "notInDesign": "Not in design",
+              "regression": "Regression",
+              "sadTextOnly": "In SAD text only",
+              "unverified": "Unverified"
+            },
+            "later": "This appears after execution completes.",
+            "mode": {
+              "afterCode": "After code",
+              "design": "Design",
+              "sideBySide": "Side by side"
+            },
+            "modeReason": {
+              "designUnavailable": "Design not available",
+              "executionNotFinished": "Available when execution completes",
+              "generateFirst": "Generate the after-code review first"
+            },
+            "openFile": "Open the diff of {{path}}",
+            "req": {
+              "after": "After",
+              "before": "Before",
+              "delivered": "Delivered",
+              "evidence": "Evidence",
+              "notCovered": "Not covered",
+              "other": "Unknown",
+              "partial": "Partial",
+              "planned": "Planned",
+              "requirement": "Requirement",
+              "unknown": "Unknown"
+            },
+            "seen": "Seen",
+            "showUnchanged": "Show unchanged",
+            "side": {
+              "afterCode": "After code",
+              "design": "Design"
+            },
+            "tab": {
+              "unplanned": "{{count}} not in design",
+              "unseen": "{{count}} new"
+            }
+          },
+          "error": {
+            "agentTooOld": "The dev server's agent is too old for the review. Update it and try again.",
+            "budgetExceeded": "The AI budget for reviews is used up.",
+            "confirmCost": "This costs more than the limit. Confirm to go on.",
+            "decisionInvalid": "That decision cannot be recorded.",
+            "decisionsOpen": "Some decisions are still open.",
+            "disabled": "The Outcome review is turned off for this project.",
+            "duplicate": "The same request was sent twice; the first one is being handled.",
+            "forbidden": "Only the person who reported the Request, or an administrator, can do this.",
+            "general": "The review could not be loaded. Try again.",
+            "knowledgeRequired": "The design review needs the project's knowledge graph, which could not be loaded.",
+            "noDevServer": "No dev server is connected for this project.",
+            "notFound": "The review was not found. It may have been replaced.",
+            "notReady": "The review opens once the Request has a plan.",
+            "resultInvalid": "The agent's answer could not be used. Try again.",
+            "runInProgress": "A review run is already going. Wait for it to finish.",
+            "skillMissing": "A skill the review needs is not installed on the dev server.",
+            "staleRevision": "Someone changed this review. It was reloaded; try again."
+          },
+          "estimate": {
+            "cached": "A checked result is kept, so no new agent run is needed.",
+            "cannotRun": "The agent run cannot start yet: {{gaps}}.",
+            "codeRun": "Reading the code takes one agent run.",
+            "drawings": "Diagrams are drawn after the review is built, when the dev server can draw.",
+            "noCostFigures": "No cost figures have been measured yet.",
+            "oneRun": "Reading the design takes one agent run."
+          },
+          "gap": {
+            "kgUnavailable": "the project's knowledge graph is not set up",
+            "noDevServer": "no dev server is connected",
+            "noRepoPath": "the project's repository has no folder on its dev server",
+            "other": "a requirement is not met"
+          },
+          "gate": {
+            "absent": "No quality gate is set up",
+            "fail": "Checks failed",
+            "pass": "Checks passed",
+            "unknown": "Not enough data to conclude",
+            "warn": "Checks raised warnings"
+          },
+          "hint": {
+            "decide": "{{count}} review decisions are waiting for you",
+            "generateDelivered": "Generate after-code review",
+            "openReview": "Open the review",
+            "reviewDesign": "Review the design"
+          },
+          "invite": {
+            "deliveredBody": "The design part is already read, so only the code needs reading. Drawings of the design are reused.",
+            "deliveredTitle": "Execution finished. Generate the after-code review.",
+            "designBody": "See how this Request changes the architecture and the flows, from the project's design, before any code exists.",
+            "designTitle": "Review the design",
+            "factsOnly": "Facts only, no agent run",
+            "generateDelivered": "Generate after-code review",
+            "generateDesign": "Generate review"
+          },
+          "phase": {
+            "delivered": "After-code review",
+            "design": "Design review"
+          },
+          "readiness": {
+            "breaking": "Breaking change",
+            "config": "Configuration change",
+            "migration": "Database migration",
+            "noneFound": "None found",
+            "present": "Present: look at it before release"
+          },
+          "risk": {
+            "critical": "Critical",
+            "high": "High",
+            "low": "Low",
+            "medium": "Medium",
+            "unknown": "Risk could not be measured"
+          },
+          "section": {
+            "architecture": "Architecture",
+            "behavior": "Behavior",
+            "config": "Config",
+            "contracts": "Contracts",
+            "data": "Data",
+            "flow": "Flow",
+            "requirements": "Requirements"
+          },
+          "severity": {
+            "breaking": "Breaking",
+            "deviation": "Deviates from design",
+            "info": "Info",
+            "regression": "Regression",
+            "warning": "Warning"
+          },
+          "state": {
+            "approved": "Approved",
+            "decisionsLater": "Decisions open after execution completes.",
+            "draft": "Draft",
+            "generatingDelivered": "Reading the design and the code…",
+            "generatingDesign": "Reading the design…",
+            "loading": "Loading the review…",
+            "ready": "Ready",
+            "stale": "Out of date",
+            "superseded": "Replaced",
+            "unavailable": "The Outcome review is not available here."
+          },
+          "timeline": {
+            "approved": "approved",
+            "decisions": "{{count}} decisions open",
+            "delivered": "after-code review",
+            "design": "design review",
+            "none": "not generated",
+            "stale": "out of date",
+            "unknown": "unknown"
+          },
+          "title": "Outcome review",
+          "unknown": "Unknown",
+          "unverified": "Unverified"
         }
       },
       "reviewMap": {

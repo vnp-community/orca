@@ -12,6 +12,8 @@ import { Check, Circle, Hand, Loader2, MessageCircleQuestion, OctagonX } from 'l
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { buildStageTimeline } from './request-stage-timeline-model'
+import { reviewCaptionText } from './outcome-review/outcome-review-timeline-copy'
+import type { ReviewTimelineInput } from './request-stage-timeline-review'
 import type { StepCaption, StepState } from './request-stage-timeline-model'
 import type { ExecutionSummary, RequestFlowView } from '../../../../shared/request-execution-types'
 import type { OrcaRequest } from '../../../../shared/request-types'
@@ -62,6 +64,8 @@ export function captionText(caption: StepCaption): string {
       return translate(`${C}archiving`, 'archiving')
     case 'handover_failed':
       return translate(`${C}handoverFailed`, 'archive failed')
+    case 'review':
+      return reviewCaptionText(caption.row, caption.openDecisions ?? 0)
   }
 }
 
@@ -69,7 +73,8 @@ export function RequestStageTimeline({
   request,
   flow,
   summary,
-  resumeStatus
+  resumeStatus,
+  review
 }: {
   request: OrcaRequest
   /** The flow of the request's type; the built-in table answers when absent. */
@@ -77,6 +82,8 @@ export function RequestStageTimeline({
   summary?: ExecutionSummary | null
   /** From the open Clarification; places the waiting marker on the step that will resume. */
   resumeStatus?: string
+  /** The Outcome Review row: shown only when the project has the review on. */
+  review?: ReviewTimelineInput
 }): React.JSX.Element | null {
   const timeline = buildStageTimeline({
     type: request.type,
@@ -86,7 +93,8 @@ export function RequestStageTimeline({
     resumeStatus,
     flow,
     engine: request.engine,
-    summary
+    summary,
+    review
   })
   if (timeline.steps.length === 0) {
     return null

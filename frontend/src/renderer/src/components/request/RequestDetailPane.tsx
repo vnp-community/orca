@@ -2,7 +2,7 @@
  * RequestDetailPane — CR-REQ-019-03
  *
  * Right-hand pane of the Requests tab: header actions, stage timeline and the
- * Overview / Analysis / Plan / History / Related tabs for one request.
+ * Overview / Analysis / Plan / Execution / Outcome review / History / Related tabs for one request (the tabs are RequestDetailTabs).
  *
  * @module components/request/RequestDetailPane
  */
@@ -11,7 +11,6 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { useRequest } from '../../hooks/useRequest'
@@ -21,16 +20,21 @@ import { useRequestRefreshOnReturn } from '../../hooks/useRequestRefreshOnReturn
 import { useRequestSubscription } from '../../hooks/useRequestSubscription'
 import { useRequestFlow } from '../../hooks/useRequestFlow'
 import { useExecutionSummary } from '../../hooks/useExecutionSummary'
+import { useOutcomeReview } from '../../hooks/useOutcomeReview'
+import { useOutcomeReviewEnabled } from '../../hooks/useOutcomeReviewEnabled'
 import { ChangeTypeConfirmDialog } from './ChangeTypeConfirmDialog'
 import { CancelRequestDialog } from './CancelRequestDialog'
 import { RequestBacklogBanner } from './RequestBacklogBanner'
 import { RequestDetailHeader } from './RequestDetailHeader'
-import { RequestActivityTab } from './activity/RequestActivityTab'
-import { ExecutionTab } from './execution/ExecutionTab'
 import { NextActionBar } from './NextActionBar'
 import { pickNextAction, type NextAction, type NextActionCommand } from './next-action-rules'
-import { RequestOverviewTab } from './RequestOverviewTab'
-import { RequestRelatedTab } from './RequestRelatedTab'
+import { withReviewHint } from './next-action-review'
+import {
+  needsDecisionItems,
+  reviewHintOf,
+  timelineRowStateOf
+} from './outcome-review/outcome-review-view-model'
+import { RequestDetailTabs } from './RequestDetailTabs'
 import { RequestStageTimeline } from './RequestStageTimeline'
 import {
   CLARIFICATION_PANEL_DOM_ID,
@@ -43,8 +47,6 @@ import { TypeConfirmationCard } from './TypeConfirmationCard'
 import { notifyRequestActionFailure } from './request-action-feedback'
 import { requestErrorMessage } from './request-error-message'
 import { getVisibleDetailTabs } from './request-action-rules'
-import { RequestPlanTab } from './plan/RequestPlanTab'
-import { RequestAnalysisTab } from './solution/RequestAnalysisTab'
 import type { ReturnedFromStage } from '../../../../shared/request-types'
 
 const T = 'auto.components.request.RequestDetailPane.'
@@ -58,16 +60,12 @@ type Props = {
 
 const EXECUTION_POLL_MS = 5000
 
-function TabDot({ label }: { label: string }): React.JSX.Element {
-  return (
-    <span
-      role="img"
-      aria-label={label}
-      className="ml-1.5 inline-block size-1.5 rounded-full bg-primary"
-      data-testid="tab-attention-dot"
-    />
-  )
-}
+// Why: the review is offered from the moment a Request has a plan, which is also when the server accepts a review.
+const REVIEW_STATUSES: ReadonlySet<string> = new Set([
+  'awaiting_plan_approval',
+  'executing',
+  'completed'
+])
 
 function detailTabForFocus(focus: 'type_confirmation' | 'analysis' | 'plan' | undefined): string {
   return focus === 'analysis' || focus === 'plan' ? focus : 'overview'
@@ -82,6 +80,10 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
   const execution = useExecutionSummary(requestId, {
     pollMs: request?.status === 'executing' ? EXECUTION_POLL_MS : 0
   })
+  const reviewFlag = useOutcomeReviewEnabled(request?.projectId)
+  const reviewActive = reviewFlag.enabled && !!request && REVIEW_STATUSES.has(request.status)
+  // Why: with the flag off or no plan yet the hook reads nothing, so there is no review traffic at all.
+  const review = useOutcomeReview(request?.id ?? null, { enabled: reviewActive })
   const currentUser = useAppStore((st) => st.currentUser)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [busy, setBusy] = useState(false)
@@ -173,12 +175,22 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
   const tabs = getVisibleDetailTabs(flow)
   // Why: a runtime without the summary channel cannot show a run, so the tab is not offered (and no red error).
   const showExecution = tabs.execution && !execution.unsupported
-  const nextAction = pickNextAction({
-    request,
-    summary: execution.summary,
-    clarificationAnswerable: clarification.answerable,
-    tabs: { ...tabs, execution: showExecution }
-  })
+  const openDecisions = review.review ? needsDecisionItems(review.review).length : 0
+  const nextAction = withReviewHint(
+    pickNextAction({
+      request,
+      summary: execution.summary,
+      clarificationAnswerable: clarification.answerable,
+      tabs: { ...tabs, execution: showExecution }
+    }),
+    reviewHintOf({
+      enabled: reviewActive,
+      requestStatus: request.status,
+      review: review.review,
+      loaded: review.status === 'ready' || review.status === 'none'
+    }),
+    openDecisions
+  )
   const onNextActionCommand = (command: NextActionCommand, action: NextAction): void => {
     if (command === 'reopen') {
       void run(() => actions.reopen(request.id))
@@ -186,14 +198,16 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
       const panel = document.getElementById(CLARIFICATION_PANEL_DOM_ID)
       panel?.scrollIntoView({ block: 'start' })
       panel?.focus({ preventScroll: true })
-    } else if (action.tab) {
-      setTab(action.tab)
+    } else if (action.primaryTab ?? action.tab) {
+      setTab((action.primaryTab ?? action.tab)!)
     }
   }
   const executionNeedsAttention =
     nextAction.kind === 'failed' ||
     (nextAction.kind === 'needs_you' && nextAction.tab === 'execution')
   const planNeedsAttention = nextAction.kind === 'needs_you' && nextAction.tab === 'plan'
+  const reviewNeedsAttention =
+    nextAction.kind === 'needs_you' && nextAction.tab === 'outcome-review'
   // Why: the failure card and the next-action bar already say a task ran out of attempts; the long banner would repeat it.
   const taskFailureStop =
     request.status === 'request_backlog' && (execution.summary?.failed.length ?? 0) > 0
@@ -241,6 +255,11 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
             resumeStatus={
               request.status === 'awaiting_information' ? clarification.resumeStatus : undefined
             }
+            review={{
+              enabled: reviewFlag.enabled,
+              row: timelineRowStateOf(review.review),
+              openDecisions
+            }}
           />
           <NextActionBar action={nextAction} busy={busy} onCommand={onNextActionCommand} />
           {request.status === 'awaiting_information' && (
@@ -257,85 +276,30 @@ export function RequestDetailPane({ requestId, onBackToList }: Props): React.JSX
             <TypeConfirmationCard request={request} onChanged={refetch} />
           )}
         </div>
-        <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="mx-4">
-            <TabsTrigger value="overview">{translate(`${T}tab.overview`, 'Overview')}</TabsTrigger>
-            {tabs.analysis && (
-              <TabsTrigger value="analysis">
-                {translate(`${T}tab.analysis`, 'Analysis')}
-              </TabsTrigger>
-            )}
-            {tabs.plan && (
-              <TabsTrigger value="plan">
-                {translate(`${T}tab.plan`, 'Plan')}
-                {planNeedsAttention && (
-                  <TabDot label={translate(`${T}tab.needsAttention`, 'Needs attention')} />
-                )}
-              </TabsTrigger>
-            )}
-            {showExecution && (
-              <TabsTrigger value="execution">
-                {translate(`${T}tab.execution`, 'Execution')}
-                {executionNeedsAttention && (
-                  <TabDot label={translate(`${T}tab.needsAttention`, 'Needs attention')} />
-                )}
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="history">{translate(`${T}tab.history`, 'History')}</TabsTrigger>
-            <TabsTrigger value="related">{translate(`${T}tab.related`, 'Related')}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="overview">
-            <RequestOverviewTab request={request} onChanged={refetch} />
-          </TabsContent>
-          {tabs.analysis && (
-            <TabsContent value="analysis">
-              <RequestAnalysisTab request={request} onChanged={refetch} />
-            </TabsContent>
-          )}
-          {tabs.plan && (
-            <TabsContent value="plan">
-              <RequestPlanTab
-                request={request}
-                onChanged={refetch}
-                flow={flow}
-                onOpenExecution={showExecution ? () => setTab('execution') : undefined}
-              />
-            </TabsContent>
-          )}
-          {showExecution && (
-            <TabsContent value="execution">
-              <ExecutionTab
-                request={request}
-                flow={flow}
-                execution={execution}
-                busy={busy}
-                onChanged={refetch}
-                onOpenPlan={tabs.plan ? () => setTab('plan') : undefined}
-                onReopen={() => void run(() => actions.reopen(request.id))}
-                onStop={() => setDialog('cancel')}
-                onAnswerClarification={() => onNextActionCommand('answer', nextAction)}
-              />
-            </TabsContent>
-          )}
-          <TabsContent value="history">
-            <RequestActivityTab
-              requestId={request.id}
-              onOpenTab={setTab}
-              active={tab === 'history'}
-              typeHistory={history}
-              typeHistoryLoading={isLoading}
-              typeHistoryError={error}
-              onRetryTypeHistory={refetch}
-            />
-          </TabsContent>
-          <TabsContent value="related">
-            <RequestRelatedTab
-              requestId={request.id}
-              links={links}
-              linksSupported={linksSupported}
-            />
-          </TabsContent>
-        </Tabs>
+        <RequestDetailTabs
+          tab={tab}
+          onTabChange={setTab}
+          request={request}
+          flow={flow}
+          tabs={tabs}
+          showExecution={showExecution}
+          showReview={reviewActive}
+          review={review}
+          execution={execution}
+          busy={busy}
+          planNeedsAttention={planNeedsAttention}
+          executionNeedsAttention={executionNeedsAttention}
+          reviewNeedsAttention={reviewNeedsAttention}
+          history={history}
+          links={links}
+          linksSupported={linksSupported}
+          isLoading={isLoading}
+          error={error}
+          onChanged={refetch}
+          onReopen={() => void run(() => actions.reopen(request.id))}
+          onStop={() => setDialog('cancel')}
+          onAnswerClarification={() => onNextActionCommand('answer', nextAction)}
+        />
       </div>
 
       {dialog === 'cancel' && (

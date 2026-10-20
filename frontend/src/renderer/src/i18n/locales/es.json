@@ -13527,7 +13527,8 @@
             "history": "Historial",
             "related": "Relacionadas",
             "needsAttention": "Requiere atención",
-            "execution": "Ejecución"
+            "execution": "Ejecución",
+            "outcomeReview": "Revisión de resultados"
           }
         },
         "RequestOverviewTab": {
@@ -13549,7 +13550,8 @@
             "phase": "Fases",
             "execution": "Ejecución",
             "handover": "Entrega",
-            "taskList": "Lista de tareas"
+            "taskList": "Lista de tareas",
+            "review": "Revisión de resultados"
           },
           "state": {
             "done": "hecho",
@@ -14704,6 +14706,406 @@
           "invalid": "No es un nombre de rama o etiqueta válido. Revísalo e inténtalo de nuevo.",
           "notFound": "No se encontró esta rama o etiqueta en el repositorio. Elige otra.",
           "checkNotConfigured": "Este servidor aún no puede comprobar ramas, así que la rama no se guardó. Consulta con un administrador."
+        },
+        "outcomeReview": {
+          "OutcomeAgentRunFacts": {
+            "cost": "Coste informado",
+            "costValue": "{{usd}} USD",
+            "reviewRuns": "Ejecuciones de la revisión",
+            "reviewRunsValue": "{{count}} ({{failed}} fallidas)",
+            "tasks": "Tareas hechas",
+            "tasksValue": "{{done}} de {{total}}",
+            "time": "Tiempo",
+            "title": "Ejecución del agente"
+          },
+          "OutcomeDesignControl": {
+            "checked": "Contrastado con el diseño (instantánea {{snapshot}})",
+            "designNotAvailable": "Diseño no disponible",
+            "fromDesign": "Del diseño (instantánea {{snapshot}})",
+            "open": "Abrir detalles de {{section}}"
+          },
+          "OutcomeNeedsDecision": {
+            "none": "Nada requiere una decisión.",
+            "title": "Requiere tu decisión"
+          },
+          "OutcomeReleaseReadiness": {
+            "title": "Preparación para el lanzamiento"
+          },
+          "OutcomeReviewHeader": {
+            "generated": "Generada {{when}}",
+            "kgSnapshot": "Instantánea del KG {{snapshot}}",
+            "kgUnavailable": "KG no disponible",
+            "regenerate": "Regenerar…"
+          },
+          "OutcomeReviewTab": {
+            "pending": "Se está leyendo la arquitectura y el flujo"
+          },
+          "OutcomeVerdictCards": {
+            "architecture": {
+              "deviations": "{{count}} desviaciones informadas"
+            },
+            "flag": {
+              "breaking": "Cambio incompatible",
+              "config": "Cambio de configuración",
+              "migration": "Migración"
+            },
+            "quality": {
+              "title": "Control de calidad"
+            },
+            "release": {
+              "title": "Riesgo de lanzamiento"
+            },
+            "requirements": {
+              "all": "Todas las tareas ligadas a estos criterios están hechas",
+              "count": "{{delivered}} de {{total}}",
+              "noData": "No hay datos suficientes para concluir",
+              "rest": "{{partial}} parciales · {{notCovered}} sin cubrir · {{unknown}} desconocidos"
+            }
+          },
+          "advisory": "Orientativo",
+          "agentReported": "Informado por el agente",
+          "artifact": {
+            "RegeneratePanel": {
+              "cancel": "Cancelar",
+              "confirm": "Esto cuesta más que el límite. Continuar de todos modos.",
+              "description": "Esto consume una ejecución del agente y reemplaza lo que otros pudieron haber mirado.",
+              "estimating": "Calculando qué haría esto…",
+              "note": "Nota (opcional)",
+              "reason": "Motivo",
+              "reasonPlaceholder": "Elige un motivo",
+              "replayed": "Esa solicitud ya se había recibido",
+              "scope": "Qué hacer",
+              "started": "Regeneración iniciada",
+              "submit": "Regenerar",
+              "title": "Regenerar"
+            },
+            "action": {
+              "close": "Cerrar",
+              "compare": "Comparar",
+              "openLarger": "Abrir en grande",
+              "regenerate": "Regenerar…",
+              "restore": "Usar esta",
+              "retry": "Reintentar",
+              "revisions": "Revisiones",
+              "zoomIn": "Acercar",
+              "zoomOut": "Alejar"
+            },
+            "compare": {
+              "addedEdges": "Flechas añadidas",
+              "addedNodes": "Cajas añadidas",
+              "changedEdges": "Flechas cambiadas",
+              "changedNodes": "Cajas cambiadas",
+              "none": "Las dos revisiones se dibujaron a partir del mismo modelo.",
+              "removedEdges": "Flechas quitadas",
+              "removedNodes": "Cajas quitadas",
+              "title": "Comparar dos revisiones"
+            },
+            "disabled": "El dibujo está desactivado, se muestra la tabla",
+            "drawing": "Dibujando…",
+            "drawnByAgent": "Dibujado por un agente a partir del modelo de arriba. Puede ser incorrecto.",
+            "estimate": {
+              "cost": "Unos {{usd}} USD, según las últimas ejecuciones",
+              "noCost": "Aún no se han medido cifras de coste",
+              "runs": "{{runs}} ejecución(es) del agente, {{diagrams}} diagrama(s) por dibujar"
+            },
+            "failed": "No se pudo dibujar",
+            "gone": "Este dibujo fue reemplazado. Vuelve a cargar la revisión.",
+            "info": "{{type}} · skill {{skill}} · revisión {{revision}} · {{when}} · {{origin}}",
+            "missing": "No hay diagrama para este cambio",
+            "origin": {
+              "auto": "dibujado automáticamente",
+              "regenerated": "regenerado",
+              "restored": "restaurado",
+              "unknown": "origen desconocido"
+            },
+            "reason": {
+              "codeChanged": "El código cambió",
+              "kgChanged": "El grafo de conocimiento cambió",
+              "looksWrong": "Parece incorrecto",
+              "other": "Otro motivo",
+              "retryFailed": "Un dibujo falló",
+              "styleChanged": "El estilo del dibujo cambió"
+            },
+            "revisions": {
+              "inForce": "(vigente)",
+              "loading": "Cargando revisiones…",
+              "restored": "La revisión {{revision}} vuelve a estar vigente",
+              "row": "Revisión {{revision}} · {{origin}}"
+            },
+            "scope": {
+              "all": "Leer de nuevo y dibujar de nuevo",
+              "artifact": "Dibujar de nuevo los diagramas",
+              "context": "Leer de nuevo el diseño y el código"
+            },
+            "skillUnknown": "desconocido",
+            "typeUnknown": "diagrama",
+            "unreadable": "No se pudo cargar el dibujo"
+          },
+          "banner": {
+            "designNotReviewed": "Diseño sin revisar: el {{percent}}% de los elementos de diseño leídos está aprobado. Los hallazgos basados en ellos son orientativos.",
+            "designPhase": "Revisión del diseño. La vista posterior al código aparece cuando termina la ejecución.",
+            "drawingFailed": "No se pudo dibujar, se muestra la tabla.",
+            "executionFinished": "La ejecución terminó. Genera la revisión posterior al código.",
+            "kgUnavailable": "El conocimiento de diseño no estaba disponible, así que las comprobaciones de arquitectura son limitadas.",
+            "rebuild": "Reconstruir la revisión",
+            "runFailed": "Falló la última ejecución del agente ({{reason}}). Se muestran los hechos que midió Orca.",
+            "stale": "Esta revisión se hizo antes de que cambiara la solicitud.",
+            "truncated": "La revisión se recortó para ajustarse a su límite de tamaño."
+          },
+          "change": {
+            "added": "Añadido",
+            "missing": "Falta",
+            "modified": "Cambiado",
+            "removed": "Quitado",
+            "unchanged": "Sin cambios"
+          },
+          "decision": {
+            "action": {
+              "accept": "Aceptar como excepción",
+              "cancel": "Cancelar",
+              "change": "Cambiar decisión",
+              "confirmAccept": "Aceptar",
+              "confirmDismiss": "Descartar",
+              "dismiss": "Descartar la afirmación",
+              "sendBack": "Devolver"
+            },
+            "bar": {
+              "approve": "Aprobar",
+              "approved": "Revisión aprobada por {{who}}. Esto no es una autorización de lanzamiento.",
+              "note": "Nota de la aprobación (opcional)",
+              "openDecisions": "Resuelve primero {{count}} decisiones abiertas",
+              "requestChanges": "Solicitar cambios",
+              "requestChangesCount": "Solicitar cambios ({{count}})"
+            },
+            "codeReview": {
+              "choose": "¿Qué worktree abrir?",
+              "noLens": "Esta parte no tiene vista en la revisión de código.",
+              "noWorktree": "La revisión de código no está disponible para esta solicitud: la revisión no tiene un worktree que abrir.",
+              "open": "Abrir en la revisión de código",
+              "unsupported": "La revisión de código no está disponible aquí."
+            },
+            "decided": {
+              "accept": "Aceptado como excepción por {{who}}",
+              "dismiss": "Afirmación descartada por {{who}}",
+              "sendBack": "Devuelto por {{who}}",
+              "unknown": "Decidido por {{who}}"
+            },
+            "dialog": {
+              "continue": "Continuar",
+              "description": "Elige los hallazgos que se devuelven. Se crea una solicitud de seguimiento con su texto, y esta solicitud queda como está.",
+              "noteLabel": "Nota para el seguimiento (opcional)",
+              "nothing": "Elige al menos un hallazgo.",
+              "title": "Solicitar cambios",
+              "working": "Registrando…"
+            },
+            "followUpFinished": "Una solicitud de seguimiento terminó. Regenera esta revisión para comprobarlo.",
+            "note": {
+              "errorRequired": "Se necesita una nota.",
+              "errorTooLong": "Máximo {{max}} caracteres.",
+              "optional": "Nota (opcional)",
+              "required": "Motivo (obligatorio)"
+            },
+            "openChild": "Abrirla",
+            "sentBackIn": "Devuelto en una solicitud de seguimiento",
+            "who": {
+              "teammate": "un compañero",
+              "you": "ti"
+            }
+          },
+          "designRow": {
+            "containers_changed": "Contenedores cambiados",
+            "design_items": "Elementos de diseño informados",
+            "drawings": "Diagramas de diseño",
+            "new_calls": "Llamadas nuevas",
+            "new_edges": "Conexiones nuevas",
+            "removed_calls": "Llamadas quitadas",
+            "removed_edges": "Conexiones quitadas",
+            "reordered": "Llamadas reordenadas",
+            "unplanned_calls": "No está en el diseño",
+            "unplanned_edges": "No está en el diseño"
+          },
+          "diff": {
+            "containers": {
+              "items": "{{count}} elemento(s)",
+              "title": "Dentro de los contenedores"
+            },
+            "copied": "Copiado",
+            "copy": "Copiar {{id}}",
+            "diagram": {
+              "afterCode": "tras el código",
+              "design": "diseño"
+            },
+            "dot": {
+              "base": "En la base",
+              "design": "En el diseño",
+              "head": "En el head",
+              "no": "no",
+              "unknown": "desconocido",
+              "yes": "sí"
+            },
+            "empty": "No hay nada aquí.",
+            "evidence": {
+              "kgSnapshot": "{{id}} · {{snapshot}}",
+              "unknown": "Desconocido"
+            },
+            "flag": {
+              "advisory": "Orientativo",
+              "breaking": "Incompatible",
+              "deviates": "Se desvía del diseño",
+              "missingFromCode": "Falta en el código",
+              "notInDesign": "No está en el diseño",
+              "regression": "Regresión",
+              "sadTextOnly": "Solo en el texto del SAD",
+              "unverified": "Sin verificar"
+            },
+            "later": "Esto aparece cuando termina la ejecución.",
+            "mode": {
+              "afterCode": "Tras el código",
+              "design": "Diseño",
+              "sideBySide": "Lado a lado"
+            },
+            "modeReason": {
+              "designUnavailable": "Diseño no disponible",
+              "executionNotFinished": "Disponible cuando termine la ejecución",
+              "generateFirst": "Genera primero la revisión posterior al código"
+            },
+            "openFile": "Abrir el diff de {{path}}",
+            "req": {
+              "after": "Después",
+              "before": "Antes",
+              "delivered": "Entregado",
+              "evidence": "Evidencia",
+              "notCovered": "Sin cubrir",
+              "other": "Desconocido",
+              "partial": "Parcial",
+              "planned": "Planificado",
+              "requirement": "Requisito",
+              "unknown": "Desconocido"
+            },
+            "seen": "Visto",
+            "showUnchanged": "Mostrar lo que no cambió",
+            "side": {
+              "afterCode": "Tras el código",
+              "design": "Diseño"
+            },
+            "tab": {
+              "unplanned": "{{count}} fuera del diseño",
+              "unseen": "{{count}} nuevos"
+            }
+          },
+          "error": {
+            "agentTooOld": "El agente del servidor de desarrollo es demasiado antiguo para la revisión. Actualízalo e inténtalo de nuevo.",
+            "budgetExceeded": "Se agotó el presupuesto de IA para revisiones.",
+            "confirmCost": "Esto cuesta más que el límite. Confirma para continuar.",
+            "decisionInvalid": "No se puede registrar esa decisión.",
+            "decisionsOpen": "Aún hay decisiones abiertas.",
+            "disabled": "La revisión de resultados está desactivada para este proyecto.",
+            "duplicate": "La misma solicitud se envió dos veces; se está atendiendo la primera.",
+            "forbidden": "Solo la persona que reportó la solicitud, o un administrador, puede hacerlo.",
+            "general": "No se pudo cargar la revisión. Inténtalo de nuevo.",
+            "knowledgeRequired": "La revisión del diseño necesita el grafo de conocimiento del proyecto, que no se pudo cargar.",
+            "noDevServer": "No hay un servidor de desarrollo conectado para este proyecto.",
+            "notFound": "No se encontró la revisión. Puede que se haya reemplazado.",
+            "notReady": "La revisión se abre cuando la solicitud tiene un plan.",
+            "resultInvalid": "No se pudo usar la respuesta del agente. Inténtalo de nuevo.",
+            "runInProgress": "Ya hay una ejecución de revisión en marcha. Espera a que termine.",
+            "skillMissing": "Falta instalar en el servidor de desarrollo un skill que la revisión necesita.",
+            "staleRevision": "Alguien cambió esta revisión. Se recargó; inténtalo de nuevo."
+          },
+          "estimate": {
+            "cached": "Hay un resultado comprobado guardado, así que no hace falta una nueva ejecución del agente.",
+            "cannotRun": "La ejecución del agente aún no puede empezar: {{gaps}}.",
+            "codeRun": "Leer el código requiere una ejecución del agente.",
+            "drawings": "Los diagramas se dibujan después de crear la revisión, cuando el servidor de desarrollo puede dibujar.",
+            "noCostFigures": "Aún no se han medido cifras de coste.",
+            "oneRun": "Leer el diseño requiere una ejecución del agente."
+          },
+          "gap": {
+            "kgUnavailable": "el grafo de conocimiento del proyecto no está configurado",
+            "noDevServer": "no hay un servidor de desarrollo conectado",
+            "noRepoPath": "el repositorio del proyecto no tiene carpeta en su servidor de desarrollo",
+            "other": "no se cumple un requisito"
+          },
+          "gate": {
+            "absent": "No hay un control de calidad configurado",
+            "fail": "Las comprobaciones fallaron",
+            "pass": "Las comprobaciones pasaron",
+            "unknown": "No hay datos suficientes para concluir",
+            "warn": "Las comprobaciones dieron advertencias"
+          },
+          "hint": {
+            "decide": "{{count}} decisiones de la revisión te esperan",
+            "generateDelivered": "Generar la revisión posterior al código",
+            "openReview": "Abrir la revisión",
+            "reviewDesign": "Revisar el diseño"
+          },
+          "invite": {
+            "deliveredBody": "La parte de diseño ya está leída, así que solo hace falta leer el código. Los dibujos del diseño se reutilizan.",
+            "deliveredTitle": "La ejecución terminó. Genera la revisión posterior al código.",
+            "designBody": "Mira cómo esta solicitud cambia la arquitectura y los flujos, según el diseño del proyecto, antes de que exista código.",
+            "designTitle": "Revisar el diseño",
+            "factsOnly": "Solo hechos, sin ejecutar el agente",
+            "generateDelivered": "Generar la revisión posterior al código",
+            "generateDesign": "Generar revisión"
+          },
+          "phase": {
+            "delivered": "Revisión posterior al código",
+            "design": "Revisión del diseño"
+          },
+          "readiness": {
+            "breaking": "Cambio incompatible",
+            "config": "Cambio de configuración",
+            "migration": "Migración de base de datos",
+            "noneFound": "No se encontró nada",
+            "present": "Presente: revísalo antes del lanzamiento"
+          },
+          "risk": {
+            "critical": "Crítico",
+            "high": "Alto",
+            "low": "Bajo",
+            "medium": "Medio",
+            "unknown": "No se pudo medir el riesgo"
+          },
+          "section": {
+            "architecture": "Arquitectura",
+            "behavior": "Comportamiento",
+            "config": "Configuración",
+            "contracts": "Contratos",
+            "data": "Datos",
+            "flow": "Flujo",
+            "requirements": "Requisitos"
+          },
+          "severity": {
+            "breaking": "Incompatible",
+            "deviation": "Se desvía del diseño",
+            "info": "Información",
+            "regression": "Regresión",
+            "warning": "Advertencia"
+          },
+          "state": {
+            "approved": "Aprobada",
+            "decisionsLater": "Las decisiones se abren cuando termina la ejecución.",
+            "draft": "Borrador",
+            "generatingDelivered": "Leyendo el diseño y el código…",
+            "generatingDesign": "Leyendo el diseño…",
+            "loading": "Cargando la revisión…",
+            "ready": "Lista",
+            "stale": "Desactualizada",
+            "superseded": "Reemplazada",
+            "unavailable": "La revisión de resultados no está disponible aquí."
+          },
+          "timeline": {
+            "approved": "aprobada",
+            "decisions": "{{count}} decisiones abiertas",
+            "delivered": "revisión posterior al código",
+            "design": "revisión del diseño",
+            "none": "no generada",
+            "stale": "desactualizada",
+            "unknown": "desconocido"
+          },
+          "title": "Revisión de resultados",
+          "unknown": "Desconocido",
+          "unverified": "Sin verificar"
         }
       },
       "reviewMap": {

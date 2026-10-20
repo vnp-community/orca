@@ -13527,7 +13527,8 @@
             "history": "历史",
             "related": "相关",
             "needsAttention": "需要关注",
-            "execution": "执行"
+            "execution": "执行",
+            "outcomeReview": "成果评审"
           }
         },
         "RequestOverviewTab": {
@@ -13549,7 +13550,8 @@
             "phase": "阶段",
             "execution": "执行",
             "handover": "交接",
-            "taskList": "任务列表"
+            "taskList": "任务列表",
+            "review": "成果评审"
           },
           "state": {
             "done": "已完成",
@@ -14704,6 +14706,406 @@
           "invalid": "这不是有效的分支或标签名称。请检查后重试。",
           "notFound": "在仓库中找不到此分支或标签。请选择其他分支。",
           "checkNotConfigured": "此服务器暂时无法检查分支，因此未保存该分支。请联系管理员。"
+        },
+        "outcomeReview": {
+          "OutcomeAgentRunFacts": {
+            "cost": "上报的成本",
+            "costValue": "{{usd}} USD",
+            "reviewRuns": "评审运行",
+            "reviewRunsValue": "{{count}}（失败 {{failed}}）",
+            "tasks": "已完成的任务",
+            "tasksValue": "{{done}} / {{total}}",
+            "time": "耗时",
+            "title": "智能体运行"
+          },
+          "OutcomeDesignControl": {
+            "checked": "已与设计对照（快照 {{snapshot}}）",
+            "designNotAvailable": "设计不可用",
+            "fromDesign": "来自设计（快照 {{snapshot}}）",
+            "open": "打开{{section}}详情"
+          },
+          "OutcomeNeedsDecision": {
+            "none": "没有需要决定的事项。",
+            "title": "需要你来决定"
+          },
+          "OutcomeReleaseReadiness": {
+            "title": "发布就绪情况"
+          },
+          "OutcomeReviewHeader": {
+            "generated": "生成于 {{when}}",
+            "kgSnapshot": "KG 快照 {{snapshot}}",
+            "kgUnavailable": "KG 不可用",
+            "regenerate": "重新生成…"
+          },
+          "OutcomeReviewTab": {
+            "pending": "正在读取架构和流程"
+          },
+          "OutcomeVerdictCards": {
+            "architecture": {
+              "deviations": "上报的偏离 {{count}} 项"
+            },
+            "flag": {
+              "breaking": "破坏性变更",
+              "config": "配置变更",
+              "migration": "迁移"
+            },
+            "quality": {
+              "title": "质量关卡"
+            },
+            "release": {
+              "title": "发布风险"
+            },
+            "requirements": {
+              "all": "与这些标准关联的任务均已完成",
+              "count": "{{delivered}} / {{total}}",
+              "noData": "数据不足，无法得出结论",
+              "rest": "部分 {{partial}} · 未覆盖 {{notCovered}} · 未知 {{unknown}}"
+            }
+          },
+          "advisory": "仅供参考",
+          "agentReported": "智能体上报",
+          "artifact": {
+            "RegeneratePanel": {
+              "cancel": "取消",
+              "confirm": "成本超过上限。仍然继续。",
+              "description": "这会消耗一次智能体运行，并替换其他人可能已看过的内容。",
+              "estimating": "正在估算这会做什么…",
+              "note": "备注（可选）",
+              "reason": "原因",
+              "reasonPlaceholder": "选择原因",
+              "replayed": "该请求已收到",
+              "scope": "要做什么",
+              "started": "已开始重新生成",
+              "submit": "重新生成",
+              "title": "重新生成"
+            },
+            "action": {
+              "close": "关闭",
+              "compare": "比较",
+              "openLarger": "放大查看",
+              "regenerate": "重新生成…",
+              "restore": "使用此版本",
+              "retry": "重试",
+              "revisions": "修订版",
+              "zoomIn": "放大",
+              "zoomOut": "缩小"
+            },
+            "compare": {
+              "addedEdges": "新增的箭头",
+              "addedNodes": "新增的方框",
+              "changedEdges": "变更的箭头",
+              "changedNodes": "变更的方框",
+              "none": "两个修订版由同一模型绘制。",
+              "removedEdges": "移除的箭头",
+              "removedNodes": "移除的方框",
+              "title": "比较两个修订版"
+            },
+            "disabled": "绘图已关闭，显示表格",
+            "drawing": "绘制中…",
+            "drawnByAgent": "由智能体根据上方模型绘制，可能有误。",
+            "estimate": {
+              "cost": "按最近几次运行约 {{usd}} USD",
+              "noCost": "尚未测得成本数据",
+              "runs": "智能体运行 {{runs}} 次，待绘制图表 {{diagrams}} 张"
+            },
+            "failed": "绘制失败",
+            "gone": "此图已被替换，请重新加载评审。",
+            "info": "{{type}} · 技能 {{skill}} · 修订版 {{revision}} · {{when}} · {{origin}}",
+            "missing": "此变更没有图表",
+            "origin": {
+              "auto": "自动绘制",
+              "regenerated": "已重新生成",
+              "restored": "已恢复",
+              "unknown": "来源未知"
+            },
+            "reason": {
+              "codeChanged": "代码已变更",
+              "kgChanged": "知识图谱已变更",
+              "looksWrong": "看起来不对",
+              "other": "其他原因",
+              "retryFailed": "有图表绘制失败",
+              "styleChanged": "绘图样式已变更"
+            },
+            "revisions": {
+              "inForce": "（当前有效）",
+              "loading": "正在加载修订版…",
+              "restored": "修订版 {{revision}} 已重新生效",
+              "row": "修订版 {{revision}} · {{origin}}"
+            },
+            "scope": {
+              "all": "重新读取并重新绘制",
+              "artifact": "重新绘制图表",
+              "context": "重新读取设计和代码"
+            },
+            "skillUnknown": "未知",
+            "typeUnknown": "图表",
+            "unreadable": "无法加载图表"
+          },
+          "banner": {
+            "designNotReviewed": "设计未评审：已读取的设计元素中只有 {{percent}}% 获得批准。基于它们的发现仅供参考。",
+            "designPhase": "设计评审。代码完成后的视图会在执行结束后出现。",
+            "drawingFailed": "绘制失败，显示表格。",
+            "executionFinished": "执行已结束。请生成代码完成后的评审。",
+            "kgUnavailable": "设计知识不可用，因此架构检查有限。",
+            "rebuild": "重新生成评审",
+            "runFailed": "最近一次智能体运行失败（{{reason}}）。显示 Orca 测得的事实。",
+            "stale": "此评审是在请求变更之前生成的。",
+            "truncated": "评审已被截断以符合大小限制。"
+          },
+          "change": {
+            "added": "新增",
+            "missing": "缺失",
+            "modified": "已变更",
+            "removed": "已移除",
+            "unchanged": "未变化"
+          },
+          "decision": {
+            "action": {
+              "accept": "作为例外接受",
+              "cancel": "取消",
+              "change": "更改决定",
+              "confirmAccept": "接受",
+              "confirmDismiss": "驳回",
+              "dismiss": "驳回该说法",
+              "sendBack": "退回"
+            },
+            "bar": {
+              "approve": "批准",
+              "approved": "评审已由{{who}}批准。这不是发布签字。",
+              "note": "批准备注（可选）",
+              "openDecisions": "请先处理 {{count}} 项未决事项",
+              "requestChanges": "请求修改",
+              "requestChangesCount": "请求修改（{{count}}）"
+            },
+            "codeReview": {
+              "choose": "打开哪个工作树？",
+              "noLens": "这一部分在代码评审中没有对应视图。",
+              "noWorktree": "此请求无法使用代码评审：评审没有可打开的工作树。",
+              "open": "在代码评审中打开",
+              "unsupported": "此处无法使用代码评审。"
+            },
+            "decided": {
+              "accept": "已由{{who}}作为例外接受",
+              "dismiss": "已由{{who}}驳回该说法",
+              "sendBack": "已由{{who}}退回",
+              "unknown": "已由{{who}}决定"
+            },
+            "dialog": {
+              "continue": "继续",
+              "description": "选择要退回的发现。系统会用它们的文字创建一个后续请求，本请求保持不变。",
+              "noteLabel": "给后续请求的备注（可选）",
+              "nothing": "请至少选择一项发现。",
+              "title": "请求修改",
+              "working": "正在记录…"
+            },
+            "followUpFinished": "一个后续请求已完成。请重新生成此评审进行核对。",
+            "note": {
+              "errorRequired": "必须填写备注。",
+              "errorTooLong": "最多 {{max}} 个字符。",
+              "optional": "备注（可选）",
+              "required": "原因（必填）"
+            },
+            "openChild": "打开",
+            "sentBackIn": "已退回到后续请求",
+            "who": {
+              "teammate": "同事",
+              "you": "你"
+            }
+          },
+          "designRow": {
+            "containers_changed": "变更的容器",
+            "design_items": "上报的设计项",
+            "drawings": "设计图表",
+            "new_calls": "新增调用",
+            "new_edges": "新增连接",
+            "removed_calls": "移除的调用",
+            "removed_edges": "移除的连接",
+            "reordered": "调整顺序的调用",
+            "unplanned_calls": "不在设计中",
+            "unplanned_edges": "不在设计中"
+          },
+          "diff": {
+            "containers": {
+              "items": "{{count}} 项",
+              "title": "容器内部"
+            },
+            "copied": "已复制",
+            "copy": "复制 {{id}}",
+            "diagram": {
+              "afterCode": "代码完成后",
+              "design": "设计"
+            },
+            "dot": {
+              "base": "在基线上",
+              "design": "在设计中",
+              "head": "在 head 上",
+              "no": "否",
+              "unknown": "未知",
+              "yes": "是"
+            },
+            "empty": "这里没有内容。",
+            "evidence": {
+              "kgSnapshot": "{{id}} · {{snapshot}}",
+              "unknown": "未知"
+            },
+            "flag": {
+              "advisory": "仅供参考",
+              "breaking": "破坏性",
+              "deviates": "偏离设计",
+              "missingFromCode": "代码中缺失",
+              "notInDesign": "不在设计中",
+              "regression": "回归",
+              "sadTextOnly": "仅出现在 SAD 文本中",
+              "unverified": "未验证"
+            },
+            "later": "执行结束后会显示在这里。",
+            "mode": {
+              "afterCode": "代码完成后",
+              "design": "设计",
+              "sideBySide": "并排"
+            },
+            "modeReason": {
+              "designUnavailable": "设计不可用",
+              "executionNotFinished": "执行结束后可用",
+              "generateFirst": "请先生成代码完成后的评审"
+            },
+            "openFile": "打开 {{path}} 的差异",
+            "req": {
+              "after": "之后",
+              "before": "之前",
+              "delivered": "已交付",
+              "evidence": "依据",
+              "notCovered": "未覆盖",
+              "other": "未知",
+              "partial": "部分",
+              "planned": "已计划",
+              "requirement": "需求",
+              "unknown": "未知"
+            },
+            "seen": "已看",
+            "showUnchanged": "显示未变化项",
+            "side": {
+              "afterCode": "代码完成后",
+              "design": "设计"
+            },
+            "tab": {
+              "unplanned": "{{count}} 项不在设计中",
+              "unseen": "{{count}} 项新内容"
+            }
+          },
+          "error": {
+            "agentTooOld": "开发服务器上的智能体版本过旧，无法进行评审。请更新后重试。",
+            "budgetExceeded": "评审用的 AI 预算已用完。",
+            "confirmCost": "成本超过上限。请确认后继续。",
+            "decisionInvalid": "无法记录该决定。",
+            "decisionsOpen": "仍有未决事项。",
+            "disabled": "此项目已关闭成果评审。",
+            "duplicate": "同一请求被发送了两次，正在处理第一次。",
+            "forbidden": "只有提交该请求的人或管理员可以执行此操作。",
+            "general": "无法加载评审，请重试。",
+            "knowledgeRequired": "设计评审需要项目的知识图谱，但无法加载。",
+            "noDevServer": "此项目没有连接开发服务器。",
+            "notFound": "未找到该评审，可能已被替换。",
+            "notReady": "请求有了计划后才能打开评审。",
+            "resultInvalid": "无法使用智能体的回答，请重试。",
+            "runInProgress": "已有一次评审运行在进行中，请等待其结束。",
+            "skillMissing": "开发服务器上未安装评审所需的技能。",
+            "staleRevision": "有人修改了此评审，已重新加载，请重试。"
+          },
+          "estimate": {
+            "cached": "已保存经过检查的结果，因此无需再次运行智能体。",
+            "cannotRun": "智能体暂时无法运行：{{gaps}}。",
+            "codeRun": "读取代码需要运行一次智能体。",
+            "drawings": "图表会在评审生成后、开发服务器可以绘制时绘制。",
+            "noCostFigures": "尚未测得成本数据。",
+            "oneRun": "读取设计需要运行一次智能体。"
+          },
+          "gap": {
+            "kgUnavailable": "项目的知识图谱未配置",
+            "noDevServer": "没有连接开发服务器",
+            "noRepoPath": "项目仓库在开发服务器上没有对应文件夹",
+            "other": "有一项要求未满足"
+          },
+          "gate": {
+            "absent": "未设置质量关卡",
+            "fail": "检查未通过",
+            "pass": "检查通过",
+            "unknown": "数据不足，无法得出结论",
+            "warn": "检查出现警告"
+          },
+          "hint": {
+            "decide": "有 {{count}} 项评审决定在等你",
+            "generateDelivered": "生成代码完成后的评审",
+            "openReview": "打开评审",
+            "reviewDesign": "评审设计"
+          },
+          "invite": {
+            "deliveredBody": "设计部分已读取，只需读取代码。设计图表会被复用。",
+            "deliveredTitle": "执行已结束。请生成代码完成后的评审。",
+            "designBody": "在代码出现之前，按项目设计查看此请求会如何改变架构和流程。",
+            "designTitle": "评审设计",
+            "factsOnly": "仅事实，不运行智能体",
+            "generateDelivered": "生成代码完成后的评审",
+            "generateDesign": "生成评审"
+          },
+          "phase": {
+            "delivered": "代码完成后的评审",
+            "design": "设计评审"
+          },
+          "readiness": {
+            "breaking": "破坏性变更",
+            "config": "配置变更",
+            "migration": "数据库迁移",
+            "noneFound": "未发现",
+            "present": "存在：发布前请检查"
+          },
+          "risk": {
+            "critical": "严重",
+            "high": "高",
+            "low": "低",
+            "medium": "中",
+            "unknown": "无法衡量风险"
+          },
+          "section": {
+            "architecture": "架构",
+            "behavior": "行为",
+            "config": "配置",
+            "contracts": "契约",
+            "data": "数据",
+            "flow": "流程",
+            "requirements": "需求"
+          },
+          "severity": {
+            "breaking": "破坏性",
+            "deviation": "偏离设计",
+            "info": "信息",
+            "regression": "回归",
+            "warning": "警告"
+          },
+          "state": {
+            "approved": "已批准",
+            "decisionsLater": "执行结束后才能做决定。",
+            "draft": "草稿",
+            "generatingDelivered": "正在读取设计和代码…",
+            "generatingDesign": "正在读取设计…",
+            "loading": "正在加载评审…",
+            "ready": "就绪",
+            "stale": "已过期",
+            "superseded": "已被替换",
+            "unavailable": "此处无法使用成果评审。"
+          },
+          "timeline": {
+            "approved": "已批准",
+            "decisions": "{{count}} 项未决",
+            "delivered": "代码完成后的评审",
+            "design": "设计评审",
+            "none": "尚未生成",
+            "stale": "已过期",
+            "unknown": "未知"
+          },
+          "title": "成果评审",
+          "unknown": "未知",
+          "unverified": "未验证"
         }
       },
       "reviewMap": {

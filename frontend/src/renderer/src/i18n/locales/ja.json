@@ -13527,7 +13527,8 @@
             "history": "履歴",
             "related": "関連",
             "needsAttention": "要対応",
-            "execution": "実行"
+            "execution": "実行",
+            "outcomeReview": "成果レビュー"
           }
         },
         "RequestOverviewTab": {
@@ -13549,7 +13550,8 @@
             "phase": "フェーズ",
             "execution": "実行",
             "handover": "引き継ぎ",
-            "taskList": "タスクリスト"
+            "taskList": "タスクリスト",
+            "review": "成果レビュー"
           },
           "state": {
             "done": "完了",
@@ -14704,6 +14706,406 @@
           "invalid": "有効なブランチ名またはタグ名ではありません。確認してもう一度お試しください。",
           "notFound": "このブランチまたはタグはリポジトリに見つかりませんでした。別のものを選択してください。",
           "checkNotConfigured": "このサーバーはまだブランチを確認できないため、ブランチは保存されませんでした。管理者に問い合わせてください。"
+        },
+        "outcomeReview": {
+          "OutcomeAgentRunFacts": {
+            "cost": "報告されたコスト",
+            "costValue": "{{usd}} USD",
+            "reviewRuns": "レビューの実行",
+            "reviewRunsValue": "{{count}}（失敗 {{failed}}）",
+            "tasks": "完了したタスク",
+            "tasksValue": "{{done}} / {{total}}",
+            "time": "所要時間",
+            "title": "エージェントの実行"
+          },
+          "OutcomeDesignControl": {
+            "checked": "設計と照合済み（スナップショット {{snapshot}}）",
+            "designNotAvailable": "設計は利用できません",
+            "fromDesign": "設計より（スナップショット {{snapshot}}）",
+            "open": "{{section}}の詳細を開く"
+          },
+          "OutcomeNeedsDecision": {
+            "none": "判断が必要なものはありません。",
+            "title": "判断が必要です"
+          },
+          "OutcomeReleaseReadiness": {
+            "title": "リリース準備状況"
+          },
+          "OutcomeReviewHeader": {
+            "generated": "{{when}}に生成",
+            "kgSnapshot": "KG スナップショット {{snapshot}}",
+            "kgUnavailable": "KG は利用できません",
+            "regenerate": "再生成…"
+          },
+          "OutcomeReviewTab": {
+            "pending": "アーキテクチャとフローを読み込み中です"
+          },
+          "OutcomeVerdictCards": {
+            "architecture": {
+              "deviations": "報告された逸脱 {{count}} 件"
+            },
+            "flag": {
+              "breaking": "破壊的変更",
+              "config": "設定の変更",
+              "migration": "マイグレーション"
+            },
+            "quality": {
+              "title": "品質ゲート"
+            },
+            "release": {
+              "title": "リリースリスク"
+            },
+            "requirements": {
+              "all": "これらの基準に紐づくタスクはすべて完了しています",
+              "count": "{{delivered}} / {{total}}",
+              "noData": "結論を出すにはデータが足りません",
+              "rest": "一部 {{partial}} · 未対応 {{notCovered}} · 不明 {{unknown}}"
+            }
+          },
+          "advisory": "参考",
+          "agentReported": "エージェント報告",
+          "artifact": {
+            "RegeneratePanel": {
+              "cancel": "キャンセル",
+              "confirm": "コストが上限を超えます。それでも続行します。",
+              "description": "エージェントを 1 回実行し、他の人が見ていた内容を置き換えます。",
+              "estimating": "実行内容を見積もっています…",
+              "note": "メモ（任意）",
+              "reason": "理由",
+              "reasonPlaceholder": "理由を選択",
+              "replayed": "そのリクエストはすでに受信済みです",
+              "scope": "実行内容",
+              "started": "再生成を開始しました",
+              "submit": "再生成",
+              "title": "再生成"
+            },
+            "action": {
+              "close": "閉じる",
+              "compare": "比較",
+              "openLarger": "拡大して開く",
+              "regenerate": "再生成…",
+              "restore": "これを使う",
+              "retry": "再試行",
+              "revisions": "リビジョン",
+              "zoomIn": "拡大",
+              "zoomOut": "縮小"
+            },
+            "compare": {
+              "addedEdges": "追加された矢印",
+              "addedNodes": "追加されたボックス",
+              "changedEdges": "変更された矢印",
+              "changedNodes": "変更されたボックス",
+              "none": "2 つのリビジョンは同じモデルから描かれています。",
+              "removedEdges": "削除された矢印",
+              "removedNodes": "削除されたボックス",
+              "title": "2 つのリビジョンを比較"
+            },
+            "disabled": "図の描画は無効です。表を表示しています",
+            "drawing": "描画中…",
+            "drawnByAgent": "上のモデルからエージェントが描いたものです。誤りがある可能性があります。",
+            "estimate": {
+              "cost": "最近の実行から約 {{usd}} USD",
+              "noCost": "コストの数値はまだ測定されていません",
+              "runs": "エージェント実行 {{runs}} 回、描画する図 {{diagrams}} 件"
+            },
+            "failed": "描画に失敗しました",
+            "gone": "この図は置き換えられました。レビューを再読み込みしてください。",
+            "info": "{{type}} · スキル {{skill}} · リビジョン {{revision}} · {{when}} · {{origin}}",
+            "missing": "この変更の図はありません",
+            "origin": {
+              "auto": "自動で描画",
+              "regenerated": "再生成",
+              "restored": "復元",
+              "unknown": "出所不明"
+            },
+            "reason": {
+              "codeChanged": "コードが変わった",
+              "kgChanged": "ナレッジグラフが変わった",
+              "looksWrong": "おかしく見える",
+              "other": "その他の理由",
+              "retryFailed": "図の描画に失敗した",
+              "styleChanged": "図のスタイルが変わった"
+            },
+            "revisions": {
+              "inForce": "（有効）",
+              "loading": "リビジョンを読み込み中…",
+              "restored": "リビジョン {{revision}} を再び有効にしました",
+              "row": "リビジョン {{revision}} · {{origin}}"
+            },
+            "scope": {
+              "all": "再読み込みして再描画",
+              "artifact": "図を再描画",
+              "context": "設計とコードを再読み込み"
+            },
+            "skillUnknown": "不明",
+            "typeUnknown": "図",
+            "unreadable": "図を読み込めませんでした"
+          },
+          "banner": {
+            "designNotReviewed": "設計は未レビューです：読み込んだ設計要素の {{percent}}% のみが承認済みです。これらに基づく指摘は参考情報です。",
+            "designPhase": "設計レビューです。コード適用後の表示は実行の完了後に現れます。",
+            "drawingFailed": "描画に失敗したため、表を表示しています。",
+            "executionFinished": "実行が完了しました。コード適用後のレビューを生成してください。",
+            "kgUnavailable": "設計の知識が利用できなかったため、アーキテクチャの確認は限定的です。",
+            "rebuild": "レビューを作り直す",
+            "runFailed": "直近のエージェント実行が失敗しました（{{reason}}）。Orca が計測した事実を表示しています。",
+            "stale": "このレビューはリクエストが変更される前に作成されました。",
+            "truncated": "サイズ上限に収めるためレビューを短縮しました。"
+          },
+          "change": {
+            "added": "追加",
+            "missing": "欠落",
+            "modified": "変更",
+            "removed": "削除",
+            "unchanged": "変更なし"
+          },
+          "decision": {
+            "action": {
+              "accept": "例外として承認",
+              "cancel": "キャンセル",
+              "change": "判断を変更",
+              "confirmAccept": "承認",
+              "confirmDismiss": "却下",
+              "dismiss": "指摘を却下",
+              "sendBack": "差し戻す"
+            },
+            "bar": {
+              "approve": "承認",
+              "approved": "{{who}}がレビューを承認しました。これはリリースの承認ではありません。",
+              "note": "承認メモ（任意）",
+              "openDecisions": "まず未決の {{count}} 件を解決してください",
+              "requestChanges": "変更を依頼",
+              "requestChangesCount": "変更を依頼（{{count}}）"
+            },
+            "codeReview": {
+              "choose": "どのワークツリーを開きますか？",
+              "noLens": "この部分にはコードレビューの表示がありません。",
+              "noWorktree": "このリクエストではコードレビューを利用できません：レビューに開けるワークツリーがありません。",
+              "open": "コードレビューで開く",
+              "unsupported": "ここではコードレビューを利用できません。"
+            },
+            "decided": {
+              "accept": "{{who}}が例外として承認",
+              "dismiss": "{{who}}が指摘を却下",
+              "sendBack": "{{who}}が差し戻し",
+              "unknown": "{{who}}が判断"
+            },
+            "dialog": {
+              "continue": "続ける",
+              "description": "差し戻す指摘を選んでください。その内容でフォローアップのリクエストを作成し、このリクエストはそのままにします。",
+              "noteLabel": "フォローアップへのメモ（任意）",
+              "nothing": "指摘を 1 件以上選んでください。",
+              "title": "変更を依頼",
+              "working": "記録中…"
+            },
+            "followUpFinished": "フォローアップのリクエストが完了しました。確認のためこのレビューを再生成してください。",
+            "note": {
+              "errorRequired": "メモが必要です。",
+              "errorTooLong": "最大 {{max}} 文字までです。",
+              "optional": "メモ（任意）",
+              "required": "理由（必須）"
+            },
+            "openChild": "開く",
+            "sentBackIn": "フォローアップのリクエストに差し戻し済み",
+            "who": {
+              "teammate": "チームメンバー",
+              "you": "あなた"
+            }
+          },
+          "designRow": {
+            "containers_changed": "変更されたコンテナ",
+            "design_items": "報告された設計項目",
+            "drawings": "設計の図",
+            "new_calls": "新しい呼び出し",
+            "new_edges": "新しい接続",
+            "removed_calls": "削除された呼び出し",
+            "removed_edges": "削除された接続",
+            "reordered": "順序が変わった呼び出し",
+            "unplanned_calls": "設計にない",
+            "unplanned_edges": "設計にない"
+          },
+          "diff": {
+            "containers": {
+              "items": "{{count}} 件",
+              "title": "コンテナの内部"
+            },
+            "copied": "コピーしました",
+            "copy": "{{id}} をコピー",
+            "diagram": {
+              "afterCode": "コード適用後",
+              "design": "設計"
+            },
+            "dot": {
+              "base": "ベースにある",
+              "design": "設計にある",
+              "head": "ヘッドにある",
+              "no": "いいえ",
+              "unknown": "不明",
+              "yes": "はい"
+            },
+            "empty": "ここには何もありません。",
+            "evidence": {
+              "kgSnapshot": "{{id}} · {{snapshot}}",
+              "unknown": "不明"
+            },
+            "flag": {
+              "advisory": "参考",
+              "breaking": "破壊的",
+              "deviates": "設計から逸脱",
+              "missingFromCode": "コードに存在しない",
+              "notInDesign": "設計にない",
+              "regression": "リグレッション",
+              "sadTextOnly": "SAD の本文のみ",
+              "unverified": "未検証"
+            },
+            "later": "これは実行の完了後に表示されます。",
+            "mode": {
+              "afterCode": "コード適用後",
+              "design": "設計",
+              "sideBySide": "並べて表示"
+            },
+            "modeReason": {
+              "designUnavailable": "設計は利用できません",
+              "executionNotFinished": "実行の完了後に利用できます",
+              "generateFirst": "先にコード適用後のレビューを生成してください"
+            },
+            "openFile": "{{path}} の差分を開く",
+            "req": {
+              "after": "変更後",
+              "before": "変更前",
+              "delivered": "完了",
+              "evidence": "根拠",
+              "notCovered": "未対応",
+              "other": "不明",
+              "partial": "一部",
+              "planned": "計画済み",
+              "requirement": "要件",
+              "unknown": "不明"
+            },
+            "seen": "確認済み",
+            "showUnchanged": "変更のないものを表示",
+            "side": {
+              "afterCode": "コード適用後",
+              "design": "設計"
+            },
+            "tab": {
+              "unplanned": "設計外 {{count}} 件",
+              "unseen": "新規 {{count}} 件"
+            }
+          },
+          "error": {
+            "agentTooOld": "開発サーバーのエージェントが古すぎてレビューに対応できません。更新してからもう一度お試しください。",
+            "budgetExceeded": "レビュー用の AI 予算を使い切りました。",
+            "confirmCost": "コストが上限を超えます。続けるには確認してください。",
+            "decisionInvalid": "その判断は記録できません。",
+            "decisionsOpen": "未決の判断が残っています。",
+            "disabled": "このプロジェクトでは成果レビューが無効です。",
+            "duplicate": "同じリクエストが 2 回送信されました。最初のものを処理中です。",
+            "forbidden": "これを行えるのは、リクエストを報告した人か管理者のみです。",
+            "general": "レビューを読み込めませんでした。もう一度お試しください。",
+            "knowledgeRequired": "設計レビューにはプロジェクトのナレッジグラフが必要ですが、読み込めませんでした。",
+            "noDevServer": "このプロジェクトに接続された開発サーバーがありません。",
+            "notFound": "レビューが見つかりません。置き換えられた可能性があります。",
+            "notReady": "リクエストにプランができるとレビューを開けます。",
+            "resultInvalid": "エージェントの回答を利用できませんでした。もう一度お試しください。",
+            "runInProgress": "レビューの実行がすでに進行中です。終わるまでお待ちください。",
+            "skillMissing": "レビューに必要なスキルが開発サーバーにインストールされていません。",
+            "staleRevision": "他の人がこのレビューを変更しました。再読み込みしたので、もう一度お試しください。"
+          },
+          "estimate": {
+            "cached": "確認済みの結果が保存されているため、エージェントを新たに実行する必要はありません。",
+            "cannotRun": "エージェントの実行はまだ開始できません：{{gaps}}。",
+            "codeRun": "コードの読み込みにはエージェントを 1 回実行します。",
+            "drawings": "図はレビューの作成後、開発サーバーが描画できるときに描かれます。",
+            "noCostFigures": "コストの数値はまだ測定されていません。",
+            "oneRun": "設計の読み込みにはエージェントを 1 回実行します。"
+          },
+          "gap": {
+            "kgUnavailable": "プロジェクトのナレッジグラフが設定されていません",
+            "noDevServer": "開発サーバーが接続されていません",
+            "noRepoPath": "プロジェクトのリポジトリに開発サーバー上のフォルダがありません",
+            "other": "満たされていない要件があります"
+          },
+          "gate": {
+            "absent": "品質ゲートが設定されていません",
+            "fail": "チェックが失敗しました",
+            "pass": "チェックに合格しました",
+            "unknown": "結論を出すにはデータが足りません",
+            "warn": "チェックで警告が出ました"
+          },
+          "hint": {
+            "decide": "レビューの判断 {{count}} 件があなたを待っています",
+            "generateDelivered": "コード適用後のレビューを生成",
+            "openReview": "レビューを開く",
+            "reviewDesign": "設計をレビュー"
+          },
+          "invite": {
+            "deliveredBody": "設計部分はすでに読み込み済みなので、コードだけを読み込みます。設計の図は再利用されます。",
+            "deliveredTitle": "実行が完了しました。コード適用後のレビューを生成してください。",
+            "designBody": "コードができる前に、このリクエストがプロジェクトの設計に対してアーキテクチャとフローをどう変えるかを確認できます。",
+            "designTitle": "設計をレビュー",
+            "factsOnly": "事実のみ（エージェントは実行しない）",
+            "generateDelivered": "コード適用後のレビューを生成",
+            "generateDesign": "レビューを生成"
+          },
+          "phase": {
+            "delivered": "コード適用後のレビュー",
+            "design": "設計レビュー"
+          },
+          "readiness": {
+            "breaking": "破壊的変更",
+            "config": "設定の変更",
+            "migration": "データベースのマイグレーション",
+            "noneFound": "見つかりませんでした",
+            "present": "あり：リリース前に確認してください"
+          },
+          "risk": {
+            "critical": "致命的",
+            "high": "高",
+            "low": "低",
+            "medium": "中",
+            "unknown": "リスクを測定できませんでした"
+          },
+          "section": {
+            "architecture": "アーキテクチャ",
+            "behavior": "振る舞い",
+            "config": "設定",
+            "contracts": "コントラクト",
+            "data": "データ",
+            "flow": "フロー",
+            "requirements": "要件"
+          },
+          "severity": {
+            "breaking": "破壊的",
+            "deviation": "設計から逸脱",
+            "info": "情報",
+            "regression": "リグレッション",
+            "warning": "警告"
+          },
+          "state": {
+            "approved": "承認済み",
+            "decisionsLater": "判断は実行の完了後に行えます。",
+            "draft": "下書き",
+            "generatingDelivered": "設計とコードを読み込み中…",
+            "generatingDesign": "設計を読み込み中…",
+            "loading": "レビューを読み込み中…",
+            "ready": "準備完了",
+            "stale": "古い",
+            "superseded": "置き換え済み",
+            "unavailable": "ここでは成果レビューを利用できません。"
+          },
+          "timeline": {
+            "approved": "承認済み",
+            "decisions": "未決の判断 {{count}} 件",
+            "delivered": "コード適用後のレビュー",
+            "design": "設計レビュー",
+            "none": "未生成",
+            "stale": "古い",
+            "unknown": "不明"
+          },
+          "title": "成果レビュー",
+          "unknown": "不明",
+          "unverified": "未検証"
         }
       },
       "reviewMap": {

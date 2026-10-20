@@ -82,6 +82,8 @@ export type ProjectEngineSettings = {
   openspecMinVersion: string
   solutionAgent: boolean
   executionMode: ExecutionModeValue
+  /** The Outcome Review is on for the project now: its choice, else the deployment default, never past the kill switch. */
+  outcomeReviewEnabled: boolean
   /** 0 when the project has no settings row yet (deployment defaults apply). */
   version: number
 }
@@ -120,6 +122,8 @@ export function parseEngineSettings(raw: unknown): ProjectEngineSettings | null 
     openspecMinVersion: minVersion,
     solutionAgent,
     executionMode: mode,
+    // Why: an older gateway does not send the flag; the review stays hidden rather than guessed.
+    outcomeReviewEnabled: o.outcomeReviewEnabled === true,
     version
   }
 }

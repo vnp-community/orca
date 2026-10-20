@@ -10,21 +10,42 @@
 import React, { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { translate } from '@/i18n/i18n'
 import { getScreenSubmitShortcutLabel, isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import { useAppStore } from '@/store'
 import { useRequestActions } from '../../hooks/useRequestActions'
 import { notifyRequestActionFailure } from './request-action-feedback'
-import { CHILD_REQUEST_RULES } from './request-stage-timeline-model'
+import { CHILD_REQUEST_RULES, type ChildRequestRule } from './request-stage-timeline-model'
 import type { OrcaRequest, RequestType } from '../../../../shared/request-types'
 
 const T = 'auto.components.request.SpawnChildRequestDialog.'
 const LET_AI_CLASSIFY = '__ai__'
+
+/** What a caller that already knows the follow-up (the Outcome Review's "Request changes") fills in before the person looks. */
+export type SpawnChildPrefill = {
+  title: string
+  body: string
+  type?: RequestType
+  /** The link the child gets; replaces the table of the request's own type, which has no rule for most types. */
+  rule: ChildRequestRule
+}
 
 type Props = {
   open: boolean
@@ -32,24 +53,44 @@ type Props = {
   request: OrcaRequest
   /** Plain-text summary of the analysis result used to pre-fill the body. */
   bodyHint?: string
+  prefill?: SpawnChildPrefill
   onChanged: () => void
+  /** The child exists; called with it before the dialog closes. */
+  onCreated?: (child: OrcaRequest) => void
 }
 
-export function SpawnChildRequestDialog({ open, onOpenChange, request, bodyHint, onChanged }: Props): React.JSX.Element | null {
+export function SpawnChildRequestDialog({
+  open,
+  onOpenChange,
+  request,
+  bodyHint,
+  prefill,
+  onChanged,
+  onCreated
+}: Props): React.JSX.Element | null {
   const { spawnChild } = useRequestActions()
-  const rule = request.type === 'unknown' ? undefined : CHILD_REQUEST_RULES[request.type]
-  const [title, setTitle] = useState(() =>
-    rule ? `${request.title} (${translate(`${T}reason.${rule.reason}`, rule.reason)})` : request.title
+  const rule =
+    prefill?.rule ?? (request.type === 'unknown' ? undefined : CHILD_REQUEST_RULES[request.type])
+  const [title, setTitle] = useState(
+    () =>
+      prefill?.title ??
+      (rule
+        ? `${request.title} (${translate(`${T}reason.${rule.reason}`, rule.reason)})`
+        : request.title)
   )
-  const [body, setBody] = useState(bodyHint ?? '')
-  const [type, setType] = useState<string>(LET_AI_CLASSIFY)
+  const [body, setBody] = useState(prefill?.body ?? bodyHint ?? '')
+  const [type, setType] = useState<string>(prefill?.type ?? LET_AI_CLASSIFY)
   const [submitting, setSubmitting] = useState(false)
-  if (!rule) {return null}
+  if (!rule) {
+    return null
+  }
 
   const blocked = submitting || title.trim().length === 0
 
   const submit = async (): Promise<void> => {
-    if (blocked) {return}
+    if (blocked) {
+      return
+    }
     setSubmitting(true)
     const result = await spawnChild({
       id: request.id,
@@ -65,6 +106,7 @@ export function SpawnChildRequestDialog({ open, onOpenChange, request, bodyHint,
       return
     }
     const child = result.value.request
+    onCreated?.(child)
     onOpenChange(false)
     onChanged()
     useAppStore.getState().upsertRequests([child])
@@ -86,7 +128,12 @@ export function SpawnChildRequestDialog({ open, onOpenChange, request, bodyHint,
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="spawn-child-title">{translate(`${T}titleLabel`, 'Title')}</Label>
-            <Input id="spawn-child-title" value={title} maxLength={500} onChange={(e) => setTitle(e.target.value)} />
+            <Input
+              id="spawn-child-title"
+              value={title}
+              maxLength={500}
+              onChange={(e) => setTitle(e.target.value)}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="spawn-child-body">{translate(`${T}body`, 'Description')}</Label>
@@ -110,7 +157,9 @@ export function SpawnChildRequestDialog({ open, onOpenChange, request, bodyHint,
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={LET_AI_CLASSIFY}>{translate(`${T}letAi`, 'Let the AI classify')}</SelectItem>
+                <SelectItem value={LET_AI_CLASSIFY}>
+                  {translate(`${T}letAi`, 'Let the AI classify')}
+                </SelectItem>
                 {rule.suggestedTypes.map((t) => (
                   <SelectItem key={t} value={t}>
                     {translate(`auto.components.request.RequestType.${t}.label`, t)}
@@ -124,7 +173,11 @@ export function SpawnChildRequestDialog({ open, onOpenChange, request, bodyHint,
           <Button variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
             {translate('auto.components.request.RequestReasonDialog.cancel', 'Cancel')}
           </Button>
-          <Button disabled={blocked} onClick={() => void submit()} title={getScreenSubmitShortcutLabel()}>
+          <Button
+            disabled={blocked}
+            onClick={() => void submit()}
+            title={getScreenSubmitShortcutLabel()}
+          >
             {translate(`${T}submit`, 'Create')}
           </Button>
         </DialogFooter>

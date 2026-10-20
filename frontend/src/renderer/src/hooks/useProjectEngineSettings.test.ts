@@ -15,6 +15,7 @@ const stored = {
   openspecMinVersion: '1.2.3',
   solutionAgent: true,
   executionMode: 'step_by_step',
+  outcomeReviewEnabled: false,
   version: 4
 }
 
