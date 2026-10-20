@@ -1724,7 +1724,15 @@
     "kind": "unary"
   },
   {
+    "name": "request.planRevisions",
+    "kind": "unary"
+  },
+  {
     "name": "request.reopen",
+    "kind": "unary"
+  },
+  {
+    "name": "request.retryPlan",
     "kind": "unary"
   },
   {

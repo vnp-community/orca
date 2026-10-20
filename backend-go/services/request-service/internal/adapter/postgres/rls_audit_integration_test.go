@@ -117,6 +117,7 @@ var isolationFixtures = map[string]string{
 	"context_sources":           `INSERT INTO request.context_sources (id, tenant_id, source_key, kind, transport, adapter, trust, enabled_for, owner_id, created_by) VALUES (gen_random_uuid(), {tenant}, 'src', 'conventions', 'internal', 'a', 'high', '[]', gen_random_uuid(), gen_random_uuid())`,
 	"evidence":                  `INSERT INTO request.evidence (id, tenant_id, request_id, context_pack_id, seq, source_id, ref, retrieved_at, freshness, trust, digest, size) VALUES (gen_random_uuid(), {tenant}, {req}, {pack}, 1, 's', 'r', now(), 'fresh', 'high', repeat('c', 64), 1)`,
 	"openspec_changes":          `INSERT INTO request.openspec_changes (id, tenant_id, request_id, change_id, status, tasks_sync_state) VALUES (gen_random_uuid(), {tenant}, {req}, 'c', 'ready', 'in_sync')`,
+	"openspec_change_revisions": `INSERT INTO request.openspec_change_revisions (id, tenant_id, request_id, revision, run_id, bundle_digest, files_json) VALUES (gen_random_uuid(), {tenant}, {req}, 1, gen_random_uuid(), 'd', '[]')`,
 	"outbox_events":             `INSERT INTO request.outbox_events (id, tenant_id, subject, occurred_at, version, payload) VALUES (gen_random_uuid(), {tenant}, 's', now(), 1, '{}')`,
 	"processed_events":          `INSERT INTO request.processed_events (tenant_id, event_id, subject) VALUES ({tenant}, gen_random_uuid(), 's')`,
 	"project_engine_settings":   `INSERT INTO request.project_engine_settings (tenant_id, project_id, solution_engine, updated_by) VALUES ({tenant}, gen_random_uuid(), 'native', gen_random_uuid())`,
@@ -144,6 +145,7 @@ var isolationFixtures = map[string]string{
 	"phase_starts":              `INSERT INTO request.phase_starts (tenant_id, phase_task_id, request_id, started_by) VALUES ({tenant}, gen_random_uuid(), {req}, gen_random_uuid())`,
 	"request_checks":            `INSERT INTO request.request_checks (id, tenant_id, request_id, kind, status, source) VALUES (gen_random_uuid(), {tenant}, {req}, 'tests_after', 'passed', 'manual')`,
 	"task_run_outcomes":         `INSERT INTO request.task_run_outcomes (id, tenant_id, request_id, task_id, outcome, event_id, occurred_at) VALUES (gen_random_uuid(), {tenant}, {req}, gen_random_uuid(), 'started', gen_random_uuid(), now())`,
+	"plan_auto_jobs":            `INSERT INTO request.plan_auto_jobs (tenant_id, request_id, anchor, origin, project_id, state) VALUES ({tenant}, {req}, 'sol', 'event', gen_random_uuid(), 'pending')`,
 	"tenant_settings":           `INSERT INTO request.tenant_settings (tenant_id) VALUES ({tenant})`,
 	"tenant_security_settings":  `INSERT INTO request.tenant_security_settings (tenant_id) VALUES ({tenant})`,
 }

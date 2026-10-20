@@ -28,10 +28,10 @@ func (r *ProjectEngineSettingsRepository) Get(ctx context.Context, projectID str
 		var minVer sql.NullString
 		// MySQL has no RLS: without the tenant bound another tenant's project would be readable.
 		err := db.QueryRowContext(ctx, `
-			SELECT tenant_id, project_id, solution_engine, openspec_min_version, solution_agent, execution_mode, updated_by, updated_at, version
+			SELECT tenant_id, project_id, solution_engine, openspec_min_version, solution_agent, execution_mode, plan_auto_generate, updated_by, updated_at, version
 			FROM project_engine_settings
 			WHERE tenant_id = ? AND project_id = ?`, tenantID, projectID).Scan(
-			&s.TenantID, &s.ProjectID, &engine, &minVer, &s.SolutionAgent, &mode, &s.UpdatedBy, &s.UpdatedAt, &s.Version,
+			&s.TenantID, &s.ProjectID, &engine, &minVer, &s.SolutionAgent, &mode, &s.PlanAutoGenerate, &s.UpdatedBy, &s.UpdatedAt, &s.Version,
 		)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
@@ -59,11 +59,11 @@ func (r *ProjectEngineSettingsRepository) Upsert(ctx context.Context, s domain.P
 	if expectedVersion == 0 {
 		query := `
 			INSERT IGNORE INTO project_engine_settings (
-				tenant_id, project_id, solution_engine, openspec_min_version, solution_agent, execution_mode, updated_by, updated_at, version
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+				tenant_id, project_id, solution_engine, openspec_min_version, solution_agent, execution_mode, plan_auto_generate, updated_by, updated_at, version
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 		`
 		res, err := r.exec(ctx).ExecContext(ctx, query,
-			s.TenantID, s.ProjectID, string(s.Engine), minVer, s.SolutionAgent, string(s.ExecutionMode.OrDefault()), s.UpdatedBy, s.UpdatedAt,
+			s.TenantID, s.ProjectID, string(s.Engine), minVer, s.SolutionAgent, string(s.ExecutionMode.OrDefault()), s.PlanAutoGenerate, s.UpdatedBy, s.UpdatedAt,
 		)
 		if err != nil {
 			return s, fmt.Errorf("mysql insert engine settings: %w", err)
@@ -78,11 +78,11 @@ func (r *ProjectEngineSettingsRepository) Upsert(ctx context.Context, s domain.P
 
 	query := `
 		UPDATE project_engine_settings
-		SET solution_engine = ?, openspec_min_version = ?, solution_agent = ?, execution_mode = ?, updated_by = ?, updated_at = ?, version = version + 1
+		SET solution_engine = ?, openspec_min_version = ?, solution_agent = ?, execution_mode = ?, plan_auto_generate = ?, updated_by = ?, updated_at = ?, version = version + 1
 		WHERE tenant_id = ? AND project_id = ? AND version = ?
 	`
 	res, err := r.exec(ctx).ExecContext(ctx, query,
-		string(s.Engine), minVer, s.SolutionAgent, string(s.ExecutionMode.OrDefault()), s.UpdatedBy, s.UpdatedAt, s.TenantID, s.ProjectID, expectedVersion,
+		string(s.Engine), minVer, s.SolutionAgent, string(s.ExecutionMode.OrDefault()), s.PlanAutoGenerate, s.UpdatedBy, s.UpdatedAt, s.TenantID, s.ProjectID, expectedVersion,
 	)
 	if err != nil {
 		return s, fmt.Errorf("mysql update engine settings: %w", err)

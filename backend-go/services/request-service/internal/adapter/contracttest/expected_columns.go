@@ -9,7 +9,7 @@ type Column struct {
 // ExpectedColumns is the foundation schema both dialects must expose (CR-REQ-002 section 2.1).
 // solution_engine comes from the solution-engines migration that sits later in the same chain.
 func ExpectedColumns() map[string][]Column {
-	return withBaseRefColumns(withExecutionModeColumns(withArtifactColumns(foundationColumns())))
+	return withPlanDocumentColumns(withPlanAutoColumns(withBaseRefColumns(withExecutionModeColumns(withArtifactColumns(foundationColumns())))))
 }
 
 func foundationColumns() map[string][]Column {

@@ -156,3 +156,31 @@ test_member_does_not_reach_other_analyze_rpcs if {
 test_agent_member_does_not_reach_steering_rpc_through_member_rule if {
 	not request.allow with input as object.union(callers.member, {"action": "analyze", "rpc": "ChooseSolutionOption", "actor_type": "agent"})
 }
+
+# CR-REQ-045: a project member reaches GeneratePlan (request-service checks reporter/admin/approver); every other plan RPC,
+# non-members and agents stay as before.
+test_member_reaches_plan_revision_rpc if {
+	request.allow with input as object.union(callers.member, {"action": "plan", "rpc": "GeneratePlan", "actor_type": "user"})
+}
+
+test_member_does_not_reach_other_plan_rpcs if {
+	every rpc in ["CommitPlan", "StartPhase", "GetPlanProposal"] {
+		not request.allow with input as object.union(callers.member, {"action": "plan", "rpc": rpc, "actor_type": "user"})
+	}
+}
+
+test_owner_and_reporter_keep_plan_rpcs if {
+	every role in ["owner", "reporter", "admin"] {
+		every rpc in ["GeneratePlan", "CommitPlan"] {
+			request.allow with input as object.union(callers[role], {"action": "plan", "rpc": rpc, "actor_type": "user"})
+		}
+	}
+}
+
+test_stranger_does_not_reach_plan_revision_rpc if {
+	not request.allow with input as object.union(callers.stranger, {"action": "plan", "rpc": "GeneratePlan", "actor_type": "user"})
+}
+
+test_agent_member_does_not_reach_plan_revision_rpc if {
+	not request.allow with input as object.union(callers.member, {"action": "plan", "rpc": "GeneratePlan", "actor_type": "agent"})
+}

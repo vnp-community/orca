@@ -16,10 +16,12 @@ Limits: between {{.MinTasks}} and {{.MaxTasks}} tasks in total, at most {{.Limit
 Give every acceptance criterion of the Request at least one scenario whose name starts with its id, and let ac= name only ids the Request lists.
 Run openspec validate --strict on the change and fix every error before you finish. Run one operation per Bash command; compound commands are refused.
 
+{{template "_language_rule_openspec.tmpl" . -}}
 {{template "_request_block.tmpl" . -}}
 {{template "_project.tmpl" . -}}
 {{template "_approved_decision.tmpl" . -}}
 {{template "_feedback.tmpl" . -}}
+{{template "_revise_in_place.tmpl" . -}}
 {{if .RetryNote}}
 Your previous attempt was rejected. The files are still in place; fix them instead of starting over:
 {{truncate .RetryNote retryNoteRunes}}

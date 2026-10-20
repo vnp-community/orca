@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -49,6 +50,7 @@ type RunProposalGeneration struct {
 	checker        BundleChecker
 	workspace      ProposalWorkspace
 	changes        OpenSpecChangeRepository
+	revisions      OpenSpecChangeRevisionRepository
 	timing         AnalysisSettings
 	newID          func() string
 	runs           AnalysisRunStore
@@ -76,17 +78,19 @@ type RunProposalGenerationDeps struct {
 	Workspace ProposalWorkspace
 	// Changes stores what the change was built from; the proposal cannot be recorded without it.
 	Changes OpenSpecChangeRepository
-	Runs    AnalysisRunStore
-	Tx      TxRunner
-	Limits  domain.PlanLimits
-	Owner   string
+	// Revisions keeps one version of the change per succeeded run, stored in the same transaction as the change.
+	Revisions OpenSpecChangeRevisionRepository
+	Runs      AnalysisRunStore
+	Tx        TxRunner
+	Limits    domain.PlanLimits
+	Owner     string
 	// Observer may be nil; it receives the structure problems found in an authored change.
 	Observer EngineObserver
 }
 
 func NewRunProposalGeneration(d RunProposalGenerationDeps) *RunProposalGeneration {
 	return &RunProposalGeneration{requests: d.Requests, solutions: d.Solutions, registry: d.Registry, projects: d.Projects, policies: d.Policies,
-		engineSettings: d.EngineSettings, timing: d.Settings.withDefaults(), checker: d.Checker, workspace: d.Workspace, changes: d.Changes, newID: uuid.NewString, runs: d.Runs, tx: d.Tx, limits: d.Limits, owner: d.Owner, now: func() time.Time { return time.Now().UTC() }, observer: d.Observer}
+		engineSettings: d.EngineSettings, timing: d.Settings.withDefaults(), checker: d.Checker, workspace: d.Workspace, changes: d.Changes, revisions: d.Revisions, newID: uuid.NewString, runs: d.Runs, tx: d.Tx, limits: d.Limits, owner: d.Owner, now: func() time.Time { return time.Now().UTC() }, observer: d.Observer}
 }
 
 func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.AnalysisRun) error {
@@ -116,6 +120,7 @@ func (w *RunProposalGeneration) Execute(ctx context.Context, run domain.Analysis
 		changeID = domain.NewChangeID(req.Number, req.Title)
 	}
 	in := ProposalInput{Run: run, Request: req, ChangeID: changeID, Shape: shape, Limits: w.limits, Feedback: run.Feedback, Settings: w.projectEngineSettings(ctx, req.ProjectID)}
+	in.PreviousFiles = previousChangeFiles(existing, hasChange)
 	var stats domain.RunStats
 	in.Stats = &stats
 	in.OnWorkspace = func(ws Workspace) { w.recordWorkspace(ctx, req, changeID, ws) }
@@ -279,6 +284,8 @@ const (
 	maxReportedRunes   = 500
 )
 
+var errNothingToCommit = errors.New("the worktree has nothing to commit")
+
 // finish commits the change to its branch, reads the files back, records what the change was built from and stores the
 // proposal on the run, the last two in one transaction. The commit comes first: a change that is not on the branch must
 // not be recorded as ready.
@@ -287,7 +294,11 @@ func (w *RunProposalGeneration) finish(ctx context.Context, run domain.AnalysisR
 	if err != nil {
 		return err
 	}
-	sha, bundle, err := w.commitAndRead(ctx, req, res)
+	sha, bundle, redacted, err := w.commitAndRead(ctx, req, res)
+	if errors.Is(err, errNothingToCommit) && hasPrev && prev.Status == domain.ChangeStatusReady {
+		// A revision that leaves every document as it was would only reopen approval on the same Plan.
+		return newFailure(run, domain.RunErrPlanRevisionNoChange, "the agent did not change any document")
+	}
 	if err != nil {
 		slog.WarnContext(ctx, "could not commit the proposal to its branch", slog.String("run_id", run.ID), slog.Any("error", err))
 		return newFailure(run, domain.RunErrSpecAgentFailed, "the change could not be committed to its branch")
@@ -297,7 +308,7 @@ func (w *RunProposalGeneration) finish(ctx context.Context, run domain.AnalysisR
 		SyncState: domain.SyncStateInSync, Commit: sha, TasksMDDigest: domain.PlanRegionDigest(res.TasksMD),
 		KGAvailable: res.Report.Present && res.Report.Knowledge.Available && res.KnowledgeRequested, KGSnapshot: clip(res.Report.Knowledge.Snapshot, maxReportedRunes),
 		KGReadIDs: boundedList(res.Report.Knowledge.Read), KGGaps: boundedList(res.Report.Knowledge.Gaps), KGConflicts: boundedList(res.Report.Knowledge.Conflicts),
-		SkillHash: res.SkillHash, Bundle: bundle, WorkspaceID: res.Workspace.WorktreeID,
+		SkillHash: res.SkillHash, Bundle: bundle, RedactedSecrets: redacted, WorkspaceID: res.Workspace.WorktreeID,
 	}
 	if hasPrev {
 		change.ID = prev.ID
@@ -306,53 +317,51 @@ func (w *RunProposalGeneration) finish(ctx context.Context, run domain.AnalysisR
 		if _, err := w.changes.Upsert(ctx, change); err != nil {
 			return err
 		}
+		if err := w.appendRevision(ctx, run, change); err != nil {
+			return err
+		}
 		return finishPlanRun(ctx, w.tx, w.runs, w.owner, w.now(), run, encoded)
 	})
 }
 
-// commitAndRead commits every changed path of the (already scope-checked) worktree and reads the change's files back.
-func (w *RunProposalGeneration) commitAndRead(ctx context.Context, req domain.Request, res ProposalResult) (string, map[string]string, error) {
+// commitAndRead commits every changed path of the (already scope-checked) worktree and reads the change's files back as the
+// masked copy the database keeps, returning how many secrets that masked.
+func (w *RunProposalGeneration) commitAndRead(ctx context.Context, req domain.Request, res ProposalResult) (string, map[string]string, int, error) {
 	changed, err := w.workspace.ChangedPaths(ctx, res.Workspace)
 	if err != nil {
-		return "", nil, err
+		return "", nil, 0, err
 	}
 	prefix := "openspec/changes/" + res.ChangeID + "/"
 	var paths []string
 	for _, c := range changed {
 		if !strings.HasPrefix(c.Path, prefix) {
-			return "", nil, fmt.Errorf("a path outside the change appeared after the scope check: %s", c.Path)
+			return "", nil, 0, fmt.Errorf("a path outside the change appeared after the scope check: %s", c.Path)
 		}
 		paths = append(paths, c.Path)
 	}
 	if len(paths) == 0 {
-		return "", nil, fmt.Errorf("the worktree has nothing to commit")
+		return "", nil, 0, errNothingToCommit
 	}
 	sha, err := w.workspace.Commit(ctx, res.Workspace, "proposal: "+res.Ref+" "+clip(req.Title, 100), paths)
 	if err != nil {
-		return "", nil, err
+		return "", nil, 0, err
 	}
 	// The whole change, not only the paths this run touched: a regenerated change leaves the files it did not rewrite on the
 	// branch, and a bundle without them would hide capabilities from the reader and from the digest the approval is bound to.
 	all, err := w.changeFiles(ctx, res.Workspace, prefix)
 	if err != nil {
-		return "", nil, err
+		return "", nil, 0, err
 	}
-	bundle := map[string]string{}
-	budget := maxBundleBytes
+	files := make([]bundleFile, 0, len(all))
 	for _, p := range all {
 		b, err := w.workspace.ReadFile(ctx, res.Workspace, p, MaxProposalReadBytes)
 		if err != nil {
-			return "", nil, fmt.Errorf("read back %s: %w", p, err)
+			return "", nil, 0, fmt.Errorf("read back %s: %w", p, err)
 		}
-		rel := strings.TrimPrefix(p, prefix)
-		if len(b) > budget {
-			bundle[rel] = omittedMarker(b)
-			continue
-		}
-		budget -= len(b)
-		bundle[rel] = string(b)
+		files = append(files, bundleFile{Path: strings.TrimPrefix(p, prefix), Content: b})
 	}
-	return sha, bundle, nil
+	bundle, redacted := redactBundle(files, maxBundleBytes)
+	return sha, bundle, redacted, nil
 }
 
 // changeFiles lists every file under the change directory, directories before files and each level in name order, bounded in

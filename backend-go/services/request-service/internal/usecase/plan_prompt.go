@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/prompts/plan_native"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
@@ -19,8 +20,12 @@ type PlanPromptInput struct {
 	Analysis string
 	// Feedback is the reviewer's guidance when a Plan is regenerated.
 	Feedback string
+	// PriorPlan is the Plan being revised, as the run stored it; empty for a first Plan.
+	PriorPlan string
 	// RetryNote is why the previous answer was rejected.
 	RetryNote string
+	// Language is the language the model writes its prose in; the zero value adds no instruction.
+	Language output_language.Language
 }
 
 // RenderPlanPrompt maps the domain input to prompts/plan_native. The labels come from the domain constants the Plan
@@ -36,7 +41,7 @@ func RenderPlanPrompt(in PlanPromptInput) (string, error) {
 			TestRegression: domain.PlanLabelTestRegression, CheckBaseline: domain.PolicyLabelCheckBaseline, CheckAfter: domain.PolicyLabelCheckAfter,
 			CheckTestsPre: domain.PolicyLabelCheckTestsPre, CheckTestsAfter: domain.PolicyLabelCheckTestsAfter, Rollback: domain.PolicyLabelRollback,
 		},
-		Analysis: in.Analysis, Feedback: in.Feedback, RetryNote: in.RetryNote,
+		Analysis: in.Analysis, Feedback: in.Feedback, PriorPlan: in.PriorPlan, RetryNote: in.RetryNote, Language: in.Language,
 	}))
 }
 

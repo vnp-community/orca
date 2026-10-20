@@ -3,4 +3,5 @@ Reply with only a JSON object that follows the schema. No code fence and no text
 Give at least {{.MinOptions}} options (at most 4). Options must differ in approach, not only in name. Exactly one option has "recommended": true and "recommendation.option_id" names it.
 Schema: {{template "_solution_schema.tmpl" .}}
 {{template "_coverage_rule.tmpl" .}}
+{{template "_language_rule.tmpl" . -}}
 {{template "_body.tmpl" . -}}

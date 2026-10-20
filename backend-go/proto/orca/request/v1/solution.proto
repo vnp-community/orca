@@ -149,6 +149,8 @@ message ProjectEngineSettings {
   bool solution_agent = 5;
   // step_by_step (default) or continuous: how Requests of this project run after their plan is approved (CR-REQ-038).
   string execution_mode = 6;
+  // CR-REQ-044: Orca starts the Plan by itself once the Analysis is approved. True unless the project turned it off.
+  bool plan_auto_generate = 7;
 }
 
 message GetProjectEngineSettingsRequest {
@@ -171,6 +173,8 @@ message SetProjectEngineSettingsRequest {
   bool solution_agent = 5;
   // Empty keeps the stored mode; otherwise step_by_step or continuous.
   string execution_mode = 6;
+  // Absent keeps the stored value (CR-REQ-044), so an older client never flips the switch.
+  optional bool plan_auto_generate = 7;
 }
 
 message SetProjectEngineSettingsResponse {

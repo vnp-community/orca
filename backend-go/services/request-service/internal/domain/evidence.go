@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type Evidence struct {
@@ -41,9 +42,17 @@ func ParseEvidenceRef(s string) (int, bool) {
 	return n, true
 }
 
+// evidenceExcerptMaxBytes matches CHECK (octet_length(excerpt) <= 4096) in migration 0005.
+const evidenceExcerptMaxBytes = 4096
+
 func NewEvidence(id, tenantID, requestID string, seq int, sourceID, sourceRef, title, excerpt, digest string, retrievedAt time.Time) Evidence {
-	if len(excerpt) > 4096 {
-		excerpt = excerpt[:4096]
+	// The column limit is in bytes (octet_length <= 4096), so cut by bytes but back up to a rune boundary to keep the text valid UTF-8.
+	if len(excerpt) > evidenceExcerptMaxBytes {
+		cut := evidenceExcerptMaxBytes
+		for cut > 0 && !utf8.RuneStart(excerpt[cut]) {
+			cut--
+		}
+		excerpt = excerpt[:cut]
 	}
 	return Evidence{
 		ID:          id,

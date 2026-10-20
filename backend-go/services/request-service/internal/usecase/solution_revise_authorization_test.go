@@ -309,6 +309,8 @@ func (o *orderRecorder) AuthorizeRevise(ctx context.Context, _ domain.Request) e
 	return nil
 }
 
+func (o *orderRecorder) AuthorizeRevisePlan(context.Context, domain.Request) error { return nil }
+
 func (o *orderRecorder) CancelPending(ctx context.Context, requestID, why string) error {
 	o.log = append(o.log, o.mark("cancel_pending", ctx))
 	return fakeCanceller{o.w}.CancelPending(ctx, requestID, why)

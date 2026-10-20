@@ -68,8 +68,13 @@ func (w *RunPlanGeneration) Execute(ctx context.Context, run domain.AnalysisRun)
 		return newFailure(run, "REQUEST_PLAN_NOT_APPLICABLE", "this request type has no Plan")
 	}
 
-	in := PlanPromptInput{Request: req, Shape: shape, Limits: w.limits, Feedback: run.Feedback}
+	in := PlanPromptInput{Request: req, Shape: shape, Limits: w.limits, Feedback: run.Feedback, Language: w.settings.OutputLanguageFor(req)}
 	in.ProjectName, in.RepoURL = projectFacts(ctx, w.projects, req.ProjectID)
+	prior, err := priorPlanText(ctx, w.runs, req.ID)
+	if err != nil {
+		return err
+	}
+	in.PriorPlan = prior
 	if sol, ok := latestApprovedAnalysis(ctx, w.solutions, req.ID); ok {
 		in.Analysis = approvedAnalysisText(sol)
 	}

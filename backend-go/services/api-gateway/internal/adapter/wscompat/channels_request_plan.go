@@ -18,8 +18,10 @@ func (c requestChannels) registerPlan(r *Registry) {
 	c.handle(r, "request.generatePlan", requestChannelOpts{timeout: requestAIChannelTimeout, ai: true}, c.generatePlan)
 	c.handle(r, "request.planProposal", requestChannelOpts{timeout: requestRPCTimeout}, c.planProposal)
 	c.handle(r, "request.planBundleFile", requestChannelOpts{timeout: requestRPCTimeout}, c.planBundleFile)
+	c.registerPlanRevisions(r)
 	c.handle(r, "request.cleanupProposal", requestChannelOpts{timeout: requestRPCTimeout}, c.cleanupProposal)
 	c.registerEngine(r)
+	c.registerPlanAuto(r)
 	c.handle(r, "request.startPhase", requestChannelOpts{timeout: requestStartPhaseTimeout}, func(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
 		in, err := decodeRequestArgs[struct {
 			ID          string `json:"id"`
@@ -49,13 +51,15 @@ func (c requestChannels) generatePlan(ctx context.Context, _ Identity, args []js
 		Feedback      string          `json:"feedback"`
 		Proposal      json.RawMessage `json:"proposal"`
 		RawAIResponse string          `json:"rawAiResponse"`
+		// IdempotencyKey makes a repeated propose return the run it started (CR-REQ-045); commit ignores it.
+		IdempotencyKey string `json:"idempotencyKey"`
 	}](args)
 	if err != nil {
 		return nil, err
 	}
 	switch strings.ToLower(strings.TrimSpace(in.Mode)) {
 	case "", "propose":
-		resp, err := c.req.GeneratePlan(ctx, &requestv1.GeneratePlanRequest{RequestId: in.ID, Feedback: in.Feedback})
+		resp, err := c.req.GeneratePlan(ctx, &requestv1.GeneratePlanRequest{RequestId: in.ID, Feedback: in.Feedback, IdempotencyKey: in.IdempotencyKey})
 		if err != nil {
 			return nil, err
 		}
@@ -112,16 +116,23 @@ func (c requestChannels) planProposal(ctx context.Context, _ Identity, args []js
 	in, err := decodeRequestArgs[struct {
 		ID    string `json:"id"`
 		RunID string `json:"runId"`
+		// Revision reads that version of the Plan (CR-REQ-045); 0 or absent reads the run or the current version.
+		Revision int64 `json:"revision"`
 	}](args)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.req.GetPlanProposal(ctx, &requestv1.GetPlanProposalRequest{RequestId: in.ID, RunId: in.RunID})
+	revision, err := planRevisionArg(in.Revision)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.req.GetPlanProposal(ctx, &requestv1.GetPlanProposalRequest{RequestId: in.ID, RunId: in.RunID, Revision: revision})
 	if err != nil {
 		return nil, err
 	}
 	out := planProposalView(resp.GetRunId(), resp.GetStatus(), resp.GetErrorCode(), resp.GetErrorMessage(), resp.GetProposal(), resp.GetRawAiResponse())
 	addPlanEngineView(out, resp)
+	addPlanAutoView(out, resp)
 	return out, nil
 }
 
@@ -164,8 +175,9 @@ func protoJSON(m proto.Message) json.RawMessage {
 // that decides what lies inside the change.
 func (c requestChannels) planBundleFile(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
 	in, err := decodeRequestArgs[struct {
-		ID   string `json:"id"`
-		Path string `json:"path"`
+		ID       string `json:"id"`
+		Path     string `json:"path"`
+		Revision int64  `json:"revision"`
 	}](args)
 	if err != nil {
 		return nil, err
@@ -173,7 +185,11 @@ func (c requestChannels) planBundleFile(ctx context.Context, _ Identity, args []
 	if strings.TrimSpace(in.Path) == "" {
 		return nil, invalidRequestArg("path is required")
 	}
-	resp, err := c.req.GetPlanBundleFile(ctx, &requestv1.GetPlanBundleFileRequest{RequestId: in.ID, Path: in.Path})
+	revision, err := planRevisionArg(in.Revision)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.req.GetPlanBundleFile(ctx, &requestv1.GetPlanBundleFileRequest{RequestId: in.ID, Path: in.Path, Revision: revision})
 	if err != nil {
 		return nil, err
 	}

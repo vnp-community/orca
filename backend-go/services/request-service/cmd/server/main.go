@@ -51,7 +51,13 @@ func main() {
 func run(ctx context.Context, cfg config.Config) error {
 	log := logging.New(cfg.ServiceName, "dev")
 	apperrors.SetLogger(log)
+	// A wrong language stops the service before it opens a store or a tracer, so a typo shows up at deploy time.
+	outputLanguage, err := parseOutputLanguage(cfg.OutputLanguage)
+	if err != nil {
+		return err
+	}
 	log.Info("request-service starting", slog.Bool("request_flow_enabled", cfg.RequestFlowEnabled))
+	log.Info("output language", slog.String("code", outputLanguage.Code))
 
 	shutdownTracer, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
 	if err != nil {
@@ -152,7 +158,7 @@ func run(ctx context.Context, cfg config.Config) error {
 	defer cancelLifecycle()
 	// Solution wiring goes first: its handlers (solution, findings, answer) replace the generic ones in the registry,
 	// and it needs the approval pieces back afterwards (the opener) via bindApprovals.
-	solution, err := wireSolution(lifecycleCtx, &lifecycleWG, cfg, log, stores, lifecycle, dirs)
+	solution, err := wireSolution(lifecycleCtx, &lifecycleWG, cfg, outputLanguage, log, stores, lifecycle, dirs)
 	if err != nil {
 		return err
 	}
@@ -204,6 +210,8 @@ func run(ctx context.Context, cfg config.Config) error {
 		return err
 	}
 	defer artifact.close()
+	// After wireArtifact so the bus consumer set is complete; the retry RPC and the auto-plan block ride on the Plan use cases.
+	plan = wirePlanAuto(lifecycleCtx, &lifecycleWG, cfg, log, stores, plan, solution, dirs, busConsumer)
 	security, err := wireSecurity(lifecycleCtx, &lifecycleWG, cfg, log, stores, rollout.SecurityHooks())
 	if err != nil {
 		return err

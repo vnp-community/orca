@@ -68,11 +68,12 @@ func (r *AnalysisRunner) WithRequests(q AnalysisRequestGetter) *AnalysisRunner {
 	return r
 }
 
-// reporterIdentity makes an analysis run started by an approver or admin look up its dev server as the reporter; the run stays
-// attributed to the caller. Plan runs keep the caller's identity. A failed lookup keeps the caller's identity, so the run then
-// fails with the same no-connection error it would have had.
+// reporterIdentity makes a run started by an approver or admin look up its dev server as the reporter; the run stays
+// attributed to the caller. Plan runs do the same since CR-REQ-045: an approver revises a Plan on the reporter's dev
+// server, and the workers only use the identity to route to that server. A failed lookup keeps the caller's identity,
+// so the run then fails with the same no-connection error it would have had.
 func (r *AnalysisRunner) reporterIdentity(ctx context.Context, run domain.AnalysisRun) context.Context {
-	if r.requests == nil || run.Kind == domain.RunKindPlan || run.ActorID == "" {
+	if r.requests == nil || run.ActorID == "" {
 		return ctx
 	}
 	req, err := r.requests.Get(ctx, run.RequestID)

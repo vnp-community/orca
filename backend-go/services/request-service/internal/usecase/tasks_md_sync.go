@@ -22,7 +22,7 @@ const (
 
 // SyncObserver counts what the sync and the archive step did. May be absent.
 type SyncObserver interface {
-	// TasksDrift is one plan region found edited by hand and restored.
+	// TasksDrift is one plan region found edited by hand, restored or (when the stored copy is masked) left as it is.
 	TasksDrift()
 	// SyncFinished is one step that ended: step tasks|archive, result done|failed|gave_up.
 	SyncFinished(step, result string)
@@ -269,9 +269,13 @@ func (s *TasksMdSyncer) syncTasks(ctx context.Context, change *domain.OpenSpecCh
 	if !ok {
 		return 0, errors.New("tasks.md has no plan region")
 	}
-	next, drifted, err := s.restoreDrift(*change, md, region)
+	next, drift, err := s.restoreDrift(*change, md, region)
 	if err != nil {
 		return 0, err
+	}
+	if drift == driftKept {
+		s.observer().TasksDrift()
+		s.log().WarnContext(ctx, "tasks.md plan region was edited by hand; kept as is because the stored copy is masked", slog.String("request_id", req.ID))
 	}
 	next, ticked, err := domain.TickTasks(next, refs)
 	if err != nil {
@@ -280,7 +284,7 @@ func (s *TasksMdSyncer) syncTasks(ctx context.Context, change *domain.OpenSpecCh
 	if next == md {
 		return 0, s.recordInSync(ctx, change, md)
 	}
-	if drifted {
+	if drift == driftRestored {
 		s.observer().TasksDrift()
 		s.log().WarnContext(ctx, "tasks.md plan region was edited by hand; the stored region was restored", slog.String("request_id", req.ID))
 	}
@@ -294,18 +298,46 @@ func (s *TasksMdSyncer) syncTasks(ctx context.Context, change *domain.OpenSpecCh
 	return len(ticked), s.recordInSync(ctx, change, next)
 }
 
-// restoreDrift puts the stored plan region back when the one in the worktree differs from what Orca last wrote.
-func (s *TasksMdSyncer) restoreDrift(change domain.OpenSpecChange, md, region string) (string, bool, error) {
+// planRegionDrift says what restoreDrift found: nothing, a hand edit it undid, or one it had to leave in place.
+type planRegionDrift int
+
+const (
+	driftNone planRegionDrift = iota
+	driftRestored
+	driftKept
+)
+
+// restoreDrift puts the stored plan region back when the one in the worktree differs from what Orca last wrote. When the
+// stored copy was masked it is never written back, or tasks.md on the branch would hold the mask: the edited region stays.
+func (s *TasksMdSyncer) restoreDrift(change domain.OpenSpecChange, md, region string) (string, planRegionDrift, error) {
+	if change.RedactedSecrets > 0 {
+		return md, maskedDrift(change, md, region), nil
+	}
 	want := change.SyncDigest
 	stored, hasStored := domain.PlanRegionText(change.Bundle[tasksMDName])
 	if want == "" && hasStored {
 		want = domain.PlanRegionDigest(stored) // never synced: the authored region is the baseline
 	}
 	if want == "" || domain.PlanRegionDigest(region) == want || !hasStored {
-		return md, false, nil
+		return md, driftNone, nil
 	}
 	restored, err := domain.ReplacePlanRegion(md, stored)
-	return restored, true, err
+	return restored, driftRestored, err
+}
+
+// maskedDrift detects a hand edit without the stored text: before the first sync the baseline is the digest of the whole
+// raw file taken when it was authored (TasksMDDigest), after it the digest of the region Orca wrote.
+func maskedDrift(change domain.OpenSpecChange, md, region string) planRegionDrift {
+	if change.SyncDigest == "" {
+		if change.TasksMDDigest != "" && domain.PlanRegionDigest(md) != change.TasksMDDigest {
+			return driftKept
+		}
+		return driftNone
+	}
+	if domain.PlanRegionDigest(region) != change.SyncDigest {
+		return driftKept
+	}
+	return driftNone
 }
 
 func (s *TasksMdSyncer) recordInSync(ctx context.Context, change *domain.OpenSpecChange, md string) error {

@@ -218,3 +218,53 @@ func TestLogin_SavesTheTokenAndNeverPrintsIt(t *testing.T) {
 		t.Errorf("missing email: exit=%d", exit)
 	}
 }
+
+func TestApprove_ExecutionModeIsSentOnlyWhenGiven(t *testing.T) {
+	for name, tc := range map[string]struct {
+		args []string
+		want any
+	}{
+		"continuous":       {[]string{"a1", "--version", "3", "--digest", "dg", "--execution-mode", "continuous"}, "continuous"},
+		"normalised":       {[]string{"a1", "--version", "3", "--digest", "dg", "--execution-mode", " Continuous "}, "continuous"},
+		"no flag":          {[]string{"a1", "--version", "3", "--digest", "dg"}, nil},
+		"empty flag value": {[]string{"a1", "--version", "3", "--digest", "dg", "--execution-mode", ""}, nil},
+	} {
+		g := &gateway{t: t, reply: map[string]string{
+			"POST /v1/approvals/a1/approve": `{"approval":{"id":"a1","status":"approved"},"requestStatus":"executing","executionMode":"continuous"}`,
+		}}
+		srv, factory := g.server()
+		var exit int
+		cmd := newApprovalDecideCmd(flowEnv{factory: factory, json: new(bool), exit: &exit}, "approve")
+		cmd.SetArgs(tc.args)
+		err := cmd.ExecuteContext(context.Background())
+		srv.Close()
+		if err != nil || exit != 0 || len(g.bodies) != 1 {
+			t.Fatalf("%s: err=%v exit=%d calls=%v", name, err, exit, g.calls)
+		}
+		if got, has := g.bodies[0]["executionMode"]; got != tc.want || (tc.want == nil && has) {
+			t.Errorf("%s: body = %v, want executionMode %v", name, g.bodies[0], tc.want)
+		}
+	}
+}
+
+func TestDecide_ABadExecutionModeIsAUsageErrorBeforeAnyCall(t *testing.T) {
+	for name, tc := range map[string]struct {
+		decision string
+		args     []string
+	}{
+		"step_by_step is not offered": {"approve", []string{"a1", "--execution-mode", "step_by_step"}},
+		"garbage":                     {"approve", []string{"a1", "--execution-mode", "turbo"}},
+		"reject refuses the flag":     {"reject", []string{"a1", "--comment", "no", "--execution-mode", "continuous"}},
+	} {
+		g := &gateway{t: t}
+		srv, factory := g.server()
+		var exit int
+		cmd := newApprovalDecideCmd(flowEnv{factory: factory, json: new(bool), exit: &exit}, tc.decision)
+		cmd.SetArgs(tc.args)
+		_ = cmd.ExecuteContext(context.Background())
+		srv.Close()
+		if exit != 2 || len(g.calls) != 0 {
+			t.Errorf("%s: exit=%d calls=%v", name, exit, g.calls)
+		}
+	}
+}

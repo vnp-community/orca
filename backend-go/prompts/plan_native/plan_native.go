@@ -3,7 +3,9 @@ package plan_native
 
 import (
 	"embed"
+	"text/template"
 
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/prompts/render"
 	"github.com/stablyai/orca-go/prompts/request_context"
 )
@@ -14,7 +16,10 @@ const ID = "plan_native/plan"
 //go:embed *.tmpl
 var files embed.FS
 
-var set = render.NewSet(request_context.Funcs(), files, request_context.Files)
+// PriorPlanRunes caps the Plan shown to the model for a revision; a longer one is cut before it is fenced.
+const PriorPlanRunes = 20000
+
+var set = render.NewSet(mergeFuncs(request_context.Funcs(), template.FuncMap{"priorPlanRunes": func() int { return PriorPlanRunes }}), files, request_context.Files)
 
 // Limits are the project's bounds on the Plan tree.
 type Limits struct {
@@ -47,12 +52,23 @@ type Input struct {
 	Analysis string
 	// Feedback is the reviewer's guidance when a Plan is regenerated.
 	Feedback string
+	// PriorPlan is the Plan being revised, as the JSON the model returned for it; empty for a first Plan.
+	PriorPlan string
 	// RetryNote is why the previous answer was rejected.
 	RetryNote string
+	// Language is the language the model writes its prose in; the zero value adds no instruction.
+	Language output_language.Language
 }
 
 // Render builds the Plan prompt. Rules that only some types need (regression test, baseline checks, rollback) are
 // added per type so the model is not told about gates that do not apply.
 func Render(in Input) (string, error) {
 	return set.Execute("plan.tmpl", in)
+}
+
+func mergeFuncs(a, b template.FuncMap) template.FuncMap {
+	for k, v := range b {
+		a[k] = v
+	}
+	return a
 }

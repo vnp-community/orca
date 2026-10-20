@@ -180,6 +180,21 @@ type OpenSpecChangeRepository interface {
 	ListWithWorkspace(ctx context.Context, limit int) ([]ProposalCleanupCandidate, error)
 }
 
+// OpenSpecChangeRevisionRepository keeps one row per OpenSpec change a Plan run produced, so a Plan's versions stay
+// listable after a revision rewrites the current change.
+type OpenSpecChangeRevisionRepository interface {
+	// Append stores the version in the ctx transaction (it joins an open one) and drops the full text of every version of
+	// the Request older than the newest keepText. A second version with the same number or run is an error.
+	Append(ctx context.Context, rev domain.OpenSpecChangeRevision, keepText int) error
+	// List returns the Request's versions, newest first, with revision < beforeRevision when that is positive. A positive
+	// limit bounds the page.
+	List(ctx context.Context, requestID string, beforeRevision, limit int) ([]domain.OpenSpecChangeRevision, error)
+	// Get returns one version; found is false when the Request has no such number.
+	Get(ctx context.Context, requestID string, revision int) (domain.OpenSpecChangeRevision, bool, error)
+	// GetByRun returns the version a Plan run produced.
+	GetByRun(ctx context.Context, runID string) (domain.OpenSpecChangeRevision, bool, error)
+}
+
 // ProposalCleanupCandidate is a change that still holds a worktree, with what the cleanup policy needs to decide about it.
 type ProposalCleanupCandidate struct {
 	Change        domain.OpenSpecChange

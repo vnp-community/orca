@@ -360,6 +360,10 @@ service RequestService {
   rpc GetPlanBundleFile(GetPlanBundleFileRequest) returns (GetPlanBundleFileResponse);
   rpc CleanupRequestProposal(CleanupRequestProposalRequest) returns (CleanupRequestProposalResponse);
   rpc CommitPlan(CommitPlanRequest) returns (CommitPlanResponse);
+  // Queues another automatic attempt at the Plan (CR-REQ-044).
+  rpc RetryPlanGeneration(RetryPlanGenerationRequest) returns (RetryPlanGenerationResponse);
+  // Lists the versions of the Plan with the changes that were asked for (CR-REQ-045).
+  rpc ListPlanRevisions(ListPlanRevisionsRequest) returns (ListPlanRevisionsResponse);
   rpc StartPhase(StartPhaseRequest) returns (StartPhaseResponse);
   rpc ReportTaskOutcome(ReportTaskOutcomeRequest) returns (ReportTaskOutcomeResponse);
   rpc RecordRequestCheck(RecordRequestCheckRequest) returns (RecordRequestCheckResponse);

@@ -16,7 +16,7 @@ func fullChange(requestID string) domain.OpenSpecChange {
 		ID: uuid.NewString(), RequestID: requestID, ChangeID: "req-42-add-ai", Branch: "request/42-proposal", Status: domain.ChangeStatusReady,
 		SyncState: domain.SyncStatePending, Commit: "abc1234", TasksMDDigest: "digest-1", KGAvailable: true, KGSnapshot: "snap-000001",
 		KGReadIDs: []string{"FR-SYS-07", "ADR-12"}, KGGaps: []string{"no quota entity"}, KGConflicts: []string{"ADR-12 vs AC-AI-05"},
-		SkillHash: "skills-1", Bundle: map[string]string{"tasks.md": "# t\n", "specs/ai/spec.md": "### Requirement: x\n"}, WorkspaceID: "wt-1",
+		SkillHash: "skills-1", RedactedSecrets: 2, Bundle: map[string]string{"tasks.md": "# t\n", "specs/ai/spec.md": "### Requirement: x\n"}, WorkspaceID: "wt-1",
 	}
 }
 
@@ -42,7 +42,7 @@ func RunOpenSpecChangeContract(t *testing.T, env Env, repo usecase.OpenSpecChang
 		first = got
 		if got.ID != want.ID || got.ChangeID != want.ChangeID || got.Branch != want.Branch || got.Status != want.Status || got.SyncState != want.SyncState ||
 			got.Commit != want.Commit || got.TasksMDDigest != want.TasksMDDigest || !got.KGAvailable || got.KGSnapshot != want.KGSnapshot ||
-			got.SkillHash != want.SkillHash || got.WorkspaceID != want.WorkspaceID || got.Version != 1 {
+			got.SkillHash != want.SkillHash || got.WorkspaceID != want.WorkspaceID || got.RedactedSecrets != 2 || got.Version != 1 {
 			t.Fatalf("scalar fields: %+v", got)
 		}
 		if len(got.KGReadIDs) != 2 || got.KGReadIDs[1] != "ADR-12" || len(got.KGGaps) != 1 || len(got.KGConflicts) != 1 {
@@ -59,12 +59,12 @@ func RunOpenSpecChangeContract(t *testing.T, env Env, repo usecase.OpenSpecChang
 
 	t.Run("a second upsert replaces the fields, keeps the row and bumps the version", func(t *testing.T) {
 		next := fullChange(req.ID) // a fresh id: the existing row must win
-		next.Commit, next.KGAvailable, next.KGReadIDs, next.Bundle = "def5678", false, nil, nil
+		next.Commit, next.KGAvailable, next.KGReadIDs, next.Bundle, next.RedactedSecrets = "def5678", false, nil, nil, 0
 		got, err := repo.Upsert(ctx, next)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got.ID != first.ID || got.Version != 2 || got.Commit != "def5678" || got.KGAvailable || len(got.KGReadIDs) != 0 || len(got.Bundle) != 0 {
+		if got.ID != first.ID || got.Version != 2 || got.Commit != "def5678" || got.KGAvailable || len(got.KGReadIDs) != 0 || len(got.Bundle) != 0 || got.RedactedSecrets != 0 {
 			t.Fatalf("%+v", got)
 		}
 	})

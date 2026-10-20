@@ -1,6 +1,11 @@
 package usecase
 
-import "time"
+import (
+	"time"
+
+	"github.com/stablyai/orca-go/prompts/output_language"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
+)
 
 // AnalysisSettings are the tunables of the analysis flow; zero fields fall back to the defaults below.
 type AnalysisSettings struct {
@@ -25,6 +30,14 @@ type AnalysisSettings struct {
 	UseAgentReadonlyFlag bool
 	// RequireEnforcedReadonly fails runs on agents that cannot enforce read-only instead of falling back to prompt-only.
 	RequireEnforcedReadonly bool
+	// OutputLanguage is the language the AI writes analysis and Plan prose in. Zero adds no instruction, so DefaultAnalysisSettings
+	// and withDefaults leave it empty; the service sets it from REQUEST_DEFAULT_OUTPUT_LANGUAGE.
+	OutputLanguage output_language.Language
+}
+
+// OutputLanguageFor is the only reader of OutputLanguage; it is where a per-project or per-Request override would plug in.
+func (s AnalysisSettings) OutputLanguageFor(domain.Request) output_language.Language {
+	return s.OutputLanguage
 }
 
 func DefaultAnalysisSettings() AnalysisSettings {

@@ -40,6 +40,7 @@ var requestFlowRoutes = []requestFlowRoute{
 	{http.MethodPost, "/{id}/plan", "request.generatePlan", byID},
 	{http.MethodGet, "/{id}/plan/bundle", "request.planProposal", byID}, // the proposal view carries the bundle listing, checks and knowledge
 	{http.MethodGet, "/{id}/plan/bundle/file", "request.planBundleFile", byID},
+	{http.MethodGet, "/{id}/plan/revisions", "request.planRevisions", byID}, // the versions of the Plan, newest first (CR-REQ-045)
 	{http.MethodPost, "/{id}/proposal/cleanup", "request.cleanupProposal", byID},
 	{http.MethodPost, "/{id}/phases/{phaseTaskId}/start", "request.startPhase", phaseStart},
 	{http.MethodGet, "/{id}/clarifications", "clarification.list", byRequest},
@@ -84,7 +85,7 @@ func (h requestRoutes) bridge(rt requestFlowRoute) http.HandlerFunc {
 			for k, v := range r.URL.Query() {
 				args[k] = v[0]
 			}
-			if !setPageSize(w, r.URL.Query().Get("pageSize"), args) {
+			if !setPageSize(w, r.URL.Query().Get("pageSize"), args) || !setRevision(w, r.URL.Query().Get("revision"), args) {
 				return
 			}
 		} else if !decodeOptionalRequestRouteBody(w, r, &args) {

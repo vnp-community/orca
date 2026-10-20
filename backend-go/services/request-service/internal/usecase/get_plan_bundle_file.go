@@ -20,15 +20,25 @@ type PlanBundleFile struct {
 // GetPlanBundleFile reads one file of a Request's authored OpenSpec change from the database copy, so it works after the
 // worktree is gone. Only paths inside the change are answered.
 type GetPlanBundleFile struct {
-	requests RequestRepository
-	changes  OpenSpecChangeRepository
+	requests  RequestRepository
+	changes   OpenSpecChangeRepository
+	runs      AnalysisRunStore
+	revisions OpenSpecChangeRevisionRepository
 }
 
 func NewGetPlanBundleFile(requests RequestRepository, changes OpenSpecChangeRepository) *GetPlanBundleFile {
 	return &GetPlanBundleFile{requests: requests, changes: changes}
 }
 
-func (uc *GetPlanBundleFile) Execute(ctx context.Context, requestID, requested string) (PlanBundleFile, error) {
+// WithRevisions lets a file of an older version be read; without it only the current change is known.
+func (uc *GetPlanBundleFile) WithRevisions(runs AnalysisRunStore, revisions OpenSpecChangeRevisionRepository) *GetPlanBundleFile {
+	uc.runs, uc.revisions = runs, revisions
+	return uc
+}
+
+// Execute reads a file of the current change, or of the numbered version when revision is positive. The newest version is
+// the current change, so a request for it reads the current row.
+func (uc *GetPlanBundleFile) Execute(ctx context.Context, requestID, requested string, revision int) (PlanBundleFile, error) {
 	if _, err := tenant.RequireTenantID(ctx); err != nil {
 		return PlanBundleFile{}, domain.ErrRequestTenantRequired()
 	}
@@ -47,11 +57,50 @@ func (uc *GetPlanBundleFile) Execute(ctx context.Context, requestID, requested s
 	if !ok {
 		return PlanBundleFile{}, domain.ErrPlanBundlePathInvalid(requested)
 	}
-	content, found := change.Bundle[rel]
+	bundle := change.Bundle
+	if revision != 0 {
+		if bundle, err = uc.versionBundle(ctx, req.ID, revision, bundle); err != nil {
+			return PlanBundleFile{}, err
+		}
+	}
+	content, found := bundle[rel]
 	if !found {
 		return PlanBundleFile{}, domain.ErrPlanBundleFileNotFound(rel)
 	}
-	return PlanBundleFile{Path: rel, Content: content, Omitted: strings.HasPrefix(content, "<omitted size=")}, nil
+	if isOmittedMarker(content) {
+		return PlanBundleFile{Path: rel, Content: content, Omitted: true}, nil
+	}
+	// A row stored before the masking existed holds the raw text: mask on read so no secret leaves the service.
+	content, _ = RedactSecrets(content)
+	return PlanBundleFile{Path: rel, Content: content}, nil
+}
+
+// versionBundle is the text of the numbered version: the current change for the newest one, the stored copy for the
+// others. A version whose text was dropped (or never kept) answers with a code of its own, not "file not found".
+func (uc *GetPlanBundleFile) versionBundle(ctx context.Context, requestID string, revision int, current map[string]string) (map[string]string, error) {
+	if revision < 0 || uc.runs == nil {
+		return nil, domain.ErrPlanRevisionNotFound(revision)
+	}
+	runs, err := uc.runs.ListSucceeded(ctx, requestID, domain.RunKindPlan)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case revision > len(runs):
+		return nil, domain.ErrPlanRevisionNotFound(revision)
+	case revision == len(runs):
+		return current, nil
+	case uc.revisions == nil:
+		return nil, domain.ErrPlanRevisionTextPruned()
+	}
+	row, found, err := uc.revisions.Get(ctx, requestID, revision)
+	if err != nil {
+		return nil, err
+	}
+	if !found || !row.TextKept {
+		return nil, domain.ErrPlanRevisionTextPruned()
+	}
+	return row.Bundle, nil
 }
 
 // bundleRelPath turns a requested path into one relative to the change. It accepts the relative form and the full form

@@ -14,6 +14,7 @@ cần deploy service nào, biến cấu hình mới, cách bật từng tính n�
 | Thực thi liên tục (CR-REQ-038) | Dự án chạy `execution_mode=continuous`: duyệt Plan **một lần** thì mọi Phase tự chạy. Mặc định vẫn `step_by_step` | Người duyệt Plan, admin dự án |
 | Nhật ký hoạt động và tóm tắt thực thi (CR-REQ-038) | Kênh `request.activity`, `request.executionSummary`; trường `engine`, `executionMode` trên Request; `openSpecProfile` trên `request.flow` | Frontend, MCP, agent |
 | Màn hình chi tiết Request mới (CR-REQ-037) | Dòng thời gian theo luồng của từng loại, thanh "việc tiếp theo", tab Execution, tab History thành Activity feed, Plan một thẻ duyệt khi chạy liên tục | Mọi người dùng |
+| Ngôn ngữ đầu ra AI (CR-REQ-046) | Biến `REQUEST_DEFAULT_OUTPUT_LANGUAGE` (`vi` mặc định, `en`): phân tích và Plan mới ra tiếng Việt; giá trị sai làm `request-service` không khởi động (mục 4.1) | Mọi người dùng, ops |
 | QA-01 Terminal | Terminal mở từ worktree mở đúng thư mục worktree, không còn `$HOME`; thư mục không dùng được thì báo `cwdFellBack` | Người dùng web |
 | QA-02 Engine | `REQUEST_DEFAULT_ENGINE=openspec` chỉ chuyển `change_request` và `refactor`; `bug`, `task`... vẫn native | Người dùng, QA |
 | QA-04 Jira | Jira Server/Data Center nhận email + PAT (Bearer, API v2); Cloud giữ Basic + API v3 | Người dùng tab Tasks |
@@ -75,10 +76,21 @@ sẵn sàng: xem `docker logs orca-go-request` (thường thiếu token nội b�
 | `REQUEST_DEFAULT_ENGINE` | `native` hoặc `openspec` | `openspec` | Engine của dự án **chưa lưu cài đặt**. `openspec` chỉ chuyển loại dùng profile `full` (`change_request`, `refactor`) |
 | `REQUEST_DEFAULT_SOLUTION_AGENT` | `true` hoặc `false` | `true` | Solution do agent đọc knowledge graph viết |
 | `REQUEST_DEFAULT_EXECUTION_MODE` | `step_by_step` hoặc `continuous` | `step_by_step` | Chế độ thực thi của dự án chưa lưu cài đặt |
+| `REQUEST_DEFAULT_OUTPUT_LANGUAGE` | `vi` hoặc `en` | `vi` | Ngôn ngữ AI viết phân tích và Plan cho **cả triển khai** (CR-REQ-046). Giá trị khác làm `request-service` không khởi động (xem dưới) |
 | `REQUEST_FLOW_ENABLED`, `REQUEST_APPROVAL_ENABLED` | `true` hoặc `false` | `false` | Hai cờ cũ, vẫn bắt buộc (xem `README.md`) |
 
-Giá trị sai không làm service chết: nó giữ mặc định an toàn và ghi cảnh báo lúc khởi động (`... is not native or openspec; native applies`).
-Cài đặt đã lưu cho một dự án **luôn thắng** biến môi trường.
+Với ba biến `REQUEST_DEFAULT_ENGINE`, `REQUEST_DEFAULT_SOLUTION_AGENT`, `REQUEST_DEFAULT_EXECUTION_MODE`, giá trị sai không làm service chết: nó giữ mặc định an toàn và ghi cảnh báo lúc khởi động (`... is not native or openspec; native applies`).
+**Ngoại lệ có chủ ý là `REQUEST_DEFAULT_OUTPUT_LANGUAGE`**: giá trị khác `vi` và `en` làm `request-service` thoát mã 1 trước khi mở kho dữ liệu, với thông báo
+`REQUEST_DEFAULT_OUTPUT_LANGUAGE "fr" is not supported; use one of: vi, en` (xem bằng `docker compose logs request-service`), vì một lỗi gõ im lặng rơi về ngôn ngữ khác sẽ đổi ngôn ngữ của cả triển khai.
+Cài đặt đã lưu cho một dự án **luôn thắng** biến môi trường (riêng ngôn ngữ đầu ra không có cài đặt theo dự án: biến này áp cho mọi dự án).
+
+**Tác động của `REQUEST_DEFAULT_OUTPUT_LANGUAGE` (đổi mặc định của mọi triển khai sang tiếng Việt):**
+
+- Sau lần deploy, phân tích (Solution, chẩn đoán, Findings, Answer) và Plan **mới** của mọi tenant ra tiếng Việt; tài liệu đã tạo giữ nguyên.
+- Muốn tiếng Anh như trước: đặt `REQUEST_DEFAULT_OUTPUT_LANGUAGE=en`. Với `en`, chỉ thị tiếng Anh vẫn được gửi, nên AI viết tiếng Anh ngay cả khi Request bằng tiếng Việt (khác hành vi cũ là để AI tự theo ngôn ngữ của Request).
+- Giao diện chưa có locale `vi`: phân tích tiếng Việt hiện dưới giao diện tiếng Anh sẽ trộn hai ngôn ngữ.
+- Kỹ năng `tdd-openspec-author` có mục `Language` mới chỉ có hiệu lực sau khi hợp nhất vào nhánh mặc định của `vnp-community/orca` và chạy `npx skills update tdd-openspec-author --global` trên từng dev server; prompt vẫn mang chỉ thị ngôn ngữ trước đó.
+- Quay lại: đặt `en` rồi `redeploy-local.sh request-service`.
 
 Mặc định của deploy này (`docker-compose.yml` và `.env.example`) là **`openspec` và `true`**; chế độ thực thi vẫn `step_by_step`. Đây là mặc định của compose: binary
 `request-service` chạy ngoài compose mà không có biến vẫn rơi về `native` và `false` (`EngineDefaultsFromEnv`). Muốn quay về native: đặt hai biến thành `native` và `false` trong `.env`
@@ -193,6 +205,7 @@ Kiểm tay nhanh trên giao diện (tài khoản admin):
 
 ## 7. Quay lại
 
+- **Ngôn ngữ đầu ra AI**: đặt `REQUEST_DEFAULT_OUTPUT_LANGUAGE=en` rồi `redeploy-local.sh request-service`; chỉ ảnh hưởng phân tích và Plan tạo sau đó.
 - **Mặc định mới của bản này an toàn**: `step_by_step` và `native` khi không có biến. Để vô hiệu thực thi liên tục cho mọi dự án mới: đặt `REQUEST_DEFAULT_EXECUTION_MODE=step_by_step`; dự án đã lưu `continuous` cần đặt lại bằng `request.engineSettingsSet`.
 - **Binary**: build lại bản cũ từ commit trước (trong một worktree riêng ở commit `46426bd95`) rồi `redeploy-local.sh`. Không cần xoá cột 0098; mã cũ bỏ qua chúng.
 - **Migration 0098**: không cần chạy `.down` để quay lại binary cũ. Chỉ chạy `.down` (cả hai dialect đều có) khi chắc không còn Request `continuous` đang chạy, vì nó xoá cột ghim chế độ.

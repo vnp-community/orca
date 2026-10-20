@@ -28,6 +28,11 @@ func (ReporterOrAdminAuthorizer) AuthorizeRevise(ctx context.Context, req domain
 	return reporterOrAdmin(ctx, req)
 }
 
+// AuthorizeRevisePlan has no approver rule here; ApproverAwareAuthorizer widens it.
+func (ReporterOrAdminAuthorizer) AuthorizeRevisePlan(ctx context.Context, req domain.Request) error {
+	return reporterOrAdmin(ctx, req)
+}
+
 func reporterOrAdmin(ctx context.Context, req domain.Request) error {
 	if uid, _ := tenant.UserID(ctx); uid != "" && uid == req.ReporterID {
 		return nil
@@ -41,6 +46,9 @@ func reporterOrAdmin(ctx context.Context, req domain.Request) error {
 // analysisGateSubjects are the Approval kinds the Analysis gate opens, one per flow: solution, findings (spike) and
 // answer (question). Revising must accept any of them, not only solution.
 var analysisGateSubjects = []domain.SubjectType{domain.SubjectSolution, domain.SubjectFindings, domain.SubjectAnswer}
+
+// planGateSubjects are the Approval kinds the Plan gate opens: the plan itself, its task list and the pre-deploy check.
+var planGateSubjects = []domain.SubjectType{domain.SubjectPlan, domain.SubjectTaskList, domain.SubjectPreDeploy}
 
 // ApproverAwareAuthorizer lets the people who may decide the pending approval steer it too: choosing an option or
 // asking for a revision is part of deciding. Starting the first analysis stays with the reporter and admins. The
@@ -75,6 +83,11 @@ func (a ApproverAwareAuthorizer) AuthorizeChoose(ctx context.Context, req domain
 // counts as its approver.
 func (a ApproverAwareAuthorizer) AuthorizeRevise(ctx context.Context, req domain.Request) error {
 	return a.orPendingApprover(ctx, req, a.Base.AuthorizeRevise(ctx, req), analysisGateSubjects...)
+}
+
+// AuthorizeRevisePlan, like AuthorizeRevise, must run before the revision cancels the pending Approval.
+func (a ApproverAwareAuthorizer) AuthorizeRevisePlan(ctx context.Context, req domain.Request) error {
+	return a.orPendingApprover(ctx, req, a.Base.AuthorizeGenerate(ctx, req), planGateSubjects...)
 }
 
 // orPendingApprover passes when the base rule did, or when the caller may decide a pending Approval of one of the

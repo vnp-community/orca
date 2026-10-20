@@ -17,6 +17,7 @@ import (
 type apprStore struct {
 	*lcStore
 	amu       sync.Mutex
+	txMu      sync.Mutex // one outermost transaction at a time, like the request row lock of a real database
 	approvals map[string]domain.Approval
 	approvers map[string][]domain.Principal
 	policies  []domain.ApprovalPolicy
@@ -32,6 +33,8 @@ func newApprStore() *apprStore {
 }
 
 func (s *apprStore) cloneApprovals() (map[string]domain.Approval, map[string][]domain.Principal) {
+	s.amu.Lock()
+	defer s.amu.Unlock()
 	a := make(map[string]domain.Approval, len(s.approvals))
 	for k, v := range s.approvals {
 		a[k] = v
@@ -48,6 +51,8 @@ func (s *apprStore) InTx(ctx context.Context, fn func(context.Context) error) er
 	if s.InTransaction(ctx) {
 		return fn(ctx)
 	}
+	s.txMu.Lock()
+	defer s.txMu.Unlock()
 	var savedA map[string]domain.Approval
 	var savedP map[string][]domain.Principal
 	err := s.lcStore.InTx(ctx, func(txCtx context.Context) error {
@@ -55,7 +60,9 @@ func (s *apprStore) InTx(ctx context.Context, fn func(context.Context) error) er
 		callsBefore := len(s.calls)
 		err := fn(txCtx)
 		if err != nil {
+			s.amu.Lock()
 			s.approvals, s.approvers = savedA, savedP
+			s.amu.Unlock()
 			s.calls = s.calls[:callsBefore]
 		}
 		return err
@@ -63,7 +70,11 @@ func (s *apprStore) InTx(ctx context.Context, fn func(context.Context) error) er
 	return err
 }
 
-func (s *apprStore) log(entry string) { s.calls = append(s.calls, entry) }
+func (s *apprStore) log(entry string) {
+	s.amu.Lock()
+	defer s.amu.Unlock()
+	s.calls = append(s.calls, entry)
+}
 
 type apprRepo struct{ s *apprStore }
 
@@ -77,6 +88,8 @@ func (r apprRepo) Insert(ctx context.Context, a domain.Approval) error {
 	return nil
 }
 func (r apprRepo) Get(_ context.Context, tenantID, id string) (domain.Approval, error) {
+	r.s.amu.Lock()
+	defer r.s.amu.Unlock()
 	a, ok := r.s.approvals[id]
 	if !ok || a.TenantID != tenantID {
 		return domain.Approval{}, ErrApprovalNotFound
@@ -106,6 +119,8 @@ func (r apprRepo) FindByIdempotencyKey(_ context.Context, tenantID, key string) 
 	return nil, nil
 }
 func (r apprRepo) UpdateDecision(_ context.Context, a domain.Approval, expected int64) (bool, error) {
+	r.s.amu.Lock()
+	defer r.s.amu.Unlock()
 	cur, ok := r.s.approvals[a.ID]
 	if !ok || cur.Status != domain.ApprovalStatusPending || cur.Version != expected {
 		return false, nil

@@ -103,8 +103,9 @@ func (c *stubChecker) Check(context.Context, BundleCheckInput) ([]BundleFinding,
 }
 
 type proposalFixtures struct {
-	ws      *fakeWorkspace
-	changes *fakeChanges
+	ws        *fakeWorkspace
+	changes   *fakeChanges
+	revisions *fakeRevisions
 }
 
 func proposalKit(t *testing.T, eng *scriptedEngine, checker BundleChecker) (*planKit, domain.AnalysisRun, *RunProposalGeneration) {
@@ -117,20 +118,20 @@ func proposalKit(t *testing.T, eng *scriptedEngine, checker BundleChecker) (*pla
 	k.w.seedApprovedSolution(req.ID, domain.SolutionKindSolution)
 	k.generate = NewGeneratePlan(GeneratePlanDeps{
 		Requests: k.w, Solutions: fakeSolutions{k.w}, Runs: fakeRuns{k.w}, Conns: fakeConns{conn: AnalysisConnection{ConnectionID: "c", RepoPath: "/srv/repo"}},
-		Auth: NewPlanActorAuthorizer(allowAll{}), Approvals: fakeCanceller{k.w}, Transition: k.w.transitioner(), Tx: k.w, Spawner: k.spawner,
+		Auth: NewPlanActorAuthorizer(allowAll{}, nil, false), Approvals: fakeCanceller{k.w}, Transition: k.w.transitioner(), Tx: k.w, Spawner: k.spawner,
 		LeaseOwner: testOwner, Pin: &stubPinner{engine: domain.EngineOpenSpec},
 	})
 	run := k.startedRun(req.ID)
 	if run.Mode != domain.AnalysisModeAgentProposal {
 		t.Fatalf("setup: run mode %s", run.Mode)
 	}
-	ws, changes := newFakeWorkspace(), newFakeChanges()
+	ws, changes, revisions := newFakeWorkspace(), newFakeChanges(), &fakeRevisions{}
 	eng.ws = ws
 	w := NewRunProposalGeneration(RunProposalGenerationDeps{
 		Requests: k.w, Solutions: fakeSolutions{k.w}, Registry: registryWith(eng), Policies: fakePolicies{domain.NewPolicyRegistry(domain.PolicyDeps{})},
-		Checker: checker, Workspace: ws, Changes: changes, Runs: fakeRuns{k.w}, Tx: k.w, Limits: domain.DefaultPlanLimits, Owner: testOwner,
+		Checker: checker, Workspace: ws, Changes: changes, Revisions: revisions, Runs: fakeRuns{k.w}, Tx: k.w, Limits: domain.DefaultPlanLimits, Owner: testOwner,
 	})
-	k.proposal = &proposalFixtures{ws: ws, changes: changes}
+	k.proposal = &proposalFixtures{ws: ws, changes: changes, revisions: revisions}
 	return k, run, w
 }
 

@@ -38,6 +38,8 @@ type ApprovalDecidedPayload struct {
 	// Stage and WaitSeconds feed audit and the approval wait histogram (CR-REQ-024); additive, omitted when unknown.
 	Stage       string  `json:"stage,omitempty"`
 	WaitSeconds float64 `json:"wait_seconds,omitempty"`
+	// ExecutionMode is the mode the approver chose in this call (CR-REQ-043), never the resolved default; empty when none.
+	ExecutionMode string `json:"execution_mode,omitempty"`
 }
 
 func NewApprovalRequestedPayload(a Approval, r Request, reason string) ApprovalRequestedPayload {

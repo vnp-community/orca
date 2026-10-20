@@ -644,11 +644,15 @@
 
 - pattern: "request.planProposal"
   category: request_flow
-  reason: "Reads the result of the asynchronous plan proposal run; waits for request_generatePlan to leave the Declared state."
+  reason: "Reads the result of the asynchronous plan proposal run, or one numbered version of the Plan (the revision argument, CR-REQ-045); waits for request_generatePlan to leave the Declared state."
 
 - pattern: "request.planBundleFile"
   category: request_flow
-  reason: "Reads one file of the OpenSpec change behind a Plan for the approver's view; file text is agent-written, so no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+  reason: "Reads one file of the OpenSpec change behind a Plan, of the current or a numbered version (the revision argument, CR-REQ-045), for the approver's view; file text is agent-written, so no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "request.planRevisions"
+  category: request_flow
+  reason: "Lists the versions of a Plan with the reviewer's change requests and the authored files' hashes; the text of the documents is agent-written from Request content, so no MCP tool is decided; add a ToolSpec after a design review of untrusted-text handling."
 
 - pattern: "request.engineSettings"
   category: request_flow
@@ -657,6 +661,10 @@
 - pattern: "request.engineSettingsSet"
   category: request_flow
   reason: "Administrator configuration that switches agents on for a project; an MCP caller must not change it, add a ToolSpec with admin gating before exposing it."
+
+- pattern: "request.retryPlan"
+  category: request_flow
+  reason: "Recovery from the UI after an automatic Plan generation failed or gave up (CR-REQ-044); an agent starts a Plan through request_generatePlan when that tool leaves the Declared state. The RPC is AgentAllowed=false and absent from agent_rpcs in request.rego."
 
 - pattern: "request.cleanupProposal"
   category: request_flow

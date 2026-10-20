@@ -418,6 +418,7 @@ func TestGenerateSolution_CallerWhoIsNotTheReporterResolvesTheDevServerAsTheRepo
 
 type allowAllAuthorizer struct{}
 
-func (allowAllAuthorizer) AuthorizeGenerate(context.Context, domain.Request) error { return nil }
-func (allowAllAuthorizer) AuthorizeChoose(context.Context, domain.Request) error   { return nil }
-func (allowAllAuthorizer) AuthorizeRevise(context.Context, domain.Request) error   { return nil }
+func (allowAllAuthorizer) AuthorizeGenerate(context.Context, domain.Request) error   { return nil }
+func (allowAllAuthorizer) AuthorizeChoose(context.Context, domain.Request) error     { return nil }
+func (allowAllAuthorizer) AuthorizeRevise(context.Context, domain.Request) error     { return nil }
+func (allowAllAuthorizer) AuthorizeRevisePlan(context.Context, domain.Request) error { return nil }

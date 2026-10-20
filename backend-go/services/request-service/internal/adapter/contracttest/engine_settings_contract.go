@@ -91,6 +91,25 @@ func RunEngineSettingsContract(t *testing.T, repo usecase.EngineSettingsReposito
 			t.Fatalf("back to step_by_step: %+v", read)
 		}
 	})
+	t.Run("automatic Plan generation is on by default and is stored, read back and turned off again", func(t *testing.T) {
+		if read, _, _ := repo.Get(ctx, project); !read.PlanAutoGenerate || read.Version != 6 {
+			t.Fatalf("a project that never chose reads as on: %+v", read)
+		}
+		off := mk(domain.EngineNative, "")
+		off.PlanAutoGenerate = false
+		if got, err := repo.Upsert(ctx, off, 6); err != nil || got.Version != 7 {
+			t.Fatalf("turn off: %+v %v", got, err)
+		}
+		if read, _, _ := repo.Get(ctx, project); read.PlanAutoGenerate || read.Version != 7 {
+			t.Fatalf("read: %+v", read)
+		}
+		if got, err := repo.Upsert(ctx, mk(domain.EngineNative, ""), 7); err != nil || got.Version != 8 {
+			t.Fatalf("turn on: %+v %v", got, err)
+		}
+		if read, _, _ := repo.Get(ctx, project); !read.PlanAutoGenerate || read.Version != 8 {
+			t.Fatalf("back on: %+v", read)
+		}
+	})
 	t.Run("update at a stale version never overwrites", func(t *testing.T) {
 		if _, err := repo.Upsert(ctx, mk(domain.EngineOpenSpec, ""), 1); !errors.Is(err, domain.ErrEngineSettingsVersionConflict) {
 			t.Fatalf("got %v", err)

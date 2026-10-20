@@ -61,6 +61,7 @@ func RunSolutionContract(t *testing.T, newEnv func(t *testing.T) SolutionEnv) {
 		{"LeaseRenewFinishAndClaim", solLease},
 		{"SolutionStoreCASSupersedeDeleteDraft", solStoreOperations},
 		{"UnicodeAndDigestSurviveTheDatabase", solUnicodeDigest},
+		{"LargeVietnameseDocumentSurvivesTheDatabase", solLargeVietnameseDocument},
 		{"TenantIsolation", solTenantIsolation},
 		{"SolutionFlowGenerateChooseApprove", solFlowApprove},
 		{"RegenerateWithFeedback", solFlowRegenerate},

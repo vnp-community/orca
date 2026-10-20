@@ -149,6 +149,13 @@ Luồng Request (CR v6) chỉ chạy khi **cả hai** cờ bật; thiếu một 
 `REQUEST_APPROVAL_ENABLED=true` bật `ApprovalService` (cổng duyệt loại, Solution, Plan...). Đổi hai biến này cần `redeploy-local.sh request-service`
 (hoặc `docker compose up -d request-service` rồi khởi động lại các service Go). Chi tiết vận hành: [Bật luồng Request](../../docs/guides/request/admin-enable-request-flow.md).
 
+### Ngôn ngữ đầu ra của AI
+
+`REQUEST_DEFAULT_OUTPUT_LANGUAGE` (CR-REQ-046) chọn ngôn ngữ AI viết phần phân tích (Solution, chẩn đoán, Findings, Answer) và Plan cho cả triển khai:
+`vi` (mặc định, nếu không đặt biến) hoặc `en`. Khoá JSON, giá trị enum, id, đường dẫn và ngữ pháp OpenSpec luôn giữ tiếng Anh. Giá trị chỉ được đọc một lần lúc khởi động,
+nên đổi xong cần `redeploy-local.sh request-service`. Đây là biến `REQUEST_DEFAULT_*` **duy nhất làm service không khởi động** khi sai giá trị; log báo
+`REQUEST_DEFAULT_OUTPUT_LANGUAGE "fr" is not supported; use one of: vi, en` và container thoát mã 1. Khởi động thành công thì log có dòng `output language code=vi`.
+
 ### Token nội bộ
 
 Không có mTLS trong stack này, nên bốn token chia sẻ là kiểm tra caller duy nhất của các RPC nội bộ. Rỗng thì `request-service` từ chối mọi RPC bằng

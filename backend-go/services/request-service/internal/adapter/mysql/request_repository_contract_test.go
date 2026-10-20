@@ -22,3 +22,8 @@ func TestMySQL_OpenSpecChangeContract(t *testing.T) {
 	f := newMigratedMySQL(t)
 	contracttest.RunOpenSpecChangeContract(t, f.contractEnv(), NewOpenSpecChangeRepository(New(f.db)))
 }
+
+func TestMySQL_PlanAutoJobContract(t *testing.T) {
+	f := newMigratedMySQL(t)
+	contracttest.RunPlanAutoJobContract(t, f.contractEnv(), NewPlanAutoJobRepository(New(f.db)))
+}

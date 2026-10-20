@@ -78,3 +78,32 @@ func TestEngineSettingsRPC_MapsRefusalsToStatusCodes(t *testing.T) {
 		t.Fatalf("second insert: %v", err)
 	}
 }
+
+func TestEngineSettingsRPC_PlanAutoGenerateMapsBothWaysAndAbsentKeepsTheStoredValue(t *testing.T) {
+	s := engineSettingsServer()
+	project := uuid.NewString()
+	off := false
+	set, err := s.SetProjectEngineSettings(roleCtx("t1", "admin"), &requestv1.SetProjectEngineSettingsRequest{ProjectId: project, SolutionEngine: "native", PlanAutoGenerate: &off})
+	if err != nil || set.GetSettings().GetPlanAutoGenerate() {
+		t.Fatalf("explicit false: %v %v", set, err)
+	}
+	// An older client sends no plan_auto_generate: the switch stays off.
+	set, err = s.SetProjectEngineSettings(roleCtx("t1", "admin"), &requestv1.SetProjectEngineSettingsRequest{ProjectId: project, SolutionEngine: "native", SolutionAgent: true, ExpectedVersion: 1})
+	if err != nil || set.GetSettings().GetPlanAutoGenerate() || !set.GetSettings().GetSolutionAgent() {
+		t.Fatalf("absent field: %v %v", set, err)
+	}
+	got, err := s.GetProjectEngineSettings(roleCtx("t1", "member"), &requestv1.GetProjectEngineSettingsRequest{ProjectId: project})
+	if err != nil || got.GetSettings().GetPlanAutoGenerate() {
+		t.Fatalf("get: %v %v", got, err)
+	}
+	// A project without a row reads as on.
+	fresh, err := s.GetProjectEngineSettings(roleCtx("t1", "member"), &requestv1.GetProjectEngineSettingsRequest{ProjectId: uuid.NewString()})
+	if err != nil || !fresh.GetSettings().GetPlanAutoGenerate() {
+		t.Fatalf("fresh: %v %v", fresh, err)
+	}
+	on := true
+	set, err = s.SetProjectEngineSettings(roleCtx("t1", "admin"), &requestv1.SetProjectEngineSettingsRequest{ProjectId: project, SolutionEngine: "native", PlanAutoGenerate: &on, ExpectedVersion: 2})
+	if err != nil || !set.GetSettings().GetPlanAutoGenerate() {
+		t.Fatalf("explicit true: %v %v", set, err)
+	}
+}

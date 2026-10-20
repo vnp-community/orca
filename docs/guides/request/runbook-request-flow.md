@@ -65,6 +65,25 @@ Trạng thái Jira đã chuyển không tự lùi.
 | Phase / task không chạy | `orca_request_task_outcome_total`, lease của `task-service` | `/metrics`; log `task-service`; kênh `backlog.execute` | Đường thực thi (`StartPhase`, `ReportTaskOutcome`) đã nối nhưng **chưa được e2e chạy trên stack thật**; kiểm Approval cổng `plan`/`phase` đã được duyệt và dev server còn kết nối |
 | Outbox đầy | `orca_request_outbox_pending` tăng liên tục | `/metrics`; log relay outbox của `request-service`; NATS | kiểm NATS còn sống và stream tồn tại; Jira sync, thông báo, audit trễ tới khi relay hồi phục |
 
+## Tự sinh Plan sau khi duyệt Analysis (CR-REQ-044)
+
+Mặc định, khi Request vào `planning` (duyệt Analysis, hoặc xác nhận loại với `task`, `docs`, `ops_request`) `request-service` tự bắt đầu run sinh Plan, tự commit khi run thành công và tự thử lại **một lần** lỗi tạm thời. `spike`, `question`, `hotfix`, replan, vòng chỉnh sửa, sinh lại sau khi từ chối duyệt Plan và Request đã có Plan **không bao giờ** tự chạy.
+
+**Chi phí.** Loại chạy engine OpenSpec (`change_request`, `refactor`; `bug`, `security`, `performance` khi dự án chọn engine này) tốn khoảng 7 đến 13 USD cho mỗi Plan (số đo ở các đợt 039 đến 042, chưa đo lại cho tính năng này), phát sinh ngay khi Analysis được duyệt, kể cả khi người duyệt bấm nhầm. Lỗi tạm thời có thể tốn thêm một Plan (mặc định). Engine native (`ai.complete`) rẻ.
+
+**Hai công tắc, cả hai phải bật:**
+
+| Công tắc | Mặc định | Tắt bằng |
+|---|---|---|
+| Triển khai | bật | `REQUEST_PLAN_AUTO_GENERATE=false` rồi khởi động lại `request-service`: không consumer, không worker, `request.retryPlan` trả `REQUEST_PLAN_AUTO_DISABLED`, `autoPlan.enabled=false`. Tính năng cũng tắt (kèm một dòng log nêu lý do) khi `REQUEST_FLOW_ENABLED=false`, thiếu event bus, hoặc approval tắt (không có `CommitPlan`) |
+| Theo dự án | bật | `request.engineSettingsSet {projectId, ..., planAutoGenerate:false}` (admin) hoặc `orca engine set --project <id> --plan-auto-generate=false`. Không có giao diện cho công tắc này |
+
+**Cách quay lui**: đặt `REQUEST_PLAN_AUTO_GENERATE=false` (hành vi cũ hoàn toàn: người bấm Generate). Job đang chạy bị bỏ lại; Request ở `planning` dùng nút Generate như trước. Tắt theo dự án chặn cả job đã xếp hàng nhưng chưa bắt đầu (job `retry` của người dùng vẫn chạy).
+
+**Chỉnh nhịp** (đều tuỳ chọn, giá trị sai giữ mặc định và ghi cảnh báo lúc khởi động): `REQUEST_PLAN_AUTO_MAX_EXTRA_ATTEMPTS` (0 đến 2, mặc định 1; `0` để không bao giờ tự thử lại, đáng cân nhắc nếu sợ tốn Plan OpenSpec thứ hai), `REQUEST_PLAN_AUTO_RETRY_DELAY` (30s), `REQUEST_PLAN_AUTO_BUSY_DELAY` (60s, khi project hết chỗ chạy agent), `REQUEST_PLAN_AUTO_START_WINDOW` (30m, quá thì bỏ cuộc với `REQUEST_ANALYSIS_BUSY`), `REQUEST_PLAN_AUTO_POLL_INTERVAL` (5s).
+
+**Triệu chứng.** Trạng thái nằm ở `autoPlan` của `request.planProposal` (`state`, `reasonCode`, `attempt/maxAttempts`) và bảng `request.plan_auto_jobs`. `gave_up` kèm `REQUEST_PLAN_AI_INVALID_JSON`/`REQUEST_OPENSPEC_INVALID_OUTPUT`: đầu ra sai, **không bao giờ** tự thử lại; người bấm Retry (`request.retryPlan`) hoặc Generate. `gave_up` kèm `REQUEST_PLAN_COMMIT_FAILED`: task-service không với tới sau 5 lần; Retry tiếp tục từ bước commit **không** gọi lại AI. `skipped`: không bắt đầu được (không có dev server, thiếu đường dẫn repo); dùng Generate thủ công sau khi sửa. Log `request-service` có dòng "plan auto-generation job finished" (`request_id`, `origin`, `state`, `reason_code`, `attempt`), không có nội dung Request.
+
 ## Diễn tập rollback
 
 **Trạng thái: chưa diễn tập ở dev.** Chưa ai chạy kế hoạch rollback; mục này không có kết quả để ghi. Diễn tập là điều kiện vào giai đoạn Beta

@@ -127,11 +127,11 @@ func newPlanKit(conns AnalysisConnectionResolver) *planKit {
 		conns = fakeConns{}
 	}
 	k.generate = NewGeneratePlan(GeneratePlanDeps{
-		Requests: w, Solutions: fakeSolutions{w}, Runs: fakeRuns{w}, Conns: conns, Auth: NewPlanActorAuthorizer(allowAll{}), Approvals: fakeCanceller{w},
+		Requests: w, Solutions: fakeSolutions{w}, Runs: fakeRuns{w}, Conns: conns, Auth: NewPlanActorAuthorizer(allowAll{}, nil, false), Approvals: fakeCanceller{w},
 		Transition: w.transitioner(), Tx: w, Spawner: k.spawner, LeaseOwner: testOwner,
 	})
 	k.commit = NewCommitPlan(CommitPlanDeps{
-		Requests: w, Auth: NewPlanActorAuthorizer(allowAll{}), Writer: k.writer, Policies: fakePolicies{domain.NewPolicyRegistry(domain.PolicyDeps{})},
+		Requests: w, Auth: NewPlanActorAuthorizer(allowAll{}, nil, false), Writer: k.writer, Policies: fakePolicies{domain.NewPolicyRegistry(domain.PolicyDeps{})},
 		Approvals: k.opener, Transition: w.transitioner(), Tx: w, Outbox: w, Limits: domain.DefaultPlanLimits,
 	})
 	return k

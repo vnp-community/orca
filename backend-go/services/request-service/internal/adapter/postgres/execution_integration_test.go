@@ -39,6 +39,7 @@ func (f *pgFixture) executionEnv() contracttest.ExecutionEnv {
 	return contracttest.ExecutionEnv{
 		LifecycleEnv:  f.lifecycleEnv(),
 		Approvals:     NewApprovalRepository(base),
+		Locker:        NewRequestLocker(base),
 		GateApprovals: NewApprovalGateReader(base),
 		PhaseStarts:   NewPhaseStartRepository(base),
 		Outcomes:      NewTaskRunOutcomeRepository(base),

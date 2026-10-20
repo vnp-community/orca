@@ -72,6 +72,8 @@ type AnalysisRunStore interface {
 	// ClaimExpired takes runs whose lease lapsed, across tenants; FOR UPDATE SKIP LOCKED keeps sweepers apart.
 	ClaimExpired(ctx context.Context, owner string, ttl time.Duration, batch int) ([]domain.AnalysisRun, error)
 	ListRecent(ctx context.Context, requestID string, limit int) ([]domain.AnalysisRun, error)
+	// ListSucceeded returns the Request's succeeded runs of one kind, oldest first.
+	ListSucceeded(ctx context.Context, requestID string, kind domain.RunKind) ([]domain.AnalysisRun, error)
 	CountRunning(ctx context.Context, projectID string, mode domain.AnalysisMode) (int, error)
 }
 
@@ -175,6 +177,9 @@ type SolutionActorAuthorizer interface {
 	AuthorizeGenerate(ctx context.Context, req domain.Request) error
 	AuthorizeChoose(ctx context.Context, req domain.Request) error
 	AuthorizeRevise(ctx context.Context, req domain.Request) error
+	// AuthorizeRevisePlan covers asking for changes to the Plan while its gate is pending: the approvers of the
+	// plan, task_list and pre_deploy Approvals count, like the Analysis gate's do for AuthorizeRevise.
+	AuthorizeRevisePlan(ctx context.Context, req domain.Request) error
 }
 
 type OpenSolutionApprovalInput struct {

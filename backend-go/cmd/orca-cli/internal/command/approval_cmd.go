@@ -2,9 +2,11 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -72,7 +74,7 @@ func newApprovalShowCmd(e flowEnv) *cobra.Command {
 // newApprovalDecideCmd serves approve and reject. The service decides only against the version and digest the person
 // saw; without --version/--digest the CLI reads them just before deciding and says so on stderr.
 func newApprovalDecideCmd(e flowEnv, decision string) *cobra.Command {
-	var comment, digest string
+	var comment, digest, executionMode string
 	var version int64
 	short := map[string]string{"approve": "approve a gate", "reject": "reject a gate (a comment is required)"}[decision]
 	cmd := &cobra.Command{
@@ -83,6 +85,10 @@ func newApprovalDecideCmd(e flowEnv, decision string) *cobra.Command {
 			}
 			if (version == 0) != (digest == "") {
 				return e.usage("give --version and --digest together, or neither")
+			}
+			mode, err := decideExecutionMode(decision, executionMode)
+			if err != nil {
+				return e.usage("%s", err.Error())
 			}
 			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
 				v, d := version, digest
@@ -95,12 +101,34 @@ func newApprovalDecideCmd(e flowEnv, decision string) *cobra.Command {
 					v, d = a.Int("version"), a.Str("subjectDigest")
 					fmt.Fprintf(os.Stderr, "%s %s gate %s at version %d, digest %s\n", decision, a.Str("subjectType"), args[0], v, d)
 				}
-				return cli.DecideApproval(ctx, args[0], decision, apiclient.Document{"version": v, "digest": d, "comment": comment})
+				body := apiclient.Document{"version": v, "digest": d, "comment": comment}
+				if mode != "" {
+					body["executionMode"] = mode
+				}
+				return cli.DecideApproval(ctx, args[0], decision, body)
 			}, nil)
 		},
 	}
 	cmd.Flags().StringVar(&comment, "comment", "", "a note recorded with the decision")
 	cmd.Flags().Int64Var(&version, "version", 0, "the gate version you saw")
 	cmd.Flags().StringVar(&digest, "digest", "", "the gate digest you saw")
+	cmd.Flags().StringVar(&executionMode, "execution-mode", "", `approve the plan and run every Phase without asking again: "continuous"`)
+	if decision == "reject" {
+		_ = cmd.Flags().MarkHidden("execution-mode") // present only to refuse it with a clear message
+	}
 	return cmd
+}
+
+// decideExecutionMode checks the flag locally so a typo is a usage error; the service stays the source of truth for the rest.
+func decideExecutionMode(decision, raw string) (string, error) {
+	mode := strings.ToLower(strings.TrimSpace(raw))
+	switch {
+	case mode == "":
+		return "", nil
+	case decision != "approve":
+		return "", errors.New("--execution-mode applies to approve only")
+	case mode != "continuous":
+		return "", fmt.Errorf("--execution-mode accepts only continuous, got %q", raw)
+	}
+	return mode, nil
 }

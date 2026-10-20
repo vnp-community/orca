@@ -67,6 +67,8 @@ message ApproveRequest {
   string comment = 2;
   string expected_digest = 3;
   int64 expected_version = 4;
+  // CR-REQ-043: empty or "continuous". Only for the plan, task_list and pre_deploy approvals at awaiting_plan_approval.
+  string execution_mode = 5;
 }
 
 message RejectRequest {
@@ -106,6 +108,8 @@ message RequestApprovalResponse {
 message ApproveResponse {
   Approval approval = 1;
   string request_status = 2;
+  // CR-REQ-043: the execution mode pinned on the Request after the decision; empty when none is pinned.
+  string execution_mode = 3;
 }
 
 message RejectResponse {

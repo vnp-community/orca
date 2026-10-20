@@ -270,11 +270,13 @@ func (x *PlanProposal) GetNotes() string {
 
 // PROPOSE writes nothing in the domain tables; it runs in the background (IMPLEMENTATION-PLAN D3).
 type GeneratePlanRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Feedback      string                 `protobuf:"bytes,2,opt,name=feedback,proto3" json:"feedback,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Feedback  string                 `protobuf:"bytes,2,opt,name=feedback,proto3" json:"feedback,omitempty"`
+	// At most 128 characters. A repeated start with the same key returns the run it created instead of a second one (CR-REQ-045).
+	IdempotencyKey string `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GeneratePlanRequest) Reset() {
@@ -317,6 +319,13 @@ func (x *GeneratePlanRequest) GetRequestId() string {
 func (x *GeneratePlanRequest) GetFeedback() string {
 	if x != nil {
 		return x.Feedback
+	}
+	return ""
+}
+
+func (x *GeneratePlanRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
 	}
 	return ""
 }
@@ -384,9 +393,11 @@ func (x *GeneratePlanResponse) GetRunId() string {
 
 // Reads the result of an asynchronous GeneratePlan run (CONTRACT section 9 Q2, option a).
 type GetPlanProposalRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	RunId         string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	RunId     string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	// CR-REQ-045: 1-based version of the Plan to read (see ListPlanRevisions); 0 reads the run or the current version as before.
+	Revision      int32 `protobuf:"varint,3,opt,name=revision,proto3" json:"revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -435,6 +446,13 @@ func (x *GetPlanProposalRequest) GetRunId() string {
 	return ""
 }
 
+func (x *GetPlanProposalRequest) GetRevision() int32 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
 type GetPlanProposalResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	RunId string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
@@ -450,8 +468,10 @@ type GetPlanProposalResponse struct {
 	Checks    []*PlanCheck   `protobuf:"bytes,9,rep,name=checks,proto3" json:"checks,omitempty"`
 	Knowledge *PlanKnowledge `protobuf:"bytes,10,opt,name=knowledge,proto3" json:"knowledge,omitempty"`
 	// What the run's agent calls reported, and how long the run took from start to finish (0 while it runs).
-	Stats         *RunStats `protobuf:"bytes,11,opt,name=stats,proto3" json:"stats,omitempty"`
-	ElapsedMs     int64     `protobuf:"varint,12,opt,name=elapsed_ms,json=elapsedMs,proto3" json:"elapsed_ms,omitempty"`
+	Stats     *RunStats `protobuf:"bytes,11,opt,name=stats,proto3" json:"stats,omitempty"`
+	ElapsedMs int64     `protobuf:"varint,12,opt,name=elapsed_ms,json=elapsedMs,proto3" json:"elapsed_ms,omitempty"`
+	// CR-REQ-044: the automatic generation of the Plan. Unset by a server without it.
+	AutoPlan      *PlanAutoState `protobuf:"bytes,13,opt,name=auto_plan,json=autoPlan,proto3" json:"auto_plan,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -570,6 +590,200 @@ func (x *GetPlanProposalResponse) GetElapsedMs() int64 {
 	return 0
 }
 
+func (x *GetPlanProposalResponse) GetAutoPlan() *PlanAutoState {
+	if x != nil {
+		return x.AutoPlan
+	}
+	return nil
+}
+
+// PlanAutoState is where the automatic Plan generation of a Request stands (CR-REQ-044).
+type PlanAutoState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Whether Orca would start the Plan by itself for the project of this Request.
+	Enabled bool `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// pending | running | committing | done | gave_up | skipped | superseded; empty when no job applies.
+	State string `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
+	// event | retry | revision
+	Origin      string `protobuf:"bytes,3,opt,name=origin,proto3" json:"origin,omitempty"`
+	Attempt     int32  `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	MaxAttempts int32  `protobuf:"varint,5,opt,name=max_attempts,json=maxAttempts,proto3" json:"max_attempts,omitempty"`
+	// Why the job gave up, was skipped or is waiting for another try (a REQUEST_* code).
+	ReasonCode string `protobuf:"bytes,6,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
+	// RFC 3339; set only while a pending job waits for its next try after a failed attempt or a busy project.
+	NextAttemptAt string `protobuf:"bytes,7,opt,name=next_attempt_at,json=nextAttemptAt,proto3" json:"next_attempt_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PlanAutoState) Reset() {
+	*x = PlanAutoState{}
+	mi := &file_orca_request_v1_plan_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlanAutoState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlanAutoState) ProtoMessage() {}
+
+func (x *PlanAutoState) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_plan_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlanAutoState.ProtoReflect.Descriptor instead.
+func (*PlanAutoState) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *PlanAutoState) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *PlanAutoState) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *PlanAutoState) GetOrigin() string {
+	if x != nil {
+		return x.Origin
+	}
+	return ""
+}
+
+func (x *PlanAutoState) GetAttempt() int32 {
+	if x != nil {
+		return x.Attempt
+	}
+	return 0
+}
+
+func (x *PlanAutoState) GetMaxAttempts() int32 {
+	if x != nil {
+		return x.MaxAttempts
+	}
+	return 0
+}
+
+func (x *PlanAutoState) GetReasonCode() string {
+	if x != nil {
+		return x.ReasonCode
+	}
+	return ""
+}
+
+func (x *PlanAutoState) GetNextAttemptAt() string {
+	if x != nil {
+		return x.NextAttemptAt
+	}
+	return ""
+}
+
+// Queues one more automatic attempt after the Plan failed or gave up (CR-REQ-044). A job that is already working is returned instead.
+type RetryPlanGenerationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetryPlanGenerationRequest) Reset() {
+	*x = RetryPlanGenerationRequest{}
+	mi := &file_orca_request_v1_plan_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetryPlanGenerationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetryPlanGenerationRequest) ProtoMessage() {}
+
+func (x *RetryPlanGenerationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_plan_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetryPlanGenerationRequest.ProtoReflect.Descriptor instead.
+func (*RetryPlanGenerationRequest) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RetryPlanGenerationRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type RetryPlanGenerationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AutoPlan      *PlanAutoState         `protobuf:"bytes,1,opt,name=auto_plan,json=autoPlan,proto3" json:"auto_plan,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetryPlanGenerationResponse) Reset() {
+	*x = RetryPlanGenerationResponse{}
+	mi := &file_orca_request_v1_plan_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetryPlanGenerationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetryPlanGenerationResponse) ProtoMessage() {}
+
+func (x *RetryPlanGenerationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_plan_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetryPlanGenerationResponse.ProtoReflect.Descriptor instead.
+func (*RetryPlanGenerationResponse) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RetryPlanGenerationResponse) GetAutoPlan() *PlanAutoState {
+	if x != nil {
+		return x.AutoPlan
+	}
+	return nil
+}
+
 // PlanBundle names the OpenSpec change a Plan was read from. Its files stay readable after the worktree is gone.
 type PlanBundle struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -592,7 +806,7 @@ type PlanBundle struct {
 
 func (x *PlanBundle) Reset() {
 	*x = PlanBundle{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[7]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -604,7 +818,7 @@ func (x *PlanBundle) String() string {
 func (*PlanBundle) ProtoMessage() {}
 
 func (x *PlanBundle) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[7]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -617,7 +831,7 @@ func (x *PlanBundle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanBundle.ProtoReflect.Descriptor instead.
 func (*PlanBundle) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{7}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *PlanBundle) GetChangeId() string {
@@ -689,14 +903,18 @@ type PlanBundleFile struct {
 	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
 	Size int64  `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
 	// True when the file was too large to keep; only its size and hash are stored.
-	Omitted       bool `protobuf:"varint,3,opt,name=omitted,proto3" json:"omitted,omitempty"`
+	Omitted bool `protobuf:"varint,3,opt,name=omitted,proto3" json:"omitted,omitempty"`
+	// CR-REQ-045: hex SHA-256 of the stored text (secrets masked); of the file itself when it is omitted. Empty when not known.
+	Sha256 string `protobuf:"bytes,4,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	// added | changed | unchanged | removed, compared with the previous version; empty when there is none to compare with.
+	Change        string `protobuf:"bytes,5,opt,name=change,proto3" json:"change,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PlanBundleFile) Reset() {
 	*x = PlanBundleFile{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[8]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -708,7 +926,7 @@ func (x *PlanBundleFile) String() string {
 func (*PlanBundleFile) ProtoMessage() {}
 
 func (x *PlanBundleFile) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[8]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -721,7 +939,7 @@ func (x *PlanBundleFile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanBundleFile.ProtoReflect.Descriptor instead.
 func (*PlanBundleFile) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{8}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *PlanBundleFile) GetPath() string {
@@ -745,6 +963,20 @@ func (x *PlanBundleFile) GetOmitted() bool {
 	return false
 }
 
+func (x *PlanBundleFile) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+func (x *PlanBundleFile) GetChange() string {
+	if x != nil {
+		return x.Change
+	}
+	return ""
+}
+
 // PlanCheck is one finding shown to the approver. error means the change was refused; Orca never stores such a proposal,
 // so approvers see warning and info only.
 type PlanCheck struct {
@@ -760,7 +992,7 @@ type PlanCheck struct {
 
 func (x *PlanCheck) Reset() {
 	*x = PlanCheck{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[9]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -772,7 +1004,7 @@ func (x *PlanCheck) String() string {
 func (*PlanCheck) ProtoMessage() {}
 
 func (x *PlanCheck) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[9]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -785,7 +1017,7 @@ func (x *PlanCheck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanCheck.ProtoReflect.Descriptor instead.
 func (*PlanCheck) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{9}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *PlanCheck) GetCode() string {
@@ -832,7 +1064,7 @@ type PlanKnowledge struct {
 
 func (x *PlanKnowledge) Reset() {
 	*x = PlanKnowledge{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[10]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -844,7 +1076,7 @@ func (x *PlanKnowledge) String() string {
 func (*PlanKnowledge) ProtoMessage() {}
 
 func (x *PlanKnowledge) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[10]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -857,7 +1089,7 @@ func (x *PlanKnowledge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanKnowledge.ProtoReflect.Descriptor instead.
 func (*PlanKnowledge) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{10}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *PlanKnowledge) GetAvailable() bool {
@@ -906,14 +1138,16 @@ type GetPlanBundleFileRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	// A path inside the change, relative to it (tasks.md) or in full (openspec/changes/<id>/tasks.md).
-	Path          string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	// CR-REQ-045: 1-based version to read; 0 reads the current one.
+	Revision      int32 `protobuf:"varint,3,opt,name=revision,proto3" json:"revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetPlanBundleFileRequest) Reset() {
 	*x = GetPlanBundleFileRequest{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[11]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -925,7 +1159,7 @@ func (x *GetPlanBundleFileRequest) String() string {
 func (*GetPlanBundleFileRequest) ProtoMessage() {}
 
 func (x *GetPlanBundleFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[11]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -938,7 +1172,7 @@ func (x *GetPlanBundleFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlanBundleFileRequest.ProtoReflect.Descriptor instead.
 func (*GetPlanBundleFileRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{11}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetPlanBundleFileRequest) GetRequestId() string {
@@ -955,6 +1189,13 @@ func (x *GetPlanBundleFileRequest) GetPath() string {
 	return ""
 }
 
+func (x *GetPlanBundleFileRequest) GetRevision() int32 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
 type GetPlanBundleFileResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
@@ -966,7 +1207,7 @@ type GetPlanBundleFileResponse struct {
 
 func (x *GetPlanBundleFileResponse) Reset() {
 	*x = GetPlanBundleFileResponse{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[12]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -978,7 +1219,7 @@ func (x *GetPlanBundleFileResponse) String() string {
 func (*GetPlanBundleFileResponse) ProtoMessage() {}
 
 func (x *GetPlanBundleFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[12]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -991,7 +1232,7 @@ func (x *GetPlanBundleFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlanBundleFileResponse.ProtoReflect.Descriptor instead.
 func (*GetPlanBundleFileResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{12}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetPlanBundleFileResponse) GetPath() string {
@@ -1026,7 +1267,7 @@ type CommitPlanRequest struct {
 
 func (x *CommitPlanRequest) Reset() {
 	*x = CommitPlanRequest{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[13]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1038,7 +1279,7 @@ func (x *CommitPlanRequest) String() string {
 func (*CommitPlanRequest) ProtoMessage() {}
 
 func (x *CommitPlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[13]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1051,7 +1292,7 @@ func (x *CommitPlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitPlanRequest.ProtoReflect.Descriptor instead.
 func (*CommitPlanRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{13}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CommitPlanRequest) GetRequestId() string {
@@ -1087,7 +1328,7 @@ type CommitPlanResponse struct {
 
 func (x *CommitPlanResponse) Reset() {
 	*x = CommitPlanResponse{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[14]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1099,7 +1340,7 @@ func (x *CommitPlanResponse) String() string {
 func (*CommitPlanResponse) ProtoMessage() {}
 
 func (x *CommitPlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[14]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1112,7 +1353,7 @@ func (x *CommitPlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitPlanResponse.ProtoReflect.Descriptor instead.
 func (*CommitPlanResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{14}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CommitPlanResponse) GetPlanTaskId() string {
@@ -1154,7 +1395,7 @@ type StartPhaseRequest struct {
 
 func (x *StartPhaseRequest) Reset() {
 	*x = StartPhaseRequest{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[15]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1166,7 +1407,7 @@ func (x *StartPhaseRequest) String() string {
 func (*StartPhaseRequest) ProtoMessage() {}
 
 func (x *StartPhaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[15]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1179,7 +1420,7 @@ func (x *StartPhaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartPhaseRequest.ProtoReflect.Descriptor instead.
 func (*StartPhaseRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{15}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StartPhaseRequest) GetRequestId() string {
@@ -1207,7 +1448,7 @@ type StartPhaseResponse struct {
 
 func (x *StartPhaseResponse) Reset() {
 	*x = StartPhaseResponse{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[16]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1219,7 +1460,7 @@ func (x *StartPhaseResponse) String() string {
 func (*StartPhaseResponse) ProtoMessage() {}
 
 func (x *StartPhaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[16]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1232,7 +1473,7 @@ func (x *StartPhaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartPhaseResponse.ProtoReflect.Descriptor instead.
 func (*StartPhaseResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{16}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *StartPhaseResponse) GetPhaseTaskId() string {
@@ -1275,7 +1516,7 @@ type ReportTaskOutcomeRequest struct {
 
 func (x *ReportTaskOutcomeRequest) Reset() {
 	*x = ReportTaskOutcomeRequest{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[17]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1287,7 +1528,7 @@ func (x *ReportTaskOutcomeRequest) String() string {
 func (*ReportTaskOutcomeRequest) ProtoMessage() {}
 
 func (x *ReportTaskOutcomeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[17]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1300,7 +1541,7 @@ func (x *ReportTaskOutcomeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportTaskOutcomeRequest.ProtoReflect.Descriptor instead.
 func (*ReportTaskOutcomeRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{17}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ReportTaskOutcomeRequest) GetEventId() string {
@@ -1381,7 +1622,7 @@ type ReportTaskOutcomeResponse struct {
 
 func (x *ReportTaskOutcomeResponse) Reset() {
 	*x = ReportTaskOutcomeResponse{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[18]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1393,7 +1634,7 @@ func (x *ReportTaskOutcomeResponse) String() string {
 func (*ReportTaskOutcomeResponse) ProtoMessage() {}
 
 func (x *ReportTaskOutcomeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[18]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1406,7 +1647,7 @@ func (x *ReportTaskOutcomeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportTaskOutcomeResponse.ProtoReflect.Descriptor instead.
 func (*ReportTaskOutcomeResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{18}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{21}
 }
 
 type RequestCheck struct {
@@ -1428,7 +1669,7 @@ type RequestCheck struct {
 
 func (x *RequestCheck) Reset() {
 	*x = RequestCheck{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[19]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1440,7 +1681,7 @@ func (x *RequestCheck) String() string {
 func (*RequestCheck) ProtoMessage() {}
 
 func (x *RequestCheck) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[19]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1453,7 +1694,7 @@ func (x *RequestCheck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestCheck.ProtoReflect.Descriptor instead.
 func (*RequestCheck) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{19}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RequestCheck) GetId() string {
@@ -1540,7 +1781,7 @@ type RecordRequestCheckRequest struct {
 
 func (x *RecordRequestCheckRequest) Reset() {
 	*x = RecordRequestCheckRequest{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[20]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1552,7 +1793,7 @@ func (x *RecordRequestCheckRequest) String() string {
 func (*RecordRequestCheckRequest) ProtoMessage() {}
 
 func (x *RecordRequestCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[20]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1565,7 +1806,7 @@ func (x *RecordRequestCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordRequestCheckRequest.ProtoReflect.Descriptor instead.
 func (*RecordRequestCheckRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{20}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *RecordRequestCheckRequest) GetRequestId() string {
@@ -1619,7 +1860,7 @@ type RecordRequestCheckResponse struct {
 
 func (x *RecordRequestCheckResponse) Reset() {
 	*x = RecordRequestCheckResponse{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[21]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1631,7 +1872,7 @@ func (x *RecordRequestCheckResponse) String() string {
 func (*RecordRequestCheckResponse) ProtoMessage() {}
 
 func (x *RecordRequestCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[21]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1644,7 +1885,7 @@ func (x *RecordRequestCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordRequestCheckResponse.ProtoReflect.Descriptor instead.
 func (*RecordRequestCheckResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{21}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RecordRequestCheckResponse) GetCheck() *RequestCheck {
@@ -1664,7 +1905,7 @@ type ListRequestChecksRequest struct {
 
 func (x *ListRequestChecksRequest) Reset() {
 	*x = ListRequestChecksRequest{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[22]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1676,7 +1917,7 @@ func (x *ListRequestChecksRequest) String() string {
 func (*ListRequestChecksRequest) ProtoMessage() {}
 
 func (x *ListRequestChecksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[22]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1689,7 +1930,7 @@ func (x *ListRequestChecksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRequestChecksRequest.ProtoReflect.Descriptor instead.
 func (*ListRequestChecksRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{22}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ListRequestChecksRequest) GetRequestId() string {
@@ -1715,7 +1956,7 @@ type ListRequestChecksResponse struct {
 
 func (x *ListRequestChecksResponse) Reset() {
 	*x = ListRequestChecksResponse{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[23]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1727,7 +1968,7 @@ func (x *ListRequestChecksResponse) String() string {
 func (*ListRequestChecksResponse) ProtoMessage() {}
 
 func (x *ListRequestChecksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[23]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1740,7 +1981,7 @@ func (x *ListRequestChecksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRequestChecksResponse.ProtoReflect.Descriptor instead.
 func (*ListRequestChecksResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{23}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListRequestChecksResponse) GetChecks() []*RequestCheck {
@@ -1760,7 +2001,7 @@ type CleanupRequestProposalRequest struct {
 
 func (x *CleanupRequestProposalRequest) Reset() {
 	*x = CleanupRequestProposalRequest{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[24]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1772,7 +2013,7 @@ func (x *CleanupRequestProposalRequest) String() string {
 func (*CleanupRequestProposalRequest) ProtoMessage() {}
 
 func (x *CleanupRequestProposalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[24]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1785,7 +2026,7 @@ func (x *CleanupRequestProposalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CleanupRequestProposalRequest.ProtoReflect.Descriptor instead.
 func (*CleanupRequestProposalRequest) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{24}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *CleanupRequestProposalRequest) GetRequestId() string {
@@ -1808,7 +2049,7 @@ type CleanupRequestProposalResponse struct {
 
 func (x *CleanupRequestProposalResponse) Reset() {
 	*x = CleanupRequestProposalResponse{}
-	mi := &file_orca_request_v1_plan_proto_msgTypes[25]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1820,7 +2061,7 @@ func (x *CleanupRequestProposalResponse) String() string {
 func (*CleanupRequestProposalResponse) ProtoMessage() {}
 
 func (x *CleanupRequestProposalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_request_v1_plan_proto_msgTypes[25]
+	mi := &file_orca_request_v1_plan_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1833,7 +2074,7 @@ func (x *CleanupRequestProposalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CleanupRequestProposalResponse.ProtoReflect.Descriptor instead.
 func (*CleanupRequestProposalResponse) Descriptor() ([]byte, []int) {
-	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{25}
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *CleanupRequestProposalResponse) GetRemoved() bool {
@@ -1855,6 +2096,261 @@ func (x *CleanupRequestProposalResponse) GetBranch() string {
 		return x.Branch
 	}
 	return ""
+}
+
+// Lists the versions of the Plan of a Request, newest first (CR-REQ-045).
+type ListPlanRevisionsRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// Default 20, at most 100.
+	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// The revision number the previous page ended with; empty for the first page.
+	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPlanRevisionsRequest) Reset() {
+	*x = ListPlanRevisionsRequest{}
+	mi := &file_orca_request_v1_plan_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPlanRevisionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPlanRevisionsRequest) ProtoMessage() {}
+
+func (x *ListPlanRevisionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_plan_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPlanRevisionsRequest.ProtoReflect.Descriptor instead.
+func (*ListPlanRevisionsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ListPlanRevisionsRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ListPlanRevisionsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListPlanRevisionsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListPlanRevisionsResponse struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Revisions []*PlanRevision        `protobuf:"bytes,1,rep,name=revisions,proto3" json:"revisions,omitempty"`
+	// Empty on the last page.
+	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPlanRevisionsResponse) Reset() {
+	*x = ListPlanRevisionsResponse{}
+	mi := &file_orca_request_v1_plan_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPlanRevisionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPlanRevisionsResponse) ProtoMessage() {}
+
+func (x *ListPlanRevisionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_plan_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPlanRevisionsResponse.ProtoReflect.Descriptor instead.
+func (*ListPlanRevisionsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ListPlanRevisionsResponse) GetRevisions() []*PlanRevision {
+	if x != nil {
+		return x.Revisions
+	}
+	return nil
+}
+
+func (x *ListPlanRevisionsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+// PlanRevision is one successful Plan run of a Request. Its number is its place among those runs, oldest first.
+type PlanRevision struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Revision int32                  `protobuf:"varint,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	RunId    string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	// current | superseded
+	Status string `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	// native | openspec
+	Engine string `protobuf:"bytes,4,opt,name=engine,proto3" json:"engine,omitempty"`
+	// What the person asked to change; empty for a run without a request for changes and for answers to a clarification.
+	RevisionFeedback string                 `protobuf:"bytes,5,opt,name=revision_feedback,json=revisionFeedback,proto3" json:"revision_feedback,omitempty"`
+	ActorId          string                 `protobuf:"bytes,6,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
+	GeneratedAt      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=generated_at,json=generatedAt,proto3" json:"generated_at,omitempty"`
+	// openspec only: the commit holding this version's documents.
+	Commit string `protobuf:"bytes,8,opt,name=commit,proto3" json:"commit,omitempty"`
+	// openspec only: files added, changed or removed against the previous version (all files for the first one).
+	FilesChanged int32 `protobuf:"varint,9,opt,name=files_changed,json=filesChanged,proto3" json:"files_changed,omitempty"`
+	FileCount    int32 `protobuf:"varint,10,opt,name=file_count,json=fileCount,proto3" json:"file_count,omitempty"`
+	// False once the text of an old version was dropped; its file list and hashes stay.
+	TextKept      bool      `protobuf:"varint,11,opt,name=text_kept,json=textKept,proto3" json:"text_kept,omitempty"`
+	Stats         *RunStats `protobuf:"bytes,12,opt,name=stats,proto3" json:"stats,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PlanRevision) Reset() {
+	*x = PlanRevision{}
+	mi := &file_orca_request_v1_plan_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlanRevision) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlanRevision) ProtoMessage() {}
+
+func (x *PlanRevision) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_plan_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlanRevision.ProtoReflect.Descriptor instead.
+func (*PlanRevision) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_plan_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *PlanRevision) GetRevision() int32 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *PlanRevision) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *PlanRevision) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *PlanRevision) GetEngine() string {
+	if x != nil {
+		return x.Engine
+	}
+	return ""
+}
+
+func (x *PlanRevision) GetRevisionFeedback() string {
+	if x != nil {
+		return x.RevisionFeedback
+	}
+	return ""
+}
+
+func (x *PlanRevision) GetActorId() string {
+	if x != nil {
+		return x.ActorId
+	}
+	return ""
+}
+
+func (x *PlanRevision) GetGeneratedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.GeneratedAt
+	}
+	return nil
+}
+
+func (x *PlanRevision) GetCommit() string {
+	if x != nil {
+		return x.Commit
+	}
+	return ""
+}
+
+func (x *PlanRevision) GetFilesChanged() int32 {
+	if x != nil {
+		return x.FilesChanged
+	}
+	return 0
+}
+
+func (x *PlanRevision) GetFileCount() int32 {
+	if x != nil {
+		return x.FileCount
+	}
+	return 0
+}
+
+func (x *PlanRevision) GetTextKept() bool {
+	if x != nil {
+		return x.TextKept
+	}
+	return false
+}
+
+func (x *PlanRevision) GetStats() *RunStats {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
 }
 
 var File_orca_request_v1_plan_proto protoreflect.FileDescriptor
@@ -1881,19 +2377,21 @@ const file_orca_request_v1_plan_proto_rawDesc = "" +
 	"\asummary\x18\x02 \x01(\tR\asummary\x126\n" +
 	"\x06phases\x18\x03 \x03(\v2\x1e.orca.request.v1.PhaseProposalR\x06phases\x123\n" +
 	"\x05tasks\x18\x04 \x03(\v2\x1d.orca.request.v1.TaskProposalR\x05tasks\x12\x14\n" +
-	"\x05notes\x18\x05 \x01(\tR\x05notes\"P\n" +
+	"\x05notes\x18\x05 \x01(\tR\x05notes\"y\n" +
 	"\x13GeneratePlanRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1a\n" +
-	"\bfeedback\x18\x02 \x01(\tR\bfeedback\"\x90\x01\n" +
+	"\bfeedback\x18\x02 \x01(\tR\bfeedback\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\"\x90\x01\n" +
 	"\x14GeneratePlanResponse\x129\n" +
 	"\bproposal\x18\x01 \x01(\v2\x1d.orca.request.v1.PlanProposalR\bproposal\x12&\n" +
 	"\x0fraw_ai_response\x18\x02 \x01(\tR\rrawAiResponse\x12\x15\n" +
-	"\x06run_id\x18\x03 \x01(\tR\x05runId\"N\n" +
+	"\x06run_id\x18\x03 \x01(\tR\x05runId\"j\n" +
 	"\x16GetPlanProposalRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x15\n" +
-	"\x06run_id\x18\x02 \x01(\tR\x05runId\"\xfe\x03\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x1a\n" +
+	"\brevision\x18\x03 \x01(\x05R\brevision\"\xbb\x04\n" +
 	"\x17GetPlanProposalResponse\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1d\n" +
@@ -1909,7 +2407,22 @@ const file_orca_request_v1_plan_proto_rawDesc = "" +
 	" \x01(\v2\x1e.orca.request.v1.PlanKnowledgeR\tknowledge\x12/\n" +
 	"\x05stats\x18\v \x01(\v2\x19.orca.request.v1.RunStatsR\x05stats\x12\x1d\n" +
 	"\n" +
-	"elapsed_ms\x18\f \x01(\x03R\telapsedMs\"\xb3\x02\n" +
+	"elapsed_ms\x18\f \x01(\x03R\telapsedMs\x12;\n" +
+	"\tauto_plan\x18\r \x01(\v2\x1e.orca.request.v1.PlanAutoStateR\bautoPlan\"\xdd\x01\n" +
+	"\rPlanAutoState\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x14\n" +
+	"\x05state\x18\x02 \x01(\tR\x05state\x12\x16\n" +
+	"\x06origin\x18\x03 \x01(\tR\x06origin\x12\x18\n" +
+	"\aattempt\x18\x04 \x01(\x05R\aattempt\x12!\n" +
+	"\fmax_attempts\x18\x05 \x01(\x05R\vmaxAttempts\x12\x1f\n" +
+	"\vreason_code\x18\x06 \x01(\tR\n" +
+	"reasonCode\x12&\n" +
+	"\x0fnext_attempt_at\x18\a \x01(\tR\rnextAttemptAt\";\n" +
+	"\x1aRetryPlanGenerationRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\"Z\n" +
+	"\x1bRetryPlanGenerationResponse\x12;\n" +
+	"\tauto_plan\x18\x01 \x01(\v2\x1e.orca.request.v1.PlanAutoStateR\bautoPlan\"\xb3\x02\n" +
 	"\n" +
 	"PlanBundle\x12\x1b\n" +
 	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x12\x16\n" +
@@ -1922,11 +2435,13 @@ const file_orca_request_v1_plan_proto_rawDesc = "" +
 	"sync_state\x18\a \x01(\tR\tsyncState\x12\x1d\n" +
 	"\n" +
 	"sync_error\x18\b \x01(\tR\tsyncError\x12#\n" +
-	"\rsync_attempts\x18\t \x01(\x05R\fsyncAttempts\"R\n" +
+	"\rsync_attempts\x18\t \x01(\x05R\fsyncAttempts\"\x82\x01\n" +
 	"\x0ePlanBundleFile\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x18\n" +
-	"\aomitted\x18\x03 \x01(\bR\aomitted\"k\n" +
+	"\aomitted\x18\x03 \x01(\bR\aomitted\x12\x16\n" +
+	"\x06sha256\x18\x04 \x01(\tR\x06sha256\x12\x16\n" +
+	"\x06change\x18\x05 \x01(\tR\x06change\"k\n" +
 	"\tPlanCheck\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05where\x18\x02 \x01(\tR\x05where\x12\x18\n" +
@@ -1939,11 +2454,12 @@ const file_orca_request_v1_plan_proto_rawDesc = "" +
 	"\x04gaps\x18\x04 \x03(\tR\x04gaps\x12\x1c\n" +
 	"\tconflicts\x18\x05 \x03(\tR\tconflicts\x12\x1d\n" +
 	"\n" +
-	"skill_hash\x18\x06 \x01(\tR\tskillHash\"M\n" +
+	"skill_hash\x18\x06 \x01(\tR\tskillHash\"i\n" +
 	"\x18GetPlanBundleFileRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\"c\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1a\n" +
+	"\brevision\x18\x03 \x01(\x05R\brevision\"c\n" +
 	"\x19GetPlanBundleFileResponse\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\x12\x18\n" +
@@ -2020,7 +2536,31 @@ const file_orca_request_v1_plan_proto_rawDesc = "" +
 	"\x1eCleanupRequestProposalResponse\x12\x18\n" +
 	"\aremoved\x18\x01 \x01(\bR\aremoved\x12\x1c\n" +
 	"\tabandoned\x18\x02 \x01(\bR\tabandoned\x12\x16\n" +
-	"\x06branch\x18\x03 \x01(\tR\x06branchBDZBgithub.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1b\x06proto3"
+	"\x06branch\x18\x03 \x01(\tR\x06branch\"u\n" +
+	"\x18ListPlanRevisionsRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
+	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tR\tpageToken\"\x80\x01\n" +
+	"\x19ListPlanRevisionsResponse\x12;\n" +
+	"\trevisions\x18\x01 \x03(\v2\x1d.orca.request.v1.PlanRevisionR\trevisions\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xa2\x03\n" +
+	"\fPlanRevision\x12\x1a\n" +
+	"\brevision\x18\x01 \x01(\x05R\brevision\x12\x15\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12\x16\n" +
+	"\x06engine\x18\x04 \x01(\tR\x06engine\x12+\n" +
+	"\x11revision_feedback\x18\x05 \x01(\tR\x10revisionFeedback\x12\x19\n" +
+	"\bactor_id\x18\x06 \x01(\tR\aactorId\x12=\n" +
+	"\fgenerated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\vgeneratedAt\x12\x16\n" +
+	"\x06commit\x18\b \x01(\tR\x06commit\x12#\n" +
+	"\rfiles_changed\x18\t \x01(\x05R\ffilesChanged\x12\x1d\n" +
+	"\n" +
+	"file_count\x18\n" +
+	" \x01(\x05R\tfileCount\x12\x1b\n" +
+	"\ttext_kept\x18\v \x01(\bR\btextKept\x12/\n" +
+	"\x05stats\x18\f \x01(\v2\x19.orca.request.v1.RunStatsR\x05statsBDZBgithub.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1b\x06proto3"
 
 var (
 	file_orca_request_v1_plan_proto_rawDescOnce sync.Once
@@ -2034,7 +2574,7 @@ func file_orca_request_v1_plan_proto_rawDescGZIP() []byte {
 	return file_orca_request_v1_plan_proto_rawDescData
 }
 
-var file_orca_request_v1_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_orca_request_v1_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_orca_request_v1_plan_proto_goTypes = []any{
 	(*TaskProposal)(nil),                   // 0: orca.request.v1.TaskProposal
 	(*PhaseProposal)(nil),                  // 1: orca.request.v1.PhaseProposal
@@ -2043,51 +2583,62 @@ var file_orca_request_v1_plan_proto_goTypes = []any{
 	(*GeneratePlanResponse)(nil),           // 4: orca.request.v1.GeneratePlanResponse
 	(*GetPlanProposalRequest)(nil),         // 5: orca.request.v1.GetPlanProposalRequest
 	(*GetPlanProposalResponse)(nil),        // 6: orca.request.v1.GetPlanProposalResponse
-	(*PlanBundle)(nil),                     // 7: orca.request.v1.PlanBundle
-	(*PlanBundleFile)(nil),                 // 8: orca.request.v1.PlanBundleFile
-	(*PlanCheck)(nil),                      // 9: orca.request.v1.PlanCheck
-	(*PlanKnowledge)(nil),                  // 10: orca.request.v1.PlanKnowledge
-	(*GetPlanBundleFileRequest)(nil),       // 11: orca.request.v1.GetPlanBundleFileRequest
-	(*GetPlanBundleFileResponse)(nil),      // 12: orca.request.v1.GetPlanBundleFileResponse
-	(*CommitPlanRequest)(nil),              // 13: orca.request.v1.CommitPlanRequest
-	(*CommitPlanResponse)(nil),             // 14: orca.request.v1.CommitPlanResponse
-	(*StartPhaseRequest)(nil),              // 15: orca.request.v1.StartPhaseRequest
-	(*StartPhaseResponse)(nil),             // 16: orca.request.v1.StartPhaseResponse
-	(*ReportTaskOutcomeRequest)(nil),       // 17: orca.request.v1.ReportTaskOutcomeRequest
-	(*ReportTaskOutcomeResponse)(nil),      // 18: orca.request.v1.ReportTaskOutcomeResponse
-	(*RequestCheck)(nil),                   // 19: orca.request.v1.RequestCheck
-	(*RecordRequestCheckRequest)(nil),      // 20: orca.request.v1.RecordRequestCheckRequest
-	(*RecordRequestCheckResponse)(nil),     // 21: orca.request.v1.RecordRequestCheckResponse
-	(*ListRequestChecksRequest)(nil),       // 22: orca.request.v1.ListRequestChecksRequest
-	(*ListRequestChecksResponse)(nil),      // 23: orca.request.v1.ListRequestChecksResponse
-	(*CleanupRequestProposalRequest)(nil),  // 24: orca.request.v1.CleanupRequestProposalRequest
-	(*CleanupRequestProposalResponse)(nil), // 25: orca.request.v1.CleanupRequestProposalResponse
-	(*wrapperspb.DoubleValue)(nil),         // 26: google.protobuf.DoubleValue
-	(*RunStats)(nil),                       // 27: orca.request.v1.RunStats
-	(*timestamppb.Timestamp)(nil),          // 28: google.protobuf.Timestamp
+	(*PlanAutoState)(nil),                  // 7: orca.request.v1.PlanAutoState
+	(*RetryPlanGenerationRequest)(nil),     // 8: orca.request.v1.RetryPlanGenerationRequest
+	(*RetryPlanGenerationResponse)(nil),    // 9: orca.request.v1.RetryPlanGenerationResponse
+	(*PlanBundle)(nil),                     // 10: orca.request.v1.PlanBundle
+	(*PlanBundleFile)(nil),                 // 11: orca.request.v1.PlanBundleFile
+	(*PlanCheck)(nil),                      // 12: orca.request.v1.PlanCheck
+	(*PlanKnowledge)(nil),                  // 13: orca.request.v1.PlanKnowledge
+	(*GetPlanBundleFileRequest)(nil),       // 14: orca.request.v1.GetPlanBundleFileRequest
+	(*GetPlanBundleFileResponse)(nil),      // 15: orca.request.v1.GetPlanBundleFileResponse
+	(*CommitPlanRequest)(nil),              // 16: orca.request.v1.CommitPlanRequest
+	(*CommitPlanResponse)(nil),             // 17: orca.request.v1.CommitPlanResponse
+	(*StartPhaseRequest)(nil),              // 18: orca.request.v1.StartPhaseRequest
+	(*StartPhaseResponse)(nil),             // 19: orca.request.v1.StartPhaseResponse
+	(*ReportTaskOutcomeRequest)(nil),       // 20: orca.request.v1.ReportTaskOutcomeRequest
+	(*ReportTaskOutcomeResponse)(nil),      // 21: orca.request.v1.ReportTaskOutcomeResponse
+	(*RequestCheck)(nil),                   // 22: orca.request.v1.RequestCheck
+	(*RecordRequestCheckRequest)(nil),      // 23: orca.request.v1.RecordRequestCheckRequest
+	(*RecordRequestCheckResponse)(nil),     // 24: orca.request.v1.RecordRequestCheckResponse
+	(*ListRequestChecksRequest)(nil),       // 25: orca.request.v1.ListRequestChecksRequest
+	(*ListRequestChecksResponse)(nil),      // 26: orca.request.v1.ListRequestChecksResponse
+	(*CleanupRequestProposalRequest)(nil),  // 27: orca.request.v1.CleanupRequestProposalRequest
+	(*CleanupRequestProposalResponse)(nil), // 28: orca.request.v1.CleanupRequestProposalResponse
+	(*ListPlanRevisionsRequest)(nil),       // 29: orca.request.v1.ListPlanRevisionsRequest
+	(*ListPlanRevisionsResponse)(nil),      // 30: orca.request.v1.ListPlanRevisionsResponse
+	(*PlanRevision)(nil),                   // 31: orca.request.v1.PlanRevision
+	(*wrapperspb.DoubleValue)(nil),         // 32: google.protobuf.DoubleValue
+	(*RunStats)(nil),                       // 33: orca.request.v1.RunStats
+	(*timestamppb.Timestamp)(nil),          // 34: google.protobuf.Timestamp
 }
 var file_orca_request_v1_plan_proto_depIdxs = []int32{
-	26, // 0: orca.request.v1.TaskProposal.estimated_hours:type_name -> google.protobuf.DoubleValue
+	32, // 0: orca.request.v1.TaskProposal.estimated_hours:type_name -> google.protobuf.DoubleValue
 	0,  // 1: orca.request.v1.PhaseProposal.tasks:type_name -> orca.request.v1.TaskProposal
 	1,  // 2: orca.request.v1.PlanProposal.phases:type_name -> orca.request.v1.PhaseProposal
 	0,  // 3: orca.request.v1.PlanProposal.tasks:type_name -> orca.request.v1.TaskProposal
 	2,  // 4: orca.request.v1.GeneratePlanResponse.proposal:type_name -> orca.request.v1.PlanProposal
 	2,  // 5: orca.request.v1.GetPlanProposalResponse.proposal:type_name -> orca.request.v1.PlanProposal
-	7,  // 6: orca.request.v1.GetPlanProposalResponse.bundle:type_name -> orca.request.v1.PlanBundle
-	9,  // 7: orca.request.v1.GetPlanProposalResponse.checks:type_name -> orca.request.v1.PlanCheck
-	10, // 8: orca.request.v1.GetPlanProposalResponse.knowledge:type_name -> orca.request.v1.PlanKnowledge
-	27, // 9: orca.request.v1.GetPlanProposalResponse.stats:type_name -> orca.request.v1.RunStats
-	8,  // 10: orca.request.v1.PlanBundle.files:type_name -> orca.request.v1.PlanBundleFile
-	2,  // 11: orca.request.v1.CommitPlanRequest.proposal:type_name -> orca.request.v1.PlanProposal
-	28, // 12: orca.request.v1.ReportTaskOutcomeRequest.occurred_at:type_name -> google.protobuf.Timestamp
-	28, // 13: orca.request.v1.RequestCheck.created_at:type_name -> google.protobuf.Timestamp
-	19, // 14: orca.request.v1.RecordRequestCheckResponse.check:type_name -> orca.request.v1.RequestCheck
-	19, // 15: orca.request.v1.ListRequestChecksResponse.checks:type_name -> orca.request.v1.RequestCheck
-	16, // [16:16] is the sub-list for method output_type
-	16, // [16:16] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	10, // 6: orca.request.v1.GetPlanProposalResponse.bundle:type_name -> orca.request.v1.PlanBundle
+	12, // 7: orca.request.v1.GetPlanProposalResponse.checks:type_name -> orca.request.v1.PlanCheck
+	13, // 8: orca.request.v1.GetPlanProposalResponse.knowledge:type_name -> orca.request.v1.PlanKnowledge
+	33, // 9: orca.request.v1.GetPlanProposalResponse.stats:type_name -> orca.request.v1.RunStats
+	7,  // 10: orca.request.v1.GetPlanProposalResponse.auto_plan:type_name -> orca.request.v1.PlanAutoState
+	7,  // 11: orca.request.v1.RetryPlanGenerationResponse.auto_plan:type_name -> orca.request.v1.PlanAutoState
+	11, // 12: orca.request.v1.PlanBundle.files:type_name -> orca.request.v1.PlanBundleFile
+	2,  // 13: orca.request.v1.CommitPlanRequest.proposal:type_name -> orca.request.v1.PlanProposal
+	34, // 14: orca.request.v1.ReportTaskOutcomeRequest.occurred_at:type_name -> google.protobuf.Timestamp
+	34, // 15: orca.request.v1.RequestCheck.created_at:type_name -> google.protobuf.Timestamp
+	22, // 16: orca.request.v1.RecordRequestCheckResponse.check:type_name -> orca.request.v1.RequestCheck
+	22, // 17: orca.request.v1.ListRequestChecksResponse.checks:type_name -> orca.request.v1.RequestCheck
+	31, // 18: orca.request.v1.ListPlanRevisionsResponse.revisions:type_name -> orca.request.v1.PlanRevision
+	34, // 19: orca.request.v1.PlanRevision.generated_at:type_name -> google.protobuf.Timestamp
+	33, // 20: orca.request.v1.PlanRevision.stats:type_name -> orca.request.v1.RunStats
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_orca_request_v1_plan_proto_init() }
@@ -2102,7 +2653,7 @@ func file_orca_request_v1_plan_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_request_v1_plan_proto_rawDesc), len(file_orca_request_v1_plan_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

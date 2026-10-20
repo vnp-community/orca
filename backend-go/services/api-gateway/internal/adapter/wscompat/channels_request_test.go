@@ -465,7 +465,7 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"approval.get", "approval.list", "approval.listPending", "approval.approve", "approval.reject", "approval.cancel",
 		"backlog.requests", "backlog.tasks", "backlog.execute",
 		// CONTRACT 2.5 and the plan proposal reader.
-		"request.links", "request.activity", "request.executionSummary", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal",
+		"request.links", "request.activity", "request.executionSummary", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal", "request.retryPlan", "request.planRevisions",
 		// CR-REQ-028: the channels useClarifications.ts calls.
 		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel", "clarification.request",
 		// The decision log: reading it, and a person confirming a high risk choice.

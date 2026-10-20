@@ -98,6 +98,9 @@ func renderBundleSection(b *strings.Builder, doc apiclient.Document) {
 		if f.Str("omitted") == "true" {
 			note = "  (too large to keep; read it from the branch)"
 		}
+		if c := f.Str("change"); c != "" && c != "unchanged" {
+			note += "  [" + c + "]"
+		}
 		fmt.Fprintf(b, "  %-40s %6d bytes%s\n", f.Str("path"), f.Int("size"), note)
 	}
 	for _, c := range doc.Docs("checks") {

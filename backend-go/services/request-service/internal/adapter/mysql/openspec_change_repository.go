@@ -23,7 +23,7 @@ func NewOpenSpecChangeRepository(r *Repository) *OpenSpecChangeRepository {
 
 const openSpecChangeColumns = `id, request_id, change_id, COALESCE(branch, ''), status, tasks_sync_state, COALESCE(commit_sha, ''),
 	COALESCE(tasks_md_digest, ''), kg_available, COALESCE(kg_snapshot, ''), kg_read_ids, kg_gaps, kg_conflicts, COALESCE(skill_hash, ''),
-	bundle_json, COALESCE(workspace_id, ''),
+	bundle_json, COALESCE(workspace_id, ''), redacted_secrets,
 	COALESCE(tasks_sync_digest, ''), COALESCE(tasks_sync_error, ''), tasks_sync_attempts, tasks_sync_next_retry_at, version`
 
 func scanOpenSpecChange(row rowScanner) (domain.OpenSpecChange, error) {
@@ -37,7 +37,7 @@ func scanOpenSpecChangeInto(row rowScanner, extra ...any) (domain.OpenSpecChange
 	var read, gaps, conflicts, bundle []byte
 	var retry sql.NullTime
 	dest := append([]any{&c.ID, &c.RequestID, &c.ChangeID, &c.Branch, &status, &syncState, &c.Commit, &c.TasksMDDigest, &c.KGAvailable,
-		&c.KGSnapshot, &read, &gaps, &conflicts, &c.SkillHash, &bundle, &c.WorkspaceID,
+		&c.KGSnapshot, &read, &gaps, &conflicts, &c.SkillHash, &bundle, &c.WorkspaceID, &c.RedactedSecrets,
 		&c.SyncDigest, &c.SyncError, &c.SyncAttempts, &retry, &c.Version}, extra...)
 	if err := row.Scan(dest...); err != nil {
 		return domain.OpenSpecChange{}, err
@@ -99,9 +99,9 @@ func (r *OpenSpecChangeRepository) Upsert(ctx context.Context, c domain.OpenSpec
 		if _, err := db.ExecContext(ctx, `
 			INSERT INTO openspec_changes (id, tenant_id, request_id, change_id, branch, status, tasks_sync_state, commit_sha,
 				tasks_md_digest, kg_available, kg_snapshot, kg_read_ids, kg_gaps, kg_conflicts, skill_hash, bundle_json, workspace_id,
-				tasks_sync_digest, tasks_sync_error, tasks_sync_attempts, tasks_sync_next_retry_at)
+				tasks_sync_digest, tasks_sync_error, tasks_sync_attempts, tasks_sync_next_retry_at, redacted_secrets)
 			VALUES (?, ?, ?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''),
-				NULLIF(?, ''), NULLIF(?, ''), ?, ?)
+				NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?)
 			ON DUPLICATE KEY UPDATE
 				change_id = VALUES(change_id), branch = VALUES(branch), status = VALUES(status), tasks_sync_state = VALUES(tasks_sync_state),
 				commit_sha = VALUES(commit_sha), tasks_md_digest = VALUES(tasks_md_digest), kg_available = VALUES(kg_available),
@@ -109,10 +109,11 @@ func (r *OpenSpecChangeRepository) Upsert(ctx context.Context, c domain.OpenSpec
 				skill_hash = VALUES(skill_hash), bundle_json = VALUES(bundle_json), workspace_id = VALUES(workspace_id),
 				tasks_sync_digest = VALUES(tasks_sync_digest), tasks_sync_error = VALUES(tasks_sync_error),
 				tasks_sync_attempts = VALUES(tasks_sync_attempts), tasks_sync_next_retry_at = VALUES(tasks_sync_next_retry_at),
+				redacted_secrets = VALUES(redacted_secrets),
 				updated_at = CURRENT_TIMESTAMP(6), version = version + 1`,
 			c.ID, tenantID, c.RequestID, c.ChangeID, c.Branch, string(c.Status), string(c.SyncState), c.Commit, c.TasksMDDigest, c.KGAvailable,
 			c.KGSnapshot, read, gaps, conflicts, c.SkillHash, bundle, c.WorkspaceID,
-			c.SyncDigest, c.SyncError, c.SyncAttempts, c.SyncNextRetryAt); err != nil {
+			c.SyncDigest, c.SyncError, c.SyncAttempts, c.SyncNextRetryAt, c.RedactedSecrets); err != nil {
 			return fmt.Errorf("mysql upsert openspec change: %w", err)
 		}
 		var found bool

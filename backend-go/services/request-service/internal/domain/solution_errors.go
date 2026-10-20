@@ -87,6 +87,8 @@ const (
 	RunErrSpecAgentFailed   = "REQUEST_OPENSPEC_AGENT_FAILED"
 	RunErrSpecTimeout       = "REQUEST_OPENSPEC_TIMEOUT"
 	RunErrSpecInvalidOutput = "REQUEST_OPENSPEC_INVALID_OUTPUT"
+	// RunErrPlanRevisionNoChange: a revision run ended with every document as it was.
+	RunErrPlanRevisionNoChange = "REQUEST_PLAN_REVISION_NO_CHANGE"
 	// RunErrBaseRefNotFound: the Request's base ref no longer exists in the repository, so no worktree could be made from it.
 	RunErrBaseRefNotFound = "REQUEST_BASE_REF_NOT_FOUND"
 	// Hotfix only: the fix task or its pre_deploy approval could not be created when the diagnosis finished.

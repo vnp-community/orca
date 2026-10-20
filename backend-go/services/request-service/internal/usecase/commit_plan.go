@@ -64,18 +64,36 @@ func NewCommitPlan(d CommitPlanDeps) *CommitPlan {
 }
 
 func (uc *CommitPlan) Execute(ctx context.Context, in CommitPlanInput) (CommitPlanResult, error) {
+	return uc.run(ctx, in, false)
+}
+
+// ExecuteForSystem commits a proposal the server itself obtained (CR-REQ-044 automatic Plan, CR-REQ-045 revision):
+// nobody is calling, so the reporter is the actor. Only internal workers call it, never an RPC.
+func (uc *CommitPlan) ExecuteForSystem(ctx context.Context, in CommitPlanInput) (CommitPlanResult, error) {
+	return uc.run(ctx, in, true)
+}
+
+func (uc *CommitPlan) run(ctx context.Context, in CommitPlanInput, system bool) (CommitPlanResult, error) {
 	if _, err := tenant.RequireTenantID(ctx); err != nil {
 		return CommitPlanResult{}, domain.ErrRequestTenantRequired()
 	}
 	actor, _ := tenant.UserID(ctx)
-	if actor == "" {
+	if actor == "" && !system {
 		return CommitPlanResult{}, domain.ErrRequestReporterRequired()
 	}
 	req, err := uc.requests.Get(ctx, in.RequestID)
 	if err != nil {
 		return CommitPlanResult{}, err
 	}
-	if err := uc.auth.AuthorizePlan(ctx, req); err != nil {
+	if system {
+		if actor == "" {
+			actor = req.ReporterID
+		}
+		if actor == "" {
+			return CommitPlanResult{}, domain.ErrRequestReporterRequired()
+		}
+		ctx = tenant.WithUserID(ctx, actor)
+	} else if err := uc.auth.AuthorizePlan(ctx, req); err != nil {
 		return CommitPlanResult{}, err
 	}
 	// A Plan that is already waiting for approval is a replay of a commit that succeeded: answer from task-service.
@@ -130,6 +148,9 @@ func (uc *CommitPlan) record(ctx context.Context, req domain.Request, flow domai
 		cur, err := uc.requests.Get(ctx, req.ID)
 		if err != nil {
 			return err
+		}
+		if cur.Status == domain.RequestStatusAwaitingPlanApproval && cur.PlanTaskID == tree.PlanTaskID {
+			return nil // the other side of a commit race (server or browser) already recorded this very Plan
 		}
 		if cur.Status != domain.RequestStatusPlanning {
 			return domain.ErrPlanWrongState(cur.Status)

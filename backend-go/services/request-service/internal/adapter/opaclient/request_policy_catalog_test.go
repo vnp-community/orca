@@ -58,8 +58,8 @@ func TestCatalogPersonMatrixAgainstRego(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// CR-REQ-041: a project member may reach the two steering RPCs; the use case then checks reporter, admin or approver.
-			if role == "member" && (strings.HasSuffix(method, "/GenerateSolution") || strings.HasSuffix(method, "/ChooseSolutionOption")) {
+			// CR-REQ-041 and CR-REQ-045: a project member may reach the steering RPCs; the use case then checks reporter, admin or approver.
+			if role == "member" && (strings.HasSuffix(method, "/GenerateSolution") || strings.HasSuffix(method, "/ChooseSolutionOption") || strings.HasSuffix(method, "/GeneratePlan")) {
 				allowed[role] = true
 			}
 			if got != allowed[role] {

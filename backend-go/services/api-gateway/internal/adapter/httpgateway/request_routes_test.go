@@ -86,7 +86,7 @@ func (f *fakeRequestRoutesClient) Approve(ctx context.Context, in *requestv1.App
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &requestv1.ApproveResponse{Approval: &requestv1.Approval{Id: in.GetId()}, RequestStatus: "planning"}, nil
+	return &requestv1.ApproveResponse{Approval: &requestv1.Approval{Id: in.GetId()}, RequestStatus: "planning", ExecutionMode: in.GetExecutionMode()}, nil
 }
 
 func (f *fakeRequestRoutesClient) Reject(ctx context.Context, in *requestv1.RejectRequest, _ ...grpc.CallOption) (*requestv1.RejectResponse, error) {
@@ -243,6 +243,28 @@ func TestRequestRoutes_ApproveAndReject(t *testing.T) {
 	rec = doRequestRoute(r, http.MethodPost, "/v1/approvals/a1/reject", `{"version":2,"digest":"dg"}`, routesIdentity)
 	if rec.Code != http.StatusBadRequest || len(fake.rejects) != 1 || decodeJSONMap(t, rec)["error"].(map[string]any)["code"] != "REQUEST_APPROVAL_COMMENT_REQUIRED" {
 		t.Errorf("reject without comment: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRequestRoutes_ApproveCarriesExecutionModeAndRejectRefusesIt(t *testing.T) {
+	fake := &fakeRequestRoutesClient{}
+	r := requestRoutesRouter(fake)
+	rec := doRequestRoute(r, http.MethodPost, "/v1/approvals/a1/approve", `{"version":2,"digest":"dg","executionMode":"continuous"}`, routesIdentity)
+	if rec.Code != http.StatusOK || decodeJSONMap(t, rec)["executionMode"] != "continuous" {
+		t.Fatalf("approve: %d %s", rec.Code, rec.Body.String())
+	}
+	if got := fake.approves[0].GetExecutionMode(); got != "continuous" {
+		t.Errorf("approve rpc mode = %q", got)
+	}
+
+	rec = doRequestRoute(r, http.MethodPost, "/v1/approvals/a2/approve", `{"version":2,"digest":"dg"}`, routesIdentity)
+	if _, has := decodeJSONMap(t, rec)["executionMode"]; rec.Code != http.StatusOK || has || fake.approves[1].GetExecutionMode() != "" {
+		t.Errorf("approve without a mode: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doRequestRoute(r, http.MethodPost, "/v1/approvals/a3/reject", `{"version":2,"digest":"dg","comment":"no","executionMode":"continuous"}`, routesIdentity)
+	if rec.Code != http.StatusBadRequest || len(fake.rejects) != 0 || decodeJSONMap(t, rec)["error"].(map[string]any)["code"] != "REQUEST_EXECUTION_MODE_INVALID" {
+		t.Errorf("reject with a mode: %d %s rpcs=%d", rec.Code, rec.Body.String(), len(fake.rejects))
 	}
 }
 

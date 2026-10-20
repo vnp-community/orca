@@ -42,6 +42,8 @@ message PlanProposal {
 message GeneratePlanRequest {
   string request_id = 1;
   string feedback = 2;
+  // At most 128 characters. A repeated start with the same key returns the run it created instead of a second one (CR-REQ-045).
+  string idempotency_key = 3;
 }
 
 message GeneratePlanResponse {
@@ -55,6 +57,8 @@ message GeneratePlanResponse {
 message GetPlanProposalRequest {
   string request_id = 1;
   string run_id = 2;
+  // CR-REQ-045: 1-based version of the Plan to read (see ListPlanRevisions); 0 reads the run or the current version as before.
+  int32 revision = 3;
 }
 
 message GetPlanProposalResponse {
@@ -73,6 +77,33 @@ message GetPlanProposalResponse {
   // What the run's agent calls reported, and how long the run took from start to finish (0 while it runs).
   RunStats stats = 11;
   int64 elapsed_ms = 12;
+  // CR-REQ-044: the automatic generation of the Plan. Unset by a server without it.
+  PlanAutoState auto_plan = 13;
+}
+
+// PlanAutoState is where the automatic Plan generation of a Request stands (CR-REQ-044).
+message PlanAutoState {
+  // Whether Orca would start the Plan by itself for the project of this Request.
+  bool enabled = 1;
+  // pending | running | committing | done | gave_up | skipped | superseded; empty when no job applies.
+  string state = 2;
+  // event | retry | revision
+  string origin = 3;
+  int32 attempt = 4;
+  int32 max_attempts = 5;
+  // Why the job gave up, was skipped or is waiting for another try (a REQUEST_* code).
+  string reason_code = 6;
+  // RFC 3339; set only while a pending job waits for its next try after a failed attempt or a busy project.
+  string next_attempt_at = 7;
+}
+
+// Queues one more automatic attempt after the Plan failed or gave up (CR-REQ-044). A job that is already working is returned instead.
+message RetryPlanGenerationRequest {
+  string request_id = 1;
+}
+
+message RetryPlanGenerationResponse {
+  PlanAutoState auto_plan = 1;
 }
 
 // PlanBundle names the OpenSpec change a Plan was read from. Its files stay readable after the worktree is gone.
@@ -98,6 +129,10 @@ message PlanBundleFile {
   int64 size = 2;
   // True when the file was too large to keep; only its size and hash are stored.
   bool omitted = 3;
+  // CR-REQ-045: hex SHA-256 of the stored text (secrets masked); of the file itself when it is omitted. Empty when not known.
+  string sha256 = 4;
+  // added | changed | unchanged | removed, compared with the previous version; empty when there is none to compare with.
+  string change = 5;
 }
 
 // PlanCheck is one finding shown to the approver. error means the change was refused; Orca never stores such a proposal,
@@ -125,6 +160,8 @@ message GetPlanBundleFileRequest {
   string request_id = 1;
   // A path inside the change, relative to it (tasks.md) or in full (openspec/changes/<id>/tasks.md).
   string path = 2;
+  // CR-REQ-045: 1-based version to read; 0 reads the current one.
+  int32 revision = 3;
 }
 
 message GetPlanBundleFileResponse {
@@ -221,4 +258,41 @@ message CleanupRequestProposalResponse {
   // True when the change was also marked abandoned (the Request is cancelled).
   bool abandoned = 2;
   string branch = 3;
+}
+
+// Lists the versions of the Plan of a Request, newest first (CR-REQ-045).
+message ListPlanRevisionsRequest {
+  string request_id = 1;
+  // Default 20, at most 100.
+  int32 page_size = 2;
+  // The revision number the previous page ended with; empty for the first page.
+  string page_token = 3;
+}
+
+message ListPlanRevisionsResponse {
+  repeated PlanRevision revisions = 1;
+  // Empty on the last page.
+  string next_page_token = 2;
+}
+
+// PlanRevision is one successful Plan run of a Request. Its number is its place among those runs, oldest first.
+message PlanRevision {
+  int32 revision = 1;
+  string run_id = 2;
+  // current | superseded
+  string status = 3;
+  // native | openspec
+  string engine = 4;
+  // What the person asked to change; empty for a run without a request for changes and for answers to a clarification.
+  string revision_feedback = 5;
+  string actor_id = 6;
+  google.protobuf.Timestamp generated_at = 7;
+  // openspec only: the commit holding this version's documents.
+  string commit = 8;
+  // openspec only: files added, changed or removed against the previous version (all files for the first one).
+  int32 files_changed = 9;
+  int32 file_count = 10;
+  // False once the text of an old version was dropped; its file list and hashes stay.
+  bool text_kept = 11;
+  RunStats stats = 12;
 }

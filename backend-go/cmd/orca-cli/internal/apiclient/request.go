@@ -3,6 +3,7 @@ package apiclient
 import (
 	"context"
 	"net/url"
+	"strconv"
 )
 
 // One method per api-gateway route of the Request flow (services/api-gateway/.../request_routes*.go). The gateway
@@ -112,16 +113,46 @@ func (c *Client) GeneratePlan(ctx context.Context, id string, body Document) (Do
 }
 
 func (c *Client) GetPlanProposal(ctx context.Context, id, runID string) (Document, error) {
+	return c.GetPlanProposalRevision(ctx, id, runID, 0)
+}
+
+// GetPlanProposalRevision reads one numbered version of the Plan (see ListPlanRevisions); revision 0 reads the run, or the
+// current version when runID is empty too.
+func (c *Client) GetPlanProposalRevision(ctx context.Context, id, runID string, revision int) (Document, error) {
 	q := url.Values{}
 	if runID != "" {
 		q.Set("runId", runID)
+	}
+	if revision > 0 {
+		q.Set("revision", strconv.Itoa(revision))
 	}
 	return c.getDoc(ctx, requestPath(id, "/plan"), q)
 }
 
 // GetPlanBundleFile reads one file of the authored OpenSpec change behind a Plan (path relative to the change).
 func (c *Client) GetPlanBundleFile(ctx context.Context, id, path string) (Document, error) {
-	return c.getDoc(ctx, requestPath(id, "/plan/bundle/file"), url.Values{"path": {path}})
+	return c.GetPlanBundleFileRevision(ctx, id, path, 0)
+}
+
+// GetPlanBundleFileRevision reads the file as it was in a numbered version; revision 0 reads the current one.
+func (c *Client) GetPlanBundleFileRevision(ctx context.Context, id, path string, revision int) (Document, error) {
+	q := url.Values{"path": {path}}
+	if revision > 0 {
+		q.Set("revision", strconv.Itoa(revision))
+	}
+	return c.getDoc(ctx, requestPath(id, "/plan/bundle/file"), q)
+}
+
+// ListPlanRevisions lists the versions of the Plan, newest first, with what was asked to get each one.
+func (c *Client) ListPlanRevisions(ctx context.Context, id, pageToken string, pageSize int) (Document, error) {
+	q := url.Values{}
+	if pageToken != "" {
+		q.Set("pageToken", pageToken)
+	}
+	if pageSize > 0 {
+		q.Set("pageSize", strconv.Itoa(pageSize))
+	}
+	return c.getDoc(ctx, requestPath(id, "/plan/revisions"), q)
 }
 
 // CleanupProposal removes the worktree of the Request's OpenSpec proposal; the branch and the stored change stay.

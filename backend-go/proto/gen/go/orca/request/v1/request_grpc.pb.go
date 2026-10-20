@@ -49,6 +49,8 @@ const (
 	RequestService_GetPlanBundleFile_FullMethodName                = "/orca.request.v1.RequestService/GetPlanBundleFile"
 	RequestService_CleanupRequestProposal_FullMethodName           = "/orca.request.v1.RequestService/CleanupRequestProposal"
 	RequestService_CommitPlan_FullMethodName                       = "/orca.request.v1.RequestService/CommitPlan"
+	RequestService_RetryPlanGeneration_FullMethodName              = "/orca.request.v1.RequestService/RetryPlanGeneration"
+	RequestService_ListPlanRevisions_FullMethodName                = "/orca.request.v1.RequestService/ListPlanRevisions"
 	RequestService_StartPhase_FullMethodName                       = "/orca.request.v1.RequestService/StartPhase"
 	RequestService_ReportTaskOutcome_FullMethodName                = "/orca.request.v1.RequestService/ReportTaskOutcome"
 	RequestService_RecordRequestCheck_FullMethodName               = "/orca.request.v1.RequestService/RecordRequestCheck"
@@ -140,6 +142,10 @@ type RequestServiceClient interface {
 	GetPlanBundleFile(ctx context.Context, in *GetPlanBundleFileRequest, opts ...grpc.CallOption) (*GetPlanBundleFileResponse, error)
 	CleanupRequestProposal(ctx context.Context, in *CleanupRequestProposalRequest, opts ...grpc.CallOption) (*CleanupRequestProposalResponse, error)
 	CommitPlan(ctx context.Context, in *CommitPlanRequest, opts ...grpc.CallOption) (*CommitPlanResponse, error)
+	// Queues another automatic attempt at the Plan (CR-REQ-044).
+	RetryPlanGeneration(ctx context.Context, in *RetryPlanGenerationRequest, opts ...grpc.CallOption) (*RetryPlanGenerationResponse, error)
+	// Lists the versions of the Plan with the changes that were asked for (CR-REQ-045).
+	ListPlanRevisions(ctx context.Context, in *ListPlanRevisionsRequest, opts ...grpc.CallOption) (*ListPlanRevisionsResponse, error)
 	StartPhase(ctx context.Context, in *StartPhaseRequest, opts ...grpc.CallOption) (*StartPhaseResponse, error)
 	ReportTaskOutcome(ctx context.Context, in *ReportTaskOutcomeRequest, opts ...grpc.CallOption) (*ReportTaskOutcomeResponse, error)
 	RecordRequestCheck(ctx context.Context, in *RecordRequestCheckRequest, opts ...grpc.CallOption) (*RecordRequestCheckResponse, error)
@@ -496,6 +502,26 @@ func (c *requestServiceClient) CommitPlan(ctx context.Context, in *CommitPlanReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CommitPlanResponse)
 	err := c.cc.Invoke(ctx, RequestService_CommitPlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) RetryPlanGeneration(ctx context.Context, in *RetryPlanGenerationRequest, opts ...grpc.CallOption) (*RetryPlanGenerationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RetryPlanGenerationResponse)
+	err := c.cc.Invoke(ctx, RequestService_RetryPlanGeneration_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) ListPlanRevisions(ctx context.Context, in *ListPlanRevisionsRequest, opts ...grpc.CallOption) (*ListPlanRevisionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPlanRevisionsResponse)
+	err := c.cc.Invoke(ctx, RequestService_ListPlanRevisions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1014,6 +1040,10 @@ type RequestServiceServer interface {
 	GetPlanBundleFile(context.Context, *GetPlanBundleFileRequest) (*GetPlanBundleFileResponse, error)
 	CleanupRequestProposal(context.Context, *CleanupRequestProposalRequest) (*CleanupRequestProposalResponse, error)
 	CommitPlan(context.Context, *CommitPlanRequest) (*CommitPlanResponse, error)
+	// Queues another automatic attempt at the Plan (CR-REQ-044).
+	RetryPlanGeneration(context.Context, *RetryPlanGenerationRequest) (*RetryPlanGenerationResponse, error)
+	// Lists the versions of the Plan with the changes that were asked for (CR-REQ-045).
+	ListPlanRevisions(context.Context, *ListPlanRevisionsRequest) (*ListPlanRevisionsResponse, error)
 	StartPhase(context.Context, *StartPhaseRequest) (*StartPhaseResponse, error)
 	ReportTaskOutcome(context.Context, *ReportTaskOutcomeRequest) (*ReportTaskOutcomeResponse, error)
 	RecordRequestCheck(context.Context, *RecordRequestCheckRequest) (*RecordRequestCheckResponse, error)
@@ -1165,6 +1195,12 @@ func (UnimplementedRequestServiceServer) CleanupRequestProposal(context.Context,
 }
 func (UnimplementedRequestServiceServer) CommitPlan(context.Context, *CommitPlanRequest) (*CommitPlanResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CommitPlan not implemented")
+}
+func (UnimplementedRequestServiceServer) RetryPlanGeneration(context.Context, *RetryPlanGenerationRequest) (*RetryPlanGenerationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RetryPlanGeneration not implemented")
+}
+func (UnimplementedRequestServiceServer) ListPlanRevisions(context.Context, *ListPlanRevisionsRequest) (*ListPlanRevisionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPlanRevisions not implemented")
 }
 func (UnimplementedRequestServiceServer) StartPhase(context.Context, *StartPhaseRequest) (*StartPhaseResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartPhase not implemented")
@@ -1861,6 +1897,42 @@ func _RequestService_CommitPlan_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RequestServiceServer).CommitPlan(ctx, req.(*CommitPlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_RetryPlanGeneration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RetryPlanGenerationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).RetryPlanGeneration(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_RetryPlanGeneration_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).RetryPlanGeneration(ctx, req.(*RetryPlanGenerationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_ListPlanRevisions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPlanRevisionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).ListPlanRevisions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_ListPlanRevisions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).ListPlanRevisions(ctx, req.(*ListPlanRevisionsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2812,6 +2884,14 @@ var RequestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CommitPlan",
 			Handler:    _RequestService_CommitPlan_Handler,
+		},
+		{
+			MethodName: "RetryPlanGeneration",
+			Handler:    _RequestService_RetryPlanGeneration_Handler,
+		},
+		{
+			MethodName: "ListPlanRevisions",
+			Handler:    _RequestService_ListPlanRevisions_Handler,
 		},
 		{
 			MethodName: "StartPhase",

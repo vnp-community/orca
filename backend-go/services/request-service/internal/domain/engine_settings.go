@@ -17,9 +17,11 @@ type ProjectEngineSettings struct {
 	SolutionAgent bool
 	// ExecutionMode is how Requests of this project run after their plan is approved. Empty reads as step_by_step.
 	ExecutionMode ExecutionMode
-	UpdatedBy     string
-	UpdatedAt     time.Time
-	Version       int64
+	// PlanAutoGenerate lets Orca start the Plan by itself once the Analysis is approved. On unless a project turns it off.
+	PlanAutoGenerate bool
+	UpdatedBy        string
+	UpdatedAt        time.Time
+	Version          int64
 	// FromDeploymentDefault marks settings that were not saved for this project but filled in from the deployment's defaults
 	// (never stored). The default engine moves only the types that run OpenSpec by default; a type that merely may run it
 	// (OpenSpecProfileLight) needs a project that chose it.
@@ -36,14 +38,15 @@ func NewProjectEngineSettings(tenantID, projectID string, engine EngineName, min
 		return ProjectEngineSettings{}, fmt.Errorf("invalid minVersion format")
 	}
 	return ProjectEngineSettings{
-		TenantID:      tenantID,
-		ProjectID:     projectID,
-		Engine:        engine,
-		MinVersion:    minVersion,
-		ExecutionMode: ExecutionStepByStep,
-		UpdatedBy:     actor,
-		UpdatedAt:     now,
-		Version:       1,
+		TenantID:         tenantID,
+		ProjectID:        projectID,
+		Engine:           engine,
+		MinVersion:       minVersion,
+		ExecutionMode:    ExecutionStepByStep,
+		PlanAutoGenerate: true,
+		UpdatedBy:        actor,
+		UpdatedAt:        now,
+		Version:          1,
 	}, nil
 }
 

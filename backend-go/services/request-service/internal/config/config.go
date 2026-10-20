@@ -35,6 +35,8 @@ type Config struct {
 	ApprovalNotifyMaxRecipients int
 	// ApprovalSubjects limits which subject types need a handler; empty means all.
 	ApprovalSubjects []string
+	// OutputLanguage is the raw REQUEST_DEFAULT_OUTPUT_LANGUAGE (CR-REQ-046); the server parses it and refuses to start on a bad value.
+	OutputLanguage string
 	// Analysis tunables (CR-REQ-007/008); zero values mean the defaults in usecase.DefaultAnalysisSettings.
 	AICompleteTimeout        time.Duration
 	AnalysisLeaseTTL         time.Duration
@@ -100,6 +102,7 @@ func Load() Config {
 		ReconcileInterval:           time.Minute,
 		ReconcileQuiet:              5 * time.Minute,
 		MetricsSampleInterval:       30 * time.Second,
+		OutputLanguage:              strings.TrimSpace(os.Getenv("REQUEST_DEFAULT_OUTPUT_LANGUAGE")),
 		StuckThresholds:             map[string]time.Duration{"classifying": 10 * time.Minute, "analyzing": 30 * time.Minute, "planning": 30 * time.Minute},
 	}
 	for _, status := range stuckStatuses {

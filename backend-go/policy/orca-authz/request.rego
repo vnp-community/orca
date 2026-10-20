@@ -46,6 +46,10 @@ agent_rpcs := {
 # is not a project member cannot read the repository the analysis needs, so they stay outside.
 member_steering_rpcs := {"GenerateSolution", "ChooseSolutionOption"}
 
+# Plan steering: the approver of the pending Plan gate asks for changes through GeneratePlan (CR-REQ-045). The first Plan
+# and CommitPlan stay with the reporter and admins, which Go enforces behind this door.
+member_plan_steering_rpcs := {"GeneratePlan"}
+
 caller_roles contains role if {
 	role := input.caller_project_role
 	role != ""
@@ -77,6 +81,14 @@ allow if {
 	human
 	input.action == "analyze"
 	input.rpc in member_steering_rpcs
+	input.caller_project_role == "member"
+}
+
+# Go decides: revision by the approver of the pending Plan gate (CR-REQ-045); first generation stays with the reporter and admins.
+allow if {
+	human
+	input.action == "plan"
+	input.rpc in member_plan_steering_rpcs
 	input.caller_project_role == "member"
 }
 

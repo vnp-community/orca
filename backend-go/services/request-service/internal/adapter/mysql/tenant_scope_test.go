@@ -23,6 +23,7 @@ func TestTenantScope(t *testing.T) {
 		"approval_repository.go:NowDB":                   clockOnly,
 		"approval_repository.go:Insert":                  "column list is the approvalColumns constant, which includes tenant_id",
 		"approval_repository.go:claim":                   relay,
+		"plan_auto_job_repository.go:ClaimDue":           relay,
 		"analysis_run_repository.go:ClaimExpired":        relay,
 		"clarification_repository.go:ListDueRefs":        relay,
 		"clarification_repository.go:ListRemindableRefs": relay,

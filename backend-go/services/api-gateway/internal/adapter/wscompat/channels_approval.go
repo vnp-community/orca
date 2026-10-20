@@ -13,11 +13,15 @@ type approvalDecisionArgs struct {
 	ExpectedVersion int64  `json:"expectedVersion"`
 	ExpectedDigest  string `json:"expectedDigest"`
 	Comment         string `json:"comment"`
+	// ExecutionMode is forwarded as sent: request-service owns the list of accepted values (CR-REQ-043).
+	ExecutionMode string `json:"executionMode"`
 }
 
 type approvalDecisionResult struct {
 	Approval      ApprovalView `json:"approval"`
 	RequestStatus string       `json:"requestStatus"`
+	// ExecutionMode is the mode pinned on the Request after the decision; absent when none is pinned.
+	ExecutionMode string `json:"executionMode,omitempty"`
 }
 
 // registerApproval has no approval.request channel: approvals are created by the state machine.
@@ -89,16 +93,21 @@ func (c requestChannels) registerApproval(r *Registry) {
 		}
 		resp, err := c.appr.Approve(ctx, &requestv1.ApproveRequest{
 			Id: in.ID, Comment: in.Comment, ExpectedDigest: in.ExpectedDigest, ExpectedVersion: in.ExpectedVersion,
+			ExecutionMode: in.ExecutionMode,
 		})
 		if err != nil {
 			return nil, err
 		}
-		return approvalDecisionResult{ApprovalViewOf(resp.GetApproval()), resp.GetRequestStatus()}, nil
+		return approvalDecisionResult{ApprovalViewOf(resp.GetApproval()), resp.GetRequestStatus(), resp.GetExecutionMode()}, nil
 	})
 	c.handle(r, "approval.reject", opts, func(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
 		in, err := decodeDecision(args)
 		if err != nil {
 			return nil, err
+		}
+		// RejectRequest has no such field, so the key would be dropped silently if it were not refused here.
+		if strings.TrimSpace(in.ExecutionMode) != "" {
+			return nil, requestInputError{msg: "REQUEST_EXECUTION_MODE_INVALID: executionMode applies to approve only"}
 		}
 		if strings.TrimSpace(in.Comment) == "" {
 			return nil, requestInputError{msg: "REQUEST_APPROVAL_COMMENT_REQUIRED: a comment is required to reject"}
@@ -109,7 +118,7 @@ func (c requestChannels) registerApproval(r *Registry) {
 		if err != nil {
 			return nil, err
 		}
-		return approvalDecisionResult{ApprovalViewOf(resp.GetApproval()), resp.GetRequestStatus()}, nil
+		return approvalDecisionResult{Approval: ApprovalViewOf(resp.GetApproval()), RequestStatus: resp.GetRequestStatus()}, nil
 	})
 	c.handle(r, "approval.cancel", opts, func(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
 		in, err := decodeRequestArgs[struct {

@@ -20,11 +20,15 @@ type DecideApprovalInput struct {
 	// ExpectedDigest must equal the stored digest for approve; for reject it is checked only when set.
 	ExpectedDigest  string
 	ExpectedVersion int64 // 0 skips the check
+	// ExecutionMode is the raw mode the approver chose (CR-REQ-043): empty or "continuous", approve of a run-starting plan only.
+	ExecutionMode string
 }
 
 type DecideApprovalResult struct {
 	Approval      domain.Approval
 	RequestStatus domain.RequestStatus
+	// ExecutionMode is the mode pinned on the Request after the decision; empty when none is pinned.
+	ExecutionMode domain.ExecutionMode
 }
 
 // DecideApproval approves or rejects in one transaction: Request lock, Approval lock, checks, state change,
@@ -40,6 +44,8 @@ type DecideApproval struct {
 	Expirer *ExpireApprovals
 	// StartPrecheck refuses a plan approval whose run could not start (CR-REQ-038); nil skips it.
 	StartPrecheck *ExecutionStartPrecheck
+	// Pinner records the mode the approver chose, in the decision's transaction; required when a caller can send one.
+	Pinner ExecutionModePinner
 }
 
 func (uc *DecideApproval) Execute(ctx context.Context, in DecideApprovalInput) (DecideApprovalResult, error) {
@@ -56,12 +62,23 @@ func (uc *DecideApproval) Execute(ctx context.Context, in DecideApprovalInput) (
 			return DecideApprovalResult{}, err
 		}
 	}
+	mode, err := domain.ParseApprovalExecutionMode(in.ExecutionMode)
+	if err != nil {
+		return DecideApprovalResult{}, err
+	}
+	if mode != "" && in.Decision == DecisionReject {
+		return DecideApprovalResult{}, domain.ErrExecutionModeInvalid(in.ExecutionMode)
+	}
 	userID, _ := tenant.UserID(ctx)
 
 	// Read the request id before locking so the lock order stays Request, then Approval.
 	probe, err := uc.Repo.Get(ctx, tenantID, in.ID)
 	if err != nil {
 		return DecideApprovalResult{}, err
+	}
+
+	if mode != "" && !domain.ExecutionModeChoiceApplies(probe) {
+		return DecideApprovalResult{}, domain.ErrExecutionModeNotApplicable()
 	}
 
 	if p, ok := uc.Authorizer.(interface {
@@ -73,7 +90,7 @@ func (uc *DecideApproval) Execute(ctx context.Context, in DecideApprovalInput) (
 	}
 
 	if uc.StartPrecheck != nil && in.Decision == DecisionApprove && probe.Status == domain.ApprovalStatusPending {
-		if err := uc.StartPrecheck.Check(ctx, probe, userID); err != nil {
+		if err := uc.StartPrecheck.Check(ctx, probe, userID, mode); err != nil {
 			return DecideApprovalResult{}, err
 		}
 	}
@@ -91,7 +108,7 @@ func (uc *DecideApproval) Execute(ctx context.Context, in DecideApprovalInput) (
 		}
 		if a.Status != domain.ApprovalStatusPending {
 			if sameDecision(a, in, userID) {
-				res = DecideApprovalResult{Approval: a, RequestStatus: req.Status} // retry of the same decision: no second event
+				res = DecideApprovalResult{Approval: a, RequestStatus: req.Status, ExecutionMode: req.ExecutionMode} // retry of the same decision: no second event
 				return nil
 			}
 			return domain.ErrApprovalNotPending
@@ -119,6 +136,9 @@ func (uc *DecideApproval) Execute(ctx context.Context, in DecideApprovalInput) (
 		}
 		if string(req.Status) != a.Stage {
 			return domain.ErrApprovalStageMismatch
+		}
+		if _, err := pinRequestedMode(ctx, uc.Pinner, req, mode); err != nil {
+			return err
 		}
 
 		prev := a.Version
@@ -155,14 +175,16 @@ func (uc *DecideApproval) Execute(ctx context.Context, in DecideApprovalInput) (
 		if err != nil {
 			return err
 		}
-		ev, err := NewOutboxEvent(ctx, domain.SubjectApprovalDecided, domain.NewApprovalDecidedPayload(a, after, decision))
+		payload := domain.NewApprovalDecidedPayload(a, after, decision)
+		payload.ExecutionMode = string(mode)
+		ev, err := NewOutboxEvent(ctx, domain.SubjectApprovalDecided, payload)
 		if err != nil {
 			return err
 		}
 		if err := uc.Outbox.InsertOutboxEvent(ctx, ev); err != nil {
 			return err
 		}
-		res = DecideApprovalResult{Approval: a, RequestStatus: after.Status}
+		res = DecideApprovalResult{Approval: a, RequestStatus: after.Status, ExecutionMode: after.ExecutionMode}
 		return nil
 	})
 	if err != nil {

@@ -46,27 +46,29 @@ func (s *ApprovalServer) RequestApproval(ctx context.Context, req *requestv1.Req
 	return &requestv1.RequestApprovalResponse{Approval: toProtoApproval(*a)}, nil
 }
 
-func (s *ApprovalServer) decide(ctx context.Context, decision, id, comment, digest string, version int64) (*requestv1.Approval, string, error) {
+func (s *ApprovalServer) decide(ctx context.Context, decision, id, comment, digest string, version int64, executionMode string) (*requestv1.Approval, string, string, error) {
 	if s.uc.Decide == nil {
-		return nil, "", status.Error(codes.Unimplemented, "approval decisions are not wired")
+		return nil, "", "", status.Error(codes.Unimplemented, "approval decisions are not wired")
 	}
-	res, err := s.uc.Decide.Execute(ctx, usecase.DecideApprovalInput{ID: id, Decision: decision, Comment: comment, ExpectedDigest: digest, ExpectedVersion: version})
+	res, err := s.uc.Decide.Execute(ctx, usecase.DecideApprovalInput{
+		ID: id, Decision: decision, Comment: comment, ExpectedDigest: digest, ExpectedVersion: version, ExecutionMode: executionMode,
+	})
 	if err != nil {
-		return nil, "", apperrors.ToGRPCStatus(err)
+		return nil, "", "", apperrors.ToGRPCStatus(err)
 	}
-	return toProtoApproval(res.Approval), string(res.RequestStatus), nil
+	return toProtoApproval(res.Approval), string(res.RequestStatus), string(res.ExecutionMode), nil
 }
 
 func (s *ApprovalServer) Approve(ctx context.Context, req *requestv1.ApproveRequest) (*requestv1.ApproveResponse, error) {
-	a, st, err := s.decide(ctx, usecase.DecisionApprove, req.GetId(), req.GetComment(), req.GetExpectedDigest(), req.GetExpectedVersion())
+	a, st, mode, err := s.decide(ctx, usecase.DecisionApprove, req.GetId(), req.GetComment(), req.GetExpectedDigest(), req.GetExpectedVersion(), req.GetExecutionMode())
 	if err != nil {
 		return nil, err
 	}
-	return &requestv1.ApproveResponse{Approval: a, RequestStatus: st}, nil
+	return &requestv1.ApproveResponse{Approval: a, RequestStatus: st, ExecutionMode: mode}, nil
 }
 
 func (s *ApprovalServer) Reject(ctx context.Context, req *requestv1.RejectRequest) (*requestv1.RejectResponse, error) {
-	a, st, err := s.decide(ctx, usecase.DecisionReject, req.GetId(), req.GetComment(), req.GetExpectedDigest(), req.GetExpectedVersion())
+	a, st, _, err := s.decide(ctx, usecase.DecisionReject, req.GetId(), req.GetComment(), req.GetExpectedDigest(), req.GetExpectedVersion(), "")
 	if err != nil {
 		return nil, err
 	}

@@ -18,6 +18,18 @@ func (g reporterOfRequest) Get(context.Context, string) (domain.Request, error) 
 	return domain.Request{ReporterID: g.reporter}, g.err
 }
 
+func TestAnalysisRunner_PlanRunResolvesAsReporter(t *testing.T) {
+	base := tenant.WithUserID(context.Background(), "approver")
+	r := &AnalysisRunner{requests: reporterOfRequest{reporter: "rep"}}
+	run := domain.AnalysisRun{Kind: domain.RunKindPlan, ActorID: "approver"}
+	if got, _ := tenant.UserID(r.reporterIdentity(base, run)); got != "rep" {
+		t.Fatalf("a plan run must resolve as the reporter, got %q", got)
+	}
+	if run.ActorID != "approver" {
+		t.Fatal("the run stays attributed to the approver")
+	}
+}
+
 func TestAnalysisRunner_ReporterIdentityForNonReporterActors(t *testing.T) {
 	base := tenant.WithUserID(context.Background(), "approver")
 	cases := []struct {
@@ -28,7 +40,9 @@ func TestAnalysisRunner_ReporterIdentityForNonReporterActors(t *testing.T) {
 	}{
 		{"approver's analysis run looks up the dev server as the reporter", &AnalysisRunner{requests: reporterOfRequest{reporter: "rep"}}, domain.AnalysisRun{Kind: domain.RunKindSolution, ActorID: "approver"}, "rep"},
 		{"reporter's own run is untouched", &AnalysisRunner{requests: reporterOfRequest{reporter: "approver"}}, domain.AnalysisRun{Kind: domain.RunKindSolution, ActorID: "approver"}, "approver"},
-		{"plan runs keep the caller", &AnalysisRunner{requests: reporterOfRequest{reporter: "rep"}}, domain.AnalysisRun{Kind: domain.RunKindPlan, ActorID: "approver"}, "approver"},
+		{"an approver's plan run looks up the dev server as the reporter", &AnalysisRunner{requests: reporterOfRequest{reporter: "rep"}}, domain.AnalysisRun{Kind: domain.RunKindPlan, ActorID: "approver"}, "rep"},
+		{"the reporter's own plan run is untouched", &AnalysisRunner{requests: reporterOfRequest{reporter: "approver"}}, domain.AnalysisRun{Kind: domain.RunKindPlan, ActorID: "approver"}, "approver"},
+		{"a failed lookup keeps the caller of a plan run", &AnalysisRunner{requests: reporterOfRequest{err: errors.New("down")}}, domain.AnalysisRun{Kind: domain.RunKindPlan, ActorID: "approver"}, "approver"},
 		{"a failed lookup keeps the caller", &AnalysisRunner{requests: reporterOfRequest{err: errors.New("down")}}, domain.AnalysisRun{Kind: domain.RunKindSolution, ActorID: "approver"}, "approver"},
 		{"no store wired keeps the caller", &AnalysisRunner{}, domain.AnalysisRun{Kind: domain.RunKindSolution, ActorID: "approver"}, "approver"},
 	}

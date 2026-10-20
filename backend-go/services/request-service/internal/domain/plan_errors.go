@@ -76,7 +76,36 @@ func ErrPlanTaskServiceUnavailable(cause error) error {
 }
 
 func ErrPlanForbidden() error {
-	return apperrors.New(apperrors.KindPermissionDenied, "REQUEST_PLAN_FORBIDDEN", "only the reporter or an administrator may generate or commit a Plan", nil)
+	return apperrors.New(apperrors.KindPermissionDenied, "REQUEST_PLAN_FORBIDDEN", "only the reporter, an administrator or an approver of the pending decision may ask for a Plan or changes to it", nil)
+}
+
+// ErrPlanIdempotencyKeyInvalid refuses a key wider than analysis_runs.idempotency_key.
+func ErrPlanIdempotencyKeyInvalid() error {
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_PLAN_IDEMPOTENCY_KEY_INVALID", fmt.Sprintf("the idempotency key is limited to %d characters", PlanAutoKeyMaxLen), nil)
+}
+
+// ErrPlanRevisionInProgress: somebody else's request for changes is already being written; asking again would start a
+// second run for the same Plan.
+func ErrPlanRevisionInProgress() error {
+	return planInvalid("REQUEST_PLAN_REVISION_IN_PROGRESS", "another request for changes to this Plan is already being worked on")
+}
+
+// ErrPlanRevisionNotApplicable: a hotfix has a single fix task made from its diagnosis, not a Plan to revise.
+func ErrPlanRevisionNotApplicable() error {
+	return planInvalid("REQUEST_PLAN_REVISION_NOT_APPLICABLE", "this request type has no Plan documents to change")
+}
+
+func ErrPlanRevisionNotFound(revision int) error {
+	return apperrors.New(apperrors.KindNotFound, "REQUEST_PLAN_REVISION_NOT_FOUND", fmt.Sprintf("this Plan has no version %d", revision), nil)
+}
+
+func ErrPlanRevisionPageTokenInvalid() error {
+	return apperrors.New(apperrors.KindInvalidArgument, "REQUEST_PLAN_REVISION_PAGE_TOKEN_INVALID", "the page token is not one this list returned", nil)
+}
+
+// ErrPlanRevisionTextPruned: only the newest versions keep the text of their documents; older ones keep the file list.
+func ErrPlanRevisionTextPruned() error {
+	return planInvalid("REQUEST_PLAN_REVISION_TEXT_PRUNED", "the text of this version was dropped to bound storage; only the current and the newest versions keep it")
 }
 
 func ErrPlanFeedbackTooLong() error {

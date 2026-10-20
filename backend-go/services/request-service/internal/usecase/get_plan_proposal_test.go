@@ -11,14 +11,14 @@ func TestGetPlanProposal_ReportsEachRunState(t *testing.T) {
 	k, req, run, _, worker := planRunKit(t, domain.RequestTypeTask, domain.RequestSizeS, []string{planJSON(false)})
 	get := NewGetPlanProposal(k.w, fakeRuns{k.w})
 
-	v, err := get.Execute(k.w.ctx(), req.ID, run.ID)
+	v, err := get.Execute(k.w.ctx(), req.ID, run.ID, 0)
 	if err != nil || v.Status != "running" || v.Proposal != nil {
 		t.Fatalf("running: %+v %v", v, err)
 	}
 	if err := worker.Execute(k.w.ctx(), run); err != nil {
 		t.Fatal(err)
 	}
-	v, err = get.Execute(k.w.ctx(), req.ID, "") // no run id: the newest plan run
+	v, err = get.Execute(k.w.ctx(), req.ID, "", 0) // no run id: the newest plan run
 	if err != nil || v.Status != "succeeded" || v.Proposal == nil || v.Proposal.Tasks[0].Title != "Implement cache" || v.RunID != run.ID {
 		t.Fatalf("succeeded: %+v %v", v, err)
 	}
@@ -35,7 +35,7 @@ func TestGetPlanProposal_FailedRunCarriesTheReasonAndRawText(t *testing.T) {
 		failed.RawOutput = &raw
 		return failed
 	}()
-	v, err := NewGetPlanProposal(k.w, fakeRuns{k.w}).Execute(k.w.ctx(), req.ID, run.ID)
+	v, err := NewGetPlanProposal(k.w, fakeRuns{k.w}).Execute(k.w.ctx(), req.ID, run.ID, 0)
 	if err != nil || v.Status != "failed" || v.ErrorCode != "REQUEST_PLAN_AI_INVALID_JSON" || !strings.Contains(v.Raw, "still nope") {
 		t.Fatalf("failed: %+v %v", v, err)
 	}
@@ -46,10 +46,10 @@ func TestGetPlanProposal_RefusesAnotherRequestsRunAndAnUnknownRun(t *testing.T) 
 	other := k.w.seedRequest(domain.RequestTypeTask, domain.RequestStatusPlanning)
 	get := NewGetPlanProposal(k.w, fakeRuns{k.w})
 
-	_, err := get.Execute(k.w.ctx(), other.ID, run.ID)
+	_, err := get.Execute(k.w.ctx(), other.ID, run.ID, 0)
 	requireCode(t, err, "REQUEST_PLAN_RUN_NOT_FOUND")
-	_, err = get.Execute(k.w.ctx(), other.ID, "")
+	_, err = get.Execute(k.w.ctx(), other.ID, "", 0)
 	requireCode(t, err, "REQUEST_PLAN_RUN_NOT_FOUND")
-	_, err = get.Execute(k.w.ctx(), other.ID, "00000000-0000-4000-8000-000000000000")
+	_, err = get.Execute(k.w.ctx(), other.ID, "00000000-0000-4000-8000-000000000000", 0)
 	requireCode(t, err, "REQUEST_PLAN_RUN_NOT_FOUND")
 }

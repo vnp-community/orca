@@ -72,12 +72,16 @@ const (
 // ActivityAnalysisRevisionRequested is a person asking for changes to the analysis; the feed records that it happened, never the text.
 const ActivityAnalysisRevisionRequested = "analysis.revision_requested"
 
+// ActivityPlanRevisionRequested is a person asking for changes to the Plan; like the analysis line it records that it
+// happened, never the text (C9).
+const ActivityPlanRevisionRequested = "plan.revision_requested"
+
 // AllActivityKinds is the closed set a filter may name.
 var AllActivityKinds = []string{
 	ActivityRequestCreated, ActivityRequestClassified, ActivityRequestTypeChange, ActivityAnalysisGenerated, ActivityClarifyAsked,
 	ActivityClarifyAnswered, ActivityApprovalRequested, ActivityApprovalDecided, ActivityPhaseStarted, ActivityPhaseDone, ActivityPlanDone,
 	ActivityTaskStarted, ActivityTaskSucceeded, ActivityTaskAccepted, ActivityTaskFailed, ActivityTaskCancelled, ActivityRequestReturned, ActivityRequestReopened,
-	ActivityRequestCancelled, ActivityAnalysisRevisionRequested,
+	ActivityRequestCancelled, ActivityAnalysisRevisionRequested, ActivityPlanRevisionRequested,
 }
 
 // ActivityRow is one line as a repository read it: the columns are generic (A to D, N) because every source table has its
@@ -206,6 +210,8 @@ func BuildActivityEntry(row ActivityRow, tasks map[string]ActivityTask, maxAttem
 		// The reviewer's feedback is user content (C9): the row has no column for it, so the line cannot show it.
 		e.Summary = "Requested changes to the analysis"
 		e.Details["solutionId"] = row.SubjectID
+	case ActivityPlanRevisionRequested:
+		e.Summary = "Requested changes to the plan"
 	case ActivityClarifyAsked:
 		e.Summary = "Clarification asked"
 		e.Details["source"], e.Details["status"], e.Details["resumeStatus"], e.Details["round"] = row.A, row.B, row.C, row.N

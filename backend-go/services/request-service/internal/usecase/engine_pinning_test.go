@@ -106,7 +106,7 @@ func (p *stubPinner) Execute(context.Context, string) (domain.EngineName, error)
 func planKitWithPin(pin EnginePinner, conns AnalysisConnectionResolver) *planKit {
 	k := newPlanKit(conns)
 	k.generate = NewGeneratePlan(GeneratePlanDeps{
-		Requests: k.w, Solutions: fakeSolutions{k.w}, Runs: fakeRuns{k.w}, Conns: conns, Auth: NewPlanActorAuthorizer(allowAll{}), Approvals: fakeCanceller{k.w},
+		Requests: k.w, Solutions: fakeSolutions{k.w}, Runs: fakeRuns{k.w}, Conns: conns, Auth: NewPlanActorAuthorizer(allowAll{}, nil, false), Approvals: fakeCanceller{k.w},
 		Transition: k.w.transitioner(), Tx: k.w, Spawner: k.spawner, LeaseOwner: testOwner, Pin: pin,
 	})
 	return k

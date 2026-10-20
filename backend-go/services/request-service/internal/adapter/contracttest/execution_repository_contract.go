@@ -20,6 +20,7 @@ import (
 type ExecutionEnv struct {
 	LifecycleEnv
 	Approvals        usecase.ApprovalRepository
+	Locker           usecase.RequestLocker
 	GateApprovals    usecase.ApprovalGateReader
 	PhaseStarts      usecase.PhaseStartRepository
 	Outcomes         usecase.TaskRunOutcomeRepository
@@ -75,6 +76,7 @@ func RunExecutionRepositoryContract(t *testing.T, newEnv func(t *testing.T) Exec
 		{"Activity_TenantIsolation", activityTenantIsolation},
 		{"Activity_RevisionRequested_OneLinePerRound_NoFeedback", activityRevisionRequested},
 		{"Activity_RevisionRequested_NullSolutionAndActor", activityRevisionWithoutSolutionOrActor},
+		{"Activity_PlanRevisionRequested_NotMistakenForAnAnalysis", activityPlanRevisionRequested},
 	}
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) { s.fn(t, env) })

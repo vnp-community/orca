@@ -2,4 +2,5 @@
 Answer the question in <request> with citations to the code or docs you read. When the evidence is thin, lower confidence and list limitations.
 Reply with exactly one JSON object, no code fence, no text outside it. Schema: {"schema_version":1,"kind":"answer","answer_markdown":"1..8000 characters","confidence":0.0,"citations":[{"ref":"path:line","excerpt":""}],"limitations":[],"suggested_follow_up":{"type":"change_request|task","title":""}}
 
+{{template "_language_rule.tmpl" . -}}
 {{template "_body.tmpl" . -}}

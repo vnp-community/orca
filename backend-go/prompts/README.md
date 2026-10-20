@@ -12,8 +12,8 @@ Module path `github.com/stablyai/orca-go/prompts`. It imports `common/secretscan
 | `classify_request` | classify a new Request (type, size, urgency); random boundary instead of a fence |
 | `analysis` | Solution (`solution.tmpl` for ai.complete, `agent_solution.tmpl` for a read-only agent), `diagnosis.tmpl`, `findings.tmpl`, `answer.tmpl` |
 | `clarification_answers` | the `<clarifications>` block with the reviewer's earlier answers |
-| `plan_native` | Plan as one JSON document |
-| `plan_openspec` | the OpenSpec change an agent authors; `TaskRange` is the task count per Request size |
+| `plan_native` | Plan as one JSON document; `_prior_plan.tmpl` shows the Plan being revised (CR-REQ-045) |
+| `plan_openspec` | the OpenSpec change an agent authors; `_revise_in_place.tmpl` tells it to edit the files of the previous version (CR-REQ-045); `TaskRange` is the task count per Request size |
 | `task_prompt_template` | the standing instruction stored with each task of an OpenSpec plan |
 | `solution_openspec` | restricts an agent to one OpenSpec change directory |
 | `task_execution` | the prompt that runs one task (`execute.tmpl`) and the result-block instruction of a contract run (`result_block_suffix.tmpl`); `{{outputs.<taskId>.*}}` is resolved by task-service after `Render` |
@@ -22,7 +22,8 @@ Module path `github.com/stablyai/orca-go/prompts`. It imports `common/secretscan
 | `git_commit_message` | ai.complete prompt for a commit message, and the file-stats body used when the diff is too large |
 | `git_pull_request` | ai.complete prompt for a PR title and description |
 | `git_agent_prompt` | prompt typed into the agent session started in a worktree created from an issue; `Sanitize` strips HTML and cuts each field to 4000 bytes |
-| `request_context` | partials shared by the flows above: `_request_block`, `_project`, `_feedback`, `_retry_note`, `_approved_decision`, plus the length caps |
+| `request_context` | partials shared by the flows above: `_request_block`, `_project`, `_feedback`, `_retry_note`, `_approved_decision`, `_language_rule`, plus the length caps |
+| `output_language` | the closed set of output languages (`vi`, `en`) the `analysis`, `plan_native` and `plan_openspec` inputs carry in `Language`; see "Output language" |
 | `fence` | `Untrusted`, `Closing`, `Truncate` |
 | `redact` | `Secrets` (always on) and `Redactor` (secrets always, PII per tenant, fails closed) |
 | `render` | the template set every flow uses and its function map |
@@ -54,6 +55,19 @@ Module path `github.com/stablyai/orca-go/prompts`. It imports `common/secretscan
 - Template functions: `fence` (neutralise every closing tag of a block that wraps user text), `closing` (one named tag), `truncate` (first n runes),
   `redact` (mask credentials; there is no switch to turn it off). `redact.Redactor` is the per-tenant variant (PII too) and fails closed when the
   tenant setting cannot be read. Order matters: `truncate`, then `redact`, then `fence`, so a cut never lands inside a mask or an escaped tag.
+
+## Output language
+
+`analysis.Input`, `plan_native.Input` and `plan_openspec.Input` carry `Language output_language.Language` (CR-REQ-046). A set Language adds one
+instruction block ahead of the data (`<request>`): the first line is always `Output language: <Name>.`, then the rules for what stays in English.
+`request_context/_language_rule.tmpl` serves the JSON prompts (keys, `kind`, enum values, ids, labels, paths and code stay in English);
+`plan_openspec/_language_rule_openspec.tmpl` serves the OpenSpec author (grammar headings, `SHALL`/`MUST`, task line labels, `ORCA_RESULT_*` stay in English).
+The partial files have different names because a set requires unique file names across the `fs.FS` it parses.
+
+- The zero Language emits nothing, so every prompt that predates the setting is byte for byte what it was; the golden files are the proof.
+  Production always passes a non-empty Language (`REQUEST_DEFAULT_OUTPUT_LANGUAGE`, default `vi`).
+- The instruction never contains the text `"kind":"<kind>"`: the stub model finds the read-only kind by that string ahead of `<request>`.
+- Templates write `{{.Language.Name}}`, never a language name, so a new language is one line in `output_language.go`.
 
 ## Package and prompt IDs
 
@@ -100,21 +114,21 @@ field) staying inside its block, optional blocks left out when empty, and a miss
 prompt is bigger than the flow's budget in `maxPromptBytes`. Fixture: a 200,000-rune Request body and 60 acceptance criteria, 30 earlier
 Solutions of 60,000 runes each with 10,000 runes of feedback, 50 clarification answers (5,000-rune question, 20,000-rune answer), 50,000-rune
 feedback and retry note, an 80,000-rune approved analysis, a 60,000-rune task description with 30 dependencies, 400,000-rune diffs, 2,000 changed
-files, 50 issue comments. The text mixes ASCII with multi-byte letters, so a cap counted in bytes instead of runes would show.
+files, 50 issue comments, a 40,000-rune prior Plan and 200 file names of a previous OpenSpec change. The text mixes ASCII with multi-byte letters, so a cap counted in bytes instead of runes would show.
 
-Measured on 2026-10-20 (bytes of the rendered prompt) and the budget set about 10 to 20 percent above it:
+Measured on 2026-10-20 (bytes of the rendered prompt) and the budget set about 10 to 20 percent above it. The analysis, `plan_native` and `plan_openspec` fixtures set `Language: output_language.Vietnamese` (CR-REQ-046), which adds 582 to 1,059 bytes. The two Plan flows were measured again with the revision context of CR-REQ-045 (prior Plan cut at 20,000 runes, 200 file names), which adds 24,403 and 28,807 bytes, so their budgets rose from 72,000 and 75,000:
 
 | Flow | Measured | Budget | What bounds it |
 |---|---:|---:|---|
 | `classify_request/classify` | 29,843 | 34,000 | body capped at 20,000 runes |
-| `analysis/solution` | 174,137 | 200,000 | body 12,000 runes, earlier Solutions 40,000 runes in total, answers uncapped in count |
-| `analysis/agent_solution` | 175,563 | 200,000 | same |
-| `analysis/diagnosis` | 173,840 | 200,000 | same |
-| `analysis/findings` | 173,635 | 200,000 | same |
-| `analysis/answer` | 173,498 | 200,000 | same |
+| `analysis/solution` | 174,719 | 200,000 | body 12,000 runes, earlier Solutions 40,000 runes in total, answers uncapped in count |
+| `analysis/agent_solution` | 176,145 | 200,000 | same |
+| `analysis/diagnosis` | 174,422 | 200,000 | same |
+| `analysis/findings` | 174,217 | 200,000 | same |
+| `analysis/answer` | 174,080 | 200,000 | same |
 | `clarification_answers/answers` | 81,749 | 95,000 | 300 + 1,000 runes per answer; the number of answers is not capped |
-| `plan_native/plan` | 62,971 | 72,000 | analysis (the approved Solution) is not capped here |
-| `plan_openspec/plan` | 66,050 | 75,000 | analysis not capped; retry note 3,000 runes |
+| `plan_native/plan` | 87,956 | 100,000 | analysis (the approved Solution) is not capped here; the prior plan of a revision is cut at 20,000 runes |
+| `plan_openspec/plan` | 95,916 | 108,000 | analysis not capped; retry note 3,000 runes; a revision lists up to 200 file names |
 | `task_prompt_template/task` | 26,462 | 30,000 | one line per criterion, not capped in count |
 | `solution_openspec/solution` | 15,040 | 17,000 | body capped at 12,000 runes |
 | `task_execution/execute` | 434,634 | 490,000 | the author's task text is sent as written (no cap) |

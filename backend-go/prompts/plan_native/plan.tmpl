@@ -5,8 +5,10 @@ Limits: at most {{.Limits.MaxPhases}} phases, at most {{.Limits.MaxTasksPerConta
 depends_on_indices lists the zero-based positions of sibling tasks (same phase, or the plan's own list) that must finish first. Do not depend on yourself and do not create cycles.
 Give every task a concrete description with a verifiable finish condition. Prefer small tasks that one agent session can complete.
 {{template "_type_rules.tmpl" .}}
+{{template "_language_rule.tmpl" . -}}
 {{template "_request_block.tmpl" . -}}
 {{template "_project.tmpl" . -}}
 {{template "_approved_decision.tmpl" . -}}
 {{template "_feedback.tmpl" . -}}
+{{template "_prior_plan.tmpl" . -}}
 {{template "_retry_note.tmpl" . -}}

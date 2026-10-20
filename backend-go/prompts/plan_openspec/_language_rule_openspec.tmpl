@@ -1,0 +1,5 @@
+{{if .Language.Code -}}
+Output language: {{.Language.Name}}.
+Write the prose of the change in {{.Language.Name}}, whatever language <request> uses: proposal.md and design.md text, the requirement sentences and scenario steps in the specs, and the task titles and the text after Serves:, Verify: and Done when:.
+Keep in English, never translate: file, folder and capability names and the change id; every heading the openspec templates define (## Why, ## What Changes, ## Capabilities, ## Impact, ## ADDED|MODIFIED|REMOVED|RENAMED Requirements, ### Requirement:, #### Scenario:, ## PH-n, ## TASKS); the words SHALL and MUST in every requirement sentence; WHEN, THEN and AND in scenarios; **Reason** and **Migration**; the orca:begin and orca:end markers; the line labels Serves:, Code:, Verify: and Done when:; the attributes in [...]; the words modify and create in Code: lines; ids (AC-n, T1.1, PH-n and the ids of the knowledge graph); paths, symbols, code, commands and error messages; the ORCA_RESULT_* block. Text you quote from the repository or from <request> stays in its original language.
+{{end -}}

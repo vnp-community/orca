@@ -160,7 +160,7 @@ func wireApproval(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lo
 		Request: &usecase.RequestApprovalFromAPI{Open: open, Repo: stores.approvals},
 		Decide: &usecase.DecideApproval{
 			Repo: stores.approvals, Tx: stores.tx, Locker: stores.locker, Registry: registry, Outbox: stores.outboxWriter, Expirer: w.expire,
-			Authorizer: authorizer,
+			Authorizer: authorizer, Pinner: stores.executionModes,
 		},
 		Cancel:  &usecase.CancelApproval{Repo: stores.approvals, Tx: stores.tx, Locker: stores.locker, Registry: registry, Outbox: stores.outboxWriter},
 		Get:     &usecase.GetApproval{Repo: stores.approvals},

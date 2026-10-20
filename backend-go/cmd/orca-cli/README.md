@@ -32,6 +32,8 @@ orca plan proposal $R                                       # trạng thái run 
 orca plan commit $R                                         # commit kế hoạch của run đã xong khi `plan generate` bị cắt vì token hết hạn (không sinh lại)
 orca plan bundle $R                                         # (openspec) danh sách tệp của gói OpenSpec đứng sau kế hoạch
 orca plan bundle $R --file tasks.md                         # đọc một tệp: proposal.md, design.md, specs/<capability>/spec.md, tasks.md
+orca plan revisions $R                                      # các phiên bản của kế hoạch, mới nhất trước: trạng thái, thời điểm, số tệp đổi, 80 ký tự đầu của yêu cầu chỉnh (CR-REQ-045)
+orca plan bundle $R --revision 2 [--file tasks.md]          # đọc một phiên bản cũ (chỉ đọc); phiên bản đã lược chữ báo REQUEST_PLAN_REVISION_TEXT_PRUNED
 orca request cleanup $R                                      # gỡ worktree của proposal (giữ nhánh và gói đã lưu); chủ Request hoặc admin
 orca plan result <task-id>                                   # kết quả lượt chạy mới nhất của task: kiểm tra, tệp, và điều agent báo đã đọc/ghi trong đồ thị tri thức
 orca plan tree $R                                           # phase, task, trạng thái, "(after ...)"
@@ -41,7 +43,7 @@ orca approval approve <phase-gate-id>
 orca plan start-phase $R <phase-task-id>                    # giao task cho agent
 ```
 
-`orca approval pending` liệt kê gate đang chờ bạn ở mọi Request. `approve` / `reject` mặc định duyệt đúng `version` + `digest` đọc lúc đó (in ra stderr); truyền cả `--version` và `--digest` nếu muốn duyệt đúng cái bạn đã xem. `reject` bắt buộc có `--comment`.
+`orca approval pending` liệt kê gate đang chờ bạn ở mọi Request. `approve` / `reject` mặc định duyệt đúng `version` + `digest` đọc lúc đó (in ra stderr); truyền cả `--version` và `--digest` nếu muốn duyệt đúng cái bạn đã xem. `reject` bắt buộc có `--comment`. `approve --execution-mode continuous` (chỉ cho cổng Plan, task list, pre_deploy) duyệt kế hoạch và chạy hết các Phase không hỏi lại; bỏ cờ thì giữ hành vi cũ, `reject` không nhận cờ này.
 
 Với engine `openspec` (kế hoạch do agent viết thành một change OpenSpec trên nhánh `request/<số>-proposal`), hãy đọc gói bằng `orca plan bundle` trước khi chạy `orca approval approve <plan-gate-id>`: quyết định duyệt gắn với digest của cả gói, nên sinh lại hoặc sửa gói sau khi mở cổng làm quyết định cũ không còn hiệu lực. Engine `native` không có gói; `orca plan bundle` nói rõ điều đó.
 
@@ -51,6 +53,8 @@ Bật engine `openspec` và Solution bằng agent cho một project (chỉ admin
 orca engine show --project <project-id> --check                       # trạng thái hai cờ + kiểm dev server (openspec, agent, skill, .tdd-agent)
 orca engine set  --project <project-id> --engine openspec --solution-agent=true
 ```
+
+Công tắc tự sinh Plan theo dự án (mặc định bật, CR-REQ-044): `orca engine set --project <project-id> --plan-auto-generate=false`; không nêu cờ thì giữ nguyên. Công tắc triển khai là biến `REQUEST_PLAN_AUTO_GENERATE` của `request-service`.
 
 `engine set` chỉ đổi mục được nêu và gửi lại `version` vừa đọc; thiếu khả năng thì vẫn lưu, in lý do kèm lệnh sửa, và Request tiếp tục chạy chế độ cũ. Cài đặt trên dev server: [docs/guides/request/knowledge-hub-setup.md](../../../docs/guides/request/knowledge-hub-setup.md).
 

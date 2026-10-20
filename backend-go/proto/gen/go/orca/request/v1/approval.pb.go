@@ -443,8 +443,10 @@ type ApproveRequest struct {
 	Comment         string                 `protobuf:"bytes,2,opt,name=comment,proto3" json:"comment,omitempty"`
 	ExpectedDigest  string                 `protobuf:"bytes,3,opt,name=expected_digest,json=expectedDigest,proto3" json:"expected_digest,omitempty"`
 	ExpectedVersion int64                  `protobuf:"varint,4,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// CR-REQ-043: empty or "continuous". Only for the plan, task_list and pre_deploy approvals at awaiting_plan_approval.
+	ExecutionMode string `protobuf:"bytes,5,opt,name=execution_mode,json=executionMode,proto3" json:"execution_mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ApproveRequest) Reset() {
@@ -503,6 +505,13 @@ func (x *ApproveRequest) GetExpectedVersion() int64 {
 		return x.ExpectedVersion
 	}
 	return 0
+}
+
+func (x *ApproveRequest) GetExecutionMode() string {
+	if x != nil {
+		return x.ExecutionMode
+	}
+	return ""
 }
 
 type RejectRequest struct {
@@ -858,6 +867,8 @@ type ApproveResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Approval      *Approval              `protobuf:"bytes,1,opt,name=approval,proto3" json:"approval,omitempty"`
 	RequestStatus string                 `protobuf:"bytes,2,opt,name=request_status,json=requestStatus,proto3" json:"request_status,omitempty"`
+	// CR-REQ-043: the execution mode pinned on the Request after the decision; empty when none is pinned.
+	ExecutionMode string `protobuf:"bytes,3,opt,name=execution_mode,json=executionMode,proto3" json:"execution_mode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -902,6 +913,13 @@ func (x *ApproveResponse) GetApproval() *Approval {
 func (x *ApproveResponse) GetRequestStatus() string {
 	if x != nil {
 		return x.RequestStatus
+	}
+	return ""
+}
+
+func (x *ApproveResponse) GetExecutionMode() string {
+	if x != nil {
+		return x.ExecutionMode
 	}
 	return ""
 }
@@ -1877,12 +1895,13 @@ const file_orca_request_v1_approval_proto_rawDesc = "" +
 	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
 	"subject_id\x18\x04 \x01(\tR\tsubjectId\x12\x18\n" +
-	"\acomment\x18\x05 \x01(\tR\acomment\"\x8e\x01\n" +
+	"\acomment\x18\x05 \x01(\tR\acomment\"\xb5\x01\n" +
 	"\x0eApproveRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\acomment\x18\x02 \x01(\tR\acomment\x12'\n" +
 	"\x0fexpected_digest\x18\x03 \x01(\tR\x0eexpectedDigest\x12)\n" +
-	"\x10expected_version\x18\x04 \x01(\x03R\x0fexpectedVersion\"\x8d\x01\n" +
+	"\x10expected_version\x18\x04 \x01(\x03R\x0fexpectedVersion\x12%\n" +
+	"\x0eexecution_mode\x18\x05 \x01(\tR\rexecutionMode\"\x8d\x01\n" +
 	"\rRejectRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\acomment\x18\x02 \x01(\tR\acomment\x12'\n" +
@@ -1901,10 +1920,11 @@ const file_orca_request_v1_approval_proto_rawDesc = "" +
 	"\x13GetApprovalResponse\x125\n" +
 	"\bapproval\x18\x01 \x01(\v2\x19.orca.request.v1.ApprovalR\bapproval\"P\n" +
 	"\x17RequestApprovalResponse\x125\n" +
-	"\bapproval\x18\x01 \x01(\v2\x19.orca.request.v1.ApprovalR\bapproval\"o\n" +
+	"\bapproval\x18\x01 \x01(\v2\x19.orca.request.v1.ApprovalR\bapproval\"\x96\x01\n" +
 	"\x0fApproveResponse\x125\n" +
 	"\bapproval\x18\x01 \x01(\v2\x19.orca.request.v1.ApprovalR\bapproval\x12%\n" +
-	"\x0erequest_status\x18\x02 \x01(\tR\rrequestStatus\"n\n" +
+	"\x0erequest_status\x18\x02 \x01(\tR\rrequestStatus\x12%\n" +
+	"\x0eexecution_mode\x18\x03 \x01(\tR\rexecutionMode\"n\n" +
 	"\x0eRejectResponse\x125\n" +
 	"\bapproval\x18\x01 \x01(\v2\x19.orca.request.v1.ApprovalR\bapproval\x12%\n" +
 	"\x0erequest_status\x18\x02 \x01(\tR\rrequestStatus\"\x91\x01\n" +

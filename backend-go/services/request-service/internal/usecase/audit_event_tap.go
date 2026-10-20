@@ -36,6 +36,7 @@ type auditFields struct {
 	ActorKind       string `json:"actor_kind"`
 	DecidedBy       string `json:"decided_by"`
 	ParentRequestID string `json:"parent_request_id"`
+	ExecutionMode   string `json:"execution_mode"`
 }
 
 func (t *AuditTap) OnEvent(ctx context.Context, ev domain.OutboxEvent) {
@@ -117,6 +118,9 @@ func approvalAudit(ctx context.Context, f auditFields) (RPCAuditEvent, bool) {
 	md := map[string]string{"subject_type": f.SubjectType}
 	if f.Stage != "" {
 		md["stage"] = f.Stage
+	}
+	if f.ExecutionMode != "" {
+		md["execution_mode"] = f.ExecutionMode
 	}
 	if action == domain.ActionApprovalExpire {
 		return RPCAuditEvent{ActorKind: domain.AuditActorSystem, Action: action, TargetType: "approval", TargetID: f.ApprovalID, Metadata: md}, true

@@ -39,26 +39,36 @@ type TaskPlanWriter interface {
 	CreatePlanTree(ctx context.Context, in PlanTreeInput) (PlanTreeResult, error)
 }
 
-// PlanActorAuthorizer decides who may generate and commit a Plan (the reporter or an admin, like Solution steering).
+// PlanActorAuthorizer decides who may generate, revise and commit a Plan. AuthorizePlan is the first generation and the
+// commit (the reporter or an admin); AuthorizePlanRevise also lets the approvers of the pending Plan gate ask for changes.
 type PlanActorAuthorizer interface {
 	AuthorizePlan(ctx context.Context, req domain.Request) error
+	AuthorizePlanRevise(ctx context.Context, req domain.Request) error
 }
 
 // planActorFromSolution reuses the Solution authorizer and reports its refusal under the Plan's own code.
-type planActorFromSolution struct{ inner SolutionActorAuthorizer }
+type planActorFromSolution struct {
+	inner SolutionActorAuthorizer
+	runs  AnalysisRunStore
+	// approversMayRevise is true only while a server-side worker commits the revised Plan: without it an approver's
+	// revision would leave a Plan nobody commits, because CommitPlan stays with the reporter and admins.
+	approversMayRevise bool
+}
 
-func NewPlanActorAuthorizer(inner SolutionActorAuthorizer) PlanActorAuthorizer {
-	return planActorFromSolution{inner: inner}
+func NewPlanActorAuthorizer(inner SolutionActorAuthorizer, runs AnalysisRunStore, approversMayRevise bool) PlanActorAuthorizer {
+	return planActorFromSolution{inner: inner, runs: runs, approversMayRevise: approversMayRevise}
 }
 
 func (a planActorFromSolution) AuthorizePlan(ctx context.Context, req domain.Request) error {
-	if err := a.inner.AuthorizeGenerate(ctx, req); err != nil {
-		if errorHasCode(err, "REQUEST_SOLUTION_FORBIDDEN") {
-			return domain.ErrPlanForbidden()
-		}
-		return err
+	return planForbidden(a.inner.AuthorizeGenerate(ctx, req))
+}
+
+// planForbidden reports a Solution refusal under the Plan's own code; any other error passes through unchanged.
+func planForbidden(err error) error {
+	if err != nil && errorHasCode(err, "REQUEST_SOLUTION_FORBIDDEN") {
+		return domain.ErrPlanForbidden()
 	}
-	return nil
+	return err
 }
 
 // errorCode is the REQUEST_* code of an application error, or "" for any other error.

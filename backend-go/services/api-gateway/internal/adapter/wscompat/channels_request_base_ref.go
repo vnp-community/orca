@@ -15,8 +15,14 @@ import (
 // gateway really serves it (CR-REQ-039). The gateway announces it: request-service does not know its own edge.
 const requestFeatureBaseRef = "request.baseRef"
 
+// requestFeatureApproveRunAll says approval.approve forwards executionMode (CR-REQ-043). An older gateway ignores the
+// unknown key and would turn "approve and run all steps" into a plain approval, so a frontend reads this first.
+const requestFeatureApproveRunAll = "approval.runAll"
+
 // requestFeatures lists the optional capabilities this gateway serves; a new gateway adds a name, never removes one.
-func requestFeatures() []string { return []string{requestFeatureBaseRef} }
+func requestFeatures() []string {
+	return []string{requestFeatureBaseRef, requestFeatureApproveRunAll, requestFeaturePlanAuto, requestFeaturePlanRevisions}
+}
 
 // withBaseRefState adds what request-service works out when it reads a Request (the lock) and, for the two writes,
 // what the ref check found. Other channels leave these keys out: their responses do not look up worktrees, so a

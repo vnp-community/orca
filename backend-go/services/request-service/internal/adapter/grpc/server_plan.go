@@ -21,6 +21,10 @@ type PlanUseCases struct {
 	Bundle *usecase.GetPlanBundleFile
 	// Cleanup removes the proposal worktree on request; nil when the openspec engine is not configured.
 	Cleanup *usecase.CleanupProposal
+	// Retry queues another automatic attempt (CR-REQ-044); nil when automatic Plan generation is off.
+	Retry *usecase.RetryPlanGeneration
+	// Revisions lists the versions of a Plan (CR-REQ-045).
+	Revisions *usecase.ListPlanRevisions
 }
 
 // WithPlan attaches the Plan handlers; without it those RPCs stay Unimplemented.
@@ -31,7 +35,7 @@ func (s *Server) GeneratePlan(ctx context.Context, req *requestv1.GeneratePlanRe
 	if s.plan.Generate == nil {
 		return nil, status.Error(codes.Unimplemented, "GeneratePlan is not wired")
 	}
-	res, err := s.plan.Generate.Execute(ctx, usecase.GeneratePlanInput{RequestID: req.GetRequestId(), Feedback: req.GetFeedback()})
+	res, err := s.plan.Generate.Execute(ctx, usecase.GeneratePlanInput{RequestID: req.GetRequestId(), Feedback: req.GetFeedback(), IdempotencyKey: req.GetIdempotencyKey()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -42,7 +46,7 @@ func (s *Server) GetPlanProposal(ctx context.Context, req *requestv1.GetPlanProp
 	if s.plan.Get == nil {
 		return nil, status.Error(codes.Unimplemented, "GetPlanProposal is not wired")
 	}
-	v, err := s.plan.Get.Execute(ctx, req.GetRequestId(), req.GetRunId())
+	v, err := s.plan.Get.Execute(ctx, req.GetRequestId(), req.GetRunId(), int(req.GetRevision()))
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -56,7 +60,7 @@ func (s *Server) GetPlanProposal(ctx context.Context, req *requestv1.GetPlanProp
 		b := &requestv1.PlanBundle{ChangeId: v.Bundle.ChangeID, Branch: v.Bundle.Branch, Commit: v.Bundle.Commit, TasksMdDigest: v.Bundle.TasksMDDigest,
 			Status: v.Bundle.Status, SyncState: v.Bundle.SyncState, SyncError: v.Bundle.SyncError, SyncAttempts: int32(v.Bundle.SyncAttempts)}
 		for _, f := range v.Bundle.Files {
-			b.Files = append(b.Files, &requestv1.PlanBundleFile{Path: f.Path, Size: f.Size, Omitted: f.Omitted})
+			b.Files = append(b.Files, &requestv1.PlanBundleFile{Path: f.Path, Size: f.Size, Omitted: f.Omitted, Sha256: f.SHA256, Change: f.Change})
 		}
 		out.Bundle = b
 	}
@@ -67,6 +71,7 @@ func (s *Server) GetPlanProposal(ctx context.Context, req *requestv1.GetPlanProp
 		out.Knowledge = &requestv1.PlanKnowledge{Available: k.Available, Snapshot: k.Snapshot, Read: k.Read, Gaps: k.Gaps, Conflicts: k.Conflicts, SkillHash: k.SkillHash}
 	}
 	out.Stats, out.ElapsedMs = toProtoRunStats(v.Stats), v.ElapsedMS
+	out.AutoPlan = toProtoPlanAuto(v.AutoPlan)
 	return out, nil
 }
 
@@ -74,7 +79,7 @@ func (s *Server) GetPlanBundleFile(ctx context.Context, req *requestv1.GetPlanBu
 	if s.plan.Bundle == nil {
 		return nil, status.Error(codes.Unimplemented, "GetPlanBundleFile is not wired")
 	}
-	f, err := s.plan.Bundle.Execute(ctx, req.GetRequestId(), req.GetPath())
+	f, err := s.plan.Bundle.Execute(ctx, req.GetRequestId(), req.GetPath(), int(req.GetRevision()))
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}

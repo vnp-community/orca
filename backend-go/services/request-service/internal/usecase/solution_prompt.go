@@ -3,6 +3,7 @@ package usecase
 import (
 	"github.com/stablyai/orca-go/prompts/analysis"
 	"github.com/stablyai/orca-go/prompts/clarification_answers"
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
@@ -24,6 +25,8 @@ type SolutionPromptInput struct {
 	AgentSolution bool
 	// UseKnowledge says the agent can reach the project's knowledge graph; without it the agent works from the repository alone.
 	UseKnowledge bool
+	// Language is the language the model writes its prose in; the zero value adds no instruction.
+	Language output_language.Language
 }
 
 // RenderSolutionPrompt maps the domain input to prompts/analysis. The wording lives in the templates, not here.
@@ -32,6 +35,7 @@ func RenderSolutionPrompt(in SolutionPromptInput) (string, error) {
 		Kind: string(in.Kind), Request: promptRequest(in.Request), Project: promptProject(in.ProjectName, in.RepoURL),
 		MinOptions: in.MinOptions, PriorArtifacts: promptPriorArtifacts(in.PriorArtifacts), Answers: promptAnswers(in.Answers),
 		Feedback: in.Feedback, RetryNote: in.RetryNote, AgentSolution: in.AgentSolution, UseKnowledge: in.UseKnowledge,
+		Language: in.Language,
 	}))
 }
 

@@ -49,6 +49,8 @@ var requestServiceRPCChannels = map[string]rpcDisposition{
 	"GetPlanBundleFile":        viaChannel("request.planBundleFile"),
 	"CleanupRequestProposal":   viaChannel("request.cleanupProposal"),
 	"CommitPlan":               viaChannel("request.generatePlan"), // mode=commit
+	"RetryPlanGeneration":      viaChannel("request.retryPlan"),
+	"ListPlanRevisions":        viaChannel("request.planRevisions"),
 	"StartPhase":               viaChannel("request.startPhase"),
 	"ReportTaskOutcome":        internalRPC("task-service reports phase outcomes"),
 	"RecordRequestCheck":       internalRPC("verification runners record checks"),

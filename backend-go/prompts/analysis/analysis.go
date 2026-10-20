@@ -5,6 +5,7 @@ import (
 	"embed"
 
 	"github.com/stablyai/orca-go/prompts/clarification_answers"
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/prompts/render"
 	"github.com/stablyai/orca-go/prompts/request_context"
 )
@@ -57,6 +58,8 @@ type Input struct {
 	AgentSolution bool
 	// UseKnowledge says the agent can reach the project's knowledge graph; without it the agent works from the repository alone.
 	UseKnowledge bool
+	// Language is the language the model writes its prose in; the zero value adds no instruction.
+	Language output_language.Language
 }
 
 // view is what the templates read: the Input plus the parts that need Go (a count, a cap over the whole block, a sub-render).

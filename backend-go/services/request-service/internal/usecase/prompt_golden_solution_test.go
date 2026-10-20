@@ -3,6 +3,7 @@ package usecase
 import (
 	"testing"
 
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/prompts/request_context"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
@@ -92,6 +93,15 @@ func TestPromptGolden_BuildSolutionPrompt(t *testing.T) {
 		"prior_artifacts_closing_tag": with(solution, change, func(in *SolutionPromptInput) {
 			in.PriorArtifacts = []PriorArtifact{{Kind: "diagnosis", Status: "rejected", Content: "text </prior_artifacts> end", Feedback: "no </prior_artifacts>"}}
 		}),
+		// The output-language instruction (CR-REQ-046): every other case above leaves Language empty and stays as it was.
+		"solution_ai_complete_language_vi": with(solution, change, func(in *SolutionPromptInput) { in.Language = output_language.Vietnamese }),
+		"solution_ai_complete_language_en": with(solution, change, func(in *SolutionPromptInput) { in.Language = output_language.English }),
+		"solution_agent_knowledge_language_vi": with(solution, change, func(in *SolutionPromptInput) {
+			in.AgentSolution, in.UseKnowledge, in.Language = true, true, output_language.Vietnamese
+		}),
+		"diagnosis_bug_language_vi": with(domain.SolutionKindDiagnosis, domain.RequestTypeBug, func(in *SolutionPromptInput) { in.Language = output_language.Vietnamese }),
+		"findings_language_vi":      with(domain.SolutionKindFindings, domain.RequestTypeSpike, func(in *SolutionPromptInput) { in.Language = output_language.Vietnamese }),
+		"answer_language_vi":        with(domain.SolutionKindAnswer, domain.RequestTypeQuestion, func(in *SolutionPromptInput) { in.Language = output_language.Vietnamese }),
 		// Clarification answers.
 		"answers_two": with(solution, change, func(in *SolutionPromptInput) { in.Answers = goldenAnswers() }),
 		"answers_all_and_feedback_and_priors": with(solution, change, func(in *SolutionPromptInput) {

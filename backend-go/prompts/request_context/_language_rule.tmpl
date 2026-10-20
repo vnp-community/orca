@@ -1,0 +1,5 @@
+{{if .Language.Code -}}
+Output language: {{.Language.Name}}.
+Write every string value that a person will read in {{.Language.Name}}, whatever language <request> uses: titles, summaries, descriptions, approaches, pros, cons, risks, assumptions, questions, answers, reasons and notes.
+Never translate: JSON keys; the value of "kind" and every value the schema lists as a choice (written a|b|c); ids such as opt-1, A-1, Q-1, AC-1, fix-1, f-1; labels; file paths, file:line references, code, identifiers, commands and error messages; text you quote from the repository or from <request>, which stays in its original language.
+{{end -}}

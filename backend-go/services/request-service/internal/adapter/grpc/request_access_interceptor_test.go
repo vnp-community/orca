@@ -110,7 +110,7 @@ func TestRequestAccess_EveryCatalogRPCByRole(t *testing.T) {
 				person[role] = false
 			}
 			// CR-REQ-041: a project member may reach the two steering RPCs; the use case then checks reporter, admin or approver.
-			if role == "member" && (strings.HasSuffix(method, "/GenerateSolution") || strings.HasSuffix(method, "/ChooseSolutionOption")) {
+			if role == "member" && (strings.HasSuffix(method, "/GenerateSolution") || strings.HasSuffix(method, "/ChooseSolutionOption") || strings.HasSuffix(method, "/GeneratePlan")) {
 				person[role] = true
 			}
 			called, err := run(ic, callerCtx(role, "user"), method, requestFor(t, method))

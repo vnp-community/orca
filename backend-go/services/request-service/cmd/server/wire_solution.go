@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/stablyai/orca-go/prompts/output_language"
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -60,9 +61,9 @@ type solutionWiring struct {
 
 // wireSolution builds solution generation and read-only analysis (CR-REQ-007/008) and starts the lease-recovery sweeper.
 // Approvals are bound later, once the registry exists (see bindApprovals), because the registry needs these handlers first.
-func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, log *slog.Logger, stores *requestStores, lifecycle *requestLifecycle, dirs *approvalDirectories) (*solutionWiring, error) {
+func wireSolution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, lang output_language.Language, log *slog.Logger, stores *requestStores, lifecycle *requestLifecycle, dirs *approvalDirectories) (*solutionWiring, error) {
 	w := &solutionWiring{stores: stores, opener: &lateApprovalOpener{log: log}}
-	settings := analysisSettings(cfg)
+	settings := analysisSettings(cfg, lang)
 	host, _ := os.Hostname()
 	owner := fmt.Sprintf("%s-%d", host, os.Getpid())
 	transition := lifecycle.Transition
@@ -183,8 +184,9 @@ func selfChoicePolicy(stores *requestStores) usecase.SelfChoicePolicy {
 	}
 }
 
-func analysisSettings(cfg config.Config) usecase.AnalysisSettings {
+func analysisSettings(cfg config.Config, lang output_language.Language) usecase.AnalysisSettings {
 	s := usecase.DefaultAnalysisSettings()
+	s.OutputLanguage = lang
 	if cfg.AICompleteTimeout > 0 {
 		s.AICompleteTimeout = cfg.AICompleteTimeout
 	}

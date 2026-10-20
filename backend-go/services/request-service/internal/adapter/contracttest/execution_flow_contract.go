@@ -222,6 +222,7 @@ func RunExecutionFlowContract(t *testing.T, newEnv func(t *testing.T) ExecutionE
 		{"ExecutionFlow_ChangeRequest_ToCompleted", flowChangeRequestToCompleted},
 		{"ExecutionFlow_Continuous_OneApprovalRunsEveryPhase", flowContinuousChangeRequest},
 		{"ExecutionFlow_Continuous_FailureStopsTheRun", flowContinuousFailureStops},
+		{"ExecutionFlow_RunAll_OneDecisionPinsAndRunsEveryPhase", flowRunAllFromTheDecision},
 		{"ExecutionFlow_TaskFailsTwice_ToBacklog", flowTaskFailsTwice},
 		{"ExecutionFlow_LostEvents_ReconcileFixes", flowLostEvents},
 		{"ExecutionFlow_ReleasedTask_ReconcileRedispatches", flowReleasedTask},

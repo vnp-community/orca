@@ -26,7 +26,7 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 	}
 	auth := usecase.NewPlanActorAuthorizer(usecase.ApproverAwareAuthorizer{
 		Approvals: stores.approvals, Decider: &usecase.AuthorizeApprovalDecision{ApproverRepo: stores.approvers, Teams: dirs.teams},
-	})
+	}, stores.analysisRuns, false) // wirePlanAuto lets the approvers revise once the worker that commits for them runs
 
 	worker := usecase.NewRunPlanGeneration(usecase.RunPlanGenerationDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Completer: solution.completer, Projects: solution.projects,
@@ -47,8 +47,9 @@ func wirePlan(log *slog.Logger, stores *requestStores, lifecycle *requestLifecyc
 			Settings: solution.settings, LeaseOwner: solution.owner,
 			Pin: usecase.NewPinSolutionEngine(stores.requests, stores.engineSettings), Registry: registry,
 		}),
-		Get:    usecase.NewGetPlanProposal(stores.requests, stores.analysisRuns).WithChanges(stores.openspecChanges),
-		Bundle: usecase.NewGetPlanBundleFile(stores.requests, stores.openspecChanges),
+		Get:       usecase.NewGetPlanProposal(stores.requests, stores.analysisRuns).WithChanges(stores.openspecChanges).WithRevisions(stores.openspecRevisions),
+		Bundle:    usecase.NewGetPlanBundleFile(stores.requests, stores.openspecChanges).WithRevisions(stores.analysisRuns, stores.openspecRevisions),
+		Revisions: usecase.NewListPlanRevisions(stores.requests, stores.analysisRuns, stores.openspecRevisions, stores.openspecChanges),
 	}
 	if solution.workspace != nil {
 		retention, warning := domain.ProposalRetentionFromEnv(os.Getenv)
@@ -120,9 +121,13 @@ func wireOpenSpecEngine(log *slog.Logger, stores *requestStores, solution *solut
 		Gate: gate, Workspace: workspace, Agent: solution.agent, Conns: solution.conns, Caps: solution.caps, Settings: solution.settings, Observer: solution.observer,
 	})
 	registry.Register(engine)
+	// A proposal run that cannot record its version would leave the change without history, so refuse to start.
+	if stores.openspecRevisions == nil {
+		return nil, fmt.Errorf("openspec engine wiring: the change revision repository is missing")
+	}
 	solution.runner.WithProposalWorker(usecase.NewRunProposalGeneration(usecase.RunProposalGenerationDeps{
 		Requests: stores.requests, Solutions: stores.solutions, Registry: registry, Projects: solution.projects, Policies: policies,
-		EngineSettings: stores.engineSettings, Settings: solution.settings, Workspace: workspace, Changes: stores.openspecChanges, Checker: usecase.NewOpenSpecBundleChecker(executor, solution.conns, limits), Observer: solution.observer, Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
+		EngineSettings: stores.engineSettings, Settings: solution.settings, Workspace: workspace, Changes: stores.openspecChanges, Revisions: stores.openspecRevisions, Checker: usecase.NewOpenSpecBundleChecker(executor, solution.conns, limits), Observer: solution.observer, Runs: stores.analysisRuns, Tx: stores.tx, Limits: limits, Owner: solution.owner,
 	}))
 	return registry, nil
 }

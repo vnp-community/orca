@@ -180,6 +180,11 @@ func RunApprovalFlowContract(t *testing.T, newEnv func(t *testing.T) ApprovalEnv
 		{"RequestTypeDirectConfirmSettlesApproval", flowRequestTypeDirectConfirm},
 		{"PendingForUserMatchesAcrossPrincipals", flowPendingForUser},
 		{"ExtendKeepsApprovalAliveAndRearmsReminder", flowExtend},
+		{"RunAllPinsTheModeInTheDecisionsTransaction", flowRunAllPinsWithTheDecision},
+		{"ApproveWithoutModeLeavesTheModeUnpinned", flowApproveWithoutModeLeavesItUnpinned},
+		{"RunAllRollsBackWithTheSubjectHandler", flowRunAllRollsBackWithTheHandler},
+		{"RunAllRefusedWhenAlreadyPinnedStepByStep", flowRunAllRefusedWhenPinnedStepByStep},
+		{"RunAllRacesAPlainApprovalExactlyOneWins", flowRunAllRacesAPlainApproval},
 	}
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) { s.fn(t, newApprovalRig(env)) })

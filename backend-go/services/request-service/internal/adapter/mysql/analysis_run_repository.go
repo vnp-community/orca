@@ -299,6 +299,28 @@ func (r *AnalysisRunRepository) ListRecent(ctx context.Context, requestID string
 	return out, err
 }
 
+// ListSucceeded returns every succeeded run of the kind for the Request, oldest first: the order of the versions of a Plan.
+func (r *AnalysisRunRepository) ListSucceeded(ctx context.Context, requestID string, kind domain.RunKind) ([]domain.AnalysisRun, error) {
+	var out []domain.AnalysisRun
+	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {
+		rows, err := db.QueryContext(ctx, `SELECT `+analysisRunColumns+` FROM analysis_runs
+			WHERE tenant_id = ? AND request_id = ? AND kind = ? AND status = 'succeeded' ORDER BY started_at ASC, id`, tenantID, requestID, string(kind))
+		if err != nil {
+			return fmt.Errorf("mysql: list succeeded analysis runs: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			run, err := scanAnalysisRun(rows)
+			if err != nil {
+				return err
+			}
+			out = append(out, run)
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
 func (r *AnalysisRunRepository) CountRunning(ctx context.Context, projectID string, mode domain.AnalysisMode) (int, error) {
 	n := 0
 	err := r.scoped(ctx, func(ctx context.Context, tenantID string, db dbExecer) error {

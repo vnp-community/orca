@@ -46,6 +46,8 @@ var ErasableColumns = []ErasableColumn{
 	{"openspec_changes", "bundle_json", "request_id", EraseNull, ""},
 	{"openspec_changes", "kg_gaps", "request_id", EraseNull, ""},
 	{"openspec_changes", "kg_conflicts", "request_id", EraseNull, ""},
+	{"openspec_change_revisions", "bundle_json", "request_id", EraseNull, ""},
+	{"openspec_change_revisions", "files_json", "request_id", EraseClearJSONArray, ""},
 	{"requests", "acceptance_criteria", "id", EraseClearJSONArray, ""},
 	{"requests", "type_fields", "id", EraseClearJSONObject, ""},
 	{"analysis_runs", "feedback", "request_id", EraseNull, ""},
@@ -107,7 +109,8 @@ var ExemptTextColumns = mergeExempt(
 		"approval_policies.created_by", "classification_runs.lease_owner", "evidence.ref", "evidence.source_id",
 		"openspec_changes.branch", "openspec_changes.change_id", "openspec_changes.commit_sha", "openspec_changes.tasks_sync_digest",
 		"openspec_changes.tasks_md_digest", "openspec_changes.kg_snapshot", "openspec_changes.kg_read_ids", "openspec_changes.skill_hash",
-		"openspec_changes.workspace_id",
+		"openspec_changes.workspace_id", "openspec_change_revisions.commit_sha", "openspec_change_revisions.tasks_md_digest",
+		"openspec_change_revisions.bundle_digest",
 		"request_idempotency.source_provider", "request_idempotency.source_ref", "request_idempotency.source_site",
 		"requests.source_ref", "requests.source_site", "context_sources.source_key"),
 	exempt("tenant or project configuration, not Request content",
@@ -126,10 +129,11 @@ var ExemptTextColumns = mergeExempt(
 		"decisions.chooser_id", "decisions.chosen_option_id", "decisions.confirmed_by", "decisions.recommended_option_id",
 		"decisions.subject_digest", "decisions.subject_id", "request_coverage.ac_id", "request_coverage.check_id",
 		"request_revisions.actor_id", "request_revisions.digest", "requests.base_ref", "requests.content_digest", "solutions.content_digest",
-		"solutions.content_ref", "tenant_settings.updated_by"),
+		"solutions.content_ref", "tenant_settings.updated_by", "plan_auto_jobs.anchor"),
 	exempt("enum, reason code or lease owner of the execution loop; no customer content",
 		"request_checks.kind", "request_checks.source", "request_checks.status", "task_run_outcomes.cause", "task_run_outcomes.outcome",
-		"execution_reconcile_state.lease_owner"),
+		"execution_reconcile_state.lease_owner", "plan_auto_jobs.origin", "plan_auto_jobs.state", "plan_auto_jobs.reason_code",
+		"plan_auto_jobs.lease_owner"),
 	exempt("provenance has no content or credential (ParseProvenance refuses unknown members)", "solutions.provenance"),
 	exempt("tool names and counts and usage figures of an agent run; never what went into or came out of a tool", "analysis_runs.run_stats"),
 	exempt("event envelope; payloads carry ids and counts, never content (outbox payload golden tests)", "outbox_events.payload", "outbox_events.subject", "processed_events.subject"),
@@ -142,8 +146,10 @@ var ExemptTextColumns = mergeExempt(
 var MySQLOnlyExemptTextColumns = exempt("opaque identifier or generated key (VARCHAR in MySQL, uuid in Postgres)",
 	"analysis_runs.id", "analysis_runs.request_id", "analysis_runs.tenant_id", "analysis_runs.active_key",
 	"openspec_changes.id", "openspec_changes.tenant_id", "openspec_changes.request_id", "approvals.pending_key",
+	"openspec_change_revisions.id", "openspec_change_revisions.tenant_id", "openspec_change_revisions.request_id", "openspec_change_revisions.run_id",
 	"project_engine_settings.project_id", "project_engine_settings.tenant_id", "project_engine_settings.updated_by",
-	"clarifications.open_key", "decisions.live_key")
+	"clarifications.open_key", "decisions.live_key", "plan_auto_jobs.tenant_id", "plan_auto_jobs.request_id", "plan_auto_jobs.project_id",
+	"plan_auto_jobs.run_id", "plan_auto_jobs.requested_by", "plan_auto_jobs.active_key")
 
 // IsExemptTextColumn tells whether table.column holds no customer content.
 func IsExemptTextColumn(column string) bool {

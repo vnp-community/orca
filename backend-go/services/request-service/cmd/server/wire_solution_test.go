@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/services/request-service/internal/config"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
@@ -41,7 +42,7 @@ func TestWireSolution_FailsWithoutApprovalStores(t *testing.T) {
 	var wg sync.WaitGroup
 	stores := &requestStores{analysisRuns: &sweepCounter{}}
 	life := &requestLifecycle{Return: &usecase.ReturnRequestToBacklog{}}
-	if _, err := wireSolution(context.Background(), &wg, config.Config{}, slog.Default(), stores, life, &approvalDirectories{}); err == nil {
+	if _, err := wireSolution(context.Background(), &wg, config.Config{}, output_language.Language{}, slog.Default(), stores, life, &approvalDirectories{}); err == nil {
 		t.Fatal("startup must fail when the solution authorizer has no approval repository")
 	}
 }
@@ -53,7 +54,7 @@ func TestWireSolution_RegistersRealHandlersAndStartsTheSweeper(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg := config.Config{AnalysisRecoveryInterval: 20 * time.Millisecond, AgentReadonlyUseAgentFlag: true}
 	life := &requestLifecycle{Return: &usecase.ReturnRequestToBacklog{}}
-	w, err := wireSolution(ctx, &wg, cfg, slog.Default(), stores, life, &approvalDirectories{})
+	w, err := wireSolution(ctx, &wg, cfg, output_language.Language{}, slog.Default(), stores, life, &approvalDirectories{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,24 +98,24 @@ func TestWireSolution_RegistersRealHandlersAndStartsTheSweeper(t *testing.T) {
 
 func TestAnalysisSettings_MapsConfigAndKeepsDefaults(t *testing.T) {
 	d := usecase.DefaultAnalysisSettings()
-	got := analysisSettings(config.Config{AgentReadonlyUseAgentFlag: true})
+	got := analysisSettings(config.Config{AgentReadonlyUseAgentFlag: true}, output_language.Language{})
 	if got != d {
 		t.Fatalf("empty config must give the defaults:\n got %+v\nwant %+v", got, d)
 	}
 	got = analysisSettings(config.Config{
 		AICompleteTimeout: time.Second, AnalysisLeaseTTL: 2 * time.Second, AnalysisHeartbeat: 3 * time.Second, AnalysisRecoveryInterval: 4 * time.Second,
 		AgentReadonlyTimeoutMS: 5, AgentReadonlyMaxPerProject: 6, RequireEnforcedReadonly: true,
-	})
+	}, output_language.English)
 	want := usecase.AnalysisSettings{AICompleteTimeout: time.Second, LeaseTTL: 2 * time.Second, Heartbeat: 3 * time.Second, RecoveryInterval: 4 * time.Second,
-		AgentTimeoutMS: 5, HotfixTimeoutMS: d.HotfixTimeoutMS, SpecTimeoutMS: d.SpecTimeoutMS, MaxAgentRunsPerProject: 6, UseAgentReadonlyFlag: false, RequireEnforcedReadonly: true}
+		AgentTimeoutMS: 5, HotfixTimeoutMS: d.HotfixTimeoutMS, SpecTimeoutMS: d.SpecTimeoutMS, MaxAgentRunsPerProject: 6, UseAgentReadonlyFlag: false, RequireEnforcedReadonly: true, OutputLanguage: output_language.English}
 	if got != want {
 		t.Fatalf("got %+v\nwant %+v", got, want)
 	}
-	spec := analysisSettings(config.Config{SpecTimeoutMS: 300_000})
+	spec := analysisSettings(config.Config{SpecTimeoutMS: 300_000}, output_language.Language{})
 	if spec.SpecTimeoutMS != 300_000 || spec.SpecTotalTimeoutMS != 0 {
 		t.Fatalf("the total is left unset so the use cases derive it from the attempt budget: %+v", spec)
 	}
-	pinned := analysisSettings(config.Config{SpecTimeoutMS: 300_000, SpecTotalTimeoutMS: 400_000})
+	pinned := analysisSettings(config.Config{SpecTimeoutMS: 300_000, SpecTotalTimeoutMS: 400_000}, output_language.Language{})
 	if pinned.SpecTotalTimeoutMS != 400_000 {
 		t.Fatalf("%+v", pinned)
 	}

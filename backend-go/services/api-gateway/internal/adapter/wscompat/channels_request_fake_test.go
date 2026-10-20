@@ -398,7 +398,8 @@ func (f *fakeRequestClient) Approve(ctx context.Context, in *requestv1.ApproveRe
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &requestv1.ApproveResponse{Approval: fakeApprovalMsg(), RequestStatus: "planning"}, nil
+	// The double echoes the requested mode as the pinned one, like a Request that had none pinned.
+	return &requestv1.ApproveResponse{Approval: fakeApprovalMsg(), RequestStatus: "planning", ExecutionMode: in.GetExecutionMode()}, nil
 }
 
 func (f *fakeRequestClient) Reject(ctx context.Context, in *requestv1.RejectRequest, _ ...grpc.CallOption) (*requestv1.RejectResponse, error) {

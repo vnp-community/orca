@@ -10,6 +10,7 @@ import (
 	"github.com/stablyai/orca-go/prompts/git_agent_prompt"
 	"github.com/stablyai/orca-go/prompts/git_commit_message"
 	"github.com/stablyai/orca-go/prompts/git_pull_request"
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/prompts/plan_native"
 	"github.com/stablyai/orca-go/prompts/plan_openspec"
 	"github.com/stablyai/orca-go/prompts/request_context"
@@ -33,8 +34,8 @@ var maxPromptBytes = map[string]int{
 	"analysis/findings":                  200000,
 	"analysis/answer":                    200000,
 	"clarification_answers/answers":      95000,
-	"plan_native/plan":                   72000,
-	"plan_openspec/plan":                 75000,
+	"plan_native/plan":                   100000,
+	"plan_openspec/plan":                 108000,
 	"task_prompt_template/task":          30000,
 	"solution_openspec/solution":         17000,
 	"task_execution/execute":             490000,
@@ -90,6 +91,7 @@ func largeAnalysisInput(kind string, agent bool) analysis.Input {
 	return analysis.Input{
 		Kind: kind, Request: largeRequest(), Project: largeProject(), MinOptions: 3, PriorArtifacts: largePriorArtifacts(),
 		Answers: largeAnswers(), Feedback: filler(50000), RetryNote: filler(50000), AgentSolution: agent, UseKnowledge: agent,
+		Language: output_language.Vietnamese,
 	}
 }
 
@@ -114,13 +116,19 @@ func sizeCases() []sizeCase {
 			TestRegression: "test:regression", CheckBaseline: "check:baseline", CheckAfter: "check:after",
 			CheckTestsPre: "check:tests-pre", CheckTestsAfter: "check:tests-after", Rollback: "rollback",
 		},
-		Analysis: filler(80000), Feedback: filler(50000), RetryNote: filler(50000),
+		Analysis: filler(80000), Feedback: filler(50000), RetryNote: filler(50000), Language: output_language.Vietnamese,
+		PriorPlan: filler(40000),
+	}
+	revisionFiles := make([]string, 200)
+	for i := range revisionFiles {
+		revisionFiles[i] = "specs/" + filler(100) + "/spec.md"
 	}
 	openspec := plan_openspec.Input{
 		Request: largeRequest(), Project: largeProject(), Ref: "REQ-142", ChangeID: "change-" + filler(20), Phases: true,
 		Limits:   plan_openspec.Limits{MaxPhases: 8, MaxTasksPerContainer: 12, MaxTitleRunes: 120},
 		MinTasks: 20, MaxTasks: 60, Analysis: filler(80000), Feedback: filler(50000), KnowledgeAvailable: true,
-		ResultNonce: "nonce-" + filler(32), RetryNote: filler(50000),
+		ResultNonce: "nonce-" + filler(32), RetryNote: filler(50000), Language: output_language.Vietnamese,
+		PreviousFiles: revisionFiles,
 	}
 	deps := make([]task_execution.Dependency, 30)
 	for i := range deps {

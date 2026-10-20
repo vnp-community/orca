@@ -60,6 +60,15 @@ Chỉ role `admin` được Set; người khác nhận lỗi `REQUEST_FLOW_ADMIN
 Bảng phân loại đầy đủ là `flowMethodClass` trong `flow_gate.go`; test quét proto đảm bảo mọi RPC có một dòng. Một số RPC trong bảng đó
 (ví dụ `RequestImpactAssessment`, `CheckReadiness`, `ListContextSources`) chưa có handler nên trả `Unimplemented`; `GenerateSolution`, `GeneratePlan`, `CommitPlan` và `StartPhase` đã có handler.
 
+## Ngôn ngữ đầu ra của AI
+
+Biến `REQUEST_DEFAULT_OUTPUT_LANGUAGE` của `request-service` (CR-REQ-046) chọn ngôn ngữ AI viết phân tích (Solution, chẩn đoán, Findings, Answer) và Plan: `vi` (mặc định khi không đặt biến) hoặc `en`.
+Khoá JSON, giá trị enum, id, đường dẫn và ngữ pháp OpenSpec giữ tiếng Anh. Giá trị được đọc một lần lúc khởi động (đổi xong cần `redeploy-local.sh request-service`), và **giá trị khác `vi`/`en` làm service không khởi động**,
+khác ba biến `REQUEST_DEFAULT_ENGINE`, `_SOLUTION_AGENT`, `_EXECUTION_MODE` chỉ cảnh báo. Biến này nằm ngoài cài đặt theo dự án: áp cho mọi dự án và tenant của triển khai.
+
+Hạn chế: ngôn ngữ không theo ngôn ngữ giao diện (giao diện chưa có locale `vi`) và không được phát hiện từ nội dung Request; đặt `en` thì AI viết tiếng Anh ngay cả khi Request bằng tiếng Việt.
+Chi tiết triển khai: [README triển khai](../../../deploy/dev/README.md) mục "Ngôn ngữ đầu ra của AI".
+
 ## Rollout đề xuất (5 giai đoạn)
 
 Số ngày và số Request là **đề xuất ban đầu, chưa có số đo thực**. Hiện chưa có tenant nào chạy các giai đoạn này.

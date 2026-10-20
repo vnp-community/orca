@@ -1034,8 +1034,10 @@ type ProjectEngineSettings struct {
 	SolutionAgent bool `protobuf:"varint,5,opt,name=solution_agent,json=solutionAgent,proto3" json:"solution_agent,omitempty"`
 	// step_by_step (default) or continuous: how Requests of this project run after their plan is approved (CR-REQ-038).
 	ExecutionMode string `protobuf:"bytes,6,opt,name=execution_mode,json=executionMode,proto3" json:"execution_mode,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// CR-REQ-044: Orca starts the Plan by itself once the Analysis is approved. True unless the project turned it off.
+	PlanAutoGenerate bool `protobuf:"varint,7,opt,name=plan_auto_generate,json=planAutoGenerate,proto3" json:"plan_auto_generate,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ProjectEngineSettings) Reset() {
@@ -1108,6 +1110,13 @@ func (x *ProjectEngineSettings) GetExecutionMode() string {
 		return x.ExecutionMode
 	}
 	return ""
+}
+
+func (x *ProjectEngineSettings) GetPlanAutoGenerate() bool {
+	if x != nil {
+		return x.PlanAutoGenerate
+	}
+	return false
 }
 
 type GetProjectEngineSettingsRequest struct {
@@ -1225,8 +1234,10 @@ type SetProjectEngineSettingsRequest struct {
 	SolutionAgent      bool                   `protobuf:"varint,5,opt,name=solution_agent,json=solutionAgent,proto3" json:"solution_agent,omitempty"`
 	// Empty keeps the stored mode; otherwise step_by_step or continuous.
 	ExecutionMode string `protobuf:"bytes,6,opt,name=execution_mode,json=executionMode,proto3" json:"execution_mode,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Absent keeps the stored value (CR-REQ-044), so an older client never flips the switch.
+	PlanAutoGenerate *bool `protobuf:"varint,7,opt,name=plan_auto_generate,json=planAutoGenerate,proto3,oneof" json:"plan_auto_generate,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *SetProjectEngineSettingsRequest) Reset() {
@@ -1299,6 +1310,13 @@ func (x *SetProjectEngineSettingsRequest) GetExecutionMode() string {
 		return x.ExecutionMode
 	}
 	return ""
+}
+
+func (x *SetProjectEngineSettingsRequest) GetPlanAutoGenerate() bool {
+	if x != nil && x.PlanAutoGenerate != nil {
+		return *x.PlanAutoGenerate
+	}
+	return false
 }
 
 type SetProjectEngineSettingsResponse struct {
@@ -1604,7 +1622,7 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\bsolution\x18\x01 \x01(\v2\x19.orca.request.v1.SolutionR\bsolution\x12'\n" +
 	"\x0fapproval_digest\x18\x02 \x01(\tR\x0eapprovalDigest\x12'\n" +
 	"\x0fdecision_status\x18\x03 \x01(\tR\x0edecisionStatus\x123\n" +
-	"\x15requires_confirmation\x18\x04 \x01(\bR\x14requiresConfirmation\"\xf9\x01\n" +
+	"\x15requires_confirmation\x18\x04 \x01(\bR\x14requiresConfirmation\"\xa7\x02\n" +
 	"\x15ProjectEngineSettings\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12'\n" +
@@ -1612,14 +1630,15 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\x14openspec_min_version\x18\x03 \x01(\tR\x12openspecMinVersion\x12\x18\n" +
 	"\aversion\x18\x04 \x01(\x03R\aversion\x12%\n" +
 	"\x0esolution_agent\x18\x05 \x01(\bR\rsolutionAgent\x12%\n" +
-	"\x0eexecution_mode\x18\x06 \x01(\tR\rexecutionMode\"V\n" +
+	"\x0eexecution_mode\x18\x06 \x01(\tR\rexecutionMode\x12,\n" +
+	"\x12plan_auto_generate\x18\a \x01(\bR\x10planAutoGenerate\"V\n" +
 	"\x1fGetProjectEngineSettingsRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x14\n" +
 	"\x05check\x18\x02 \x01(\bR\x05check\"\xa6\x01\n" +
 	" GetProjectEngineSettingsResponse\x12B\n" +
 	"\bsettings\x18\x01 \x01(\v2&.orca.request.v1.ProjectEngineSettingsR\bsettings\x12>\n" +
-	"\tpreflight\x18\x02 \x01(\v2 .orca.request.v1.EnginePreflightR\tpreflight\"\x94\x02\n" +
+	"\tpreflight\x18\x02 \x01(\v2 .orca.request.v1.EnginePreflightR\tpreflight\"\xde\x02\n" +
 	"\x1fSetProjectEngineSettingsRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12'\n" +
@@ -1627,7 +1646,9 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\x14openspec_min_version\x18\x03 \x01(\tR\x12openspecMinVersion\x12)\n" +
 	"\x10expected_version\x18\x04 \x01(\x03R\x0fexpectedVersion\x12%\n" +
 	"\x0esolution_agent\x18\x05 \x01(\bR\rsolutionAgent\x12%\n" +
-	"\x0eexecution_mode\x18\x06 \x01(\tR\rexecutionMode\"\xa6\x01\n" +
+	"\x0eexecution_mode\x18\x06 \x01(\tR\rexecutionMode\x121\n" +
+	"\x12plan_auto_generate\x18\a \x01(\bH\x00R\x10planAutoGenerate\x88\x01\x01B\x15\n" +
+	"\x13_plan_auto_generate\"\xa6\x01\n" +
 	" SetProjectEngineSettingsResponse\x12B\n" +
 	"\bsettings\x18\x01 \x01(\v2&.orca.request.v1.ProjectEngineSettingsR\bsettings\x12>\n" +
 	"\tpreflight\x18\x02 \x01(\v2 .orca.request.v1.EnginePreflightR\tpreflight\"\x95\x02\n" +
@@ -1732,6 +1753,7 @@ func file_orca_request_v1_solution_proto_init() {
 	if File_orca_request_v1_solution_proto != nil {
 		return
 	}
+	file_orca_request_v1_solution_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

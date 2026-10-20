@@ -36,7 +36,11 @@ UNION ALL
 -- The reviewer's feedback is user content (C9): it is tested here and never selected, so the line cannot carry it.
 -- A run the system started after a clarification carries a marker, not a reviewer's ask.
 SELECT 'analysis.revision_requested', CONCAT(id, ':revision'), started_at, 'user', COALESCE(actor_id, ''), 'solution', COALESCE(solution_id, ''), '', '', '', '', CAST(0 AS SIGNED)
-  FROM analysis_runs WHERE tenant_id = ? AND request_id = ? AND feedback IS NOT NULL AND feedback <> '' AND feedback NOT LIKE 'clarification:%'
+  FROM analysis_runs WHERE tenant_id = ? AND request_id = ? AND kind <> 'plan' AND feedback IS NOT NULL AND feedback <> '' AND feedback NOT LIKE 'clarification:%'
+UNION ALL
+-- The same rule for a Plan run: its feedback shares the column with the analysis runs, so each branch filters on kind.
+SELECT 'plan.revision_requested', CONCAT(id, ':plan-revision'), started_at, 'user', COALESCE(actor_id, ''), 'plan', '', '', '', '', '', CAST(0 AS SIGNED)
+  FROM analysis_runs WHERE tenant_id = ? AND request_id = ? AND kind = 'plan' AND feedback IS NOT NULL AND feedback <> '' AND feedback NOT LIKE 'clarification:%'
 UNION ALL
 SELECT 'clarification.asked', CONCAT(id, ':asked'), created_at, 'system', created_by, 'clarification', id, source, status, resume_status, '', CAST(round AS SIGNED)
   FROM clarifications WHERE tenant_id = ? AND request_id = ?
@@ -71,7 +75,7 @@ SELECT CASE action WHEN 'returned' THEN 'request.returned' WHEN 'reopened' THEN 
   FROM request_return_history WHERE tenant_id = ? AND request_id = ?
 `
 
-const activityBranches = 11
+const activityBranches = 12
 
 // ListActivity reads the newest lines of one Request first; see the Postgres adapter for what runs in SQL and what does not.
 func (r *RequestActivityRepository) ListActivity(ctx context.Context, requestID string, q domain.ActivityQuery) ([]domain.ActivityRow, error) {

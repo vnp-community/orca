@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
@@ -20,13 +21,26 @@ type PlanGenerator interface {
 type nativeEngine struct {
 	completer AICompleter
 	planGen   PlanGenerator
+	settings  AnalysisSettings
 }
 
-func NewNativeEngine(completer AICompleter, planGen PlanGenerator) SolutionEngine {
-	return &nativeEngine{
+// NativeEngineOption configures NewNativeEngine.
+type NativeEngineOption func(*nativeEngine)
+
+// WithOutputLanguage sets the language the model writes its options in; without it the prompt has no language instruction.
+func WithOutputLanguage(l output_language.Language) NativeEngineOption {
+	return func(e *nativeEngine) { e.settings.OutputLanguage = l }
+}
+
+func NewNativeEngine(completer AICompleter, planGen PlanGenerator, opts ...NativeEngineOption) SolutionEngine {
+	e := &nativeEngine{
 		completer: completer,
 		planGen:   planGen,
 	}
+	for _, opt := range opts {
+		opt(e)
+	}
+	return e
 }
 
 func (e *nativeEngine) Name() domain.EngineName {
@@ -46,6 +60,7 @@ func (e *nativeEngine) GenerateAnalysis(ctx context.Context, p ProjectRef, in An
 	minOptions := domain.MinOptionsFor(in.Request.Type)
 	prompt := SolutionPromptInput{
 		Kind: domain.SolutionKindSolution, Request: in.Request, MinOptions: minOptions, PriorArtifacts: in.PriorArtifacts, Feedback: in.Feedback,
+		Language: e.settings.OutputLanguageFor(in.Request),
 	}
 	var raw string
 	for attempt := 0; attempt < 2; attempt++ {

@@ -26,5 +26,5 @@ func (d *DefaultedEngineSettings) Get(ctx context.Context, projectID string) (do
 	if err != nil || found {
 		return s, found, err
 	}
-	return domain.ProjectEngineSettings{ProjectID: projectID, Engine: d.defaults.Engine, SolutionAgent: d.defaults.SolutionAgent, ExecutionMode: d.defaults.ExecutionMode.OrDefault(), FromDeploymentDefault: true}, true, nil
+	return domain.ProjectEngineSettings{ProjectID: projectID, Engine: d.defaults.Engine, SolutionAgent: d.defaults.SolutionAgent, ExecutionMode: d.defaults.ExecutionMode.OrDefault(), PlanAutoGenerate: true, FromDeploymentDefault: true}, true, nil
 }

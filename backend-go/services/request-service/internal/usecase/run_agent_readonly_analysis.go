@@ -110,6 +110,7 @@ func (a *RunAgentReadonlyAnalysis) Execute(ctx context.Context, run domain.Analy
 		Kind: kind, Request: req, Feedback: run.Feedback, MinOptions: domain.MinOptionsFor(req.Type),
 		PriorArtifacts: priorArtifacts(ctx, a.solutions, req.ID, kind, run.SolutionID),
 		Answers:        answeredForPrompt(ctx, a.answers, req.ID),
+		Language:       a.settings.OutputLanguageFor(req),
 	}
 	in.ProjectName, in.RepoURL = projectFacts(ctx, a.projects, req.ProjectID)
 	// Only the Solution reads the knowledge graph; the other kinds keep their prompt and tools unchanged.

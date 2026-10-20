@@ -11,7 +11,7 @@ import (
 
 func newPlanCmd(e flowEnv) *cobra.Command {
 	cmd := &cobra.Command{Use: "plan", Short: "the execution plan of a Request: generate it, read its tree, start a Phase"}
-	cmd.AddCommand(newPlanGenerateCmd(e), newPlanProposalCmd(e), newPlanCommitCmd(e), newPlanBundleCmd(e), newPlanResultCmd(e), newPlanTreeCmd(e), newPlanStartPhaseCmd(e))
+	cmd.AddCommand(newPlanGenerateCmd(e), newPlanProposalCmd(e), newPlanCommitCmd(e), newPlanBundleCmd(e), newPlanRevisionsCmd(e), newPlanResultCmd(e), newPlanTreeCmd(e), newPlanStartPhaseCmd(e))
 	return cmd
 }
 
@@ -87,24 +87,47 @@ func newPlanProposalCmd(e flowEnv) *cobra.Command {
 	return cmd
 }
 
-// newPlanBundleCmd reads the OpenSpec change a plan was authored as: the file list, or one file's text.
+// newPlanBundleCmd reads the OpenSpec change a plan was authored as: the file list, or one file's text. With --revision it
+// reads an older version, which is read-only: a change to the plan is asked for with `orca plan generate --feedback`.
 func newPlanBundleCmd(e flowEnv) *cobra.Command {
 	var file, run string
+	var revision int
 	cmd := &cobra.Command{
 		Use: "bundle <request-id>", Short: "the OpenSpec change behind a plan: its files, or one file with --file (read it before you approve the plan)", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if revision < 0 {
+				return e.usage("--revision must be a version number (see `orca plan revisions`)")
+			}
 			if file != "" {
 				return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
-					return cli.GetPlanBundleFile(ctx, args[0], file)
+					return cli.GetPlanBundleFileRevision(ctx, args[0], file, revision)
 				}, renderBundleFile)
 			}
 			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
-				return cli.GetPlanProposal(ctx, args[0], run)
+				return cli.GetPlanProposalRevision(ctx, args[0], run, revision)
 			}, renderPlanBundle)
 		},
 	}
 	cmd.Flags().StringVar(&file, "file", "", "print this file of the change (for example tasks.md or specs/<capability>/spec.md)")
 	cmd.Flags().StringVar(&run, "run", "", "run id (default: the latest)")
+	cmd.Flags().IntVar(&revision, "revision", 0, "read this version of the plan (default: the current one; see `orca plan revisions`)")
+	return cmd
+}
+
+// newPlanRevisionsCmd lists the versions of a plan, newest first, with the first words of what was asked for each.
+func newPlanRevisionsCmd(e flowEnv) *cobra.Command {
+	var pageToken string
+	var pageSize int
+	cmd := &cobra.Command{
+		Use: "revisions <request-id>", Short: "the versions of a plan, newest first, with what was asked to get each one", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
+				return cli.ListPlanRevisions(ctx, args[0], pageToken, pageSize)
+			}, renderPlanRevisions)
+		},
+	}
+	cmd.Flags().IntVar(&pageSize, "page-size", 0, "versions per page (default 20, at most 100)")
+	cmd.Flags().StringVar(&pageToken, "page-token", "", "continue from the token a previous page printed")
 	return cmd
 }
 

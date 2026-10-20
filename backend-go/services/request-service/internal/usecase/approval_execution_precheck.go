@@ -17,23 +17,22 @@ type ExecutionStartPrecheck struct {
 	Authorizer ApprovalAuthorizer
 }
 
-// Check runs for an approval that is about to be approved by approverID. It never writes.
-func (p *ExecutionStartPrecheck) Check(ctx context.Context, a domain.Approval, approverID string) error {
-	if p == nil || p.Access == nil || p.Requests == nil || a.Stage != string(domain.RequestStatusAwaitingPlanApproval) {
-		return nil
-	}
-	switch a.SubjectType {
-	case domain.SubjectPlan, domain.SubjectTaskList, domain.SubjectPreDeploy:
-	default:
+// Check runs for an approval that is about to be approved by approverID. It never writes. requested is the mode the
+// approver chose in this call ("" for none): it wins over the project setting, because choosing to run everything makes
+// the approver the execution actor even in a project that is step by step.
+func (p *ExecutionStartPrecheck) Check(ctx context.Context, a domain.Approval, approverID string, requested domain.ExecutionMode) error {
+	if p == nil || p.Access == nil || p.Requests == nil || !domain.ExecutionModeChoiceApplies(a) {
 		return nil
 	}
 	req, err := p.Requests.Get(ctx, a.RequestID)
 	if err != nil {
 		return err
 	}
-	mode, err := p.Modes.Mode(ctx, req)
-	if err != nil {
-		return err
+	mode := requested
+	if mode == "" {
+		if mode, err = p.Modes.Mode(ctx, req); err != nil {
+			return err
+		}
 	}
 	if mode != domain.ExecutionContinuous {
 		return nil

@@ -266,7 +266,7 @@ func TestRequestFlowStatus_PublishesFeatures(t *testing.T) {
 	}
 	mustEqual(t, res["enabled"], true)
 	feats, ok := res["features"].([]any)
-	if !ok || len(feats) != 1 || feats[0] != "request.baseRef" {
-		t.Errorf("features = %v, want [request.baseRef]", res["features"])
+	if !ok || len(feats) != 4 || feats[0] != "request.baseRef" || feats[1] != "approval.runAll" || feats[2] != "request.planAuto" || feats[3] != "request.planRevisions" {
+		t.Errorf("features = %v, want [request.baseRef approval.runAll request.planAuto request.planRevisions]", res["features"])
 	}
 }

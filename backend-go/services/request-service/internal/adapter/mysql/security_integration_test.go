@@ -48,6 +48,8 @@ func (f *myFixture) securityEnv() contracttest.SecurityEnv {
 				VALUES (UUID(), ?, ?, @pack, 1, 's', 'r', NOW(6), 'fresh', 'high', REPEAT('c', 64), 1, 'SECRET', 'SECRET')`, tenantID, requestID)
 			f.execAdmin(t, `INSERT INTO openspec_changes (id, tenant_id, request_id, change_id, status, tasks_sync_state, tasks_sync_error, bundle_json, kg_gaps, kg_conflicts)
 				VALUES (UUID(), ?, ?, 'c', 'ready', 'failed', 'SECRET', '{"tasks.md":"SECRET"}', '["SECRET"]', '["SECRET"]')`, tenantID, requestID)
+			f.execAdmin(t, `INSERT INTO openspec_change_revisions (id, tenant_id, request_id, revision, run_id, bundle_digest, files_json, bundle_json)
+				VALUES (UUID(), ?, ?, 1, UUID(), 'd', '[{"path":"specs/SECRET/spec.md"}]', '{"tasks.md":"SECRET"}')`, tenantID, requestID)
 			f.execAdmin(t, `INSERT INTO request_revisions (id, tenant_id, request_id, revision, cause, snapshot, digest, actor_kind) VALUES (UUID(), ?, ?, 1, 'created', '{"title":"SECRET"}', 'd', 'user')`, tenantID, requestID)
 			f.execAdmin(t, `SET @clar = UUID()`)
 			f.execAdmin(t, `INSERT INTO clarifications (id, tenant_id, request_id, seq, source, status, resume_status, asked_request_revision, due_at, cancel_reason, created_by)

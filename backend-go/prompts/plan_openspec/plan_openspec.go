@@ -5,6 +5,7 @@ import (
 	"embed"
 	"text/template"
 
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/prompts/render"
 	"github.com/stablyai/orca-go/prompts/request_context"
 )
@@ -43,6 +44,9 @@ type Input struct {
 	// Analysis is the approved Solution rendered as text; empty for types that skip analysis.
 	Analysis string
 	Feedback string
+	// PreviousFiles are the files of the version being revised, relative to the change directory. Empty on a first run,
+	// and then the prompt says nothing about a revision.
+	PreviousFiles []string
 	// KnowledgeAvailable is false when the project has no usable knowledge graph; the prompt then says so instead of
 	// sending the agent to a server that is not there.
 	KnowledgeAvailable bool
@@ -50,6 +54,8 @@ type Input struct {
 	ResultNonce string
 	// RetryNote lists what was wrong with the previous attempt (parser violations, structure findings).
 	RetryNote string
+	// Language is the language the prose is written in; the zero value adds no instruction.
+	Language output_language.Language
 }
 
 // Render builds the prompt. ChangeID, Ref and ResultNonce are required: the agent writes under the change directory and

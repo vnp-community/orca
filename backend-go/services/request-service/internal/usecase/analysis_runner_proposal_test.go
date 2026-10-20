@@ -68,7 +68,7 @@ func startedOpenSpecRun(t *testing.T) (*planKit, domain.AnalysisRun) {
 	k := newPlanKit(fakeConns{conn: AnalysisConnection{ConnectionID: "c", RepoPath: "/r"}})
 	k.generate = NewGeneratePlan(GeneratePlanDeps{
 		Requests: k.w, Solutions: fakeSolutions{k.w}, Runs: fakeRuns{k.w}, Conns: fakeConns{conn: AnalysisConnection{ConnectionID: "c", RepoPath: "/r"}},
-		Auth: NewPlanActorAuthorizer(allowAll{}), Approvals: fakeCanceller{k.w}, Transition: k.w.transitioner(), Tx: k.w, Spawner: k.spawner,
+		Auth: NewPlanActorAuthorizer(allowAll{}, nil, false), Approvals: fakeCanceller{k.w}, Transition: k.w.transitioner(), Tx: k.w, Spawner: k.spawner,
 		LeaseOwner: testOwner, Pin: &stubPinner{engine: domain.EngineOpenSpec},
 	})
 	req := k.w.seedRequest(domain.RequestTypeChangeRequest, domain.RequestStatusPlanning)

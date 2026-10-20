@@ -74,8 +74,10 @@ type ProposalInput struct {
 	Limits   domain.PlanLimits
 	// Analysis is the approved Solution as text; Feedback the reviewer's guidance on a regenerate.
 	Analysis, Feedback string
-	ProjectName        string
-	RepoURL            string
+	// PreviousFiles are the files of the version being revised, relative to the change directory; empty on a first run.
+	PreviousFiles []string
+	ProjectName   string
+	RepoURL       string
 	// Settings is the project's engine setting, for the readiness check.
 	Settings *domain.ProjectEngineSettings
 	// RetryNote and Workspace are set on the second attempt: the agent fixes the files already in place.
@@ -224,8 +226,8 @@ func (e *openspecEngine) runAgent(ctx context.Context, run domain.AnalysisRun, r
 		nonce := e.nonce()
 		prompt, perr := RenderOpenSpecPlanPrompt(OpenSpecPlanPromptInput{
 			Request: req, Ref: ref, ChangeID: changeID, Shape: in.Shape, Limits: in.Limits, MinTasks: min, MaxTasks: max,
-			ProjectName: in.ProjectName, RepoURL: in.RepoURL, Analysis: in.Analysis, Feedback: in.Feedback,
-			KnowledgeAvailable: withKnowledge, ResultNonce: nonce, RetryNote: in.RetryNote,
+			ProjectName: in.ProjectName, RepoURL: in.RepoURL, Analysis: in.Analysis, Feedback: in.Feedback, PreviousFiles: in.PreviousFiles,
+			KnowledgeAvailable: withKnowledge, ResultNonce: nonce, RetryNote: in.RetryNote, Language: e.d.Settings.OutputLanguageFor(req),
 		})
 		if perr != nil {
 			return AgentPromptResult{}, perr

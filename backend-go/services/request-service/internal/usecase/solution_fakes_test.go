@@ -257,6 +257,22 @@ func (f fakeRuns) ListRecent(_ context.Context, requestID string, limit int) ([]
 	return out, nil
 }
 
+func (f fakeRuns) ListSucceeded(_ context.Context, requestID string, kind domain.RunKind) ([]domain.AnalysisRun, error) {
+	var out []domain.AnalysisRun
+	for _, r := range f.w.runs {
+		if r.RequestID == requestID && r.Kind == kind && r.Status == domain.RunStatusSucceeded {
+			out = append(out, r)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if !out[i].StartedAt.Equal(out[j].StartedAt) {
+			return out[i].StartedAt.Before(out[j].StartedAt)
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out, nil
+}
+
 func (f fakeRuns) CountRunning(_ context.Context, projectID string, mode domain.AnalysisMode) (int, error) {
 	n := 0
 	for _, r := range f.w.runs {
@@ -298,9 +314,10 @@ func (d fakeDigests) UpdatePendingDigest(_ context.Context, _ string, st domain.
 
 type allowAll struct{}
 
-func (allowAll) AuthorizeGenerate(context.Context, domain.Request) error { return nil }
-func (allowAll) AuthorizeChoose(context.Context, domain.Request) error   { return nil }
-func (allowAll) AuthorizeRevise(context.Context, domain.Request) error   { return nil }
+func (allowAll) AuthorizeGenerate(context.Context, domain.Request) error   { return nil }
+func (allowAll) AuthorizeChoose(context.Context, domain.Request) error     { return nil }
+func (allowAll) AuthorizeRevise(context.Context, domain.Request) error     { return nil }
+func (allowAll) AuthorizeRevisePlan(context.Context, domain.Request) error { return nil }
 
 type fakeConns struct {
 	conn AnalysisConnection

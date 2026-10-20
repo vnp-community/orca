@@ -127,3 +127,23 @@ func TestAllActivityKinds_NamesTheRevisionKindOnce(t *testing.T) {
 		t.Fatalf("analysis.revision_requested must be a valid filter kind, found %d times", n)
 	}
 }
+
+func TestBuildActivityEntry_PlanRevisionRequestedIsInfoWithAFixedSummary(t *testing.T) {
+	row := ActivityRow{Kind: ActivityPlanRevisionRequested, ID: "r:revision", OccurredAt: activityT0, ActorKind: "user", ActorID: "u1", SubjectType: "plan"}
+	e := BuildActivityEntry(row, nil, 2)
+	if e.Summary != "Requested changes to the plan" || e.Severity != ActivityInfo || e.ActorKind != "user" || e.ActorID != "u1" || len(e.Details) != 0 {
+		t.Fatalf("the line carries no reviewer text and no detail: %+v", e)
+	}
+}
+
+func TestAllActivityKinds_NamesThePlanRevisionKindOnce(t *testing.T) {
+	n := 0
+	for _, k := range AllActivityKinds {
+		if k == "plan.revision_requested" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("plan.revision_requested must be a valid filter kind, found %d times", n)
+	}
+}

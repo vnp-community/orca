@@ -132,16 +132,22 @@ func (h requestRoutes) listPending(w http.ResponseWriter, r *http.Request) {
 func (h requestRoutes) decide(channel string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			Version int64  `json:"version"`
-			Digest  string `json:"digest"`
-			Comment string `json:"comment"`
+			Version       int64  `json:"version"`
+			Digest        string `json:"digest"`
+			Comment       string `json:"comment"`
+			ExecutionMode string `json:"executionMode"`
 		}
 		if !decodeRequestRouteBody(w, r, &body) {
 			return
 		}
-		h.call(w, r, channel, map[string]any{
+		args := map[string]any{
 			"id": chi.URLParam(r, "id"), "expectedVersion": body.Version, "expectedDigest": body.Digest, "comment": body.Comment,
-		}, nil)
+		}
+		// Passed to reject as well: the channel refuses it, so a client cannot believe a rejection ran in a mode.
+		if body.ExecutionMode != "" {
+			args["executionMode"] = body.ExecutionMode
+		}
+		h.call(w, r, channel, args, nil)
 	}
 }
 
@@ -171,6 +177,20 @@ func setPageSize(w http.ResponseWriter, raw string, args map[string]any) bool {
 	return true
 }
 
+// setRevision turns the `revision` query value into the integer the channel wants; absent means the current version.
+func setRevision(w http.ResponseWriter, raw string, args map[string]any) bool {
+	if raw == "" {
+		return true
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		writeJSONError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "revision must be 0 or a version number")
+		return false
+	}
+	args["revision"] = n
+	return true
+}
+
 var requestErrorCode = regexp.MustCompile(`^([A-Z][A-Z0-9_]*): ?(.*)$`)
 
 // writeRequestChannelError turns a channel error "<CODE>: <message>" into an HTTP
@@ -190,7 +210,8 @@ func writeRequestChannelError(w http.ResponseWriter, err error) {
 
 func requestErrorHTTPStatus(code string) int {
 	switch {
-	case code == "INVALID_ARGUMENT", strings.HasSuffix(code, "_REQUIRED"):
+	case code == "INVALID_ARGUMENT", code == "REQUEST_EXECUTION_MODE_INVALID", code == "REQUEST_PLAN_REVISION_PAGE_TOKEN_INVALID",
+		code == "REQUEST_PLAN_IDEMPOTENCY_KEY_INVALID", strings.HasSuffix(code, "_REQUIRED"):
 		return http.StatusBadRequest
 	case strings.HasSuffix(code, "_NOT_FOUND"):
 		return http.StatusNotFound

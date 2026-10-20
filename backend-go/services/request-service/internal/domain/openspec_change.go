@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -56,8 +57,10 @@ type OpenSpecChange struct {
 	SkillHash string
 	// Bundle holds the committed files of the change by path relative to the change directory, so the proposal can be read
 	// after its worktree is gone. Only text under the size caps is kept.
-	Bundle      map[string]string
-	WorkspaceID string
+	Bundle map[string]string
+	// RedactedSecrets counts the secrets masked in Bundle; the branch keeps the raw text. Rows written before CR-REQ-045 hold 0.
+	RedactedSecrets int
+	WorkspaceID     string
 	// SyncDigest is the digest of the plan region Orca last wrote to tasks.md; a region that no longer matches was edited by hand.
 	SyncDigest   string
 	SyncError    string
@@ -77,7 +80,8 @@ type SyncUpdate struct {
 }
 
 // BundleDigest is a stable hash of the stored files: the plan gate folds it into its subject digest, so a change edited
-// after the approver opened it no longer matches what was shown.
+// after the approver opened it no longer matches what was shown. It covers the masked copy; an approval opened before the
+// masking existed hashed the raw text, and still matches because that row is never rewritten.
 func (c OpenSpecChange) BundleDigest() string {
 	paths := make([]string, 0, len(c.Bundle))
 	for p := range c.Bundle {
@@ -89,6 +93,24 @@ func (c OpenSpecChange) BundleDigest() string {
 		fmt.Fprintf(h, "%d:%s\n%d:%s\n", len(p), p, len(c.Bundle[p]), c.Bundle[p])
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// omittedMarkerPattern is what the proposal run stores in place of a file that did not fit the bundle budget: the size and
+// the sha256 of the raw file.
+var omittedMarkerPattern = regexp.MustCompile(`^<omitted size=(\d+) sha256=([0-9a-f]{64})>$`)
+
+// ParseOmittedMarker reads the size and hash a bundle file was replaced by; ok is false for any other text, or a size that
+// does not fit an int64.
+func ParseOmittedMarker(s string) (size int64, sha256 string, ok bool) {
+	m := omittedMarkerPattern.FindStringSubmatch(s)
+	if m == nil {
+		return 0, "", false
+	}
+	n, err := strconv.ParseInt(m[1], 10, 64)
+	if err != nil {
+		return 0, "", false
+	}
+	return n, m[2], true
 }
 
 func (c *OpenSpecChange) MarkReady() error {

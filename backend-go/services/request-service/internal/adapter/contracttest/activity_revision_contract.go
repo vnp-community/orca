@@ -32,11 +32,27 @@ func AssertActivityUnionOmitsFeedback(t *testing.T, union string) {
 }
 
 // activityUnionFeedbackProblem is "" when the union is safe; split from the assertion so the check itself can be tested.
+// The analysis and the plan branch share the run table, so each must also keep to its own kind.
 func activityUnionFeedbackProblem(union string) string {
 	code := sqlLineComment.ReplaceAllString(union, "")
-	start := strings.Index(code, "'"+domain.ActivityAnalysisRevisionRequested+"'")
+	for _, b := range []struct{ kind, kindPredicate string }{
+		{domain.ActivityAnalysisRevisionRequested, "kind <> 'plan'"},
+		{domain.ActivityPlanRevisionRequested, "kind = 'plan'"},
+	} {
+		if problem := revisionBranchProblem(code, b.kind, b.kindPredicate); problem != "" {
+			return problem
+		}
+	}
+	if rest := feedbackPredicateRE.ReplaceAllString(code, ""); strings.Contains(strings.ToLower(rest), "feedback") {
+		return fmt.Sprintf("the activity union names the feedback column outside the revision filters: %q", rest)
+	}
+	return ""
+}
+
+func revisionBranchProblem(code, kind, kindPredicate string) string {
+	start := strings.Index(code, "'"+kind+"'")
 	if start < 0 {
-		return "the activity union has no " + domain.ActivityAnalysisRevisionRequested + " branch"
+		return "the activity union has no " + kind + " branch"
 	}
 	branch := code[start:]
 	if end := strings.Index(branch, "UNION ALL"); end >= 0 {
@@ -44,16 +60,16 @@ func activityUnionFeedbackProblem(union string) string {
 	}
 	from := strings.Index(strings.ToUpper(branch), " FROM ")
 	if from < 0 {
-		return fmt.Sprintf("the revision branch has no FROM: %q", branch)
+		return fmt.Sprintf("the %s branch has no FROM: %q", kind, branch)
 	}
 	if strings.Contains(strings.ToLower(branch[:from]), "feedback") {
-		return fmt.Sprintf("the revision branch selects feedback: %q", branch[:from])
+		return fmt.Sprintf("the %s branch selects feedback: %q", kind, branch[:from])
 	}
 	if !feedbackPredicateRE.MatchString(branch[from:]) {
-		return fmt.Sprintf("the revision branch must keep only runs with non-empty feedback: %q", branch[from:])
+		return fmt.Sprintf("the %s branch must keep only runs with non-empty feedback: %q", kind, branch[from:])
 	}
-	if rest := feedbackPredicateRE.ReplaceAllString(code, ""); strings.Contains(strings.ToLower(rest), "feedback") {
-		return fmt.Sprintf("the activity union names the feedback column outside the revision filter: %q", rest)
+	if !strings.Contains(branch[from:], kindPredicate) {
+		return fmt.Sprintf("the %s branch must filter on %s: %q", kind, kindPredicate, branch[from:])
 	}
 	return ""
 }
@@ -205,5 +221,67 @@ func activityRevisionWithoutSolutionOrActor(t *testing.T, env ExecutionEnv) {
 	}
 	if r := rows[0]; r.ActorID != "" || r.SubjectID != "" || r.ActorKind != "user" || r.SubjectType != "solution" || r.ID != run["id"].(string)+":revision" {
 		t.Fatalf("empty ids, not an error: %+v", r)
+	}
+}
+
+// A Plan run keeps its feedback in the same column as the analysis runs: it must read as a plan line, never as an analysis one.
+func activityPlanRevisionRequested(t *testing.T, env ExecutionEnv) {
+	tenantID := newTenant()
+	req := seedExecuting(t, env, tenOf(tenantID), nil)
+	ctx := tenOf(tenantID)
+	t0 := usec().Add(-3 * time.Hour)
+	alice := uuid.NewString()
+	planRun := func(feedback any, actor string, at time.Time) map[string]any {
+		row := revisionRun(tenantID, req.ID, "", actor, feedback, at)
+		row["kind"] = "plan"
+		return row
+	}
+	analysis := revisionRun(tenantID, req.ID, uuid.NewString(), alice, revisionFeedbackMarker+" analysis", t0)
+	first := planRun(nil, alice, t0.Add(time.Minute))
+	blank := planRun("", alice, t0.Add(2*time.Minute))
+	system := planRun(domain.ClarificationFeedbackPrefix+uuid.NewString(), "", t0.Add(3*time.Minute))
+	revised := planRun(revisionFeedbackMarker+" plan", alice, t0.Add(4*time.Minute))
+	noActor := planRun(revisionFeedbackMarker+" plan again", "", t0.Add(5*time.Minute))
+	otherTenant := planRun(revisionFeedbackMarker+" foreign", alice, t0.Add(6*time.Minute))
+	otherTenant["tenant_id"] = newTenant()
+	for _, r := range []map[string]any{analysis, first, blank, system, revised, noActor, otherTenant} {
+		activityRaw(t, env, "analysis_runs", r)
+	}
+
+	read := func(kinds ...string) []domain.ActivityRow {
+		t.Helper()
+		rows, err := env.Activity.ListActivity(ctx, req.ID, domain.ActivityQuery{Kinds: kinds, Limit: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rows
+	}
+	plans := read(domain.ActivityPlanRevisionRequested)
+	if len(plans) != 2 || plans[0].ID != noActor["id"].(string)+":plan-revision" || plans[1].ID != revised["id"].(string)+":plan-revision" {
+		t.Fatalf("two Plan rounds with feedback make two plan lines, newest first: %+v", plans)
+	}
+	for _, row := range plans {
+		if row.ActorKind != "user" || row.SubjectType != "plan" || row.SubjectID != "" || row.A != "" || row.B != "" || row.C != "" || row.D != "" || row.N != 0 {
+			t.Fatalf("a plan line has fixed columns: %+v", row)
+		}
+	}
+	if plans[1].ActorID != alice || plans[0].ActorID != "" {
+		t.Fatalf("the actor is the run's: %+v", plans)
+	}
+	analyses := read(domain.ActivityAnalysisRevisionRequested)
+	if len(analyses) != 1 || analyses[0].ID != analysis["id"].(string)+":revision" || analyses[0].SubjectType != "solution" {
+		t.Fatalf("the Plan runs must not appear as analysis lines: %+v", analyses)
+	}
+	for _, row := range read() {
+		entry := domain.BuildActivityEntry(row, nil, 2)
+		if strings.Contains(fmt.Sprintf("%+v", row), revisionFeedbackMarker) || strings.Contains(fmt.Sprintf("%+v", entry), revisionFeedbackMarker) {
+			t.Fatalf("feedback leaked into the feed: %+v", row)
+		}
+		if row.Kind == domain.ActivityPlanRevisionRequested && (entry.Summary != "Requested changes to the plan" || entry.Severity != domain.ActivityInfo) {
+			t.Fatalf("a plan line has a fixed summary and info severity: %+v", entry)
+		}
+	}
+	if both := read(domain.ActivityPlanRevisionRequested, domain.ActivityAnalysisRevisionRequested); len(both) != 3 {
+		t.Fatalf("both kinds in one filter: %d", len(both))
 	}
 }

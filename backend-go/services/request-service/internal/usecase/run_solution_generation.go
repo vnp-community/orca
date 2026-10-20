@@ -51,6 +51,7 @@ func (g *RunSolutionGeneration) Execute(ctx context.Context, run domain.Analysis
 		Kind: kind, Request: req, MinOptions: domain.MinOptionsFor(req.Type), Feedback: run.Feedback,
 		PriorArtifacts: priorArtifacts(ctx, g.solutions, req.ID, kind, run.SolutionID),
 		Answers:        answeredForPrompt(ctx, g.answers, req.ID),
+		Language:       g.settings.OutputLanguageFor(req),
 	}
 	in.ProjectName, in.RepoURL = projectFacts(ctx, g.projects, req.ProjectID)
 

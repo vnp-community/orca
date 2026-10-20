@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -97,6 +98,15 @@ func TestApprovalServer_UnwiredRPCsAnswerUnimplementedNotPanic(t *testing.T) {
 		if status.Code(err) != codes.Unimplemented {
 			t.Errorf("%s = %v", name, err)
 		}
+	}
+}
+
+// The use case parses the mode before reading anything, so a bad value reaching it proves Approve forwards execution_mode.
+func TestApprovalServer_ApproveForwardsTheExecutionModeToTheUseCase(t *testing.T) {
+	s := NewApprovalServer(ApprovalUseCases{Decide: &usecase.DecideApproval{}})
+	_, err := s.Approve(userCtx(), &requestv1.ApproveRequest{Id: "a", ExecutionMode: "turbo", ExpectedDigest: "d"})
+	if status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "REQUEST_EXECUTION_MODE_INVALID") {
+		t.Fatalf("got %v, want REQUEST_EXECUTION_MODE_INVALID", err)
 	}
 }
 

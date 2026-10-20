@@ -75,3 +75,40 @@ func TestRenderEngineSettings_SaysWhatIsOnAndWhyItCannotRunYet(t *testing.T) {
 		t.Fatalf("a read without a check printed a verdict:\n%s", plain)
 	}
 }
+
+func TestEngineSetCmd_PlanAutoGenerateIsSentOnlyWhenNamed(t *testing.T) {
+	run := func(args ...string) map[string]any {
+		g := &gateway{t: t, reply: map[string]string{
+			"GET /v1/projects/p1/request-engine": engineReadJSON,
+			"PUT /v1/projects/p1/request-engine": `{"projectId":"p1","engine":"openspec","planAutoGenerate":false,"version":5}`,
+		}}
+		srv, factory := g.server()
+		defer srv.Close()
+		var exit int
+		cmd := newEngineSetCmd(flowEnv{factory: factory, json: new(bool), exit: &exit})
+		cmd.SetArgs(append([]string{"--project", "p1"}, args...))
+		if err := cmd.ExecuteContext(context.Background()); err != nil || exit != 0 {
+			t.Fatalf("err=%v exit=%d", err, exit)
+		}
+		return g.bodies[1]
+	}
+	if put := run("--solution-agent=true"); put["planAutoGenerate"] != nil {
+		t.Fatalf("an unnamed switch must not be sent: %v", put)
+	}
+	if put := run("--plan-auto-generate=false"); put["planAutoGenerate"] != false {
+		t.Fatalf("false must be sent: %v", put)
+	}
+	if put := run("--plan-auto-generate=true"); put["planAutoGenerate"] != true {
+		t.Fatalf("true must be sent: %v", put)
+	}
+}
+
+func TestRenderEngineSettings_ShowsPlanAutoGenerateOnlyWhenTheGatewaySendsIt(t *testing.T) {
+	with := renderEngineSettings(parseDoc(t, `{"projectId":"p1","engine":"native","solutionAgent":false,"planAutoGenerate":false,"version":2}`))
+	if !strings.Contains(with, "plan auto-generate: off") {
+		t.Fatalf("output = %q", with)
+	}
+	if without := renderEngineSettings(parseDoc(t, engineReadJSON)); strings.Contains(without, "plan auto-generate") {
+		t.Fatalf("an older gateway sends no value: %q", without)
+	}
+}

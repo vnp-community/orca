@@ -78,6 +78,8 @@ func TestAudit_EveryEventDerivedActionWritesExactlyOneEntry(t *testing.T) {
 			domain.ActionRequestCancel, domain.AuditActorUser, "request", "r1", nil},
 		{"approve", auditCtx("u2", ""), domain.SubjectApprovalDecided, map[string]any{"approval_id": "a1", "decision": "approved", "decided_by": "u2", "subject_type": "plan", "stage": "awaiting_plan_approval"},
 			domain.ActionApprovalApprove, domain.AuditActorUser, "approval", "a1", map[string]string{"subject_type": "plan", "stage": "awaiting_plan_approval"}},
+		{"approve and run all steps", auditCtx("u2", ""), domain.SubjectApprovalDecided, map[string]any{"approval_id": "a1", "decision": "approved", "decided_by": "u2", "subject_type": "plan", "stage": "awaiting_plan_approval", "execution_mode": "continuous"},
+			domain.ActionApprovalApprove, domain.AuditActorUser, "approval", "a1", map[string]string{"subject_type": "plan", "stage": "awaiting_plan_approval", "execution_mode": "continuous"}},
 		{"reject", auditCtx("u2", ""), domain.SubjectApprovalDecided, map[string]any{"approval_id": "a1", "decision": "rejected", "decided_by": "u2", "subject_type": "solution"},
 			domain.ActionApprovalReject, domain.AuditActorUser, "approval", "a1", map[string]string{"subject_type": "solution"}},
 		{"cancel approval", auditCtx("u2", ""), domain.SubjectApprovalDecided, map[string]any{"approval_id": "a1", "decision": "cancelled", "decided_by": "u2", "subject_type": "phase"},

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"testing"
+	"time"
 )
 
 func TestEffectiveEngine_Table(t *testing.T) {
@@ -98,5 +99,15 @@ func TestEffectiveEngine_DeploymentDefaultOnlyMovesFullProfileTypes(t *testing.T
 	pinned := EngineOpenSpec
 	if got := EffectiveEngine(&pinned, fromDefault, OpenSpecProfileLight); got != EngineOpenSpec {
 		t.Fatalf("a Request pinned to openspec keeps it, got %s", got)
+	}
+}
+
+func TestNewProjectEngineSettingsPlansAutomaticallyByDefault(t *testing.T) {
+	s, err := NewProjectEngineSettings("tenant", "project", EngineNative, "", "actor", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.PlanAutoGenerate {
+		t.Error("a project that has not chosen otherwise generates its Plan automatically")
 	}
 }

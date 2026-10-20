@@ -314,3 +314,64 @@ func TestStartPhase_InternalIsRecordedAsAuto(t *testing.T) {
 		t.Fatalf("an internal start is auto: %+v", rows)
 	}
 }
+
+// The same run as above, but the mode comes from the decision that approves the plan instead of being seeded: one
+// approval with "continuous" pins the mode, and the Phases then follow without a Phase approval or a Start button.
+func TestContinuous_ApprovingThePlanWithTheChoiceRunsEveryPhase(t *testing.T) {
+	r := newExRig(t)
+	req := r.store.seed(func(q *domain.Request) {
+		q.Type, q.Size, q.Status = domain.RequestTypeChangeRequest, domain.RequestSizeM, domain.RequestStatusAwaitingPlanApproval
+	})
+	plan := r.plan(req)
+	p1, p2 := r.phase(req, plan, "p1"), r.phase(req, plan, "p2")
+	t1, t2 := r.leaf(req, p1, "t1", domain.TaskStatusOpen), r.leaf(req, p2, "t2", domain.TaskStatusOpen)
+
+	s := &apprStore{lcStore: r.store, approvals: map[string]domain.Approval{}, approvers: map[string][]domain.Principal{}}
+	locker := apprLocker{s}
+	registry := NewSubjectHandlerRegistry()
+	registry.Register(domain.SubjectPlan, &TransitionSubjectHandler{Artifacts: &fakeArtifacts{}, Transition: newLcTransition(r.store), Requests: locker})
+	decide := &DecideApproval{Repo: apprRepo{s}, Tx: s, Locker: locker, Registry: registry, Outbox: s, Authorizer: anyApprover{}, Pinner: s}
+	gate := domain.Approval{
+		ID: "gate-1", TenantID: "t1", RequestID: req.ID, SubjectType: domain.SubjectPlan, SubjectID: plan.ID, Stage: string(domain.RequestStatusAwaitingPlanApproval),
+		Status: domain.ApprovalStatusPending, Version: 1, SubjectDigest: "d",
+	}
+	s.approvals[gate.ID] = gate
+
+	res, err := decide.Execute(lcCtxWithUser("approver-1", "admin"), DecideApprovalInput{ID: gate.ID, Decision: "approve", ExpectedDigest: "d", ExecutionMode: "continuous"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.RequestStatus != domain.RequestStatusExecuting || res.ExecutionMode != domain.ExecutionContinuous {
+		t.Fatalf("decision result = %+v", res)
+	}
+
+	if started, err := r.startExec.Execute(lcCtx(), req.ID); err != nil || !started {
+		t.Fatalf("the run starts by itself: started=%v err=%v", started, err)
+	}
+	if got := pendingPhaseApprovals(r); len(got) != 0 {
+		t.Fatalf("no Phase approval is opened, got %v", got)
+	}
+	r.finishPhaseTask(req, t1)
+	if r.tasks.get(t2.ID).Status != domain.TaskStatusInProgress {
+		t.Fatalf("the second Phase follows the first: %v", r.tasks.calls)
+	}
+	r.finishPhaseTask(req, t2)
+	got := r.reload(req)
+	if got.Status != domain.RequestStatusCompleted || got.ExecutionMode != domain.ExecutionContinuous {
+		t.Fatalf("status=%s mode=%q, want completed / continuous", got.Status, got.ExecutionMode)
+	}
+	rows, _ := r.starts.ListByRequest(lcCtx(), req.ID)
+	if len(rows) != 2 {
+		t.Fatalf("phase_starts = %d rows, want 2", len(rows))
+	}
+	for i, row := range rows {
+		if row.Trigger != domain.PhaseStartAuto {
+			t.Errorf("start %d: trigger=%q, want auto", i, row.Trigger)
+		}
+	}
+}
+
+// anyApprover lets the decision through: who may approve is covered by the authorizer's own tests.
+type anyApprover struct{}
+
+func (anyApprover) CanDecide(context.Context, domain.Request, domain.Approval) error { return nil }
