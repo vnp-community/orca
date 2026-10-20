@@ -69,7 +69,9 @@ type requestStores struct {
 	reviewRuns     usecase.OutcomeReviewRunRepository
 	// reviewContexts keeps the locked design and the checked results of context runs (CR-OR-002).
 	reviewContexts usecase.ReviewContextStore
-	close          func()
+	// reviewArtifacts keeps the drawings of reviews and their content (CR-OR-011).
+	reviewArtifacts usecase.ReviewArtifactRepository
+	close           func()
 }
 
 func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, healthSrv *health.Server) (*requestStores, error) {
@@ -119,6 +121,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			outcomeReviews:    postgresadapter.NewOutcomeReviewRepository(base),
 			reviewRuns:        postgresadapter.NewOutcomeReviewRunRepository(base),
 			reviewContexts:    postgresadapter.NewOutcomeReviewContextRepository(base),
+			reviewArtifacts:   postgresadapter.NewReviewArtifactRepository(base),
 			close:             pool.Close,
 		}, nil
 	case dbcapability.DialectMySQL:
@@ -173,6 +176,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			outcomeReviews:    mysqladapter.NewOutcomeReviewRepository(base),
 			reviewRuns:        mysqladapter.NewOutcomeReviewRunRepository(base),
 			reviewContexts:    mysqladapter.NewOutcomeReviewContextRepository(base),
+			reviewArtifacts:   mysqladapter.NewReviewArtifactRepository(base),
 			close:             func() { _ = db.Close() },
 		}, nil
 	default:

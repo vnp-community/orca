@@ -260,6 +260,12 @@ type DiagramRef struct {
 	Status      string        `json:"status"` // cached|missing|drawing|failed
 }
 
+// WithStatus is the reference with the state of its drawing set: missing, cached, drawing, failed or disabled.
+func (r DiagramRef) WithStatus(status, artifactID string) DiagramRef {
+	r.Status, r.ArtifactID = status, artifactID
+	return r
+}
+
 // OutcomeReview is the whole review as stored and returned. InputsDigest covers what the facts were built from, never a time.
 type OutcomeReview struct {
 	SchemaVersion int           `json:"schemaVersion"`

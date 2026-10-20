@@ -17,7 +17,14 @@ const (
 	SpecViolationsTotal    = "request_spec_check_violations_total"
 	TasksDriftTotal        = "request_engine_drift_total"
 	TasksSyncTotal         = "request_engine_sync_total"
+
+	// Series of the Outcome Review drawings (CR-OR-011). The hit ratio is lookups{result="hit"} over all lookups.
+	ReviewArtifactLookups = "request_review_artifact_lookups_total"
+	ReviewArtifactBytes   = "request_review_artifact_bytes_stored_total"
+	ReviewArtifactDeduped = "request_review_artifact_blobs_deduped_total"
 )
+
+var knownArtifactResults = map[string]bool{"hit": true, "miss": true, "failed": true, "corrupt": true}
 
 // knownKnowledgeTools is what a read-only tdd-agent server offers. A tool name outside it, from a stream Orca does not
 // control, is counted as "other" so the label set cannot grow without bound.
@@ -35,6 +42,9 @@ type engineSeries struct {
 	violations *prometheus.CounterVec
 	drift      prometheus.Counter
 	sync       *prometheus.CounterVec
+	lookups    *prometheus.CounterVec
+	stored     prometheus.Counter
+	deduped    prometheus.Counter
 }
 
 func newEngineSeries(reg *prometheus.Registry) engineSeries {
@@ -52,14 +62,35 @@ func newEngineSeries(reg *prometheus.Registry) engineSeries {
 		Help: "Plan regions of tasks.md found edited by hand and restored."})
 	e.sync = prometheus.NewCounterVec(prometheus.CounterOpts{Name: TasksSyncTotal,
 		Help: "tasks.md sync and archive steps that ended, by step (tasks, archive) and result (done, failed, gave_up)."}, []string{"step", "result"})
-	reg.MustRegister(e.runs, e.preflight, e.toolCalls, e.violations, e.drift, e.sync)
+	e.lookups = prometheus.NewCounterVec(prometheus.CounterOpts{Name: ReviewArtifactLookups,
+		Help: "Lookups of an Outcome Review drawing, by result (hit, miss, failed, corrupt)."}, []string{"result"})
+	e.stored = prometheus.NewCounter(prometheus.CounterOpts{Name: ReviewArtifactBytes, Help: "Bytes of Outcome Review drawings stored."})
+	e.deduped = prometheus.NewCounter(prometheus.CounterOpts{Name: ReviewArtifactDeduped, Help: "Outcome Review drawings whose content was already stored."})
+	reg.MustRegister(e.runs, e.preflight, e.toolCalls, e.violations, e.drift, e.sync, e.lookups, e.stored, e.deduped)
 	return e
 }
 
 var (
-	_ usecase.EngineObserver = (*Set)(nil)
-	_ usecase.SyncObserver   = (*Set)(nil)
+	_ usecase.EngineObserver         = (*Set)(nil)
+	_ usecase.SyncObserver           = (*Set)(nil)
+	_ usecase.ReviewArtifactObserver = (*Set)(nil)
 )
+
+func (s *Set) ArtifactLookup(result string) {
+	if !knownArtifactResults[result] {
+		result = "other"
+	}
+	s.engine.lookups.WithLabelValues(result).Inc()
+}
+
+func (s *Set) ArtifactStored(bytes int, deduped bool) {
+	if bytes > 0 {
+		s.engine.stored.Add(float64(bytes))
+	}
+	if deduped {
+		s.engine.deduped.Inc()
+	}
+}
 
 func (s *Set) RunFinished(engine, kind, result string) {
 	s.engine.runs.WithLabelValues(engine, kind, result).Inc()

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/stablyai/orca-go/prompts/outcome_review_context"
+	"github.com/stablyai/orca-go/prompts/outcome_review_draw"
 	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
@@ -87,3 +88,5 @@ func changedGroups(changed []domain.ChangedPath) ([]outcome_review_context.Chang
 	sort.Strings(paths)
 	return groups, paths
 }
+
+func drawPromptVersionOfModule() string { return outcome_review_draw.Version }

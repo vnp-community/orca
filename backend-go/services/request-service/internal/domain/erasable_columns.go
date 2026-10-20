@@ -71,6 +71,12 @@ var ErasableColumns = []ErasableColumn{
 	{"outcome_reviews", "model", "request_id", EraseClearJSONObject, ""},
 	// The cached design and context results quote the same text as the review model.
 	{"outcome_review_contexts", "payload", "request_id", EraseClearJSONObject, ""},
+	// A drawing shows the labels of the review model, so its content, text and model are cleared with the Request.
+	{"review_artifact_blobs", "content", "request_id", EraseClearText, ""},
+	{"review_artifacts", "title", "request_id", EraseClearText, ""},
+	{"review_artifacts", "description", "request_id", EraseClearText, ""},
+	{"review_artifacts", "reason", "request_id", EraseClearText, ""},
+	{"review_artifacts", "model", "request_id", EraseClearJSONObject, ""},
 }
 
 func exempt(reason string, columns ...string) map[string]string {
@@ -144,7 +150,11 @@ var ExemptTextColumns = mergeExempt(
 		"outcome_reviews.context_digest", "outcome_review_runs.kind", "outcome_review_runs.status", "outcome_review_runs.scope",
 		"outcome_review_runs.agent_run_ref", "outcome_review_runs.cost_estimate", "outcome_review_runs.cost_actual",
 		"outcome_review_runs.error_code", "outcome_review_runs.active_key", "outcome_review_contexts.kind", "outcome_review_contexts.digest",
-		"outcome_review_contexts.prompt_version", "project_engine_settings.outcome_review"),
+		"outcome_review_contexts.prompt_version",
+		"review_artifact_blobs.digest", "review_artifact_blobs.media_type", "review_artifacts.section", "review_artifacts.variant", "review_artifacts.name",
+		"review_artifacts.diagram_type", "review_artifacts.input_digest", "review_artifacts.preset_digest", "review_artifacts.skill_version",
+		"review_artifacts.state", "review_artifacts.origin", "review_artifacts.error_code", "review_artifacts.blob_digest", "review_artifacts.view_box",
+		"review_artifacts.self_check", "review_artifacts.active_key", "project_engine_settings.outcome_review"),
 	exempt("provenance has no content or credential (ParseProvenance refuses unknown members)", "solutions.provenance"),
 	exempt("tool names and counts and usage figures of an agent run; never what went into or came out of a tool", "analysis_runs.run_stats"),
 	exempt("event envelope; payloads carry ids and counts, never content (outbox payload golden tests)", "outbox_events.payload", "outbox_events.subject", "processed_events.subject"),

@@ -32,6 +32,9 @@ type ReviewContextRunner struct {
 	Files    RepoFileStat
 	Projects ProjectContextReader
 	Observer EngineObserver
+	// Draw may be nil; when set, the diagrams of a review are drawn as soon as its context is in, and again when a cached context is
+	// applied, so a skill installed later is enough to get the drawings.
+	Draw *ReviewDrawRunner
 	// Spawn runs the background part. The default starts a goroutine; a test passes a function that runs it inline.
 	Spawn func(func())
 	Now   func() time.Time
@@ -77,6 +80,11 @@ type StartContextResult struct {
 	ContextCached bool
 	// Skipped is "kg_unavailable" when the project has no knowledge graph and a code-only run was not asked for.
 	Skipped string
+	// Draw is what happened to the drawings of the review when the context was already there: the run that was started, or the code
+	// of the error that kept one from starting (for instance the skill is missing). Nil when the context run is still going.
+	Draw *StartDrawResult
+	// DrawError is the code of that error.
+	DrawError string
 }
 
 type contextPlan struct {
@@ -125,6 +133,7 @@ func (r *ReviewContextRunner) Start(ctx context.Context, in StartContextInput) (
 			return res, cerr
 		} else if ok {
 			res.View, res.ContextCached = applied, true
+			res.Draw, res.DrawError = r.drawAfter(ctx, req.ID, in.CreatedBy)
 			return res, nil
 		}
 	}
@@ -150,6 +159,7 @@ func (r *ReviewContextRunner) Start(ctx context.Context, in StartContextInput) (
 			return res, cerr
 		} else if ok {
 			res.View, res.ContextCached = applied, true
+			res.Draw, res.DrawError = r.drawAfter(ctx, req.ID, in.CreatedBy)
 			return res, nil
 		}
 	}
@@ -172,23 +182,25 @@ func (r *ReviewContextRunner) Start(ctx context.Context, in StartContextInput) (
 // startRun takes the one slot a Request has for a context run. A run that has been active for longer than any run can last was
 // cut off by a restart: it is ended as interrupted so it does not block the Request for good.
 func (r *ReviewContextRunner) startRun(ctx context.Context, p *contextPlan) (ReviewRun, error) {
-	try := func() (ReviewRun, error) {
-		return r.Runs.Start(ctx, ReviewRun{ID: uuid.NewString(), ReviewID: p.stored.ID, RequestID: p.req.ID, Kind: ReviewRunContext, Status: ReviewRunRunning, Scope: string(p.mode)})
-	}
-	run, err := try()
+	return startReviewRun(ctx, r.Runs, ReviewRun{ID: uuid.NewString(), ReviewID: p.stored.ID, RequestID: p.req.ID, Kind: ReviewRunContext, Status: ReviewRunRunning, Scope: string(p.mode)},
+		r.now(), time.Duration(r.Config.ContextTimeoutMS())*time.Millisecond+2*time.Minute, r.logger())
+}
+
+// startReviewRun takes the slot of a kind of run and ends a run that outlived maxAge, which only a restart can cause.
+func startReviewRun(ctx context.Context, runs OutcomeReviewRunRepository, in ReviewRun, now time.Time, maxAge time.Duration, log *slog.Logger) (ReviewRun, error) {
+	run, err := runs.Start(ctx, in)
 	if err == nil || domainCode(err) != domain.CodeReviewRunInProgress {
 		return run, err
 	}
-	cur, ok, aerr := r.Runs.ActiveForRequest(ctx, p.req.ID, ReviewRunContext)
-	maxAge := time.Duration(r.Config.ContextTimeoutMS())*time.Millisecond + 2*time.Minute
-	if aerr != nil || !ok || r.now().Sub(cur.StartedAt) <= maxAge {
+	cur, ok, aerr := runs.ActiveForRequest(ctx, in.RequestID, in.Kind)
+	if aerr != nil || !ok || now.Sub(cur.StartedAt) <= maxAge {
 		return ReviewRun{}, err
 	}
-	r.logger().WarnContext(ctx, "outcome review: ending a context run that outlived its limit", slog.String("run_id", cur.ID))
-	if ferr := r.Runs.Finish(ctx, cur.ID, ReviewRunFailed, "REQUEST_REVIEW_INTERRUPTED", ""); ferr != nil {
+	log.WarnContext(ctx, "outcome review: ending a run that outlived its limit", slog.String("run_id", cur.ID), slog.String("kind", string(in.Kind)))
+	if ferr := runs.Finish(ctx, cur.ID, ReviewRunFailed, "REQUEST_REVIEW_INTERRUPTED", ""); ferr != nil {
 		return ReviewRun{}, err
 	}
-	return try()
+	return runs.Start(ctx, in)
 }
 
 // decide settles whether the run reads the graph, reads code only, or does not start. It spends nothing.
@@ -298,6 +310,7 @@ func (r *ReviewContextRunner) execute(ctx context.Context, p *contextPlan, run R
 		if err := r.Runs.Finish(ctx, run.ID, status, code, cost); err != nil {
 			r.logger().ErrorContext(ctx, "outcome review: could not end the run", slog.String("run_id", run.ID), slog.Any("error", err))
 		}
+		observerOrNoop(r.Observer).RunFinished("review", string(ReviewRunContext), string(status))
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -339,6 +352,22 @@ func (r *ReviewContextRunner) execute(ctx context.Context, p *contextPlan, run R
 		return
 	}
 	finish(ReviewRunSucceeded, "")
+	r.drawAfter(ctx, p.req.ID, "")
+}
+
+// drawAfter hands the review to the draw runner. A drawing that cannot start (no skill, no dev server) leaves the diagrams missing,
+// which the review shows; it never fails the context run that came before.
+func (r *ReviewContextRunner) drawAfter(ctx context.Context, requestID, createdBy string) (*StartDrawResult, string) {
+	if r.Draw == nil {
+		return nil, ""
+	}
+	res, err := r.Draw.Start(ctx, StartDrawInput{RequestID: requestID, CreatedBy: createdBy, Origin: domain.ArtifactOriginAuto})
+	if err != nil {
+		code := domainCode(err)
+		r.logger().InfoContext(ctx, "outcome review: the drawings did not start", slog.String("request_id", requestID), slog.String("code", code))
+		return nil, code
+	}
+	return &res, ""
 }
 
 // runAgent calls the agent, giving it one retry with the violations of a result that broke the contract. It returns a failure
@@ -504,9 +533,14 @@ func (r *ReviewContextRunner) snapshot(ctx context.Context, worktreeID string) (
 	return snap, true
 }
 
-// checkRun turns an agent result into a failure code when the run itself went wrong or the repository changed. A context run
-// is enforced read-only, so any change is a violation and the result is thrown away.
+// checkRun turns an agent result into a failure code when the run itself went wrong or the repository changed. A context run is
+// enforced read-only, so any change is a violation and the result is thrown away.
 func (r *ReviewContextRunner) checkRun(ctx context.Context, res AgentPromptResult, before RepoSnapshot, compared bool, worktreeID string) string {
+	return checkReadonlyReviewRun(ctx, r.Probe, res, before, compared, worktreeID)
+}
+
+// checkReadonlyReviewRun is the check both review runs share: neither may change the repository.
+func checkReadonlyReviewRun(ctx context.Context, probe RepoStateProbe, res AgentPromptResult, before RepoSnapshot, compared bool, worktreeID string) string {
 	switch {
 	case res.TimedOut:
 		return "REQUEST_REVIEW_TIMEOUT"
@@ -524,8 +558,8 @@ func (r *ReviewContextRunner) checkRun(ctx context.Context, res AgentPromptResul
 	if res.HeadMoved || res.ChangedFiles > 0 {
 		return "REQUEST_REVIEW_REPO_MODIFIED"
 	}
-	if compared {
-		if after, err := r.Probe.Snapshot(ctx, worktreeID); err == nil && !before.Equal(after) {
+	if compared && probe != nil {
+		if after, err := probe.Snapshot(ctx, worktreeID); err == nil && !before.Equal(after) {
 			return "REQUEST_REVIEW_REPO_MODIFIED"
 		}
 	}

@@ -55,3 +55,26 @@ func TestEngineMetrics_NoCallsNoSeries(t *testing.T) {
 		t.Fatal("a zero count created a series")
 	}
 }
+
+func TestEngineMetrics_ReviewDrawingsAreCountedByAClosedSetOfResults(t *testing.T) {
+	s := New()
+	for _, r := range []string{"hit", "hit", "miss", "failed", "corrupt", "surprise"} {
+		s.ArtifactLookup(r)
+	}
+	s.ArtifactStored(1500, false)
+	s.ArtifactStored(500, true)
+	s.ArtifactStored(0, false)
+	body := scrape(t, s)
+	for _, want := range []string{
+		`request_review_artifact_lookups_total{result="hit"} 2`, `request_review_artifact_lookups_total{result="miss"} 1`,
+		`request_review_artifact_lookups_total{result="failed"} 1`, `request_review_artifact_lookups_total{result="corrupt"} 1`,
+		`request_review_artifact_lookups_total{result="other"} 1`, `request_review_artifact_bytes_stored_total 2000`, `request_review_artifact_blobs_deduped_total 1`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %s in\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "surprise") {
+		t.Error("a result outside the set must not become a label")
+	}
+}

@@ -52,6 +52,8 @@ var flowMethodClass = map[string]flowClass{
 	requestSvc + "GetOutcomeReview":                 classRead,
 	requestSvc + "ListOutcomeReviews":               classRead,
 	requestSvc + "ListOutcomeReviewRuns":            classRead,
+	requestSvc + "GetReviewArtifact":                classRead,
+	requestSvc + "ListReviewArtifactRevisions":      classRead,
 	requestSvc + "GenerateOutcomeReview":            classAdvance,
 	requestSvc + "GetRequestFlow":                   classRead,
 	requestSvc + "GetRequestFlowSettings":           classRead,

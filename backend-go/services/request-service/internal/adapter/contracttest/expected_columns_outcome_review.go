@@ -1,6 +1,6 @@
 package contracttest
 
-// withOutcomeReviewColumns adds the tables of migrations 0105 and 0107 (CR-OR-001, CR-OR-002).
+// withOutcomeReviewColumns adds the tables of migrations 0105, 0107 and 0108 (CR-OR-001, 002, 011).
 func withOutcomeReviewColumns(m map[string][]Column) map[string][]Column {
 	n := func(name string) Column { return Column{Name: name} }
 	y := func(name string) Column { return Column{Name: name, Nullable: true} }
@@ -16,6 +16,12 @@ func withOutcomeReviewColumns(m map[string][]Column) map[string][]Column {
 	}
 	m["outcome_review_contexts"] = []Column{
 		n("id"), n("tenant_id"), n("request_id"), n("kind"), n("digest"), n("prompt_version"), n("payload"), n("created_at"), n("expires_at"),
+	}
+	m["review_artifact_blobs"] = []Column{n("tenant_id"), n("request_id"), n("digest"), n("media_type"), n("size_bytes"), n("content"), n("created_at")}
+	m["review_artifacts"] = []Column{
+		n("id"), n("tenant_id"), n("request_id"), n("section"), n("variant"), n("name"), n("diagram_type"), n("input_digest"), n("preset_digest"),
+		n("skill_version"), n("revision"), n("state"), n("origin"), n("reason"), n("error_code"), n("blob_digest"), n("size_bytes"), n("view_box"),
+		n("title"), n("description"), n("self_check"), n("model"), y("created_by"), n("created_at"), y("active_key"),
 	}
 	return m
 }

@@ -117,3 +117,19 @@ func TestOutcomeReviewConfigFromEnv_ContextLimits(t *testing.T) {
 		t.Errorf("the agent stops a run at 15 minutes, so the timeout is capped: %d", long.ContextTimeoutMS())
 	}
 }
+
+func TestOutcomeReviewConfigFromEnv_ArtifactLimits(t *testing.T) {
+	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+	cfg, warn := domain.OutcomeReviewConfigFromEnv(env(map[string]string{"REQUEST_REVIEW_ARTIFACT_RETENTION": "720h", "REQUEST_REVIEW_ARTIFACT_QUOTA_MB": "64"}))
+	if len(warn) != 0 || cfg.ArtifactRetentionOrDefault() != 720*time.Hour || cfg.ArtifactQuotaBytes() != 64<<20 {
+		t.Errorf("good values: %+v %v", cfg, warn)
+	}
+	def, warn := domain.OutcomeReviewConfigFromEnv(env(nil))
+	if len(warn) != 0 || def.ArtifactRetentionOrDefault() != domain.DefaultArtifactRetention || def.ArtifactQuotaBytes() != 512<<20 {
+		t.Errorf("defaults: %+v %v", def, warn)
+	}
+	bad, warn := domain.OutcomeReviewConfigFromEnv(env(map[string]string{"REQUEST_REVIEW_ARTIFACT_RETENTION": "1h", "REQUEST_REVIEW_ARTIFACT_QUOTA_MB": "0"}))
+	if len(warn) != 2 || bad.ArtifactRetentionOrDefault() != domain.DefaultArtifactRetention || bad.ArtifactQuotaBytes() != 512<<20 {
+		t.Errorf("bad values keep the defaults and warn: %+v %v", bad, warn)
+	}
+}

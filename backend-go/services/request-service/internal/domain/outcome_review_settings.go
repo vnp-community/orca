@@ -31,6 +31,10 @@ type OutcomeReviewConfig struct {
 	ContextTimeout time.Duration
 	// ContextMaxFiles is the number of files the agent may open in one run. Zero means the default.
 	ContextMaxFiles int
+	// ArtifactRetention is how long a drawing that is no longer in force is kept. Zero means the default.
+	ArtifactRetention time.Duration
+	// ArtifactQuotaMB is the most drawings a tenant keeps. Zero means the default.
+	ArtifactQuotaMB int
 }
 
 const (
@@ -39,7 +43,22 @@ const (
 	MaxReviewContextTimeout      = 15 * time.Minute
 	DefaultReviewContextMaxFiles = 60
 	MaxReviewContextMaxFiles     = 400
+	DefaultArtifactRetention     = 90 * 24 * time.Hour
 )
+
+func (c OutcomeReviewConfig) ArtifactRetentionOrDefault() time.Duration {
+	if c.ArtifactRetention > 0 {
+		return c.ArtifactRetention
+	}
+	return DefaultArtifactRetention
+}
+
+func (c OutcomeReviewConfig) ArtifactQuotaBytes() int64 {
+	if c.ArtifactQuotaMB > 0 {
+		return int64(c.ArtifactQuotaMB) << 20
+	}
+	return int64(DefaultArtifactQuotaMB) << 20
+}
 
 func (c OutcomeReviewConfig) ContextTTLOrDefault() time.Duration {
 	if c.ContextTTL > 0 {
@@ -100,6 +119,18 @@ func OutcomeReviewConfigFromEnv(getenv func(string) string) (OutcomeReviewConfig
 			warnings = append(warnings, "REQUEST_REVIEW_CONTEXT_MAX_FILES "+strconv.Quote(raw)+" is not a number from 5 to "+strconv.Itoa(MaxReviewContextMaxFiles)+"; the default applies")
 		} else {
 			c.ContextMaxFiles = n
+		}
+	}
+	if d, ok, w := envDuration(getenv, "REQUEST_REVIEW_ARTIFACT_RETENTION", 24*time.Hour, 5*365*24*time.Hour); w != "" {
+		warnings = append(warnings, w)
+	} else if ok {
+		c.ArtifactRetention = d
+	}
+	if raw := strings.TrimSpace(getenv("REQUEST_REVIEW_ARTIFACT_QUOTA_MB")); raw != "" {
+		if n, err := strconv.Atoi(raw); err != nil || n < 1 || n > 100_000 {
+			warnings = append(warnings, "REQUEST_REVIEW_ARTIFACT_QUOTA_MB "+strconv.Quote(raw)+" is not a number from 1 to 100000; the default applies")
+		} else {
+			c.ArtifactQuotaMB = n
 		}
 	}
 	return c, warnings

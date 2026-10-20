@@ -17,6 +17,8 @@ type OutcomeReviewUseCases struct {
 	Service *usecase.OutcomeReviewService
 	// Context may be nil; the review is then built from the facts alone and a request to run the context is refused.
 	Context *usecase.ReviewContextRunner
+	// Artifacts may be nil; the drawings are then not served.
+	Artifacts *usecase.ReviewArtifactStore
 }
 
 // WithOutcomeReview attaches the review handlers; without it those RPCs stay Unimplemented.
@@ -78,6 +80,13 @@ func (s *Server) GenerateOutcomeReview(ctx context.Context, req *requestv1.Gener
 		}
 		if res.Run != nil {
 			out.Run = toProtoOutcomeReviewRun(*res.Run)
+		}
+		out.DrawError = res.DrawError
+		if d := res.Draw; d != nil {
+			out.DrawingsCached, out.DrawingsPending = int32(d.Cached), int32(d.Pending)
+			if d.Run != nil {
+				out.DrawRun = toProtoOutcomeReviewRun(*d.Run)
+			}
 		}
 		return out, nil
 	}
@@ -173,4 +182,56 @@ func toProtoOutcomeReviewRun(r usecase.ReviewRun) *requestv1.OutcomeReviewRun {
 		out.FinishedAt = timestamppb.New(*r.FinishedAt)
 	}
 	return out
+}
+
+func (s *Server) GetReviewArtifact(ctx context.Context, req *requestv1.GetReviewArtifactRequest) (*requestv1.GetReviewArtifactResponse, error) {
+	if err := s.outcomeReviewWired(); err != nil {
+		return nil, err
+	}
+	if s.outcomeReview.Artifacts == nil {
+		return nil, status.Error(codes.Unimplemented, "the review drawings are not wired")
+	}
+	if req.GetRequestId() == "" || req.GetArtifactId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "request_id and artifact_id are required")
+	}
+	got, err := s.outcomeReview.Artifacts.Read(ctx, req.GetRequestId(), req.GetArtifactId(), req.GetIfDigest())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := &requestv1.GetReviewArtifactResponse{Artifact: toProtoArtifactMeta(got.Artifact), NotModified: got.NotModified}
+	if !got.NotModified && got.Blob.Digest != "" {
+		out.MediaType, out.Content = got.Blob.MediaType, string(got.Blob.Content)
+	}
+	return out, nil
+}
+
+func (s *Server) ListReviewArtifactRevisions(ctx context.Context, req *requestv1.ListReviewArtifactRevisionsRequest) (*requestv1.ListReviewArtifactRevisionsResponse, error) {
+	if err := s.outcomeReviewWired(); err != nil {
+		return nil, err
+	}
+	if s.outcomeReview.Artifacts == nil {
+		return &requestv1.ListReviewArtifactRevisionsResponse{}, nil
+	}
+	section := domain.ReviewSection(req.GetSection())
+	if req.GetRequestId() == "" || !section.Drawn() || (req.GetVariant() != domain.DiagramVariantDesign && req.GetVariant() != domain.DiagramVariantDelta) {
+		return nil, status.Error(codes.InvalidArgument, "request_id, a drawn section and a variant (design or delta) are required")
+	}
+	rows, err := s.outcomeReview.Artifacts.Revisions(ctx, req.GetRequestId(), section, req.GetVariant(), req.GetName())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := &requestv1.ListReviewArtifactRevisionsResponse{}
+	for _, a := range rows {
+		out.Revisions = append(out.Revisions, toProtoArtifactMeta(a))
+	}
+	return out, nil
+}
+
+func toProtoArtifactMeta(a domain.ReviewArtifact) *requestv1.ReviewArtifactMeta {
+	return &requestv1.ReviewArtifactMeta{
+		ArtifactId: a.ID, RequestId: a.RequestID, Section: string(a.Key.Section), Variant: a.Key.Variant, Name: a.Key.Name, DiagramType: string(a.Type),
+		InputDigest: a.Key.InputDigest, PresetDigest: a.Key.PresetDigest, SkillVersion: a.Key.SkillVersion, Revision: int32(a.Revision), State: string(a.State),
+		Origin: string(a.Origin), Reason: a.Reason, ErrorCode: a.ErrorCode, BlobDigest: a.BlobDigest, SizeBytes: int32(a.SizeBytes), ViewBox: a.ViewBox,
+		Title: a.Title, Desc: a.Desc, CreatedAt: timestamppb.New(a.CreatedAt),
+	}
 }

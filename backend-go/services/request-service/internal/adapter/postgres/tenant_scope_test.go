@@ -40,6 +40,7 @@ func TestTenantScope(t *testing.T) {
 		"processed_events.go:Prune":                      relay,
 		"retention.go:ListTenants":                       "lists the tenants whose retention runs; every other retention query is scoped",
 		"webhook_nonces.go:PruneExpired":                 relay,
+		"review_artifact_repository.go:lockSlot":         "takes an advisory lock whose key begins with the tenant id, touches no table",
 		"tx.go:InTx":                                     "sets the tenant GUC, touches no table",
 		"tx.go:withRelayTx":                              "sets the relay GUC, touches no table",
 	})

@@ -183,3 +183,40 @@ func TestContextRun_ListRunsBelongToTheRequestsReview(t *testing.T) {
 		t.Error("a review is not listed through another Request")
 	}
 }
+
+func TestArtifactCleanup_RemovesOldInactiveDrawingsAndNeverTheOneInForce(t *testing.T) {
+	arts := newMemArtifacts()
+	ctx := context.Background()
+	mk := func(input string, state domain.ReviewArtifactState, content string) domain.ReviewArtifact {
+		a := domain.ReviewArtifact{ID: input, RequestID: "req", Key: domain.ArtifactKey{Section: domain.SectionFlow, Variant: "delta", InputDigest: input, PresetDigest: "p", SkillVersion: "s"}, State: state}
+		var blob *domain.ReviewBlob
+		if content != "" {
+			blob = &domain.ReviewBlob{Digest: domain.BlobDigest([]byte(content)), Content: []byte(content), CreatedAt: time.Now().Add(-2 * time.Hour)}
+			a.BlobDigest = blob.Digest
+		}
+		saved, _ := arts.Save(ctx, a, blob)
+		return saved
+	}
+	mk("old", domain.ArtifactActive, "<svg>old</svg>")
+	mk("new", domain.ArtifactActive, "<svg>new</svg>")
+	mk("bad", domain.ArtifactFailed, "")
+	cleanup := &ReviewArtifactCleanup{Repo: arts, Tenants: func(context.Context) ([]string, error) { return []string{"t1", "t2"}, nil }, Retention: time.Hour,
+		Now: func() time.Time { return time.Now().Add(3 * time.Hour) }}
+	sum, err := cleanup.Run(ctx)
+	if err != nil || sum.Tenants != 2 || sum.Drawings < 2 {
+		t.Fatalf("summary %+v err=%v", sum, err)
+	}
+	if active, _ := arts.ListActive(ctx, "req"); len(active) != 1 || active[0].Key.InputDigest != "new" {
+		t.Errorf("only the drawing in force stays: %+v", active)
+	}
+	if _, ok, _ := arts.Blob(ctx, "req", domain.BlobDigest([]byte("<svg>new</svg>"))); !ok {
+		t.Error("the content of the drawing in force stays")
+	}
+	if _, ok, _ := arts.Blob(ctx, "req", domain.BlobDigest([]byte("<svg>old</svg>"))); ok {
+		t.Error("content nothing points at goes")
+	}
+	failing := &ReviewArtifactCleanup{Repo: arts, Tenants: func(context.Context) ([]string, error) { return nil, errors.New("down") }}
+	if _, err := failing.Run(ctx); err == nil {
+		t.Error("a failure to list tenants is reported")
+	}
+}

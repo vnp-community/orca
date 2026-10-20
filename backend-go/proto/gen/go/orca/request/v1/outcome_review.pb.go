@@ -403,8 +403,14 @@ type GenerateOutcomeReviewResponse struct {
 	ContextCached bool `protobuf:"varint,5,opt,name=context_cached,json=contextCached,proto3" json:"context_cached,omitempty"`
 	// kg_unavailable when no run was started because the project has no knowledge graph.
 	ContextSkipped string `protobuf:"bytes,6,opt,name=context_skipped,json=contextSkipped,proto3" json:"context_skipped,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The drawings (CR-OR-010): the run that was started when the context was already there, how many diagrams already had a drawing,
+	// and the code of the error that kept the drawing from starting (for instance REQUEST_REVIEW_SKILL_MISSING).
+	DrawRun         *OutcomeReviewRun `protobuf:"bytes,7,opt,name=draw_run,json=drawRun,proto3" json:"draw_run,omitempty"`
+	DrawingsCached  int32             `protobuf:"varint,8,opt,name=drawings_cached,json=drawingsCached,proto3" json:"drawings_cached,omitempty"`
+	DrawingsPending int32             `protobuf:"varint,9,opt,name=drawings_pending,json=drawingsPending,proto3" json:"drawings_pending,omitempty"`
+	DrawError       string            `protobuf:"bytes,10,opt,name=draw_error,json=drawError,proto3" json:"draw_error,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GenerateOutcomeReviewResponse) Reset() {
@@ -475,6 +481,34 @@ func (x *GenerateOutcomeReviewResponse) GetContextCached() bool {
 func (x *GenerateOutcomeReviewResponse) GetContextSkipped() string {
 	if x != nil {
 		return x.ContextSkipped
+	}
+	return ""
+}
+
+func (x *GenerateOutcomeReviewResponse) GetDrawRun() *OutcomeReviewRun {
+	if x != nil {
+		return x.DrawRun
+	}
+	return nil
+}
+
+func (x *GenerateOutcomeReviewResponse) GetDrawingsCached() int32 {
+	if x != nil {
+		return x.DrawingsCached
+	}
+	return 0
+}
+
+func (x *GenerateOutcomeReviewResponse) GetDrawingsPending() int32 {
+	if x != nil {
+		return x.DrawingsPending
+	}
+	return 0
+}
+
+func (x *GenerateOutcomeReviewResponse) GetDrawError() string {
+	if x != nil {
+		return x.DrawError
 	}
 	return ""
 }
@@ -923,6 +957,448 @@ func (x *ListOutcomeReviewsResponse) GetNextPageToken() string {
 	return ""
 }
 
+// ReviewArtifactMeta describes one stored drawing without its content.
+type ReviewArtifactMeta struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	ArtifactId   string                 `protobuf:"bytes,1,opt,name=artifact_id,json=artifactId,proto3" json:"artifact_id,omitempty"`
+	RequestId    string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Section      string                 `protobuf:"bytes,3,opt,name=section,proto3" json:"section,omitempty"`
+	Variant      string                 `protobuf:"bytes,4,opt,name=variant,proto3" json:"variant,omitempty"`
+	Name         string                 `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	DiagramType  string                 `protobuf:"bytes,6,opt,name=diagram_type,json=diagramType,proto3" json:"diagram_type,omitempty"`
+	InputDigest  string                 `protobuf:"bytes,7,opt,name=input_digest,json=inputDigest,proto3" json:"input_digest,omitempty"`
+	PresetDigest string                 `protobuf:"bytes,8,opt,name=preset_digest,json=presetDigest,proto3" json:"preset_digest,omitempty"`
+	SkillVersion string                 `protobuf:"bytes,9,opt,name=skill_version,json=skillVersion,proto3" json:"skill_version,omitempty"`
+	Revision     int32                  `protobuf:"varint,10,opt,name=revision,proto3" json:"revision,omitempty"`
+	// active | superseded | failed
+	State string `protobuf:"bytes,11,opt,name=state,proto3" json:"state,omitempty"`
+	// auto | regenerated
+	Origin        string                 `protobuf:"bytes,12,opt,name=origin,proto3" json:"origin,omitempty"`
+	Reason        string                 `protobuf:"bytes,13,opt,name=reason,proto3" json:"reason,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,14,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	BlobDigest    string                 `protobuf:"bytes,15,opt,name=blob_digest,json=blobDigest,proto3" json:"blob_digest,omitempty"`
+	SizeBytes     int32                  `protobuf:"varint,16,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	ViewBox       string                 `protobuf:"bytes,17,opt,name=view_box,json=viewBox,proto3" json:"view_box,omitempty"`
+	Title         string                 `protobuf:"bytes,18,opt,name=title,proto3" json:"title,omitempty"`
+	Desc          string                 `protobuf:"bytes,19,opt,name=desc,proto3" json:"desc,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewArtifactMeta) Reset() {
+	*x = ReviewArtifactMeta{}
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewArtifactMeta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewArtifactMeta) ProtoMessage() {}
+
+func (x *ReviewArtifactMeta) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewArtifactMeta.ProtoReflect.Descriptor instead.
+func (*ReviewArtifactMeta) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ReviewArtifactMeta) GetArtifactId() string {
+	if x != nil {
+		return x.ArtifactId
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetSection() string {
+	if x != nil {
+		return x.Section
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetVariant() string {
+	if x != nil {
+		return x.Variant
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetDiagramType() string {
+	if x != nil {
+		return x.DiagramType
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetInputDigest() string {
+	if x != nil {
+		return x.InputDigest
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetPresetDigest() string {
+	if x != nil {
+		return x.PresetDigest
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetSkillVersion() string {
+	if x != nil {
+		return x.SkillVersion
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetRevision() int32 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *ReviewArtifactMeta) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetOrigin() string {
+	if x != nil {
+		return x.Origin
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetBlobDigest() string {
+	if x != nil {
+		return x.BlobDigest
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetSizeBytes() int32 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *ReviewArtifactMeta) GetViewBox() string {
+	if x != nil {
+		return x.ViewBox
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetDesc() string {
+	if x != nil {
+		return x.Desc
+	}
+	return ""
+}
+
+func (x *ReviewArtifactMeta) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type GetReviewArtifactRequest struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	RequestId  string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ArtifactId string                 `protobuf:"bytes,2,opt,name=artifact_id,json=artifactId,proto3" json:"artifact_id,omitempty"`
+	// The blob_digest the caller already holds; when it matches, no content is sent.
+	IfDigest      string `protobuf:"bytes,3,opt,name=if_digest,json=ifDigest,proto3" json:"if_digest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReviewArtifactRequest) Reset() {
+	*x = GetReviewArtifactRequest{}
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReviewArtifactRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReviewArtifactRequest) ProtoMessage() {}
+
+func (x *GetReviewArtifactRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReviewArtifactRequest.ProtoReflect.Descriptor instead.
+func (*GetReviewArtifactRequest) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetReviewArtifactRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *GetReviewArtifactRequest) GetArtifactId() string {
+	if x != nil {
+		return x.ArtifactId
+	}
+	return ""
+}
+
+func (x *GetReviewArtifactRequest) GetIfDigest() string {
+	if x != nil {
+		return x.IfDigest
+	}
+	return ""
+}
+
+type GetReviewArtifactResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Artifact    *ReviewArtifactMeta    `protobuf:"bytes,1,opt,name=artifact,proto3" json:"artifact,omitempty"`
+	NotModified bool                   `protobuf:"varint,2,opt,name=not_modified,json=notModified,proto3" json:"not_modified,omitempty"`
+	MediaType   string                 `protobuf:"bytes,3,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
+	// The drawing, already checked: a self-contained HTML page with one inline SVG. Show it in a sandboxed frame.
+	Content       string `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReviewArtifactResponse) Reset() {
+	*x = GetReviewArtifactResponse{}
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReviewArtifactResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReviewArtifactResponse) ProtoMessage() {}
+
+func (x *GetReviewArtifactResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReviewArtifactResponse.ProtoReflect.Descriptor instead.
+func (*GetReviewArtifactResponse) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetReviewArtifactResponse) GetArtifact() *ReviewArtifactMeta {
+	if x != nil {
+		return x.Artifact
+	}
+	return nil
+}
+
+func (x *GetReviewArtifactResponse) GetNotModified() bool {
+	if x != nil {
+		return x.NotModified
+	}
+	return false
+}
+
+func (x *GetReviewArtifactResponse) GetMediaType() string {
+	if x != nil {
+		return x.MediaType
+	}
+	return ""
+}
+
+func (x *GetReviewArtifactResponse) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type ListReviewArtifactRevisionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Section       string                 `protobuf:"bytes,2,opt,name=section,proto3" json:"section,omitempty"`
+	Variant       string                 `protobuf:"bytes,3,opt,name=variant,proto3" json:"variant,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListReviewArtifactRevisionsRequest) Reset() {
+	*x = ListReviewArtifactRevisionsRequest{}
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListReviewArtifactRevisionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListReviewArtifactRevisionsRequest) ProtoMessage() {}
+
+func (x *ListReviewArtifactRevisionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListReviewArtifactRevisionsRequest.ProtoReflect.Descriptor instead.
+func (*ListReviewArtifactRevisionsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ListReviewArtifactRevisionsRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ListReviewArtifactRevisionsRequest) GetSection() string {
+	if x != nil {
+		return x.Section
+	}
+	return ""
+}
+
+func (x *ListReviewArtifactRevisionsRequest) GetVariant() string {
+	if x != nil {
+		return x.Variant
+	}
+	return ""
+}
+
+func (x *ListReviewArtifactRevisionsRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type ListReviewArtifactRevisionsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Newest first.
+	Revisions     []*ReviewArtifactMeta `protobuf:"bytes,1,rep,name=revisions,proto3" json:"revisions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListReviewArtifactRevisionsResponse) Reset() {
+	*x = ListReviewArtifactRevisionsResponse{}
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListReviewArtifactRevisionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListReviewArtifactRevisionsResponse) ProtoMessage() {}
+
+func (x *ListReviewArtifactRevisionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_request_v1_outcome_review_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListReviewArtifactRevisionsResponse.ProtoReflect.Descriptor instead.
+func (*ListReviewArtifactRevisionsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_request_v1_outcome_review_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListReviewArtifactRevisionsResponse) GetRevisions() []*ReviewArtifactMeta {
+	if x != nil {
+		return x.Revisions
+	}
+	return nil
+}
+
 var File_orca_request_v1_outcome_review_proto protoreflect.FileDescriptor
 
 const file_orca_request_v1_outcome_review_proto_rawDesc = "" +
@@ -968,14 +1444,20 @@ const file_orca_request_v1_outcome_review_proto_rawDesc = "" +
 	"\vrun_context\x18\x03 \x01(\bR\n" +
 	"runContext\x12&\n" +
 	"\x0fallow_code_only\x18\x04 \x01(\bR\rallowCodeOnly\x12\x14\n" +
-	"\x05force\x18\x05 \x01(\bR\x05force\"\x8e\x02\n" +
+	"\x05force\x18\x05 \x01(\bR\x05force\"\xbf\x03\n" +
 	"\x1dGenerateOutcomeReviewResponse\x126\n" +
 	"\x06review\x18\x01 \x01(\v2\x1e.orca.request.v1.OutcomeReviewR\x06review\x12\x16\n" +
 	"\x06reused\x18\x02 \x01(\bR\x06reused\x12\x18\n" +
 	"\acreated\x18\x03 \x01(\bR\acreated\x123\n" +
 	"\x03run\x18\x04 \x01(\v2!.orca.request.v1.OutcomeReviewRunR\x03run\x12%\n" +
 	"\x0econtext_cached\x18\x05 \x01(\bR\rcontextCached\x12'\n" +
-	"\x0fcontext_skipped\x18\x06 \x01(\tR\x0econtextSkipped\"\x84\x03\n" +
+	"\x0fcontext_skipped\x18\x06 \x01(\tR\x0econtextSkipped\x12<\n" +
+	"\bdraw_run\x18\a \x01(\v2!.orca.request.v1.OutcomeReviewRunR\adrawRun\x12'\n" +
+	"\x0fdrawings_cached\x18\b \x01(\x05R\x0edrawingsCached\x12)\n" +
+	"\x10drawings_pending\x18\t \x01(\x05R\x0fdrawingsPending\x12\x1d\n" +
+	"\n" +
+	"draw_error\x18\n" +
+	" \x01(\tR\tdrawError\"\x84\x03\n" +
 	"\x10OutcomeReviewRun\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1b\n" +
 	"\treview_id\x18\x02 \x01(\tR\breviewId\x12\x1d\n" +
@@ -1015,7 +1497,55 @@ const file_orca_request_v1_outcome_review_proto_rawDesc = "" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\"~\n" +
 	"\x1aListOutcomeReviewsResponse\x128\n" +
 	"\areviews\x18\x01 \x03(\v2\x1e.orca.request.v1.OutcomeReviewR\areviews\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenBDZBgithub.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1b\x06proto3"
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xed\x04\n" +
+	"\x12ReviewArtifactMeta\x12\x1f\n" +
+	"\vartifact_id\x18\x01 \x01(\tR\n" +
+	"artifactId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\x12\x18\n" +
+	"\asection\x18\x03 \x01(\tR\asection\x12\x18\n" +
+	"\avariant\x18\x04 \x01(\tR\avariant\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\x12!\n" +
+	"\fdiagram_type\x18\x06 \x01(\tR\vdiagramType\x12!\n" +
+	"\finput_digest\x18\a \x01(\tR\vinputDigest\x12#\n" +
+	"\rpreset_digest\x18\b \x01(\tR\fpresetDigest\x12#\n" +
+	"\rskill_version\x18\t \x01(\tR\fskillVersion\x12\x1a\n" +
+	"\brevision\x18\n" +
+	" \x01(\x05R\brevision\x12\x14\n" +
+	"\x05state\x18\v \x01(\tR\x05state\x12\x16\n" +
+	"\x06origin\x18\f \x01(\tR\x06origin\x12\x16\n" +
+	"\x06reason\x18\r \x01(\tR\x06reason\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x0e \x01(\tR\terrorCode\x12\x1f\n" +
+	"\vblob_digest\x18\x0f \x01(\tR\n" +
+	"blobDigest\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\x10 \x01(\x05R\tsizeBytes\x12\x19\n" +
+	"\bview_box\x18\x11 \x01(\tR\aviewBox\x12\x14\n" +
+	"\x05title\x18\x12 \x01(\tR\x05title\x12\x12\n" +
+	"\x04desc\x18\x13 \x01(\tR\x04desc\x129\n" +
+	"\n" +
+	"created_at\x18\x14 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"w\n" +
+	"\x18GetReviewArtifactRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1f\n" +
+	"\vartifact_id\x18\x02 \x01(\tR\n" +
+	"artifactId\x12\x1b\n" +
+	"\tif_digest\x18\x03 \x01(\tR\bifDigest\"\xb8\x01\n" +
+	"\x19GetReviewArtifactResponse\x12?\n" +
+	"\bartifact\x18\x01 \x01(\v2#.orca.request.v1.ReviewArtifactMetaR\bartifact\x12!\n" +
+	"\fnot_modified\x18\x02 \x01(\bR\vnotModified\x12\x1d\n" +
+	"\n" +
+	"media_type\x18\x03 \x01(\tR\tmediaType\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\tR\acontent\"\x8b\x01\n" +
+	"\"ListReviewArtifactRevisionsRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x18\n" +
+	"\asection\x18\x02 \x01(\tR\asection\x12\x18\n" +
+	"\avariant\x18\x03 \x01(\tR\avariant\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\"h\n" +
+	"#ListReviewArtifactRevisionsResponse\x12A\n" +
+	"\trevisions\x18\x01 \x03(\v2#.orca.request.v1.ReviewArtifactMetaR\trevisionsBDZBgithub.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1b\x06proto3"
 
 var (
 	file_orca_request_v1_outcome_review_proto_rawDescOnce sync.Once
@@ -1029,37 +1559,46 @@ func file_orca_request_v1_outcome_review_proto_rawDescGZIP() []byte {
 	return file_orca_request_v1_outcome_review_proto_rawDescData
 }
 
-var file_orca_request_v1_outcome_review_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_orca_request_v1_outcome_review_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_orca_request_v1_outcome_review_proto_goTypes = []any{
-	(*OutcomeReview)(nil),                 // 0: orca.request.v1.OutcomeReview
-	(*EstimateOutcomeReviewRequest)(nil),  // 1: orca.request.v1.EstimateOutcomeReviewRequest
-	(*EstimateOutcomeReviewResponse)(nil), // 2: orca.request.v1.EstimateOutcomeReviewResponse
-	(*GenerateOutcomeReviewRequest)(nil),  // 3: orca.request.v1.GenerateOutcomeReviewRequest
-	(*GenerateOutcomeReviewResponse)(nil), // 4: orca.request.v1.GenerateOutcomeReviewResponse
-	(*OutcomeReviewRun)(nil),              // 5: orca.request.v1.OutcomeReviewRun
-	(*ListOutcomeReviewRunsRequest)(nil),  // 6: orca.request.v1.ListOutcomeReviewRunsRequest
-	(*ListOutcomeReviewRunsResponse)(nil), // 7: orca.request.v1.ListOutcomeReviewRunsResponse
-	(*GetOutcomeReviewRequest)(nil),       // 8: orca.request.v1.GetOutcomeReviewRequest
-	(*GetOutcomeReviewResponse)(nil),      // 9: orca.request.v1.GetOutcomeReviewResponse
-	(*ListOutcomeReviewsRequest)(nil),     // 10: orca.request.v1.ListOutcomeReviewsRequest
-	(*ListOutcomeReviewsResponse)(nil),    // 11: orca.request.v1.ListOutcomeReviewsResponse
-	(*timestamppb.Timestamp)(nil),         // 12: google.protobuf.Timestamp
+	(*OutcomeReview)(nil),                       // 0: orca.request.v1.OutcomeReview
+	(*EstimateOutcomeReviewRequest)(nil),        // 1: orca.request.v1.EstimateOutcomeReviewRequest
+	(*EstimateOutcomeReviewResponse)(nil),       // 2: orca.request.v1.EstimateOutcomeReviewResponse
+	(*GenerateOutcomeReviewRequest)(nil),        // 3: orca.request.v1.GenerateOutcomeReviewRequest
+	(*GenerateOutcomeReviewResponse)(nil),       // 4: orca.request.v1.GenerateOutcomeReviewResponse
+	(*OutcomeReviewRun)(nil),                    // 5: orca.request.v1.OutcomeReviewRun
+	(*ListOutcomeReviewRunsRequest)(nil),        // 6: orca.request.v1.ListOutcomeReviewRunsRequest
+	(*ListOutcomeReviewRunsResponse)(nil),       // 7: orca.request.v1.ListOutcomeReviewRunsResponse
+	(*GetOutcomeReviewRequest)(nil),             // 8: orca.request.v1.GetOutcomeReviewRequest
+	(*GetOutcomeReviewResponse)(nil),            // 9: orca.request.v1.GetOutcomeReviewResponse
+	(*ListOutcomeReviewsRequest)(nil),           // 10: orca.request.v1.ListOutcomeReviewsRequest
+	(*ListOutcomeReviewsResponse)(nil),          // 11: orca.request.v1.ListOutcomeReviewsResponse
+	(*ReviewArtifactMeta)(nil),                  // 12: orca.request.v1.ReviewArtifactMeta
+	(*GetReviewArtifactRequest)(nil),            // 13: orca.request.v1.GetReviewArtifactRequest
+	(*GetReviewArtifactResponse)(nil),           // 14: orca.request.v1.GetReviewArtifactResponse
+	(*ListReviewArtifactRevisionsRequest)(nil),  // 15: orca.request.v1.ListReviewArtifactRevisionsRequest
+	(*ListReviewArtifactRevisionsResponse)(nil), // 16: orca.request.v1.ListReviewArtifactRevisionsResponse
+	(*timestamppb.Timestamp)(nil),               // 17: google.protobuf.Timestamp
 }
 var file_orca_request_v1_outcome_review_proto_depIdxs = []int32{
-	12, // 0: orca.request.v1.OutcomeReview.created_at:type_name -> google.protobuf.Timestamp
-	12, // 1: orca.request.v1.OutcomeReview.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 0: orca.request.v1.OutcomeReview.created_at:type_name -> google.protobuf.Timestamp
+	17, // 1: orca.request.v1.OutcomeReview.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: orca.request.v1.GenerateOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
 	5,  // 3: orca.request.v1.GenerateOutcomeReviewResponse.run:type_name -> orca.request.v1.OutcomeReviewRun
-	12, // 4: orca.request.v1.OutcomeReviewRun.started_at:type_name -> google.protobuf.Timestamp
-	12, // 5: orca.request.v1.OutcomeReviewRun.finished_at:type_name -> google.protobuf.Timestamp
-	5,  // 6: orca.request.v1.ListOutcomeReviewRunsResponse.runs:type_name -> orca.request.v1.OutcomeReviewRun
-	0,  // 7: orca.request.v1.GetOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
-	0,  // 8: orca.request.v1.ListOutcomeReviewsResponse.reviews:type_name -> orca.request.v1.OutcomeReview
-	9,  // [9:9] is the sub-list for method output_type
-	9,  // [9:9] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	5,  // 4: orca.request.v1.GenerateOutcomeReviewResponse.draw_run:type_name -> orca.request.v1.OutcomeReviewRun
+	17, // 5: orca.request.v1.OutcomeReviewRun.started_at:type_name -> google.protobuf.Timestamp
+	17, // 6: orca.request.v1.OutcomeReviewRun.finished_at:type_name -> google.protobuf.Timestamp
+	5,  // 7: orca.request.v1.ListOutcomeReviewRunsResponse.runs:type_name -> orca.request.v1.OutcomeReviewRun
+	0,  // 8: orca.request.v1.GetOutcomeReviewResponse.review:type_name -> orca.request.v1.OutcomeReview
+	0,  // 9: orca.request.v1.ListOutcomeReviewsResponse.reviews:type_name -> orca.request.v1.OutcomeReview
+	17, // 10: orca.request.v1.ReviewArtifactMeta.created_at:type_name -> google.protobuf.Timestamp
+	12, // 11: orca.request.v1.GetReviewArtifactResponse.artifact:type_name -> orca.request.v1.ReviewArtifactMeta
+	12, // 12: orca.request.v1.ListReviewArtifactRevisionsResponse.revisions:type_name -> orca.request.v1.ReviewArtifactMeta
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_orca_request_v1_outcome_review_proto_init() }
@@ -1073,7 +1612,7 @@ func file_orca_request_v1_outcome_review_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_request_v1_outcome_review_proto_rawDesc), len(file_orca_request_v1_outcome_review_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

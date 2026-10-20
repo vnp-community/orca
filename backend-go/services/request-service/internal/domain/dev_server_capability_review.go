@@ -52,3 +52,37 @@ func dedupeGaps(in []ReviewContextGap) []ReviewContextGap {
 	}
 	return out
 }
+
+// ReviewDrawSkill is the skill a draw run uses to make the drawings.
+const ReviewDrawSkill = "diagram-design"
+
+// PinnedDiagramDesignSHA is the content hash prefix (the 16 hex characters an agent reports) of the vendored SKILL.md. Empty until the
+// skill is vendored; while it is empty a draw run accepts any installed version and records the one it saw as the skill version.
+var PinnedDiagramDesignSHA = ""
+
+// ReviewDrawGaps lists why the agent cannot run a draw run; empty means it can. A draw needs read-only enforcement (the run must
+// write nothing) and the pinned skill. The agent reports the hash of SKILL.md; a different hash is a different skill.
+func ReviewDrawGaps(c DevServerCapability) []ReviewContextGap {
+	var gaps []ReviewContextGap
+	if !c.HasFeature(FeatureReadonly) {
+		gaps = append(gaps, ReviewContextGap{Code: CodeReviewAgentTooOld, Message: "the dev server agent cannot enforce read-only mode"})
+	}
+	st, ok := c.Skills[ReviewDrawSkill]
+	switch {
+	case !c.SkillsKnown:
+		gaps = append(gaps, ReviewContextGap{Code: CodeReviewSkillMissing, Message: "the dev server agent does not report its skills, so " + ReviewDrawSkill + " cannot be confirmed"})
+	case !ok || !st.Installed:
+		gaps = append(gaps, ReviewContextGap{Code: CodeReviewSkillMissing, Message: "the " + ReviewDrawSkill + " skill is not installed on the dev server"})
+	case PinnedDiagramDesignSHA != "" && st.SHA256 != PinnedDiagramDesignSHA:
+		gaps = append(gaps, ReviewContextGap{Code: CodeReviewSkillMissing, Message: "the " + ReviewDrawSkill + " skill on the dev server is not the version Orca pins"})
+	}
+	return gaps
+}
+
+// ReviewDrawSkillVersion names the skill version a drawing was made with: the skill and the hash the agent reported.
+func ReviewDrawSkillVersion(c DevServerCapability) string {
+	if st, ok := c.Skills[ReviewDrawSkill]; ok && st.Installed && st.SHA256 != "" {
+		return ReviewDrawSkill + "@" + st.SHA256
+	}
+	return ""
+}

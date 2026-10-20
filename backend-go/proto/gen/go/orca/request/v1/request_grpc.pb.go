@@ -99,6 +99,8 @@ const (
 	RequestService_GetOutcomeReview_FullMethodName                 = "/orca.request.v1.RequestService/GetOutcomeReview"
 	RequestService_ListOutcomeReviews_FullMethodName               = "/orca.request.v1.RequestService/ListOutcomeReviews"
 	RequestService_ListOutcomeReviewRuns_FullMethodName            = "/orca.request.v1.RequestService/ListOutcomeReviewRuns"
+	RequestService_GetReviewArtifact_FullMethodName                = "/orca.request.v1.RequestService/GetReviewArtifact"
+	RequestService_ListReviewArtifactRevisions_FullMethodName      = "/orca.request.v1.RequestService/ListReviewArtifactRevisions"
 	RequestService_EraseRequest_FullMethodName                     = "/orca.request.v1.RequestService/EraseRequest"
 	RequestService_ExportRequest_FullMethodName                    = "/orca.request.v1.RequestService/ExportRequest"
 	RequestService_ExportTenantRequests_FullMethodName             = "/orca.request.v1.RequestService/ExportTenantRequests"
@@ -205,6 +207,8 @@ type RequestServiceClient interface {
 	GetOutcomeReview(ctx context.Context, in *GetOutcomeReviewRequest, opts ...grpc.CallOption) (*GetOutcomeReviewResponse, error)
 	ListOutcomeReviews(ctx context.Context, in *ListOutcomeReviewsRequest, opts ...grpc.CallOption) (*ListOutcomeReviewsResponse, error)
 	ListOutcomeReviewRuns(ctx context.Context, in *ListOutcomeReviewRunsRequest, opts ...grpc.CallOption) (*ListOutcomeReviewRunsResponse, error)
+	GetReviewArtifact(ctx context.Context, in *GetReviewArtifactRequest, opts ...grpc.CallOption) (*GetReviewArtifactResponse, error)
+	ListReviewArtifactRevisions(ctx context.Context, in *ListReviewArtifactRevisionsRequest, opts ...grpc.CallOption) (*ListReviewArtifactRevisionsResponse, error)
 	// Security and compliance (CR-REQ-035), admin only.
 	EraseRequest(ctx context.Context, in *EraseRequestRequest, opts ...grpc.CallOption) (*EraseRequestResponse, error)
 	ExportRequest(ctx context.Context, in *ExportRequestRequest, opts ...grpc.CallOption) (*ExportRequestResponse, error)
@@ -1019,6 +1023,26 @@ func (c *requestServiceClient) ListOutcomeReviewRuns(ctx context.Context, in *Li
 	return out, nil
 }
 
+func (c *requestServiceClient) GetReviewArtifact(ctx context.Context, in *GetReviewArtifactRequest, opts ...grpc.CallOption) (*GetReviewArtifactResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetReviewArtifactResponse)
+	err := c.cc.Invoke(ctx, RequestService_GetReviewArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) ListReviewArtifactRevisions(ctx context.Context, in *ListReviewArtifactRevisionsRequest, opts ...grpc.CallOption) (*ListReviewArtifactRevisionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListReviewArtifactRevisionsResponse)
+	err := c.cc.Invoke(ctx, RequestService_ListReviewArtifactRevisions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *requestServiceClient) EraseRequest(ctx context.Context, in *EraseRequestRequest, opts ...grpc.CallOption) (*EraseRequestResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EraseRequestResponse)
@@ -1159,6 +1183,8 @@ type RequestServiceServer interface {
 	GetOutcomeReview(context.Context, *GetOutcomeReviewRequest) (*GetOutcomeReviewResponse, error)
 	ListOutcomeReviews(context.Context, *ListOutcomeReviewsRequest) (*ListOutcomeReviewsResponse, error)
 	ListOutcomeReviewRuns(context.Context, *ListOutcomeReviewRunsRequest) (*ListOutcomeReviewRunsResponse, error)
+	GetReviewArtifact(context.Context, *GetReviewArtifactRequest) (*GetReviewArtifactResponse, error)
+	ListReviewArtifactRevisions(context.Context, *ListReviewArtifactRevisionsRequest) (*ListReviewArtifactRevisionsResponse, error)
 	// Security and compliance (CR-REQ-035), admin only.
 	EraseRequest(context.Context, *EraseRequestRequest) (*EraseRequestResponse, error)
 	ExportRequest(context.Context, *ExportRequestRequest) (*ExportRequestResponse, error)
@@ -1412,6 +1438,12 @@ func (UnimplementedRequestServiceServer) ListOutcomeReviews(context.Context, *Li
 }
 func (UnimplementedRequestServiceServer) ListOutcomeReviewRuns(context.Context, *ListOutcomeReviewRunsRequest) (*ListOutcomeReviewRunsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListOutcomeReviewRuns not implemented")
+}
+func (UnimplementedRequestServiceServer) GetReviewArtifact(context.Context, *GetReviewArtifactRequest) (*GetReviewArtifactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReviewArtifact not implemented")
+}
+func (UnimplementedRequestServiceServer) ListReviewArtifactRevisions(context.Context, *ListReviewArtifactRevisionsRequest) (*ListReviewArtifactRevisionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListReviewArtifactRevisions not implemented")
 }
 func (UnimplementedRequestServiceServer) EraseRequest(context.Context, *EraseRequestRequest) (*EraseRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EraseRequest not implemented")
@@ -2883,6 +2915,42 @@ func _RequestService_ListOutcomeReviewRuns_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RequestService_GetReviewArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReviewArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).GetReviewArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_GetReviewArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).GetReviewArtifact(ctx, req.(*GetReviewArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_ListReviewArtifactRevisions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListReviewArtifactRevisionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).ListReviewArtifactRevisions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_ListReviewArtifactRevisions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).ListReviewArtifactRevisions(ctx, req.(*ListReviewArtifactRevisionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RequestService_EraseRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EraseRequestRequest)
 	if err := dec(in); err != nil {
@@ -3256,6 +3324,14 @@ var RequestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListOutcomeReviewRuns",
 			Handler:    _RequestService_ListOutcomeReviewRuns_Handler,
+		},
+		{
+			MethodName: "GetReviewArtifact",
+			Handler:    _RequestService_GetReviewArtifact_Handler,
+		},
+		{
+			MethodName: "ListReviewArtifactRevisions",
+			Handler:    _RequestService_ListReviewArtifactRevisions_Handler,
 		},
 		{
 			MethodName: "EraseRequest",

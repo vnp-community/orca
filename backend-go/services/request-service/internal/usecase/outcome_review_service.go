@@ -36,8 +36,13 @@ type OutcomeReviewService struct {
 	Redact func(string) string
 	// Audit may be nil; it receives one event for each review that is built or rebuilt.
 	Audit ReviewAuditor
-	Now   func() time.Time
-	Log   *slog.Logger
+	// Artifacts, Profiles and Runs are optional. With them a read tells, for each diagram, whether its drawing is kept, missing, or being
+	// drawn now; without them every diagram reads as missing, which is true of a service that draws nothing.
+	Artifacts *ReviewArtifactStore
+	Profiles  DrawingProfiles
+	Runs      OutcomeReviewRunRepository
+	Now       func() time.Time
+	Log       *slog.Logger
 }
 
 func (s *OutcomeReviewService) now() time.Time {
@@ -243,7 +248,11 @@ func (s *OutcomeReviewService) Get(ctx context.Context, reviewID string) (Review
 	if err != nil {
 		return ReviewView{}, err
 	}
-	return s.withStaleness(ctx, st)
+	v, err := s.withStaleness(ctx, st)
+	if err != nil {
+		return ReviewView{}, err
+	}
+	return s.annotateDiagrams(ctx, v), nil
 }
 
 // Latest returns the newest review of a Request that is not superseded; ok is false when there is none yet.
@@ -256,7 +265,10 @@ func (s *OutcomeReviewService) Latest(ctx context.Context, requestID string) (Re
 		return ReviewView{}, false, err
 	}
 	v, err := s.withStaleness(ctx, st)
-	return v, err == nil, err
+	if err != nil {
+		return ReviewView{}, false, err
+	}
+	return s.annotateDiagrams(ctx, v), true, nil
 }
 
 func (s *OutcomeReviewService) withStaleness(ctx context.Context, st StoredReview) (ReviewView, error) {
@@ -345,4 +357,39 @@ func (s *OutcomeReviewService) Estimate(ctx context.Context, requestID string) (
 		est.Stale = existing.InputsDigest != built.InputsDigest || existing.State == domain.ReviewStateStale
 	}
 	return est, nil
+}
+
+// annotateDiagrams sets the status of each diagram from what the store holds. It never fails the read: a store that cannot be asked
+// leaves the diagrams as they were saved, which says "missing".
+func (s *OutcomeReviewService) annotateDiagrams(ctx context.Context, v ReviewView) ReviewView {
+	if s.Artifacts == nil || len(v.Review.Diagrams) == 0 {
+		return v
+	}
+	profile := domain.DefaultDrawingProfile()
+	if s.Profiles != nil {
+		if req, err := s.Requests.Get(ctx, v.Stored.RequestID); err == nil {
+			if p, perr := s.Profiles.Resolve(ctx, req.ProjectID); perr == nil {
+				profile = p
+			}
+		}
+	}
+	refs, err := s.Artifacts.Annotate(ctx, v.Stored.RequestID, v.Review.Diagrams, profile)
+	if err != nil {
+		s.logger().WarnContext(ctx, "outcome review: drawings could not be looked up", slog.String("review_id", v.Stored.ID), slog.Any("error", err))
+		return v
+	}
+	if s.Runs != nil {
+		if run, active, rerr := s.Runs.ActiveForRequest(ctx, v.Stored.RequestID, ReviewRunDraw); rerr == nil && active && run.ReviewID == v.Stored.ID {
+			for i := range refs {
+				if refs[i].Status == "missing" {
+					refs[i] = refs[i].WithStatus("drawing", "")
+				}
+			}
+		}
+	}
+	v.Review.Diagrams = refs
+	if raw, merr := json.Marshal(v.Review); merr == nil {
+		v.Stored.Model = raw
+	}
+	return v
 }

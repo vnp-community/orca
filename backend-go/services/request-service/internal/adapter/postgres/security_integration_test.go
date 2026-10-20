@@ -65,6 +65,8 @@ func (f *pgFixture) securityEnv() contracttest.SecurityEnv {
 			f.execAdmin(t, `INSERT INTO request.task_run_outcomes (id, tenant_id, request_id, task_id, outcome, error_message, event_id, occurred_at) VALUES (gen_random_uuid(), $1, $2, gen_random_uuid(), 'failed', 'SECRET', gen_random_uuid(), now())`, tenantID, requestID)
 			f.execAdmin(t, `INSERT INTO request.request_checks (id, tenant_id, request_id, kind, status, metrics, summary, source) VALUES (gen_random_uuid(), $1, $2, 'tests_after', 'passed', '{"k":"SECRET"}', 'SECRET', 'manual')`, tenantID, requestID)
 			f.execAdmin(t, `INSERT INTO request.outcome_review_contexts (id, tenant_id, request_id, kind, digest, payload, expires_at) VALUES (gen_random_uuid(), $1, $2, 'design', 'd', '{"k":"SECRET"}', now() + interval '1 day')`, tenantID, requestID)
+			f.execAdmin(t, `INSERT INTO request.review_artifact_blobs (tenant_id, request_id, digest, media_type, size_bytes, content) VALUES ($1, $2, 'd', 'text/html', 6, 'SECRET')`, tenantID, requestID)
+			f.execAdmin(t, `INSERT INTO request.review_artifacts (id, tenant_id, request_id, section, variant, diagram_type, input_digest, preset_digest, skill_version, revision, state, origin, reason, title, description, model) VALUES (gen_random_uuid(), $1, $2, 'flow', 'delta', 'sequence', 'i', 'p', 's', 1, 'failed', 'auto', 'SECRET', 'SECRET', 'SECRET', '{"k":"SECRET"}')`, tenantID, requestID)
 			f.execAdmin(t, `INSERT INTO request.outcome_reviews (id, tenant_id, request_id, phase, head_key, inputs_digest, state, model) VALUES (gen_random_uuid(), $1, $2, 'design', 'design', 'd', 'ready', '{"k":"SECRET"}')`, tenantID, requestID)
 		},
 		ReadColumn: func(t *testing.T, c domain.ErasableColumn, requestID string) (string, bool) {

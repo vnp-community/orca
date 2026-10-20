@@ -69,6 +69,12 @@ message GenerateOutcomeReviewResponse {
   bool context_cached = 5;
   // kg_unavailable when no run was started because the project has no knowledge graph.
   string context_skipped = 6;
+  // The drawings (CR-OR-010): the run that was started when the context was already there, how many diagrams already had a drawing,
+  // and the code of the error that kept the drawing from starting (for instance REQUEST_REVIEW_SKILL_MISSING).
+  OutcomeReviewRun draw_run = 7;
+  int32 drawings_cached = 8;
+  int32 drawings_pending = 9;
+  string draw_error = 10;
 }
 
 // OutcomeReviewRun is one agent run of a review. The run ends in succeeded, failed or cancelled; error_code says why it failed.
@@ -121,4 +127,57 @@ message ListOutcomeReviewsRequest {
 message ListOutcomeReviewsResponse {
   repeated OutcomeReview reviews = 1;
   string next_page_token = 2;
+}
+
+// ReviewArtifactMeta describes one stored drawing without its content.
+message ReviewArtifactMeta {
+  string artifact_id = 1;
+  string request_id = 2;
+  string section = 3;
+  string variant = 4;
+  string name = 5;
+  string diagram_type = 6;
+  string input_digest = 7;
+  string preset_digest = 8;
+  string skill_version = 9;
+  int32 revision = 10;
+  // active | superseded | failed
+  string state = 11;
+  // auto | regenerated
+  string origin = 12;
+  string reason = 13;
+  string error_code = 14;
+  string blob_digest = 15;
+  int32 size_bytes = 16;
+  string view_box = 17;
+  string title = 18;
+  string desc = 19;
+  google.protobuf.Timestamp created_at = 20;
+}
+
+message GetReviewArtifactRequest {
+  string request_id = 1;
+  string artifact_id = 2;
+  // The blob_digest the caller already holds; when it matches, no content is sent.
+  string if_digest = 3;
+}
+
+message GetReviewArtifactResponse {
+  ReviewArtifactMeta artifact = 1;
+  bool not_modified = 2;
+  string media_type = 3;
+  // The drawing, already checked: a self-contained HTML page with one inline SVG. Show it in a sandboxed frame.
+  string content = 4;
+}
+
+message ListReviewArtifactRevisionsRequest {
+  string request_id = 1;
+  string section = 2;
+  string variant = 3;
+  string name = 4;
+}
+
+message ListReviewArtifactRevisionsResponse {
+  // Newest first.
+  repeated ReviewArtifactMeta revisions = 1;
 }

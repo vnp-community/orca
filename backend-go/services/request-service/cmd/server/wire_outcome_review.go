@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
+	"sync"
 
 	requestgrpc "github.com/stablyai/orca-go/services/request-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/request-service/internal/adapter/grpcclient"
@@ -22,7 +24,7 @@ func loadOutcomeReviewConfig(log *slog.Logger) domain.OutcomeReviewConfig {
 // wireOutcomeReview builds the Outcome Review (CR-OR-001). It needs nothing the service does not already have: without
 // git-gateway a delivered review is built without its diff and says so in its warnings, and the feature stays off unless the
 // deployment or the project turns it on.
-func wireOutcomeReview(log *slog.Logger, cfg domain.OutcomeReviewConfig, stores *requestStores, tasks *executionTasks, solution *solutionWiring, settings usecase.ReviewSettingsReader, audit usecase.ReviewAuditor) requestgrpc.OutcomeReviewUseCases {
+func wireOutcomeReview(ctx context.Context, wg *sync.WaitGroup, log *slog.Logger, cfg domain.OutcomeReviewConfig, stores *requestStores, tasks *executionTasks, solution *solutionWiring, settings usecase.ReviewSettingsReader, audit usecase.ReviewAuditor) requestgrpc.OutcomeReviewUseCases {
 	collector := &usecase.ReviewFactsCollector{
 		Tasks: tasks.client, Outcomes: stores.execution.outcomes, Coverage: stores.artifact.coverage, Log: log,
 	}
@@ -31,11 +33,18 @@ func wireOutcomeReview(log *slog.Logger, cfg domain.OutcomeReviewConfig, stores 
 	} else {
 		log.Warn("GIT_GATEWAY_SERVICE_ADDR unset: a delivered review is built without the diff")
 	}
+	artifacts := &usecase.ReviewArtifactStore{Repo: stores.reviewArtifacts, QuotaBytes: cfg.ArtifactQuotaBytes()}
+	if ao, ok := solution.observer.(usecase.ReviewArtifactObserver); ok {
+		artifacts.Observer = ao
+	}
 	svc := &usecase.OutcomeReviewService{
 		Requests: stores.requests, Reviews: stores.outcomeReviews, Collector: collector, Settings: settings, Config: cfg,
-		Redact: usecase.RedactRaw, Audit: audit, Log: log,
+		Redact: usecase.RedactRaw, Audit: audit, Log: log, Artifacts: artifacts, Runs: stores.reviewRuns,
 	}
-	uc := requestgrpc.OutcomeReviewUseCases{Service: svc}
+	cleanup := &usecase.ReviewArtifactCleanup{Repo: stores.reviewArtifacts, Tenants: stores.retention.ListTenants, Retention: cfg.ArtifactRetentionOrDefault(), Log: log}
+	wg.Add(1)
+	go func() { defer wg.Done(); cleanup.RunLoop(ctx, 0) }()
+	uc := requestgrpc.OutcomeReviewUseCases{Service: svc, Artifacts: artifacts}
 	if solution.conns != nil && solution.agent != nil && solution.caps != nil && solution.infra != nil {
 		runner := &usecase.ReviewContextRunner{
 			Service: svc, Runs: stores.reviewRuns, Contexts: stores.reviewContexts, Conns: solution.conns, Agent: solution.agent, Caps: solution.caps,
@@ -46,6 +55,10 @@ func wireOutcomeReview(log *slog.Logger, cfg domain.OutcomeReviewConfig, stores 
 			if solution.proj != nil {
 				runner.Files = grpcclient.NewProposalWorkspace(solution.git, solution.proj)
 			}
+		}
+		runner.Draw = &usecase.ReviewDrawRunner{
+			Service: svc, Runs: stores.reviewRuns, Contexts: stores.reviewContexts, Artifacts: artifacts, Conns: solution.conns, Agent: solution.agent,
+			Caps: solution.caps, Config: cfg, Settings: solution.settings, Probe: runner.Probe, Observer: solution.observer, Log: log,
 		}
 		uc.Context = runner
 	} else {

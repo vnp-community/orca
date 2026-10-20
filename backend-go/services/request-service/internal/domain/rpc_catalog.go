@@ -100,6 +100,8 @@ var Catalog = map[string]Entry{
 	reqSvc + "GetOutcomeReview":                 onRequest(GroupRead, "request_id", RateRead, true),
 	reqSvc + "ListOutcomeReviews":               onRequest(GroupRead, "request_id", RateRead, true),
 	reqSvc + "ListOutcomeReviewRuns":            onRequest(GroupRead, "request_id", RateRead, true),
+	reqSvc + "GetReviewArtifact":                onRequest(GroupRead, "request_id", RateRead, true),
+	reqSvc + "ListReviewArtifactRevisions":      onRequest(GroupRead, "request_id", RateRead, true),
 	reqSvc + "GetRequestFlow":                   unlocated(GroupAuthenticated, RateRead, true),
 	reqSvc + "LookupRequestBySource":            unlocated(GroupInternal, RateNone, false),
 	reqSvc + "GetRequestFlowSettings":           unlocated(GroupAuthenticated, RateRead, true),

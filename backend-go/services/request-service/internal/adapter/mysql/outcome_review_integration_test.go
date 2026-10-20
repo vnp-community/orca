@@ -18,3 +18,8 @@ func TestMySQL_ReviewContextStoreContract(t *testing.T) {
 	f := newMigratedMySQL(t)
 	contracttest.RunReviewContextStoreContract(t, NewOutcomeReviewContextRepository(New(f.db)))
 }
+
+func TestMySQL_ReviewArtifactContract(t *testing.T) {
+	f := newMigratedMySQL(t)
+	contracttest.RunReviewArtifactContract(t, NewReviewArtifactRepository(New(f.db)))
+}

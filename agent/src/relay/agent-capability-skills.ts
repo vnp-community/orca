@@ -1,6 +1,6 @@
 // src/relay/agent-capability-skills.ts
-// Reports which knowledge-hub skills are installed for claude on this host, by name and content
-// hash only. Names come from a fixed allowlist; nothing outside it is ever read.
+// Reports which skills Orca relies on are installed for claude on this host (the knowledge hub, and the diagram-design skill the
+// Outcome Review draws with), by name and content hash only. Names come from a fixed allowlist; nothing outside it is ever read.
 
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -11,7 +11,8 @@ export const KNOWLEDGE_SKILL_NAMES = [
   'tdd-knowledge',
   'tdd-openspec-author',
   'tdd-knowledge-writeback',
-  'tdd-orca-task'
+  'tdd-orca-task',
+  'diagram-design'
 ] as const
 
 export type SkillEntry = { name: string; installed: boolean; sha256?: string }

@@ -11,6 +11,7 @@ import (
 	"github.com/stablyai/orca-go/prompts/git_commit_message"
 	"github.com/stablyai/orca-go/prompts/git_pull_request"
 	"github.com/stablyai/orca-go/prompts/outcome_review_context"
+	"github.com/stablyai/orca-go/prompts/outcome_review_draw"
 	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/prompts/plan_native"
 	"github.com/stablyai/orca-go/prompts/plan_openspec"
@@ -48,6 +49,7 @@ var maxPromptBytes = map[string]int{
 	"git_pull_request/fields":            545000,
 	"git_agent_prompt/issue":             235000,
 	"outcome_review_context/context":     200000,
+	"outcome_review_draw/draw":           80000,
 }
 
 // filler returns about n runes of text that mixes ASCII with multi-byte letters, so a cap counted in bytes instead of runes
@@ -205,6 +207,17 @@ func sizeCases() []sizeCase {
 			return git_commit_message.RenderStatsOnly(git_commit_message.StatsOnlyInput{Files: largeFiles(2000)})
 		}},
 		{git_pull_request.ID, func() (string, error) { return git_pull_request.Render(git_pull_request.Input{Diff: filler(400000)}) }},
+		{outcome_review_draw.ID, func() (string, error) {
+			items := make([]outcome_review_draw.Item, outcome_review_draw.MaxItems)
+			for i := range items {
+				items[i] = outcome_review_draw.Item{Section: "architecture", Variant: "design", Name: filler(60), Type: "architecture-delta", InputDigest: filler(64),
+					ModelJSON: filler(60000), Violations: []string{filler(5000), filler(5000)}}
+			}
+			return outcome_review_draw.Render(outcome_review_draw.Input{
+				Items: items, ResultNonce: filler(64), Language: output_language.Vietnamese,
+				Style: outcome_review_draw.Style{Detail: "balanced", Audience: "mixed", Size: "medium", MaxNodes: 12},
+			})
+		}},
 		{outcome_review_context.ID, func() (string, error) {
 			paths := make([]string, 400)
 			rows := make([]outcome_review_context.DesignContainer, 100)

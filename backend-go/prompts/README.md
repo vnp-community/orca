@@ -16,6 +16,7 @@ Module path `github.com/stablyai/orca-go/prompts`. It imports `common/secretscan
 | `plan_openspec` | the OpenSpec change an agent authors; `_revise_in_place.tmpl` tells it to edit the files of the previous version (CR-REQ-045); `TaskRange` is the task count per Request size |
 | `task_prompt_template` | the standing instruction stored with each task of an OpenSpec plan |
 | `solution_openspec` | restricts an agent to one OpenSpec change directory |
+| `outcome_review_draw` | draw run of an Outcome Review: the diagram-design skill turns checked diagram models into drawings returned in a nonce result block (CR-OR-010); `Version` is part of every preset digest |
 | `outcome_review_context` | context run of an Outcome Review: the design and the diagram models a read-only agent returns in a nonce result block (CR-OR-002); `Version` is part of the design lock |
 | `task_execution` | the prompt that runs one task (`execute.tmpl`) and the result-block instruction of a contract run (`result_block_suffix.tmpl`); `{{outputs.<taskId>.*}}` is resolved by task-service after `Render` |
 | `task_decompose` | ai.complete prompt that breaks a task into subtasks |
@@ -85,6 +86,7 @@ generated artifact, so it is part of the contract: renaming a package or a docum
 | `task_prompt_template/task` | `task_prompt_template` |
 | `solution_openspec/solution` | `solution_openspec` |
 | `outcome_review_context/context` | `outcome_review_context` |
+| `outcome_review_draw/draw` | `outcome_review_draw` |
 | `task_execution/execute`, `task_execution/result_block_suffix` | `task_execution` |
 | `task_decompose/decompose` | `task_decompose` |
 | `task_agent_prompt/generate` | `task_agent_prompt` |
@@ -133,7 +135,8 @@ Measured on 2026-10-20 (bytes of the rendered prompt) and the budget set about 1
 | `plan_openspec/plan` | 95,916 | 108,000 | analysis not capped; retry note 3,000 runes; a revision lists up to 200 file names |
 | `task_prompt_template/task` | 26,462 | 30,000 | one line per criterion, not capped in count |
 | `solution_openspec/solution` | 15,040 | 17,000 | body capped at 12,000 runes |
-| `outcome_review_context/context` | 186,351 | 200,000 | paths, design rows and violations are capped before rendering |
+| `outcome_review_context/context` | 186,351 | 200,000 |
+| `outcome_review_draw/draw` | 67,956 | 80,000 | each model is cut at 12,000 runes, at most 4 diagrams | paths, design rows and violations are capped before rendering |
 | `task_execution/execute` | 434,634 | 490,000 | the author's task text is sent as written (no cap) |
 | `task_execution/result_block_suffix` | 1,235 | 2,000 | fixed text plus the nonce |
 | `task_decompose/decompose` | 212,110 | 240,000 | task text sent as written |
