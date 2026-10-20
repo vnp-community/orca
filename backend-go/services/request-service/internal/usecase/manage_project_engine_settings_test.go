@@ -182,3 +182,41 @@ func TestManageEngineSettings_GetReadsDefaultsAndRunsTheCheckOnlyWhenAsked(t *te
 		t.Fatal("a malformed project id was accepted")
 	}
 }
+
+// The tab of the Outcome Review shows from this flag, so it must be the effective one: the project's choice, else the deployment
+// default, and never past the kill switch.
+func TestManageEngineSettings_ReportsWhetherTheReviewIsOnNow(t *testing.T) {
+	read := func(cfg domain.OutcomeReviewConfig, saved string) bool {
+		k := newSettingsKit()
+		k.uc = k.uc.WithOutcomeReviewConfig(cfg)
+		project := uuid.NewString()
+		if saved != "" {
+			if _, err := k.uc.SetProjectEngineSettings(adminCtx(tA), SetProjectEngineSettingsInput{ProjectID: project, Engine: "native", OutcomeReview: saved}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		view, err := k.uc.GetProjectEngineSettings(memberCtx(), project, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return view.OutcomeReviewEnabled
+	}
+	manual := domain.OutcomeReviewConfig{Default: domain.OutcomeReviewManual}
+	off := domain.OutcomeReviewConfig{Default: domain.OutcomeReviewOff}
+	killed := domain.OutcomeReviewConfig{Default: domain.OutcomeReviewManual, KillSwitch: true}
+	for name, c := range map[string]struct {
+		cfg   domain.OutcomeReviewConfig
+		saved string
+		want  bool
+	}{
+		"no choice follows a manual default": {manual, "", true},
+		"no choice follows an off default":   {off, "", false},
+		"a project's manual wins over off":   {off, "manual", true},
+		"a project's off wins over manual":   {manual, "off", false},
+		"the kill switch wins over all":      {killed, "manual", false},
+	} {
+		if got := read(c.cfg, c.saved); got != c.want {
+			t.Errorf("%s: enabled=%v, want %v", name, got, c.want)
+		}
+	}
+}

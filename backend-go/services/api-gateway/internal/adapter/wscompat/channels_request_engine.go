@@ -38,9 +38,11 @@ type EngineSettingsView struct {
 	// PlanAutoGenerate is whether Orca starts the Plan by itself once the Analysis is approved (CR-REQ-044).
 	PlanAutoGenerate bool `json:"planAutoGenerate"`
 	// OutcomeReview is off or manual, or empty when the project saved no choice (CR-OR-001).
-	OutcomeReview string               `json:"outcomeReview"`
-	Version       int64                `json:"version"`
-	Preflight     *EnginePreflightView `json:"preflight,omitempty"`
+	OutcomeReview string `json:"outcomeReview"`
+	// OutcomeReviewEnabled is whether the review is on for the project now (its choice, else the deployment default, never past the kill switch).
+	OutcomeReviewEnabled bool                 `json:"outcomeReviewEnabled"`
+	Version              int64                `json:"version"`
+	Preflight            *EnginePreflightView `json:"preflight,omitempty"`
 }
 
 // looseBool reads true/false or "true"/"false": a REST query string carries every value as text.
@@ -121,7 +123,7 @@ func (c requestChannels) registerEngine(r *Registry) {
 func engineSettingsView(s *requestv1.ProjectEngineSettings, p *requestv1.EnginePreflight) EngineSettingsView {
 	v := EngineSettingsView{
 		ProjectID: s.GetProjectId(), Engine: s.GetSolutionEngine(), OpenSpecMinVersion: s.GetOpenspecMinVersion(),
-		SolutionAgent: s.GetSolutionAgent(), ExecutionMode: s.GetExecutionMode(), PlanAutoGenerate: s.GetPlanAutoGenerate(), OutcomeReview: s.GetOutcomeReview(), Version: s.GetVersion(),
+		SolutionAgent: s.GetSolutionAgent(), ExecutionMode: s.GetExecutionMode(), PlanAutoGenerate: s.GetPlanAutoGenerate(), OutcomeReview: s.GetOutcomeReview(), OutcomeReviewEnabled: s.GetOutcomeReviewEnabled(), Version: s.GetVersion(),
 	}
 	if p != nil {
 		v.Preflight = &EnginePreflightView{

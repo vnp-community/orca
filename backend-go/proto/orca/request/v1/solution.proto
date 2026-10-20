@@ -153,6 +153,8 @@ message ProjectEngineSettings {
   bool plan_auto_generate = 7;
   // Outcome Review (CR-OR-001): off or manual, or empty when the project saved no choice and the deployment default applies.
   string outcome_review = 8;
+  // Whether the review is on for this project now: the project's choice, else the deployment default, and never while the kill switch is on.
+  bool outcome_review_enabled = 9;
 }
 
 message GetProjectEngineSettingsRequest {

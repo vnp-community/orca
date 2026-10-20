@@ -1038,8 +1038,10 @@ type ProjectEngineSettings struct {
 	PlanAutoGenerate bool `protobuf:"varint,7,opt,name=plan_auto_generate,json=planAutoGenerate,proto3" json:"plan_auto_generate,omitempty"`
 	// Outcome Review (CR-OR-001): off or manual, or empty when the project saved no choice and the deployment default applies.
 	OutcomeReview string `protobuf:"bytes,8,opt,name=outcome_review,json=outcomeReview,proto3" json:"outcome_review,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Whether the review is on for this project now: the project's choice, else the deployment default, and never while the kill switch is on.
+	OutcomeReviewEnabled bool `protobuf:"varint,9,opt,name=outcome_review_enabled,json=outcomeReviewEnabled,proto3" json:"outcome_review_enabled,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ProjectEngineSettings) Reset() {
@@ -1126,6 +1128,13 @@ func (x *ProjectEngineSettings) GetOutcomeReview() string {
 		return x.OutcomeReview
 	}
 	return ""
+}
+
+func (x *ProjectEngineSettings) GetOutcomeReviewEnabled() bool {
+	if x != nil {
+		return x.OutcomeReviewEnabled
+	}
+	return false
 }
 
 type GetProjectEngineSettingsRequest struct {
@@ -1649,7 +1658,7 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\bsolution\x18\x01 \x01(\v2\x19.orca.request.v1.SolutionR\bsolution\x12'\n" +
 	"\x0fapproval_digest\x18\x02 \x01(\tR\x0eapprovalDigest\x12'\n" +
 	"\x0fdecision_status\x18\x03 \x01(\tR\x0edecisionStatus\x123\n" +
-	"\x15requires_confirmation\x18\x04 \x01(\bR\x14requiresConfirmation\"\xce\x02\n" +
+	"\x15requires_confirmation\x18\x04 \x01(\bR\x14requiresConfirmation\"\x84\x03\n" +
 	"\x15ProjectEngineSettings\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12'\n" +
@@ -1659,7 +1668,8 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\x0esolution_agent\x18\x05 \x01(\bR\rsolutionAgent\x12%\n" +
 	"\x0eexecution_mode\x18\x06 \x01(\tR\rexecutionMode\x12,\n" +
 	"\x12plan_auto_generate\x18\a \x01(\bR\x10planAutoGenerate\x12%\n" +
-	"\x0eoutcome_review\x18\b \x01(\tR\routcomeReview\"V\n" +
+	"\x0eoutcome_review\x18\b \x01(\tR\routcomeReview\x124\n" +
+	"\x16outcome_review_enabled\x18\t \x01(\bR\x14outcomeReviewEnabled\"V\n" +
 	"\x1fGetProjectEngineSettingsRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x14\n" +

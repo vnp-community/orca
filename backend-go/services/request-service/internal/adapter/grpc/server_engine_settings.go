@@ -5,7 +5,6 @@ import (
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	requestv1 "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1"
-	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,7 +24,7 @@ func (s *Server) GetProjectEngineSettings(ctx context.Context, req *requestv1.Ge
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &requestv1.GetProjectEngineSettingsResponse{Settings: toProtoEngineSettings(view.Settings), Preflight: toProtoPreflight(view)}, nil
+	return &requestv1.GetProjectEngineSettingsResponse{Settings: toProtoEngineSettings(view), Preflight: toProtoPreflight(view)}, nil
 }
 
 func (s *Server) SetProjectEngineSettings(ctx context.Context, req *requestv1.SetProjectEngineSettingsRequest) (*requestv1.SetProjectEngineSettingsResponse, error) {
@@ -39,13 +38,14 @@ func (s *Server) SetProjectEngineSettings(ctx context.Context, req *requestv1.Se
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &requestv1.SetProjectEngineSettingsResponse{Settings: toProtoEngineSettings(view.Settings), Preflight: toProtoPreflight(view)}, nil
+	return &requestv1.SetProjectEngineSettingsResponse{Settings: toProtoEngineSettings(view), Preflight: toProtoPreflight(view)}, nil
 }
 
-func toProtoEngineSettings(s domain.ProjectEngineSettings) *requestv1.ProjectEngineSettings {
+func toProtoEngineSettings(v usecase.EngineSettingsView) *requestv1.ProjectEngineSettings {
+	s := v.Settings
 	return &requestv1.ProjectEngineSettings{
 		ProjectId: s.ProjectID, SolutionEngine: string(s.Engine), OpenspecMinVersion: s.MinVersion, Version: s.Version, SolutionAgent: s.SolutionAgent, ExecutionMode: string(s.ExecutionMode.OrDefault()), PlanAutoGenerate: s.PlanAutoGenerate,
-		OutcomeReview: string(s.OutcomeReview),
+		OutcomeReview: string(s.OutcomeReview), OutcomeReviewEnabled: v.OutcomeReviewEnabled,
 	}
 }
 

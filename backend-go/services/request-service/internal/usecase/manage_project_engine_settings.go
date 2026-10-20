@@ -32,6 +32,8 @@ type EngineSettingsView struct {
 	// Preflight is nil when no check ran.
 	Preflight *PreflightReport
 	Warnings  []string
+	// OutcomeReviewEnabled is whether the review is on for the project now: its choice, else the deployment default, never past the kill switch.
+	OutcomeReviewEnabled bool
 }
 
 // ManageProjectEngineSettings reads and changes the per-project switches: which engine writes the Plan and whether the
@@ -84,7 +86,7 @@ func (uc *ManageProjectEngineSettings) GetProjectEngineSettings(ctx context.Cont
 	if !ok {
 		settings = domain.ProjectEngineSettings{ProjectID: projectID, Engine: domain.EngineNative, ExecutionMode: domain.ExecutionStepByStep, PlanAutoGenerate: true}
 	}
-	view := EngineSettingsView{Settings: settings}
+	view := EngineSettingsView{Settings: settings, OutcomeReviewEnabled: uc.reviewCfg.Effective(settings.OutcomeReview).Enabled()}
 	if check {
 		view.Preflight, view.Warnings = uc.preflight(ctx, settings)
 	}
@@ -178,7 +180,7 @@ func (uc *ManageProjectEngineSettings) SetProjectEngineSettings(ctx context.Cont
 	if err != nil {
 		return EngineSettingsView{}, err
 	}
-	view := EngineSettingsView{Settings: s}
+	view := EngineSettingsView{Settings: s, OutcomeReviewEnabled: uc.reviewCfg.Effective(s.OutcomeReview).Enabled()}
 	view.Preflight, view.Warnings = uc.preflight(ctx, s)
 	return view, nil
 }
