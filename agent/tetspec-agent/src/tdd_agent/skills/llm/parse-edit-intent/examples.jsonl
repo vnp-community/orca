@@ -1,0 +1,1 @@
+{"name": "timeout request", "input": {"prompt": "Change the SBOM submit timeout to 30 seconds", "known_paths": ["props.timeout_seconds"]}, "expect": {"output": {"operation": "modify", "path": "props.timeout_seconds", "value": 30}, "resolved_by": "llm"}}

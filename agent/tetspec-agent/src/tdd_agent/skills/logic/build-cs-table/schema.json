@@ -1,0 +1,57 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "srs_delta",
+      "tdd_set",
+      "sad",
+      "impact"
+    ],
+    "properties": {
+      "srs_delta": {
+        "type": "object"
+      },
+      "tdd_set": {
+        "type": "object"
+      },
+      "sad": {
+        "type": "object"
+      },
+      "impact": {
+        "type": "object"
+      },
+      "cr": {
+        "type": "object"
+      },
+      "code_targets": {
+        "type": "object"
+      },
+      "verifications": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "status",
+      "items",
+      "pending",
+      "errors"
+    ],
+    "properties": {
+      "status": {
+        "type": "string"
+      },
+      "items": {
+        "type": "array"
+      },
+      "pending": {
+        "type": "array"
+      },
+      "errors": {
+        "type": "array"
+      }
+    }
+  }
+}

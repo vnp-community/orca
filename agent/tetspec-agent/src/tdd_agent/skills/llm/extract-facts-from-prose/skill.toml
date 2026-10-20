@@ -1,0 +1,9 @@
+id = "extract-facts-from-prose"
+version = "1"
+agent = "generation"
+tier = "llm"
+description = "Read candidate lines of free-form source text and propose typed design facts. Every fact must quote its line; the verifier rejects wrong anchors, classes, missing required properties and numbers that are not in the quote."
+role = "extractor"
+reason = "Requirements stated as natural-language sentences have no fixed structure a rule could parse into typed properties."
+demotion = "Numbers, units, ids and method/path are already taken from the line by rule and used to cross-check the model; promote sentence patterns (e.g. 'timeout of N seconds') to rules in extract-structured-facts once they recur with identical extraction."
+verifiers = ["block-in-spans", "class-allowed", "quote-in-line", "required-props", "numbers-in-quote"]

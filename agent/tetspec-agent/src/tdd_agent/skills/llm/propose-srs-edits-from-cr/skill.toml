@@ -1,0 +1,9 @@
+id = "propose-srs-edits-from-cr"
+version = "1"
+agent = "impact"
+tier = "llm"
+description = "Read a change request (prose) against the requirement rows of the SRS and propose edits: change a fragment of a statement, add a row next to a sibling, remove a row. Every edit cites a verbatim quote of the CR; ids, fragments, numbers and quotes are verified by rules, and the SRS is patched by rules, never by the model."
+role = "author"
+reason = "Understanding which requirements a free-text change request touches and rewording them is language understanding."
+demotion = "Accept the CR as structured rows (id, kind, new statement) for the common cases so only free-text requests reach the model; rank candidate requirements by id mention and word overlap before asking."
+verifiers = ["quote-in-cr", "target-exists", "fragment-occurs-once", "numbers-and-ids-from-cr", "patched-srs-read-back"]

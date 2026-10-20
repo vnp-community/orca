@@ -1,0 +1,1 @@
+{"name": "identical normalised names are settled by rule", "input": {"a": {"id": "ENT-1", "class": "Entity", "name": "Asset  Entitlement"}, "b": {"id": "X-9", "class": "Entity", "name": "asset entitlement"}}, "expect": {"output": {"same": true}, "resolved_by": "rule"}}

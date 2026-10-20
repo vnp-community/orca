@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tdd:quality:KnowledgeNeedResult:1.0.0",
+  "type": "object",
+  "properties": {
+    "need_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "array"
+    },
+    "applicability": {
+      "enum": [
+        "applicable",
+        "not_applicable"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "searched_sources": {
+      "type": "array"
+    },
+    "matched_evidence": {
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "found",
+        "missing",
+        "conflict",
+        "not_applicable"
+      ]
+    },
+    "conflicts": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "need_id",
+    "scope",
+    "applicability",
+    "reason",
+    "searched_sources",
+    "matched_evidence",
+    "status",
+    "conflicts"
+  ],
+  "additionalProperties": true
+}

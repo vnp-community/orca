@@ -1,0 +1,5819 @@
+{
+  "version": "0.5.0",
+  "canonical_release": {
+    "version": "0.6.0",
+    "status": "active_runtime",
+    "compatibility_runtime": "0.5.0",
+    "deprecates": "0.5.0",
+    "cutover_date": "2026-10-07",
+    "source_versions": [
+      "0.4.0",
+      "0.5.0"
+    ],
+    "fixture": "fixtures/migration-v06-cases.json",
+    "acceptance": {
+      "runtime_contract": "passed",
+      "migration": "passed",
+      "authoring_quality": "pending_human_review",
+      "evidence": "data/test-pbom/run-quality-v6-authoring/benchmark.result.v6.json"
+    },
+    "requires": [
+      "complete_legacy_new_inventory",
+      "typed_quantity_and_evidence_contract",
+      "loss_report_and_exact_rollback",
+      "independent_semantic_acceptance"
+    ]
+  },
+  "classes": [
+    "AcceptanceReceipt",
+    "AuditTrail",
+    "Capability",
+    "CapacityModel",
+    "ChangeSpecItem",
+    "ConsistencyModel",
+    "ContractCompatibility",
+    "DesignObligation",
+    "DocumentRef",
+    "FailurePolicy",
+    "GenerationProfile",
+    "GenerationRun",
+    "HighAvailabilityTopology",
+    "IdempotencyPolicy",
+    "ImpactApproval",
+    "ImpactReport",
+    "IntakeReport",
+    "KnowledgeNeed",
+    "LedgerInvariant",
+    "LoadProfile",
+    "Measurement",
+    "Migration",
+    "MigrationStage",
+    "ObligationResolution",
+    "Ownership",
+    "PermissionDecision",
+    "PromptEditRequest",
+    "Quantity",
+    "ReadinessReport",
+    "ReconciliationPolicy",
+    "RecoveryObjective",
+    "RepoSnapshot",
+    "RequirementDelta",
+    "RequirementVersion",
+    "RetryPolicy",
+    "Saga",
+    "SectionRef",
+    "SemanticResolution",
+    "SrsDelta",
+    "TddSetRealization",
+    "TestReceipt",
+    "TimeoutBudget",
+    "Transaction"
+  ],
+  "relations": [
+    "after_requirement",
+    "before_requirement",
+    "depends_on_work",
+    "for_change",
+    "has_change_spec_item",
+    "has_impact_approval",
+    "has_impact_report",
+    "has_intake_report",
+    "has_measurement",
+    "has_migration_stage",
+    "has_obligation_resolution",
+    "has_readiness_report",
+    "has_requirement",
+    "has_scenario",
+    "has_section",
+    "has_semantic_resolution",
+    "has_srs_delta",
+    "implements",
+    "in_baseline",
+    "models_state_of",
+    "produces",
+    "realizes_tdd_set",
+    "requested_by_prompt",
+    "requires_knowledge",
+    "traces_to",
+    "uses_baseline",
+    "uses_profile",
+    "uses_repo_snapshot",
+    "verifies"
+  ],
+  "legacy_classes": [
+    "AlertRule",
+    "Algorithm",
+    "Alternative",
+    "Artefact",
+    "Assumption",
+    "Attribute",
+    "Baseline",
+    "Block",
+    "Budget",
+    "BusinessRule",
+    "ChangeOp",
+    "ChangeRequest",
+    "ChangeSet",
+    "Component",
+    "Concern",
+    "Condition",
+    "ConfigItem",
+    "Constant",
+    "Constraint",
+    "Control",
+    "Credential",
+    "DataClass",
+    "DataStore",
+    "DbRole",
+    "Decision",
+    "DecisionRule",
+    "DecisionTable",
+    "Dependency",
+    "DeploymentUnit",
+    "Deviation",
+    "Document",
+    "DocumentTemplate",
+    "DocumentVersion",
+    "Element",
+    "Entity",
+    "Enumeration",
+    "Environment",
+    "ErrorCode",
+    "Event",
+    "ExternalSystem",
+    "Flow",
+    "Formula",
+    "Gate",
+    "Index",
+    "Interface",
+    "Job",
+    "Layer",
+    "LogSpec",
+    "Message",
+    "Metric",
+    "Migration",
+    "Milestone",
+    "Module",
+    "OpenIssue",
+    "Operation",
+    "Policy",
+    "PriorityLevel",
+    "QualityCharacteristic",
+    "QualityTarget",
+    "RateLimitProfile",
+    "Requirement",
+    "RetentionPolicy",
+    "Risk",
+    "Role",
+    "RoutePolicy",
+    "Scenario",
+    "Schema",
+    "Scope",
+    "Screen",
+    "Section",
+    "SectionSpec",
+    "Sequence",
+    "Slo",
+    "SourceBlock",
+    "Stakeholder",
+    "Standard",
+    "State",
+    "StateMachine",
+    "System",
+    "Term",
+    "TestCase",
+    "Threat",
+    "TraceSpec",
+    "Transition",
+    "Trigger",
+    "View",
+    "Waiver",
+    "WorkItem"
+  ],
+  "legacy_relations": [
+    "accepts",
+    "affects",
+    "alerts_on",
+    "assumes",
+    "binds",
+    "blocked_by",
+    "budgeted_by",
+    "changes",
+    "chooses",
+    "cites",
+    "classified_as",
+    "configures",
+    "conflicts_with",
+    "conforms_to",
+    "constrained_by",
+    "consumes",
+    "decided_by",
+    "decides_by",
+    "deferred_to",
+    "depends_on",
+    "deployed_on",
+    "derived_from_version",
+    "derives_from",
+    "describes",
+    "deviates_from",
+    "emits",
+    "enforces",
+    "enumerates",
+    "exposes",
+    "gated_by",
+    "governed_by",
+    "guarded_by",
+    "has_attribute",
+    "has_block",
+    "has_condition",
+    "has_op",
+    "has_priority",
+    "has_rule",
+    "has_section_spec",
+    "has_state",
+    "implemented_by",
+    "in_machine",
+    "indexes",
+    "logs_with",
+    "may_fail_with",
+    "measured_by",
+    "mitigates",
+    "observed_by",
+    "owns",
+    "part_of",
+    "protects",
+    "protects_slo",
+    "provides",
+    "publishes",
+    "raises",
+    "reads",
+    "realized_in",
+    "realizes",
+    "realizes_request",
+    "references_entity",
+    "rejects",
+    "requires_role",
+    "requires_scope",
+    "resolves",
+    "retained_by",
+    "returns",
+    "routes_to",
+    "satisfies",
+    "scheduled_in",
+    "spec_of",
+    "stored_in",
+    "subscribes",
+    "supersedes",
+    "targets",
+    "threatens",
+    "traces_with",
+    "transition_from",
+    "transition_to",
+    "triggered_by",
+    "uses_algorithm",
+    "uses_constant",
+    "uses_credential",
+    "uses_formula",
+    "uses_term",
+    "validated_by",
+    "verified_by",
+    "waives",
+    "writes"
+  ],
+  "legacy_properties": {
+    "AlertRule": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "condition",
+          "type": "expr",
+          "level": "M"
+        },
+        {
+          "name": "severity",
+          "type": "enum:Severity",
+          "level": "M"
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "for",
+          "type": "qty",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "condition",
+        "severity",
+        "action",
+        "for"
+      ]
+    },
+    "Algorithm": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "inputs",
+          "type": "list:str",
+          "level": "M"
+        },
+        {
+          "name": "outputs",
+          "type": "list:str",
+          "level": "M"
+        },
+        {
+          "name": "complexity",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "deterministic",
+          "type": "bool",
+          "level": "M"
+        },
+        {
+          "name": "steps",
+          "type": "list:str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "inputs",
+        "outputs",
+        "complexity",
+        "deterministic",
+        "steps"
+      ]
+    },
+    "Alternative": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "pros",
+          "type": "text",
+          "level": "O"
+        },
+        {
+          "name": "cons",
+          "type": "text",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "pros",
+        "cons"
+      ]
+    },
+    "Artefact": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "path",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "format",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "artefact_kind",
+          "type": "enum:ArtefactKind",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "path",
+        "format",
+        "artefact_kind"
+      ]
+    },
+    "Assumption": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "statement",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "validation_plan",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "validate_by",
+          "type": "ref:Milestone",
+          "level": "M"
+        },
+        {
+          "name": "impact_if_false",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "owner",
+          "type": "str",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "statement",
+        "validation_plan",
+        "validate_by",
+        "impact_if_false",
+        "owner"
+      ]
+    },
+    "Attribute": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "datatype",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "nullable",
+          "type": "bool",
+          "level": "M"
+        },
+        {
+          "name": "default",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "enum_ref",
+          "type": "ref:Enumeration",
+          "level": "O"
+        },
+        {
+          "name": "enum_values",
+          "type": "list:str",
+          "level": "O"
+        },
+        {
+          "name": "unit",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "pii",
+          "type": "bool",
+          "level": "O"
+        },
+        {
+          "name": "pk",
+          "type": "bool",
+          "level": "O"
+        },
+        {
+          "name": "unique",
+          "type": "bool",
+          "level": "O"
+        },
+        {
+          "name": "constraint",
+          "type": "expr",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "datatype",
+        "nullable",
+        "default",
+        "enum_ref",
+        "enum_values",
+        "unit",
+        "pii",
+        "pk",
+        "unique",
+        "constraint"
+      ]
+    },
+    "Baseline": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "members",
+          "type": "list:ref:DocumentVersion",
+          "level": "M"
+        },
+        {
+          "name": "signed_by",
+          "type": "str",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "members",
+        "signed_by"
+      ]
+    },
+    "Block": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "doc",
+          "type": "ref:Document",
+          "level": "M"
+        },
+        {
+          "name": "section",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "seq",
+          "type": "int",
+          "level": "M"
+        },
+        {
+          "name": "block_kind",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "text_hash",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "prose_only",
+          "type": "bool",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "doc",
+        "section",
+        "seq",
+        "block_kind",
+        "text",
+        "text_hash",
+        "prose_only"
+      ]
+    },
+    "Budget": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "scope",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "target",
+          "type": "qty",
+          "level": "M"
+        },
+        {
+          "name": "basis",
+          "type": "enum:EvidenceBasis",
+          "level": "M"
+        },
+        {
+          "name": "parent_budget",
+          "type": "ref:Budget",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "scope",
+        "target",
+        "basis",
+        "parent_budget"
+      ]
+    },
+    "BusinessRule": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "rule_form",
+          "type": "json",
+          "level": "C"
+        },
+        {
+          "name": "precedence",
+          "type": "int",
+          "level": "O"
+        },
+        {
+          "name": "rule_kind",
+          "type": "enum:BusinessRuleKind",
+          "level": "O"
+        },
+        {
+          "name": "severity",
+          "type": "enum:RuleLevel",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "rule_form",
+        "precedence",
+        "rule_kind",
+        "severity"
+      ]
+    },
+    "ChangeOp": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "op",
+          "type": "enum:ChangeOpKind",
+          "level": "M"
+        },
+        {
+          "name": "target",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "path",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "before",
+          "type": "json",
+          "level": "C"
+        },
+        {
+          "name": "after",
+          "type": "json",
+          "level": "C"
+        },
+        {
+          "name": "cascade",
+          "type": "enum:CascadePolicy",
+          "level": "C"
+        },
+        {
+          "name": "seq",
+          "type": "int",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "op",
+        "target",
+        "path",
+        "before",
+        "after",
+        "cascade",
+        "seq"
+      ]
+    },
+    "ChangeRequest": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "change_source",
+          "type": "enum:ChangeSource",
+          "level": "M"
+        },
+        {
+          "name": "requester",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "rationale",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "status",
+          "type": "enum:ChangeStatus",
+          "level": "M"
+        },
+        {
+          "name": "target_docs",
+          "type": "list:ref:Document",
+          "level": "M"
+        },
+        {
+          "name": "decision_by",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "decided_at",
+          "type": "date",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "change_source",
+        "requester",
+        "rationale",
+        "status",
+        "target_docs",
+        "decision_by",
+        "decided_at"
+      ]
+    },
+    "ChangeSet": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "request",
+          "type": "ref:ChangeRequest",
+          "level": "M"
+        },
+        {
+          "name": "base_version",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "result_version",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "status",
+          "type": "enum:ChangeStatus",
+          "level": "M"
+        },
+        {
+          "name": "applied_at",
+          "type": "date",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "request",
+        "base_version",
+        "result_version",
+        "status",
+        "applied_at"
+      ]
+    },
+    "Component": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "component_kind",
+          "type": "enum:ComponentKind",
+          "level": "M"
+        },
+        {
+          "name": "responsibility",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "tech",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "package",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "stateless",
+          "type": "bool",
+          "level": "O"
+        },
+        {
+          "name": "scaling_unit",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "runtime_unit",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "db_role",
+          "type": "ref:DbRole",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "component_kind",
+        "responsibility",
+        "tech",
+        "package",
+        "stateless",
+        "scaling_unit",
+        "runtime_unit",
+        "db_role"
+      ]
+    },
+    "Concern": {
+      "parent": "Element",
+      "own": [],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "Condition": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "condition_kind",
+          "type": "enum:ConditionKind",
+          "level": "M"
+        },
+        {
+          "name": "expression",
+          "type": "expr",
+          "level": "M"
+        },
+        {
+          "name": "violation_error",
+          "type": "ref:ErrorCode",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "condition_kind",
+        "expression",
+        "violation_error"
+      ]
+    },
+    "ConfigItem": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "key",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "type",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "default",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "env_var",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "secret",
+          "type": "bool",
+          "level": "M"
+        },
+        {
+          "name": "unit",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "runtime_changeable",
+          "type": "bool",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "key",
+        "type",
+        "default",
+        "env_var",
+        "secret",
+        "unit",
+        "runtime_changeable"
+      ]
+    },
+    "Constant": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "key",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "constant_kind",
+          "type": "enum:ConstantKind",
+          "level": "M"
+        },
+        {
+          "name": "value",
+          "type": "qty",
+          "level": "M"
+        },
+        {
+          "name": "basis",
+          "type": "enum:EvidenceBasis",
+          "level": "M"
+        },
+        {
+          "name": "mutable",
+          "type": "bool",
+          "level": "M"
+        },
+        {
+          "name": "by_phase",
+          "type": "json",
+          "level": "O"
+        },
+        {
+          "name": "config_item",
+          "type": "ref:ConfigItem",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "key",
+        "constant_kind",
+        "value",
+        "basis",
+        "mutable",
+        "by_phase",
+        "config_item"
+      ]
+    },
+    "Constraint": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "constraint_kind",
+          "type": "enum:ConstraintKind",
+          "level": "M"
+        },
+        {
+          "name": "statement",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "limit",
+          "type": "qty",
+          "level": "O"
+        },
+        {
+          "name": "enforced_by",
+          "type": "ref:Element",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "constraint_kind",
+        "statement",
+        "limit",
+        "enforced_by"
+      ]
+    },
+    "Control": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "control_kind",
+          "type": "enum:ControlKind",
+          "level": "M"
+        },
+        {
+          "name": "standard_ref",
+          "type": "ref:Standard",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "control_kind",
+        "standard_ref"
+      ]
+    },
+    "Credential": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "credential_kind",
+          "type": "enum:CredentialKind",
+          "level": "M"
+        },
+        {
+          "name": "storage",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "lifetime",
+          "type": "qty",
+          "level": "C"
+        },
+        {
+          "name": "rotation",
+          "type": "text",
+          "level": "C"
+        },
+        {
+          "name": "revocation",
+          "type": "text",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "credential_kind",
+        "storage",
+        "lifetime",
+        "rotation",
+        "revocation"
+      ]
+    },
+    "DataClass": {
+      "parent": "Element",
+      "own": [],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "DataStore": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "technology",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "owner_module",
+          "type": "ref:Module",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "technology",
+        "owner_module"
+      ]
+    },
+    "DbRole": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "privileges",
+          "type": "text",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "privileges"
+      ]
+    },
+    "Decision": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "context",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "chosen",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "rationale",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "reversible",
+          "type": "bool",
+          "level": "M"
+        },
+        {
+          "name": "decided_by",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "decided_on",
+          "type": "date",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "context",
+        "chosen",
+        "rationale",
+        "reversible",
+        "decided_by",
+        "decided_on"
+      ]
+    },
+    "DecisionRule": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "when",
+          "type": "json",
+          "level": "M"
+        },
+        {
+          "name": "then",
+          "type": "json",
+          "level": "M"
+        },
+        {
+          "name": "level",
+          "type": "enum:RuleLevel",
+          "level": "O"
+        },
+        {
+          "name": "grace",
+          "type": "qty",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "when",
+        "then",
+        "level",
+        "grace"
+      ]
+    },
+    "DecisionTable": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "inputs",
+          "type": "list:ref:Enumeration",
+          "level": "M"
+        },
+        {
+          "name": "outputs",
+          "type": "list:str",
+          "level": "M"
+        },
+        {
+          "name": "hit_policy",
+          "type": "enum:HitPolicy",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "inputs",
+        "outputs",
+        "hit_policy"
+      ]
+    },
+    "Dependency": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "license",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "version",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "approved",
+          "type": "bool",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "license",
+        "version",
+        "approved"
+      ]
+    },
+    "DeploymentUnit": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "artifact",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "scaling",
+          "type": "str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "artifact",
+        "scaling"
+      ]
+    },
+    "Deviation": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "upstream_ref",
+          "type": "ref:Element",
+          "level": "M"
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "approved_by",
+          "type": "str",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "upstream_ref",
+        "reason",
+        "approved_by"
+      ]
+    },
+    "Document": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "doc_type",
+          "type": "enum:DocumentType",
+          "level": "M"
+        },
+        {
+          "name": "version",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "profile",
+          "type": "str",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "doc_type",
+        "version",
+        "profile"
+      ]
+    },
+    "DocumentTemplate": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "doc_type",
+          "type": "enum:DocumentType",
+          "level": "M"
+        },
+        {
+          "name": "template_version",
+          "type": "str",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "doc_type",
+        "template_version"
+      ]
+    },
+    "DocumentVersion": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "content_hash",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "released_at",
+          "type": "date",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "content_hash",
+        "released_at"
+      ]
+    },
+    "Element": {
+      "parent": "null",
+      "own": [
+        {
+          "name": "id",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "name",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "level": "O"
+        },
+        {
+          "name": "owner_doc",
+          "type": "ref:Document",
+          "level": "M"
+        },
+        {
+          "name": "origin",
+          "type": "enum:Origin",
+          "level": "M"
+        },
+        {
+          "name": "lifecycle",
+          "type": "enum:LifecycleStatus",
+          "level": "M"
+        },
+        {
+          "name": "maturity",
+          "type": "enum:Maturity",
+          "level": "M"
+        },
+        {
+          "name": "priority",
+          "type": "enum:PriorityLevel",
+          "level": "C"
+        },
+        {
+          "name": "scope_status",
+          "type": "enum:ScopeStatus",
+          "level": "O"
+        },
+        {
+          "name": "deferred_to",
+          "type": "ref:Milestone",
+          "level": "C"
+        },
+        {
+          "name": "source_ref",
+          "type": "list:SourceRef",
+          "level": "M"
+        },
+        {
+          "name": "version_introduced",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "version_removed",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "confidence",
+          "type": "num",
+          "level": "M"
+        },
+        {
+          "name": "extracted_by",
+          "type": "enum:ExtractionMethod",
+          "level": "M"
+        },
+        {
+          "name": "review_status",
+          "type": "enum:ReviewStatus",
+          "level": "M"
+        },
+        {
+          "name": "reviewed_by",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "reviewed_at",
+          "type": "date",
+          "level": "C"
+        },
+        {
+          "name": "gaps",
+          "type": "list:Gap",
+          "level": "O"
+        },
+        {
+          "name": "tags",
+          "type": "list:str",
+          "level": "O"
+        },
+        {
+          "name": "ext",
+          "type": "json",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "Entity": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "level",
+          "type": "enum:EntityLevel",
+          "level": "M"
+        },
+        {
+          "name": "table_name",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "store",
+          "type": "ref:DataStore",
+          "level": "C"
+        },
+        {
+          "name": "pk",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "soft_delete",
+          "type": "bool",
+          "level": "O"
+        },
+        {
+          "name": "partition",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "data_class",
+          "type": "enum:DataClassVocab",
+          "level": "O"
+        },
+        {
+          "name": "fillfactor",
+          "type": "int",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "level",
+        "table_name",
+        "store",
+        "pk",
+        "soft_delete",
+        "partition",
+        "data_class",
+        "fillfactor"
+      ]
+    },
+    "Enumeration": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "values",
+          "type": "list:str",
+          "level": "M"
+        },
+        {
+          "name": "closed",
+          "type": "bool",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "values",
+        "closed"
+      ]
+    },
+    "Environment": {
+      "parent": "Element",
+      "own": [],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "ErrorCode": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "code",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "http_status",
+          "type": "int",
+          "level": "M"
+        },
+        {
+          "name": "slug",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "retryable",
+          "type": "bool",
+          "level": "M"
+        },
+        {
+          "name": "when",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "handling",
+          "type": "text",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "code",
+        "http_status",
+        "slug",
+        "retryable",
+        "when",
+        "handling"
+      ]
+    },
+    "Event": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "topic",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "channel",
+          "type": "enum:EventChannel",
+          "level": "M"
+        },
+        {
+          "name": "delivery",
+          "type": "enum:DeliverySemantics",
+          "level": "M"
+        },
+        {
+          "name": "ordering_key",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "payload",
+          "type": "ref:Message",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "topic",
+        "channel",
+        "delivery",
+        "ordering_key",
+        "payload"
+      ]
+    },
+    "ExternalSystem": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "contract",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "trust_level",
+          "type": "str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "contract",
+        "trust_level"
+      ]
+    },
+    "Flow": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "trigger",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "steps",
+          "type": "list:str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "trigger",
+        "steps"
+      ]
+    },
+    "Formula": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "expression",
+          "type": "expr",
+          "level": "M"
+        },
+        {
+          "name": "variables",
+          "type": "json",
+          "level": "M"
+        },
+        {
+          "name": "result_unit",
+          "type": "str",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "expression",
+        "variables",
+        "result_unit"
+      ]
+    },
+    "Gate": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "criteria",
+          "type": "list:str",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "criteria"
+      ]
+    },
+    "Index": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "columns",
+          "type": "list:str",
+          "level": "M"
+        },
+        {
+          "name": "unique",
+          "type": "bool",
+          "level": "M"
+        },
+        {
+          "name": "partial",
+          "type": "expr",
+          "level": "O"
+        },
+        {
+          "name": "method",
+          "type": "str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "columns",
+        "unique",
+        "partial",
+        "method"
+      ]
+    },
+    "Interface": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "protocol",
+          "type": "enum:Protocol",
+          "level": "M"
+        },
+        {
+          "name": "style",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "contract_ref",
+          "type": "ref:Artefact",
+          "level": "C"
+        },
+        {
+          "name": "authn",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "versioning",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "timeout",
+          "type": "qty",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "protocol",
+        "style",
+        "contract_ref",
+        "authn",
+        "versioning",
+        "timeout"
+      ]
+    },
+    "Job": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "trigger_kind",
+          "type": "enum:JobTrigger",
+          "level": "M"
+        },
+        {
+          "name": "schedule",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "queue",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "queue_priority",
+          "type": "int",
+          "level": "O"
+        },
+        {
+          "name": "job_key",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "idempotent",
+          "type": "bool",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "trigger_kind",
+        "schedule",
+        "queue",
+        "queue_priority",
+        "job_key",
+        "idempotent"
+      ]
+    },
+    "Layer": {
+      "parent": "Element",
+      "own": [],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "LogSpec": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "fields",
+          "type": "list:str",
+          "level": "M"
+        },
+        {
+          "name": "level",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "pii_policy",
+          "type": "text",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "fields",
+        "level",
+        "pii_policy"
+      ]
+    },
+    "Message": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "schema_ref",
+          "type": "ref:Artefact",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "schema_ref"
+      ]
+    },
+    "Metric": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "metric_type",
+          "type": "enum:MetricType",
+          "level": "M"
+        },
+        {
+          "name": "unit",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "labels",
+          "type": "list:str",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "metric_type",
+        "unit",
+        "labels"
+      ]
+    },
+    "Migration": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "path",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "reversible",
+          "type": "bool",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "path",
+        "reversible"
+      ]
+    },
+    "Milestone": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "criteria",
+          "type": "list:str",
+          "level": "M"
+        },
+        {
+          "name": "target_date",
+          "type": "date",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "criteria",
+        "target_date"
+      ]
+    },
+    "Module": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "responsibility",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "runtime_unit",
+          "type": "str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "responsibility",
+        "runtime_unit"
+      ]
+    },
+    "OpenIssue": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "issue_kind",
+          "type": "enum:OpenIssueKind",
+          "level": "M"
+        },
+        {
+          "name": "question",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "owner",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "due",
+          "type": "date",
+          "level": "M"
+        },
+        {
+          "name": "status",
+          "type": "enum:OpenIssueStatus",
+          "level": "M"
+        },
+        {
+          "name": "proposed_default",
+          "type": "text",
+          "level": "O"
+        },
+        {
+          "name": "resolution",
+          "type": "text",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "issue_kind",
+        "question",
+        "owner",
+        "due",
+        "status",
+        "proposed_default",
+        "resolution"
+      ]
+    },
+    "Operation": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "method",
+          "type": "str",
+          "level": "C"
+        },
+        {
+          "name": "path_or_name",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "idempotent",
+          "type": "bool",
+          "level": "M"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "bool",
+          "level": "C"
+        },
+        {
+          "name": "concurrency_control",
+          "type": "enum:ConcurrencyControl",
+          "level": "C"
+        },
+        {
+          "name": "authn",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "timeout",
+          "type": "qty",
+          "level": "O"
+        },
+        {
+          "name": "roles",
+          "type": "list:ref:Role",
+          "level": "O"
+        },
+        {
+          "name": "sla_ref",
+          "type": "ref:Slo",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "method",
+        "path_or_name",
+        "idempotent",
+        "idempotency_key",
+        "concurrency_control",
+        "authn",
+        "timeout",
+        "roles",
+        "sla_ref"
+      ]
+    },
+    "Policy": {
+      "parent": "Element",
+      "own": [],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "PriorityLevel": {
+      "parent": "Element",
+      "own": [],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "QualityCharacteristic": {
+      "parent": "Element",
+      "own": [],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "QualityTarget": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "characteristic",
+          "type": "ref:QualityCharacteristic",
+          "level": "M"
+        },
+        {
+          "name": "target",
+          "type": "qty",
+          "level": "M"
+        },
+        {
+          "name": "basis",
+          "type": "enum:EvidenceBasis",
+          "level": "M"
+        },
+        {
+          "name": "measurement_ref",
+          "type": "ref:Element",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "characteristic",
+        "target",
+        "basis",
+        "measurement_ref"
+      ]
+    },
+    "RateLimitProfile": {
+      "parent": "Policy",
+      "own": [
+        {
+          "name": "limit",
+          "type": "qty",
+          "level": "M"
+        },
+        {
+          "name": "key_by",
+          "type": "str",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "limit",
+        "key_by"
+      ]
+    },
+    "Requirement": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "req_kind",
+          "type": "enum:RequirementKind",
+          "level": "M"
+        },
+        {
+          "name": "statement",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "acceptance",
+          "type": "text",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "req_kind",
+        "statement",
+        "acceptance"
+      ]
+    },
+    "RetentionPolicy": {
+      "parent": "Policy",
+      "own": [
+        {
+          "name": "period",
+          "type": "qty",
+          "level": "M"
+        },
+        {
+          "name": "action",
+          "type": "enum:RetentionAction",
+          "level": "M"
+        },
+        {
+          "name": "legal_basis",
+          "type": "str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "period",
+        "action",
+        "legal_basis"
+      ]
+    },
+    "Risk": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "likelihood",
+          "type": "enum:RiskLevel",
+          "level": "M"
+        },
+        {
+          "name": "impact",
+          "type": "enum:RiskLevel",
+          "level": "M"
+        },
+        {
+          "name": "treatment",
+          "type": "enum:RiskTreatment",
+          "level": "M"
+        },
+        {
+          "name": "owner",
+          "type": "str",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "likelihood",
+        "impact",
+        "treatment",
+        "owner"
+      ]
+    },
+    "Role": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "principal_type",
+          "type": "enum:PrincipalType",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "principal_type"
+      ]
+    },
+    "RoutePolicy": {
+      "parent": "Policy",
+      "own": [
+        {
+          "name": "upstream",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "auth",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "principals",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "rate_limit",
+          "type": "ref:RateLimitProfile",
+          "level": "M"
+        },
+        {
+          "name": "timeout",
+          "type": "qty",
+          "level": "M"
+        },
+        {
+          "name": "retry",
+          "type": "enum:RetryMode",
+          "level": "M"
+        },
+        {
+          "name": "max_body",
+          "type": "qty",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "upstream",
+        "auth",
+        "principals",
+        "rate_limit",
+        "timeout",
+        "retry",
+        "max_body"
+      ]
+    },
+    "Scenario": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "actors",
+          "type": "list:ref:Stakeholder",
+          "level": "M"
+        },
+        {
+          "name": "main_flow",
+          "type": "ref:Flow",
+          "level": "O"
+        },
+        {
+          "name": "end_conditions",
+          "type": "text",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "actors",
+        "main_flow",
+        "end_conditions"
+      ]
+    },
+    "Schema": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "owner_role",
+          "type": "ref:DbRole",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "owner_role"
+      ]
+    },
+    "Scope": {
+      "parent": "Element",
+      "own": [],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "Screen": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "route",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "roles",
+          "type": "list:ref:Role",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "route",
+        "roles"
+      ]
+    },
+    "Section": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "number",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "title",
+          "type": "str",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "number",
+        "title"
+      ]
+    },
+    "SectionSpec": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "number",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "title",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "seq",
+          "type": "int",
+          "level": "M"
+        },
+        {
+          "name": "holds",
+          "type": "list:str",
+          "level": "M"
+        },
+        {
+          "name": "render_mode",
+          "type": "enum:RenderMode",
+          "level": "M"
+        },
+        {
+          "name": "required",
+          "type": "bool",
+          "level": "M"
+        },
+        {
+          "name": "min_recall",
+          "type": "num",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "number",
+        "title",
+        "seq",
+        "holds",
+        "render_mode",
+        "required",
+        "min_recall"
+      ]
+    },
+    "Sequence": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "gap_allowed",
+          "type": "bool",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "gap_allowed"
+      ]
+    },
+    "Slo": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "objective",
+          "type": "qty",
+          "level": "M"
+        },
+        {
+          "name": "window",
+          "type": "qty",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "objective",
+        "window"
+      ]
+    },
+    "SourceBlock": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "kind",
+          "type": "enum:BlockKind",
+          "level": "M"
+        },
+        {
+          "name": "line",
+          "type": "int",
+          "level": "M"
+        },
+        {
+          "name": "text_hash",
+          "type": "str",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "kind",
+        "line",
+        "text_hash"
+      ]
+    },
+    "Stakeholder": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "concerns",
+          "type": "list:str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "concerns"
+      ]
+    },
+    "Standard": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "identifier",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "edition",
+          "type": "str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "identifier",
+        "edition"
+      ]
+    },
+    "State": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "final",
+          "type": "bool",
+          "level": "O"
+        },
+        {
+          "name": "meaning",
+          "type": "text",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "final",
+        "meaning"
+      ]
+    },
+    "StateMachine": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "subject_entity",
+          "type": "ref:Entity",
+          "level": "M"
+        },
+        {
+          "name": "initial_state",
+          "type": "ref:State",
+          "level": "M"
+        },
+        {
+          "name": "terminal_states",
+          "type": "list:ref:State",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "subject_entity",
+        "initial_state",
+        "terminal_states"
+      ]
+    },
+    "System": {
+      "parent": "Element",
+      "own": [],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext"
+      ]
+    },
+    "Term": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "definition",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "synonyms",
+          "type": "list:str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "definition",
+        "synonyms"
+      ]
+    },
+    "TestCase": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "level",
+          "type": "enum:TestLevel",
+          "level": "M"
+        },
+        {
+          "name": "kind",
+          "type": "enum:TestKind",
+          "level": "M"
+        },
+        {
+          "name": "expected",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "tool",
+          "type": "str",
+          "level": "O"
+        },
+        {
+          "name": "automation",
+          "type": "enum:Automation",
+          "level": "O"
+        },
+        {
+          "name": "preconditions",
+          "type": "text",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "level",
+        "kind",
+        "expected",
+        "tool",
+        "automation",
+        "preconditions"
+      ]
+    },
+    "Threat": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "category",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "asset",
+          "type": "str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "category",
+        "asset"
+      ]
+    },
+    "TraceSpec": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "propagation",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "sampling",
+          "type": "str",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "propagation",
+        "sampling"
+      ]
+    },
+    "Transition": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "trigger",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "guard",
+          "type": "expr",
+          "level": "O"
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "trigger",
+        "guard",
+        "action"
+      ]
+    },
+    "Trigger": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "timing",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "enforces_text",
+          "type": "text",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "timing",
+        "enforces_text"
+      ]
+    },
+    "View": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "definition",
+          "type": "expr",
+          "level": "O"
+        },
+        {
+          "name": "materialized",
+          "type": "bool",
+          "level": "O"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "definition",
+        "materialized"
+      ]
+    },
+    "Waiver": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "rule_id",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "target",
+          "type": "ref:Element",
+          "level": "M"
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "level": "M"
+        },
+        {
+          "name": "approved_by",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "expires",
+          "type": "date",
+          "level": "M"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "rule_id",
+        "target",
+        "reason",
+        "approved_by",
+        "expires"
+      ]
+    },
+    "WorkItem": {
+      "parent": "Element",
+      "own": [
+        {
+          "name": "estimate",
+          "type": "str",
+          "level": "M"
+        },
+        {
+          "name": "milestone",
+          "type": "ref:Milestone",
+          "level": "O"
+        },
+        {
+          "name": "definition_of_done",
+          "type": "text",
+          "level": "C"
+        }
+      ],
+      "effective": [
+        "id",
+        "name",
+        "summary",
+        "owner_doc",
+        "origin",
+        "lifecycle",
+        "maturity",
+        "priority",
+        "scope_status",
+        "deferred_to",
+        "source_ref",
+        "version_introduced",
+        "version_removed",
+        "confidence",
+        "extracted_by",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "gaps",
+        "tags",
+        "ext",
+        "estimate",
+        "milestone",
+        "definition_of_done"
+      ]
+    }
+  },
+  "legacy_property_names": [
+    "acceptance",
+    "action",
+    "actors",
+    "after",
+    "applied_at",
+    "approved",
+    "approved_by",
+    "artefact_kind",
+    "artifact",
+    "asset",
+    "auth",
+    "authn",
+    "automation",
+    "base_version",
+    "basis",
+    "before",
+    "block_kind",
+    "by_phase",
+    "cascade",
+    "category",
+    "change_source",
+    "channel",
+    "characteristic",
+    "chosen",
+    "closed",
+    "code",
+    "columns",
+    "complexity",
+    "component_kind",
+    "concerns",
+    "concurrency_control",
+    "condition",
+    "condition_kind",
+    "confidence",
+    "config_item",
+    "cons",
+    "constant_kind",
+    "constraint",
+    "constraint_kind",
+    "content_hash",
+    "context",
+    "contract",
+    "contract_ref",
+    "control_kind",
+    "credential_kind",
+    "criteria",
+    "data_class",
+    "datatype",
+    "db_role",
+    "decided_at",
+    "decided_by",
+    "decided_on",
+    "decision_by",
+    "default",
+    "deferred_to",
+    "definition",
+    "definition_of_done",
+    "delivery",
+    "deterministic",
+    "doc",
+    "doc_type",
+    "due",
+    "edition",
+    "end_conditions",
+    "enforced_by",
+    "enforces_text",
+    "enum_ref",
+    "enum_values",
+    "env_var",
+    "estimate",
+    "expected",
+    "expires",
+    "expression",
+    "ext",
+    "extracted_by",
+    "fields",
+    "fillfactor",
+    "final",
+    "for",
+    "format",
+    "gap_allowed",
+    "gaps",
+    "grace",
+    "guard",
+    "handling",
+    "hit_policy",
+    "holds",
+    "http_status",
+    "id",
+    "idempotency_key",
+    "idempotent",
+    "identifier",
+    "impact",
+    "impact_if_false",
+    "initial_state",
+    "inputs",
+    "issue_kind",
+    "job_key",
+    "key",
+    "key_by",
+    "kind",
+    "labels",
+    "legal_basis",
+    "level",
+    "license",
+    "lifecycle",
+    "lifetime",
+    "likelihood",
+    "limit",
+    "line",
+    "main_flow",
+    "materialized",
+    "maturity",
+    "max_body",
+    "meaning",
+    "measurement_ref",
+    "members",
+    "method",
+    "metric_type",
+    "milestone",
+    "min_recall",
+    "mutable",
+    "name",
+    "nullable",
+    "number",
+    "objective",
+    "op",
+    "ordering_key",
+    "origin",
+    "outputs",
+    "owner",
+    "owner_doc",
+    "owner_module",
+    "owner_role",
+    "package",
+    "parent_budget",
+    "partial",
+    "partition",
+    "path",
+    "path_or_name",
+    "payload",
+    "period",
+    "pii",
+    "pii_policy",
+    "pk",
+    "precedence",
+    "preconditions",
+    "principal_type",
+    "principals",
+    "priority",
+    "privileges",
+    "profile",
+    "propagation",
+    "proposed_default",
+    "pros",
+    "prose_only",
+    "protocol",
+    "question",
+    "queue",
+    "queue_priority",
+    "rate_limit",
+    "rationale",
+    "reason",
+    "released_at",
+    "render_mode",
+    "req_kind",
+    "request",
+    "requester",
+    "required",
+    "resolution",
+    "responsibility",
+    "result_unit",
+    "result_version",
+    "retry",
+    "retryable",
+    "reversible",
+    "review_status",
+    "reviewed_at",
+    "reviewed_by",
+    "revocation",
+    "roles",
+    "rotation",
+    "route",
+    "rule_form",
+    "rule_id",
+    "rule_kind",
+    "runtime_changeable",
+    "runtime_unit",
+    "sampling",
+    "scaling",
+    "scaling_unit",
+    "schedule",
+    "schema_ref",
+    "scope",
+    "scope_status",
+    "secret",
+    "section",
+    "seq",
+    "severity",
+    "signed_by",
+    "sla_ref",
+    "slug",
+    "soft_delete",
+    "source_ref",
+    "standard_ref",
+    "stateless",
+    "statement",
+    "status",
+    "steps",
+    "storage",
+    "store",
+    "style",
+    "subject_entity",
+    "summary",
+    "synonyms",
+    "table_name",
+    "tags",
+    "target",
+    "target_date",
+    "target_docs",
+    "tech",
+    "technology",
+    "template_version",
+    "terminal_states",
+    "text",
+    "text_hash",
+    "then",
+    "timeout",
+    "timing",
+    "title",
+    "tool",
+    "topic",
+    "treatment",
+    "trigger",
+    "trigger_kind",
+    "trust_level",
+    "type",
+    "unique",
+    "unit",
+    "upstream",
+    "upstream_ref",
+    "validate_by",
+    "validation_plan",
+    "value",
+    "values",
+    "variables",
+    "version",
+    "version_introduced",
+    "version_removed",
+    "versioning",
+    "violation_error",
+    "when",
+    "window"
+  ],
+  "canonical_property_names": [
+    "acceptance",
+    "accepted_by",
+    "action",
+    "actual_snapshot",
+    "after_revision",
+    "allocations",
+    "applicability",
+    "approver_id",
+    "artifact_types",
+    "authorization",
+    "average",
+    "backfill",
+    "backoff",
+    "base_snapshot",
+    "baseline_id",
+    "baseline_snapshot",
+    "baseline_tdd_snapshot",
+    "before_revision",
+    "blockers",
+    "boundary",
+    "change_request_id",
+    "code_target",
+    "compatibility",
+    "compensation",
+    "consistency",
+    "consumers",
+    "content_hash",
+    "cr_acceptance_refs",
+    "cr_id",
+    "cr_ref",
+    "criterion_refs",
+    "cs_id",
+    "currency",
+    "dead_letter",
+    "decision",
+    "decision_hash",
+    "deduplication",
+    "depends_on",
+    "design_refs",
+    "document_id",
+    "effect",
+    "entries",
+    "escalation",
+    "events",
+    "evidence",
+    "executed_at",
+    "failover",
+    "failure_domains",
+    "failure_modes",
+    "fallback",
+    "findings",
+    "from_schema",
+    "graph_snapshot",
+    "growth",
+    "guarantees",
+    "headroom",
+    "id",
+    "ids",
+    "impact_report_id",
+    "integrity",
+    "intent",
+    "invariants",
+    "isolation",
+    "key",
+    "kind",
+    "lifecycle",
+    "lock",
+    "logical_requirement_id",
+    "mandatory_needs",
+    "manifest_hash",
+    "mappings",
+    "max_attempts",
+    "metric",
+    "mismatch_handling",
+    "modality",
+    "mode",
+    "name",
+    "need_id",
+    "obligation_id",
+    "observed_at",
+    "outcomes",
+    "owner",
+    "payload",
+    "peak",
+    "policy_hash",
+    "policy_version",
+    "preconditions",
+    "profile_id",
+    "prompt_hash",
+    "purpose",
+    "question",
+    "rationale",
+    "recovery_procedure",
+    "replicas",
+    "repo",
+    "required",
+    "resolution_hash",
+    "resource",
+    "resources",
+    "responsibilities",
+    "result",
+    "retention",
+    "retryable_errors",
+    "revision",
+    "role",
+    "rollback",
+    "roots",
+    "rpo",
+    "rto",
+    "rule_coverage",
+    "run_id",
+    "sad_ref",
+    "scale",
+    "scaling",
+    "schedule",
+    "scope",
+    "section_id",
+    "section_spec",
+    "sections",
+    "slot",
+    "source",
+    "source_ref",
+    "sources",
+    "srs_ref",
+    "srs_refs",
+    "stable_key",
+    "stage",
+    "stages",
+    "statement",
+    "status",
+    "steps",
+    "subject",
+    "target",
+    "target_class",
+    "tdd_refs",
+    "team",
+    "to_schema",
+    "total",
+    "unit",
+    "unresolved",
+    "value",
+    "verification",
+    "verification_refs",
+    "versioning"
+  ],
+  "property_aliases": {
+    "authn": "auth",
+    "concurrency_control": "concurrency",
+    "measurement_ref": "measurement",
+    "path_or_name": "path"
+  },
+  "canonical_alias_map": {
+    "authn": {
+      "canonical": "auth",
+      "status": "accepted"
+    },
+    "concurrency_control": {
+      "canonical": "concurrency",
+      "status": "accepted"
+    },
+    "measurement_ref": {
+      "canonical": "measurement",
+      "status": "accepted"
+    },
+    "path_or_name": {
+      "canonical": "path",
+      "status": "accepted"
+    }
+  },
+  "typed_contracts": {
+    "Quantity": {
+      "value": "number",
+      "unit": "non_empty_string",
+      "stage": [
+        "target",
+        "budget",
+        "observed",
+        "measured",
+        "assumed"
+      ]
+    },
+    "Evidence": {
+      "kind": [
+        "extracted",
+        "derived",
+        "proposed",
+        "prompt"
+      ],
+      "source_id": "non_empty_string",
+      "source_version": "non_empty_string",
+      "source_hash": "non_empty_string",
+      "anchor": "non_empty_string",
+      "quote_hash": "non_empty_string"
+    }
+  },
+  "legacy_required_properties": {
+    "Algorithm": [
+      "inputs",
+      "outputs",
+      "deterministic"
+    ]
+  },
+  "profiles": [
+    "prompt-tdd-edit",
+    "spec-change-generation",
+    "tdd-generation"
+  ],
+  "required_properties": {
+    "AcceptanceReceipt": [
+      "id",
+      "cr_id",
+      "criterion_refs",
+      "accepted_by",
+      "status"
+    ],
+    "AuditTrail": [
+      "id",
+      "events",
+      "retention",
+      "integrity"
+    ],
+    "Capability": [
+      "id",
+      "name",
+      "stable_key",
+      "purpose",
+      "scope",
+      "owner",
+      "lifecycle"
+    ],
+    "CapacityModel": [
+      "id",
+      "resources",
+      "headroom",
+      "scaling"
+    ],
+    "ChangeSpecItem": [
+      "id",
+      "action",
+      "code_target",
+      "srs_refs",
+      "tdd_refs",
+      "verification",
+      "cr_acceptance_refs"
+    ],
+    "ConsistencyModel": [
+      "id",
+      "mode",
+      "guarantees"
+    ],
+    "ContractCompatibility": [
+      "id",
+      "versioning",
+      "compatibility",
+      "consumers"
+    ],
+    "DesignObligation": [
+      "id",
+      "question",
+      "srs_refs",
+      "cr_acceptance_refs",
+      "applicability",
+      "status"
+    ],
+    "DocumentRef": [
+      "id",
+      "role",
+      "revision",
+      "content_hash"
+    ],
+    "FailurePolicy": [
+      "id",
+      "failure_modes",
+      "fallback",
+      "dead_letter"
+    ],
+    "GenerationProfile": [
+      "id",
+      "name",
+      "artifact_types",
+      "mandatory_needs"
+    ],
+    "GenerationRun": [
+      "id",
+      "intent",
+      "scope",
+      "profile_id",
+      "status",
+      "manifest_hash"
+    ],
+    "HighAvailabilityTopology": [
+      "id",
+      "replicas",
+      "failure_domains",
+      "failover"
+    ],
+    "IdempotencyPolicy": [
+      "id",
+      "key",
+      "scope",
+      "deduplication"
+    ],
+    "ImpactApproval": [
+      "id",
+      "impact_report_id",
+      "approver_id",
+      "role",
+      "decision_hash"
+    ],
+    "ImpactReport": [
+      "id",
+      "cr_ref",
+      "srs_ref",
+      "sad_ref",
+      "baseline_tdd_snapshot",
+      "entries",
+      "findings",
+      "status"
+    ],
+    "IntakeReport": [
+      "id",
+      "need_id",
+      "status",
+      "sources"
+    ],
+    "KnowledgeNeed": [
+      "id",
+      "profile_id",
+      "section_spec",
+      "slot",
+      "target_class",
+      "required"
+    ],
+    "LedgerInvariant": [
+      "id",
+      "currency",
+      "scale",
+      "invariants"
+    ],
+    "LoadProfile": [
+      "id",
+      "average",
+      "peak",
+      "payload",
+      "growth"
+    ],
+    "Measurement": [
+      "id",
+      "metric",
+      "value",
+      "stage",
+      "observed_at",
+      "source_ref"
+    ],
+    "Migration": [
+      "id",
+      "from_schema",
+      "to_schema",
+      "stages",
+      "backfill",
+      "lock",
+      "compatibility",
+      "rollback"
+    ],
+    "MigrationStage": [
+      "id",
+      "action",
+      "depends_on",
+      "preconditions",
+      "verification"
+    ],
+    "ObligationResolution": [
+      "id",
+      "obligation_id",
+      "design_refs",
+      "decision",
+      "verification_refs",
+      "status"
+    ],
+    "Ownership": [
+      "id",
+      "team",
+      "responsibilities",
+      "escalation"
+    ],
+    "PermissionDecision": [
+      "id",
+      "subject",
+      "resource",
+      "action",
+      "effect",
+      "evidence"
+    ],
+    "PromptEditRequest": [
+      "id",
+      "prompt_hash",
+      "target",
+      "base_snapshot",
+      "authorization"
+    ],
+    "Quantity": [
+      "id",
+      "value",
+      "unit",
+      "stage"
+    ],
+    "ReadinessReport": [
+      "id",
+      "run_id",
+      "outcomes",
+      "blockers",
+      "rule_coverage"
+    ],
+    "ReconciliationPolicy": [
+      "id",
+      "source",
+      "schedule",
+      "mismatch_handling"
+    ],
+    "RecoveryObjective": [
+      "id",
+      "rto",
+      "rpo",
+      "recovery_procedure"
+    ],
+    "RepoSnapshot": [
+      "id",
+      "repo",
+      "revision",
+      "content_hash"
+    ],
+    "RequirementDelta": [
+      "id",
+      "kind",
+      "rationale",
+      "change_request_id"
+    ],
+    "RequirementVersion": [
+      "id",
+      "logical_requirement_id",
+      "revision",
+      "statement",
+      "modality",
+      "acceptance",
+      "baseline_id"
+    ],
+    "RetryPolicy": [
+      "id",
+      "max_attempts",
+      "backoff",
+      "retryable_errors"
+    ],
+    "Saga": [
+      "id",
+      "steps",
+      "compensation"
+    ],
+    "SectionRef": [
+      "id",
+      "document_id",
+      "role",
+      "revision",
+      "content_hash",
+      "section_id"
+    ],
+    "SemanticResolution": [
+      "id",
+      "policy_version",
+      "policy_hash",
+      "roots",
+      "ids",
+      "boundary",
+      "unresolved",
+      "graph_snapshot",
+      "resolution_hash",
+      "status"
+    ],
+    "SrsDelta": [
+      "id",
+      "cr_id",
+      "before_revision",
+      "after_revision",
+      "sections"
+    ],
+    "TddSetRealization": [
+      "id",
+      "baseline_snapshot",
+      "actual_snapshot",
+      "mappings",
+      "status"
+    ],
+    "TestReceipt": [
+      "id",
+      "cs_id",
+      "criterion_refs",
+      "result",
+      "executed_at"
+    ],
+    "TimeoutBudget": [
+      "id",
+      "total",
+      "allocations"
+    ],
+    "Transaction": [
+      "id",
+      "boundary",
+      "isolation",
+      "consistency"
+    ]
+  },
+  "maturity_policy": {
+    "values": [
+      "sketch",
+      "specified",
+      "verified",
+      "baselined"
+    ],
+    "requirements": {
+      "sketch": [],
+      "specified": [
+        "origin",
+        "maturity",
+        "version_introduced",
+        "provenance"
+      ],
+      "verified": [
+        "origin",
+        "maturity",
+        "version_introduced",
+        "provenance",
+        "review_status"
+      ],
+      "baselined": [
+        "origin",
+        "maturity",
+        "version_introduced",
+        "provenance",
+        "review_status"
+      ]
+    }
+  },
+  "conditional_requirements": [
+    {
+      "id": "operation-write-contract",
+      "class": "Operation",
+      "when": {
+        "property": "method",
+        "in": [
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE"
+        ]
+      },
+      "required": [
+        "idempotency",
+        "concurrency"
+      ]
+    },
+    {
+      "id": "operation-transaction-contract",
+      "class": "Operation",
+      "when": {
+        "property": "transactional",
+        "equals": true
+      },
+      "required": [
+        "timeout",
+        "retry",
+        "failure_policy"
+      ]
+    },
+    {
+      "id": "measurement-source-contract",
+      "class": "Measurement",
+      "when": {
+        "property": "stage",
+        "in": [
+          "observed",
+          "measured"
+        ]
+      },
+      "required": [
+        "observed_at",
+        "source_ref"
+      ]
+    }
+  ],
+  "parity": {
+    "legacy_class_count": 88,
+    "canonical_class_count": 43,
+    "legacy_relation_count": 88,
+    "canonical_relation_count": 29,
+    "legacy_property_count": 253,
+    "canonical_property_count": 144,
+    "unmapped_legacy_classes": [
+      "AlertRule",
+      "Algorithm",
+      "Alternative",
+      "Artefact",
+      "Assumption",
+      "Attribute",
+      "Baseline",
+      "Block",
+      "Budget",
+      "BusinessRule",
+      "ChangeOp",
+      "ChangeRequest",
+      "ChangeSet",
+      "Component",
+      "Concern",
+      "Condition",
+      "ConfigItem",
+      "Constant",
+      "Constraint",
+      "Control",
+      "Credential",
+      "DataClass",
+      "DataStore",
+      "DbRole",
+      "Decision",
+      "DecisionRule",
+      "DecisionTable",
+      "Dependency",
+      "DeploymentUnit",
+      "Deviation",
+      "Document",
+      "DocumentTemplate",
+      "DocumentVersion",
+      "Element",
+      "Entity",
+      "Enumeration",
+      "Environment",
+      "ErrorCode",
+      "Event",
+      "ExternalSystem",
+      "Flow",
+      "Formula",
+      "Gate",
+      "Index",
+      "Interface",
+      "Job",
+      "Layer",
+      "LogSpec",
+      "Message",
+      "Metric",
+      "Milestone",
+      "Module",
+      "OpenIssue",
+      "Operation",
+      "Policy",
+      "PriorityLevel",
+      "QualityCharacteristic",
+      "QualityTarget",
+      "RateLimitProfile",
+      "Requirement",
+      "RetentionPolicy",
+      "Risk",
+      "Role",
+      "RoutePolicy",
+      "Scenario",
+      "Schema",
+      "Scope",
+      "Screen",
+      "Section",
+      "SectionSpec",
+      "Sequence",
+      "Slo",
+      "SourceBlock",
+      "Stakeholder",
+      "Standard",
+      "State",
+      "StateMachine",
+      "System",
+      "Term",
+      "TestCase",
+      "Threat",
+      "TraceSpec",
+      "Transition",
+      "Trigger",
+      "View",
+      "Waiver",
+      "WorkItem"
+    ],
+    "passthrough_legacy_relations": [
+      "accepts",
+      "affects",
+      "alerts_on",
+      "assumes",
+      "binds",
+      "blocked_by",
+      "budgeted_by",
+      "changes",
+      "chooses",
+      "cites",
+      "classified_as",
+      "configures",
+      "conflicts_with",
+      "conforms_to",
+      "constrained_by",
+      "consumes",
+      "decided_by",
+      "decides_by",
+      "deferred_to",
+      "depends_on",
+      "deployed_on",
+      "derived_from_version",
+      "derives_from",
+      "describes",
+      "deviates_from",
+      "emits",
+      "enforces",
+      "enumerates",
+      "exposes",
+      "gated_by",
+      "governed_by",
+      "guarded_by",
+      "has_attribute",
+      "has_block",
+      "has_condition",
+      "has_op",
+      "has_priority",
+      "has_rule",
+      "has_section_spec",
+      "has_state",
+      "implemented_by",
+      "in_machine",
+      "indexes",
+      "logs_with",
+      "may_fail_with",
+      "measured_by",
+      "mitigates",
+      "observed_by",
+      "owns",
+      "part_of",
+      "protects",
+      "protects_slo",
+      "provides",
+      "publishes",
+      "raises",
+      "reads",
+      "realized_in",
+      "realizes",
+      "realizes_request",
+      "references_entity",
+      "rejects",
+      "requires_role",
+      "requires_scope",
+      "resolves",
+      "retained_by",
+      "returns",
+      "routes_to",
+      "satisfies",
+      "scheduled_in",
+      "spec_of",
+      "stored_in",
+      "subscribes",
+      "supersedes",
+      "targets",
+      "threatens",
+      "traces_with",
+      "transition_from",
+      "transition_to",
+      "triggered_by",
+      "uses_algorithm",
+      "uses_constant",
+      "uses_credential",
+      "uses_formula",
+      "uses_term",
+      "validated_by",
+      "verified_by",
+      "waives",
+      "writes"
+    ],
+    "unmapped_legacy_properties": [
+      "actors",
+      "after",
+      "applied_at",
+      "approved",
+      "approved_by",
+      "artefact_kind",
+      "artifact",
+      "asset",
+      "auth",
+      "automation",
+      "base_version",
+      "basis",
+      "before",
+      "block_kind",
+      "by_phase",
+      "cascade",
+      "category",
+      "change_source",
+      "channel",
+      "characteristic",
+      "chosen",
+      "closed",
+      "code",
+      "columns",
+      "complexity",
+      "component_kind",
+      "concerns",
+      "condition",
+      "condition_kind",
+      "confidence",
+      "config_item",
+      "cons",
+      "constant_kind",
+      "constraint",
+      "constraint_kind",
+      "context",
+      "contract",
+      "contract_ref",
+      "control_kind",
+      "credential_kind",
+      "criteria",
+      "data_class",
+      "datatype",
+      "db_role",
+      "decided_at",
+      "decided_by",
+      "decided_on",
+      "decision_by",
+      "default",
+      "deferred_to",
+      "definition",
+      "definition_of_done",
+      "delivery",
+      "deterministic",
+      "doc",
+      "doc_type",
+      "due",
+      "edition",
+      "end_conditions",
+      "enforced_by",
+      "enforces_text",
+      "enum_ref",
+      "enum_values",
+      "env_var",
+      "estimate",
+      "expected",
+      "expires",
+      "expression",
+      "ext",
+      "extracted_by",
+      "fields",
+      "fillfactor",
+      "final",
+      "for",
+      "format",
+      "gap_allowed",
+      "gaps",
+      "grace",
+      "guard",
+      "handling",
+      "hit_policy",
+      "holds",
+      "http_status",
+      "idempotency_key",
+      "idempotent",
+      "identifier",
+      "impact",
+      "impact_if_false",
+      "initial_state",
+      "inputs",
+      "issue_kind",
+      "job_key",
+      "key_by",
+      "labels",
+      "legal_basis",
+      "level",
+      "license",
+      "lifetime",
+      "likelihood",
+      "limit",
+      "line",
+      "main_flow",
+      "materialized",
+      "maturity",
+      "max_body",
+      "meaning",
+      "members",
+      "method",
+      "metric_type",
+      "milestone",
+      "min_recall",
+      "mutable",
+      "nullable",
+      "number",
+      "objective",
+      "op",
+      "ordering_key",
+      "origin",
+      "outputs",
+      "owner_doc",
+      "owner_module",
+      "owner_role",
+      "package",
+      "parent_budget",
+      "partial",
+      "partition",
+      "path",
+      "period",
+      "pii",
+      "pii_policy",
+      "pk",
+      "precedence",
+      "principal_type",
+      "principals",
+      "priority",
+      "privileges",
+      "profile",
+      "propagation",
+      "proposed_default",
+      "pros",
+      "prose_only",
+      "protocol",
+      "queue",
+      "queue_priority",
+      "rate_limit",
+      "reason",
+      "released_at",
+      "render_mode",
+      "req_kind",
+      "request",
+      "requester",
+      "resolution",
+      "responsibility",
+      "result_unit",
+      "result_version",
+      "retry",
+      "retryable",
+      "reversible",
+      "review_status",
+      "reviewed_at",
+      "reviewed_by",
+      "revocation",
+      "roles",
+      "rotation",
+      "route",
+      "rule_form",
+      "rule_id",
+      "rule_kind",
+      "runtime_changeable",
+      "runtime_unit",
+      "sampling",
+      "scaling_unit",
+      "schema_ref",
+      "scope_status",
+      "secret",
+      "section",
+      "seq",
+      "severity",
+      "signed_by",
+      "sla_ref",
+      "slug",
+      "soft_delete",
+      "standard_ref",
+      "stateless",
+      "storage",
+      "store",
+      "style",
+      "subject_entity",
+      "summary",
+      "synonyms",
+      "table_name",
+      "tags",
+      "target_date",
+      "target_docs",
+      "tech",
+      "technology",
+      "template_version",
+      "terminal_states",
+      "text",
+      "text_hash",
+      "then",
+      "timeout",
+      "timing",
+      "title",
+      "tool",
+      "topic",
+      "treatment",
+      "trigger",
+      "trigger_kind",
+      "trust_level",
+      "type",
+      "unique",
+      "upstream",
+      "upstream_ref",
+      "validate_by",
+      "validation_plan",
+      "values",
+      "variables",
+      "version",
+      "version_introduced",
+      "version_removed",
+      "violation_error",
+      "when",
+      "window"
+    ]
+  },
+  "canonical_version": "0.6.0"
+}

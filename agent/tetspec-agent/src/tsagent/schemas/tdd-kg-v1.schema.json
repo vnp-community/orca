@@ -1,0 +1,58 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "tdd-kg/v1",
+ "title": "TDD KG package (ONTOLOGY-TDD section 8)",
+ "type": "object",
+ "required": ["format", "ontologyVersion", "feature", "package", "ontology", "nodes"],
+ "properties": {
+  "format": {"const": "tdd-kg/v1"},
+  "ontologyVersion": {"type": "string", "pattern": "^tdd-core-\\d+(\\+ext-\\d+)?$"},
+  "feature": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"},
+  "package": {
+   "type": "object",
+   "required": ["kind"],
+   "properties": {
+    "kind": {"enum": ["full", "slice"]},
+    "cr": {"type": ["string", "null"]},
+    "generatedAt": {"type": "string"},
+    "sourceHash": {"type": "string"}
+   }
+  },
+  "ontology": {
+   "type": "object",
+   "required": ["classes", "relations"],
+   "properties": {
+    "classes": {"type": "array", "items": {
+     "type": "object", "required": ["name"],
+     "properties": {"name": {"type": "string", "minLength": 1}, "parent": {"type": ["string", "null"]},
+                    "required": {"type": "array", "items": {"type": "string"}}, "attrs": {"type": "array", "items": {"type": "string"}},
+                    "doc": {"type": ["string", "null"]}}}},
+    "relations": {"type": "array", "items": {
+     "type": "object", "required": ["name", "domain", "range"],
+     "properties": {"name": {"type": "string", "minLength": 1}, "domain": {"type": "array", "items": {"type": "string"}},
+                    "range": {"type": "array", "items": {"type": "string"}}, "doc": {"type": ["string", "null"]}}}}
+   }
+  },
+  "nodes": {"type": "array", "minItems": 1, "items": {
+   "type": "object", "required": ["code", "class"],
+   "properties": {
+    "code": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "class": {"type": "string", "minLength": 1},
+    "label": {"type": "string"}, "version": {"type": ["string", "number"]},
+    "status": {"enum": ["Draft", "InReview", "Baselined", "Superseded"]},
+    "sourceDoc": {"type": "string"}, "sourceSection": {"type": "string"}, "owner": {"type": ["string", "null"]},
+    "description": {"type": "string"}, "note": {"type": "string"},
+    "testScope": {"enum": ["context"]}, "primary": {"type": "boolean"},
+    "props": {"type": "object"}
+   }
+  }},
+  "edges": {"type": "array", "items": {
+   "type": "array", "minItems": 3, "maxItems": 4,
+   "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "string"}, {"type": "object"}]
+  }},
+  "supersede": {"type": "array", "items": {
+   "type": "object", "required": ["old", "new"],
+   "properties": {"old": {"type": "string"}, "new": {"type": "string"}}
+  }}
+ }
+}

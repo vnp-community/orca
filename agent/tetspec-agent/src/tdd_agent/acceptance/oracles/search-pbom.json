@@ -1,0 +1,647 @@
+{
+ "name": "search-pbom",
+ "description": "Known-item queries over the PBOM knowledge graph: each query is four consecutive words taken from the middle of an SRS requirement sentence, the expected element is that requirement. Written from the documents, never from the output of search.",
+ "kg": "tests: store.contract.pbom_graph (earlier pilot run of data/test-pbom)",
+ "queries": [
+  {
+   "id": "Q-FR-KB-08",
+   "query": "phiên bản Connector chỉ",
+   "expected": [
+    "FR-KB-08"
+   ],
+   "derived_from": "SRS statement of FR-KB-08: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-ADM-01",
+   "query": "IdP sang vai trò",
+   "expected": [
+    "FR-ADM-01"
+   ],
+   "derived_from": "SRS statement of FR-ADM-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-ADM-02",
+   "query": "trò Viewer Contributor Owner",
+   "expected": [
+    "FR-ADM-02"
+   ],
+   "derived_from": "SRS statement of FR-ADM-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-ADM-03",
+   "query": "API token theo với",
+   "expected": [
+    "FR-ADM-03"
+   ],
+   "derived_from": "SRS statement of FR-ADM-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-ADM-04",
+   "query": "license asset rule retention",
+   "expected": [
+    "FR-ADM-04"
+   ],
+   "derived_from": "SRS statement of FR-ADM-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-INV-01",
+   "query": "Project Environment Service gán",
+   "expected": [
+    "FR-INV-01"
+   ],
+   "derived_from": "SRS statement of FR-INV-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-INV-02",
+   "query": "hoặc SPDX JSON kèm",
+   "expected": [
+    "FR-INV-02"
+   ],
+   "derived_from": "SRS statement of FR-INV-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-INV-03",
+   "query": "login whoami Phụ lục",
+   "expected": [
+    "FR-INV-03"
+   ],
+   "derived_from": "SRS statement of FR-INV-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-INV-04",
+   "query": "nhận lại mỗi ngày",
+   "expected": [
+    "FR-INV-04"
+   ],
+   "derived_from": "SRS statement of FR-INV-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-INV-05",
+   "query": "snapshot hiển thị đường",
+   "expected": [
+    "FR-INV-05"
+   ],
+   "derived_from": "SRS statement of FR-INV-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-INV-06",
+   "query": "distributed third party network",
+   "expected": [
+    "FR-INV-06"
+   ],
+   "derived_from": "SRS statement of FR-INV-06: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-INV-07",
+   "query": "snapshot thêm bớt đổi",
+   "expected": [
+    "FR-INV-07"
+   ],
+   "derived_from": "SRS statement of FR-INV-07: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-INV-08",
+   "query": "loạt Usage Excel hoặc",
+   "expected": [
+    "FR-INV-08"
+   ],
+   "derived_from": "SRS statement of FR-INV-08: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-KB-01",
+   "query": "dần OSV GitHub Advisory",
+   "expected": [
+    "FR-KB-01"
+   ],
+   "derived_from": "SRS statement of FR-KB-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-KB-02",
+   "query": "CPE mỗi giờ CISA",
+   "expected": [
+    "FR-KB-02"
+   ],
+   "derived_from": "SRS statement of FR-KB-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-KB-03",
+   "query": "date hằng ngày cho",
+   "expected": [
+    "FR-KB-03"
+   ],
+   "derived_from": "SRS statement of FR-KB-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-KB-04",
+   "query": "repo release gần nhất",
+   "expected": [
+    "FR-KB-04"
+   ],
+   "derived_from": "SRS statement of FR-KB-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-KB-05",
+   "query": "URL theo Component mục",
+   "expected": [
+    "FR-KB-05"
+   ],
+   "derived_from": "SRS statement of FR-KB-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-KB-06",
+   "query": "nhất alias CVE GHSA",
+   "expected": [
+    "FR-KB-06"
+   ],
+   "derived_from": "SRS statement of FR-KB-06: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-KB-07",
+   "query": "cảnh báo SEC khi",
+   "expected": [
+    "FR-KB-07"
+   ],
+   "derived_from": "SRS statement of FR-KB-07: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-KB-08",
+   "query": "tắt phiên bản Connector",
+   "expected": [
+    "FR-KB-08"
+   ],
+   "derived_from": "SRS statement of FR-KB-08: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-VUL-01",
+   "query": "hoặc cập nhật Finding",
+   "expected": [
+    "FR-VUL-01"
+   ],
+   "derived_from": "SRS statement of FR-VUL-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-VUL-02",
+   "query": "môi trường network exposed",
+   "expected": [
+    "FR-VUL-02"
+   ],
+   "derived_from": "SRS statement of FR-VUL-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-VUL-03",
+   "query": "profile Critical giờ High",
+   "expected": [
+    "FR-VUL-03"
+   ],
+   "derived_from": "SRS statement of FR-VUL-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-VUL-04",
+   "query": "Affected hoặc Fixed hoặc",
+   "expected": [
+    "FR-VUL-04"
+   ],
+   "derived_from": "SRS statement of FR-VUL-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-VUL-05",
+   "query": "affected theo vulnerability component",
+   "expected": [
+    "FR-VUL-05"
+   ],
+   "derived_from": "SRS statement of FR-VUL-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-VUL-06",
+   "query": "gần nhất loại nâng",
+   "expected": [
+    "FR-VUL-06"
+   ],
+   "derived_from": "SRS statement of FR-VUL-06: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-VUL-07",
+   "query": "không còn phiên bản",
+   "expected": [
+    "FR-VUL-07"
+   ],
+   "derived_from": "SRS statement of FR-VUL-07: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LCM-01",
+   "query": "line ngày EOL EOS",
+   "expected": [
+    "FR-LCM-01"
+   ],
+   "derived_from": "SRS statement of FR-LCM-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LCM-02",
+   "query": "EOL tại hằng tuần",
+   "expected": [
+    "FR-LCM-02"
+   ],
+   "derived_from": "SRS statement of FR-LCM-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LCM-03",
+   "query": "báo EOL tay trong",
+   "expected": [
+    "FR-LCM-03"
+   ],
+   "derived_from": "SRS statement of FR-LCM-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LCM-04",
+   "query": "cảnh báo khi không",
+   "expected": [
+    "FR-LCM-04"
+   ],
+   "derived_from": "SRS statement of FR-LCM-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LCM-05",
+   "query": "rule cấu hình theo",
+   "expected": [
+    "FR-LCM-05"
+   ],
+   "derived_from": "SRS statement of FR-LCM-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LCM-06",
+   "query": "phần hoặc phiên bản",
+   "expected": [
+    "FR-LCM-06"
+   ],
+   "derived_from": "SRS statement of FR-LCM-06: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LIC-01",
+   "query": "chọn phương hạn chế",
+   "expected": [
+    "FR-LIC-01"
+   ],
+   "derived_from": "SRS statement of FR-LIC-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LIC-02",
+   "query": "trận nhóm license hình",
+   "expected": [
+    "FR-LIC-02"
+   ],
+   "derived_from": "SRS statement of FR-LIC-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LIC-03",
+   "query": "bản cảnh báo SEC",
+   "expected": [
+    "FR-LIC-03"
+   ],
+   "derived_from": "SRS statement of FR-LIC-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LIC-04",
+   "query": "khoản theo phiên bản",
+   "expected": [
+    "FR-LIC-04"
+   ],
+   "derived_from": "SRS statement of FR-LIC-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-LIC-05",
+   "query": "báo cáo license NOTICE",
+   "expected": [
+    "FR-LIC-05"
+   ],
+   "derived_from": "SRS statement of FR-LIC-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CAT-01",
+   "query": "ngữ framework CSDL cache",
+   "expected": [
+    "FR-CAT-01"
+   ],
+   "derived_from": "SRS statement of FR-CAT-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CAT-02",
+   "query": "Adopt Trial Hold Banned",
+   "expected": [
+    "FR-CAT-02"
+   ],
+   "derived_from": "SRS statement of FR-CAT-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CAT-03",
+   "query": "từng line health score",
+   "expected": [
+    "FR-CAT-03"
+   ],
+   "derived_from": "SRS statement of FR-CAT-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CAT-04",
+   "query": "phiên bản tối thiểu",
+   "expected": [
+    "FR-CAT-04"
+   ],
+   "derived_from": "SRS statement of FR-CAT-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CAT-05",
+   "query": "bản tối thiểu qua",
+   "expected": [
+    "FR-CAT-05"
+   ],
+   "derived_from": "SRS statement of FR-CAT-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CAT-06",
+   "query": "review mặc định ngày",
+   "expected": [
+    "FR-CAT-06"
+   ],
+   "derived_from": "SRS statement of FR-CAT-06: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CAT-07",
+   "query": "version pin baseline JSON",
+   "expected": [
+    "FR-CAT-07"
+   ],
+   "derived_from": "SRS statement of FR-CAT-07: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CAT-08",
+   "query": "lưu Comparison sheet gắn",
+   "expected": [
+    "FR-CAT-08"
+   ],
+   "derived_from": "SRS statement of FR-CAT-08: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-SEL-01",
+   "query": "cho mới theo hình",
+   "expected": [
+    "FR-SEL-01"
+   ],
+   "derived_from": "SRS statement of FR-SEL-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-SEL-04",
+   "query": "Stack Review Report DOCX",
+   "expected": [
+    "FR-SEL-04"
+   ],
+   "derived_from": "SRS statement of FR-SEL-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-SEL-05",
+   "query": "Change Request production chỉ",
+   "expected": [
+    "FR-SEL-05"
+   ],
+   "derived_from": "SRS statement of FR-SEL-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-SEL-06",
+   "query": "thành Usage planned giám",
+   "expected": [
+    "FR-SEL-06"
+   ],
+   "derived_from": "SRS statement of FR-SEL-06: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-GOV-01",
+   "query": "acceptance License exception Catalog",
+   "expected": [
+    "FR-GOV-01"
+   ],
+   "derived_from": "SRS statement of FR-GOV-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-GOV-02",
+   "query": "phạm khi Decision hết",
+   "expected": [
+    "FR-GOV-02"
+   ],
+   "derived_from": "SRS statement of FR-GOV-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-GOV-03",
+   "query": "thêm cho mọi thay",
+   "expected": [
+    "FR-GOV-03"
+   ],
+   "derived_from": "SRS statement of FR-GOV-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-GOV-04",
+   "query": "webhook Teams Slack Telegram",
+   "expected": [
+    "FR-GOV-04"
+   ],
+   "derived_from": "SRS statement of FR-GOV-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-GOV-05",
+   "query": "SLA chuyển cấp tới",
+   "expected": [
+    "FR-GOV-05"
+   ],
+   "derived_from": "SRS statement of FR-GOV-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-GOV-06",
+   "query": "hằng tháng PDF XLSX",
+   "expected": [
+    "FR-GOV-06"
+   ],
+   "derived_from": "SRS statement of FR-GOV-06: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-GOV-07",
+   "query": "thủ khách hàng SBOM",
+   "expected": [
+    "FR-GOV-07"
+   ],
+   "derived_from": "SRS statement of FR-GOV-07: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CI-01",
+   "query": "kèm submit trả pass",
+   "expected": [
+    "FR-CI-01"
+   ],
+   "derived_from": "SRS statement of FR-CI-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CI-02",
+   "query": "fail warn mặc định",
+   "expected": [
+    "FR-CI-02"
+   ],
+   "derived_from": "SRS statement of FR-CI-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CI-03",
+   "query": "hình rule theo ghi",
+   "expected": [
+    "FR-CI-03"
+   ],
+   "derived_from": "SRS statement of FR-CI-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-CI-05",
+   "query": "Trivy Grype OSV Scanner",
+   "expected": [
+    "FR-CI-05"
+   ],
+   "derived_from": "SRS statement of FR-CI-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-UI-01",
+   "query": "Finding SLA top rủi",
+   "expected": [
+    "FR-UI-01"
+   ],
+   "derived_from": "SRS statement of FR-UI-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-UI-02",
+   "query": "với tab Stack Findings",
+   "expected": [
+    "FR-UI-02"
+   ],
+   "derived_from": "SRS statement of FR-UI-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-UI-03",
+   "query": "theo phiên bản EOL",
+   "expected": [
+    "FR-UI-03"
+   ],
+   "derived_from": "SRS statement of FR-UI-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-UI-04",
+   "query": "Finding được giao hạn",
+   "expected": [
+    "FR-UI-04"
+   ],
+   "derived_from": "SRS statement of FR-UI-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-UI-06",
+   "query": "radius search đang dùng",
+   "expected": [
+    "FR-UI-06"
+   ],
+   "derived_from": "SRS statement of FR-UI-06: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-UI-07",
+   "query": "theo loại nguồn license",
+   "expected": [
+    "FR-UI-07"
+   ],
+   "derived_from": "SRS statement of FR-UI-07: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-UI-08",
+   "query": "cho PROC SEC kho",
+   "expected": [
+    "FR-UI-08"
+   ],
+   "derived_from": "SRS statement of FR-UI-08: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-UI-09",
+   "query": "đọc đường dẫn file",
+   "expected": [
+    "FR-UI-09"
+   ],
+   "derived_from": "SRS statement of FR-UI-09: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-UI-10",
+   "query": "tìm lọc trợ tiếng",
+   "expected": [
+    "FR-UI-10"
+   ],
+   "derived_from": "SRS statement of FR-UI-10: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-AST-01",
+   "query": "thư mục build qua",
+   "expected": [
+    "FR-AST-01"
+   ],
+   "derived_from": "SRS statement of FR-AST-01: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-AST-02",
+   "query": "gián tiếp CSS link",
+   "expected": [
+    "FR-AST-02"
+   ],
+   "derived_from": "SRS statement of FR-AST-02: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-AST-03",
+   "query": "đọc metadata font bảng",
+   "expected": [
+    "FR-AST-03"
+   ],
+   "derived_from": "SRS statement of FR-AST-03: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-AST-04",
+   "query": "license font nameID không",
+   "expected": [
+    "FR-AST-04"
+   ],
+   "derived_from": "SRS statement of FR-AST-04: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-AST-05",
+   "query": "metadata ảnh XMP IPTC",
+   "expected": [
+    "FR-AST-05"
+   ],
+   "derived_from": "SRS statement of FR-AST-05: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-AST-06",
+   "query": "stock marketplace theo tên",
+   "expected": [
+    "FR-AST-06"
+   ],
+   "derived_from": "SRS statement of FR-AST-06: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-AST-07",
+   "query": "tài sản không quét",
+   "expected": [
+    "FR-AST-07"
+   ],
+   "derived_from": "SRS statement of FR-AST-07: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-AST-08",
+   "query": "theo SHA gộp biến",
+   "expected": [
+    "FR-AST-08"
+   ],
+   "derived_from": "SRS statement of FR-AST-08: four consecutive words from the middle of the sentence"
+  },
+  {
+   "id": "Q-FR-AST-09",
+   "query": "Figma REST API đọc",
+   "expected": [
+    "FR-AST-09"
+   ],
+   "derived_from": "SRS statement of FR-AST-09: four consecutive words from the middle of the sentence"
+  }
+ ]
+}

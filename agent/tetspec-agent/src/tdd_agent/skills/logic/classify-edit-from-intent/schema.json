@@ -1,0 +1,36 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "intent"
+    ],
+    "properties": {
+      "intent": {
+        "type": "object"
+      },
+      "upstream": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "kind",
+      "reasons"
+    ],
+    "properties": {
+      "kind": {
+        "enum": [
+          "presentation",
+          "semantic",
+          "clarification",
+          "conflict"
+        ]
+      },
+      "reasons": {
+        "type": "array"
+      }
+    }
+  }
+}

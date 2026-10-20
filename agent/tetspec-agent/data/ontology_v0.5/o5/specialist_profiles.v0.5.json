@@ -1,0 +1,11 @@
+{
+  "version": "0.5.0",
+  "packages": [
+    {"id": "behavior", "version": "1", "rules": ["FSM-COVERAGE", "DECISION-COVERAGE"], "supported_classes": ["Flow", "StateMachine", "Decision", "Algorithm", "BusinessRule"]},
+    {"id": "integration", "version": "1", "rules": ["CONTRACT-COMPATIBILITY", "FAILURE-POLICY"], "supported_classes": ["Interface", "Operation", "Event", "ExternalSystem", "FailurePolicy"]},
+    {"id": "transaction", "version": "1", "rules": ["TRANSACTION-BOUNDARY", "RETRY-DEADLINE", "IDEMPOTENCY"], "supported_classes": ["Transaction", "Saga", "RetryPolicy", "TimeoutBudget", "IdempotencyPolicy", "ConsistencyModel"]},
+    {"id": "data", "version": "1", "rules": ["SCHEMA-MIGRATION", "RETENTION-INTEGRITY"], "supported_classes": ["Entity", "Attribute", "Migration", "DataStore", "RetentionPolicy"]},
+    {"id": "operations", "version": "1", "rules": ["LOAD-CAPACITY", "HA-RECOVERY"], "supported_classes": ["LoadProfile", "CapacityModel", "HighAvailabilityTopology", "RecoveryObjective", "QualityTarget", "Metric"]},
+    {"id": "security", "version": "1", "rules": ["THREAT-CONTROL", "AUTHZ-COVERAGE"], "supported_classes": ["Threat", "Control", "Credential", "Role", "Scope", "AuditTrail"]}
+  ]
+}

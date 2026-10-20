@@ -1,0 +1,9 @@
+id = "detect-sad-conflict"
+version = "1"
+agent = "impact"
+tier = "hybrid"
+description = "Flag SRS changes that contradict the read-only SAD: rule checks compare rejected alternatives and numeric limits; the model may only raise suspected conflicts about prose constraints, each tied to an exact SAD quotation. Findings are never removed by the model."
+role = "critic"
+reason = "Architecture constraints are often stated in prose; deciding whether a requirement violates them needs reading comprehension."
+demotion = "When a prose constraint recurs, record it as a typed Constraint (technology/limit) in the SAD KG so the rule path covers it; track false positives to tune the prompt."
+verifiers = ["sad-quote-exact", "sad-element-exists", "change-exists", "findings-only-added"]

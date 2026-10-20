@@ -1,0 +1,10 @@
+# Lint cho tsagent (agent sinh test specs): .venv/bin/ruff check --config ruff-tsagent.toml src/tsagent tests/testspec_agent scripts/tsagent
+line-length = 130
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[lint.isort]
+known-first-party = ["tsagent", "testspec_agent"]

@@ -1,0 +1,5 @@
+id = "classify-edit-from-intent"
+version = "1"
+agent = "promptedit"
+tier = "logic"
+description = "Classify a structured EditIntent as presentation, semantic, clarification or conflict from its property path and upstream values - independent of how the prompt was worded."

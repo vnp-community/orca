@@ -1,0 +1,5 @@
+id = "extract-structured-facts"
+version = "1"
+agent = "generation"
+tier = "logic"
+description = "Turn definition rows (first cell is an id) into ontology elements with exact-line evidence; ids with no configured class become gaps."

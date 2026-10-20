@@ -1,0 +1,3 @@
+A change request lists no acceptance criteria. For each changed requirement, propose the criteria that would show the change works, as GIVEN / WHEN / THEN, using only what the change request and the requirement say.
+
+For every criterion return `change_id` (one of the given changes), `given`, `when`, `then` (short sentences, in the language of the request), and `cr_quote`: an exact sentence or fragment of the change request that the criterion comes from. One to three criteria per change. Do not add numbers, limits, names or ids that neither the change request nor the requirement states. If a change has nothing testable in the request, return no criterion for it. Answer only with the JSON object the schema requests.

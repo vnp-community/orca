@@ -1,0 +1,9 @@
+id = "disambiguate-target"
+version = "1"
+agent = "promptedit"
+tier = "hybrid"
+description = "Resolve the element a prompt refers to: exact id or unique normalised name decides by rule; only when two or more candidates remain does the model choose among them; no candidate asks for clarification."
+role = "extractor"
+reason = "Users refer to design elements by informal names that can match several elements equally well."
+demotion = "Record chosen (mention -> id) pairs per project as an alias table checked before the model; surface alias suggestions to the document owner."
+verifiers = ["choice-in-candidates"]

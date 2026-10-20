@@ -1,0 +1,20 @@
+{
+  "input": {
+    "type": "object",
+    "required": ["instruction", "section", "current"],
+    "properties": {
+      "instruction": {"type": "string"},
+      "section": {"type": "object"},
+      "current": {"type": "string"}
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": ["mode", "markdown", "summary"],
+    "properties": {
+      "mode": {"enum": ["replace", "append"]},
+      "markdown": {"type": "string"},
+      "summary": {"type": "string"}
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "version": "0.5.0",
+  "canonical_version": "0.6.0",
+  "profiles": {
+    "tdd-generation": {
+      "artifact_types": [
+        "TDD"
+      ],
+      "mandatory_needs": [
+        "purpose",
+        "scope",
+        "requirements",
+        "contracts",
+        "data",
+        "behavior",
+        "decisions",
+        "quality",
+        "work",
+        "validation",
+        "provenance"
+      ],
+      "rules": [
+        "QG-01",
+        "QG-02",
+        "QG-03",
+        "QG-04",
+        "QG-05",
+        "QG-06",
+        "QG-07",
+        "QG-08",
+        "QG-09",
+        "QG-10"
+      ]
+    },
+    "spec-change-generation": {
+      "artifact_types": [
+        "proposal.md",
+        "design.md",
+        "tasks.md",
+        "spec.md"
+      ],
+      "mandatory_needs": [
+        "intent",
+        "baseline",
+        "delta",
+        "scenarios",
+        "design",
+        "impact",
+        "work",
+        "validation",
+        "repo_context",
+        "provenance"
+      ],
+      "rules": [
+        "QG-01",
+        "QG-02",
+        "QG-03",
+        "QG-04",
+        "QG-05",
+        "QG-06",
+        "QG-07",
+        "QG-08",
+        "QG-09",
+        "QG-10",
+        "TS-01",
+        "TS-02",
+        "TS-03",
+        "TS-04",
+        "TS-05",
+        "TS-06",
+        "TS-07",
+        "TS-08",
+        "TS-09",
+        "TS-10"
+      ]
+    },
+    "prompt-tdd-edit": {
+      "artifact_types": [
+        "TDD"
+      ],
+      "mandatory_needs": [
+        "prompt",
+        "target",
+        "base_snapshot",
+        "authorization",
+        "impact",
+        "validation",
+        "provenance"
+      ],
+      "rules": [
+        "QG-01",
+        "QG-02",
+        "QG-03",
+        "QG-04",
+        "QG-05",
+        "QG-06",
+        "QG-07",
+        "QG-08",
+        "QG-09",
+        "QG-10"
+      ]
+    }
+  }
+}

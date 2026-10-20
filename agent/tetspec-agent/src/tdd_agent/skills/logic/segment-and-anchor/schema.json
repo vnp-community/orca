@@ -1,0 +1,61 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "source_id",
+      "revision",
+      "role",
+      "text"
+    ],
+    "properties": {
+      "source_id": {
+        "type": "string"
+      },
+      "revision": {
+        "type": [
+          "string",
+          "number"
+        ]
+      },
+      "role": {
+        "type": "string"
+      },
+      "text": {
+        "type": "string"
+      },
+      "id_class_map": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "source_id",
+      "revision",
+      "role",
+      "source_hash",
+      "blocks"
+    ],
+    "properties": {
+      "source_id": {
+        "type": "string"
+      },
+      "revision": {
+        "type": "string"
+      },
+      "role": {
+        "type": "string"
+      },
+      "source_hash": {
+        "type": "string"
+      },
+      "blocks": {
+        "type": "array"
+      },
+      "counts": {
+        "type": "object"
+      }
+    }
+  }
+}

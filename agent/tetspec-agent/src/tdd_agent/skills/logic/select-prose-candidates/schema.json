@@ -1,0 +1,30 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "text"
+    ],
+    "properties": {
+      "text": {
+        "type": "string"
+      },
+      "covered_lines": {
+        "type": "array",
+        "items": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "spans"
+    ],
+    "properties": {
+      "spans": {
+        "type": "array"
+      }
+    }
+  }
+}

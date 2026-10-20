@@ -1,0 +1,1091 @@
+version: 0.4.0
+deprecated:
+  tests:
+  - verified_by
+  - flip
+  applies_to:
+  - constrained_by
+  - flip
+  configures_legacy:
+  - configures
+  - same
+relations:
+  part_of:
+    domain:
+    - Section
+    - Component
+    - Module
+    - Attribute
+    - Index
+    - State
+    - Transition
+    - Entity
+    - Enumeration
+    - DecisionRule
+    - Condition
+    range:
+    - Section
+    - Document
+    - Module
+    - System
+    - Entity
+    - StateMachine
+    - Component
+    - DecisionTable
+    - Operation
+    - Layer
+    - Algorithm
+    inverse: has_part
+    cardinality: n-1
+    characteristics:
+    - acyclic
+    desc: Thành phần thuộc cái chứa nó
+    attrs: []
+  describes:
+    domain:
+    - Section
+    range: ANY
+    inverse: described_in
+    cardinality: n-n
+    characteristics: []
+    desc: Mục mô tả phần tử
+    attrs: []
+  owns:
+    domain:
+    - Document
+    range: ANY
+    inverse: owned_by
+    cardinality: 1-n
+    characteristics: []
+    desc: Tài liệu sở hữu duy nhất một phần tử
+    attrs: []
+  depends_on:
+    domain:
+    - Module
+    - Component
+    - WorkItem
+    - Document
+    - Milestone
+    - Job
+    range:
+    - Module
+    - Component
+    - WorkItem
+    - Document
+    - Dependency
+    - ExternalSystem
+    - Milestone
+    - Job
+    - Algorithm
+    inverse: required_by
+    cardinality: n-n
+    characteristics:
+    - acyclic_for:Module,WorkItem
+    desc: Phụ thuộc
+    attrs:
+    - kind (runtime, build, data, event)
+    - mode (read, write, call)
+  deployed_on:
+    domain:
+    - DeploymentUnit
+    - Component
+    - Module
+    range:
+    - Environment
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Chạy trên môi trường
+    attrs: []
+  realized_in:
+    domain:
+    - Interface
+    - Entity
+    - Operation
+    - Message
+    range:
+    - Artefact
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Hiện thực bằng tệp liên kết (OpenAPI, DDL)
+    attrs: []
+  supersedes:
+    domain: ANY
+    range: ANY
+    inverse: superseded_by
+    cardinality: 1-1
+    characteristics:
+    - acyclic
+    desc: Phiên bản kế
+    attrs: []
+  conflicts_with:
+    domain: ANY
+    range: ANY
+    inverse: null
+    cardinality: n-n
+    characteristics:
+    - symmetric
+    desc: Mâu thuẫn do công cụ hoặc người ghi
+    attrs: []
+  derives_from:
+    domain: ANY
+    range:
+    - Requirement
+    - Decision
+    - QualityTarget
+    - BusinessRule
+    - Scenario
+    - Constraint
+    - Milestone
+    - Standard
+    inverse: derived_into
+    cardinality: n-n
+    characteristics: []
+    desc: Xuất phát từ
+    attrs: []
+  satisfies:
+    domain:
+    - Module
+    - Component
+    - Job
+    - Algorithm
+    - Formula
+    - DecisionTable
+    - Interface
+    - Operation
+    - Message
+    - Event
+    - Entity
+    - DataStore
+    - Flow
+    - StateMachine
+    - Transition
+    - Control
+    - Policy
+    - Screen
+    - Trigger
+    - Decision
+    - ConfigItem
+    - WorkItem
+    range:
+    - Requirement
+    - QualityTarget
+    - BusinessRule
+    - Scenario
+    - Milestone
+    - Constraint
+    inverse: satisfied_by
+    cardinality: n-n
+    characteristics: []
+    desc: Đáp ứng yêu cầu
+    attrs: []
+  verified_by:
+    domain: ANY
+    range:
+    - TestCase
+    inverse: verifies
+    cardinality: n-n
+    characteristics: []
+    desc: Được kiểm bởi ca kiểm thử; thay cho quan hệ `tests` của v0.2
+    attrs: []
+  implemented_by:
+    domain:
+    - Component
+    - Operation
+    - Entity
+    - Module
+    - Job
+    - Control
+    - StateMachine
+    - Flow
+    - Algorithm
+    - Interface
+    - Event
+    - Policy
+    range:
+    - WorkItem
+    inverse: implements
+    cardinality: n-n
+    characteristics: []
+    desc: Được cài đặt bởi đầu việc
+    attrs: []
+  scheduled_in:
+    domain:
+    - WorkItem
+    range:
+    - Milestone
+    inverse: schedules
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  gated_by:
+    domain:
+    - Milestone
+    - WorkItem
+    range:
+    - Gate
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  has_priority:
+    domain: ANY
+    range:
+    - PriorityLevel
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: Ưu tiên
+    attrs: []
+  deferred_to:
+    domain: ANY
+    range:
+    - Milestone
+    - PriorityLevel
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: Hoãn tới mốc hoặc mức ưu tiên
+    attrs: []
+  cites:
+    domain: ANY
+    range:
+    - Standard
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Viện dẫn chuẩn
+    attrs: []
+  uses_term:
+    domain: ANY
+    range:
+    - Term
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  provides:
+    domain:
+    - Component
+    - Module
+    range:
+    - Interface
+    - Operation
+    inverse: provided_by
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  consumes:
+    domain:
+    - Component
+    - Module
+    - Job
+    - Operation
+    range:
+    - Interface
+    - Event
+    - Operation
+    - ExternalSystem
+    inverse: consumed_by
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  exposes:
+    domain:
+    - Interface
+    - Component
+    range:
+    - Operation
+    inverse: exposed_by
+    cardinality: 1-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  accepts:
+    domain:
+    - Operation
+    range:
+    - Message
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  returns:
+    domain:
+    - Operation
+    range:
+    - Message
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  may_fail_with:
+    domain:
+    - Operation
+    - Component
+    - Job
+    - Interface
+    - RoutePolicy
+    range:
+    - ErrorCode
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Có thể trả lỗi
+    attrs:
+    - when (điều kiện phát sinh)
+  raises:
+    domain:
+    - Component
+    - Job
+    - Transition
+    - Algorithm
+    range:
+    - ErrorCode
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  requires_scope:
+    domain:
+    - Operation
+    - RoutePolicy
+    range:
+    - Scope
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  requires_role:
+    domain:
+    - Operation
+    - Screen
+    - Transition
+    range:
+    - Role
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  publishes:
+    domain:
+    - Component
+    - Module
+    - Job
+    - Operation
+    range:
+    - Event
+    inverse: published_by
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  subscribes:
+    domain:
+    - Component
+    - Module
+    - Job
+    range:
+    - Event
+    inverse: subscribed_by
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  emits:
+    domain:
+    - Transition
+    - Operation
+    - Job
+    range:
+    - Event
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  governed_by:
+    domain:
+    - Operation
+    - Interface
+    - Entity
+    - Component
+    - Job
+    range:
+    - Policy
+    - RoutePolicy
+    - RateLimitProfile
+    - RetentionPolicy
+    inverse: governs
+    cardinality: n-n
+    characteristics: []
+    desc: Chịu chính sách
+    attrs: []
+  routes_to:
+    domain:
+    - RoutePolicy
+    range:
+    - Operation
+    - Interface
+    - Component
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  uses_credential:
+    domain:
+    - Component
+    - Operation
+    - Job
+    - Interface
+    range:
+    - Credential
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  has_attribute:
+    domain:
+    - Entity
+    - Message
+    - View
+    range:
+    - Attribute
+    inverse: attribute_of
+    cardinality: 1-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  references_entity:
+    domain:
+    - Attribute
+    - Entity
+    range:
+    - Entity
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Khoá ngoại hoặc tham chiếu
+    attrs: []
+  realizes:
+    domain:
+    - Entity
+    range:
+    - Entity
+    inverse: realized_by
+    cardinality: n-n
+    characteristics: []
+    desc: Bảng vật lý hiện thực thực thể nghiệp vụ
+    attrs: []
+  indexes:
+    domain:
+    - Index
+    range:
+    - Entity
+    inverse: indexed_by
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  stored_in:
+    domain:
+    - Entity
+    - Index
+    - View
+    - Sequence
+    range:
+    - DataStore
+    - Schema
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  reads:
+    domain:
+    - Component
+    - Module
+    - Operation
+    - Job
+    - Algorithm
+    - Flow
+    range:
+    - Entity
+    - DataStore
+    - View
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Đọc dữ liệu
+    attrs:
+    - mode
+  writes:
+    domain:
+    - Component
+    - Module
+    - Operation
+    - Job
+    - Algorithm
+    - Flow
+    - Trigger
+    - Migration
+    range:
+    - Entity
+    - DataStore
+    - Sequence
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Ghi dữ liệu
+    attrs: []
+  retained_by:
+    domain:
+    - Entity
+    - DataStore
+    - Attribute
+    range:
+    - RetentionPolicy
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  classified_as:
+    domain:
+    - Entity
+    - Attribute
+    - Message
+    - Credential
+    range:
+    - DataClass
+    - DataClassVocab
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  enumerates:
+    domain:
+    - Attribute
+    - DecisionTable
+    - Message
+    range:
+    - Enumeration
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  has_state:
+    domain:
+    - StateMachine
+    range:
+    - State
+    inverse: null
+    cardinality: 1-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  in_machine:
+    domain:
+    - Transition
+    range:
+    - StateMachine
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  transition_from:
+    domain:
+    - Transition
+    range:
+    - State
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  transition_to:
+    domain:
+    - Transition
+    range:
+    - State
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  triggered_by:
+    domain:
+    - Transition
+    - Job
+    - Flow
+    range:
+    - Event
+    - Operation
+    - Job
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  guarded_by:
+    domain:
+    - Transition
+    - Operation
+    range:
+    - Condition
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  has_condition:
+    domain: ANY
+    range:
+    - Condition
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Điều kiện tiên quyết, hậu điều kiện hoặc bất biến
+    attrs: []
+  uses_formula:
+    domain:
+    - Algorithm
+    - DecisionRule
+    - Component
+    - Job
+    range:
+    - Formula
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  uses_constant:
+    domain: ANY
+    range:
+    - Constant
+    inverse: constant_of
+    cardinality: n-n
+    characteristics: []
+    desc: Dùng hằng số thay vì ghi trị số
+    attrs: []
+  decides_by:
+    domain:
+    - BusinessRule
+    - Algorithm
+    - Operation
+    - Job
+    range:
+    - DecisionTable
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  has_rule:
+    domain:
+    - DecisionTable
+    range:
+    - DecisionRule
+    inverse: null
+    cardinality: 1-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  enforces:
+    domain:
+    - Component
+    - Control
+    - Trigger
+    - Operation
+    - Job
+    - Index
+    - Attribute
+    - Entity
+    range:
+    - BusinessRule
+    - Constraint
+    - Condition
+    inverse: enforced_by
+    cardinality: n-n
+    characteristics: []
+    desc: Thi hành quy tắc hoặc ràng buộc
+    attrs: []
+  configures:
+    domain:
+    - ConfigItem
+    range:
+    - Component
+    - Module
+    - Job
+    - Operation
+    - Policy
+    inverse: configured_by
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  measured_by:
+    domain:
+    - QualityTarget
+    - Slo
+    - Budget
+    range:
+    - Metric
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  observed_by:
+    domain:
+    - Operation
+    - Component
+    - Job
+    - Interface
+    - Entity
+    - Control
+    range:
+    - Metric
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  alerts_on:
+    domain:
+    - AlertRule
+    range:
+    - Metric
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  protects_slo:
+    domain:
+    - AlertRule
+    range:
+    - Slo
+    - QualityTarget
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  targets:
+    domain:
+    - Slo
+    range:
+    - QualityTarget
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: ''
+    attrs: []
+  logs_with:
+    domain:
+    - Component
+    - Module
+    - Job
+    range:
+    - LogSpec
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  traces_with:
+    domain:
+    - Component
+    - Module
+    - Job
+    range:
+    - TraceSpec
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  threatens:
+    domain:
+    - Threat
+    range: ANY
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  mitigates:
+    domain:
+    - Control
+    - Decision
+    - Component
+    - Policy
+    range:
+    - Risk
+    - Threat
+    inverse: mitigated_by
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  protects:
+    domain:
+    - Control
+    range:
+    - Entity
+    - Credential
+    - Interface
+    - Operation
+    - DataStore
+    - Component
+    - Module
+    - Job
+    - Flow
+    - Dependency
+    - Artefact
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Biện pháp bảo vệ phần tử
+    attrs: []
+  decided_by:
+    domain: ANY
+    range:
+    - Decision
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  chooses:
+    domain:
+    - Decision
+    range:
+    - Alternative
+    inverse: null
+    cardinality: 1-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  rejects:
+    domain:
+    - Decision
+    range:
+    - Alternative
+    inverse: null
+    cardinality: 1-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  assumes:
+    domain: ANY
+    range:
+    - Assumption
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  validated_by:
+    domain:
+    - Assumption
+    range:
+    - TestCase
+    - Milestone
+    - Metric
+    - WorkItem
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Cách kiểm chứng giả định
+    attrs: []
+  constrained_by:
+    domain: ANY
+    range:
+    - Constraint
+    inverse: constrains
+    cardinality: n-n
+    characteristics: []
+    desc: Chịu ràng buộc
+    attrs: []
+  blocked_by:
+    domain: ANY
+    range:
+    - OpenIssue
+    inverse: blocks
+    cardinality: n-n
+    characteristics: []
+    desc: Bị chặn hoặc phụ thuộc vào vấn đề mở
+    attrs: []
+  resolves:
+    domain:
+    - Decision
+    - Deviation
+    - Assumption
+    - TestCase
+    - WorkItem
+    range:
+    - OpenIssue
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  deviates_from:
+    domain:
+    - Deviation
+    range: ANY
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: ''
+    attrs: []
+  waives:
+    domain:
+    - Waiver
+    range: ANY
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Miễn trừ cho phần tử
+    attrs: []
+  budgeted_by:
+    domain: ANY
+    range:
+    - Budget
+    inverse: budget_of
+    cardinality: n-n
+    characteristics: []
+    desc: Phần tử chịu ngân sách tài nguyên hoặc thời gian
+    attrs: []
+  uses_algorithm:
+    domain:
+    - Component
+    - Module
+    - Job
+    - Operation
+    - Control
+    - Flow
+    range:
+    - Algorithm
+    inverse: algorithm_of
+    cardinality: n-n
+    characteristics: []
+    desc: Dùng thuật toán
+    attrs: []
+  has_op:
+    domain:
+    - ChangeSet
+    range:
+    - ChangeOp
+    inverse: op_of
+    cardinality: n-1
+    characteristics: []
+    desc: Bộ thay đổi gồm các thao tác
+    attrs: []
+  realizes_request:
+    domain:
+    - ChangeSet
+    range:
+    - ChangeRequest
+    inverse: realized_by_set
+    cardinality: n-1
+    characteristics: []
+    desc: Bộ thay đổi hiện thực một yêu cầu
+    attrs: []
+  affects:
+    domain:
+    - ChangeRequest
+    - ChangeSet
+    range: ANY
+    inverse: affected_by
+    cardinality: n-n
+    characteristics: []
+    desc: Phần tử bị thay đổi hoặc bị tác động
+    attrs: []
+  changes:
+    domain:
+    - ChangeOp
+    range: ANY
+    inverse: changed_by
+    cardinality: n-n
+    characteristics: []
+    desc: Phần tử là đích của thao tác
+    attrs: []
+  has_section_spec:
+    domain:
+    - DocumentTemplate
+    range:
+    - SectionSpec
+    inverse: section_spec_of
+    cardinality: 1-n
+    characteristics: []
+    desc: Mẫu gồm các đặc tả mục
+    attrs: []
+  conforms_to:
+    domain:
+    - Document
+    - DocumentVersion
+    range:
+    - DocumentTemplate
+    inverse: template_of
+    cardinality: n-1
+    characteristics: []
+    desc: Tài liệu theo mẫu
+    attrs: []
+  has_block:
+    domain:
+    - Section
+    range:
+    - Block
+    inverse: block_of
+    cardinality: 1-n
+    characteristics: []
+    desc: Mục gồm các khối nguồn có thứ tự
+    attrs: []
+  binds:
+    domain:
+    - Block
+    range: ANY
+    inverse: bound_by
+    cardinality: n-n
+    characteristics: []
+    desc: Khối là nơi phần tử được định nghĩa hoặc nêu (căn cứ dựng lại)
+    attrs: []
+  spec_of:
+    domain:
+    - SectionSpec
+    range:
+    - Section
+    inverse: null
+    cardinality: n-n
+    characteristics: []
+    desc: Đặc tả mục áp vào mục cụ thể
+    attrs: []
+  derived_from_version:
+    domain: ANY
+    range:
+    - DocumentVersion
+    inverse: null
+    cardinality: n-1
+    characteristics: []
+    desc: Phần tử suy ra từ phiên bản thượng nguồn nào (phát hiện cũ)
+    attrs: []

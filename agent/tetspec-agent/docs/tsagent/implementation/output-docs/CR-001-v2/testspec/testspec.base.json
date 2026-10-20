@@ -1,0 +1,309 @@
+{
+ "feature": "SCHEDULED-TRANSFER",
+ "version": 1,
+ "status": "Draft",
+ "runId": "run-58a1a6b50994",
+ "counts": {
+  "obligations": 52,
+  "conditions": 237,
+  "oracles": 213,
+  "gaps": 66,
+  "testRequirements": 68,
+  "testDesigns": 99,
+  "coverageItems": 257,
+  "testCases": 257
+ },
+ "changes": [
+  "CR-001"
+ ],
+ "added": 3380,
+ "modified": 0,
+ "validation": {
+  "blocking": 0,
+  "baselineBlockers": 2,
+  "warnings": 0
+ },
+ "pending": {
+  "total": 3224,
+  "byClass": {
+   "Assertion": 258,
+   "CoverageItem": 257,
+   "DataField": 59,
+   "FaultInjection": 5,
+   "FaultModel": 5,
+   "Fixture": 221,
+   "Partition": 33,
+   "PassCriterion": 237,
+   "RiskRating": 12,
+   "ScenarioPath": 2,
+   "StubSpec": 9,
+   "TestCase": 257,
+   "TestCondition": 237,
+   "TestData": 59,
+   "TestDesign": 99,
+   "TestEnvironment": 3,
+   "TestGap": 66,
+   "TestObligation": 52,
+   "TestOracle": 213,
+   "TestRequirement": 68,
+   "TestSet": 30,
+   "TestStep": 1042
+  },
+  "pendingConfirmation": 98,
+  "inferred": 2938
+ },
+ "gaps": [
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-CancelSchedule-llm-87d534",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi scheduleId thiếu hoặc sai định dạng, API trả HTTP status và errorCode nào (400 VALIDATION_ERROR hay 404 SCHEDULE_NOT_FOUND)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-CancelSchedule-llm-a6ab2b",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi DELETE gửi lại cùng Idempotency-Key nhưng khác scheduleId hoặc nội dung, hệ thống trả mã HTTP và errorCode nào?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-CreateSchedule-llm-40f8fd",
+   "owner": "QA Lead",
+   "askedQuestion": "Thứ tự kiểm tra và mã lỗi trả về khi request vi phạm nhiều điều kiện cùng lúc là gì?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-CreateSchedule-llm-76ef97",
+   "owner": "QA Lead",
+   "askedQuestion": "firstRunAt đúng bằng now+5 phút hoặc now+90 ngày có hợp lệ không, và endDate quá 366 ngày tính từ mốc nào (hiện tại hay firstRunAt)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-CreateSchedule-llm-aa4397",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi hai yêu cầu cùng Idempotency-Key và cùng nội dung đến đồng thời, yêu cầu thua nhận mã HTTP nào và thời hạn lưu Idempotency-Key là bao lâu?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-CreateSchedule-llm-ac15cd",
+   "owner": "QA Lead",
+   "askedQuestion": "endDate và maxRuns có bắt buộc tuyệt đối không, hay chỉ cần một trong hai cho DAILY/WEEKLY/MONTHLY và tùy chọn với ONCE? Thiếu từng trường riêng lẻ với ONCE trả mã nào?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-GetSchedule-llm-14f50a",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi scheduleId thiếu hoặc sai định dạng, API trả mã HTTP và errorCode nào (ví dụ 400 VALIDATION_ERROR hay 404 SCHEDULE_NOT_FOUND)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-GetSchedule-llm-a47ba4",
+   "owner": "QA Lead",
+   "askedQuestion": "Nếu người gọi không phải chủ tài khoản và scheduleId không tồn tại thì trả 404 hay 403?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-ListRuns-llm-aed052",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi limit < 1 hoặc > 100 thì API trả HTTP status và errorCode nào (ví dụ 400 VALIDATION_ERROR)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-ListRuns-llm-d51712",
+   "owner": "QA Lead",
+   "askedQuestion": "Request tới /v1/scheduled-transfers//runs trả HTTP status và errorCode nào?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-ListRuns-llm-f2b3df",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi offset âm thì API trả HTTP status và errorCode nào?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-ListSchedules-llm-35e859",
+   "owner": "QA Lead",
+   "askedQuestion": "limit=0, limit=101 và offset=-1 trả 400 INVALID_REQUEST hay được điều chỉnh về giá trị hợp lệ?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-ListSchedules-llm-79d96d",
+   "owner": "QA Lead",
+   "askedQuestion": "Mặc định limit và offset là bao nhiêu, danh sách sắp theo trường nào, và body 200 gồm những trường nào (có total không)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-ListSchedules-llm-a7d6c1",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi accountId rỗng/thiếu trong path, endpoint trả mã HTTP và errorCode nào?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-UpdateScheduleStatus-llm-504db5",
+   "owner": "QA Lead",
+   "askedQuestion": "Thứ tự kiểm tra là gì, và PATCH lên lịch đã CANCELLED trả mã nào?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-UpdateScheduleStatus-llm-85bd4b",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi scheduleId thiếu/rỗng hoặc sai định dạng, API trả mã HTTP và errorCode nào (404, 400 hay lỗi routing)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-EP-UpdateScheduleStatus-llm-c34efc",
+   "owner": "QA Lead",
+   "askedQuestion": "Lần chạy đã được chiếm trước khi PAUSED có tiếp tục thực thi hay bị hủy/SKIPPED?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-040-llm-054334",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi yêu cầu vi phạm đồng thời nhiều quy tắc (ví dụ sai chủ tài khoản và đích không tồn tại), mã lỗi nào được trả trước?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-040-llm-8ec604",
+   "owner": "QA Lead",
+   "askedQuestion": "firstRunAt đúng bằng hiện tại + 5 phút và đúng + 90 ngày có được chấp nhận không, và dùng đồng hồ nào để so sánh?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-041-llm-0dd02e",
+   "owner": "QA Lead",
+   "askedQuestion": "Lần chạy có thời điểm trong ngày endDate nhưng sau giờ của firstRunAt có được chạy không, và endDate tính theo múi giờ nào?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-041-llm-6a4874",
+   "owner": "QA Lead",
+   "askedQuestion": "Lần chạy MONTHLY tháng sau tính từ ngày neo ban đầu (31 → 31/03) hay từ ngày của lần chạy trước (28/02 → 28/03)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-041-llm-a2144e",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi có cả endDate và maxRuns, lịch dừng ở điều kiện nào đến trước? Lần chạy FAILED/MISSED có được tính vào maxRuns và có sinh lần chạy kế tiếp không?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-042-llm-60943b",
+   "owner": "QA Lead",
+   "askedQuestion": "limit hoặc offset ngoài biên trả mã HTTP và errorCode nào, hay bị cắt về biên? Giá trị mặc định của limit là bao nhiêu?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-042-llm-8f66a9",
+   "owner": "QA Lead",
+   "askedQuestion": "Danh sách lịch sắp theo trường nào? Runs có cùng scheduledAt được sắp ổn định theo khóa nào?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-042-llm-afd35f",
+   "owner": "QA Lead",
+   "askedQuestion": "nextRunAt là null hay bỏ trường khi lịch không còn lần chạy kế tiếp? transferId và reasonCode là null hay vắng mặt tùy trạng thái lần chạy?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-043-llm-67fe31",
+   "owner": "QA Lead",
+   "askedQuestion": "DELETE lịch PAUSED có được hủy không, và các lần chạy PENDING của lịch PAUSED xử lý thế nào? Các trạng thái lịch nào ngoài ACTIVE/CANCELLED/COMPLETED cho phép hủy?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-043-llm-e8e035",
+   "owner": "QA Lead",
+   "askedQuestion": "Body phản hồi 200 của DELETE gồm những trường nào (ví dụ trạng thái lịch, số lần chạy bị hủy)? Lần gọi lặp có trả đúng cùng body không?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-044-llm-2d373a",
+   "owner": "QA Lead",
+   "askedQuestion": "Các bản ghi SKIPPED được tạo ngay khi PATCH ACTIVE hay ở chu kỳ quét kế tiếp, và có giới hạn số bản ghi cho khoảng tạm dừng dài không?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-044-llm-4c9409",
+   "owner": "QA Lead",
+   "askedQuestion": "Thứ tự kiểm tra 400, 401, 403, 404, 409 là gì khi nhiều điều kiện lỗi cùng đúng?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-044-llm-6d8e04",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi PATCH PAUSED đến lúc lần chạy đã được chiếm (đang chạy), lần chạy đó hoàn tất bình thường hay bị dừng, và trạng thái cuối là gì?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-045-llm-1db06b",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi một kiểm tra tại lúc chạy thất bại, run chuyển sang trạng thái nào và dùng mã lỗi nào cho từng nguyên nhân (thử lại hay FAILED theo BR-13)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-045-llm-9af403",
+   "owner": "QA Lead",
+   "askedQuestion": "Idempotency-Key ghép mã lịch và thời điểm dự kiến theo định dạng nào (dấu nối, ISO-8601 hay epoch, múi giờ)? Các lần chạy sau lần đầu và lần thử lại dùng khóa gì?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-046-llm-0795ee",
+   "owner": "QA Lead",
+   "askedQuestion": "Bộ đếm 3 lần FAILED liên tiếp đếm các run đã FAILED cuối cùng (kể cả lỗi không thử lại), hay đếm từng lần thử lỗi? Run thành công có đặt lại bộ đếm về 0 không?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-046-llm-f38f3b",
+   "owner": "QA Lead",
+   "askedQuestion": "reasonCode của run FAILED là mã lỗi gốc của lần thử cuối hay mã riêng? Nếu lần thử lại trả loại lỗi khác thì áp chính sách của loại lỗi mới hay giữ bộ đếm cũ?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-047-llm-0b387a",
+   "owner": "QA Lead",
+   "askedQuestion": "Tập giá trị reasonCode hợp lệ là gì, và mẫu nội dung SMS cho kết quả thành công và FAILED cụ thể ra sao (có chứa số tiền, mã lịch không)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-047-llm-714bfe",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi gửi SMS lỗi, consumer có thử lại không, tối đa mấy lần, và lỗi được ghi nhận ở đâu (sms_log trạng thái FAILED, audit hay chỉ log)?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-048-llm-18130b",
+   "owner": "QA Lead",
+   "askedQuestion": "Danh sách chính xác các giá trị loại sự kiện audit cho tạo, hủy, tạm dừng, tiếp tục và từng kết quả lần chạy là gì?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-048-llm-8adeb8",
+   "owner": "QA Lead",
+   "askedQuestion": "Ghi audit có nằm trong cùng giao dịch với thay đổi lịch/lần chạy không, và khi ghi audit lỗi thì thao tác có bị hoàn tác không?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-048-llm-ff4b4d",
+   "owner": "QA Lead",
+   "askedQuestion": "Các lần gọi lặp idempotent (hủy lịch đã CANCELLED, tạo lại cùng Idempotency-Key) có ghi thêm bản ghi audit không?"
+  },
+  {
+   "code": "TGAP-SCHEDULED-TRANSFER-FR-049-llm-914174",
+   "owner": "QA Lead",
+   "askedQuestion": "Khi số lần chạy quá hạn lớn hơn 20 mỗi chu kỳ, các lần còn lại có thể bị quá 24 giờ trong lúc chờ và chuyển MISSED không? Thứ tự ưu tiên chọn lần chạy là gì?"
+  }
+ ],
+ "solution": {
+  "EP": 6,
+  "FLD": 26,
+  "RSP": 34,
+  "AC": 43,
+  "SM": 2,
+  "TRN": 15
+ },
+ "requirements": [
+  "FR-040",
+  "FR-041",
+  "FR-042",
+  "FR-043",
+  "FR-044",
+  "FR-045",
+  "FR-046",
+  "FR-047",
+  "FR-048",
+  "FR-049",
+  "NFR-010",
+  "NFR-011",
+  "NFR-012",
+  "NFR-013",
+  "NFR-014"
+ ],
+ "files": {
+  "TestRequirements": "01-test-requirements.md",
+  "TestDesign": "02-test-design.md",
+  "TestCases": "03-test-cases.md"
+ },
+ "notes": [],
+ "slice": {
+  "seeds": 56,
+  "context": 96,
+  "requirements": [
+   "FR-040",
+   "FR-041",
+   "FR-042",
+   "FR-043",
+   "FR-044",
+   "FR-045",
+   "FR-046",
+   "FR-047",
+   "FR-048",
+   "FR-049",
+   "NFR-010",
+   "NFR-011",
+   "NFR-012",
+   "NFR-013",
+   "NFR-014"
+  ]
+ }
+}

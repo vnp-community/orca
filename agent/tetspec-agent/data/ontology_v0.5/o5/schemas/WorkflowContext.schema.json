@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/tdd/schema/WorkflowContext-v0.5",
+  "title": "Settled document workflow context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cr", "srs_delta", "sad", "impact", "tdd_set"],
+  "properties": {
+    "cr": {"type": "object"},
+    "srs_delta": {"type": "object"},
+    "sad": {"type": "object"},
+    "impact": {"type": "object"},
+    "tdd_set": {"type": "object"},
+    "srs_clarification": {"type": "boolean"}
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tdd:quality:FactLineage:1.0.0",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "enum": [
+        "extracted",
+        "derived",
+        "proposed",
+        "prompt"
+      ]
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "block": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "kind",
+    "source_id",
+    "source_version",
+    "source_hash",
+    "block"
+  ],
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "proposed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "decision_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "derived"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "inputs",
+          "derivation"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+graft data/ontology_v0.5/o5
+prune data/ontology_v0.5/o5/fixtures
+prune data/ontology_v0.5/o5/tests
+include data/ontology_v0.4/o4/classes.yaml
+include data/ontology_v0.4/o4/relations.yaml
+global-exclude __pycache__ *.pyc .DS_Store

@@ -1,0 +1,9 @@
+id = "resolve-entity-match"
+version = "1"
+agent = "generation"
+tier = "hybrid"
+description = "Decide whether two extracted elements are the same entity: identical ids/normalised names or clearly different classes are settled by rule; the model only judges the ambiguous middle, and a 'same' verdict must also pass a lexical check."
+role = "extractor"
+reason = "Two documents can name the same thing differently (synonyms, abbreviations), which no normalisation rule covers completely."
+demotion = "Collect LLM-resolved pairs; promote repeated synonym pairs to an alias table consulted before the model; widen the rule thresholds only with negative examples."
+verifiers = ["same-class", "lexical-overlap"]

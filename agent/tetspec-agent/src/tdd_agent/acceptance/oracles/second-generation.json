@@ -1,0 +1,100 @@
+{
+  "name": "second-generation",
+  "description": "Expected facts of the synthetic payment-gateway fixture (src/tdd_agent/acceptance/data/second). Synthetic: results must not be generalised to real projects.",
+  "provenance": "authored from the fixture",
+  "synthetic": true,
+  "checks": [
+    {
+      "id": "element:FR-PAY-01",
+      "kind": "element",
+      "element": "FR-PAY-01",
+      "class": "Requirement"
+    },
+    {
+      "id": "element:FR-PAY-02",
+      "kind": "element",
+      "element": "FR-PAY-02",
+      "class": "Requirement"
+    },
+    {
+      "id": "element:BRL-1",
+      "kind": "element",
+      "element": "BRL-1",
+      "class": "BusinessRule"
+    },
+    {
+      "id": "element:ENT-1",
+      "kind": "element",
+      "element": "ENT-1",
+      "class": "Entity"
+    },
+    {
+      "id": "element:ADR-1",
+      "kind": "element",
+      "element": "ADR-1",
+      "class": "Decision",
+      "props": {
+        "chosen": "PostgreSQL"
+      }
+    },
+    {
+      "id": "element:SM-ENT-1",
+      "kind": "element",
+      "element": "SM-ENT-1",
+      "class": "StateMachine"
+    },
+    {
+      "id": "element:ERR-duplicate_capture",
+      "kind": "element",
+      "element": "ERR-duplicate_capture",
+      "class": "ErrorCode"
+    },
+    {
+      "id": "element:API-1",
+      "kind": "element",
+      "element": "API-1",
+      "class": "Operation",
+      "props": {
+        "declared_method": "POST",
+        "path": "/v1/payments/capture"
+      }
+    },
+    {
+      "id": "relation:FR-PAY-01->BRL-2",
+      "kind": "relation",
+      "src": "FR-PAY-01",
+      "rel": "traces_to",
+      "dst": "BRL-2"
+    },
+    {
+      "id": "counts:Transition",
+      "kind": "class_count_ge",
+      "class": "Transition",
+      "n": 2
+    },
+    {
+      "id": "fact:retry",
+      "kind": "fact",
+      "class": "*",
+      "props": {},
+      "quote_contains": "3 times"
+    },
+    {
+      "id": "evidence-verified",
+      "kind": "evidence_verified"
+    },
+    {
+      "id": "no-invented-facts",
+      "kind": "no_invented_facts"
+    },
+    {
+      "id": "not-ready",
+      "kind": "not_ready"
+    },
+    {
+      "id": "roundtrip",
+      "kind": "roundtrip"
+    }
+  ],
+  "revision_note": "element:API-1 corrected after the first run: a POST without a stated idempotency/concurrency contract keeps its method as declared_method plus gaps (design D-rule), so `method` is intentionally not asserted. The first-run oracle (agent-approved, hash 'af228d1d99') expected props.method."
+}

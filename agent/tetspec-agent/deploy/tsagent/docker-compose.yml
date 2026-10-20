@@ -1,0 +1,63 @@
+# tsagent v2 for dev. From the repo root: docker compose -f deploy/tsagent/docker-compose.yml up -d --build agent
+# (binary: docker build -f deploy/tsagent/Dockerfile --target export --output type=local,dest=bin . then --profile bin up -d agent-bin)
+# Override environment variables with --env-file deploy/tsagent/.env (see .env.example). SQLite DB, cache, snapshots, specs live on the tsagent-data volume.
+name: testspec-agent
+
+x-env: &env
+  TSAGENT_DB: /data/tsagent.db
+  TSAGENT_CACHE_DIR: /data/cache
+  TSAGENT_SNAPSHOT_DIR: /data/snapshots
+  TSAGENT_SPECS_ROOT: /data/specs
+  TSAGENT_INBOX_DIR: /data/inbox
+  TSAGENT_SOURCE_ROOTS: /data/sources
+  # binding 0.0.0.0 inside the container makes the token mandatory; this is a DEV token
+  TSAGENT_TOKEN: ${TSAGENT_TOKEN:-dev-token}
+  TSAGENT_LLM: ${TSAGENT_LLM:?set TSAGENT_LLM = none | anthropic | openai (there is no default)}
+  TSAGENT_LLM_STEPS: ${TSAGENT_LLM_STEPS:-analysis,design,specification}
+  TSAGENT_LLM_CAP_ANALYSIS: ${TSAGENT_LLM_CAP_ANALYSIS:-200}
+  TSAGENT_LLM_CAP_DESIGN: ${TSAGENT_LLM_CAP_DESIGN:-100}
+  TSAGENT_LLM_CAP_SPEC: ${TSAGENT_LLM_CAP_SPEC:-300}
+  TSAGENT_LLM_PARALLEL: ${TSAGENT_LLM_PARALLEL:-1}
+  TSAGENT_LLM_GROUP_RETRIES: ${TSAGENT_LLM_GROUP_RETRIES:-2}
+  TSAGENT_AUTO_APPROVE: ${TSAGENT_AUTO_APPROVE:-}
+  TSAGENT_MCP_REVIEW: ${TSAGENT_MCP_REVIEW:-0}
+  TSAGENT_MAX_BODY_KB: ${TSAGENT_MAX_BODY_KB:-4096}
+  TSAGENT_ALLOWED_ORIGINS: ${TSAGENT_ALLOWED_ORIGINS:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+  ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-}
+
+services:
+  agent:
+    build: {context: ../.., dockerfile: deploy/tsagent/Dockerfile, target: dev}
+    image: testspec-agent:v2-dev
+    container_name: testspec-agent-dev
+    environment: *env
+    ports: ["127.0.0.1:${TSAGENT_PORT:-8766}:8766"]
+    restart: unless-stopped
+    volumes:
+      - ../../src/tsagent:/app/tsagent:ro
+      - ${TSAGENT_SOURCES_DIR:-../../tests/testspec_agent/fixtures}:/data/sources:ro
+      - tsagent-data:/data
+
+  agent-bin:
+    profiles: ["bin"]
+    build: {context: ../.., dockerfile: deploy/tsagent/Dockerfile, target: runtime}
+    image: testspec-agent:v2-bin
+    container_name: testspec-agent-bin
+    environment: *env
+    ports: ["127.0.0.1:${TSAGENT_PORT:-8766}:8766"]
+    restart: unless-stopped
+    volumes:
+      - ../../bin:/opt/tsagent/bin:ro
+      - ${TSAGENT_SOURCES_DIR:-../../tests/testspec_agent/fixtures}:/data/sources:ro
+      - tsagent-data:/data
+    healthcheck:
+      test: ["CMD", "/opt/tsagent/bin/tsagent", "--version"]
+      interval: 10s
+
+volumes:
+  tsagent-data:

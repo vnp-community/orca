@@ -1,0 +1,234 @@
+# Mapping of the tdd-agent design KG (ontology v0.4 + v0.6 classes) to tsagent tdd-kg/v1 packages.
+# SOLUTION-INTEGRATE-TDD-AGENT section 6. Bump `version` when the table changes (it is part of the input hash of gates GT, TS1).
+#
+# classes.<tdd-agent class>: list of rules; the first rule whose `when` matches is used.
+#   when.prop_in   {key: [values]}    the attribute value (lower-cased) is in the list
+#   when.id_prefix [prefixes]         the element id starts with one of the prefixes
+#   when.has       [key]              every key has a value
+#   to             tsagent class
+#   attrs          {tsagent attribute: source}; source is a list of keys (looked up in props, attrs, ext, the element),
+#                  or {from: [key], fn: function name}, or {const: value}, or {edge_out: relation} (first target id)
+#   acceptance     [key]: acceptance criterion text/ids become AcceptanceCriterion nodes + hasAcceptance edges
+#   derive         extra nodes: {suffix, to, if: [key], attrs, link: {via: tdd-agent relation into this element, rel: tsagent relation}}
+# Functions (fn): ms (duration -> milliseconds), int, bool, not (negated bool), num (first number), unit (unit after the number), list, str.
+version: 1
+
+# Classes of v0.4 that are not projected (document structure, operations, project management): listed in output.unmapped.
+unmapped:
+  - Element
+  - Document
+  - DocumentVersion
+  - Baseline
+  - Section
+  - SourceBlock
+  - Term
+  - Standard
+  - Stakeholder
+  - Concern
+  - Milestone
+  - PriorityLevel
+  - QualityCharacteristic
+  - System
+  - Layer
+  - DeploymentUnit
+  - Environment
+  - Dependency
+  - Artefact
+  - Screen
+  - Event
+  - Scope
+  - Role
+  - Credential
+  - Policy
+  - RetentionPolicy
+  - DataStore
+  - Schema
+  - Index
+  - View
+  - Sequence
+  - Trigger
+  - DbRole
+  - Migration
+  - DataClass
+  - Enumeration
+  - Formula
+  - DecisionTable
+  - DecisionRule
+  - Condition
+  - Budget
+  - Metric
+  - AlertRule
+  - Slo
+  - LogSpec
+  - TraceSpec
+  - Threat
+  - Deviation
+  - Waiver
+  - Constant
+  - ConfigItem
+  - WorkItem
+  - Gate
+  - TestCase
+  - ChangeSet
+  - ChangeOp
+  - DocumentTemplate
+  - SectionSpec
+  - Block
+
+classes:
+  Requirement:
+    - when: {prop_in: {req_kind: [quality, non_functional, nonfunctional, nfr, performance, security, availability, reliability, usability]}}
+      to: NonFunctionalRequirement
+      attrs: {text: [statement, summary, name], category: [req_kind], priority: [priority]}
+      acceptance: [acceptance]
+    - when: {id_prefix: [NFR]}
+      to: NonFunctionalRequirement
+      attrs: {text: [statement, summary, name], category: {const: quality}, priority: [priority]}
+      acceptance: [acceptance]
+    - to: FunctionalRequirement
+      attrs: {text: [statement, summary, name], priority: [priority]}
+      acceptance: [acceptance]
+  QualityTarget:
+    - to: NonFunctionalRequirement
+      attrs:
+        text: [statement, summary, name]
+        category: [characteristic]
+        targetValue: {from: [target], fn: num}
+        targetUnit: {from: [target], fn: unit}
+        priority: [priority]
+  BusinessRule:
+    - to: FunctionalRequirement
+      attrs: {text: [statement, summary, name], ruleKind: [rule_kind], priority: [priority]}
+  Operation:
+    - when: {has: [method, path]}
+      to: Endpoint
+      attrs: {method: [method], path: [path], idempotent: {from: [idempotent], fn: bool}, auth: [authn, auth]}
+    - when: {has: [method, path_or_name]}
+      to: Endpoint
+      attrs: {method: [method], path: [path_or_name], idempotent: {from: [idempotent], fn: bool}, auth: [authn, auth]}
+    - to: Mechanism
+      attrs: {mechanismKind: {const: operation}}
+  Message:
+    - to: Message
+      attrs: {messageType: [message_type, kind]}
+  Attribute:
+    - to: Field
+      attrs:
+        name: [name]
+        type: [datatype, type]
+        required: {from: [nullable], fn: not}
+        enum: {from: [enum_values], fn: list}
+  ErrorCode:
+    - to: Response
+      attrs: {statusCode: {from: [http_status, HTTP, status], fn: int}, errorCode: [code, Mã, slug], condition: [when, Điều kiện, summary]}
+  Interface:
+    - to: Integration
+      attrs:
+        integrationType: [protocol]
+        direction: [direction]
+        interactionStyle: [style]
+        idempotent: {from: [idempotent], fn: bool}
+  ExternalSystem:
+    - to: ExternalParty
+      attrs: {partyType: {const: external-system}}
+  RoutePolicy:
+    - to: Mechanism
+      attrs: {mechanismKind: {const: route-policy}}
+      derive:
+        - suffix: TO
+          to: TimeoutPolicy
+          if: [timeout]
+          attrs: {totalMs: {from: [timeout], fn: ms}}
+          link: {via: governed_by, rel: hasTimeoutPolicy}
+        - suffix: RT
+          to: RetryPolicy
+          if: [retry]
+          attrs: {maxAttempts: {from: [retry], fn: num}}
+          link: {via: governed_by, rel: hasRetryPolicy}
+  RateLimitProfile:
+    - to: PartnerLimit
+      attrs: {requestsPerSecond: {from: [limit], fn: num}}
+  StateMachine:
+    - to: StateMachine
+      attrs: {name: [name], initial: [initial_state]}
+  State:
+    - to: State
+      attrs: {name: [name], terminal: {from: [final], fn: bool}}
+  Transition:
+    - to: Transition
+      attrs: {from: {edge_out: transition_from}, to: {edge_out: transition_to}, trigger: [trigger], guard: [guard], effect: [action]}
+  Module:
+    - to: Module
+      attrs: {responsibility: [responsibility, summary, name]}
+  Component:
+    - to: Module
+      attrs: {responsibility: [responsibility, summary, name], layer: [component_kind]}
+  Flow:
+    - to: Scenario
+      attrs: {steps: {from: [steps, main_flow], fn: list}}
+  Scenario:
+    - to: Scenario
+      attrs: {steps: {from: [main_flow, steps], fn: list}}
+  Entity:
+    - to: DataEntity
+      attrs: {table: [table_name]}
+  Control:
+    - to: Mechanism
+      attrs: {mechanismKind: {const: control}}
+  Job:
+    - to: Mechanism
+      attrs: {mechanismKind: {const: job}}
+  Algorithm:
+    - to: Mechanism
+      attrs: {mechanismKind: {const: algorithm}}
+  Decision:
+    - to: Decision
+      attrs: {statement: [chosen, statement, summary, name], rationale: [rationale]}
+  Alternative:
+    - to: Alternative
+      attrs: {reasonRejected: [reason_rejected, summary]}
+  Assumption:
+    - to: Assumption
+      attrs: {statement: [statement, summary, name], dueDate: [validate_by]}
+  Constraint:
+    - to: Constraint
+      attrs: {constraintType: [constraint_kind], statement: [statement, summary]}
+  OpenIssue:
+    - to: OpenQuestion
+      attrs: {statement: [question, summary, name], dueDate: [due], confirmStatus: [status]}
+  Risk:
+    - to: Risk
+      attrs: {likelihood: [likelihood], impact: [impact], mitigation: [treatment]}
+  ChangeRequest:
+    - to: ChangeRequest
+      attrs: {description: [name, summary], changeKind: {const: cr}}
+
+# v0.6 classes (module 04) tsagent understands in the Extended profile: projected with the same name and props; one such node makes the package declare `+ext-1`.
+extended_passthrough: [DesignObligation, Transaction, Saga, TimeoutBudget, IdempotencyPolicy, LoadProfile, ContractCompatibility]
+
+# Relations: each tdd-agent relation has a list of candidates; the first candidate whose end classes (after projection) fit the domain/range is used.
+#   reverse: swap the ends;  lift: {via: relation, side: src}: replace the `src` end by the elements X with an edge X -via-> src.
+relations:
+  satisfies: [{to: satisfiedBy, reverse: true}, {to: realizedBy, reverse: true}]
+  decided_by: [{to: satisfiedBy}]
+  provides: [{to: hasEndpoint}, {to: integratesVia}]
+  exposes: [{to: hasEndpoint}]
+  consumes: [{to: integratesVia}, {to: withParty}]
+  accepts: [{to: hasRequest}]
+  returns: [{to: hasResponse}]
+  may_fail_with: [{to: hasResponse}]
+  has_attribute: [{to: hasField}, {to: hasField, lift: {via: accepts, side: src}}]
+  has_state: [{to: hasState}]
+  in_machine: [{to: inMachine}, {to: hasTransition, reverse: true}]
+  depends_on: [{to: dependsOn}]
+  writes: [{to: ownsData}]
+  blocked_by: [{to: blockedBy}]
+  assumes: [{to: assumes}]
+  constrained_by: [{to: constrainedBy}]
+  mitigates: [{to: mitigatedBy, reverse: true}]
+  affects: [{to: affects}]
+  part_of: [{to: hasTransition, reverse: true}, {to: hasState, reverse: true}]
+
+# Limit of context nodes (neighbours up to 2 hops) per feature, so a large KG does not bloat the package.
+context_depth: 2
+context_limit: 400

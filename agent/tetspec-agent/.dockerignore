@@ -1,0 +1,9 @@
+.venv
+.git
+.tdd-agent
+data
+docs
+openspec
+bin
+**/__pycache__
+.pytest_cache

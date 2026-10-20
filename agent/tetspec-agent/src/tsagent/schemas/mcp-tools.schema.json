@@ -1,0 +1,638 @@
+{
+ "$comment": "GENERATED from tsagent/gateway/tools.py (tsagent ontology codegen); do not edit by hand",
+ "tools": [
+  {
+   "description": "Approve Draft nodes (by code or filter)",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "by": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "classes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "codes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "derivation": {
+      "enum": [
+       "stated",
+       "rule",
+       "llm",
+       "human"
+      ]
+     },
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "layer": {
+      "enum": [
+       "A",
+       "B",
+       "C"
+      ]
+     },
+     "note": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "feature",
+     "by"
+    ],
+    "type": "object"
+   },
+   "name": "approve_nodes",
+   "reviewOnly": true,
+   "write": true
+  },
+  {
+   "description": "Baseline the Draft version (gate GS, primary TDD Baselined, dropped nodes with a CR)",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "by": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "retired_by": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "feature",
+     "by"
+    ],
+    "type": "object"
+   },
+   "name": "baseline_spec",
+   "reviewOnly": true,
+   "write": true
+  },
+  {
+   "description": "Node differences between two versions",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "from": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "to": {
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "required": [
+     "feature",
+     "from",
+     "to"
+    ],
+    "type": "object"
+   },
+   "name": "diff_versions",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Layer A: obligations, conditions with oracles, gaps; filter by source subject",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "subject": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "version": {
+      "minimum": 1,
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "feature"
+    ],
+    "type": "object"
+   },
+   "name": "get_analysis",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Node counts by class and level; gate result",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "version": {
+      "minimum": 1,
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "feature"
+    ],
+    "type": "object"
+   },
+   "name": "get_coverage",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Neighbours of a node: test KG nodes by relation, or source nodes by TDD edge",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "code": {
+      "type": "string"
+     },
+     "depth": {
+      "maximum": 3,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     }
+    },
+    "required": [
+     "feature",
+     "code"
+    ],
+    "type": "object"
+   },
+   "name": "get_neighbors",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Run status and each step",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "runId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "runId"
+    ],
+    "type": "object"
+   },
+   "name": "get_run_status",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "One md document (TestRequirements, TestDesign, TestCases); read on with offset",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "docKind": {
+      "enum": [
+       "TestRequirements",
+       "TestDesign",
+       "TestCases"
+      ]
+     },
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "max_chars": {
+      "maximum": 30000,
+      "minimum": 1000,
+      "type": "integer"
+     },
+     "offset": {
+      "minimum": 0,
+      "type": "integer"
+     },
+     "version": {
+      "minimum": 1,
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "feature",
+     "docKind"
+    ],
+    "type": "object"
+   },
+   "name": "get_spec",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "A test case with its steps, assertions, oracles, data, fixtures, stubs, fault injections, coverage, conditions",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "code": {
+      "type": "string"
+     },
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "version": {
+      "minimum": 1,
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "feature",
+     "code"
+    ],
+    "type": "object"
+   },
+   "name": "get_testcase",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Source -> obligation -> condition -> TR -> coverage item -> test case",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "compact": {
+      "type": "boolean"
+     },
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "version": {
+      "minimum": 1,
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "feature"
+    ],
+    "type": "object"
+   },
+   "name": "get_traceability",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Results of rules TSO-001..021 for gate GS (v1-compatible shape)",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "version": {
+      "minimum": 1,
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "feature"
+    ],
+    "type": "object"
+   },
+   "name": "get_validation",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Version history: CRs, nodes added/changed/dropped",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     }
+    },
+    "required": [
+     "feature"
+    ],
+    "type": "object"
+   },
+   "name": "get_version_history",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "TestGaps with question, owner, review status; the list is cut at limit (total is the full count)",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "limit": {
+      "maximum": 500,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "offset": {
+      "minimum": 0,
+      "type": "integer"
+     },
+     "open_only": {
+      "type": "boolean"
+     },
+     "version": {
+      "minimum": 1,
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "feature"
+    ],
+    "type": "object"
+   },
+   "name": "list_gaps",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Nodes awaiting review (LLM proposals first), gap-blocked nodes, unreviewed LLM nodes; the list is cut at limit",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "limit": {
+      "maximum": 500,
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "required": [
+     "feature"
+    ],
+    "type": "object"
+   },
+   "name": "list_pending_review",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Features with test specs, their latest version and status",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "limit": {
+      "maximum": 500,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "offset": {
+      "minimum": 0,
+      "type": "integer"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "name": "list_specs",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Reject Draft nodes",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "by": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "classes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "codes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "derivation": {
+      "enum": [
+       "stated",
+       "rule",
+       "llm",
+       "human"
+      ]
+     },
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "layer": {
+      "enum": [
+       "A",
+       "B",
+       "C"
+      ]
+     },
+     "note": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "feature",
+     "by"
+    ],
+    "type": "object"
+   },
+   "name": "reject_nodes",
+   "reviewOnly": true,
+   "write": true
+  },
+  {
+   "description": "Find test KG nodes (and source nodes) by code or text",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "classes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "limit": {
+      "maximum": 200,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "query": {
+      "minLength": 2,
+      "type": "string"
+     }
+    },
+    "required": [
+     "feature",
+     "query"
+    ],
+    "type": "object"
+   },
+   "name": "search",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "SELECT only on v_* views (mode=ro, time and row limits)",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "limit": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "query": {
+      "maxLength": 8000,
+      "minLength": 6,
+      "type": "string"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "type": "object"
+   },
+   "name": "sql_select",
+   "reviewOnly": false,
+   "write": false
+  },
+  {
+   "description": "Run the test-spec pipeline (in the background, returns runId). documents: tdd-kg/v1 JSON and md as {name, content}; paths: paths inside TSAGENT_SOURCE_ROOTS",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "documents": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "additionalProperties": false,
+         "properties": {
+          "content": {
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "name",
+          "content"
+         ],
+         "type": "object"
+        }
+       ]
+      },
+      "maxItems": 50,
+      "type": "array"
+     },
+     "dry_run": {
+      "type": "boolean"
+     },
+     "feature": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "type": "string"
+     },
+     "force": {
+      "type": "boolean"
+     },
+     "from_step": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "paths": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 50,
+      "type": "array"
+     },
+     "steps": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "feature"
+    ],
+    "type": "object"
+   },
+   "name": "start_run",
+   "reviewOnly": false,
+   "write": true
+  }
+ ]
+}

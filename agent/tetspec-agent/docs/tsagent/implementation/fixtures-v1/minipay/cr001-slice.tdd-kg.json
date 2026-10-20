@@ -1,0 +1,5044 @@
+{
+ "format": "tdd-kg/v1",
+ "ontologyVersion": "tdd-core-1+ext-0",
+ "feature": "SCHEDULED-TRANSFER",
+ "package": {
+  "kind": "slice",
+  "cr": "CR-001",
+  "generatedAt": "2026-10-12T08:11:19Z",
+  "sourceHash": "sha256:b4f026cb526f42c347678025d68be352473e5bafb212bf5e82f006c40ef2cfd5"
+ },
+ "ontology": {
+  "classes": [
+   {
+    "name": "Alternative",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "reasonRejected"
+    ],
+    "attrs": [
+     "reasonRejected"
+    ],
+    "doc": "Phương án đã loại"
+   },
+   {
+    "name": "Assumption",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "statement"
+    ],
+    "attrs": [
+     "statement",
+     "dueDate",
+     "confirmStatus"
+    ],
+    "doc": "Giả định"
+   },
+   {
+    "name": "Channel",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "partitionKey",
+     "deliverySemantics"
+    ],
+    "attrs": [
+     "partitionKey",
+     "partitionCount",
+     "deliverySemantics",
+     "retentionDays",
+     "maxMessageKB",
+     "dlqName",
+     "consumerIdempotent"
+    ],
+    "doc": "Topic/queue"
+   },
+   {
+    "name": "CircuitBreaker",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "failureRatePercent",
+     "minimumCalls",
+     "openDurationSec"
+    ],
+    "attrs": [
+     "failureRatePercent",
+     "minimumCalls",
+     "openDurationSec"
+    ],
+    "doc": "Circuit breaker"
+   },
+   {
+    "name": "ConnectionPool",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "maxTotal"
+    ],
+    "attrs": [
+     "maxTotal",
+     "maxPerRoute",
+     "minIdle",
+     "maxLifetimeSec",
+     "idleTimeoutSec",
+     "validationEnabled",
+     "bulkheadGroup"
+    ],
+    "doc": "Connection pool"
+   },
+   {
+    "name": "Constraint",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "constraintType"
+    ],
+    "attrs": [
+     "constraintType"
+    ],
+    "doc": "Ràng buộc"
+   },
+   {
+    "name": "DataEntity",
+    "parent": "Entity",
+    "required": [
+     "code"
+    ],
+    "attrs": [
+     "retentionRule",
+     "volumeEstimate"
+    ],
+    "doc": "Thực thể dữ liệu logic"
+   },
+   {
+    "name": "Decision",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "statement"
+    ],
+    "attrs": [
+     "statement",
+     "rationale",
+     "noAlternativeNote"
+    ],
+    "doc": "Quyết định kỹ thuật (ADR)"
+   },
+   {
+    "name": "DesignItem",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "kind",
+     "location"
+    ],
+    "attrs": [
+     "kind",
+     "location",
+     "demoImplementation"
+    ],
+    "doc": "Mục LLD / vị trí code"
+   },
+   {
+    "name": "Document",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "docType"
+    ],
+    "attrs": [
+     "docType",
+     "baselineDate"
+    ],
+    "doc": "Tài liệu nguồn/đích"
+   },
+   {
+    "name": "Endpoint",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "method",
+     "path"
+    ],
+    "attrs": [
+     "method",
+     "path",
+     "apiVersion",
+     "mediaType"
+    ],
+    "doc": "Endpoint REST"
+   },
+   {
+    "name": "Entity",
+    "parent": "Entity",
+    "required": [
+     "code"
+    ],
+    "attrs": [],
+    "doc": "Lớp gốc: thuộc tính chung cho mọi nút"
+   },
+   {
+    "name": "Environment",
+    "parent": "Entity",
+    "required": [
+     "code"
+    ],
+    "attrs": [
+     "hostingType"
+    ],
+    "doc": "Môi trường"
+   },
+   {
+    "name": "ErrorMapping",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "trigger",
+     "errorCategory",
+     "retryable",
+     "action"
+    ],
+    "attrs": [
+     "trigger",
+     "errorCategory",
+     "retryable",
+     "action"
+    ],
+    "doc": "Xử lý một kết quả lỗi"
+   },
+   {
+    "name": "Evidence",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "summary"
+    ],
+    "attrs": [
+     "summary",
+     "measuredAt",
+     "location",
+     "metrics"
+    ],
+    "doc": "PoC/benchmark/đo đạc"
+   },
+   {
+    "name": "ExternalParty",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "partyType"
+    ],
+    "attrs": [
+     "partyType",
+     "ownerContact",
+     "sandboxAvailable",
+     "maintenanceWindow",
+     "contractConfirmed"
+    ],
+    "doc": "Đối tác/hệ thống ngoài"
+   },
+   {
+    "name": "FallbackStrategy",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "mode"
+    ],
+    "attrs": [
+     "mode"
+    ],
+    "doc": "Dự phòng khi đối tác lỗi"
+   },
+   {
+    "name": "FunctionalRequirement",
+    "parent": "Requirement",
+    "required": [
+     "code",
+     "text"
+    ],
+    "attrs": [],
+    "doc": "Yêu cầu chức năng"
+   },
+   {
+    "name": "Header",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "name",
+     "required"
+    ],
+    "attrs": [
+     "name",
+     "required",
+     "example"
+    ],
+    "doc": "Header/metadata"
+   },
+   {
+    "name": "Integration",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "integrationType",
+     "direction",
+     "interactionStyle",
+     "idempotent"
+    ],
+    "attrs": [
+     "integrationType",
+     "direction",
+     "interactionStyle",
+     "protocol",
+     "idempotent",
+     "expectedRps",
+     "demoImplementation"
+    ],
+    "doc": "Điểm tích hợp - gốc của contract"
+   },
+   {
+    "name": "Mechanism",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "mechanismKind"
+    ],
+    "attrs": [
+     "mechanismKind"
+    ],
+    "doc": "Cơ chế đáp ứng NFR / dùng chung"
+   },
+   {
+    "name": "Message",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "messageType"
+    ],
+    "attrs": [
+     "messageType",
+     "direction",
+     "example",
+     "sensitiveFields"
+    ],
+    "doc": "Payload/sự kiện"
+   },
+   {
+    "name": "Module",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "responsibility"
+    ],
+    "attrs": [
+     "responsibility",
+     "layer"
+    ],
+    "doc": "Module/thành phần"
+   },
+   {
+    "name": "MonitoringSpec",
+    "parent": "Entity",
+    "required": [
+     "code"
+    ],
+    "attrs": [
+     "metrics",
+     "alertThreshold"
+    ],
+    "doc": "Giám sát"
+   },
+   {
+    "name": "NonFunctionalRequirement",
+    "parent": "Requirement",
+    "required": [
+     "code",
+     "text"
+    ],
+    "attrs": [],
+    "doc": "Yêu cầu phi chức năng"
+   },
+   {
+    "name": "OpenQuestion",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "statement"
+    ],
+    "attrs": [
+     "statement",
+     "dueDate",
+     "confirmStatus"
+    ],
+    "doc": "Câu hỏi mở"
+   },
+   {
+    "name": "PartnerLimit",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "maxConcurrentConnections"
+    ],
+    "attrs": [
+     "requestsPerSecond",
+     "maxPayloadKB",
+     "maxConcurrentConnections",
+     "slaAvailabilityPercent",
+     "p99LatencyMs"
+    ],
+    "doc": "Giới hạn phía đối tác"
+   },
+   {
+    "name": "ReconciliationJob",
+    "parent": "Entity",
+    "required": [
+     "code"
+    ],
+    "attrs": [
+     "schedule",
+     "scope"
+    ],
+    "doc": "Đối soát định kỳ"
+   },
+   {
+    "name": "Requirement",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "text"
+    ],
+    "attrs": [
+     "text",
+     "priority",
+     "targetValue",
+     "targetUnit"
+    ],
+    "doc": "Yêu cầu"
+   },
+   {
+    "name": "RetryPolicy",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "maxAttempts",
+     "idempotentOnly"
+    ],
+    "attrs": [
+     "maxAttempts",
+     "backoffType",
+     "jitter",
+     "idempotentOnly"
+    ],
+    "doc": "Chính sách retry"
+   },
+   {
+    "name": "Risk",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "likelihood",
+     "impact"
+    ],
+    "attrs": [
+     "likelihood",
+     "impact",
+     "mitigation"
+    ],
+    "doc": "Rủi ro kỹ thuật"
+   },
+   {
+    "name": "Scenario",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "responseBudgetMs"
+    ],
+    "attrs": [
+     "steps",
+     "responseBudgetMs"
+    ],
+    "doc": "Luồng xử lý chính"
+   },
+   {
+    "name": "Schema",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "format",
+     "location"
+    ],
+    "attrs": [
+     "format",
+     "schemaVersion",
+     "location",
+     "compatibilityRule"
+    ],
+    "doc": "Schema payload"
+   },
+   {
+    "name": "SecurityScheme",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "schemeType"
+    ],
+    "attrs": [
+     "schemeType",
+     "secretStore",
+     "rotationDays",
+     "signatureCheck"
+    ],
+    "doc": "Cơ chế bảo mật"
+   },
+   {
+    "name": "Technology",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "category"
+    ],
+    "attrs": [
+     "category",
+     "techVersion"
+    ],
+    "doc": "Công nghệ"
+   },
+   {
+    "name": "TestCase",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "level"
+    ],
+    "attrs": [
+     "level",
+     "testStatus",
+     "location"
+    ],
+    "doc": "Test case"
+   },
+   {
+    "name": "TimeoutPolicy",
+    "parent": "Entity",
+    "required": [
+     "code",
+     "connectMs",
+     "readMs",
+     "totalMs"
+    ],
+    "attrs": [
+     "connectMs",
+     "readMs",
+     "totalMs",
+     "poolAcquireMs",
+     "idleMs"
+    ],
+    "doc": "Timeout phía client"
+   }
+  ],
+  "relations": [
+   {
+    "name": "allocatedTo",
+    "domain": [
+     "FunctionalRequirement"
+    ],
+    "range": [
+     "Module"
+    ],
+    "doc": "FR được phân bổ cho module nào"
+   },
+   {
+    "name": "assumes",
+    "domain": [
+     "Decision",
+     "Integration"
+    ],
+    "range": [
+     "Assumption"
+    ],
+    "doc": "Dựa trên giả định"
+   },
+   {
+    "name": "blockedBy",
+    "domain": [
+     "Decision",
+     "Integration"
+    ],
+    "range": [
+     "OpenQuestion"
+    ],
+    "doc": "Đang chờ câu hỏi mở"
+   },
+   {
+    "name": "boundedBy",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "PartnerLimit"
+    ],
+    "doc": "Giới hạn đối tác"
+   },
+   {
+    "name": "carries",
+    "domain": [
+     "Channel"
+    ],
+    "range": [
+     "Message"
+    ],
+    "doc": "Channel mang message"
+   },
+   {
+    "name": "constrainedBy",
+    "domain": [
+     "Decision",
+     "Module",
+     "Integration"
+    ],
+    "range": [
+     "Constraint"
+    ],
+    "doc": "Bị ràng buộc bởi"
+   },
+   {
+    "name": "dependsOn",
+    "domain": [
+     "Module"
+    ],
+    "range": [
+     "Module"
+    ],
+    "doc": "Phụ thuộc giữa module"
+   },
+   {
+    "name": "deployedIn",
+    "domain": [
+     "Module"
+    ],
+    "range": [
+     "Environment"
+    ],
+    "doc": "Module chạy ở môi trường"
+   },
+   {
+    "name": "describedIn",
+    "domain": [
+     "Entity"
+    ],
+    "range": [
+     "Document"
+    ],
+    "doc": "Mô tả trong tài liệu"
+   },
+   {
+    "name": "hasEndpoint",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "Endpoint"
+    ],
+    "doc": "Endpoint"
+   },
+   {
+    "name": "hasErrorMapping",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "ErrorMapping"
+    ],
+    "doc": "Xử lý lỗi"
+   },
+   {
+    "name": "hasFallback",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "FallbackStrategy"
+    ],
+    "doc": "Dự phòng"
+   },
+   {
+    "name": "hasRequest",
+    "domain": [
+     "Endpoint"
+    ],
+    "range": [
+     "Message"
+    ],
+    "doc": "Request message"
+   },
+   {
+    "name": "hasResponse",
+    "domain": [
+     "Endpoint"
+    ],
+    "range": [
+     "Message"
+    ],
+    "doc": "Response message"
+   },
+   {
+    "name": "hasRetryPolicy",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "RetryPolicy"
+    ],
+    "doc": "Retry"
+   },
+   {
+    "name": "hasRisk",
+    "domain": [
+     "Module",
+     "Integration",
+     "Decision"
+    ],
+    "range": [
+     "Risk"
+    ],
+    "doc": "Gắn rủi ro"
+   },
+   {
+    "name": "hasSchema",
+    "domain": [
+     "Message"
+    ],
+    "range": [
+     "Schema"
+    ],
+    "doc": "Schema của payload"
+   },
+   {
+    "name": "hasTimeoutPolicy",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "TimeoutPolicy"
+    ],
+    "doc": "Timeout"
+   },
+   {
+    "name": "integratesVia",
+    "domain": [
+     "Module"
+    ],
+    "range": [
+     "Integration"
+    ],
+    "doc": "Module giao tiếp ngoài qua tích hợp"
+   },
+   {
+    "name": "invokes",
+    "domain": [
+     "Scenario"
+    ],
+    "range": [
+     "Integration"
+    ],
+    "doc": "Luồng gọi điểm tích hợp"
+   },
+   {
+    "name": "mitigatedBy",
+    "domain": [
+     "Risk"
+    ],
+    "range": [
+     "Mechanism",
+     "Decision"
+    ],
+    "doc": "Biện pháp giảm thiểu"
+   },
+   {
+    "name": "monitoredBy",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "MonitoringSpec"
+    ],
+    "doc": "Giám sát"
+   },
+   {
+    "name": "ownsData",
+    "domain": [
+     "Module"
+    ],
+    "range": [
+     "DataEntity"
+    ],
+    "doc": "Module sở hữu dữ liệu"
+   },
+   {
+    "name": "participatesIn",
+    "domain": [
+     "Module"
+    ],
+    "range": [
+     "Scenario"
+    ],
+    "doc": "Module tham gia luồng"
+   },
+   {
+    "name": "protectedBy",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "CircuitBreaker"
+    ],
+    "doc": "Circuit breaker"
+   },
+   {
+    "name": "realizedBy",
+    "domain": [
+     "Requirement"
+    ],
+    "range": [
+     "Scenario"
+    ],
+    "doc": "Luồng xử lý hiện thực yêu cầu"
+   },
+   {
+    "name": "reconciledBy",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "ReconciliationJob"
+    ],
+    "doc": "Đối soát"
+   },
+   {
+    "name": "refinedBy",
+    "domain": [
+     "Module",
+     "Integration"
+    ],
+    "range": [
+     "DesignItem"
+    ],
+    "doc": "Mục LLD/code chi tiết hóa"
+   },
+   {
+    "name": "rejects",
+    "domain": [
+     "Decision"
+    ],
+    "range": [
+     "Alternative"
+    ],
+    "doc": "Phương án đã loại"
+   },
+   {
+    "name": "relatesTo",
+    "domain": [
+     "DataEntity"
+    ],
+    "range": [
+     "DataEntity"
+    ],
+    "doc": "Quan hệ dữ liệu"
+   },
+   {
+    "name": "requiresHeader",
+    "domain": [
+     "Endpoint",
+     "Message"
+    ],
+    "range": [
+     "Header"
+    ],
+    "doc": "Header bắt buộc"
+   },
+   {
+    "name": "satisfiedBy",
+    "domain": [
+     "Requirement"
+    ],
+    "range": [
+     "Module",
+     "Mechanism",
+     "Decision"
+    ],
+    "doc": "Yêu cầu được đáp ứng bởi thành phần/cơ chế nào"
+   },
+   {
+    "name": "securedBy",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "SecurityScheme"
+    ],
+    "doc": "Bảo mật"
+   },
+   {
+    "name": "selects",
+    "domain": [
+     "Decision"
+    ],
+    "range": [
+     "Technology"
+    ],
+    "doc": "Quyết định chọn công nghệ"
+   },
+   {
+    "name": "supersedes",
+    "domain": [
+     "Entity"
+    ],
+    "range": [
+     "Entity"
+    ],
+    "doc": "Nút mới thay nút cũ (cùng lớp)"
+   },
+   {
+    "name": "supportedBy",
+    "domain": [
+     "Decision"
+    ],
+    "range": [
+     "Evidence"
+    ],
+    "doc": "Bằng chứng hỗ trợ"
+   },
+   {
+    "name": "uses",
+    "domain": [
+     "Module"
+    ],
+    "range": [
+     "Technology"
+    ],
+    "doc": "Module dùng công nghệ"
+   },
+   {
+    "name": "usesChannel",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "Channel"
+    ],
+    "doc": "Topic/queue"
+   },
+   {
+    "name": "usesPool",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "ConnectionPool"
+    ],
+    "doc": "Connection pool"
+   },
+   {
+    "name": "verifiedBy",
+    "domain": [
+     "Requirement"
+    ],
+    "range": [
+     "TestCase"
+    ],
+    "doc": "Test kiểm chứng yêu cầu"
+   },
+   {
+    "name": "withParty",
+    "domain": [
+     "Integration"
+    ],
+    "range": [
+     "ExternalParty"
+    ],
+    "doc": "Đối tác"
+   }
+  ]
+ },
+ "nodes": [
+  {
+   "code": "AD-05",
+   "class": "Decision",
+   "label": "Scheduler polling trong tiến trình, chu kỳ 30 giây, chiếm lần chạy bằng UPDATE có điều kiện",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "Quyết định",
+   "props": {
+    "statement": "Scheduler là vòng lặp nền trong tiến trình MiniPay, quét lần chạy đến hạn mỗi 30 giây và chiếm lần chạy bằng UPDATE có điều kiện",
+    "rationale": "Tuân CON-010, không thêm hạ tầng; chu kỳ 30 giây đủ cho NFR-010 (60 giây); UPDATE có điều kiện chống chạy trùng (NFR-011)"
+   }
+  },
+  {
+   "code": "ALT-APScheduler",
+   "class": "Alternative",
+   "label": "Thư viện APScheduler",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "Quyết định",
+   "props": {
+    "reasonRejected": "Thêm phụ thuộc không cần thiết; vòng lặp đơn giản đã đủ"
+   }
+  },
+  {
+   "code": "ALT-DelayedQueue",
+   "class": "Alternative",
+   "label": "Delayed queue riêng",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "Quyết định",
+   "props": {
+    "reasonRejected": "Thêm hạ tầng ngoài, vi phạm CON-010"
+   }
+  },
+  {
+   "code": "ALT-OSCron",
+   "class": "Alternative",
+   "label": "Cron của hệ điều hành",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "Quyết định",
+   "props": {
+    "reasonRejected": "Tách khỏi tiến trình và CSDL, vi phạm CON-010; khó kiểm soát chạy trùng"
+   }
+  },
+  {
+   "code": "ASM-001",
+   "class": "Assumption",
+   "label": "Dịch vụ Fraud Check chịu được 50 request mỗi giây; đối tác chưa xác nhận giới hạn này",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Giả định",
+   "owner": "Tech Lead",
+   "testScope": "context",
+   "props": {
+    "statement": "Dịch vụ Fraud Check chịu được 50 request mỗi giây; đối tác chưa xác nhận giới hạn này",
+    "dueDate": "2026-10-21",
+    "confirmStatus": "Open"
+   }
+  },
+  {
+   "code": "ASM-002",
+   "class": "Assumption",
+   "label": "SMS Gateway có môi trường sandbox để chạy test",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Giả định",
+   "owner": "QA Lead",
+   "testScope": "context",
+   "props": {
+    "statement": "SMS Gateway có môi trường sandbox để chạy test",
+    "dueDate": "2026-10-21",
+    "confirmStatus": "Open"
+   }
+  },
+  {
+   "code": "ASM-010",
+   "class": "Assumption",
+   "label": "Chu kỳ quét 30 giây đủ cho NFR-010",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Giả định",
+   "owner": "Tech Lead",
+   "note": "Q4: vòng lặp nền trong tiến trình, 30 giây, khóa bằng UPDATE có điều kiện",
+   "props": {
+    "statement": "Chu kỳ quét 30 giây đủ cho NFR-010",
+    "dueDate": "2026-10-21",
+    "confirmStatus": "Confirmed"
+   }
+  },
+  {
+   "code": "ASM-011",
+   "class": "Assumption",
+   "label": "Fraud Check chịu được tải thêm từ scheduler (liên quan ASM-001)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Giả định",
+   "owner": "Tech Lead",
+   "note": "Q5: giới hạn 20 lần chạy mỗi chu kỳ, rate limit 10 rps cho scheduler; ASM-001 (đối tác xác nhận 50 rps) vẫn Open",
+   "props": {
+    "statement": "Fraud Check chịu được tải thêm từ scheduler (liên quan ASM-001)",
+    "dueDate": "2026-10-21",
+    "confirmStatus": "Confirmed"
+   }
+  },
+  {
+   "code": "CB-INT01",
+   "class": "CircuitBreaker",
+   "label": "Circuit breaker Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "description": "Mở sau 5 lần thất bại liên tiếp (= 100% trong tối thiểu 5 lần gọi), giữ mở 30 giây",
+   "testScope": "context",
+   "props": {
+    "failureRatePercent": 100,
+    "minimumCalls": 5,
+    "openDurationSec": 30
+   }
+  },
+  {
+   "code": "CH-INT02-events",
+   "class": "Channel",
+   "label": "Topic minipay.transfer.events.v1",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "partitionKey": "fromAccountId",
+    "partitionCount": 3,
+    "deliverySemantics": "atLeastOnce",
+    "retentionDays": 7,
+    "maxMessageKB": 64,
+    "dlqName": "minipay.transfer.events.v1.dlq",
+    "consumerIdempotent": true
+   }
+  },
+  {
+   "code": "CON-010",
+   "class": "Constraint",
+   "label": "Scheduler chạy cùng tiến trình và cùng CSDL với MiniPay",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Ràng buộc",
+   "props": {
+    "constraintType": "technology"
+   }
+  },
+  {
+   "code": "CR-001",
+   "class": "ChangeRequest",
+   "label": "CR-001",
+   "description": "CR-001",
+   "status": "Baselined",
+   "sourceDoc": "CR-001",
+   "props": {
+    "changeKind": "feature"
+   }
+  },
+  {
+   "code": "DE-Account",
+   "class": "DataEntity",
+   "label": "Account",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Dữ liệu mức khái niệm",
+   "description": "Giữ vô thời hạn",
+   "testScope": "context",
+   "props": {
+    "retentionRule": "Giữ vô thời hạn"
+   }
+  },
+  {
+   "code": "DE-AuditLog",
+   "class": "DataEntity",
+   "label": "AuditLog",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Dữ liệu mức khái niệm",
+   "description": "Chỉ thêm, không sửa/xóa",
+   "testScope": "context",
+   "props": {
+    "retentionRule": "Chỉ thêm, không sửa/xóa"
+   }
+  },
+  {
+   "code": "DE-LedgerEntry",
+   "class": "DataEntity",
+   "label": "LedgerEntry",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Dữ liệu mức khái niệm",
+   "description": "Chỉ thêm, không sửa/xóa",
+   "testScope": "context",
+   "props": {
+    "retentionRule": "Chỉ thêm, không sửa/xóa"
+   }
+  },
+  {
+   "code": "DE-OutboxEvent",
+   "class": "DataEntity",
+   "label": "OutboxEvent",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Dữ liệu mức khái niệm",
+   "description": "Xóa sau khi đã phát và quá hạn lưu",
+   "testScope": "context",
+   "props": {
+    "retentionRule": "Xóa sau khi đã phát và quá hạn lưu"
+   }
+  },
+  {
+   "code": "DE-ScheduledRun",
+   "class": "DataEntity",
+   "label": "ScheduledRun",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "Dữ liệu mức khái niệm",
+   "props": {
+    "retentionRule": "Giữ 5 năm"
+   }
+  },
+  {
+   "code": "DE-ScheduledTransfer",
+   "class": "DataEntity",
+   "label": "ScheduledTransfer",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "Dữ liệu mức khái niệm",
+   "props": {
+    "retentionRule": "Giữ 5 năm",
+    "volumeEstimate": "Tối đa 20 lịch ACTIVE/PAUSED mỗi tài khoản (BR-15)"
+   }
+  },
+  {
+   "code": "DE-Transfer",
+   "class": "DataEntity",
+   "label": "Transfer",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Dữ liệu mức khái niệm",
+   "description": "Giữ 5 năm",
+   "testScope": "context",
+   "props": {
+    "retentionRule": "Giữ 5 năm"
+   }
+  },
+  {
+   "code": "DI-API",
+   "class": "DesignItem",
+   "label": "api.py: REST layer",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "module",
+    "location": "minipay/api.py::create_app"
+   }
+  },
+  {
+   "code": "DI-Account",
+   "class": "DesignItem",
+   "label": "service.create_account",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "function",
+    "location": "minipay/service.py::create_account"
+   }
+  },
+  {
+   "code": "DI-Audit",
+   "class": "DesignItem",
+   "label": "service.audit",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "function",
+    "location": "minipay/service.py::audit"
+   }
+  },
+  {
+   "code": "DI-Consumer",
+   "class": "DesignItem",
+   "label": "notify.consume (consumer + INT-03 caller)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "function",
+    "location": "minipay/notify.py::consume"
+   }
+  },
+  {
+   "code": "DI-FraudClient",
+   "class": "DesignItem",
+   "label": "FraudClient (adapter INT-01)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "class",
+    "location": "minipay/fraud_client.py::FraudClient"
+   }
+  },
+  {
+   "code": "DI-FraudClient-INT01",
+   "class": "DesignItem",
+   "label": "FraudClient.check (contract INT-01)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "function",
+    "location": "minipay/fraud_client.py::check"
+   }
+  },
+  {
+   "code": "DI-Ledger",
+   "class": "DesignItem",
+   "label": "service.balance_of / ledger_entries",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "function",
+    "location": "minipay/service.py::balance_of"
+   }
+  },
+  {
+   "code": "DI-Notify",
+   "class": "DesignItem",
+   "label": "notify.py: relay + consumer",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "module",
+    "location": "minipay/notify.py::consume"
+   }
+  },
+  {
+   "code": "DI-Outbox",
+   "class": "DesignItem",
+   "label": "notify.relay_outbox (INT-02 producer)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "function",
+    "location": "minipay/notify.py::relay_outbox"
+   }
+  },
+  {
+   "code": "DI-SchedAPI",
+   "class": "DesignItem",
+   "label": "api.py: sáu endpoint scheduled-transfers",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "kind": "function",
+    "location": "minipay/api.py::scheduled_transfers"
+   }
+  },
+  {
+   "code": "DI-SchedAudit",
+   "class": "DesignItem",
+   "label": "service.audit: sự kiện lịch, tác nhân SCHEDULER",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "kind": "function",
+    "location": "minipay/service.py::audit_schedule_event"
+   }
+  },
+  {
+   "code": "DI-SchedNotify",
+   "class": "DesignItem",
+   "label": "notify: mẫu SMS kết quả lần chạy",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "kind": "function",
+    "location": "minipay/notify.py::scheduled_run_sms"
+   }
+  },
+  {
+   "code": "DI-ScheduledRepo",
+   "class": "DesignItem",
+   "label": "Kho scheduled_transfers/scheduled_runs",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "kind": "function",
+    "location": "minipay/scheduler.py::create_schedule"
+   }
+  },
+  {
+   "code": "DI-Scheduler",
+   "class": "DesignItem",
+   "label": "Scheduler.scan_and_run",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "kind": "function",
+    "location": "minipay/scheduler.py::scan_and_run"
+   }
+  },
+  {
+   "code": "DI-Transfer",
+   "class": "DesignItem",
+   "label": "service.transfer",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "LLD",
+   "sourceSection": "-",
+   "testScope": "context",
+   "props": {
+    "kind": "function",
+    "location": "minipay/service.py::transfer"
+   }
+  },
+  {
+   "code": "DI-TransferCore",
+   "class": "DesignItem",
+   "label": "service.execute_transfer (lõi dùng chung API và scheduler)",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "kind": "function",
+    "location": "minipay/service.py::execute_transfer"
+   }
+  },
+  {
+   "code": "DOC-HLD",
+   "class": "Document",
+   "label": "SAD/HLD MiniPay",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SAD/HLD",
+   "props": {
+    "docType": "SAD/HLD",
+    "baselineDate": "2026-10-07"
+   }
+  },
+  {
+   "code": "DOC-SRS",
+   "class": "Document",
+   "label": "SRS MiniPay",
+   "version": "0.1",
+   "status": "Baselined",
+   "sourceDoc": "SRS",
+   "props": {
+    "docType": "SRS",
+    "baselineDate": "2026-10-07"
+   }
+  },
+  {
+   "code": "DOC-SRS-CR001",
+   "class": "Document",
+   "label": "SRS bổ sung CR-001: chuyển tiền hẹn lịch và định kỳ",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "-",
+   "primary": true,
+   "props": {
+    "docType": "SRS"
+   }
+  },
+  {
+   "code": "DOC-TDD",
+   "class": "Document",
+   "label": "TDD MiniPay",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "props": {
+    "docType": "TDD"
+   }
+  },
+  {
+   "code": "DOC-TEST",
+   "class": "Document",
+   "label": "Test suite (pytest)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "Test",
+   "props": {
+    "docType": "Test Plan"
+   }
+  },
+  {
+   "code": "ENV-Demo",
+   "class": "Environment",
+   "label": "Demo: máy lập trình viên, một tiến trình",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "10",
+   "testScope": "context",
+   "props": {
+    "hostingType": "local"
+   }
+  },
+  {
+   "code": "EP-INT01-check",
+   "class": "Endpoint",
+   "label": "POST /v1/fraud/checks",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "method": "POST",
+    "path": "/v1/fraud/checks",
+    "apiVersion": "v1",
+    "mediaType": "application/json"
+   }
+  },
+  {
+   "code": "EP-INT03-sms",
+   "class": "Endpoint",
+   "label": "POST /v1/sms",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "method": "POST",
+    "path": "/v1/sms",
+    "apiVersion": "v1",
+    "mediaType": "application/json"
+   }
+  },
+  {
+   "code": "ERR-INT01-4xx",
+   "class": "ErrorMapping",
+   "label": "HTTP 4xx (400, 401, 422)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "trigger": "HTTP 4xx (400, 401, 422)",
+    "errorCategory": "permanent",
+    "retryable": false,
+    "action": "Không retry; coi là Fraud không khả dụng, áp chính sách FB-INT01; ghi cảnh báo vi phạm contract"
+   }
+  },
+  {
+   "code": "ERR-INT01-5xx",
+   "class": "ErrorMapping",
+   "label": "HTTP 5xx",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "trigger": "HTTP 5xx",
+    "errorCategory": "transient",
+    "retryable": true,
+    "action": "Retry 1 lần; vẫn lỗi thì coi là không khả dụng, áp FB-INT01; tính vào circuit breaker"
+   }
+  },
+  {
+   "code": "ERR-INT01-schema",
+   "class": "ErrorMapping",
+   "label": "HTTP 200 nhưng response sai schema",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "trigger": "HTTP 200 nhưng response sai schema",
+    "errorCategory": "permanent",
+    "retryable": false,
+    "action": "Không retry; coi là không khả dụng; ghi cảnh báo vi phạm contract"
+   }
+  },
+  {
+   "code": "ERR-INT01-timeout",
+   "class": "ErrorMapping",
+   "label": "Timeout (connect/read) hoặc lỗi mạng",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "trigger": "Timeout (connect/read) hoặc lỗi mạng",
+    "errorCategory": "unknownOutcome",
+    "retryable": true,
+    "action": "Retry 1 lần với cùng transactionId (idempotent); vẫn lỗi thì áp FB-INT01"
+   }
+  },
+  {
+   "code": "ERR-INT02-broker",
+   "class": "ErrorMapping",
+   "label": "Broker không khả dụng / 5xx",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "trigger": "Broker không khả dụng / 5xx",
+    "errorCategory": "transient",
+    "retryable": true,
+    "action": "Giữ sự kiện PENDING trong outbox, retry theo backoff"
+   }
+  },
+  {
+   "code": "ERR-INT02-schema",
+   "class": "ErrorMapping",
+   "label": "Sự kiện sai schema hoặc quá maxMessageKB",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "trigger": "Sự kiện sai schema hoặc quá maxMessageKB",
+    "errorCategory": "permanent",
+    "retryable": false,
+    "action": "Không retry; chuyển DLQ"
+   }
+  },
+  {
+   "code": "ERR-INT02-timeout",
+   "class": "ErrorMapping",
+   "label": "Timeout khi publish",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "trigger": "Timeout khi publish",
+    "errorCategory": "unknownOutcome",
+    "retryable": true,
+    "action": "Retry; có thể trùng sự kiện, consumer khử trùng theo eventId"
+   }
+  },
+  {
+   "code": "ERR-INT03-4xx",
+   "class": "ErrorMapping",
+   "label": "HTTP 4xx (số nhận không hợp lệ)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "trigger": "HTTP 4xx (số nhận không hợp lệ)",
+    "errorCategory": "permanent",
+    "retryable": false,
+    "action": "Không retry; ghi nhận và bỏ qua"
+   }
+  },
+  {
+   "code": "ERR-INT03-5xx",
+   "class": "ErrorMapping",
+   "label": "HTTP 5xx",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "trigger": "HTTP 5xx",
+    "errorCategory": "transient",
+    "retryable": true,
+    "action": "Retry tối đa 3 lần"
+   }
+  },
+  {
+   "code": "ERR-INT03-timeout",
+   "class": "ErrorMapping",
+   "label": "Timeout",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "trigger": "Timeout",
+    "errorCategory": "unknownOutcome",
+    "retryable": true,
+    "action": "Retry với cùng Idempotency-Key; gateway khử trùng"
+   }
+  },
+  {
+   "code": "FB-INT01",
+   "class": "FallbackStrategy",
+   "label": "Dự phòng khi Fraud lỗi",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "description": "Số tiền < 5.000.000 VND: cho qua, riskCheck=SKIPPED. Từ 5.000.000 VND: từ chối FRAUD_CHECK_UNAVAILABLE (503)",
+   "testScope": "context",
+   "props": {
+    "mode": "degraded"
+   }
+  },
+  {
+   "code": "FB-INT03",
+   "class": "FallbackStrategy",
+   "label": "Dự phòng khi SMS lỗi",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "description": "Sau 3 lần thất bại ghi nhận và bỏ qua; không đổi kết quả chuyển tiền",
+   "testScope": "context",
+   "props": {
+    "mode": "degraded"
+   }
+  },
+  {
+   "code": "FR-040",
+   "class": "FunctionalRequirement",
+   "label": "Tạo lịch chuyển tiền một lần tại thời điểm trong tương lai",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Tạo lịch chuyển tiền một lần tại thời điểm trong tương lai",
+    "priority": "Must"
+   }
+  },
+  {
+   "code": "FR-041",
+   "class": "FunctionalRequirement",
+   "label": "Tạo lịch định kỳ DAILY/WEEKLY/MONTHLY có ngày kết thúc hoặc số lần tối đa",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Tạo lịch định kỳ DAILY/WEEKLY/MONTHLY có ngày kết thúc hoặc số lần tối đa",
+    "priority": "Must"
+   }
+  },
+  {
+   "code": "FR-042",
+   "class": "FunctionalRequirement",
+   "label": "Tra cứu một lịch, danh sách lịch của tài khoản và các lần chạy của lịch",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Tra cứu một lịch, danh sách lịch của tài khoản và các lần chạy của lịch",
+    "priority": "Must"
+   }
+  },
+  {
+   "code": "FR-043",
+   "class": "FunctionalRequirement",
+   "label": "Hủy lịch chuyển tiền",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Hủy lịch chuyển tiền",
+    "priority": "Must"
+   }
+  },
+  {
+   "code": "FR-044",
+   "class": "FunctionalRequirement",
+   "label": "Tạm dừng và tiếp tục lịch định kỳ",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Tạm dừng và tiếp tục lịch định kỳ",
+    "priority": "Should"
+   }
+  },
+  {
+   "code": "FR-045",
+   "class": "FunctionalRequirement",
+   "label": "Đến hạn, tự chuyển tiền bằng luồng chuyển tiền hiện có; Idempotency-Key = mã lịch + thời điểm dự kiến",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Đến hạn, tự chuyển tiền bằng luồng chuyển tiền hiện có; Idempotency-Key = mã lịch + thời điểm dự kiến",
+    "priority": "Must"
+   }
+  },
+  {
+   "code": "FR-046",
+   "class": "FunctionalRequirement",
+   "label": "Xử lý thất bại của lần chạy theo loại lỗi (BR-13): thử lại, FAILED, tự PAUSED sau 3 lần FAILED liên tiếp",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Xử lý thất bại của lần chạy theo loại lỗi (BR-13): thử lại, FAILED, tự PAUSED sau 3 lần FAILED liên tiếp",
+    "priority": "Must"
+   }
+  },
+  {
+   "code": "FR-047",
+   "class": "FunctionalRequirement",
+   "label": "Thông báo kết quả mỗi lần chạy qua SMS (ScheduledRunCompleted/ScheduledRunFailed qua outbox)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Thông báo kết quả mỗi lần chạy qua SMS (ScheduledRunCompleted/ScheduledRunFailed qua outbox)",
+    "priority": "Should"
+   }
+  },
+  {
+   "code": "FR-048",
+   "class": "FunctionalRequirement",
+   "label": "Ghi audit cho tạo, hủy, tạm dừng, tiếp tục lịch và mọi kết quả lần chạy, tác nhân SCHEDULER",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Ghi audit cho tạo, hủy, tạm dừng, tiếp tục lịch và mọi kết quả lần chạy, tác nhân SCHEDULER",
+    "priority": "Must"
+   }
+  },
+  {
+   "code": "FR-049",
+   "class": "FunctionalRequirement",
+   "label": "Chạy bù các lần chạy quá hạn không quá 24 giờ sau khi hệ thống ngừng; quá hạn thì MISSED",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu chức năng",
+   "props": {
+    "text": "Chạy bù các lần chạy quá hạn không quá 24 giờ sau khi hệ thống ngừng; quá hạn thì MISSED",
+    "priority": "Should"
+   }
+  },
+  {
+   "code": "HDR-INT01-auth",
+   "class": "Header",
+   "label": "Authorization",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "name": "Authorization",
+    "required": true,
+    "example": "Bearer <token>"
+   }
+  },
+  {
+   "code": "HDR-INT01-corr",
+   "class": "Header",
+   "label": "X-Correlation-Id",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "name": "X-Correlation-Id",
+    "required": true,
+    "example": "7f3c..."
+   }
+  },
+  {
+   "code": "HDR-INT02-corr",
+   "class": "Header",
+   "label": "correlationId (trong message)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "name": "correlationId",
+    "required": true
+   }
+  },
+  {
+   "code": "HDR-INT03-auth",
+   "class": "Header",
+   "label": "Authorization",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "name": "Authorization",
+    "required": true
+   }
+  },
+  {
+   "code": "HDR-INT03-idem",
+   "class": "Header",
+   "label": "Idempotency-Key",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "name": "Idempotency-Key",
+    "required": true,
+    "example": "TRF-AB12"
+   }
+  },
+  {
+   "code": "INT-01",
+   "class": "Integration",
+   "label": "Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "integrationType": "ThirdParty",
+    "direction": "outbound",
+    "interactionStyle": "sync",
+    "protocol": "REST/JSON",
+    "idempotent": true,
+    "expectedRps": 50,
+    "demoImplementation": "mock FastAPI (minipay/fraud_mock.py)"
+   }
+  },
+  {
+   "code": "INT-02",
+   "class": "Integration",
+   "label": "Sự kiện giao dịch (message queue)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "integrationType": "MessageQueue",
+    "direction": "outbound",
+    "interactionStyle": "async",
+    "protocol": "queue",
+    "idempotent": true,
+    "expectedRps": 50,
+    "demoImplementation": "simulated by table queue_messages"
+   }
+  },
+  {
+   "code": "INT-03",
+   "class": "Integration",
+   "label": "SMS Gateway",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "integrationType": "ThirdParty",
+    "direction": "outbound",
+    "interactionStyle": "async",
+    "protocol": "REST/JSON",
+    "idempotent": false,
+    "expectedRps": 20,
+    "demoImplementation": "simulated by table sms_log"
+   }
+  },
+  {
+   "code": "LIM-INT01",
+   "class": "PartnerLimit",
+   "label": "Giới hạn Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "requestsPerSecond": 50,
+    "maxConcurrentConnections": 50,
+    "maxPayloadKB": 16,
+    "p99LatencyMs": 500
+   }
+  },
+  {
+   "code": "LIM-INT02",
+   "class": "PartnerLimit",
+   "label": "Giới hạn broker",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "requestsPerSecond": 1000,
+    "maxConcurrentConnections": 100,
+    "maxPayloadKB": 64
+   }
+  },
+  {
+   "code": "LIM-INT03",
+   "class": "PartnerLimit",
+   "label": "Giới hạn SMS Gateway",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "requestsPerSecond": 20,
+    "maxConcurrentConnections": 10,
+    "maxPayloadKB": 4
+   }
+  },
+  {
+   "code": "MECH-AppendOnlyLedger",
+   "class": "Mechanism",
+   "label": "Sổ cái chỉ thêm, số dư = balance_after của bút toán cuối",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "testScope": "context",
+   "props": {
+    "mechanismKind": "integrity"
+   }
+  },
+  {
+   "code": "MECH-CatchUp",
+   "class": "Mechanism",
+   "label": "Chạy bù lần quá hạn trong 24 giờ, quá hạn thì MISSED",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "note": "Thời hạn chạy bù 24 giờ (OQ-012 đã chốt)",
+   "props": {
+    "mechanismKind": "availability"
+   }
+  },
+  {
+   "code": "MECH-CircuitBreaker",
+   "class": "Mechanism",
+   "label": "Circuit breaker ở Risk adapter",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "testScope": "context",
+   "props": {
+    "mechanismKind": "resilience"
+   }
+  },
+  {
+   "code": "MECH-Correlation",
+   "class": "Mechanism",
+   "label": "X-Correlation-Id sinh ở API, ghi vào giao dịch, audit, lời gọi ngoài",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "testScope": "context",
+   "props": {
+    "mechanismKind": "observability"
+   }
+  },
+  {
+   "code": "MECH-IdempotentConsumer",
+   "class": "Mechanism",
+   "label": "Consumer khử trùng theo eventId (processed_events)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "testScope": "context",
+   "props": {
+    "mechanismKind": "messaging"
+   }
+  },
+  {
+   "code": "MECH-Outbox",
+   "class": "Mechanism",
+   "label": "Bảng outbox ghi cùng giao dịch CSDL, relay lên queue",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "testScope": "context",
+   "props": {
+    "mechanismKind": "messaging"
+   }
+  },
+  {
+   "code": "MECH-RunClaim",
+   "class": "Mechanism",
+   "label": "Chiếm lần chạy bằng UPDATE có điều kiện trên scheduled_runs",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "props": {
+    "mechanismKind": "concurrency"
+   }
+  },
+  {
+   "code": "MECH-ScheduleRetry",
+   "class": "Mechanism",
+   "label": "Thử lại theo loại lỗi BR-13 và tự PAUSED sau 3 lần FAILED liên tiếp",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "note": "FRAUD_CHECK_UNAVAILABLE: 3 lần cách 5 phút; INSUFFICIENT_FUNDS: 2 lần cách 1 giờ (OQ-010 đã chốt); lỗi vĩnh viễn không thử lại",
+   "props": {
+    "mechanismKind": "resilience"
+   }
+  },
+  {
+   "code": "MECH-SchedulerThrottle",
+   "class": "Mechanism",
+   "label": "Giới hạn 20 lần chạy mỗi chu kỳ quét và rate limit 10 rps cho scheduler",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "props": {
+    "mechanismKind": "rate-limit"
+   }
+  },
+  {
+   "code": "MECH-TimeoutBudget",
+   "class": "Mechanism",
+   "label": "Ngân sách timeout chia từ ngoài vào trong",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "testScope": "context",
+   "props": {
+    "mechanismKind": "resilience"
+   }
+  },
+  {
+   "code": "MECH-WriteLock",
+   "class": "Mechanism",
+   "label": "BEGIN IMMEDIATE và kiểm tra lại số dư/hạn mức trong giao dịch",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "7, 9",
+   "testScope": "context",
+   "props": {
+    "mechanismKind": "concurrency"
+   }
+  },
+  {
+   "code": "MOD-API",
+   "class": "Module",
+   "label": "API Layer",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Phân rã module",
+   "testScope": "context",
+   "props": {
+    "responsibility": "Nhận REST, xác thực API key, kiểm tra đầu vào, đọc Idempotency-Key và X-Correlation-Id, đổi lỗi nghiệp vụ thành mã HTTP",
+    "layer": "api"
+   }
+  },
+  {
+   "code": "MOD-Account",
+   "class": "Module",
+   "label": "Quản lý tài khoản",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Phân rã module",
+   "testScope": "context",
+   "props": {
+    "responsibility": "Tạo tài khoản, cấp và băm API key, tra cứu tài khoản",
+    "layer": "domain"
+   }
+  },
+  {
+   "code": "MOD-Audit",
+   "class": "Module",
+   "label": "Audit",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Phân rã module",
+   "testScope": "context",
+   "props": {
+    "responsibility": "Ghi audit cho thao tác thay đổi dữ liệu và giao dịch bị từ chối",
+    "layer": "domain"
+   }
+  },
+  {
+   "code": "MOD-Ledger",
+   "class": "Module",
+   "label": "Sổ cái",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Phân rã module",
+   "testScope": "context",
+   "props": {
+    "responsibility": "Ghi bút toán ghi nợ và ghi có, giữ số dư không âm, bảo toàn tổng số dư",
+    "layer": "domain"
+   }
+  },
+  {
+   "code": "MOD-Notify",
+   "class": "Module",
+   "label": "Thông báo",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Phân rã module",
+   "testScope": "context",
+   "props": {
+    "responsibility": "Đưa sự kiện từ outbox lên message queue; nhận sự kiện và gửi SMS",
+    "layer": "adapter"
+   }
+  },
+  {
+   "code": "MOD-Risk",
+   "class": "Module",
+   "label": "Risk adapter",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Phân rã module",
+   "testScope": "context",
+   "props": {
+    "responsibility": "Gọi Fraud Check và áp chính sách khi dịch vụ lỗi hoặc quá thời gian",
+    "layer": "adapter"
+   }
+  },
+  {
+   "code": "MOD-Scheduler",
+   "class": "Module",
+   "label": "Scheduler",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "Phân rã module",
+   "props": {
+    "layer": "domain",
+    "responsibility": "Quản lý lịch chuyển tiền và lần chạy; quét lần chạy đến hạn mỗi 30 giây, chiếm lần chạy bằng UPDATE có điều kiện, gọi lõi chuyển tiền, thử lại, chạy bù, giới hạn 20 lần chạy mỗi chu kỳ"
+   }
+  },
+  {
+   "code": "MOD-Transfer",
+   "class": "Module",
+   "label": "Chuyển tiền",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SAD/HLD",
+   "sourceSection": "Phân rã module",
+   "testScope": "context",
+   "props": {
+    "responsibility": "Điều phối luồng chuyển tiền: idempotency, hạn mức, gọi Risk, ghi sổ, ghi outbox; xử lý nạp tiền và tra cứu giao dịch",
+    "layer": "domain"
+   }
+  },
+  {
+   "code": "MON-INT01",
+   "class": "MonitoringSpec",
+   "label": "Giám sát Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "metrics": "fraud_latency_ms, fraud_error_rate, breaker_state",
+    "alertThreshold": "p95 > 800 ms hoặc breaker mở"
+   }
+  },
+  {
+   "code": "MON-INT02",
+   "class": "MonitoringSpec",
+   "label": "Giám sát queue",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "metrics": "outbox_pending_count, dlq_size",
+    "alertThreshold": "outbox_pending_count > 100"
+   }
+  },
+  {
+   "code": "MSG-INT01-req",
+   "class": "Message",
+   "label": "Fraud check request",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "messageType": "request",
+    "direction": "outbound",
+    "example": "{\"transactionId\":\"TRF-AB12\",\"fromAccount\":\"0123456789\",\"toAccount\":\"9876543210\",\"amount\":1000000,\"currency\":\"VND\"}",
+    "sensitiveFields": "fromAccount,toAccount"
+   }
+  },
+  {
+   "code": "MSG-INT01-res",
+   "class": "Message",
+   "label": "Fraud check response",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "messageType": "response",
+    "direction": "inbound",
+    "example": "{\"decision\":\"APPROVE\",\"riskScore\":10,\"correlationId\":\"...\"}"
+   }
+  },
+  {
+   "code": "MSG-INT02-event",
+   "class": "Message",
+   "label": "Sự kiện TransferCompleted",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "messageType": "event",
+    "direction": "outbound",
+    "example": "{\"eventId\":\"TRF-AB12\",\"transferId\":\"TRF-AB12\",\"fromAccountId\":\"..\",\"toAccountId\":\"..\",\"amount\":1000,\"correlationId\":\"..\"}",
+    "sensitiveFields": "fromAccountId,toAccountId"
+   }
+  },
+  {
+   "code": "MSG-INT02-scheduled-run",
+   "class": "Message",
+   "label": "Sự kiện ScheduledRunCompleted/ScheduledRunFailed",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "props": {
+    "messageType": "event",
+    "direction": "outbound",
+    "example": "{\"eventId\":\"RUN-AB12\",\"scheduleId\":\"SCH-01\",\"runId\":\"RUN-AB12\",\"fromAccountId\":\"..\",\"toAccountId\":\"..\",\"amount\":1000,\"correlationId\":\"..\",\"transferId\":\"TRF-AB12\"}",
+    "sensitiveFields": "fromAccountId,toAccountId"
+   }
+  },
+  {
+   "code": "MSG-INT03-req",
+   "class": "Message",
+   "label": "SMS request",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "messageType": "request",
+    "direction": "outbound",
+    "example": "{\"to\":\"0912345678\",\"content\":\"MiniPay: +1,000 VND\",\"messageId\":\"TRF-AB12\"}",
+    "sensitiveFields": "to"
+   }
+  },
+  {
+   "code": "NFR-010",
+   "class": "NonFunctionalRequirement",
+   "label": "Đúng giờ: 99% lần chạy bắt đầu trong 60 giây kể từ thời điểm dự kiến",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "props": {
+    "text": "Đúng giờ: 99% lần chạy bắt đầu trong 60 giây kể từ thời điểm dự kiến",
+    "priority": "Must",
+    "targetValue": 60,
+    "targetUnit": "s"
+   }
+  },
+  {
+   "code": "NFR-011",
+   "class": "NonFunctionalRequirement",
+   "label": "Không chạy trùng: 0 giao dịch trùng cho một lần chạy, kể cả khi hai scheduler cùng quét",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "props": {
+    "text": "Không chạy trùng: 0 giao dịch trùng cho một lần chạy, kể cả khi hai scheduler cùng quét",
+    "priority": "Must",
+    "targetValue": 0,
+    "targetUnit": "giao dịch trùng"
+   }
+  },
+  {
+   "code": "NFR-012",
+   "class": "NonFunctionalRequirement",
+   "label": "Phục hồi: sau khởi động lại, lần chạy quá hạn trong 24 giờ được xử lý trong 5 chu kỳ quét đầu",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "props": {
+    "text": "Phục hồi: sau khởi động lại, lần chạy quá hạn trong 24 giờ được xử lý trong 5 chu kỳ quét đầu",
+    "priority": "Must",
+    "targetValue": 5,
+    "targetUnit": "chu kỳ quét"
+   }
+  },
+  {
+   "code": "NFR-013",
+   "class": "NonFunctionalRequirement",
+   "label": "Xử lý 100 lần chạy đến hạn cùng lúc mà p95 chuyển tiền qua API vẫn <= 500 ms",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "props": {
+    "text": "Xử lý 100 lần chạy đến hạn cùng lúc mà p95 chuyển tiền qua API vẫn <= 500 ms",
+    "priority": "Must",
+    "targetValue": 500,
+    "targetUnit": "ms"
+   }
+  },
+  {
+   "code": "NFR-014",
+   "class": "NonFunctionalRequirement",
+   "label": "Truy vết: 100% lần chạy có correlationId riêng, đi theo giao dịch, audit và lời gọi Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Yêu cầu phi chức năng",
+   "props": {
+    "text": "Truy vết: 100% lần chạy có correlationId riêng, đi theo giao dịch, audit và lời gọi Fraud Check",
+    "priority": "Must",
+    "targetValue": 100,
+    "targetUnit": "%"
+   }
+  },
+  {
+   "code": "OQ-001",
+   "class": "OpenQuestion",
+   "label": "Hạn mức mỗi giao dịch và mỗi ngày cuối cùng do bộ phận nào phê duyệt",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Câu hỏi mở",
+   "owner": "Business Analyst",
+   "testScope": "context",
+   "props": {
+    "statement": "Hạn mức mỗi giao dịch và mỗi ngày cuối cùng do bộ phận nào phê duyệt",
+    "dueDate": "2026-10-28",
+    "confirmStatus": "Open"
+   }
+  },
+  {
+   "code": "OQ-010",
+   "class": "OpenQuestion",
+   "label": "Quy tắc thử lại khi thiếu số dư",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Câu hỏi mở",
+   "owner": "Business Analyst",
+   "note": "Q1: thử lại 2 lần, cách 1 giờ (BR-13)",
+   "props": {
+    "statement": "Quy tắc thử lại khi thiếu số dư",
+    "dueDate": "2026-10-21",
+    "confirmStatus": "Confirmed"
+   }
+  },
+  {
+   "code": "OQ-011",
+   "class": "OpenQuestion",
+   "label": "Giới hạn 20 lịch ACTIVE/PAUSED mỗi tài khoản phù hợp nghiệp vụ",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Câu hỏi mở",
+   "owner": "Business Analyst",
+   "note": "Q2: 20 lịch (BR-15)",
+   "props": {
+    "statement": "Giới hạn 20 lịch ACTIVE/PAUSED mỗi tài khoản phù hợp nghiệp vụ",
+    "dueDate": "2026-10-21",
+    "confirmStatus": "Confirmed"
+   }
+  },
+  {
+   "code": "OQ-012",
+   "class": "OpenQuestion",
+   "label": "Thời hạn chạy bù khi hệ thống ngừng",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "SRS",
+   "sourceSection": "Câu hỏi mở",
+   "owner": "Business Analyst",
+   "note": "Q3: 24 giờ",
+   "props": {
+    "statement": "Thời hạn chạy bù khi hệ thống ngừng",
+    "dueDate": "2026-10-21",
+    "confirmStatus": "Confirmed"
+   }
+  },
+  {
+   "code": "PARTY-Broker",
+   "class": "ExternalParty",
+   "label": "Message broker nền tảng",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6",
+   "testScope": "context",
+   "props": {
+    "partyType": "InternalService",
+    "contractConfirmed": true,
+    "sandboxAvailable": true
+   }
+  },
+  {
+   "code": "PARTY-Fraud",
+   "class": "ExternalParty",
+   "label": "Dịch vụ Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6",
+   "testScope": "context",
+   "props": {
+    "partyType": "ThirdParty",
+    "contractConfirmed": false,
+    "sandboxAvailable": true
+   }
+  },
+  {
+   "code": "PARTY-SMS",
+   "class": "ExternalParty",
+   "label": "SMS Gateway",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6",
+   "testScope": "context",
+   "props": {
+    "partyType": "ThirdParty",
+    "contractConfirmed": false,
+    "sandboxAvailable": true
+   }
+  },
+  {
+   "code": "POOL-INT01",
+   "class": "ConnectionPool",
+   "label": "Pool Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "maxTotal": 20,
+    "maxPerRoute": 20,
+    "minIdle": 10,
+    "idleTimeoutSec": 30,
+    "validationEnabled": false,
+    "bulkheadGroup": "fraud"
+   }
+  },
+  {
+   "code": "POOL-INT02",
+   "class": "ConnectionPool",
+   "label": "Pool producer",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "maxTotal": 5,
+    "maxPerRoute": 5,
+    "minIdle": 1,
+    "idleTimeoutSec": 60,
+    "validationEnabled": true,
+    "bulkheadGroup": "queue"
+   }
+  },
+  {
+   "code": "POOL-INT03",
+   "class": "ConnectionPool",
+   "label": "Pool SMS",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "maxTotal": 5,
+    "maxPerRoute": 5,
+    "minIdle": 1,
+    "idleTimeoutSec": 30,
+    "bulkheadGroup": "sms"
+   }
+  },
+  {
+   "code": "REC-INT02",
+   "class": "ReconciliationJob",
+   "label": "Đối soát outbox",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "schedule": "mỗi 5 phút",
+    "scope": "outbox PENDING quá 5 phút"
+   }
+  },
+  {
+   "code": "RISK-001",
+   "class": "Risk",
+   "label": "Fraud Check chậm hoặc không sẵn sàng",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "11",
+   "testScope": "context",
+   "props": {
+    "likelihood": "Medium",
+    "impact": "High",
+    "mitigation": "Timeout chặt, retry có giới hạn, circuit breaker, chính sách fail theo ngưỡng (AD-04)"
+   }
+  },
+  {
+   "code": "RISK-002",
+   "class": "Risk",
+   "label": "Số dư âm do hai giao dịch chạy đồng thời",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "11",
+   "testScope": "context",
+   "props": {
+    "likelihood": "Medium",
+    "impact": "High"
+   }
+  },
+  {
+   "code": "RISK-003",
+   "class": "Risk",
+   "label": "Sự kiện thông báo bị gửi trùng",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "11",
+   "testScope": "context",
+   "props": {
+    "likelihood": "High",
+    "impact": "Low"
+   }
+  },
+  {
+   "code": "RISK-005",
+   "class": "Risk",
+   "label": "Chạy trùng giao dịch khi nhiều scheduler và tải thêm lên Fraud Check giờ cao điểm",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "11",
+   "props": {
+    "likelihood": "Medium",
+    "impact": "High",
+    "mitigation": "MECH-RunClaim (UPDATE có điều kiện) + idempotency key cố định; giới hạn 20 lần chạy mỗi chu kỳ và rate limit 10 rps (MECH-SchedulerThrottle)"
+   }
+  },
+  {
+   "code": "RT-INT01",
+   "class": "RetryPolicy",
+   "label": "Retry Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "maxAttempts": 2,
+    "backoffType": "none",
+    "jitter": false,
+    "idempotentOnly": true
+   }
+  },
+  {
+   "code": "RT-INT02",
+   "class": "RetryPolicy",
+   "label": "Retry publish",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "maxAttempts": 3,
+    "backoffType": "exponential",
+    "jitter": true,
+    "idempotentOnly": true
+   }
+  },
+  {
+   "code": "RT-INT03",
+   "class": "RetryPolicy",
+   "label": "Retry SMS",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "description": "Retry an toàn nhờ Idempotency-Key = eventId (R9)",
+   "testScope": "context",
+   "props": {
+    "maxAttempts": 3,
+    "backoffType": "exponential",
+    "jitter": true,
+    "idempotentOnly": false
+   }
+  },
+  {
+   "code": "SCH-INT01-req",
+   "class": "Schema",
+   "label": "Fraud check request schema",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "format": "JSONSchema",
+    "schemaVersion": "1.0",
+    "location": "contracts/fraud-check.request.schema.json",
+    "compatibilityRule": "backward"
+   }
+  },
+  {
+   "code": "SCH-INT01-res",
+   "class": "Schema",
+   "label": "Fraud check response schema",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "format": "JSONSchema",
+    "schemaVersion": "1.0",
+    "location": "contracts/fraud-check.response.schema.json",
+    "compatibilityRule": "backward"
+   }
+  },
+  {
+   "code": "SCH-INT02-event",
+   "class": "Schema",
+   "label": "TransferCompleted schema",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "format": "JSONSchema",
+    "schemaVersion": "1.0",
+    "location": "contracts/transfer-completed.event.schema.json",
+    "compatibilityRule": "backward"
+   }
+  },
+  {
+   "code": "SCH-INT02-scheduled-run",
+   "class": "Schema",
+   "label": "ScheduledRun event schema",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "props": {
+    "format": "JSONSchema",
+    "schemaVersion": "1.0",
+    "location": "contracts/scheduled-run.event.schema.json",
+    "compatibilityRule": "backward"
+   }
+  },
+  {
+   "code": "SCH-INT03-req",
+   "class": "Schema",
+   "label": "SMS request schema",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "format": "JSONSchema",
+    "schemaVersion": "1.0",
+    "location": "contracts/sms.request.schema.json",
+    "compatibilityRule": "backward"
+   }
+  },
+  {
+   "code": "SCN-Notify",
+   "class": "Scenario",
+   "label": "Thông báo sau chuyển tiền (bất đồng bộ)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "8",
+   "testScope": "context",
+   "props": {
+    "responseBudgetMs": 60000,
+    "steps": [
+     "Outbox",
+     "queue",
+     "consumer khử trùng",
+     "SMS Gateway"
+    ]
+   }
+  },
+  {
+   "code": "SCN-ScheduledRun",
+   "class": "Scenario",
+   "label": "Chạy lịch chuyển tiền đến hạn",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "8",
+   "props": {
+    "responseBudgetMs": 60000,
+    "steps": [
+     "Quét mỗi 30 giây",
+     "chọn tối đa 20 lần chạy đến hạn",
+     "chiếm lần chạy (UPDATE có điều kiện)",
+     "sinh correlationId",
+     "lõi chuyển tiền (idempotency, hạn mức/số dư, Fraud Check, ghi sổ + outbox)",
+     "cập nhật lần chạy",
+     "thử lại/FAILED",
+     "audit + sự kiện"
+    ]
+   }
+  },
+  {
+   "code": "SCN-Transfer",
+   "class": "Scenario",
+   "label": "Chuyển tiền (đồng bộ)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "8",
+   "testScope": "context",
+   "props": {
+    "responseBudgetMs": 3000,
+    "steps": [
+     "Xác thực",
+     "kiểm tra đầu vào",
+     "idempotency",
+     "hạn mức/số dư",
+     "Fraud Check",
+     "ghi sổ + outbox",
+     "trả kết quả"
+    ]
+   }
+  },
+  {
+   "code": "SEC-INT01",
+   "class": "SecurityScheme",
+   "label": "Bearer token Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "testScope": "context",
+   "props": {
+    "schemeType": "APIKey",
+    "secretStore": "biến môi trường (demo); secret manager khi triển khai thật",
+    "rotationDays": 90
+   }
+  },
+  {
+   "code": "SEC-INT02",
+   "class": "SecurityScheme",
+   "label": "mTLS tới broker",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "schemeType": "mTLS",
+    "secretStore": "secret manager",
+    "rotationDays": 365
+   }
+  },
+  {
+   "code": "SEC-INT03",
+   "class": "SecurityScheme",
+   "label": "API key SMS",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "schemeType": "APIKey",
+    "secretStore": "secret manager",
+    "rotationDays": 90
+   }
+  },
+  {
+   "code": "TC-S01",
+   "class": "TestCase",
+   "label": "test_create_once_and_validation",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_create_once_and_validation"
+   }
+  },
+  {
+   "code": "TC-S02",
+   "class": "TestCase",
+   "label": "test_query_schedules_and_runs",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_query_schedules_and_runs"
+   }
+  },
+  {
+   "code": "TC-S03",
+   "class": "TestCase",
+   "label": "test_cancel_and_pause_resume",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_cancel_and_pause_resume"
+   }
+  },
+  {
+   "code": "TC-S04",
+   "class": "TestCase",
+   "label": "test_due_run_creates_one_transfer",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_due_run_creates_one_transfer"
+   }
+  },
+  {
+   "code": "TC-S05",
+   "class": "TestCase",
+   "label": "test_retry_policy_and_auto_pause",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_retry_policy_and_auto_pause"
+   }
+  },
+  {
+   "code": "TC-S06",
+   "class": "TestCase",
+   "label": "test_run_result_events_and_sms",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_run_result_events_and_sms"
+   }
+  },
+  {
+   "code": "TC-S07",
+   "class": "TestCase",
+   "label": "test_schedule_audit_actor_scheduler",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_schedule_audit_actor_scheduler"
+   }
+  },
+  {
+   "code": "TC-S08",
+   "class": "TestCase",
+   "label": "test_catch_up_and_missed",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_catch_up_and_missed"
+   }
+  },
+  {
+   "code": "TC-S09",
+   "class": "TestCase",
+   "label": "test_scan_punctuality_fake_clock",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_scan_punctuality_fake_clock"
+   }
+  },
+  {
+   "code": "TC-S10",
+   "class": "TestCase",
+   "label": "test_two_schedulers_no_duplicate",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_two_schedulers_no_duplicate"
+   }
+  },
+  {
+   "code": "TC-S11",
+   "class": "TestCase",
+   "label": "test_restart_between_claim_and_transfer",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_restart_between_claim_and_transfer"
+   }
+  },
+  {
+   "code": "TC-S12",
+   "class": "TestCase",
+   "label": "test_scheduler_correlation_id",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "integration",
+    "testStatus": "Planned",
+    "location": "tests/test_scheduler.py::test_scheduler_correlation_id"
+   }
+  },
+  {
+   "code": "TC-S13",
+   "class": "TestCase",
+   "label": "benchmark_scheduler_100_runs",
+   "version": "0.1",
+   "status": "Draft",
+   "sourceDoc": "TDD",
+   "sourceSection": "-",
+   "props": {
+    "level": "benchmark",
+    "testStatus": "Planned",
+    "location": "scripts/benchmark_scheduler.py::main"
+   }
+  },
+  {
+   "code": "TECH-FastAPI",
+   "class": "Technology",
+   "label": "FastAPI",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "4",
+   "testScope": "context",
+   "props": {
+    "category": "framework",
+    "techVersion": "0.142"
+   }
+  },
+  {
+   "code": "TECH-Python",
+   "class": "Technology",
+   "label": "Python",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "4",
+   "testScope": "context",
+   "props": {
+    "category": "language",
+    "techVersion": "3.10+"
+   }
+  },
+  {
+   "code": "TECH-SQLite",
+   "class": "Technology",
+   "label": "SQLite (WAL)",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "4",
+   "testScope": "context",
+   "props": {
+    "category": "database",
+    "techVersion": "3"
+   }
+  },
+  {
+   "code": "TECH-Uvicorn",
+   "class": "Technology",
+   "label": "Uvicorn",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "4",
+   "testScope": "context",
+   "props": {
+    "category": "infra",
+    "techVersion": "0.53"
+   }
+  },
+  {
+   "code": "TECH-httpx",
+   "class": "Technology",
+   "label": "httpx",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "4",
+   "testScope": "context",
+   "props": {
+    "category": "framework",
+    "techVersion": "0.28"
+   }
+  },
+  {
+   "code": "TO-INT01",
+   "class": "TimeoutPolicy",
+   "label": "Timeout Fraud Check",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.1",
+   "description": "totalMs là thời gian tối đa của MỘT lần gọi; tối đa 2 lần gọi (retry 1 lần) = 2000 ms < ngân sách 3000 ms",
+   "testScope": "context",
+   "props": {
+    "connectMs": 300,
+    "readMs": 800,
+    "totalMs": 1000,
+    "poolAcquireMs": 200,
+    "idleMs": 30000
+   }
+  },
+  {
+   "code": "TO-INT02",
+   "class": "TimeoutPolicy",
+   "label": "Timeout publish",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.2",
+   "testScope": "context",
+   "props": {
+    "connectMs": 500,
+    "readMs": 1000,
+    "totalMs": 2000,
+    "poolAcquireMs": 200
+   }
+  },
+  {
+   "code": "TO-INT03",
+   "class": "TimeoutPolicy",
+   "label": "Timeout SMS",
+   "version": "0.1",
+   "status": "InReview",
+   "sourceDoc": "TDD",
+   "sourceSection": "6.3",
+   "testScope": "context",
+   "props": {
+    "connectMs": 500,
+    "readMs": 2000,
+    "totalMs": 3000,
+    "poolAcquireMs": 300
+   }
+  }
+ ],
+ "edges": [
+  [
+   "AD-05",
+   "assumes",
+   "ASM-010",
+   {}
+  ],
+  [
+   "AD-05",
+   "constrainedBy",
+   "CON-010",
+   {}
+  ],
+  [
+   "AD-05",
+   "describedIn",
+   "DOC-HLD",
+   {}
+  ],
+  [
+   "AD-05",
+   "hasRisk",
+   "RISK-005",
+   {}
+  ],
+  [
+   "AD-05",
+   "rejects",
+   "ALT-APScheduler",
+   {}
+  ],
+  [
+   "AD-05",
+   "rejects",
+   "ALT-DelayedQueue",
+   {}
+  ],
+  [
+   "AD-05",
+   "rejects",
+   "ALT-OSCron",
+   {}
+  ],
+  [
+   "CH-INT02-events",
+   "carries",
+   "MSG-INT02-event",
+   {}
+  ],
+  [
+   "CH-INT02-events",
+   "carries",
+   "MSG-INT02-scheduled-run",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "AD-05",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "ALT-APScheduler",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "ALT-DelayedQueue",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "ALT-OSCron",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "ASM-010",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "ASM-011",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "CON-010",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "DE-ScheduledRun",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "DE-ScheduledTransfer",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "DI-SchedAPI",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "DI-SchedAudit",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "DI-SchedNotify",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "DI-ScheduledRepo",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "DI-Scheduler",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "DI-TransferCore",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-040",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-041",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-042",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-043",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-044",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-045",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-046",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-047",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-048",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "FR-049",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "MECH-CatchUp",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "MECH-RunClaim",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "MECH-ScheduleRetry",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "MECH-SchedulerThrottle",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "MSG-INT02-scheduled-run",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "NFR-010",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "NFR-011",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "NFR-012",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "NFR-013",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "NFR-014",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "OQ-010",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "OQ-011",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "OQ-012",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "RISK-005",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "SCH-INT02-scheduled-run",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S01",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S02",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S03",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S04",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S05",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S06",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S07",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S08",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S09",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S10",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S11",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S12",
+   {}
+  ],
+  [
+   "CR-001",
+   "affects",
+   "TC-S13",
+   {}
+  ],
+  [
+   "DE-Account",
+   "relatesTo",
+   "DE-LedgerEntry",
+   {}
+  ],
+  [
+   "DE-ScheduledRun",
+   "relatesTo",
+   "DE-Transfer",
+   {}
+  ],
+  [
+   "DE-ScheduledTransfer",
+   "relatesTo",
+   "DE-ScheduledRun",
+   {}
+  ],
+  [
+   "DE-Transfer",
+   "relatesTo",
+   "DE-LedgerEntry",
+   {}
+  ],
+  [
+   "DE-Transfer",
+   "relatesTo",
+   "DE-OutboxEvent",
+   {}
+  ],
+  [
+   "EP-INT01-check",
+   "hasRequest",
+   "MSG-INT01-req",
+   {}
+  ],
+  [
+   "EP-INT01-check",
+   "hasResponse",
+   "MSG-INT01-res",
+   {}
+  ],
+  [
+   "EP-INT01-check",
+   "requiresHeader",
+   "HDR-INT01-auth",
+   {}
+  ],
+  [
+   "EP-INT01-check",
+   "requiresHeader",
+   "HDR-INT01-corr",
+   {}
+  ],
+  [
+   "EP-INT03-sms",
+   "hasRequest",
+   "MSG-INT03-req",
+   {}
+  ],
+  [
+   "EP-INT03-sms",
+   "requiresHeader",
+   "HDR-INT03-auth",
+   {}
+  ],
+  [
+   "EP-INT03-sms",
+   "requiresHeader",
+   "HDR-INT03-idem",
+   {}
+  ],
+  [
+   "FR-040",
+   "allocatedTo",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-040",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-040",
+   "satisfiedBy",
+   "MOD-API",
+   {}
+  ],
+  [
+   "FR-040",
+   "satisfiedBy",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-040",
+   "verifiedBy",
+   "TC-S01",
+   {}
+  ],
+  [
+   "FR-041",
+   "allocatedTo",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-041",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-041",
+   "satisfiedBy",
+   "MOD-API",
+   {}
+  ],
+  [
+   "FR-041",
+   "satisfiedBy",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-041",
+   "verifiedBy",
+   "TC-S01",
+   {}
+  ],
+  [
+   "FR-042",
+   "allocatedTo",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-042",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-042",
+   "satisfiedBy",
+   "MOD-API",
+   {}
+  ],
+  [
+   "FR-042",
+   "satisfiedBy",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-042",
+   "verifiedBy",
+   "TC-S02",
+   {}
+  ],
+  [
+   "FR-043",
+   "allocatedTo",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-043",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-043",
+   "satisfiedBy",
+   "MOD-API",
+   {}
+  ],
+  [
+   "FR-043",
+   "satisfiedBy",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-043",
+   "verifiedBy",
+   "TC-S03",
+   {}
+  ],
+  [
+   "FR-044",
+   "allocatedTo",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-044",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-044",
+   "satisfiedBy",
+   "MOD-API",
+   {}
+  ],
+  [
+   "FR-044",
+   "satisfiedBy",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-044",
+   "verifiedBy",
+   "TC-S03",
+   {}
+  ],
+  [
+   "FR-045",
+   "allocatedTo",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-045",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-045",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "FR-045",
+   "satisfiedBy",
+   "MECH-RunClaim",
+   {}
+  ],
+  [
+   "FR-045",
+   "satisfiedBy",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-045",
+   "satisfiedBy",
+   "MOD-Transfer",
+   {}
+  ],
+  [
+   "FR-045",
+   "verifiedBy",
+   "TC-S04",
+   {}
+  ],
+  [
+   "FR-046",
+   "allocatedTo",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-046",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-046",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "FR-046",
+   "satisfiedBy",
+   "MECH-ScheduleRetry",
+   {}
+  ],
+  [
+   "FR-046",
+   "verifiedBy",
+   "TC-S05",
+   {}
+  ],
+  [
+   "FR-047",
+   "allocatedTo",
+   "MOD-Notify",
+   {}
+  ],
+  [
+   "FR-047",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-047",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "FR-047",
+   "satisfiedBy",
+   "MECH-Outbox",
+   {}
+  ],
+  [
+   "FR-047",
+   "satisfiedBy",
+   "MOD-Notify",
+   {}
+  ],
+  [
+   "FR-047",
+   "verifiedBy",
+   "TC-S06",
+   {}
+  ],
+  [
+   "FR-048",
+   "allocatedTo",
+   "MOD-Audit",
+   {}
+  ],
+  [
+   "FR-048",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-048",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "FR-048",
+   "satisfiedBy",
+   "MOD-Audit",
+   {}
+  ],
+  [
+   "FR-048",
+   "verifiedBy",
+   "TC-S07",
+   {}
+  ],
+  [
+   "FR-049",
+   "allocatedTo",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "FR-049",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "FR-049",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "FR-049",
+   "satisfiedBy",
+   "MECH-CatchUp",
+   {}
+  ],
+  [
+   "FR-049",
+   "verifiedBy",
+   "TC-S08",
+   {}
+  ],
+  [
+   "INT-01",
+   "assumes",
+   "ASM-001",
+   {}
+  ],
+  [
+   "INT-01",
+   "blockedBy",
+   "OQ-001",
+   {}
+  ],
+  [
+   "INT-01",
+   "boundedBy",
+   "LIM-INT01",
+   {}
+  ],
+  [
+   "INT-01",
+   "describedIn",
+   "DOC-TDD",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasEndpoint",
+   "EP-INT01-check",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasErrorMapping",
+   "ERR-INT01-4xx",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasErrorMapping",
+   "ERR-INT01-5xx",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasErrorMapping",
+   "ERR-INT01-schema",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasErrorMapping",
+   "ERR-INT01-timeout",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasFallback",
+   "FB-INT01",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasRetryPolicy",
+   "RT-INT01",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasRisk",
+   "RISK-001",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasRisk",
+   "RISK-005",
+   {}
+  ],
+  [
+   "INT-01",
+   "hasTimeoutPolicy",
+   "TO-INT01",
+   {}
+  ],
+  [
+   "INT-01",
+   "monitoredBy",
+   "MON-INT01",
+   {}
+  ],
+  [
+   "INT-01",
+   "protectedBy",
+   "CB-INT01",
+   {}
+  ],
+  [
+   "INT-01",
+   "refinedBy",
+   "DI-FraudClient-INT01",
+   {}
+  ],
+  [
+   "INT-01",
+   "securedBy",
+   "SEC-INT01",
+   {}
+  ],
+  [
+   "INT-01",
+   "usesPool",
+   "POOL-INT01",
+   {}
+  ],
+  [
+   "INT-01",
+   "withParty",
+   "PARTY-Fraud",
+   {}
+  ],
+  [
+   "INT-02",
+   "boundedBy",
+   "LIM-INT02",
+   {}
+  ],
+  [
+   "INT-02",
+   "describedIn",
+   "DOC-TDD",
+   {}
+  ],
+  [
+   "INT-02",
+   "hasErrorMapping",
+   "ERR-INT02-broker",
+   {}
+  ],
+  [
+   "INT-02",
+   "hasErrorMapping",
+   "ERR-INT02-schema",
+   {}
+  ],
+  [
+   "INT-02",
+   "hasErrorMapping",
+   "ERR-INT02-timeout",
+   {}
+  ],
+  [
+   "INT-02",
+   "hasRetryPolicy",
+   "RT-INT02",
+   {}
+  ],
+  [
+   "INT-02",
+   "hasRisk",
+   "RISK-003",
+   {}
+  ],
+  [
+   "INT-02",
+   "hasTimeoutPolicy",
+   "TO-INT02",
+   {}
+  ],
+  [
+   "INT-02",
+   "monitoredBy",
+   "MON-INT02",
+   {}
+  ],
+  [
+   "INT-02",
+   "reconciledBy",
+   "REC-INT02",
+   {}
+  ],
+  [
+   "INT-02",
+   "refinedBy",
+   "DI-Outbox",
+   {}
+  ],
+  [
+   "INT-02",
+   "securedBy",
+   "SEC-INT02",
+   {}
+  ],
+  [
+   "INT-02",
+   "usesChannel",
+   "CH-INT02-events",
+   {}
+  ],
+  [
+   "INT-02",
+   "usesPool",
+   "POOL-INT02",
+   {}
+  ],
+  [
+   "INT-02",
+   "withParty",
+   "PARTY-Broker",
+   {}
+  ],
+  [
+   "INT-03",
+   "assumes",
+   "ASM-002",
+   {}
+  ],
+  [
+   "INT-03",
+   "boundedBy",
+   "LIM-INT03",
+   {}
+  ],
+  [
+   "INT-03",
+   "describedIn",
+   "DOC-TDD",
+   {}
+  ],
+  [
+   "INT-03",
+   "hasEndpoint",
+   "EP-INT03-sms",
+   {}
+  ],
+  [
+   "INT-03",
+   "hasErrorMapping",
+   "ERR-INT03-4xx",
+   {}
+  ],
+  [
+   "INT-03",
+   "hasErrorMapping",
+   "ERR-INT03-5xx",
+   {}
+  ],
+  [
+   "INT-03",
+   "hasErrorMapping",
+   "ERR-INT03-timeout",
+   {}
+  ],
+  [
+   "INT-03",
+   "hasFallback",
+   "FB-INT03",
+   {}
+  ],
+  [
+   "INT-03",
+   "hasRetryPolicy",
+   "RT-INT03",
+   {}
+  ],
+  [
+   "INT-03",
+   "hasTimeoutPolicy",
+   "TO-INT03",
+   {}
+  ],
+  [
+   "INT-03",
+   "refinedBy",
+   "DI-Consumer",
+   {}
+  ],
+  [
+   "INT-03",
+   "securedBy",
+   "SEC-INT03",
+   {}
+  ],
+  [
+   "INT-03",
+   "usesPool",
+   "POOL-INT03",
+   {}
+  ],
+  [
+   "INT-03",
+   "withParty",
+   "PARTY-SMS",
+   {}
+  ],
+  [
+   "MOD-API",
+   "dependsOn",
+   "MOD-Account",
+   {}
+  ],
+  [
+   "MOD-API",
+   "dependsOn",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "MOD-API",
+   "dependsOn",
+   "MOD-Transfer",
+   {}
+  ],
+  [
+   "MOD-API",
+   "deployedIn",
+   "ENV-Demo",
+   {}
+  ],
+  [
+   "MOD-API",
+   "describedIn",
+   "DOC-HLD",
+   {}
+  ],
+  [
+   "MOD-API",
+   "participatesIn",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "MOD-API",
+   "participatesIn",
+   "SCN-Transfer",
+   {}
+  ],
+  [
+   "MOD-API",
+   "refinedBy",
+   "DI-API",
+   {}
+  ],
+  [
+   "MOD-API",
+   "refinedBy",
+   "DI-SchedAPI",
+   {}
+  ],
+  [
+   "MOD-API",
+   "uses",
+   "TECH-FastAPI",
+   {}
+  ],
+  [
+   "MOD-API",
+   "uses",
+   "TECH-Python",
+   {}
+  ],
+  [
+   "MOD-API",
+   "uses",
+   "TECH-Uvicorn",
+   {}
+  ],
+  [
+   "MOD-Account",
+   "dependsOn",
+   "MOD-Audit",
+   {}
+  ],
+  [
+   "MOD-Account",
+   "deployedIn",
+   "ENV-Demo",
+   {}
+  ],
+  [
+   "MOD-Account",
+   "describedIn",
+   "DOC-HLD",
+   {}
+  ],
+  [
+   "MOD-Account",
+   "ownsData",
+   "DE-Account",
+   {}
+  ],
+  [
+   "MOD-Account",
+   "refinedBy",
+   "DI-Account",
+   {}
+  ],
+  [
+   "MOD-Account",
+   "uses",
+   "TECH-SQLite",
+   {}
+  ],
+  [
+   "MOD-Audit",
+   "deployedIn",
+   "ENV-Demo",
+   {}
+  ],
+  [
+   "MOD-Audit",
+   "describedIn",
+   "DOC-HLD",
+   {}
+  ],
+  [
+   "MOD-Audit",
+   "ownsData",
+   "DE-AuditLog",
+   {}
+  ],
+  [
+   "MOD-Audit",
+   "participatesIn",
+   "SCN-Transfer",
+   {}
+  ],
+  [
+   "MOD-Audit",
+   "refinedBy",
+   "DI-Audit",
+   {}
+  ],
+  [
+   "MOD-Audit",
+   "refinedBy",
+   "DI-SchedAudit",
+   {}
+  ],
+  [
+   "MOD-Audit",
+   "uses",
+   "TECH-SQLite",
+   {}
+  ],
+  [
+   "MOD-Ledger",
+   "deployedIn",
+   "ENV-Demo",
+   {}
+  ],
+  [
+   "MOD-Ledger",
+   "describedIn",
+   "DOC-HLD",
+   {}
+  ],
+  [
+   "MOD-Ledger",
+   "hasRisk",
+   "RISK-002",
+   {}
+  ],
+  [
+   "MOD-Ledger",
+   "ownsData",
+   "DE-LedgerEntry",
+   {}
+  ],
+  [
+   "MOD-Ledger",
+   "participatesIn",
+   "SCN-Transfer",
+   {}
+  ],
+  [
+   "MOD-Ledger",
+   "refinedBy",
+   "DI-Ledger",
+   {}
+  ],
+  [
+   "MOD-Ledger",
+   "uses",
+   "TECH-SQLite",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "dependsOn",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "dependsOn",
+   "MOD-Transfer",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "deployedIn",
+   "ENV-Demo",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "describedIn",
+   "DOC-HLD",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "integratesVia",
+   "INT-02",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "integratesVia",
+   "INT-03",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "participatesIn",
+   "SCN-Notify",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "refinedBy",
+   "DI-Notify",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "refinedBy",
+   "DI-SchedNotify",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "uses",
+   "TECH-Python",
+   {}
+  ],
+  [
+   "MOD-Notify",
+   "uses",
+   "TECH-SQLite",
+   {}
+  ],
+  [
+   "MOD-Risk",
+   "deployedIn",
+   "ENV-Demo",
+   {}
+  ],
+  [
+   "MOD-Risk",
+   "describedIn",
+   "DOC-HLD",
+   {}
+  ],
+  [
+   "MOD-Risk",
+   "integratesVia",
+   "INT-01",
+   {}
+  ],
+  [
+   "MOD-Risk",
+   "participatesIn",
+   "SCN-Transfer",
+   {}
+  ],
+  [
+   "MOD-Risk",
+   "refinedBy",
+   "DI-FraudClient",
+   {}
+  ],
+  [
+   "MOD-Risk",
+   "uses",
+   "TECH-httpx",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "constrainedBy",
+   "CON-010",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "dependsOn",
+   "MOD-Account",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "dependsOn",
+   "MOD-Audit",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "dependsOn",
+   "MOD-Risk",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "dependsOn",
+   "MOD-Transfer",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "deployedIn",
+   "ENV-Demo",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "describedIn",
+   "DOC-HLD",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "hasRisk",
+   "RISK-005",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "integratesVia",
+   "INT-01",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "ownsData",
+   "DE-ScheduledRun",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "ownsData",
+   "DE-ScheduledTransfer",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "participatesIn",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "refinedBy",
+   "DI-ScheduledRepo",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "refinedBy",
+   "DI-Scheduler",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "uses",
+   "TECH-Python",
+   {}
+  ],
+  [
+   "MOD-Scheduler",
+   "uses",
+   "TECH-SQLite",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "dependsOn",
+   "MOD-Account",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "dependsOn",
+   "MOD-Audit",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "dependsOn",
+   "MOD-Ledger",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "dependsOn",
+   "MOD-Risk",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "deployedIn",
+   "ENV-Demo",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "describedIn",
+   "DOC-HLD",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "ownsData",
+   "DE-OutboxEvent",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "ownsData",
+   "DE-Transfer",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "participatesIn",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "participatesIn",
+   "SCN-Transfer",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "refinedBy",
+   "DI-Transfer",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "refinedBy",
+   "DI-TransferCore",
+   {}
+  ],
+  [
+   "MOD-Transfer",
+   "uses",
+   "TECH-SQLite",
+   {}
+  ],
+  [
+   "MSG-INT01-req",
+   "hasSchema",
+   "SCH-INT01-req",
+   {}
+  ],
+  [
+   "MSG-INT01-res",
+   "hasSchema",
+   "SCH-INT01-res",
+   {}
+  ],
+  [
+   "MSG-INT02-event",
+   "hasSchema",
+   "SCH-INT02-event",
+   {}
+  ],
+  [
+   "MSG-INT02-event",
+   "requiresHeader",
+   "HDR-INT02-corr",
+   {}
+  ],
+  [
+   "MSG-INT02-scheduled-run",
+   "hasSchema",
+   "SCH-INT02-scheduled-run",
+   {}
+  ],
+  [
+   "MSG-INT02-scheduled-run",
+   "requiresHeader",
+   "HDR-INT02-corr",
+   {}
+  ],
+  [
+   "MSG-INT03-req",
+   "hasSchema",
+   "SCH-INT03-req",
+   {}
+  ],
+  [
+   "NFR-010",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "NFR-010",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "NFR-010",
+   "satisfiedBy",
+   "AD-05",
+   {}
+  ],
+  [
+   "NFR-010",
+   "satisfiedBy",
+   "MOD-Scheduler",
+   {}
+  ],
+  [
+   "NFR-010",
+   "verifiedBy",
+   "TC-S09",
+   {}
+  ],
+  [
+   "NFR-011",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "NFR-011",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "NFR-011",
+   "satisfiedBy",
+   "MECH-RunClaim",
+   {}
+  ],
+  [
+   "NFR-011",
+   "verifiedBy",
+   "TC-S10",
+   {}
+  ],
+  [
+   "NFR-011",
+   "verifiedBy",
+   "TC-S11",
+   {}
+  ],
+  [
+   "NFR-012",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "NFR-012",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "NFR-012",
+   "satisfiedBy",
+   "MECH-CatchUp",
+   {}
+  ],
+  [
+   "NFR-012",
+   "verifiedBy",
+   "TC-S08",
+   {}
+  ],
+  [
+   "NFR-013",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "NFR-013",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "NFR-013",
+   "satisfiedBy",
+   "MECH-SchedulerThrottle",
+   {}
+  ],
+  [
+   "NFR-013",
+   "satisfiedBy",
+   "MECH-TimeoutBudget",
+   {}
+  ],
+  [
+   "NFR-013",
+   "verifiedBy",
+   "TC-S13",
+   {}
+  ],
+  [
+   "NFR-014",
+   "describedIn",
+   "DOC-SRS-CR001",
+   {}
+  ],
+  [
+   "NFR-014",
+   "realizedBy",
+   "SCN-ScheduledRun",
+   {}
+  ],
+  [
+   "NFR-014",
+   "satisfiedBy",
+   "MECH-Correlation",
+   {}
+  ],
+  [
+   "NFR-014",
+   "verifiedBy",
+   "TC-S12",
+   {}
+  ],
+  [
+   "RISK-001",
+   "mitigatedBy",
+   "MECH-CircuitBreaker",
+   {}
+  ],
+  [
+   "RISK-001",
+   "mitigatedBy",
+   "MECH-TimeoutBudget",
+   {}
+  ],
+  [
+   "RISK-002",
+   "mitigatedBy",
+   "MECH-AppendOnlyLedger",
+   {}
+  ],
+  [
+   "RISK-002",
+   "mitigatedBy",
+   "MECH-WriteLock",
+   {}
+  ],
+  [
+   "RISK-003",
+   "mitigatedBy",
+   "MECH-IdempotentConsumer",
+   {}
+  ],
+  [
+   "RISK-005",
+   "mitigatedBy",
+   "MECH-RunClaim",
+   {}
+  ],
+  [
+   "RISK-005",
+   "mitigatedBy",
+   "MECH-SchedulerThrottle",
+   {}
+  ],
+  [
+   "SCN-Notify",
+   "invokes",
+   "INT-02",
+   {}
+  ],
+  [
+   "SCN-Notify",
+   "invokes",
+   "INT-03",
+   {}
+  ],
+  [
+   "SCN-ScheduledRun",
+   "invokes",
+   "INT-01",
+   {}
+  ],
+  [
+   "SCN-Transfer",
+   "invokes",
+   "INT-01",
+   {}
+  ]
+ ],
+ "supersede": []
+}

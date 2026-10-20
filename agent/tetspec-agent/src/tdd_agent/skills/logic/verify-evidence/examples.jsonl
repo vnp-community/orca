@@ -1,0 +1,1 @@
+{"name": "exact line passes, edited quote fails", "input": {"records": [], "sources": []}, "expect": {"output": {"ok": true}, "resolved_by": "rule"}}

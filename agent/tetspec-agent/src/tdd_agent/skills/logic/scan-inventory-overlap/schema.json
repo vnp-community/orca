@@ -1,0 +1,44 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "changes",
+      "tdd_docs",
+      "elements",
+      "edges"
+    ],
+    "properties": {
+      "changes": {
+        "type": "array"
+      },
+      "tdd_docs": {
+        "type": "array"
+      },
+      "elements": {
+        "type": "array"
+      },
+      "edges": {
+        "type": "array"
+      },
+      "hops": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "tdds",
+      "delta_uncovered"
+    ],
+    "properties": {
+      "tdds": {
+        "type": "array"
+      },
+      "delta_uncovered": {
+        "type": "array"
+      }
+    }
+  }
+}

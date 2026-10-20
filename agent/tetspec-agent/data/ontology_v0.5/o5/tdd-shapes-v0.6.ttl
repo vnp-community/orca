@@ -1,0 +1,261 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix tdd: <https://example.org/tdd#> .
+# Generated from ontology.json 0.6.0
+tdd:DocumentRefShape a sh:NodeShape ; sh:targetClass tdd:DocumentRef .
+tdd:DocumentRefShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:DocumentRefShape sh:property [ sh:path tdd:role ; sh:minCount 1 ] .
+tdd:DocumentRefShape sh:property [ sh:path tdd:revision ; sh:minCount 1 ] .
+tdd:DocumentRefShape sh:property [ sh:path tdd:content_hash ; sh:minCount 1 ] .
+tdd:SectionRefShape a sh:NodeShape ; sh:targetClass tdd:SectionRef .
+tdd:SectionRefShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:SectionRefShape sh:property [ sh:path tdd:document_id ; sh:minCount 1 ] .
+tdd:SectionRefShape sh:property [ sh:path tdd:role ; sh:minCount 1 ] .
+tdd:SectionRefShape sh:property [ sh:path tdd:revision ; sh:minCount 1 ] .
+tdd:SectionRefShape sh:property [ sh:path tdd:content_hash ; sh:minCount 1 ] .
+tdd:SectionRefShape sh:property [ sh:path tdd:section_id ; sh:minCount 1 ] .
+tdd:SrsDeltaShape a sh:NodeShape ; sh:targetClass tdd:SrsDelta .
+tdd:SrsDeltaShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:SrsDeltaShape sh:property [ sh:path tdd:cr_id ; sh:minCount 1 ] .
+tdd:SrsDeltaShape sh:property [ sh:path tdd:before_revision ; sh:minCount 1 ] .
+tdd:SrsDeltaShape sh:property [ sh:path tdd:after_revision ; sh:minCount 1 ] .
+tdd:SrsDeltaShape sh:property [ sh:path tdd:sections ; sh:minCount 1 ] .
+tdd:ImpactReportShape a sh:NodeShape ; sh:targetClass tdd:ImpactReport .
+tdd:ImpactReportShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:ImpactReportShape sh:property [ sh:path tdd:cr_ref ; sh:minCount 1 ] .
+tdd:ImpactReportShape sh:property [ sh:path tdd:srs_ref ; sh:minCount 1 ] .
+tdd:ImpactReportShape sh:property [ sh:path tdd:sad_ref ; sh:minCount 1 ] .
+tdd:ImpactReportShape sh:property [ sh:path tdd:baseline_tdd_snapshot ; sh:minCount 1 ] .
+tdd:ImpactReportShape sh:property [ sh:path tdd:entries ; sh:minCount 1 ] .
+tdd:ImpactReportShape sh:property [ sh:path tdd:findings ; sh:minCount 1 ] .
+tdd:ImpactReportShape sh:property [ sh:path tdd:status ; sh:minCount 1 ] .
+tdd:ImpactApprovalShape a sh:NodeShape ; sh:targetClass tdd:ImpactApproval .
+tdd:ImpactApprovalShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:ImpactApprovalShape sh:property [ sh:path tdd:impact_report_id ; sh:minCount 1 ] .
+tdd:ImpactApprovalShape sh:property [ sh:path tdd:approver_id ; sh:minCount 1 ] .
+tdd:ImpactApprovalShape sh:property [ sh:path tdd:role ; sh:minCount 1 ] .
+tdd:ImpactApprovalShape sh:property [ sh:path tdd:decision_hash ; sh:minCount 1 ] .
+tdd:TddSetRealizationShape a sh:NodeShape ; sh:targetClass tdd:TddSetRealization .
+tdd:TddSetRealizationShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:TddSetRealizationShape sh:property [ sh:path tdd:baseline_snapshot ; sh:minCount 1 ] .
+tdd:TddSetRealizationShape sh:property [ sh:path tdd:actual_snapshot ; sh:minCount 1 ] .
+tdd:TddSetRealizationShape sh:property [ sh:path tdd:mappings ; sh:minCount 1 ] .
+tdd:TddSetRealizationShape sh:property [ sh:path tdd:status ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape a sh:NodeShape ; sh:targetClass tdd:SemanticResolution .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:policy_version ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:policy_hash ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:roots ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:ids ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:boundary ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:unresolved ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:graph_snapshot ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:resolution_hash ; sh:minCount 1 ] .
+tdd:SemanticResolutionShape sh:property [ sh:path tdd:status ; sh:minCount 1 ] .
+tdd:QuantityShape a sh:NodeShape ; sh:targetClass tdd:Quantity .
+tdd:QuantityShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:QuantityShape sh:property [ sh:path tdd:value ; sh:minCount 1 ] .
+tdd:QuantityShape sh:property [ sh:path tdd:unit ; sh:minCount 1 ] .
+tdd:QuantityShape sh:property [ sh:path tdd:stage ; sh:minCount 1 ] .
+tdd:MigrationShape a sh:NodeShape ; sh:targetClass tdd:Migration .
+tdd:MigrationShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:MigrationShape sh:property [ sh:path tdd:from_schema ; sh:minCount 1 ] .
+tdd:MigrationShape sh:property [ sh:path tdd:to_schema ; sh:minCount 1 ] .
+tdd:MigrationShape sh:property [ sh:path tdd:stages ; sh:minCount 1 ] .
+tdd:MigrationShape sh:property [ sh:path tdd:backfill ; sh:minCount 1 ] .
+tdd:MigrationShape sh:property [ sh:path tdd:lock ; sh:minCount 1 ] .
+tdd:MigrationShape sh:property [ sh:path tdd:compatibility ; sh:minCount 1 ] .
+tdd:MigrationShape sh:property [ sh:path tdd:rollback ; sh:minCount 1 ] .
+tdd:MigrationStageShape a sh:NodeShape ; sh:targetClass tdd:MigrationStage .
+tdd:MigrationStageShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:MigrationStageShape sh:property [ sh:path tdd:action ; sh:minCount 1 ] .
+tdd:MigrationStageShape sh:property [ sh:path tdd:depends_on ; sh:minCount 1 ] .
+tdd:MigrationStageShape sh:property [ sh:path tdd:preconditions ; sh:minCount 1 ] .
+tdd:MigrationStageShape sh:property [ sh:path tdd:verification ; sh:minCount 1 ] .
+tdd:MeasurementShape a sh:NodeShape ; sh:targetClass tdd:Measurement .
+tdd:MeasurementShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:MeasurementShape sh:property [ sh:path tdd:metric ; sh:minCount 1 ] .
+tdd:MeasurementShape sh:property [ sh:path tdd:value ; sh:minCount 1 ] .
+tdd:MeasurementShape sh:property [ sh:path tdd:stage ; sh:minCount 1 ] .
+tdd:MeasurementShape sh:property [ sh:path tdd:observed_at ; sh:minCount 1 ] .
+tdd:MeasurementShape sh:property [ sh:path tdd:source_ref ; sh:minCount 1 ] .
+tdd:PermissionDecisionShape a sh:NodeShape ; sh:targetClass tdd:PermissionDecision .
+tdd:PermissionDecisionShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:PermissionDecisionShape sh:property [ sh:path tdd:subject ; sh:minCount 1 ] .
+tdd:PermissionDecisionShape sh:property [ sh:path tdd:resource ; sh:minCount 1 ] .
+tdd:PermissionDecisionShape sh:property [ sh:path tdd:action ; sh:minCount 1 ] .
+tdd:PermissionDecisionShape sh:property [ sh:path tdd:effect ; sh:minCount 1 ] .
+tdd:PermissionDecisionShape sh:property [ sh:path tdd:evidence ; sh:minCount 1 ] .
+tdd:ChangeSpecItemShape a sh:NodeShape ; sh:targetClass tdd:ChangeSpecItem .
+tdd:ChangeSpecItemShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:ChangeSpecItemShape sh:property [ sh:path tdd:action ; sh:minCount 1 ] .
+tdd:ChangeSpecItemShape sh:property [ sh:path tdd:code_target ; sh:minCount 1 ] .
+tdd:ChangeSpecItemShape sh:property [ sh:path tdd:srs_refs ; sh:minCount 1 ] .
+tdd:ChangeSpecItemShape sh:property [ sh:path tdd:tdd_refs ; sh:minCount 1 ] .
+tdd:ChangeSpecItemShape sh:property [ sh:path tdd:verification ; sh:minCount 1 ] .
+tdd:ChangeSpecItemShape sh:property [ sh:path tdd:cr_acceptance_refs ; sh:minCount 1 ] .
+tdd:TransactionShape a sh:NodeShape ; sh:targetClass tdd:Transaction .
+tdd:TransactionShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:TransactionShape sh:property [ sh:path tdd:boundary ; sh:minCount 1 ] .
+tdd:TransactionShape sh:property [ sh:path tdd:isolation ; sh:minCount 1 ] .
+tdd:TransactionShape sh:property [ sh:path tdd:consistency ; sh:minCount 1 ] .
+tdd:SagaShape a sh:NodeShape ; sh:targetClass tdd:Saga .
+tdd:SagaShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:SagaShape sh:property [ sh:path tdd:steps ; sh:minCount 1 ] .
+tdd:SagaShape sh:property [ sh:path tdd:compensation ; sh:minCount 1 ] .
+tdd:RetryPolicyShape a sh:NodeShape ; sh:targetClass tdd:RetryPolicy .
+tdd:RetryPolicyShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:RetryPolicyShape sh:property [ sh:path tdd:max_attempts ; sh:minCount 1 ] .
+tdd:RetryPolicyShape sh:property [ sh:path tdd:backoff ; sh:minCount 1 ] .
+tdd:RetryPolicyShape sh:property [ sh:path tdd:retryable_errors ; sh:minCount 1 ] .
+tdd:TimeoutBudgetShape a sh:NodeShape ; sh:targetClass tdd:TimeoutBudget .
+tdd:TimeoutBudgetShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:TimeoutBudgetShape sh:property [ sh:path tdd:total ; sh:minCount 1 ] .
+tdd:TimeoutBudgetShape sh:property [ sh:path tdd:allocations ; sh:minCount 1 ] .
+tdd:IdempotencyPolicyShape a sh:NodeShape ; sh:targetClass tdd:IdempotencyPolicy .
+tdd:IdempotencyPolicyShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:IdempotencyPolicyShape sh:property [ sh:path tdd:key ; sh:minCount 1 ] .
+tdd:IdempotencyPolicyShape sh:property [ sh:path tdd:scope ; sh:minCount 1 ] .
+tdd:IdempotencyPolicyShape sh:property [ sh:path tdd:deduplication ; sh:minCount 1 ] .
+tdd:ConsistencyModelShape a sh:NodeShape ; sh:targetClass tdd:ConsistencyModel .
+tdd:ConsistencyModelShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:ConsistencyModelShape sh:property [ sh:path tdd:mode ; sh:minCount 1 ] .
+tdd:ConsistencyModelShape sh:property [ sh:path tdd:guarantees ; sh:minCount 1 ] .
+tdd:FailurePolicyShape a sh:NodeShape ; sh:targetClass tdd:FailurePolicy .
+tdd:FailurePolicyShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:FailurePolicyShape sh:property [ sh:path tdd:failure_modes ; sh:minCount 1 ] .
+tdd:FailurePolicyShape sh:property [ sh:path tdd:fallback ; sh:minCount 1 ] .
+tdd:FailurePolicyShape sh:property [ sh:path tdd:dead_letter ; sh:minCount 1 ] .
+tdd:LoadProfileShape a sh:NodeShape ; sh:targetClass tdd:LoadProfile .
+tdd:LoadProfileShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:LoadProfileShape sh:property [ sh:path tdd:average ; sh:minCount 1 ] .
+tdd:LoadProfileShape sh:property [ sh:path tdd:peak ; sh:minCount 1 ] .
+tdd:LoadProfileShape sh:property [ sh:path tdd:payload ; sh:minCount 1 ] .
+tdd:LoadProfileShape sh:property [ sh:path tdd:growth ; sh:minCount 1 ] .
+tdd:CapacityModelShape a sh:NodeShape ; sh:targetClass tdd:CapacityModel .
+tdd:CapacityModelShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:CapacityModelShape sh:property [ sh:path tdd:resources ; sh:minCount 1 ] .
+tdd:CapacityModelShape sh:property [ sh:path tdd:headroom ; sh:minCount 1 ] .
+tdd:CapacityModelShape sh:property [ sh:path tdd:scaling ; sh:minCount 1 ] .
+tdd:HighAvailabilityTopologyShape a sh:NodeShape ; sh:targetClass tdd:HighAvailabilityTopology .
+tdd:HighAvailabilityTopologyShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:HighAvailabilityTopologyShape sh:property [ sh:path tdd:replicas ; sh:minCount 1 ] .
+tdd:HighAvailabilityTopologyShape sh:property [ sh:path tdd:failure_domains ; sh:minCount 1 ] .
+tdd:HighAvailabilityTopologyShape sh:property [ sh:path tdd:failover ; sh:minCount 1 ] .
+tdd:RecoveryObjectiveShape a sh:NodeShape ; sh:targetClass tdd:RecoveryObjective .
+tdd:RecoveryObjectiveShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:RecoveryObjectiveShape sh:property [ sh:path tdd:rto ; sh:minCount 1 ] .
+tdd:RecoveryObjectiveShape sh:property [ sh:path tdd:rpo ; sh:minCount 1 ] .
+tdd:RecoveryObjectiveShape sh:property [ sh:path tdd:recovery_procedure ; sh:minCount 1 ] .
+tdd:OwnershipShape a sh:NodeShape ; sh:targetClass tdd:Ownership .
+tdd:OwnershipShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:OwnershipShape sh:property [ sh:path tdd:team ; sh:minCount 1 ] .
+tdd:OwnershipShape sh:property [ sh:path tdd:responsibilities ; sh:minCount 1 ] .
+tdd:OwnershipShape sh:property [ sh:path tdd:escalation ; sh:minCount 1 ] .
+tdd:ContractCompatibilityShape a sh:NodeShape ; sh:targetClass tdd:ContractCompatibility .
+tdd:ContractCompatibilityShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:ContractCompatibilityShape sh:property [ sh:path tdd:versioning ; sh:minCount 1 ] .
+tdd:ContractCompatibilityShape sh:property [ sh:path tdd:compatibility ; sh:minCount 1 ] .
+tdd:ContractCompatibilityShape sh:property [ sh:path tdd:consumers ; sh:minCount 1 ] .
+tdd:LedgerInvariantShape a sh:NodeShape ; sh:targetClass tdd:LedgerInvariant .
+tdd:LedgerInvariantShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:LedgerInvariantShape sh:property [ sh:path tdd:currency ; sh:minCount 1 ] .
+tdd:LedgerInvariantShape sh:property [ sh:path tdd:scale ; sh:minCount 1 ] .
+tdd:LedgerInvariantShape sh:property [ sh:path tdd:invariants ; sh:minCount 1 ] .
+tdd:ReconciliationPolicyShape a sh:NodeShape ; sh:targetClass tdd:ReconciliationPolicy .
+tdd:ReconciliationPolicyShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:ReconciliationPolicyShape sh:property [ sh:path tdd:source ; sh:minCount 1 ] .
+tdd:ReconciliationPolicyShape sh:property [ sh:path tdd:schedule ; sh:minCount 1 ] .
+tdd:ReconciliationPolicyShape sh:property [ sh:path tdd:mismatch_handling ; sh:minCount 1 ] .
+tdd:AuditTrailShape a sh:NodeShape ; sh:targetClass tdd:AuditTrail .
+tdd:AuditTrailShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:AuditTrailShape sh:property [ sh:path tdd:events ; sh:minCount 1 ] .
+tdd:AuditTrailShape sh:property [ sh:path tdd:retention ; sh:minCount 1 ] .
+tdd:AuditTrailShape sh:property [ sh:path tdd:integrity ; sh:minCount 1 ] .
+tdd:DesignObligationShape a sh:NodeShape ; sh:targetClass tdd:DesignObligation .
+tdd:DesignObligationShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:DesignObligationShape sh:property [ sh:path tdd:question ; sh:minCount 1 ] .
+tdd:DesignObligationShape sh:property [ sh:path tdd:srs_refs ; sh:minCount 1 ] .
+tdd:DesignObligationShape sh:property [ sh:path tdd:cr_acceptance_refs ; sh:minCount 1 ] .
+tdd:DesignObligationShape sh:property [ sh:path tdd:applicability ; sh:minCount 1 ] .
+tdd:DesignObligationShape sh:property [ sh:path tdd:status ; sh:minCount 1 ] .
+tdd:ObligationResolutionShape a sh:NodeShape ; sh:targetClass tdd:ObligationResolution .
+tdd:ObligationResolutionShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:ObligationResolutionShape sh:property [ sh:path tdd:obligation_id ; sh:minCount 1 ] .
+tdd:ObligationResolutionShape sh:property [ sh:path tdd:design_refs ; sh:minCount 1 ] .
+tdd:ObligationResolutionShape sh:property [ sh:path tdd:decision ; sh:minCount 1 ] .
+tdd:ObligationResolutionShape sh:property [ sh:path tdd:verification_refs ; sh:minCount 1 ] .
+tdd:ObligationResolutionShape sh:property [ sh:path tdd:status ; sh:minCount 1 ] .
+tdd:TestReceiptShape a sh:NodeShape ; sh:targetClass tdd:TestReceipt .
+tdd:TestReceiptShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:TestReceiptShape sh:property [ sh:path tdd:cs_id ; sh:minCount 1 ] .
+tdd:TestReceiptShape sh:property [ sh:path tdd:criterion_refs ; sh:minCount 1 ] .
+tdd:TestReceiptShape sh:property [ sh:path tdd:result ; sh:minCount 1 ] .
+tdd:TestReceiptShape sh:property [ sh:path tdd:executed_at ; sh:minCount 1 ] .
+tdd:AcceptanceReceiptShape a sh:NodeShape ; sh:targetClass tdd:AcceptanceReceipt .
+tdd:AcceptanceReceiptShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:AcceptanceReceiptShape sh:property [ sh:path tdd:cr_id ; sh:minCount 1 ] .
+tdd:AcceptanceReceiptShape sh:property [ sh:path tdd:criterion_refs ; sh:minCount 1 ] .
+tdd:AcceptanceReceiptShape sh:property [ sh:path tdd:accepted_by ; sh:minCount 1 ] .
+tdd:AcceptanceReceiptShape sh:property [ sh:path tdd:status ; sh:minCount 1 ] .
+tdd:CapabilityShape a sh:NodeShape ; sh:targetClass tdd:Capability .
+tdd:CapabilityShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:CapabilityShape sh:property [ sh:path tdd:name ; sh:minCount 1 ] .
+tdd:CapabilityShape sh:property [ sh:path tdd:stable_key ; sh:minCount 1 ] .
+tdd:CapabilityShape sh:property [ sh:path tdd:purpose ; sh:minCount 1 ] .
+tdd:CapabilityShape sh:property [ sh:path tdd:scope ; sh:minCount 1 ] .
+tdd:CapabilityShape sh:property [ sh:path tdd:owner ; sh:minCount 1 ] .
+tdd:CapabilityShape sh:property [ sh:path tdd:lifecycle ; sh:minCount 1 ] .
+tdd:RequirementVersionShape a sh:NodeShape ; sh:targetClass tdd:RequirementVersion .
+tdd:RequirementVersionShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:RequirementVersionShape sh:property [ sh:path tdd:logical_requirement_id ; sh:minCount 1 ] .
+tdd:RequirementVersionShape sh:property [ sh:path tdd:revision ; sh:minCount 1 ] .
+tdd:RequirementVersionShape sh:property [ sh:path tdd:statement ; sh:minCount 1 ] .
+tdd:RequirementVersionShape sh:property [ sh:path tdd:modality ; sh:minCount 1 ] .
+tdd:RequirementVersionShape sh:property [ sh:path tdd:acceptance ; sh:minCount 1 ] .
+tdd:RequirementVersionShape sh:property [ sh:path tdd:baseline_id ; sh:minCount 1 ] .
+tdd:RequirementDeltaShape a sh:NodeShape ; sh:targetClass tdd:RequirementDelta .
+tdd:RequirementDeltaShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:RequirementDeltaShape sh:property [ sh:path tdd:kind ; sh:minCount 1 ] .
+tdd:RequirementDeltaShape sh:property [ sh:path tdd:rationale ; sh:minCount 1 ] .
+tdd:RequirementDeltaShape sh:property [ sh:path tdd:change_request_id ; sh:minCount 1 ] .
+tdd:KnowledgeNeedShape a sh:NodeShape ; sh:targetClass tdd:KnowledgeNeed .
+tdd:KnowledgeNeedShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:KnowledgeNeedShape sh:property [ sh:path tdd:profile_id ; sh:minCount 1 ] .
+tdd:KnowledgeNeedShape sh:property [ sh:path tdd:section_spec ; sh:minCount 1 ] .
+tdd:KnowledgeNeedShape sh:property [ sh:path tdd:slot ; sh:minCount 1 ] .
+tdd:KnowledgeNeedShape sh:property [ sh:path tdd:target_class ; sh:minCount 1 ] .
+tdd:KnowledgeNeedShape sh:property [ sh:path tdd:required ; sh:minCount 1 ] .
+tdd:IntakeReportShape a sh:NodeShape ; sh:targetClass tdd:IntakeReport .
+tdd:IntakeReportShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:IntakeReportShape sh:property [ sh:path tdd:need_id ; sh:minCount 1 ] .
+tdd:IntakeReportShape sh:property [ sh:path tdd:status ; sh:minCount 1 ] .
+tdd:IntakeReportShape sh:property [ sh:path tdd:sources ; sh:minCount 1 ] .
+tdd:GenerationProfileShape a sh:NodeShape ; sh:targetClass tdd:GenerationProfile .
+tdd:GenerationProfileShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:GenerationProfileShape sh:property [ sh:path tdd:name ; sh:minCount 1 ] .
+tdd:GenerationProfileShape sh:property [ sh:path tdd:artifact_types ; sh:minCount 1 ] .
+tdd:GenerationProfileShape sh:property [ sh:path tdd:mandatory_needs ; sh:minCount 1 ] .
+tdd:GenerationRunShape a sh:NodeShape ; sh:targetClass tdd:GenerationRun .
+tdd:GenerationRunShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:GenerationRunShape sh:property [ sh:path tdd:intent ; sh:minCount 1 ] .
+tdd:GenerationRunShape sh:property [ sh:path tdd:scope ; sh:minCount 1 ] .
+tdd:GenerationRunShape sh:property [ sh:path tdd:profile_id ; sh:minCount 1 ] .
+tdd:GenerationRunShape sh:property [ sh:path tdd:status ; sh:minCount 1 ] .
+tdd:GenerationRunShape sh:property [ sh:path tdd:manifest_hash ; sh:minCount 1 ] .
+tdd:ReadinessReportShape a sh:NodeShape ; sh:targetClass tdd:ReadinessReport .
+tdd:ReadinessReportShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:ReadinessReportShape sh:property [ sh:path tdd:run_id ; sh:minCount 1 ] .
+tdd:ReadinessReportShape sh:property [ sh:path tdd:outcomes ; sh:minCount 1 ] .
+tdd:ReadinessReportShape sh:property [ sh:path tdd:blockers ; sh:minCount 1 ] .
+tdd:ReadinessReportShape sh:property [ sh:path tdd:rule_coverage ; sh:minCount 1 ] .
+tdd:PromptEditRequestShape a sh:NodeShape ; sh:targetClass tdd:PromptEditRequest .
+tdd:PromptEditRequestShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:PromptEditRequestShape sh:property [ sh:path tdd:prompt_hash ; sh:minCount 1 ] .
+tdd:PromptEditRequestShape sh:property [ sh:path tdd:target ; sh:minCount 1 ] .
+tdd:PromptEditRequestShape sh:property [ sh:path tdd:base_snapshot ; sh:minCount 1 ] .
+tdd:PromptEditRequestShape sh:property [ sh:path tdd:authorization ; sh:minCount 1 ] .
+tdd:RepoSnapshotShape a sh:NodeShape ; sh:targetClass tdd:RepoSnapshot .
+tdd:RepoSnapshotShape sh:property [ sh:path tdd:id ; sh:minCount 1 ] .
+tdd:RepoSnapshotShape sh:property [ sh:path tdd:repo ; sh:minCount 1 ] .
+tdd:RepoSnapshotShape sh:property [ sh:path tdd:revision ; sh:minCount 1 ] .
+tdd:RepoSnapshotShape sh:property [ sh:path tdd:content_hash ; sh:minCount 1 ] .

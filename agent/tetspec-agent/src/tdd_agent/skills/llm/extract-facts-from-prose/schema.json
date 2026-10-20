@@ -1,0 +1,45 @@
+{
+  "input": {
+    "type": "object",
+    "required": [
+      "source",
+      "spans",
+      "allowed_classes"
+    ],
+    "properties": {
+      "source": {
+        "type": "object",
+        "required": [
+          "id",
+          "revision",
+          "text"
+        ]
+      },
+      "spans": {
+        "type": "array"
+      },
+      "allowed_classes": {
+        "type": "object"
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "elements",
+      "gaps",
+      "rejected"
+    ],
+    "properties": {
+      "elements": {
+        "type": "array"
+      },
+      "gaps": {
+        "type": "array"
+      },
+      "rejected": {
+        "type": "array"
+      }
+    }
+  }
+}
