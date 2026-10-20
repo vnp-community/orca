@@ -43,7 +43,12 @@ import {
 import { isLiveRun, loadLiveStackConfig } from './live-stack-config'
 import { dismissFirstRunTip } from './live-ui-session'
 
-const NATIVE = { engine: 'native', solutionAgent: false, executionMode: 'step_by_step' } as const
+const NATIVE = {
+  engine: 'native',
+  solutionAgent: false,
+  executionMode: 'step_by_step',
+  planAutoGenerate: true
+} as const
 const PLAN_WAIT_MS = 120_000
 
 test.describe('the Plan written by Orca after the Analysis is approved (live stack)', () => {

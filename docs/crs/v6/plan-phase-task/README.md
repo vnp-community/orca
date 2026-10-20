@@ -10,9 +10,9 @@
 | [CR-REQ-014](./CR-REQ-014-type-specific-execution-policies.md) | `hotfix`, `security`, `performance`, `ops_request`, `refactor` cần cổng và kiểm tra riêng | 🟠 P1 | Large | 📝 Đề xuất, chưa triển khai |
 | [CR-REQ-038](./CR-REQ-038-continuous-execution-activity-feed-and-execution-summary.md) | Mọi luồng có Phase đều chờ người bấm `StartPhase`, `change_request` còn duyệt từng Phase; không có API nhật ký hoạt động và tóm tắt thực thi; `Request` không có `engine`, `execution_mode` | 🟠 P1 | Large | 📝 Đề xuất, chưa triển khai |
 | [CR-REQ-039](./CR-REQ-039-request-worktree-base-branch.md) | Worktree của Request (đề xuất OpenSpec và thực thi task) không cho chọn nhánh gốc; task rẽ từ HEAD của checkout chính thay vì nhánh mặc định | 🟠 P1 | Medium | 002, 013, 016, 026, 038 |
-| [CR-REQ-043](./CR-REQ-043-approve-plan-and-run-all-steps.md) | Duyệt từng Phase là trải nghiệm kém; chế độ `continuous` đã có nhưng tắt và không bật được từ giao diện: thêm "Approve and run all steps" khi duyệt Plan và công tắc theo dự án | 🟠 P1 | Medium | 📝 Đề xuất, chưa triển khai |
-| [CR-REQ-044](./CR-REQ-044-automatic-plan-generation-after-analysis-approval.md) | Duyệt Analysis xong phải tự bấm Generate plan, lỗi chỉ hiện ở tab đã bấm: tự sinh và tự commit Plan, tự thử lại có giới hạn, thẻ Retry bền | 🟠 P1 | Large | 📝 Đề xuất, chưa triển khai |
-| [CR-REQ-045](./CR-REQ-045-plan-documents-viewer-and-revision-by-prompt.md) | Plan chỉ hiện bước lớn và task con: xem tài liệu OpenSpec, chỉnh bằng prompt ở cổng Plan, che bí mật trong bundle | 🟠 P1 | Large | 📝 Đề xuất, chưa triển khai |
+| [CR-REQ-043](./CR-REQ-043-approve-plan-and-run-all-steps.md) | Duyệt từng Phase là trải nghiệm kém; chế độ `continuous` đã có nhưng tắt và không bật được từ giao diện: thêm "Approve and run all steps" khi duyệt Plan và công tắc theo dự án | 🟠 P1 | Medium | ✅ Đã triển khai (2026-10-20), chưa merge |
+| [CR-REQ-044](./CR-REQ-044-automatic-plan-generation-after-analysis-approval.md) | Duyệt Analysis xong phải tự bấm Generate plan, lỗi chỉ hiện ở tab đã bấm: tự sinh và tự commit Plan, tự thử lại có giới hạn, thẻ Retry bền | 🟠 P1 | Large | ✅ Đã triển khai (2026-10-20), chưa merge |
+| [CR-REQ-045](./CR-REQ-045-plan-documents-viewer-and-revision-by-prompt.md) | Plan chỉ hiện bước lớn và task con: xem tài liệu OpenSpec, chỉnh bằng prompt ở cổng Plan, che bí mật trong bundle | 🟠 P1 | Large | ✅ Đã triển khai (2026-10-20), chưa merge |
 
 ## Thứ tự thực thi
 

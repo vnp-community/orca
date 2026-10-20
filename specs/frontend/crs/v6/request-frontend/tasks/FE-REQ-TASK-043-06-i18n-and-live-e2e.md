@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json`, `tests/stages/e2e/orca-flows/ui-live/approve-run-all.web.e2e.ts` (mới) + `live-run-all-steps.ts` (mới), `tests/stages/e2e/orca-flows/ui-live/continuous-execute-real.web.e2e.ts` (sửa), `tests/stages/e2e/orca-flows/run_ui_flow.py` (docstring)
 **Depends on:** FE-REQ-TASK-043-03, 043-04, 043-05, backend TASK-REQ-043-06
-**Status:** [ ] PARTIAL (2026-10-20): đã làm và kiểm bằng đơn vị; còn lại: not run on the stack
+**Status:** [x] DONE (2026-10-20): i18n kiểm bằng đơn vị; hai spec stub chạy trên stack xanh; còn lại một mục loại B không chạy theo chỉ định (`--real continuous`)
 
 ---
 
@@ -33,8 +33,8 @@
 ## Tiêu chí hoàn thành
 
 - [x] Đủ khoá ở 5 locale; hai lệnh verify không tệ hơn mốc. (28 khoá, ghi nguyên tử vào 5 locale bằng một script, placeholder `{{n}}`/`{{preDeploy}}` đồng nhất; `plan-locale-coverage.test.ts` xanh. **Hai lệnh `verify:localization-catalog` / `verify:localization-coverage` không chạy được ở cây này**: `config/scripts/verify-localization-catalog.mjs` và `audit-localization-coverage.mjs` không tồn tại; chỉ có `check-max-lines-ratchet.mjs`. Thay bằng kiểm tự viết: mọi khoá `translate(...)` của file đã đổi tồn tại ở `en.json` và mặc định trong mã bằng chuỗi `en`).
-- [ ] Spec `approve-run-all` xanh với claude giả; `continuous-execute-real` xanh ở loại B hoặc ghi rõ lý do chưa chạy.
-- [ ] Không hồi quy các spec QA hiện có.
+- [x] Spec `approve-run-all` xanh với claude giả; `continuous-execute-real` xanh ở loại B hoặc ghi rõ lý do chưa chạy. (Sau `redeploy-local.sh frontend` với `BUILD_FRONTEND=1` và khởi động lại api-gateway: `run_ui_flow.py --ai-stub -- approve-run-all analysis-output-language`: 5 passed, 3,6 phút, 4/4 test của `approve-run-all`. `continuous-execute-real` (loại B, Claude thật) **không chạy** theo chỉ định của điều phối; chỉ liệt kê và kiểm kiểu `tsc` sạch.)
+- [x] Không hồi quy các spec QA hiện có. (`run_ui_flow.py --ai-stub -- qa-bug-task-native-flow analysis-revision request-base-branch`: 11 passed, 6,8 phút. `qa-regressions` không chạy lại vì không thuộc phần được giao.)
 
 ## Rủi ro và lưu ý
 
@@ -64,6 +64,14 @@
 - Hộp thoại: focus trả về nút mở được kiểm bằng đơn vị (happy-dom), chưa bằng trình duyệt thật.
 - `continuous-execute-real` (loại B) chưa chạy; không chạy OpenSpec thật (loại C).
 - Cần build lại container frontend và khởi động lại gateway sau khi triển khai lại stack trước khi chạy hai spec.
+
+### Kết quả chạy trên stack (2026-10-20)
+
+- Dựng lại frontend: `BUILD_FRONTEND=1 ./deploy/dev/scripts/redeploy-local.sh frontend` (build vite xong, container khởi động lại), rồi `docker compose restart api-gateway`.
+- `approve-run-all` (stub): test 1 (hai nút, hộp thoại đúng số bước, "Not now"/Esc không đổi gì, xác nhận ghim `continuous`, dải "The agent runs it on its own.", nhãn Execution), test 2 (duyệt thường, gateway thiếu `approval.runAll` ẩn nút phụ), test 3 (dự án `continuous` chỉ một thẻ, bấm là chạy), test 4 (Project Settings): xanh, không sửa mã giao diện. Chỉ sửa spec: test 4 không cần AI nên được đưa ra khỏi khối `describe` chỉ-stub (`with the fake claude`), để chạy được cả với agent thật.
+- **Kiểm với agent THẬT cục bộ, không tốn AI:** `python3 tests/stages/e2e/orca-flows/run_ui_flow.py -- approve-run-all` (không `--ai-stub`; dev server `dev-local-mac`, Claude thật không được gọi): 3 test dùng claude giả được bỏ qua, test Project Settings **xanh trong 19,8 s**: mục "Request execution" hiện giá trị hiện tại ("Ask before each step") và dòng "Requests already running keep their mode.", đổi sang "Run all steps after one approval" và lưu, `request.engineSettings` đổi đúng `executionMode` (+1 phiên bản, engine và `solutionAgent` không đổi), tải lại vẫn giữ, trả lại giá trị cũ. Ảnh (Playwright xoá `test-results/` mỗi lượt chạy nên đã chép ra `/private/tmp/claude-501/-Users-datbeohbbh-Desktop-work-vnpay-agentic-app-orca/4dd9ab23-68c3-43c1-86f7-176f40e6ac6f/scratchpad/e2e-screens/real-agent-project-settings/{02-project-settings-execution-before,03-project-settings-execution-saved}.png`): thấy mục "Request execution", hai lựa chọn, dòng "Orca will start each step with the access of the person who approves the plan." và toast "Request execution updated".
+- **Hộp thoại xác nhận với agent thật:** không kiểm. Cần Plan ở `awaiting_plan_approval`, mà phân loại và Plan bắt buộc gọi Claude (tốn AI) nên chỉ kiểm dưới stub: ảnh ở `.../scratchpad/e2e-screens/stub-run-all/-aedaf--/{10-run-all-two-buttons,11-run-all-dialog,12-run-all-dialog,13-run-all-execution-label}.png` và các thư mục anh em (thẻ một nút, nhãn "Asks before each step", cờ tính năng tắt). Lần chạy đầu chụp hộp thoại lúc nó còn đang hiện dần (nửa trong suốt); đã thêm chờ 600 ms trước khi chụp ở `live-run-all-steps.ts` (`openRunAllDialogAndRead`), chạy lại 4/4 xanh và ảnh rõ.
+- Console của trình duyệt: 0 mục ngoài allowlist; các `Failed to fetch worktrees ... GITGATEWAY_DEV_SERVER_UNREACHABLE` là nhiễu có sẵn do các project cũ của máy này gắn dev server khác.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

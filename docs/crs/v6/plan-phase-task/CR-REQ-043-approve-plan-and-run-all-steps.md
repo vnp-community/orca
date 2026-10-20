@@ -9,7 +9,7 @@
 | **Effort** | Medium |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-20 |
-| **Trạng thái** | 📝 Đề xuất, chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (2026-10-20), chưa merge; e2e stub xanh, chưa chạy thật hạng C |
 | **Phụ thuộc** | CR-REQ-038 (chế độ `continuous`, ghim `execution_mode`, `ExecutionStartPrecheck`), CR-REQ-009 và 010 (Approval và quyền duyệt), CR-REQ-013 (`StartPhase`, `EvaluateExecution`), CR-REQ-016 (kênh gateway, `request.flowStatus.features`), CR-REQ-021 và 037 (thanh duyệt Plan, tab Execution), CR-REQ-035 (audit) |
 | **Mở khoá** | Không. Ghi nhận hai CR con có thể tách sau: đổi chế độ cho Request đang chạy (mục 2.10) và Pause/Resume (mục 2.11) |
 | **Tác động** | `backend-go/proto/orca/request/v1/approval.proto`, `backend-go/services/request-service` (`usecase/decide_approval.go`, `approval_execution_precheck.go`, `audit_event_tap.go`, `domain/execution_mode.go`, `domain/approval_events.go`, `adapter/grpc/approval_server.go`, `cmd/server/wire_approval.go`), `backend-go/services/api-gateway` (`wscompat/channels_approval.go`, `channels_request_base_ref.go` hoặc file tương đương cho `requestFeatures()`, `httpgateway/request_routes.go`), `backend-go/cmd/orca-cli` (cờ của `orca approval approve`), `frontend/src/renderer/src/components/request/{plan,execution}`, `components/project`, `hooks/usePlanDecision.ts`, `shared/request-*.ts`, 5 file locale, `tests/stages/e2e/orca-flows` |

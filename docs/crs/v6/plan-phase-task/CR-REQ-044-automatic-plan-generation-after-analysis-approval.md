@@ -9,7 +9,7 @@
 | **Effort** | Large |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-20 |
-| **Trạng thái** | 📝 Đề xuất, chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (2026-10-20), chưa merge; e2e stub xanh, chưa chạy thật hạng C |
 | **Phụ thuộc** | CR-REQ-012 (`GeneratePlan`, `CommitPlan`), CR-REQ-013 (Request sau khi Plan được duyệt), CR-REQ-026 (engine OpenSpec, run `agent_proposal`), CR-REQ-028 (consumer `request-service-clarification-resume` là mẫu), CR-REQ-038 (`ProjectEngineSettings`, `execution_mode`), CR-REQ-009 và 010 (Approval mở sau commit) |
 | **Mở khoá** | [CR-REQ-045](./CR-REQ-045-plan-documents-viewer-and-revision-by-prompt.md) (xem tài liệu của Plan và chỉnh lại Plan) phụ thuộc vào **commit phía server** thiết kế ở đây (mục 2.6): không có nó thì Plan do tác tử viết chỉ commit được khi trình duyệt còn mở |
 | **Tác động** | `backend-go/services/request-service` (domain `plan_auto`, usecase `EnqueuePlanAuto`, `PlanAutoWorker`, `RetryPlanGeneration`, sửa `GeneratePlan`, `CommitPlan`, `GetPlanProposal`, `ManageProjectEngineSettings`, consumer `eventbus`, wiring `wire_plan_auto.go`, migration mới hai dialect), `backend-go/proto/orca/request/v1/{plan,solution,request}.proto`, `backend-go/services/api-gateway` (kênh `request.retryPlan`, `request.planProposal`, `request.engineSettings(Set)`, `request.flowStatus.features`, MCP), `backend-go/policy/orca-authz/request.rego`, `frontend/src/renderer/src/{hooks,components/request/plan,shared}`, 5 file locale, `tests/stages/e2e/orca-flows` |

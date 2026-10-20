@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stablyai/orca-go/prompts/output_language"
 	"github.com/stablyai/orca-go/services/request-service/internal/adapter/grpcclient"
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
@@ -294,6 +295,113 @@ func TestFakeClaude_RevisionRoundsAnswerDifferentlyAndStayValid(t *testing.T) {
 		}
 		if strings.Contains(answers[0], "revised") || !strings.Contains(answers[1], "[revised, round 2, asked: "+feedback+"]") || !strings.Contains(answers[2], "[revised, round 3, asked: "+feedback+"]") {
 			t.Errorf("%s: the round markers are wrong:\n%s\n%s\n%s", kind, answers[0], answers[1], answers[2])
+		}
+	}
+}
+
+// CR-REQ-046: with `Language: Vietnamese` the real prompts carry the directive, the fake answers in Vietnamese, and the answers still
+// pass the same real parsers and validators as the English ones (ids, enums and labels are not translated).
+func hasVietnameseLetter(s string) bool {
+	return strings.ContainsAny(strings.ToLower(s), "ăâđêôơưàáạảãèéẹẻẽìíịỉĩòóọỏõùúụủũỳýỵỷỹ")
+}
+
+func requireDirective(t *testing.T, prompt string) {
+	t.Helper()
+	if !strings.Contains(prompt, "\nOutput language: Vietnamese.\n") {
+		t.Fatalf("the real prompt carries no Vietnamese directive line:\n%.400s", prompt)
+	}
+}
+
+func TestFakeClaude_VietnameseSolutionPassesTheRealValidators(t *testing.T) {
+	for _, typ := range []domain.RequestType{domain.RequestTypeChangeRequest, domain.RequestTypeRefactor} {
+		req := requestWithACs(typ, domain.RequestSizeM, "AC-1", "AC-2")
+		min := domain.MinOptionsFor(typ)
+		prompt := renderedSolution(t, usecase.SolutionPromptInput{Kind: domain.SolutionKindSolution, Request: req, MinOptions: min, Language: output_language.Vietnamese})
+		requireDirective(t, prompt)
+		doc, err := usecase.ExtractJSONObject(askFakeClaude(t, prompt))
+		if err != nil {
+			t.Fatalf("%s: %v", typ, err)
+		}
+		opts, err := domain.ParseSolutionOptions(doc)
+		if err == nil {
+			err = opts.Validate(min)
+		}
+		if err != nil {
+			t.Fatalf("%s: the real validator rejected the Vietnamese Solution: %v", typ, err)
+		}
+		o := opts.Options[0]
+		if o.ID != "opt-1" || !hasVietnameseLetter(o.Title) || !hasVietnameseLetter(o.Summary) || !hasVietnameseLetter(o.Approach) {
+			t.Errorf("%s: option 1 is not Vietnamese or lost its id: %+v", typ, o)
+		}
+		content, _ := domain.ContentFromRequest(req)
+		view, err := domain.ParseSolutionCoverage(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, o := range opts.Options {
+			if vs := domain.ValidateArtifactSemantics(domain.ArtifactContext{Request: content, Solution: &view, ChosenOptionID: o.ID}); len(vs) > 0 {
+				t.Errorf("%s: option %s leaves ACs uncovered: %v", typ, o.ID, vs)
+			}
+		}
+	}
+}
+
+func TestFakeClaude_VietnamesePlanPassesTheRealValidators(t *testing.T) {
+	policies := domain.NewPolicyRegistry(domain.PolicyDeps{})
+	for _, typ := range domain.AllRequestTypes() {
+		flow, err := domain.FlowFor(typ)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, size := range []domain.RequestSize{domain.RequestSizeS, domain.RequestSizeM, domain.RequestSizeL} {
+			shape := domain.PlanShapeFor(flow, size)
+			if shape == domain.ShapeNone {
+				continue
+			}
+			name := fmt.Sprintf("%s/%s", typ, size)
+			req := requestWithACs(typ, size, "AC-1")
+			prompt := renderedPlan(t, usecase.PlanPromptInput{Request: req, Shape: shape, Limits: domain.DefaultPlanLimits, ProjectName: "p", RepoURL: "r", Language: output_language.Vietnamese})
+			requireDirective(t, prompt)
+			p, err := usecase.ParsePlanOutput(askFakeClaude(t, prompt))
+			if err != nil {
+				t.Fatalf("%s: the real parser rejected the Vietnamese Plan: %v", name, err)
+			}
+			if err := domain.ValidatePlanProposal(typ, shape, domain.DefaultPlanLimits, p); err != nil {
+				t.Fatalf("%s: ValidatePlanProposal rejected the Vietnamese Plan: %v", name, err)
+			}
+			if !hasVietnameseLetter(p.Title) {
+				t.Errorf("%s: the Plan title is not Vietnamese: %q", name, p.Title)
+			}
+			if typ != domain.RequestTypePerformance {
+				if err := policies.PolicyFor(typ).PlanPreconditions(nil, req, p); err != nil { //nolint:staticcheck // these policies ignore ctx
+					t.Errorf("%s: the %s policy rejected the Vietnamese Plan: %v", name, typ, err)
+				}
+			}
+		}
+	}
+}
+
+func TestFakeClaude_VietnameseReadonlyAnalysisPassesTheRealValidators(t *testing.T) {
+	for _, typ := range []domain.RequestType{domain.RequestTypeBug, domain.RequestTypeSpike, domain.RequestTypeQuestion} {
+		flow, _ := domain.FlowFor(typ)
+		kind, ok := domain.KindForAnalysis(flow.AnalysisKind)
+		if !ok || kind == domain.SolutionKindSolution {
+			t.Fatalf("%s has no read-only analysis", typ)
+		}
+		req := requestWithACs(typ, domain.RequestSizeM, "AC-1")
+		prompt := renderedSolution(t, usecase.SolutionPromptInput{Kind: kind, Request: req, MinOptions: domain.MinOptionsFor(typ), Language: output_language.Vietnamese})
+		requireDirective(t, prompt)
+		text := askFakeClaudeReadonly(t, prompt)
+		obj, err := usecase.ExtractJSONObject(text)
+		if err != nil {
+			t.Fatalf("%s/%s: %v", typ, kind, err)
+		}
+		doc, err := usecase.ValidateByKind(kind, obj, domain.MinOptionsFor(typ))
+		if err != nil {
+			t.Fatalf("%s/%s: the real validator rejected the Vietnamese document: %v", typ, kind, err)
+		}
+		if !hasVietnameseLetter(string(doc)) || !strings.Contains(string(doc), `"kind":"`+string(kind)+`"`) {
+			t.Errorf("%s/%s: the document is not Vietnamese or lost its kind: %.300s", typ, kind, doc)
 		}
 	}
 }

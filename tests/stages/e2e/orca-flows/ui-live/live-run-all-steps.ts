@@ -92,6 +92,8 @@ export async function openRunAllDialogAndRead(f: LiveFlow, steps: number): Promi
   await expect(dialog).toContainText('needs information from you')
   await expect(dialog).toContainText('goes back to the backlog')
   await expect(dialog).toContainText('You can stop the run at any time.')
+  // The dialog fades in; a shot taken at once shows it half transparent.
+  await f.page.waitForTimeout(600)
   await f.shots.take('run-all-dialog')
 }
 

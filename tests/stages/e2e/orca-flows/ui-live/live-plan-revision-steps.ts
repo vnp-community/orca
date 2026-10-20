@@ -30,6 +30,8 @@ import { dismissFirstRunTip } from './live-ui-session'
 
 // Why: a real OpenSpec plan runs up to 64 minutes (the tab's own budget); a native one takes seconds to a few minutes.
 const PLAN_WAIT_MS = 70 * 60_000
+// Why: the fake claude writes a Plan in seconds, so a Plan that has not reached the screen after three minutes is a defect, and it should fail with its screenshot, not at the test timeout.
+const STUB_PLAN_WAIT_MS = 3 * 60_000
 const PLAN_SUBJECTS = new Set(['plan', 'task_list'])
 export const MAX_FEEDBACK = 2000
 
@@ -38,7 +40,8 @@ export async function withNativeProject(f: LiveFlow, body: () => Promise<void>):
   const before = await configureProject(f, {
     engine: 'native',
     solutionAgent: false,
-    executionMode: 'step_by_step'
+    executionMode: 'step_by_step',
+    planAutoGenerate: true
   })
   try {
     await body()
@@ -100,7 +103,9 @@ export async function reachPlanReady(
     'the Plan is written and waits for approval; the revision panel is offered',
     async () => {
       await openDetailTab(f.page, 'Plan')
-      await expect(planApproveButton(f.page)).toBeVisible({ timeout: PLAN_WAIT_MS })
+      await expect(planApproveButton(f.page)).toBeVisible({
+        timeout: o.real ? PLAN_WAIT_MS : STUB_PLAN_WAIT_MS
+      })
       await waitForApiStatus(f.rpc, r.requestId, ['awaiting_plan_approval'], 30_000)
       await expectScreenFollowsService(f.page, f.rpc, f.gaps, {
         requestId: r.requestId,

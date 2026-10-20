@@ -5,7 +5,7 @@
 **Service:** `deploy/dev`, `docs`
 **File:** `deploy/dev/docker-compose.yml` (sửa, khối `request-service` quanh dòng 463-475), `deploy/dev/.env.example` (sửa, khối "Request defaults" quanh dòng 221-228), `deploy/dev/README.md` (sửa), `deploy/dev/RELEASE-2026-10-DEPLOY.md` (sửa mục 4.1) hoặc tài liệu phát hành của bản kế tiếp nếu bản 2026-10 đã phát hành, `docs/guides/request/admin-enable-request-flow.md` (thêm một mục ngắn), `docs/guides/request/knowledge-hub-setup.md` (một dòng về kỹ năng)
 **Depends on:** TASK-REQ-046-02
-**Status:** [ ] PARTIAL (2026-10-20): các kiểm thủ công (a) và (b) trên stack chưa chạy (not run on the stack)
+**Status:** [x] DONE (2026-10-20): hai kiểm thủ công (a) và (b) đã chạy trên stack
 
 ---
 
@@ -34,7 +34,7 @@
 
 - [x] Compose, `.env.example`, README, tài liệu phát hành, hướng dẫn quản trị nêu biến, giá trị, mặc định, hiệu lực và ngoại lệ "sai thì dừng". Bằng chứng ở "Ghi chú triển khai": cả năm tài liệu nêu biến, giá trị, mặc định, hiệu lực sau `redeploy-local.sh request-service` và ngoại lệ "sai thì dừng".
 - [x] Ghi chú phát hành nêu tác động lên tenant hiện có và cách quay lại. Mục "Tác động" ở `RELEASE-2026-10-DEPLOY.md` 4.1: tenant hiện có, `en` vẫn ép tiếng Anh, giao diện chưa có locale `vi`, kỹ năng cần `npx skills update`, cách quay lại.
-- [ ] Hai kiểm thủ công (a) và (b) có kết quả trong PR. Chưa chạy: hai kiểm thủ công (a) và (b) cần stack local (not run on the stack).
+- [x] Hai kiểm thủ công (a) và (b) có kết quả trong PR. (a) `docker logs orca-go-request | grep '"msg":"output language"'`: `{"level":"INFO","msg":"output language","service":"request-service","code":"vi"}` ngay sau lần khởi động hiện tại (container `StartedAt` 05:19:56Z, dòng 05:19:57Z; không đặt biến nên là mặc định compose `vi`). (b) container dùng một lần: `docker compose -f docker-compose.yml -f docker-compose.local.yml run --rm --no-deps -T -e REQUEST_DEFAULT_OUTPUT_LANGUAGE=fr --name ara-olg-throwaway request-service`: thoát mã 1 với đúng một dòng `error: REQUEST_DEFAULT_OUTPUT_LANGUAGE "fr" is not supported; use one of: vi, en`, container `--rm` không còn, `orca-go-request` thật không bị đụng tới và vẫn `healthy` (stack không bao giờ ở giá trị sai). `docker compose logs request-service` của dịch vụ thật không có dòng này vì phép thử chạy ở container riêng.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`, `skills/`
 **File:** `skills/tdd-openspec-author/SKILL.md` (sửa, repo gốc), `backend-go/services/request-service/internal/domain/testdata/openspec_vietnamese/` (mới: `proposal.md`, `specs/dang-nhap/spec.md`, `tasks.md`), `internal/domain/openspec_vietnamese_test.go` (mới)
 **Depends on:** TASK-REQ-046-01
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -30,15 +30,27 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Gói mẫu tiếng Việt qua `ParsePlanRegion`, `CheckBundle` và (khi có CLI) `openspec validate --strict`.
-- [ ] Ca âm chứng minh phần nào phải giữ tiếng Anh: `SHALL`/`MUST`, tiêu đề delta, `#### Scenario:`, nhãn dòng task, thuộc tính.
-- [ ] `SKILL.md` có mục Language nhất quán với chỉ thị trong prompt; PR nêu việc phân phối kỹ năng.
+- [x] Gói mẫu tiếng Việt qua `ParsePlanRegion`, `CheckBundle` và (khi có CLI) `openspec validate --strict`. (`TestOpenSpecVietnamese_TasksMdParsesWithAccentedTitles`, `_BundlePassesCheckBundle`, `_OpenSpecValidateAcceptsTheBundleAndRefusesTranslatedGrammar`: xanh trên máy có `openspec` 1.3.0)
+- [x] Ca âm chứng minh phần nào phải giữ tiếng Anh: `SHALL`/`MUST`, tiêu đề delta, `#### Scenario:`, nhãn dòng task, thuộc tính. (`TestOpenSpecVietnamese_TranslatedGrammarIsRejected`: 7 ca; hai ca `openspec validate` âm: "phải" thay `SHALL`/`MUST` và tiêu đề delta dịch; ca `#### Kịch bản:` qua `openspec` nhưng Orca báo `REQUEST_SPEC_AC_NOT_COVERED`)
+- [x] `SKILL.md` có mục Language nhất quán với chỉ thị trong prompt; PR nêu việc phân phối kỹ năng. (`grep -c '^## Language' skills/tdd-openspec-author/SKILL.md` = 1; đối chiếu tay với `_language_rule_openspec.tmpl`: cùng danh sách phải giữ tiếng Anh. Việc phân phối: chỉ có hiệu lực sau khi hợp nhất và `npx skills update tdd-openspec-author --global` trên từng dev server; `SkillHash` của thay đổi tạo từ nay khác: nêu trong PR.)
 
 ## Rủi ro và lưu ý
 
 - Hành vi khi kỹ năng đã cài (không có mục Language) bất đồng với prompt chưa kiểm; prompt vẫn nêu đủ.
 - Phiên bản `openspec` trên dev server có thể khác 1.3.0 (`REQUEST_OPENSPEC_MIN_VERSION`); ca CLI chỉ chứng minh cho phiên bản chạy test.
 - Trần byte của gói (tệp ≤ 256 KiB, tổng ≤ 1 MiB, `tasks.md` ≤ 1 MiB) co lại khoảng 1,5 lần theo ký tự với tiếng Việt; chưa đo trên thay đổi thật.
+
+## Ghi chú triển khai (2026-10-20)
+
+**Tệp:** `skills/tdd-openspec-author/SKILL.md` (mục `## Language` sau "Inputs you are given", một đoạn), `backend-go/services/request-service/internal/domain/testdata/openspec_vietnamese/{proposal.md,specs/dang-nhap/spec.md,tasks.md}` (REQ-901, 2 phase, 4 task đủ bốn dòng mô tả, hai AC), `internal/domain/openspec_vietnamese_test.go`.
+
+**Lệnh và kết quả:** `cd backend-go/services/request-service && go test ./internal/domain/ -run 'OpenSpecVietnamese' -race -count=1`: ok (5,5 s; ca CLI chạy thật vì máy có `openspec` 1.3.0, ~4 s). `go vet ./internal/domain/`, `gofmt -l`: sạch.
+
+**Phát hiện khi viết ca âm (đưa vào test, không phải lỗi sản phẩm):**
+- Khoá thuộc tính dịch có dấu (`[tiêu_chí=AC-1]`) KHÔNG làm `TASKSMD_UNKNOWN_ATTR`: ngữ pháp thuộc tính của parser là ASCII (`[a-zA-Z0-9_]+`) nên cả cụm rơi vào tiêu đề task, và hệ quả là `REQUEST_SPEC_AC_NO_TASK` ở `CheckBundle`. Chỉ khoá ASCII lạ (`[nhan=...]`) mới ra `TASKSMD_UNKNOWN_ATTR`. Bản đặc tả task ghi `[nhãn=…]` ra `TASKSMD_UNKNOWN_ATTR`: thực tế là như trên; test ghi đúng hành vi thật.
+- Tên kịch bản "AC-1 đăng nhập" (chữ Việt thường ngay sau id) vẫn khớp `AC-1`: ranh giới chỉ tính byte đầu của phần còn lại.
+
+**Blast radius:** chỉ thêm tệp test, testdata và một mục trong `SKILL.md`; không đổi mã sản xuất. **Chưa kiểm:** bản `openspec` khác 1.3.0; hành vi khi kỹ năng đã cài (chưa có mục Language) bất đồng với prompt; trần byte của gói với tiếng Việt trên thay đổi thật; không chạy OpenSpec thật (7 đến 13 USD).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

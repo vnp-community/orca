@@ -165,8 +165,9 @@ def run(ctx: AcceptanceContext) -> None:
             got = drv.get(ctx, run_["request"])
             exc = stack.expect_error("REQUEST_BASE_REF_LOCKED", lambda g=got: ws.call("request.setBaseRef", {"id": g["id"], "baseRef": DEFAULT, "expectedVersion": g["version"]}))
             reason = stack.error_trailer(exc).get("reason")
-            assert reason in ("task", "execution"), f"[{key}] lock reason {reason!r}, expected task or execution"
-            assert got.get("baseRefLocked") is True and got.get("baseRefLockReason") in ("task", "execution"), (
+            # Why: the fake claude now finishes the task (CR-REQ-043), so by the time of this check the Request may be done, which locks it as `terminal`.
+            assert reason in ("task", "execution", "terminal"), f"[{key}] lock reason {reason!r}, expected task, execution or terminal"
+            assert got.get("baseRefLocked") is True and got.get("baseRefLockReason") in ("task", "execution", "terminal"), (
                 f"[{key}] request.get says baseRefLocked={got.get('baseRefLocked')!r} reason={got.get('baseRefLockReason')!r} though a worktree exists")
             assert drv.get(ctx, run_["request"])["baseRef"] == got["baseRef"], f"[{key}] a refused setBaseRef changed the ref"
     rec.run("BRF-08", "After the first task worktree exists, setBaseRef is REQUEST_BASE_REF_LOCKED (reason task or execution)", locked_after_worktree)

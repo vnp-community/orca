@@ -1,6 +1,6 @@
 # Kế hoạch triển khai CR-REQ-043, 044, 045, 046
 
-**Ngày soạn:** 2026-10-20 · **Nhánh nền:** `feat/e2e-acceptance-fixes` · **Trạng thái:** 📝 chưa bắt đầu (0/49 task)
+**Ngày soạn:** 2026-10-20 · **Nhánh nền:** `feat/e2e-acceptance-fixes` · **Trạng thái:** ✅ 49/49 task có mã và test; e2e trên stack (stub) xanh, chưa chạy `--real` cho 043/044/045 và chưa chạy OpenSpec thật (hạng C). Chưa push
 **Nguồn:** phản hồi của người dùng ngày 2026-10-20 (Bug 2 đến Bug 5; Bug 1 do người dùng tự xác nhận là nhầm lẫn, không phải lỗi). Kế hoạch này theo cùng khung của [IMPLEMENTATION-PLAN-CR-REQ-039-042.md](./IMPLEMENTATION-PLAN-CR-REQ-039-042.md).
 
 ## 1. Bốn CR và quyết định đã chốt
@@ -80,10 +80,15 @@ Giống kế hoạch 039–042: mọi ô "Tiêu chí hoàn thành" được tick
 
 | CR | Task | Trạng thái |
 |---|---|---|
-| 043 BE | 01 … 06 | [ ] [ ] [ ] [ ] [ ] [ ] |
-| 043 FE | 01 … 06 | [ ] [ ] [ ] [ ] [ ] [ ] |
-| 044 BE | 01 … 09 | [ ] ×9 |
-| 044 FE | 01 … 04 | [ ] [ ] [ ] [ ] |
-| 045 BE | 01 … 09 | [ ] ×9 |
-| 045 FE | 01 … 08 | [ ] ×8 |
-| 046 BE | 01 … 07 | [ ] ×7 |
+| 043 BE | 01 … 06 | [x] ×6 (ARA-01..06 xanh, ARA-07 chặn) |
+| 043 FE | 01 … 06 | [x] ×6 (spec `approve-run-all` 4/4) |
+| 044 BE | 01 … 09 | [x] ×9 (APG-01..09b, 11 xanh; APG-10 hạng C bỏ qua) |
+| 044 FE | 01 … 04 | [x] ×4 (spec `auto-plan-generation`) |
+| 045 BE | 01 … 09 | [x] ×9 (PRV-01..08b, 11..13 xanh; PRV-09, 10, 14, 15 bỏ qua có lý do) |
+| 045 FE | 01 … 08 | [x] ×8 (`plan-revision` 3, `plan-documents` 2; ca OpenSpec thật bỏ qua) |
+| 046 BE | 01 … 07 | [x] ×7 (OLG-01..05 xanh, OLG-06 bỏ qua; `--real language` 1 lần) |
+
+Kết quả cuối: acceptance 158 đạt, 1 lỗi đã sửa (BRF-08, kỳ vọng cũ của harness), 4 chặn, 8 bỏ qua; UI 27 spec: 23 đạt, 1 lỗi chập chờn (auto-plan ca (c), 5/5 khi chạy lặp), 3 bỏ qua. Lỗi thật tìm thấy và sửa khi chạy: outbox task-service kẹt (`task.grant_received`), consumer tự sinh Plan phát lại sự kiện cũ (chặn sự kiện quá 30 phút), hotfix bị kẹt khi chỉnh Plan (PRV-08), UI không mở luồng sự kiện ở khoảng 30% lần tải trang.
+
+Câu hỏi mới cần bạn chốt: Request `task`/`docs`/`ops_request` phải trả lời Clarification sẵn sàng sẽ không được tự sinh Plan (trả lời kích hoạt `information_provided`, thiết kế D3 không tự sinh). Có cho `information_provided → planning` cũng tự sinh Plan không?
+

@@ -1,0 +1,91 @@
+package domain_test
+
+// Compiled into task-service's domain package only through `go test -overlay` (see verify-against-request-service.sh). It builds the
+// execution prompt with the REAL prompt builders, runs the fake `claude` on it the way agent.execPrompt does for task.execute
+// (`--print --output-format stream-json --verbose --dangerously-skip-permissions`, prompt on stdin, answer = the `result` event), and
+// feeds the answer to the REAL result-block parser. A change to the prompt or to the block schema fails here before the e2e does.
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+
+	"github.com/stablyai/orca-go/prompts/task_execution"
+	"github.com/stablyai/orca-go/services/task-service/internal/domain"
+)
+
+func askFakeClaudeToExecute(t *testing.T, prompt string) string {
+	t.Helper()
+	bin := os.Getenv("FAKE_CLAUDE_BIN")
+	if bin == "" {
+		t.Skip("FAKE_CLAUDE_BIN is not set")
+	}
+	cmd := exec.Command(bin, "--print", "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions")
+	cmd.Dir = t.TempDir()
+	cmd.Env = append(os.Environ(), "FAKE_CLAUDE_STATE_DIR="+t.TempDir(), "FAKE_CLAUDE_LOGGED_IN=1")
+	cmd.Stdin = bytes.NewBufferString(prompt)
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("fake claude failed: %v\n%s%s", err, out.String(), errb.String())
+	}
+	answer, found := "", false
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+		var ev struct {
+			Type    string `json:"type"`
+			IsError bool   `json:"is_error"`
+			Result  string `json:"result"`
+		}
+		if err := json.Unmarshal([]byte(line), &ev); err != nil {
+			t.Fatalf("stream-json line is not JSON: %v\n%s", err, line)
+		}
+		if ev.Type == "result" {
+			if ev.IsError {
+				t.Fatalf("fake claude ended with an error result: %s", ev.Result)
+			}
+			answer, found = ev.Result, true
+		}
+	}
+	if !found {
+		t.Fatalf("no result event in the stream:\n%s", out.String())
+	}
+	return answer
+}
+
+func TestFakeClaude_ExecutionAnswerPassesTheRealResultParser(t *testing.T) {
+	const nonce = "0123456789abcdefABCDEF"
+	for _, c := range []struct{ requireCheck, hub bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
+		body, err := task_execution.Render(task_execution.Input{Task: task_execution.Task{Title: "P1 Implement", Description: "Implement the change."}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		suffix, err := domain.ContractPromptSuffix(nonce, c.requireCheck, c.hub)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsed := domain.ParseExecutionResult(askFakeClaudeToExecute(t, body+suffix), nonce, nil)
+		if parsed.Status != domain.ParseStatusOK || parsed.Result == nil || parsed.Result.Status != domain.ResultDone {
+			t.Fatalf("requireCheck=%v hub=%v: the real parser did not accept a done block: %+v", c.requireCheck, c.hub, parsed)
+		}
+		if c.requireCheck && !parsed.Result.HasPassingCheck() {
+			t.Errorf("the prompt demands a passing check and the answer lists none: %+v", parsed.Result.ChecksRun)
+		}
+		if len(parsed.Result.FilesChanged) != 0 {
+			t.Errorf("the fixture changes no file, yet it lists %v", parsed.Result.FilesChanged)
+		}
+	}
+}
+
+// A task without a spec is a plain run: the prompt is the bare execute template, which the fake must still recognise (it answers one line, exit 0).
+func TestFakeClaude_PlainExecutionPromptIsRecognised(t *testing.T) {
+	body, err := task_execution.Render(task_execution.Input{Task: task_execution.Task{Title: "P1 Prepare", Description: "Prepare the change. Done when the branch builds."}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if answer := askFakeClaudeToExecute(t, body); strings.Contains(answer, "ORCA_RESULT_BEGIN") || answer == "" {
+		t.Fatalf("a plain run must get one plain line, got %q", answer)
+	}
+}

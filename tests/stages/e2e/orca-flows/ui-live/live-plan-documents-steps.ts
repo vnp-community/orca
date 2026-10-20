@@ -53,13 +53,22 @@ export async function expectNativeProposal(f: LiveFlow, r: RequestUnderTest): Pr
         'a later task says what it waits for'
       ).toContainText(/Depends on #1/)
       await expect(view.getByTestId('proposal-depends').first()).toBeVisible()
-      await expect(
-        view.getByText('Agent prompt').first(),
-        'the prompt is there, closed'
-      ).toBeVisible()
-      const answer = await f.rpc.call<{ proposal?: { title?: string } }>('request.planProposal', {
-        id: r.requestId
-      })
+      const answer = await f.rpc.call<{
+        proposal?: {
+          title?: string
+          tasks?: { promptTemplate?: string }[]
+          phases?: { tasks?: { promptTemplate?: string }[] }[]
+        }
+      }>('request.planProposal', { id: r.requestId })
+      // Why: the prompt is shown only for a task that has one, and the fake claude's tasks carry none.
+      const hasPrompt = [
+        ...(answer.proposal?.tasks ?? []),
+        ...(answer.proposal?.phases ?? []).flatMap((phase) => phase.tasks ?? [])
+      ].some((task) => (task.promptTemplate ?? '').trim() !== '')
+      const promptEntry = view.getByText('Agent prompt')
+      await (hasPrompt
+        ? expect(promptEntry.first(), 'the prompt is there, closed').toBeVisible()
+        : expect(promptEntry, 'no task has a prompt to show').toHaveCount(0))
       await expect(view).toContainText(answer.proposal?.title ?? '')
       expect(
         await view.getByRole('button', { name: /edit|save|run/i }).count(),
@@ -192,10 +201,14 @@ export async function expectOpenspecDocuments(
   await f.step(
     'the checks strip shows what Orca checked and labels the agent report as the agent’s own',
     async () => {
-      await detailPane(f.page)
-        .getByRole('button', { name: /^Checks/ })
-        .click()
-      await expect(detailPane(f.page).getByTestId('plan-checks-list')).toContainText('STRUCTURE_OK')
+      const list = detailPane(f.page).getByTestId('plan-checks-list')
+      // Why: the strip opens by itself when a check needs review, and the planted change carries warnings (no knowledge, skills unverified).
+      if (!(await list.isVisible().catch(() => false))) {
+        await detailPane(f.page)
+          .getByRole('button', { name: /^Checks/ })
+          .click()
+      }
+      await expect(list).toContainText('STRUCTURE_OK')
       const disclaimer = detailPane(f.page).getByTestId('plan-knowledge-disclaimer')
       if (await disclaimer.isVisible().catch(() => false)) {
         await expect(disclaimer).toContainText('Orca did not verify it')

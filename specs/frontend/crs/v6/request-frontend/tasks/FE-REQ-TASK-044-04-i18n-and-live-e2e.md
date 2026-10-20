@@ -5,7 +5,7 @@
 **Area:** frontend / request
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json`, `tests/stages/e2e/orca-flows/ui-live/auto-plan-generation.web.e2e.ts` (mới), `tests/stages/e2e/orca-flows/ui-live/live-auto-plan-steps.ts` (mới), `tests/stages/e2e/orca-flows/run_ui_flow.py` (chỉ chú thích tên spec nếu cần)
 **Depends on:** FE-REQ-TASK-044-03, backend TASK-REQ-044-09 (stub gây lỗi Plan theo trạng thái)
-**Status:** [ ] PARTIAL (2026-10-20): khoá i18n xong; spec UI đã viết, liệt kê và kiểm kiểu được; not run on the stack.
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -33,8 +33,8 @@
 ## Tiêu chí hoàn thành
 
 - [x] Đủ khoá ở 5 locale; placeholder giữ nguyên; kiểm tra i18n không xấu hơn HEAD. (`plan-locale-coverage.test.ts` xanh; placeholder kiểm khi ghi; hai lệnh `verify:localization-*` của gốc repo trỏ tới `config/scripts/*.mjs` không có trong checkout này, bản trong `desktop/` không quét `frontend/`)
-- [ ] Spec UI xanh: (a) Plan tự xuất hiện không cần bấm; (b) thẻ lỗi bền vững qua tải lại và Retry hoạt động; (c) lỗi tạm thời tự thử lại; (d) gateway cũ giữ hành vi cũ; (e) công tắc dự án tắt thì như cũ. (not run on the stack; đã `playwright test --list` và type-check)
-- [ ] Không hồi quy các spec hiện có. (spec `qa-bug-task-native-flow` và `analysis-revision` chưa chạy lại: not run on the stack)
+- [x] Spec UI xanh: (a) Plan tự xuất hiện không cần bấm; (b) thẻ lỗi bền vững qua tải lại và Retry hoạt động; (c) lỗi tạm thời tự thử lại; (d) gateway cũ giữ hành vi cũ; (e) công tắc dự án tắt thì như cũ. (not run on the stack; đã `playwright test --list` và type-check)
+- [x] Không hồi quy các spec hiện có. (spec `qa-bug-task-native-flow` và `analysis-revision` chưa chạy lại: not run on the stack)
 
 ## Rủi ro và lưu ý
 
@@ -43,7 +43,17 @@
 - Bản dịch es/ja/ko/zh cần người bản ngữ rà.
 - Spec chưa chạy lần nào lúc soạn.
 
-## Ghi chú triển khai (2026-10-20)
+## Ghi chú triển khai (2026-10-20, chạy trên stack)
+
+**i18n:** 18 khoá ở 5 locale (xem trên); bản dịch es/ja/ko/zh cần người bản ngữ rà.
+
+**Spec:** `ui-live/auto-plan-generation.web.e2e.ts` (4 test). Sửa harness: `configureProject` luôn đặt `planAutoGenerate:false` nên (a)-(c) không bao giờ thấy Plan tự ra; thêm trường `planAutoGenerate?` vào `ProjectRunSettings` (mặc định false cho các spec cũ), spec này và `withNativeProject` (CR-045) truyền `true`. Kết quả `run_ui_flow.py --ai-stub -- auto-plan-generation`: 4/4 xanh (hai lần), trong lần hồi quy 27 spec có một lần (c) đỏ ("Generate plan was never offered") rồi chạy lại riêng `--grep "may pass" --repeat-each 5`: 5/5 xanh (một lần đỏ chưa tái hiện được; nghi dải ngắn giữa các lượt khi UI đọc `request.planProposal` bị lỗi tạm).
+
+**Lỗi giao diện tìm được và sửa (chứng minh bằng chạy lặp):** trong 2-3/8 lần mở trang, UI KHÔNG BAO GIỜ gửi `request.subscribe` (đếm khung WebSocket: 0 khung sự kiện; độ trễ phân loại 13.9 s = chu kỳ poll 15 s) nên khi server tự commit Plan, tab Plan hiện cây và banner "An approval is waiting" nhưng không có nút Approve vì danh sách Approval của `usePlanTree` chỉ làm mới theo sự kiện, không theo sự kiện poll. Nguyên nhân: `useRequestEvents` mở luồng một lần theo `[support]`; nếu `settings.activeRuntimeEnvironmentId` tới sau khi dò hỗ trợ xong thì đích là `local` (chỉ poll) và không bao giờ mở lại. Sửa: `frontend/src/renderer/src/hooks/useRequestEvents.ts` thêm `activeEnvironmentId` vào deps (2 test mới trong `useRequestEvents.test.ts`, một test đỏ khi bỏ sửa). Sau khi build lại container: 9/9 lần chạy lặp đều có `request.subscribe` và 15-18 sự kiện, độ trễ phân loại 0.9-1.9 s (trước sửa 3/8 và 4/10 lần không có luồng).
+
+**Chưa kiểm / còn lại:** `usePlanTree` vẫn không làm mới Approval khi chỉ có sự kiện poll (chế độ dự phòng): chưa sửa. Luồng `DeliverAll` của consumer tạm của gateway phát lại lịch sử stream (32 000 tin) cho mỗi phiên: chưa sửa (ghi nhận).
+
+### Ghi chú lúc soạn (trước khi chạy trên stack)
 
 - **i18n**: 18 khoá `auto.components.request.plan.{PlanAutoWriting,PlanRunFailedCard,PlanAutoSkippedNote,PlanRewriteStrip}.*` ghi vào cả 5 locale bằng một script duy nhất; bản dịch es/ja/ko/zh cần người bản ngữ rà (ghi vào PR).
 - **Spec**: `tests/stages/e2e/orca-flows/ui-live/auto-plan-generation.web.e2e.ts` (4 test: a; b; c; d+e gộp trên một Request để đỡ một vòng phân loại), `live-auto-plan-steps.ts`, `live-plan-auto-gateway-features.ts` + `.test.ts` (proxy WebSocket bỏ `request.planAuto`, 5 test xanh), `run_ui_flow.py` (docstring + truyền `ORCA_E2E_FAKE_CLAUDE_STATE_DIR` = thư mục trạng thái của stub; spec tự bỏ qua khi biến này thiếu).

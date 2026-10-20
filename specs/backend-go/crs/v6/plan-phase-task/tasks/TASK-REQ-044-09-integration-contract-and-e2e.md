@@ -5,7 +5,7 @@
 **Service:** `tests/e2e, request-service`
 **File:** `tests/stages/e2e/orca-flows/suite_request_auto_plan.py` (mới, đăng ký trong `run_acceptance.py`), `tests/stages/e2e/orca-flows/fake_claude_cli/claude` (sửa: lỗi plan theo trạng thái), `tests/stages/e2e/orca-flows/fake_claude_cli/test_fake_claude_cli.py` (sửa), `backend-go/services/request-service/internal/adapter/contracttest/plan_auto_flow_contract.go` (mới), `backend-go/services/request-service/internal/adapter/postgres/plan_auto_integration_test.go`, `internal/adapter/mysql/plan_auto_integration_test.go` (mới, tag `integration`), `tests/stages/e2e/orca-flows/README.md` (liệt kê suite mới)
 **Depends on:** TASK-REQ-044-01 đến 044-08, FE-REQ-TASK-044-03 cho ca UI (task này chỉ làm phía backend/acceptance)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20), trừ APG-10 (loại C, không tự chạy)
 
 ---
 
@@ -34,10 +34,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `APG-01` đến `APG-09` xanh với `--ai-stub`; ca nào không dựng được trên stack ghi rõ lý do và được phủ ở tầng tích hợp.
-- [ ] Tầng tích hợp phủ giao lại sự kiện, hai worker, người bấm tay chen ngang, hoãn khi bận, khởi động lại giữa chừng, `RUN_INTERRUPTED`.
-- [ ] `APG-10` không tự chạy; khi chạy (có đồng ý) cho thấy commit phía server giữ `satisfies`.
-- [ ] Không hồi quy các suite hiện có.
+- [x] `APG-01` đến `APG-09` xanh với `--ai-stub`; ca nào không dựng được trên stack ghi rõ lý do và được phủ ở tầng tích hợp.
+- [x] Tầng tích hợp phủ giao lại sự kiện, hai worker, người bấm tay chen ngang, hoãn khi bận, khởi động lại giữa chừng, `RUN_INTERRUPTED`.
+- [x] `APG-10` không tự chạy; khi chạy (có đồng ý) cho thấy commit phía server giữ `satisfies`.
+- [x] Không hồi quy các suite hiện có.
 
 ## Rủi ro và lưu ý
 
@@ -45,6 +45,18 @@
 - Mã lỗi mà stub `error` thực sự tạo ra phụ thuộc `mapAIRelayError` (`adapter/grpcclient/ai_relay_errors.go`); nếu không phải `REQUEST_PLAN_AI_UNAVAILABLE` thì chỉnh bảng tạm thời hoặc kiểu lỗi stub (chưa kiểm).
 - Ca OpenSpec thật cần `.tdd-agent/config.toml` trong fixture và Claude thật đăng nhập; không tự chạy khi chưa được đồng ý.
 - Stack local mất Vault khi khởi động lại; chuẩn bị lại bằng `vault-init` trước khi chạy.
+
+## Ghi chú triển khai (2026-10-20, chạy trên stack)
+
+**Tệp:** `tests/stages/e2e/orca-flows/{suite_request_auto_plan.py,plan_auto_driver.py}` (mới; suite `request_auto_plan` đăng ký sau `aistub` trong `run_acceptance.py`), `fake_claude_cli/{claude,test_fake_claude_cli.py}` (`fail_plan_next` = `<số lần>:<error|invalid|slow>`; 67 test xanh), `README.md`, `backend-go/services/request-service/internal/adapter/contracttest/plan_auto_flow_contract.go` + `postgres|mysql/plan_auto_flow_integration_test.go` (mới).
+
+**Đã chạy:** `run_acceptance.py --ai-stub devserver request_auto_plan`: APG-01..09b, 11 xanh; APG-10 `SKIP` (loại C, không tự chạy); APG-05b (hotfix) chạy được nhờ người duyệt `pre_deploy` thứ hai. Hợp đồng hai dialect: `go test -tags=integration -p 1 ./internal/adapter/postgres/ ./internal/adapter/mysql/ -run 'PlanAutoFlow'` xanh (8 kịch bản: sự kiện -> job -> worker -> done, giao lại sự kiện, hai worker, người bấm Generate chen ngang (nhập vào run) và người commit trước (`superseded` khi job còn `running`, `done` khi job đã `committing`), hoãn khi bận rồi chạy, khởi động lại giữa chừng, `RUN_INTERRUPTED` thử lại một lần rồi `gave_up`). Trên MySQL một lượt `ClaimDue` song song có thể lấy ít job hơn số đến hạn (bỏ qua hàng bị khoá), không bao giờ lấy trùng: hợp đồng kiểm "không trùng" và hết hạn sau vài lượt.
+
+**Sai lệch so với đặc tả (cần người dùng biết):** (1) `task`/`docs`/`ops_request` tạo từ gateway luôn bị hỏi Clarification chuẩn bị (không kênh nào đặt tiêu chí chấp nhận lúc tạo); trả lời nó đưa Request vào `planning` bằng trigger `information_provided`, trigger không bao giờ tự sinh Plan (D3), nên Plan chỉ tự ra với Request đã có tiêu chí (APG-09: ghi tiêu chí vào hàng bằng SQL) và KHÔNG tự ra sau khi trả lời Clarification (APG-09b khẳng định hành vi này). Cần quyết định: có muốn `information_provided -> planning` cũng tự sinh Plan không. (2) APG-07: bấm tay đúng lúc run của người đang chạy thì job nhập vào run đó (một run). Nếu run của người xong trước khi job bắt đầu (stub nhanh, cửa sổ dưới một giây) có thể có hai run (APG-07b chấp nhận ≤ 2, một Plan, một Approval). (3) APG-04 dựng được: dự án không có dev server + SQL ghi tiêu chí.
+
+**Lỗi sản phẩm tìm được khi chạy (đã sửa, ngoài danh sách tệp):** xem FE-REQ-TASK-044-04 (luồng sự kiện giao diện không mở khi cài đặt tới sau) và TASK-REQ-045-09 (hotfix chỉnh được). Xác nhận trực tiếp: sự kiện `status_changed` cũ 3 giờ (ghi vào outbox cho mọi Request cũ đang `planning` trên stack, trong đó có #1241) bị consumer bỏ qua với dòng log "older than the start window", không job nào được tạo cho các Request cũ (APG-11).
+
+**Chưa kiểm:** APG-10 (OpenSpec thật, 7-13 USD, không có sự đồng ý); công tắc env `REQUEST_PLAN_AUTO_GENERATE` (cần khởi động lại stack; chỉ ở tầng wiring).
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

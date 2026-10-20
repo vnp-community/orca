@@ -5,7 +5,7 @@
 **Service:** `tests/e2e`, `request-service`
 **File:** `tests/stages/e2e/orca-flows/suite_approve_run_all.py` (mới, đăng ký trong `run_acceptance.py`), `tests/stages/e2e/orca-flows/fake_claude_cli/{claude,test_fake_claude_cli.py}` (sửa), `tests/stages/e2e/orca-flows/README.md` (bảng "Danh mục test", sửa), `deploy/dev/RELEASE-2026-10-DEPLOY.md` mục 4.3 và dòng 207 (sửa)
 **Depends on:** TASK-REQ-043-04, TASK-REQ-043-05
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20): chạy trên stack; còn lại một mục không chạy theo chỉ định (`--real continuous`, loại B)
 
 ---
 
@@ -41,15 +41,29 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `ARA-01`, `02`, `04`, `05`, `06` xanh với claude giả; `ARA-03` xanh với claude giả mở rộng hoặc được ghi rõ chỉ chạy ở loại B kèm lý do; `ARA-07` xanh khi có tài khoản thứ hai, ngược lại `BLOCKED` có lý do.
-- [ ] Claude giả nhận prompt thực thi, có test, và không làm vỡ các kiểu prompt cũ.
-- [ ] Không hồi quy các suite hiện có; README và RELEASE đã cập nhật.
+- [x] `ARA-01`, `02`, `04`, `05`, `06` xanh với claude giả; `ARA-03` xanh với claude giả mở rộng (chạy hết 2 Phase, 6 task, miễn phí); `ARA-07` `BLOCKED` có lý do. (`python3 tests/stages/e2e/orca-flows/run_acceptance.py --ai-stub devserver approve_run_all`: ARA-01..06 PASS, ARA-07 BLOCKED, 53 s; ba dòng FAIL `AST-01..03` của lần chạy hẹp này là do `aistub` tự thêm vào và chạy trước khi có lời gọi AI nào, không phải lỗi: lần chạy đầy đủ bên dưới xanh.)
+- [x] Claude giả nhận prompt thực thi, có test, và không làm vỡ các kiểu prompt cũ. (`python3 -m unittest tests/stages/e2e/orca-flows/fake_claude_cli/test_fake_claude_cli.py`: 57 test OK; `bash .../verify-against-request-service.sh`: OK cả hai module, gồm `TestFakeClaude_ExecutionAnswerPassesTheRealResultParser` và `TestFakeClaude_PlainExecutionPromptIsRecognised` ở task-service)
+- [x] Không hồi quy các suite hiện có; README và RELEASE đã cập nhật. (`run_acceptance.py --ai-stub` toàn bộ: 151 pass, 6 fail, 5 blocked, 4 skip, 354 s. 6 FAIL đều ngoài phạm vi: `QA-TERM-01..03` (stub không mở được PTY: `INFRA_AGENT_SPAWN_PTY_FAILED`), `QA-GH-01/03` (BUG-QA-03 chưa sửa, đã ghi ở RELEASE mục 8), `QA-JIRA-02` (assert của test, không liên quan). 5 BLOCKED: `AIS-01/03`, `MCP-01/02`, `ARV-13` như các lần trước, cộng `ARA-07`. UI stub: `qa-bug-task-native-flow` 3/3, `analysis-revision` 5/5, `request-base-branch` 3/3 xanh.)
 
 ## Rủi ro và lưu ý
 
 - Chưa kiểm chứng task-service chấp nhận khối kết quả `done` không có thay đổi tệp.
 - Dev stack mặc định engine `openspec` và `REQUEST_DEFAULT_SOLUTION_AGENT=true`; phải đặt `native` và tắt `solutionAgent` cho dự án thử, nếu không ca vô tình chạy OpenSpec tốn tiền.
 - Stack local mất Vault khi khởi động lại; chuẩn bị lại bằng `vault-init` trước khi chạy. Không sửa checkout orca trong lúc `--real` chạy.
+
+## Ghi chú triển khai (2026-10-20)
+
+**Tệp:** `tests/stages/e2e/orca-flows/{suite_approve_run_all.py,approve_run_all_driver.py}` (mới), `run_acceptance.py` (đăng ký `approve_run_all` sau `aistub`), `fake_claude_cli/{claude,test_fake_claude_cli.py,verify-against-request-service.sh,task_service_contract.overlay.go.txt}`, `README.md` (dòng `ARA`), `deploy/dev/RELEASE-2026-10-DEPLOY.md` (4.3, dòng chạy thử, mục 8: đã có màn hình Project Settings cho chế độ thực thi). Sửa lỗi sản phẩm: xem "Lỗi tìm được" bên dưới.
+
+**Claude giả và prompt thực thi (điều tra theo yêu cầu):** prompt thực thi tới claude giả có hai dạng: (a) task không có spec: `agent.execPrompt` ghi quyền `--print --output-format stream-json --verbose --dangerously-skip-permissions`, prompt (stdin) bắt đầu bằng khối `# Orca Project Context` của agent rồi `Complete the following task.\n\nTask: ...`, **không có khối kết quả**, task-service coi exit 0 là xong; (b) task có spec (contract run): thêm hậu tố `ORCA_RESULT_BEGIN <nonce>`. Stub nhận cả hai (`prompt_kind` = `execute`), trả một dòng (a) hoặc khối `done` hợp lệ (b), ghi `outputLanguage`, `dangerousSkip`, `gitWorktree` vào `calls.jsonl`; từ chối phân tích chỉ đọc có cờ bỏ qua quyền. **task-service có chấp nhận `done` không đổi tệp nào không: có.** Chạy thật: task `open` -> `review` -> `done` (tự hoàn thành) với `files_changed` rỗng và không có thay đổi tệp, Phase 1 rồi Phase 2 chạy xong. `files_changed` không được dùng để từ chối ở `execution_result.go`; riêng đường contract có `ClassifyRunFailureChecked` (cần check đạt khi `RequirePassingCheck`), đã kiểm bằng parser thật chứ chưa chạy trên stack (task native không có spec).
+
+**Lỗi tìm được và sửa (task-service, ngoài danh sách tệp của task nhưng là lỗi thật chặn `ARA-03`):** lần chạy `ARA-07` làm member duyệt, `ExecutionAccess` cấp quyền execute và task-service ghi sự kiện outbox `task.grant_received`. Chủ đề này **nằm ngoài stream JetStream `TASK` (`orca.task.>`)** nên mỗi lần phát bị từ chối (`nats: no response from stream`), và `common/outbox.Relay` dừng ở lần lỗi đầu tiên của lô (có chủ ý, để giữ thứ tự): **mọi sự kiện đứng sau bị giữ vô hạn** (331 lần thử lại trong 30 phút, 28 sự kiện `statuschanged` kẹt). Hậu quả: request-service không nhận `task.statuschanged` nên task kẹt ở `review`, Request kẹt `executing` mãi (ARA-03 hết 360 s). Bất kỳ lần cấp/thu quyền task nào ở bất kỳ tenant nào cũng gây ra. Sửa: `internal/adapter/eventbus/publisher.go` (`streamSubject` thêm tiền tố `orca.` cho mọi sự kiện chưa có), test `publisher_test.go` (`TestPublisher_PutsEveryEventUnderTheTaskStream`), migration `0022_outbox_grant_subjects` ở **postgres và mysql** (đổi tên chủ đề của các hàng chưa gửi, `down` là no-op). Triển khai: `redeploy-local.sh task-service` (migration áp dụng, 0 hàng chưa gửi sau đó), khởi động lại request-service và api-gateway. Blast radius: chỉ `Publisher.Publish` (người gọi: `Grant`, `RevokeGrant`); không có consumer nào của hai chủ đề này. **Chưa chạy**: test tích hợp migration trên Postgres 16/MySQL 8 (máy không có CLI `migrate`); câu SQL của MySQL chưa chạy thật.
+
+**ARA-07:** `BLOCKED` có lý do (README ghi): qua gateway không đạt được lỗi `REQUEST_EXECUTION_ACTOR_NOT_ALLOWED`, vì cây Plan do admin (người commit) sở hữu và `ExecutionAccess.CheckReady` chỉ từ chối khi người duyệt chính là chủ cây mà không có quyền; member được cấp quyền từ chủ cây và lời gọi thành công, Request chạy `continuous`. Không thêm `ORCA_E2E_MEMBER_*`: suite tự tạo member bằng `admin.createUser`.
+
+**Các kiểm tra khác:** ARA-06 chạy thật: Request ghim `step_by_step` (chạy Phase 1 bằng tay), `request.returnToBacklog` stage `phase`, `request.reopen`, đi lại phân tích và Plan (commit Plan mới được), rồi `continuous` bị `REQUEST_EXECUTION_MODE_ALREADY_PINNED`, duyệt thường vẫn thành công. Sự cố vận hành ghi nhận: lần chạy `--ai-stub` có outbox bị giữ kết thúc với "dev server 'dev-local-mac' did not reconnect within 90s" khi khôi phục agent (mã thoát 3); chạy lại `start-local-agent.sh` thì nối ngay; sau khi sửa outbox các lần khôi phục đều thành công.
+
+**Chưa kiểm:** mục 4 (`run_ui_flow.py --real continuous`, loại B) không chạy theo chỉ định; spec chỉ được liệt kê và kiểm kiểu. Không chạy OpenSpec thật.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

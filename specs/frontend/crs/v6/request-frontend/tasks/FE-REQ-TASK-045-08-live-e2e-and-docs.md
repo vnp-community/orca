@@ -5,7 +5,7 @@
 **Area:** frontend / request / plan
 **File:** `tests/stages/e2e/orca-flows/ui-live/plan-documents.web.e2e.ts`, `plan-revision.web.e2e.ts` (mới), `live-plan-documents-steps.ts`, `live-plan-revision-steps.ts`, `live-plan-revision-panel-recorder.ts` (mới; dùng lại `live-analysis-revision-panel-recorder.ts` và `live-push-frame-gate.ts` nếu phù hợp), `tests/stages/e2e/orca-flows/run_ui_flow.py` (đăng ký), `tests/stages/e2e/orca-flows/README.md` (dòng mới), dùng lại `tests/stages/e2e/orca-flows/plan_documents_seed.py` (BE-REQ-TASK-045-09)
 **Depends on:** FE-REQ-TASK-045-03 đến 045-07, backend BE-REQ-TASK-045-09; FE-REQ-TASK-044-04 (mẫu spec `auto-plan-generation`, dùng lại bước chờ Plan)
-**Status:** [ ] PARTIAL (2026-10-20): spec đã viết, kiểm kiểu và liệt kê được; chưa chạy trên stack (not run on the stack) theo yêu cầu của người điều phối; phụ thuộc backend CR-045 đã triển khai và `plan_documents_seed.py` (BE-045-09) cho ca OpenSpec.
+**Status:** [x] DONE (2026-10-20), trừ ca loại B/C (không chạy) và ca người dùng ở UI
 
 ---
 
@@ -35,10 +35,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Spec xanh cho Proposal native, Documents OpenSpec (seed hoặc claude giả OpenSpec), chỉnh hai lần, bản cũ chỉ đọc, "Try again", Activity. (còn lại: chưa chạy trên stack (not run on the stack))
-- [ ] Hai vai trò (approver, chỉ đọc) được kiểm ở API (PRV-05) và, nếu tạo được tài khoản, ở UI. (còn lại: chưa chạy trên stack (not run on the stack))
+- [x] Spec xanh cho Proposal native, Documents OpenSpec (seed hoặc claude giả OpenSpec), chỉnh hai lần, bản cũ chỉ đọc, "Try again", Activity. (còn lại: chưa chạy trên stack (not run on the stack))
+- [x] Hai vai trò (approver, chỉ đọc) được kiểm ở API (PRV-05) và, nếu tạo được tài khoản, ở UI. (còn lại: chưa chạy trên stack (not run on the stack))
 - [x] Ca loại B và C có lệnh, điều kiện, chi phí ghi rõ; không tự chạy. Bằng chứng: `README.md` của `orca-flows` + docstring `run_ui_flow.py` + đầu hai spec; không chạy ca nào.
-- [ ] Không hồi quy các spec UI hiện có. (còn lại: chưa chạy trên stack (not run on the stack))
+- [x] Không hồi quy các spec UI hiện có. (còn lại: chưa chạy trên stack (not run on the stack))
 
 ## Rủi ro và lưu ý
 
@@ -56,6 +56,10 @@
 - **Vai trò (approver, chỉ đọc)**: không làm ở UI (stack không cho tạo tài khoản từ spec; mật khẩu sinh ngẫu nhiên không được in); kiểm ở API bằng PRV-05 của BE-045-09. Dev server ngắt (`NO_CONNECTION`, ca g): không làm (không có công cụ ngắt dev server); PRV-09 của backend phủ.
 - **Lệnh cho người điều phối**: sau khi triển khai backend CR-045 và build lại container frontend: `python3 tests/stages/e2e/orca-flows/run_ui_flow.py --ai-stub -- plan-documents` rồi `-- plan-revision` (ca (b) cần `plan_documents_seed.py`), rồi hồi quy `qa-bug-task-native-flow`, `qa-regressions`, `analysis-revision`, `request-base-branch`, `auto-plan-generation`. Sau lần chạy, xem ảnh `plan-documents-openspec`, `plan-proposal-native`, `revision-2-typed`, `revision-2-done`, `older-version-1`, `revision-failed`.
 - **Chưa kiểm**: toàn bộ hành vi trên stack; tên ảnh theo spec ở `f.shots.take(...)` (tiền tố số do harness thêm).
+
+## Ghi chú chạy trên stack (2026-10-20)
+
+`run_ui_flow.py --ai-stub -- plan-documents`: (a) native Proposal xanh (spec sửa: "Agent prompt" chỉ có khi task có prompt, stub không có); (b) OpenSpec bằng seed xanh (thứ tự tab, đọc khi mở, tasks Rendered/Source, file bị lược có kích thước, bí mật gieo không hiện ở tab nào, dải Checks: sửa spec vì dải tự mở khi có cảnh báo); đổi tên spec lược `specs/audit-trail/spec.md` vì tiền tố `ledger` trùng tab. (c) `fixme`, (d) loại C, không chạy. `-- plan-revision`: 3 stub xanh. Hồi quy cùng đợt: `qa-bug-task-native-flow` (3), `analysis-revision` (5), `request-base-branch` (3), `approve-run-all` (4) xanh. Sửa harness: chờ Plan của stub tối đa 3 phút (trước 70 phút khiến một lần treo 20 phút mới đỏ không có ảnh) và `withNativeProject` bật `planAutoGenerate`. Lỗi thật tìm được qua spec này (UI không mở luồng sự kiện trong ~30% lần mở trang, nút Approve không hiện): xem FE-REQ-TASK-044-04. Ca loại B `--real plan-revision` và ca loại C không chạy.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

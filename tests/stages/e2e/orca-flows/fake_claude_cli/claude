@@ -17,11 +17,24 @@ Answers are keyed on the prompts the real request-service builds (classification
 diagnosis / findings / answer analyses) and are written to pass the real parsers and validators (ParseClassificationProposal,
 SolutionOptions.Validate + coverage, ParsePlanOutput, ValidatePlanProposal, ValidateByKind). A prompt it does not recognise fails loudly instead of inventing an answer.
 
-A reviewer's change request (a <feedback> block after </request>) is echoed in the answer, so each round differs; the code
-[stub:fail-once] in that feedback makes the first answer fail and later ones succeed, and [stub:slow] delays the answer
-(FAKE_CLAUDE_SLOW_SECONDS, default 6).
+Execution (agent.execPrompt with accessMode=write: `claude --print --output-format stream-json --verbose --dangerously-skip-permissions`, cwd the task's
+worktree): a task that has a spec is a contract run, whose prompt asks for a result block; the answer is a valid `done` block between the nonce markers
+the prompt gives. Any other task (the default opener "Complete the following task.") gets one plain line. The fixture changes no file, claims none in
+files_changed, and lists a passing check only when the prompt requires one (marked as fake). Read-only prompts are refused when the bypass flag is present.
 
-State (calls.jsonl, logged_in, fail-once markers) lives in $FAKE_CLAUDE_STATE_DIR, default ~/.fake-claude. The agent strips FAKE_* variables
+Language: a line `Output language: Vietnamese.` before <request> (the directive request-service adds, CR-REQ-046) makes the human-readable strings of the
+Solution, Plan and read-only answers Vietnamese (table VI); ids, enums, labels and keys never change. Every call records `outputLanguage` (vi, en or "").
+
+A reviewer's change request (a <feedback> block after </request>) is echoed in the answer, so each round differs (a revised Plan counts its round
+from the marker in the <prior_plan> block); the code [stub:fail-once] in that feedback makes the first answer fail and later ones succeed, and
+[stub:slow] delays the answer (FAKE_CLAUDE_SLOW_SECONDS, default 6). Both apply to Solutions and to Plans.
+
+A Plan that nobody asked to revise (the automatic run of CR-REQ-044 has no <feedback>) is failed on demand with the file `fail_plan_next` in the state
+dir: its content `<count>:<kind>` makes the next <count> Plan prompts fail (`error` = the call fails, `invalid` = the reply is not JSON) or run
+slowly (`slow` = answer normally after FAKE_CLAUDE_SLOW_SECONDS, so a test can act while the run is in flight); each prompt decrements the count,
+and an empty or exhausted file does nothing. A native Plan gets one repair attempt, so `invalid` needs a count of 2 to fail a run.
+
+State (calls.jsonl, logged_in, fail-once markers, fail_plan_next) lives in $FAKE_CLAUDE_STATE_DIR, default ~/.fake-claude. The agent strips FAKE_* variables
 from the environment of `claude -p`, so the login state can also be switched with the `logged_in` file (0 or 1).
 POSIX only (macOS, Linux); a Windows agent resolves claude.cmd, so the stub does not apply there.
 """
@@ -100,6 +113,13 @@ def flag_value(argv, name):
     return None
 
 
+def write_utf8(text):
+    """Raw UTF-8 bytes, like the real CLI, whatever the locale of the agent's environment: Vietnamese must reach the agent unescaped."""
+    sys.stdout.flush()
+    sys.stdout.buffer.write(text.encode("utf-8"))
+    sys.stdout.buffer.flush()
+
+
 def emit(result_text, is_error=False, api_status=None, prompt_len=0):
     out = {
         "type": "result",
@@ -114,8 +134,7 @@ def emit(result_text, is_error=False, api_status=None, prompt_len=0):
     }
     if api_status is not None:
         out["api_error_status"] = api_status
-    sys.stdout.write(json.dumps(out))
-    sys.stdout.flush()
+    write_utf8(json.dumps(out, ensure_ascii=False))
     return 1 if is_error else 0
 
 
@@ -127,6 +146,13 @@ PLAN_MARK = "You are a senior engineer turning an approved decision into an exec
 READONLY_MARK = "You analyse a repository in READ-ONLY mode."
 # Tools a read-only analysis may be given; anything else (Edit, Write, Bash...) means the agent lost its read-only guard.
 READONLY_TOOLS = {"Read", "Glob", "Grep"}
+# The instruction line of backend-go/prompts/task_execution/result_block_suffix.tmpl; the nonce follows on the next line.
+EXECUTE_OPENER = "Complete the following task.\n\nTask: "  # execute.tmpl when the task has no prompt template of its own
+CONTEXT_PREAMBLE = "# Orca Project Context\n"  # the agent puts this block (project, repo, branch, dev server) in front of every task prompt
+EXECUTE_INSTRUCTION = "\nWhen you are done, end your reply with exactly one result block and print the two marker lines only there"
+BYPASS_FLAG = "--dangerously-skip-permissions"
+REQUIRE_CHECK_LINE = "\nThis task has a Verify step: run it for real and list it in checks_run"
+LANGUAGE_CODES = {"Vietnamese": "vi", "English": "en"}
 
 # First match wins. Phrases are specific on purpose: the e2e suite titles its Requests "matrix hotfix", "matrix security" and so
 # on only to label them, and must not make the AI propose a type that needs a human approver (hotfix, security).
@@ -214,13 +240,16 @@ FAIL_ONCE_TRIGGER = "[stub:fail-once]"
 SLOW_TRIGGER = "[stub:slow]"
 
 
+def slow_seconds():
+    try:
+        return max(0.0, float(os.environ.get("FAKE_CLAUDE_SLOW_SECONDS", "6")))
+    except ValueError:
+        return 6.0
+
+
 def pause_if_slow(prompt):
     if SLOW_TRIGGER in revision_feedback(prompt):
-        try:
-            seconds = float(os.environ.get("FAKE_CLAUDE_SLOW_SECONDS", "6"))
-        except ValueError:
-            seconds = 6.0
-        time.sleep(max(0.0, seconds))
+        time.sleep(slow_seconds())
 
 
 def fail_once(prompt):
@@ -238,9 +267,94 @@ def fail_once(prompt):
     return True
 
 
+def fail_plan_next():
+    """What the file `fail_plan_next` asks for this Plan prompt ("error", "invalid" or "slow"), or "". Consumes one of its count."""
+    path = os.path.join(state_dir(), "fail_plan_next")
+    try:
+        with open(path) as fh:
+            count, _, kind = fh.read().strip().partition(":")
+        left = int(count)
+    except (OSError, ValueError):
+        return ""
+    kind = kind.strip() or "error"
+    if left <= 0 or kind not in ("error", "invalid", "slow"):
+        return ""
+    try:
+        with open(path, "w") as fh:
+            fh.write(f"{left - 1}:{kind}")
+    except OSError:
+        return ""  # cannot count the failure down: answering beats failing forever
+    return kind
+
+
+def language_directive(prompt):
+    """vi, en or "": the code of the `Output language: <Name>.` line that request-service puts before <request>. Only that part is read:
+    the request text is untrusted and may quote the line."""
+    if "\n<request>\n" not in prompt:
+        return ""
+    head = prompt.split("\n<request>\n", 1)[0]
+    m = re.search(r"^Output language: (\w+)\.$", head, re.M)
+    return LANGUAGE_CODES.get(m.group(1), "") if m else ""
+
+
+# Reader-facing strings in Vietnamese, with full diacritics. Anything the schema or a parser matches (ids, enums, labels, keys) stays out.
+VI = {
+    "opt_extend": "Phương án {i}: mở rộng mô-đun hiện có",
+    "opt_new": "Phương án {i}: thêm một thành phần riêng",
+    "opt_summary": "Phương án {i} của claude giả cho: {title}{note}",
+    "opt_approach": "1. Thay đổi đường mã phục vụ \"{title}\".\n2. Phủ bằng kiểm thử.\n3. Triển khai sau một cờ tính năng.",
+    "pro_small": "Phạm vi ảnh hưởng nhỏ",
+    "pro_clear": "Tách bạch rõ ràng",
+    "con_coupled": "Gắn chặt với mã hiện tại",
+    "con_more": "Thêm mã cần bảo trì",
+    "risk": "Hồi quy ở hành vi lân cận",
+    "rollback": "Hoàn tác thay đổi.",
+    "recommendation": "Thay đổi nhỏ nhất đáp ứng yêu cầu.",
+    "assumption": "Hành vi hiện tại đã được kiểm thử phủ.",
+    "question": "Tín hiệu sức khoẻ nào sẽ điều khiển huy hiệu?",
+    "plan_title": "Kế hoạch: {title}",
+    "plan_summary": "Kế hoạch làm việc của claude giả.",
+    "plan_notes": "Kế hoạch xác định của claude giả.",
+    "plan_notes_revised": " Đã sửa theo phản hồi của người duyệt.",
+    "t_fix": "Sửa lỗi",
+    "t_fix_desc": "Áp dụng bản sửa cho: {title}. Xong khi triệu chứng trên môi trường thật biến mất.",
+    "t_prepare": "Chuẩn bị",
+    "t_prepare_desc": "Chuẩn bị thay đổi cho: {title}. Xong khi nhánh biên dịch được.",
+    "t_prepare_ops_desc": "Chuẩn bị thay đổi cho: {title}. Xong khi các điều kiện tiên quyết đã được kiểm.",
+    "t_implement": "Triển khai",
+    "t_implement_desc": "Triển khai thay đổi. Xong khi các kiểm thử đơn vị của nó đạt.",
+    "t_verify": "Kiểm chứng",
+    "t_verify_desc": "Kiểm chứng thay đổi từ đầu đến cuối. Xong khi các tiêu chí chấp nhận được chứng minh.",
+    "t_apply": "Áp dụng",
+    "t_apply_desc": "Áp dụng thay đổi. Xong khi dịch vụ báo trạng thái mới.",
+    "t_rollback": "Hoàn tác",
+    "t_rollback_desc": "Khôi phục trạng thái trước đó. Xong khi dịch vụ trả lời như trước thay đổi.",
+    "ph1_title": "Giai đoạn 1: Nền tảng",
+    "ph1_desc": "Giao phần nền. Xong khi có thể rà soát độc lập.",
+    "ph2_title": "Giai đoạn 2: Triển khai",
+    "ph2_desc": "Bật thay đổi. Xong khi đã phát hành.",
+    "diag_summary": "Chẩn đoán của claude giả cho: {title}{note}",
+    "diag_root": "Nguyên nhân gốc giả định cho: {title}",
+    "diag_repro": "Claude giả không tái hiện lỗi.",
+    "diag_fix": "Áp dụng bản sửa nhỏ nhất và thêm kiểm thử hồi quy.",
+    "find_summary": "Kết quả của claude giả cho: {title}{note}",
+    "find_statement": "Claude giả không tìm thấy điều gì để báo cáo.",
+    "find_reco": "Không cần làm gì thêm.",
+    "find_reason": "Câu trả lời giả định.",
+    "answer": "Câu trả lời của claude giả cho: {title}. Đây là dữ liệu giả định, được dựng sẵn để kiểm thử.{note}",
+    "limitation": "Câu trả lời giả định; không đọc mã nguồn nào.",
+}
+
+
+def tr(lang, key, en, **kw):
+    """The Vietnamese text of `key` when the prompt asked for Vietnamese, else the English text unchanged."""
+    return VI[key].format(**kw) if lang == "vi" else en
+
+
 def solution_answer(prompt):
     block = request_block(prompt)
     note = revision_note(prompt)
+    lang = language_directive(prompt)
     title = request_field(block, "title")[:80] or "the request"
     m = re.search(r"Give at least (\d+) options", prompt)
     count = min(4, max(2, int(m.group(1)) if m else 2))
@@ -248,24 +362,24 @@ def solution_answer(prompt):
     for i in range(1, count + 1):
         options.append({
             "id": f"opt-{i}",
-            "title": f"Option {i}: {'extend the existing module' if i == 1 else 'add a dedicated component'}",
-            "summary": f"Fake-claude option {i} for: {title}{note}",
-            "approach": f"1. Change the code path that serves \"{title}\".\n2. Cover it with tests.\n3. Roll out behind a flag.",
-            "pros": ["Small blast radius" if i == 1 else "Clear separation"],
-            "cons": ["Couples to current code" if i == 1 else "More code to maintain"],
-            "risks": [{"description": "Regression in adjacent behaviour", "severity": "low"}],
+            "title": tr(lang, "opt_extend" if i == 1 else "opt_new", f"Option {i}: {'extend the existing module' if i == 1 else 'add a dedicated component'}", i=i),
+            "summary": tr(lang, "opt_summary", f"Fake-claude option {i} for: {title}{note}", i=i, title=title, note=note),
+            "approach": tr(lang, "opt_approach", f"1. Change the code path that serves \"{title}\".\n2. Cover it with tests.\n3. Roll out behind a flag.", title=title),
+            "pros": [tr(lang, "pro_small" if i == 1 else "pro_clear", "Small blast radius" if i == 1 else "Clear separation")],
+            "cons": [tr(lang, "con_coupled" if i == 1 else "con_more", "Couples to current code" if i == 1 else "More code to maintain")],
+            "risks": [{"description": tr(lang, "risk", "Regression in adjacent behaviour"), "severity": "low"}],
             "effort": {"size": "S" if i == 1 else "M", "hours_estimate": 4 * i},
             "affected_areas": [{"kind": "service", "name": "request-service"}],
             "breaking_change": False,
-            "rollback": "Revert the change.",
+            "rollback": tr(lang, "rollback", "Revert the change."),
             "recommended": i == 1,
         })
     ids = [o["id"] for o in options]
     doc = {
         "schema_version": 1,
         "options": options,
-        "recommendation": {"option_id": "opt-1", "reason": "Smallest change that meets the request."},
-        "assumptions": [{"id": "A-1", "text": "The current behaviour is covered by tests.", "needs_confirmation": False}],
+        "recommendation": {"option_id": "opt-1", "reason": tr(lang, "recommendation", "Smallest change that meets the request.")},
+        "assumptions": [{"id": "A-1", "text": tr(lang, "assumption", "The current behaviour is covered by tests."), "needs_confirmation": False}],
         "open_questions": blocking_questions(block, prompt),
         "requirement_coverage": [{"ac_id": ac, "option_ids": ids, "status": "covered", "note": ""} for ac in acceptance_ids(block)],
     }
@@ -275,12 +389,25 @@ def solution_answer(prompt):
 def blocking_questions(block, prompt):
     if BLOCKING_QUESTION_TRIGGER not in block or has_answered_clarifications(prompt):
         return []
-    return [{"id": "Q-1", "text": "Which health signal should the badge be driven by?", "blocking": True}]
+    return [{"id": "Q-1", "text": tr(language_directive(prompt), "question", "Which health signal should the badge be driven by?"), "blocking": True}]
+
+
+def plan_revision_note(prompt):
+    """" [revised, round N, asked: <feedback>]" for a Plan prompt with a reviewer's <feedback>, else "". N is one more than the highest round in the
+    <prior_plan> block (the previous version's notes), 2 when that block has none, so each version of one Request reads differently."""
+    feedback = revision_feedback(prompt)
+    if not feedback:
+        return ""
+    after = prompt.split("\n</request>\n", 1)[1]
+    prior = after.split("<prior_plan>", 1)[1] if "<prior_plan>" in after else ""
+    rounds = [int(n) for n in re.findall(r"\[revised, round (\d+)", prior)]
+    return f" [revised, round {max(rounds) + 1 if rounds else 2}, asked: {' '.join(feedback.split())[:60]}]"
 
 
 def plan_answer(prompt):
     block = request_block(prompt)
     rtype = request_field(block, "type")
+    lang = language_directive(prompt)
     title = request_field(block, "title")[:80] or "the request"
     phased = "Split the work into phases" in prompt
 
@@ -298,29 +425,29 @@ def plan_answer(prompt):
 
     def chain(prefix):
         if rtype == "hotfix":  # the hotfix policy accepts exactly one task and no phases
-            return [task(f"{prefix}Fix", f"Apply the fix for: {title}. Done when the production symptom is gone.")]
+            return [task(prefix + tr(lang, "t_fix", "Fix"), tr(lang, "t_fix_desc", f"Apply the fix for: {title}. Done when the production symptom is gone.", title=title))]
         if rtype == "ops_request":  # runbook: an irreversible step, then a rollback task ordered after it
             return [
-                task(f"{prefix}Prepare", f"Prepare the change for: {title}. Done when the preconditions are checked."),
-                task(f"{prefix}Apply", "Apply the change. Done when the service reports the new state.", deps=[0], irreversible=True),
-                task(f"{prefix}Rollback", "Restore the previous state. Done when the service answers as before the change.", deps=[1], labels=["rollback"]),
+                task(prefix + tr(lang, "t_prepare", "Prepare"), tr(lang, "t_prepare_ops_desc", f"Prepare the change for: {title}. Done when the preconditions are checked.", title=title)),
+                task(prefix + tr(lang, "t_apply", "Apply"), tr(lang, "t_apply_desc", "Apply the change. Done when the service reports the new state."), deps=[0], irreversible=True),
+                task(prefix + tr(lang, "t_rollback", "Rollback"), tr(lang, "t_rollback_desc", "Restore the previous state. Done when the service answers as before the change."), deps=[1], labels=["rollback"]),
             ]
         return [
-            task(f"{prefix}Prepare", f"Prepare the change for: {title}. Done when the branch builds.", labels=first),
-            task(f"{prefix}Implement", "Implement the change. Done when the unit tests for it pass.", deps=[0]),
-            task(f"{prefix}Verify", "Verify the change end to end. Done when the acceptance criteria are demonstrated.", deps=[1], labels=last),
+            task(prefix + tr(lang, "t_prepare", "Prepare"), tr(lang, "t_prepare_desc", f"Prepare the change for: {title}. Done when the branch builds.", title=title), labels=first),
+            task(prefix + tr(lang, "t_implement", "Implement"), tr(lang, "t_implement_desc", "Implement the change. Done when the unit tests for it pass."), deps=[0]),
+            task(prefix + tr(lang, "t_verify", "Verify"), tr(lang, "t_verify_desc", "Verify the change end to end. Done when the acceptance criteria are demonstrated."), deps=[1], labels=last),
         ]
 
-    notes = "Deterministic fake-claude plan."
+    notes = tr(lang, "plan_notes", "Deterministic fake-claude plan.")
     if "<feedback>" in prompt:
-        notes += " Revised after reviewer feedback."
-    plan = {"title": f"Plan: {title}"[:200], "summary": "Fake-claude work plan.", "notes": notes}
+        notes += tr(lang, "plan_notes_revised", " Revised after reviewer feedback.") + plan_revision_note(prompt)
+    plan = {"title": tr(lang, "plan_title", f"Plan: {title}", title=title)[:200], "summary": tr(lang, "plan_summary", "Fake-claude work plan."), "notes": notes}
     if phased:
         plan["tasks"] = []
         plan["phases"] = [
-            {"title": "Phase 1: Foundation", "description": "Ship the groundwork. Done when it is reviewable on its own.",
+            {"title": tr(lang, "ph1_title", "Phase 1: Foundation"), "description": tr(lang, "ph1_desc", "Ship the groundwork. Done when it is reviewable on its own."),
              "depends_on_phase_indices": [], "tasks": chain("P1 ")},
-            {"title": "Phase 2: Rollout", "description": "Enable the change. Done when it is released.",
+            {"title": tr(lang, "ph2_title", "Phase 2: Rollout"), "description": tr(lang, "ph2_desc", "Enable the change. Done when it is released."),
              "depends_on_phase_indices": [0], "tasks": chain("P2 ")},
         ]
     else:
@@ -340,30 +467,54 @@ def readonly_kind(prompt):
 
 def readonly_answer(prompt, kind):
     block = request_block(prompt)
+    lang = language_directive(prompt)
     title = request_field(block, "title")[:80] or "the request"
     note = revision_note(prompt)
     # No file is claimed: the fixture reads nothing, and evidence must not pretend it did.
     evidence = [{"type": "command", "ref": "fake-claude", "excerpt": "Deterministic fixture; no repository file was read."}]
     if kind == "diagnosis":
         return {
-            "schema_version": 1, "kind": "diagnosis", "summary": f"Fake-claude diagnosis for: {title}{note}",
-            "root_cause": {"statement": f"Fixture root cause for: {title}", "confidence": 0.5, "evidence": evidence},
-            "reproduction": {"reproducible": "unknown", "steps": [], "notes": "Not reproduced by the fixture."},
+            "schema_version": 1, "kind": "diagnosis", "summary": tr(lang, "diag_summary", f"Fake-claude diagnosis for: {title}{note}", title=title, note=note),
+            "root_cause": {"statement": tr(lang, "diag_root", f"Fixture root cause for: {title}", title=title), "confidence": 0.5, "evidence": evidence},
+            "reproduction": {"reproducible": "unknown", "steps": [], "notes": tr(lang, "diag_repro", "Not reproduced by the fixture.")},
             "impact": {"severity": "low", "scope": "fixture", "affected_components": [], "user_facing": False, "data_risk": False},
-            "fix_directions": [{"id": "fix-1", "summary": "Apply the smallest fix and add a regression test.", "risk": "low"}],
+            "fix_directions": [{"id": "fix-1", "summary": tr(lang, "diag_fix", "Apply the smallest fix and add a regression test."), "risk": "low"}],
             "suggested_size": "S", "suggest_escalate_to_change_request": False, "open_questions": [],
         }
     if kind == "findings":
         return {
-            "schema_version": 1, "kind": "findings", "question": title, "summary": f"Fake-claude findings for: {title}{note}",
-            "findings": [{"id": "f-1", "statement": "The fixture found nothing to report.", "confidence": 0.5, "evidence": evidence}],
-            "recommendation": {"statement": "No follow-up needed.", "reason": "Fixture answer."},
+            "schema_version": 1, "kind": "findings", "question": title, "summary": tr(lang, "find_summary", f"Fake-claude findings for: {title}{note}", title=title, note=note),
+            "findings": [{"id": "f-1", "statement": tr(lang, "find_statement", "The fixture found nothing to report."), "confidence": 0.5, "evidence": evidence}],
+            "recommendation": {"statement": tr(lang, "find_reco", "No follow-up needed."), "reason": tr(lang, "find_reason", "Fixture answer.")},
             "follow_ups": [], "unknowns": [],
         }
     return {
-        "schema_version": 1, "kind": "answer", "answer_markdown": f"Fake-claude answer for: {title}. This is a deterministic fixture.{note}",
-        "confidence": 0.5, "citations": [], "limitations": ["Fixture answer; no repository was read."],
+        "schema_version": 1, "kind": "answer",
+        "answer_markdown": tr(lang, "answer", f"Fake-claude answer for: {title}. This is a deterministic fixture.{note}", title=title, note=note),
+        "confidence": 0.5, "citations": [], "limitations": [tr(lang, "limitation", "Fixture answer; no repository was read.")],
     }
+
+
+def execution_nonce(prompt):
+    """The nonce of the result block a task-execution prompt asks for, or "". The instruction line is the platform's own text at the
+    end of the prompt, so only what follows its last occurrence is read (the task text is untrusted and may quote a block)."""
+    at = prompt.rfind(EXECUTE_INSTRUCTION)
+    if at < 0:
+        return ""
+    m = re.search(r"^ORCA_RESULT_BEGIN ([A-Za-z0-9]{16,64})$", prompt[at:], re.M)
+    return m.group(1) if m else ""
+
+
+def execution_answer(prompt):
+    """The reply text of a task run: a short line, then one valid `done` block. No file is changed or claimed. A passing check is listed
+    only when the prompt demands one, and says it is the fixture's."""
+    nonce = execution_nonce(prompt)
+    if not nonce:  # a plain run: task-service takes exit 0 as success and reads no block
+        return "Fake-claude ran the task (deterministic fixture; no file was changed).\n"
+    checks = [{"id": "fake-claude: no command was run", "exit": 0}] if REQUIRE_CHECK_LINE in prompt[prompt.rfind(EXECUTE_INSTRUCTION):] else []
+    result = {"schema_version": 1, "status": "done", "summary": "Fake-claude finished the task (deterministic fixture; no file was changed).",
+              "files_changed": [], "checks_run": checks, "questions": [], "notes": ""}
+    return f"Fake-claude ran the task.\nORCA_RESULT_BEGIN {nonce}\n{json.dumps(result)}\nORCA_RESULT_END {nonce}\n"
 
 
 def main():
@@ -396,17 +547,26 @@ def run_print_stdin(argv):
     prompt = sys.stdin.read()
     tools = flag_value(argv, "--tools")
     record("print", argv, len(prompt.encode("utf-8")), {"mode": "stdin", "tools": tools, "systemPrompt": flag_value(argv, "--system-prompt"),
-                                                         "promptKind": prompt_kind(prompt), "prompt": prompt[:6000]})  # test fixture only: lets a failing run be diagnosed
+                                                         "promptKind": prompt_kind(prompt), "outputLanguage": language_directive(prompt),
+                                                         "prompt": prompt[:6000]})  # test fixture only: lets a failing run be diagnosed
     if not logged_in():
         return emit("Not logged in \u00b7 Please run /login", is_error=True, api_status=None, prompt_len=len(prompt))
     if tools != "":
         # The untrusted prompt must never get tools: fail the call so an agent regression is visible in the suite.
         return emit("fake claude: refusing to run without --tools \"\"", is_error=True, prompt_len=len(prompt))
     kind = prompt_kind(prompt)
-    if kind == "solution" and fail_once(prompt):
+    if kind in ("solution", "plan") and fail_once(prompt):
         return emit("fake claude: scripted one-time failure", is_error=True, prompt_len=len(prompt))
-    if kind == "solution":
+    if kind in ("solution", "plan"):
         pause_if_slow(prompt)
+    if kind == "plan":
+        failure = fail_plan_next()
+        if failure == "error":
+            return emit("fake claude: scripted Plan failure (fail_plan_next)", is_error=True, prompt_len=len(prompt))
+        if failure == "invalid":
+            return emit("This is not a JSON plan (fail_plan_next).", prompt_len=len(prompt))
+        if failure == "slow":
+            time.sleep(slow_seconds())
     if kind == "classification":
         body = classify_answer(prompt)
     elif kind == "solution":
@@ -415,12 +575,11 @@ def run_print_stdin(argv):
         body = plan_answer(prompt)
     else:
         return emit("fake claude: no canned answer for this prompt", is_error=True, prompt_len=len(prompt))
-    return emit(json.dumps(body), prompt_len=len(prompt))
+    return emit(json.dumps(body, ensure_ascii=False), prompt_len=len(prompt))
 
 
 def stream_event(event):
-    sys.stdout.write(json.dumps(event) + "\n")
-    sys.stdout.flush()
+    write_utf8(json.dumps(event, ensure_ascii=False) + "\n")
 
 
 def stream_result(text, is_error=False):
@@ -443,6 +602,8 @@ def run_print_arg(argv):
     kind = prompt_kind(prompt)
     record("print", argv, 0 if in_argv else len(prompt.encode("utf-8")), {"mode": "arg" if in_argv else "print-stdin", "tools": tools, "permissionMode": mode, "promptKind": kind,
                                                          "outputFormat": output_format, "verbose": verbose,
+                                                         "outputLanguage": language_directive(prompt), "dangerousSkip": BYPASS_FLAG in argv,
+                                                         "gitWorktree": os.path.exists(os.path.join(os.getcwd(), ".git")),
                                                          "prompt": prompt[:6000]})  # test fixture only: lets a failing run be diagnosed
     if output_format not in ("text", "stream-json"):
         sys.stderr.write(f"fake claude: --output-format {output_format!r} is not supported with a prompt in argv\n")
@@ -463,8 +624,13 @@ def run_print_arg(argv):
     if tools is not None and not set(t for t in tools.split(",") if t) <= READONLY_TOOLS:
         sys.stderr.write(f"fake claude: refusing, --tools {tools!r} contains a tool that can write\n")
         return 1
+    if kind == "execute":
+        return run_execute(prompt, streaming)
     if not kind.startswith("readonly:"):
         sys.stderr.write("fake claude: no canned answer for this prompt\n")
+        return 1
+    if BYPASS_FLAG in argv:
+        sys.stderr.write(f"fake claude: refusing, a read-only analysis must not carry {BYPASS_FLAG}\n")
         return 1
     if fail_once(prompt):
         sys.stderr.write("fake claude: scripted one-time failure\n")
@@ -475,9 +641,21 @@ def run_print_arg(argv):
         # No tool event: the fixture reads nothing, and the activity stream must not pretend it did.
         stream_event({"type": "assistant", "message": {"role": "assistant", "content": [
             {"type": "text", "text": "Analysing the request (deterministic fixture, no repository file is read)."}]}, "session_id": SESSION_ID})
-        stream_result(json.dumps(body))
+        stream_result(json.dumps(body, ensure_ascii=False))
         return 0
-    sys.stdout.write(json.dumps(body) + "\n")
+    write_utf8(json.dumps(body, ensure_ascii=False) + "\n")
+    return 0
+
+
+def run_execute(prompt, streaming):
+    """agent.execPrompt with accessMode=write (task.execute): the prompt ends with the result-block instruction."""
+    text = execution_answer(prompt)
+    if streaming:
+        stream_event({"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "text", "text": "Running the task (deterministic fixture, no file is changed)."}]}, "session_id": SESSION_ID})
+        stream_result(text)
+        return 0
+    write_utf8(text)
     return 0
 
 
@@ -488,6 +666,9 @@ def prompt_kind(prompt):
             return kind
     if prompt.startswith(READONLY_MARK) and readonly_kind(prompt):
         return "readonly:" + readonly_kind(prompt)
+    body = prompt[prompt.index("\n\n", len(CONTEXT_PREAMBLE)) + 2:] if prompt.startswith(CONTEXT_PREAMBLE) and "\n\n" in prompt[len(CONTEXT_PREAMBLE):] else prompt
+    if execution_nonce(prompt) or body.startswith(EXECUTE_OPENER):
+        return "execute"
     return "unknown"
 
 

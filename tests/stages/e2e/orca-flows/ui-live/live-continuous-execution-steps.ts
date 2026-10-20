@@ -21,6 +21,8 @@ export type ProjectRunSettings = {
   engine: string
   solutionAgent: boolean
   executionMode: 'continuous' | 'step_by_step'
+  /** Orca writes the Plan by itself after the Analysis is approved (CR-REQ-044); off unless a spec asks for it. */
+  planAutoGenerate?: boolean
 }
 
 /**
@@ -54,8 +56,8 @@ export async function configureProject(
       openspecMinVersion: cur.openspecMinVersion ?? '',
       solutionAgent: want.solutionAgent,
       executionMode: want.executionMode,
-      // Why: these flows press Generate plan themselves; automatic plan generation (CR-REQ-044) has its own spec.
-      planAutoGenerate: false,
+      // Why: most flows press Generate plan themselves; the specs of automatic plan generation and of Plan revision (CR-REQ-044/045) ask for it on.
+      planAutoGenerate: want.planAutoGenerate ?? false,
       expectedVersion: cur.version
     })
     expect(next.executionMode, 'the mode was stored').toBe(want.executionMode)

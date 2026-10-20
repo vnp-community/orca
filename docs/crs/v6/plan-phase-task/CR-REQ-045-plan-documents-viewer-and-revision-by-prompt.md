@@ -9,7 +9,7 @@
 | **Effort** | Large (9 task backend, 8 task frontend) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-20 |
-| **Trạng thái** | 📝 Đề xuất, chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (2026-10-20), chưa merge; e2e stub xanh, chưa chạy thật hạng C |
 | **Phụ thuộc** | CR-REQ-012 (sinh Plan, `GeneratePlan`, `CommitPlan`), CR-REQ-026 (engine OpenSpec, `openspec_changes`, `bundle_json`), CR-REQ-010 (Approval), CR-REQ-016 (kênh gateway), CR-REQ-021 (tab Plan), CR-REQ-037 (tab Activity), CR-REQ-041 (mẫu chỉnh bằng prompt: `AuthorizeRevise`, `revision_feedback`, danh sách phiên bản), CR-REQ-039 (khoá nhánh gốc chỉ ảnh hưởng lượt chỉnh), CR-REQ-042 (danh mục prompt và golden), **[CR-REQ-044](./CR-REQ-044-automatic-plan-generation-after-analysis-approval.md) (commit Plan phía server, mục 2.6 và 2.14: `CommitPlan.ExecuteForSystem`, bảng `plan_auto_jobs`, bước `committing`; phụ thuộc cứng, xem mục 6 R1)**, CR-REQ-046 (phối hợp prompt, mục 2.7) |
 | **Mở khoá** | Không |
 | **Tác động** | `backend-go/services/request-service` (`usecase/generate_plan.go`, `plan_ports.go`, `solution_authorization.go`, `analysis_runner.go`, `run_proposal_generation.go`, `get_plan_proposal.go`, `get_plan_bundle_file.go`, `tasks_md_sync.go`, domain, adapter hai dialect, migration mới), `backend-go/prompts/{plan_openspec,plan_native}`, `backend-go/policy/orca-authz/request.rego`, `backend-go/proto/orca/request/v1/plan.proto`, `backend-go/services/api-gateway` (`wscompat`, `httpgateway`, MCP loại trừ), `backend-go/cmd/orca-cli`, `frontend/src/renderer/src/components/request/plan/`, `activity/`, 5 file locale |

@@ -9,7 +9,7 @@
 | **Effort** | Medium |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-20 |
-| **Trạng thái** | 📝 Đề xuất, chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (2026-10-20), chưa merge; e2e stub xanh, chưa chạy thật hạng C |
 | **Phụ thuộc** | CR-REQ-007, 008 (Solution và phân tích chỉ đọc), CR-REQ-012 (Plan native), CR-REQ-026 (engine OpenSpec), CR-REQ-041 (prompt phân tích có phản hồi và bản cũ), CR-REQ-042 (danh mục prompt `backend-go/prompts/`, golden, ngân sách kích thước) |
 | **Mở khoá** | [CR-REQ-034](./CR-REQ-034-ai-governance-budgets-evals-prompt-versioning.md) (provenance có thể ghi ngôn ngữ đầu ra); ghi đè theo dự án hoặc theo Request về sau (mục 2.8) mà không sửa mẫu prompt |
 | **Tác động** | `backend-go/prompts/` (gói mới `output_language`, hai partial mới, năm mẫu `analysis/`, `plan_native/plan.tmpl`, `plan_openspec/plan.tmpl`), `backend-go/services/request-service` (`internal/config`, `cmd/server`, `internal/usecase` ba struct đầu vào và sáu nơi gọi, `internal/domain/evidence.go`), `skills/tdd-openspec-author/SKILL.md`, `deploy/dev/` (compose, `.env.example`, README, tài liệu phát hành), `tests/stages/e2e/orca-flows/` (claude giả, suite `OLG`, spec UI). **Không** đổi proto, migration, kênh gateway, MCP hay frontend |

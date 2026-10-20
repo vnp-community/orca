@@ -17,9 +17,9 @@
 | CR-REQ-037 | [FE-REQ-SOL-037](./FE-REQ-SOL-037-request-detail-redesign-execution-tab-and-activity.md) | Chi tiết Request: nhãn Requests ở sidebar, thang tiến độ theo luồng, Plan duyệt một lần, tab Execution, tab History đầy đủ | 🚧 Đã triển khai (7 DONE, 2 PARTIAL trên 9, 2026-10-16; backend BE-REQ-SOL-038 xong) |
 | CR-REQ-040 | [FE-REQ-SOL-040](./FE-REQ-SOL-040-request-base-branch-picker.md) | Chọn nhánh gốc của worktree khi tạo và xem Request | 📝 Đề xuất (0/5) |
 | CR-REQ-041 | [FE-REQ-SOL-041](./FE-REQ-SOL-041-analysis-revision-by-prompt.md) | Chỉnh phân tích bằng prompt tại cổng duyệt Analysis, danh sách phiên bản | 📝 Đề xuất (0/4) |
-| CR-REQ-043 | [FE-REQ-SOL-043](./FE-REQ-SOL-043-approve-plan-and-run-all-steps-ui.md) | Duyệt Plan và chạy hết các bước, công tắc chế độ thực thi | 📝 Đề xuất (0/6) |
-| CR-REQ-044 | [FE-REQ-SOL-044](./FE-REQ-SOL-044-automatic-plan-generation.md) | Tự sinh Plan: trạng thái đang viết, thẻ lỗi và Retry | 📝 Đề xuất (0/4) |
-| CR-REQ-045 | [FE-REQ-SOL-045](./FE-REQ-SOL-045-plan-documents-and-revision-ui.md) | Xem tài liệu OpenSpec của Plan và chỉnh bằng prompt | 📝 Đề xuất (0/8) |
+| CR-REQ-043 | [FE-REQ-SOL-043](./FE-REQ-SOL-043-approve-plan-and-run-all-steps-ui.md) | Duyệt Plan và chạy hết các bước, công tắc chế độ thực thi | ✅ Đã triển khai (6/6) |
+| CR-REQ-044 | [FE-REQ-SOL-044](./FE-REQ-SOL-044-automatic-plan-generation.md) | Tự sinh Plan: trạng thái đang viết, thẻ lỗi và Retry | ✅ Đã triển khai (4/4) |
+| CR-REQ-045 | [FE-REQ-SOL-045](./FE-REQ-SOL-045-plan-documents-and-revision-ui.md) | Xem tài liệu OpenSpec của Plan và chỉnh bằng prompt | ✅ Đã triển khai (8/8) |
 
 Các solution 018 đến 021 để chỗ cắm cho 022 và 023 (`ApprovalInboxTab`, `BacklogTab` trong `RequestPage`, `RejectReasonDialog`, `useApprovals`, `useBacklog` với `backlog.requests|tasks|execute`).
 

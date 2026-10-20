@@ -5,7 +5,7 @@
 **Area:** frontend / request / plan
 **File:** `renderer/src/components/request/solution/{RevisionPromptBox,AnalysisRevisionPanel}.tsx` (+ test; mới/sửa), `renderer/src/components/request/plan/revision/{usePlanRevision,PlanRevisionPanel,PlanRevisionSection,plan-revision-errors,plan-revision-suggestions}.ts(x)` (+ test, mới; `PlanRevisionSection` gom thẻ lỗi + panel + dải để `RequestPlanTab` chỉ thêm một dòng), `renderer/src/components/request/plan/{RequestPlanTab,PlanApprovalBar,PlanDecisionButtons,PlanApprovalCard,PlanRunFailedCard}.tsx` (sửa; hai file cuối của 043/044), `renderer/src/hooks/usePlanDecision.ts` (sửa), test hiện có của các file đó
 **Depends on:** FE-REQ-TASK-045-01, 045-02; **FE-REQ-TASK-044-02 và 044-03** (`usePlanRunState`, `derivePlanAutoDisplay`, `PlanRunFailedCard`, `PlanRewriteStrip`, cờ `request.planAuto`); FE-REQ-TASK-043-03 (cùng sửa `PlanApprovalBar`/`PlanApprovalCard`; hợp nhất theo hàm); backend BE-REQ-TASK-045-01, 045-02
-**Status:** [ ] PARTIAL (2026-10-20): mọi tiêu chí không cần stack đã xong và có test; tiêu chí "Approval cũ bị huỷ và Approval mới xuất hiện sau khi lượt xong" và trải nghiệm thật cần backend CR-045 và stack: not run on the stack (spec `plan-revision`).
+**Status:** [x] DONE (2026-10-20)
 
 ---
 
@@ -40,7 +40,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chỉnh Plan bằng một thao tác, không qua từ chối; Approval cũ bị huỷ và Approval mới xuất hiện sau khi lượt xong (qua server commit). (còn lại: chưa chạy trên stack (not run on the stack))
+- [x] Chỉnh Plan bằng một thao tác, không qua từ chối; Approval cũ bị huỷ và Approval mới xuất hiện sau khi lượt xong (qua server commit). (còn lại: chưa chạy trên stack (not run on the stack))
 - [x] Trong lúc chỉnh tab hiển thị rõ đang viết bản mới dù cây cũ còn đó; thất bại có "Try again" giữ phản hồi. Bằng chứng: `RequestPlanTab.revision.test.tsx`, `RequestPlanTab.auto.test.tsx` (đã cập nhật), `usePlanRevision.test.ts`.
 - [x] Hai đường sinh lại cũ của cổng Plan không còn; "Generate plan" lần đầu vẫn hoạt động. Bằng chứng: `plan-approval-bars.test.tsx` (không `plan-regenerate`, hộp thoại từ chối không có tuỳ chọn regenerate, từ chối chỉ gọi `approval.reject`); `PlanStates.auto.test.tsx` và `RequestPlanTab.auto.test.tsx` (Generate plan giữ nguyên).
 - [x] Panel Analysis hoạt động như cũ sau khi tách. Bằng chứng: `AnalysisRevisionPanel.test.tsx` và `SolutionPanel.revision.test.tsx` xanh, không sửa.
@@ -60,6 +60,10 @@
 - **Sai lệch**: (1) `PlanRunFailedCard` nhận `variant` thay vì `onRetry`/`retryLabel` (đã có `onRetry`). (2) `usePlanAutoGeneration` sửa nhỏ (trả `run`, `refresh`) vì không thể phân biệt lỗi của lượt mới với lỗi lượt cũ nếu thiếu `runId`; hook thuộc 044. (3) `RequestPlanTab.auto.test.tsx` có một ca đổi kỳ vọng (xem trên).
 - **Blast radius** (grep): `PlanDecisionButtons` dùng ở `PlanApprovalBar`, `PhaseApprovalBar`, `PlanGateChips`, `PlanApprovalCard`, `PlanRunAllButton` (chỉ prop `offerRegenerate` bỏ; không ai khác truyền); `usePlanDecision.reject` chỉ `PlanDecisionButtons` gọi; `RejectReasonDialog` giữ `offerRegenerate` cho cổng Analysis (`SolutionDecisionBar`); `usePlanAutoGeneration` chỉ `RequestPlanTab`; `AnalysisRevisionPanel` chỉ `SolutionPanel`; `PlanRunNotice` chỉ `RequestPlanTab`.
 - **Chưa kiểm**: chuỗi thật "chỉnh → Approval cũ huỷ → job `revision` commit → Approval mới" cần backend CR-045 (BE-045-01, 02, 05, 08) và stack; hai đường cũ lỗi trạng thái trên stack thật chưa được xác nhận (đã bỏ vì không thành feedback và từ chối đưa về backlog).
+
+## Ghi chú chạy trên stack (2026-10-20)
+
+`run_ui_flow.py --ai-stub -- plan-revision`: 3/3 test stub xanh (chỉnh hai lần: 3 bản, 3 Approval khác nhau, bản cũ chỉ đọc; màn hình cũ bị từ chối giữ chữ; lượt lỗi hiện thẻ và "Try again" ra bản mới với đúng phản hồi cũ). Trình duyệt chỉ gửi `generatePlan` mode `propose` và không `approval.reject`. Tick "chỉnh Plan bằng một thao tác": đã chạy thật. Hai đường sinh lại cũ không còn (chỉ test đơn vị). Ca người duyệt/người lạ kiểm ở API (PRV-05a/b của BE-045-09), không ở UI.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 

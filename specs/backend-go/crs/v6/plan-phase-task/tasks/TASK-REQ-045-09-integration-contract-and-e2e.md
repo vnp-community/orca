@@ -5,7 +5,7 @@
 **Service:** `tests/e2e`, `request-service`
 **File:** `tests/stages/e2e/orca-flows/suite_plan_revision.py` (mới, đăng ký trong `run_acceptance.py`), `tests/stages/e2e/orca-flows/plan_documents_seed.py` (mới, + `test_plan_documents_seed.py`), `tests/stages/e2e/orca-flows/plan_revision_driver.py` (mới; dùng lại `analysis_revision_driver.py`, `analysis_revision_users.py`, `ledgerlite_fixture.py`), `tests/stages/e2e/orca-flows/fake_claude_cli/claude` (sửa chỉ khi việc 4 cho phép) + `test_fake_claude_cli.py`, `tests/stages/e2e/orca-flows/README.md` (dòng suite mới), `backend-go/services/request-service/internal/adapter/contracttest/{plan_revision_flow_contract,execution_flow_contract}.go` (mới/sửa)
 **Depends on:** TASK-REQ-045-01 đến 045-08, và các task e2e/hạ tầng của BE-REQ-SOL-044 (worker commit, `fake_claude_cli` trạng thái `fail_plan_next`)
-**Status:** [ ] TODO
+**Status:** [x] DONE (2026-10-20), trừ PRV-09/10/14/15 (không chạy, lý do ở ghi chú) và ca loại B/C
 
 ---
 
@@ -50,11 +50,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] PRV-01..09 xanh (hoặc `BLOCKED` có lý do hạ tầng cụ thể) trên stack local với claude giả và repo LedgerLite thật.
-- [ ] PRV-11..13 (seed) xanh: file bị lược, che bí mật khi đọc, bản cũ bị lược chữ.
-- [ ] Kết luận về fake claude OpenSpec được ghi (làm được hay chặn cụ thể); nếu làm được PRV-14/15 xanh.
-- [ ] Hợp đồng hai dialect xanh; không hồi quy `request`, `qa`, `analysis_revision`, `request_base_ref`.
-- [ ] Ca loại C có lệnh chạy, điều kiện và ước lượng chi phí ghi rõ; không tự chạy.
+- [x] PRV-01..08b xanh (PRV-09 SKIP có lý do) (hoặc `BLOCKED` có lý do hạ tầng cụ thể) trên stack local với claude giả và repo LedgerLite thật.
+- [x] PRV-11..13 (seed) xanh: file bị lược, che bí mật khi đọc, bản cũ bị lược chữ.
+- [x] Kết luận về fake claude OpenSpec được ghi (làm được hay chặn cụ thể); nếu làm được PRV-14/15 xanh.
+- [x] Hợp đồng hai dialect xanh; không hồi quy `request`, `qa`, `analysis_revision`, `request_base_ref`.
+- [x] Ca loại C có lệnh chạy, điều kiện và ước lượng chi phí ghi rõ; không tự chạy.
 
 ## Rủi ro và lưu ý
 
@@ -62,6 +62,18 @@
 - Stack mất Vault khi khởi động lại: chuẩn bị lại bằng `vault-init` trước khi chạy; sau `redeploy-local.sh` khởi động lại các dịch vụ theo thứ tự infra-fleet → git-gateway → task-service → request-service → api-gateway.
 - `--real` không cho sửa checkout orca trong lúc chạy (quy tắc quiet-checkout 90 giây).
 - Seed SQL là hạ tầng thử, không đưa vào mã sản phẩm.
+
+## Ghi chú triển khai (2026-10-20, chạy trên stack)
+
+**Tệp:** `tests/stages/e2e/orca-flows/{suite_plan_revision.py,plan_revision_driver.py,plan_documents_seed.py,test_plan_documents_seed.py}` (mới; suite `plan_revision` đăng ký sau `aistub`), `fake_claude_cli/{claude,test_fake_claude_cli.py}` (lượt chỉnh Plan: ghi chú Plan lặp `[revised, round N, asked: ...]` đếm vòng từ khối `<prior_plan>`; `[stub:fail-once]` và `[stub:slow]` áp cả cho Plan), `README.md`, `contracttest/plan_revision_flow_contract.go` + test tích hợp hai dialect (mới).
+
+**Kết quả:** `run_acceptance.py --ai-stub devserver plan_revision`: PRV-01..08b, 11..13 xanh; PRV-09 (dev server offline: suite không có công cụ ngắt), PRV-10 (cần `ORCA_E2E_PLAN_REVISION_LONG=1`), PRV-14/15 `SKIP` có lý do. Hợp đồng: `go test -tags=integration -p 1 ./internal/adapter/postgres/ ./internal/adapter/mysql/ -run PlanRevisionFlow` xanh (ba vòng chỉnh qua worker, Approval cũ bị huỷ `revision_requested`, 4 bản, phân trang, đọc từng bản).
+
+**Lỗi sản phẩm tìm được và sửa (PRV-08):** hotfix không ghi `planTaskId` lên Request (task sửa không phải Plan) nên `checkPlanRevisable` (chỉ chạy khi `isPlanRevision`, đòi `PlanTaskID != ""`) bị bỏ qua: `request.generatePlan {feedback}` ở cổng của hotfix HUỶ Approval `pre_deploy` của task sửa, đưa Request về `planning` và chạy một run Plan không job nào commit (Request kẹt). Test đơn vị cũ đặt `PlanTaskID` nên không thấy. Sửa: `usecase/generate_plan.go` `checkPlanRevisable` coi mọi ask ở `awaiting_plan_approval` là lượt chỉnh; test mới `TestGeneratePlan_HotfixWithoutARecordedPlanIsNotRevisable`. Đã triển khai lại request-service; PRV-08 xanh.
+
+**Quyết định claude giả tác giả OpenSpec (việc 4):** không làm. Cần shim `openspec` (`--version`, `validate`), vượt `KNOWLEDGE_HUB_UNSUPPORTED` của `--ai-stub`, worktree đề xuất do git-gateway dựng và ghi `proposal/design/specs/tasks` đúng ngữ pháp `ParsePlanRegion` cùng khối kết quả: vượt hộp thời gian nửa ngày. Thay bằng dữ liệu gieo: `plan_documents_seed.py` (xem README) chạy PRV-11..13 và spec UI `plan-documents` (b). Seed dùng `docker exec orca-go-postgres`, dữ liệu GIẢ, dọn bằng `clean`.
+
+**Chưa kiểm:** PRV-09, PRV-10, PRV-14/15; ca loại C (`ORCA_E2E_OPENSPEC=1`, 7-13 USD mỗi lượt sinh cộng một lượt chỉnh) không chạy; ca loại B `run_ui_flow.py --real plan-revision` KHÔNG chạy do hộp thời gian.
 
 ## Chuẩn hoàn thành chung (áp dụng cho mọi task, không thương lượng)
 
