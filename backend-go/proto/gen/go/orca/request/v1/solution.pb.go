@@ -1036,8 +1036,10 @@ type ProjectEngineSettings struct {
 	ExecutionMode string `protobuf:"bytes,6,opt,name=execution_mode,json=executionMode,proto3" json:"execution_mode,omitempty"`
 	// CR-REQ-044: Orca starts the Plan by itself once the Analysis is approved. True unless the project turned it off.
 	PlanAutoGenerate bool `protobuf:"varint,7,opt,name=plan_auto_generate,json=planAutoGenerate,proto3" json:"plan_auto_generate,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Outcome Review (CR-OR-001): off or manual, or empty when the project saved no choice and the deployment default applies.
+	OutcomeReview string `protobuf:"bytes,8,opt,name=outcome_review,json=outcomeReview,proto3" json:"outcome_review,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProjectEngineSettings) Reset() {
@@ -1117,6 +1119,13 @@ func (x *ProjectEngineSettings) GetPlanAutoGenerate() bool {
 		return x.PlanAutoGenerate
 	}
 	return false
+}
+
+func (x *ProjectEngineSettings) GetOutcomeReview() string {
+	if x != nil {
+		return x.OutcomeReview
+	}
+	return ""
 }
 
 type GetProjectEngineSettingsRequest struct {
@@ -1236,8 +1245,10 @@ type SetProjectEngineSettingsRequest struct {
 	ExecutionMode string `protobuf:"bytes,6,opt,name=execution_mode,json=executionMode,proto3" json:"execution_mode,omitempty"`
 	// Absent keeps the stored value (CR-REQ-044), so an older client never flips the switch.
 	PlanAutoGenerate *bool `protobuf:"varint,7,opt,name=plan_auto_generate,json=planAutoGenerate,proto3,oneof" json:"plan_auto_generate,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Empty keeps the stored choice; off or manual sets it; default clears it so the deployment default applies again.
+	OutcomeReview string `protobuf:"bytes,8,opt,name=outcome_review,json=outcomeReview,proto3" json:"outcome_review,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SetProjectEngineSettingsRequest) Reset() {
@@ -1317,6 +1328,13 @@ func (x *SetProjectEngineSettingsRequest) GetPlanAutoGenerate() bool {
 		return *x.PlanAutoGenerate
 	}
 	return false
+}
+
+func (x *SetProjectEngineSettingsRequest) GetOutcomeReview() string {
+	if x != nil {
+		return x.OutcomeReview
+	}
+	return ""
 }
 
 type SetProjectEngineSettingsResponse struct {
@@ -1622,7 +1640,7 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\bsolution\x18\x01 \x01(\v2\x19.orca.request.v1.SolutionR\bsolution\x12'\n" +
 	"\x0fapproval_digest\x18\x02 \x01(\tR\x0eapprovalDigest\x12'\n" +
 	"\x0fdecision_status\x18\x03 \x01(\tR\x0edecisionStatus\x123\n" +
-	"\x15requires_confirmation\x18\x04 \x01(\bR\x14requiresConfirmation\"\xa7\x02\n" +
+	"\x15requires_confirmation\x18\x04 \x01(\bR\x14requiresConfirmation\"\xce\x02\n" +
 	"\x15ProjectEngineSettings\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12'\n" +
@@ -1631,14 +1649,15 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\aversion\x18\x04 \x01(\x03R\aversion\x12%\n" +
 	"\x0esolution_agent\x18\x05 \x01(\bR\rsolutionAgent\x12%\n" +
 	"\x0eexecution_mode\x18\x06 \x01(\tR\rexecutionMode\x12,\n" +
-	"\x12plan_auto_generate\x18\a \x01(\bR\x10planAutoGenerate\"V\n" +
+	"\x12plan_auto_generate\x18\a \x01(\bR\x10planAutoGenerate\x12%\n" +
+	"\x0eoutcome_review\x18\b \x01(\tR\routcomeReview\"V\n" +
 	"\x1fGetProjectEngineSettingsRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x14\n" +
 	"\x05check\x18\x02 \x01(\bR\x05check\"\xa6\x01\n" +
 	" GetProjectEngineSettingsResponse\x12B\n" +
 	"\bsettings\x18\x01 \x01(\v2&.orca.request.v1.ProjectEngineSettingsR\bsettings\x12>\n" +
-	"\tpreflight\x18\x02 \x01(\v2 .orca.request.v1.EnginePreflightR\tpreflight\"\xde\x02\n" +
+	"\tpreflight\x18\x02 \x01(\v2 .orca.request.v1.EnginePreflightR\tpreflight\"\x85\x03\n" +
 	"\x1fSetProjectEngineSettingsRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12'\n" +
@@ -1647,7 +1666,8 @@ const file_orca_request_v1_solution_proto_rawDesc = "" +
 	"\x10expected_version\x18\x04 \x01(\x03R\x0fexpectedVersion\x12%\n" +
 	"\x0esolution_agent\x18\x05 \x01(\bR\rsolutionAgent\x12%\n" +
 	"\x0eexecution_mode\x18\x06 \x01(\tR\rexecutionMode\x121\n" +
-	"\x12plan_auto_generate\x18\a \x01(\bH\x00R\x10planAutoGenerate\x88\x01\x01B\x15\n" +
+	"\x12plan_auto_generate\x18\a \x01(\bH\x00R\x10planAutoGenerate\x88\x01\x01\x12%\n" +
+	"\x0eoutcome_review\x18\b \x01(\tR\routcomeReviewB\x15\n" +
 	"\x13_plan_auto_generate\"\xa6\x01\n" +
 	" SetProjectEngineSettingsResponse\x12B\n" +
 	"\bsettings\x18\x01 \x01(\v2&.orca.request.v1.ProjectEngineSettingsR\bsettings\x12>\n" +

@@ -64,6 +64,7 @@ func (f *pgFixture) securityEnv() contracttest.SecurityEnv {
 				SELECT gen_random_uuid(), $1, d.id, 'chosen', 'SECRET' FROM d`, tenantID, requestID)
 			f.execAdmin(t, `INSERT INTO request.task_run_outcomes (id, tenant_id, request_id, task_id, outcome, error_message, event_id, occurred_at) VALUES (gen_random_uuid(), $1, $2, gen_random_uuid(), 'failed', 'SECRET', gen_random_uuid(), now())`, tenantID, requestID)
 			f.execAdmin(t, `INSERT INTO request.request_checks (id, tenant_id, request_id, kind, status, metrics, summary, source) VALUES (gen_random_uuid(), $1, $2, 'tests_after', 'passed', '{"k":"SECRET"}', 'SECRET', 'manual')`, tenantID, requestID)
+			f.execAdmin(t, `INSERT INTO request.outcome_reviews (id, tenant_id, request_id, phase, head_key, inputs_digest, state, model) VALUES (gen_random_uuid(), $1, $2, 'design', 'design', 'd', 'ready', '{"k":"SECRET"}')`, tenantID, requestID)
 		},
 		ReadColumn: func(t *testing.T, c domain.ErasableColumn, requestID string) (string, bool) {
 			where := c.KeyColumn + ` = $1::uuid`

@@ -19,9 +19,11 @@ type ProjectEngineSettings struct {
 	ExecutionMode ExecutionMode
 	// PlanAutoGenerate lets Orca start the Plan by itself once the Analysis is approved. On unless a project turns it off.
 	PlanAutoGenerate bool
-	UpdatedBy        string
-	UpdatedAt        time.Time
-	Version          int64
+	// OutcomeReview is the project's own choice for the Outcome Review; empty means none was saved and the deployment default applies.
+	OutcomeReview OutcomeReviewMode
+	UpdatedBy     string
+	UpdatedAt     time.Time
+	Version       int64
 	// FromDeploymentDefault marks settings that were not saved for this project but filled in from the deployment's defaults
 	// (never stored). The default engine moves only the types that run OpenSpec by default; a type that merely may run it
 	// (OpenSpecProfileLight) needs a project that chose it.

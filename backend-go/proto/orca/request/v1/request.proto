@@ -13,6 +13,7 @@ import "orca/request/v1/context.proto";
 import "orca/request/v1/decision.proto";
 import "orca/request/v1/execution_readiness.proto";
 import "orca/request/v1/impact.proto";
+import "orca/request/v1/outcome_review.proto";
 import "orca/request/v1/plan.proto";
 import "orca/request/v1/request_backlog.proto";
 import "orca/request/v1/solution.proto";
@@ -417,6 +418,12 @@ service RequestService {
   rpc PreviewContextPack(PreviewContextPackRequest) returns (PreviewContextPackResponse);
   rpc GetEvidence(GetEvidenceRequest) returns (GetEvidenceResponse);
   rpc ListEvidence(ListEvidenceRequest) returns (ListEvidenceResponse);
+
+  // Outcome Review (CR-OR-001).
+  rpc EstimateOutcomeReview(EstimateOutcomeReviewRequest) returns (EstimateOutcomeReviewResponse);
+  rpc GenerateOutcomeReview(GenerateOutcomeReviewRequest) returns (GenerateOutcomeReviewResponse);
+  rpc GetOutcomeReview(GetOutcomeReviewRequest) returns (GetOutcomeReviewResponse);
+  rpc ListOutcomeReviews(ListOutcomeReviewsRequest) returns (ListOutcomeReviewsResponse);
 
   // Security and compliance (CR-REQ-035), admin only.
   rpc EraseRequest(EraseRequestRequest) returns (EraseRequestResponse);

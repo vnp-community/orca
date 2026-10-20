@@ -25,6 +25,7 @@ type Server struct {
 	execution      ExecutionUseCases
 	plan           PlanUseCases
 	baseRef        BaseRefUseCases
+	outcomeReview  OutcomeReviewUseCases
 }
 
 func NewServer(getRequest *usecase.GetRequest, listRequests *usecase.ListRequests) *Server {

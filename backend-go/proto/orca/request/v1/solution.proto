@@ -151,6 +151,8 @@ message ProjectEngineSettings {
   string execution_mode = 6;
   // CR-REQ-044: Orca starts the Plan by itself once the Analysis is approved. True unless the project turned it off.
   bool plan_auto_generate = 7;
+  // Outcome Review (CR-OR-001): off or manual, or empty when the project saved no choice and the deployment default applies.
+  string outcome_review = 8;
 }
 
 message GetProjectEngineSettingsRequest {
@@ -175,6 +177,8 @@ message SetProjectEngineSettingsRequest {
   string execution_mode = 6;
   // Absent keeps the stored value (CR-REQ-044), so an older client never flips the switch.
   optional bool plan_auto_generate = 7;
+  // Empty keeps the stored choice; off or manual sets it; default clears it so the deployment default applies again.
+  string outcome_review = 8;
 }
 
 message SetProjectEngineSettingsResponse {

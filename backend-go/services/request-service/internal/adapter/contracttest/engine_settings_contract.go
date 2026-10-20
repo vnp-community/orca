@@ -110,6 +110,33 @@ func RunEngineSettingsContract(t *testing.T, repo usecase.EngineSettingsReposito
 			t.Fatalf("back on: %+v", read)
 		}
 	})
+	t.Run("the outcome review choice is empty by default and is stored, read back and cleared", func(t *testing.T) {
+		if read, _, _ := repo.Get(ctx, project); read.OutcomeReview != "" || read.Version != 8 {
+			t.Fatalf("a project that never chose has no review choice: %+v", read)
+		}
+		manual := mk(domain.EngineNative, "")
+		manual.OutcomeReview = domain.OutcomeReviewManual
+		if got, err := repo.Upsert(ctx, manual, 8); err != nil || got.Version != 9 {
+			t.Fatalf("choose manual: %+v %v", got, err)
+		}
+		if read, _, _ := repo.Get(ctx, project); read.OutcomeReview != domain.OutcomeReviewManual || read.Version != 9 {
+			t.Fatalf("read: %+v", read)
+		}
+		off := mk(domain.EngineNative, "")
+		off.OutcomeReview = domain.OutcomeReviewOff
+		if _, err := repo.Upsert(ctx, off, 9); err != nil {
+			t.Fatal(err)
+		}
+		if read, _, _ := repo.Get(ctx, project); read.OutcomeReview != domain.OutcomeReviewOff {
+			t.Fatalf("an explicit off is stored and differs from no choice: %+v", read)
+		}
+		if got, err := repo.Upsert(ctx, mk(domain.EngineNative, ""), 10); err != nil || got.Version != 11 {
+			t.Fatalf("clear the choice: %+v %v", got, err)
+		}
+		if read, _, _ := repo.Get(ctx, project); read.OutcomeReview != "" || read.Version != 11 {
+			t.Fatalf("cleared: %+v", read)
+		}
+	})
 	t.Run("update at a stale version never overwrites", func(t *testing.T) {
 		if _, err := repo.Upsert(ctx, mk(domain.EngineOpenSpec, ""), 1); !errors.Is(err, domain.ErrEngineSettingsVersionConflict) {
 			t.Fatalf("got %v", err)

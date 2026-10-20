@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+// Outcome Review (CR-OR-001): a review of what a Request delivered, at the level of the system rather than of lines of code.
+// The review itself travels as JSON in model_json (schemaVersion 1) so the model can grow without a message per field; the
+// columns beside it are what a client lists and compares by. RPCs live in RequestService.
+
+message OutcomeReview {
+  string review_id = 1;
+  string request_id = 2;
+  // design | delivered
+  string phase = 3;
+  // draft | ready | stale | approved | superseded
+  string state = 4;
+  string head_key = 5;
+  string model_json = 6;
+  string kg_snapshot = 7;
+  int64 version = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+// EstimateOutcomeReview costs no agent run: it reads the database and git-gateway and says what GenerateOutcomeReview would do.
+message EstimateOutcomeReviewRequest {
+  string request_id = 1;
+}
+
+message EstimateOutcomeReviewResponse {
+  string phase = 1;
+  bool execution_finished = 2;
+  bool review_exists = 3;
+  string review_id = 4;
+  bool stale = 5;
+  string current_inputs_digest = 6;
+  repeated string warnings = 7;
+}
+
+message GenerateOutcomeReviewRequest {
+  string request_id = 1;
+  // Empty lets the service pick: delivered once execution is over, design before that.
+  string phase = 2;
+}
+
+message GenerateOutcomeReviewResponse {
+  OutcomeReview review = 1;
+  // True when a review with the same inputs already existed and nothing was written.
+  bool reused = 2;
+  bool created = 3;
+}
+
+message GetOutcomeReviewRequest {
+  // request_id is required: it is how the caller is authorized. With review_id the review must belong to that Request; without
+  // it the newest review that is not superseded is returned.
+  string review_id = 1;
+  string request_id = 2;
+}
+
+message GetOutcomeReviewResponse {
+  OutcomeReview review = 1;
+  bool found = 2;
+}
+
+message ListOutcomeReviewsRequest {
+  string request_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListOutcomeReviewsResponse {
+  repeated OutcomeReview reviews = 1;
+  string next_page_token = 2;
+}

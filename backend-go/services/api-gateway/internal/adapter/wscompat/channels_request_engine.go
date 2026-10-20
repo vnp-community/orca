@@ -35,9 +35,11 @@ type EngineSettingsView struct {
 	// ExecutionMode is step_by_step or continuous (CR-REQ-038).
 	ExecutionMode string `json:"executionMode"`
 	// PlanAutoGenerate is whether Orca starts the Plan by itself once the Analysis is approved (CR-REQ-044).
-	PlanAutoGenerate bool                 `json:"planAutoGenerate"`
-	Version          int64                `json:"version"`
-	Preflight        *EnginePreflightView `json:"preflight,omitempty"`
+	PlanAutoGenerate bool `json:"planAutoGenerate"`
+	// OutcomeReview is off or manual, or empty when the project saved no choice (CR-OR-001).
+	OutcomeReview string               `json:"outcomeReview"`
+	Version       int64                `json:"version"`
+	Preflight     *EnginePreflightView `json:"preflight,omitempty"`
 }
 
 // looseBool reads true/false or "true"/"false": a REST query string carries every value as text.
@@ -95,7 +97,8 @@ func (c requestChannels) registerEngine(r *Registry) {
 			ExecutionMode   string `json:"executionMode"`
 			ExpectedVersion int64  `json:"expectedVersion"`
 			// A missing key keeps the stored switch; a client that predates it must not flip it.
-			PlanAutoGenerate *bool `json:"planAutoGenerate"`
+			PlanAutoGenerate *bool  `json:"planAutoGenerate"`
+			OutcomeReview    string `json:"outcomeReview"`
 		}](args)
 		if err != nil {
 			return nil, err
@@ -105,7 +108,7 @@ func (c requestChannels) registerEngine(r *Registry) {
 		}
 		resp, err := c.req.SetProjectEngineSettings(ctx, &requestv1.SetProjectEngineSettingsRequest{
 			ProjectId: in.ProjectID, SolutionEngine: in.Engine, OpenspecMinVersion: in.MinVersion,
-			SolutionAgent: in.SolutionAgent, ExecutionMode: in.ExecutionMode, ExpectedVersion: in.ExpectedVersion, PlanAutoGenerate: in.PlanAutoGenerate,
+			SolutionAgent: in.SolutionAgent, ExecutionMode: in.ExecutionMode, ExpectedVersion: in.ExpectedVersion, PlanAutoGenerate: in.PlanAutoGenerate, OutcomeReview: in.OutcomeReview,
 		})
 		if err != nil {
 			return nil, err
@@ -117,7 +120,7 @@ func (c requestChannels) registerEngine(r *Registry) {
 func engineSettingsView(s *requestv1.ProjectEngineSettings, p *requestv1.EnginePreflight) EngineSettingsView {
 	v := EngineSettingsView{
 		ProjectID: s.GetProjectId(), Engine: s.GetSolutionEngine(), OpenSpecMinVersion: s.GetOpenspecMinVersion(),
-		SolutionAgent: s.GetSolutionAgent(), ExecutionMode: s.GetExecutionMode(), PlanAutoGenerate: s.GetPlanAutoGenerate(), Version: s.GetVersion(),
+		SolutionAgent: s.GetSolutionAgent(), ExecutionMode: s.GetExecutionMode(), PlanAutoGenerate: s.GetPlanAutoGenerate(), OutcomeReview: s.GetOutcomeReview(), Version: s.GetVersion(),
 	}
 	if p != nil {
 		v.Preflight = &EnginePreflightView{

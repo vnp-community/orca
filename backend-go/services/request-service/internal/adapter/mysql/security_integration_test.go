@@ -62,6 +62,7 @@ func (f *myFixture) securityEnv() contracttest.SecurityEnv {
 			f.execAdmin(t, `INSERT INTO decision_history (id, tenant_id, decision_id, action, rationale) VALUES (UUID(), ?, @dec, 'chosen', 'SECRET')`, tenantID)
 			f.execAdmin(t, `INSERT INTO task_run_outcomes (id, tenant_id, request_id, task_id, outcome, error_message, event_id, occurred_at) VALUES (UUID(), ?, ?, UUID(), 'failed', 'SECRET', UUID(), NOW(6))`, tenantID, requestID)
 			f.execAdmin(t, `INSERT INTO request_checks (id, tenant_id, request_id, kind, status, metrics, summary, source) VALUES (UUID(), ?, ?, 'tests_after', 'passed', '{"k":"SECRET"}', 'SECRET', 'manual')`, tenantID, requestID)
+			f.execAdmin(t, `INSERT INTO outcome_reviews (id, tenant_id, request_id, phase, head_key, inputs_digest, state, model) VALUES (UUID(), ?, ?, 'design', 'design', 'd', 'ready', '{"k":"SECRET"}')`, tenantID, requestID)
 		},
 		ReadColumn: func(t *testing.T, c domain.ErasableColumn, requestID string) (string, bool) {
 			where := c.KeyColumn + ` = ?`

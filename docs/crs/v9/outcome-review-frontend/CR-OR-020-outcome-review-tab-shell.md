@@ -59,6 +59,7 @@ Chỉ thẻ kết luận, "Needs your decision" và thanh quyết định (CR-OR
 | Đang sinh | Tầng F hiện ngay; các khối chờ context/hình có khung xương và dòng trạng thái trong vùng `aria-live=polite` (cùng cách `NextActionBar`); tiến độ từ push `request.review.progress` |
 | Sẵn sàng | Như 2.2 |
 | Cũ (`stale`) | Dải "This review was made before the Request changed" + nút "Regenerate…"; nội dung cũ vẫn xem được |
+| Thiết kế chưa duyệt (`reviewedRatio` thấp, AM-3) | Dải "Design not reviewed: n of m design elements are approved. Findings based on them are advisory."; mục lệch dựa trên phần tử chưa duyệt hiển thị nhãn "Advisory" và **không** vào "Needs your decision" |
 | KG vắng | Dải thông tin "Design knowledge was not available, so architecture checks are limited", liệt kê lý do (`kg_unavailable`) và cách bật; thẻ Architecture hiện "Unknown" |
 | Một phần lỗi | Mỗi khối lỗi tự giải thích (ví dụ "Drawing failed, showing the table"), có thử lại |
 | Lỗi toàn bộ | Mã `REQUEST_REVIEW_*` → câu hướng dẫn bằng i18n, không in chuỗi lỗi thô |
@@ -99,6 +100,7 @@ Chỉ thẻ kết luận, "Needs your decision" và thanh quyết định (CR-OR
 - [ ] `OutcomeDesignControl` nằm trên cùng, hiển thị Architecture và Flow với số `unplanned` đúng; `designChecked=false` → Unknown, không phải 0; bấm thẻ nhảy tới đúng tab con.
 - [ ] Thẻ Requirements khớp số liệu mô hình; AC không có dữ liệu hiển thị "Unknown", không bao giờ "Delivered".
 - [ ] Mục `origin=agent` luôn có nhãn "Agent reported"; thiếu bằng chứng có nhãn "Unverified".
+- [ ] Thiết kế chưa duyệt: dải "Design not reviewed" kèm tỉ lệ; mục `advisory` không nằm trong "Needs your decision" và không chặn Approve.
 - [ ] KG vắng: thẻ Architecture "Unknown", dải giải thích, không có id KG nào hiển thị.
 - [ ] `stale`: dải cảnh báo và nút sinh lại; nội dung cũ còn xem được.
 - [ ] Mã lỗi `REQUEST_REVIEW_*` hiển thị qua i18n; không in chuỗi lỗi thô.

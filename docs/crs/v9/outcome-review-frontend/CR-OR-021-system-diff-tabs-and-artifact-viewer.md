@@ -41,7 +41,7 @@
 
 **Đối chiếu trước/sau code (Architecture, Flow).** Công tắc ba chế độ: `Design` (đã thiết kế, trước code, từ KG), `After code` (thay đổi so với base và thiết kế, mặc định), `Side by side` (hai khung cạnh nhau để so). Trước khi Execution xong (pha `design`) **chỉ có `Design`**: `After code` và `Side by side` bị vô hiệu kèm "Available when execution completes"; pha `delivered` mặc định `After code`. `Design` bị vô hiệu kèm giải thích khi KG vắng. Mỗi hàng diff cho biết nó có trong thiết kế / base / head (ba chấm `Design`, `Base`, `Head`); nút/cạnh `unmapped` có nhãn "Not in design".
 
-Architecture và Flow đứng đầu thanh tab con, hiển thị số `unplanned` thay vì chỉ số mục chưa xem. Tab hiển thị số mục chưa xem. Hàng diff: ký hiệu `+`/`~`/`−` (không chỉ màu), tiêu đề, chi tiết, chip bằng chứng, cờ. Chip `kg` hiển thị id và `snapshot` kèm nút sao chép (**không** liên kết: Orca không đọc KG); chip `file` mở diff của tệp trong cây làm việc; chip `rpc|channel|migration|check` hiển thị tên. Ô "đã xem" lưu **phía client** theo `reviewId` (mất khi đổi máy; Q1).
+Architecture và Flow đứng đầu thanh tab con, hiển thị số `unplanned` thay vì chỉ số mục chưa xem. Tab hiển thị số mục chưa xem. Mỗi nút/hàng hiển thị nhãn nguồn: không nhãn (`kg`), "In SAD text only" (`sad-text`), "Not in design" (`code`, unmapped); hàng dựa trên phần tử chưa duyệt có nhãn "Advisory" (AM-2, AM-3). Hàng diff: ký hiệu `+`/`~`/`−` (không chỉ màu), tiêu đề, chi tiết, chip bằng chứng, cờ. Chip `kg` hiển thị id và `snapshot` kèm nút sao chép (**không** liên kết: Orca không đọc KG); chip `file` mở diff của tệp trong cây làm việc; chip `rpc|channel|migration|check` hiển thị tên. Ô "đã xem" lưu **phía client** theo `reviewId` (mất khi đổi máy; Q1).
 
 ### 2.2 `ReviewArtifactFrame`
 
@@ -82,7 +82,8 @@ Mỗi hình ≤ 256 KiB; tải theo yêu cầu; cache trong bộ nhớ theo `blo
 - [ ] iframe không có `allow-scripts` hay `allow-same-origin`; thử nạp artifact chứa `<script>` (giả lập bộ kiểm bị bỏ qua) không thực thi và không đổi DOM trang chủ.
 - [ ] Đổi giao diện sáng ↔ tối đổi màu hình mà không gọi mạng; mọi chữ trong hình đủ tương phản (kiểm tay trên fixture).
 - [ ] Hình `failed`/thiếu hiển thị bảng, không để khoảng trống; nút thử lại ẩn khi không đủ quyền.
-- [ ] Mỗi hàng diff có ký hiệu `+`/`~`/`−` và bằng chứng; chip `kg` có nút sao chép, không có liên kết.
+- [ ] Mỗi hàng diff có ký hiệu `+`/`~`/`−` và bằng chứng; chip `kg` có nút sao chép, không có liên kết; chip `source` hiển thị tài liệu/mục/dòng của SAD (không liên kết).
+- [ ] Nhãn nguồn nút đúng (AM-2): "In SAD text only" cho `source=sad-text` (datastore, hệ ngoài), "Not in design" chỉ cho `source=code`; mục `advisory` (AM-3) mang nhãn "Advisory" và dải "Design not reviewed" hiển thị khi `reviewedRatio` thấp.
 - [ ] Không có hex màu cứng trong mã mới; chỉ token từ `main.css`.
 - [ ] "Compare" hiển thị hai revision cạnh nhau và danh sách thay đổi mô hình, không gọi AI.
 - [ ] Điều khiển bằng bàn phím được: tab con, hình phóng to, đóng bằng Esc, ô "đã xem".

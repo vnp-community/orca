@@ -38,7 +38,7 @@ func newEngineShowCmd(e flowEnv) *cobra.Command {
 // newEngineSetCmd keeps what the flags leave out: an administrator turning one switch must not flip the other, so the
 // current settings are read first and the version they carry is sent back with the change.
 func newEngineSetCmd(e flowEnv) *cobra.Command {
-	var project, engine, minVersion string
+	var project, engine, minVersion, outcomeReview string
 	var solutionAgent, planAutoGenerate bool
 	var expected int64
 	cmd := &cobra.Command{
@@ -48,8 +48,8 @@ func newEngineSetCmd(e flowEnv) *cobra.Command {
 				return e.usage("--project is required")
 			}
 			flags := cmd.Flags()
-			if !flags.Changed("engine") && !flags.Changed("solution-agent") && !flags.Changed("min-version") && !flags.Changed("plan-auto-generate") {
-				return e.usage("name what to change: --engine, --solution-agent, --min-version or --plan-auto-generate")
+			if !flags.Changed("engine") && !flags.Changed("solution-agent") && !flags.Changed("min-version") && !flags.Changed("plan-auto-generate") && !flags.Changed("outcome-review") {
+				return e.usage("name what to change: --engine, --solution-agent, --min-version, --plan-auto-generate or --outcome-review")
 			}
 			return e.run(cmd, func(ctx context.Context, cli *apiclient.Client) (apiclient.Document, error) {
 				cur, err := cli.GetEngineSettings(ctx, project, false)
@@ -73,6 +73,10 @@ func newEngineSetCmd(e flowEnv) *cobra.Command {
 				if flags.Changed("plan-auto-generate") {
 					body["planAutoGenerate"] = planAutoGenerate
 				}
+				// An absent key keeps the stored choice; "default" clears it so the deployment default applies again.
+				if flags.Changed("outcome-review") {
+					body["outcomeReview"] = outcomeReview
+				}
 				if flags.Changed("expected-version") {
 					body["expectedVersion"] = expected
 				}
@@ -84,6 +88,7 @@ func newEngineSetCmd(e flowEnv) *cobra.Command {
 	cmd.Flags().StringVar(&engine, "engine", "", "plan engine: native or openspec")
 	cmd.Flags().BoolVar(&solutionAgent, "solution-agent", false, "write the Solution with the read-only agent and the knowledge graph")
 	cmd.Flags().BoolVar(&planAutoGenerate, "plan-auto-generate", true, "start the Plan by itself once the Analysis is approved (use =false to turn off for the project)")
+	cmd.Flags().StringVar(&outcomeReview, "outcome-review", "", "outcome review for the project: off, manual, or default to follow the deployment")
 	cmd.Flags().StringVar(&minVersion, "min-version", "", "lowest openspec version the dev server must have (empty clears it)")
 	cmd.Flags().Int64Var(&expected, "expected-version", 0, "version the change is based on (default: the version just read)")
 	return cmd
@@ -99,6 +104,9 @@ func renderEngineSettings(doc apiclient.Document) string {
 	fmt.Fprintf(&b, "\n  solution by agent: %s\n", onOff(doc.Bool("solutionAgent")))
 	if _, present := doc["planAutoGenerate"]; present { // an older gateway does not send it; "off" would be a guess
 		fmt.Fprintf(&b, "  plan auto-generate: %s\n", onOff(doc.Bool("planAutoGenerate")))
+	}
+	if _, present := doc["outcomeReview"]; present {
+		fmt.Fprintf(&b, "  outcome review: %s\n", firstOr(doc.Str("outcomeReview"), "default (deployment)"))
 	}
 	pre := doc.Doc("preflight")
 	if pre == nil {

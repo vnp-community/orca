@@ -100,12 +100,14 @@ func TestCatalogAgentMatrix(t *testing.T) {
 		"GetApproval", "ListApprovals", "ListPendingForUser", "GetRequestFlow", "GetRequestFlowSettings",
 		"CreateRequest", "SpawnChildRequest", "ClassifyRequest", "ChangeRequestType", "GenerateSolution",
 		"ReturnToBacklog", "ReopenRequest", "ListRequestActivity", "GetExecutionSummary",
+		"EstimateOutcomeReview", "GetOutcomeReview", "ListOutcomeReviews",
 	}
 	denied := []string{
 		"Approve", "Reject", "Cancel", "ExtendApproval", "StartPhase", "GeneratePlan", "CommitPlan", "CancelRequest",
 		"ConfirmRequestType", "ChooseSolutionOption", "SetRequestFlowSettings", "EraseRequest", "ExportRequest",
 		"ExportTenantRequests", "AcceptRisk", "OverrideRiskGate", "WaiveReadiness", "UpsertApprovalPolicy",
 		"UpsertAiBudget", "SetAiTenantSettings", "RequestApproval", "ReportTaskOutcome", "UpsertContextSource",
+		"GenerateOutcomeReview",
 	}
 	byName := map[string]Entry{}
 	for full, e := range Catalog {

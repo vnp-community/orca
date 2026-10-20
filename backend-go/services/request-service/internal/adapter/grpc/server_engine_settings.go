@@ -34,7 +34,7 @@ func (s *Server) SetProjectEngineSettings(ctx context.Context, req *requestv1.Se
 	}
 	view, err := s.engineSettings.SetProjectEngineSettings(ctx, usecase.SetProjectEngineSettingsInput{
 		ProjectID: req.GetProjectId(), Engine: req.GetSolutionEngine(), MinVersion: req.GetOpenspecMinVersion(),
-		SolutionAgent: req.GetSolutionAgent(), ExecutionMode: req.GetExecutionMode(), PlanAutoGenerate: req.PlanAutoGenerate, ExpectedVersion: req.GetExpectedVersion(),
+		SolutionAgent: req.GetSolutionAgent(), ExecutionMode: req.GetExecutionMode(), PlanAutoGenerate: req.PlanAutoGenerate, OutcomeReview: req.GetOutcomeReview(), ExpectedVersion: req.GetExpectedVersion(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -45,6 +45,7 @@ func (s *Server) SetProjectEngineSettings(ctx context.Context, req *requestv1.Se
 func toProtoEngineSettings(s domain.ProjectEngineSettings) *requestv1.ProjectEngineSettings {
 	return &requestv1.ProjectEngineSettings{
 		ProjectId: s.ProjectID, SolutionEngine: string(s.Engine), OpenspecMinVersion: s.MinVersion, Version: s.Version, SolutionAgent: s.SolutionAgent, ExecutionMode: string(s.ExecutionMode.OrDefault()), PlanAutoGenerate: s.PlanAutoGenerate,
+		OutcomeReview: string(s.OutcomeReview),
 	}
 }
 

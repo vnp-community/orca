@@ -27,13 +27,13 @@ func (r *ProjectEngineSettingsRepository) Get(ctx context.Context, projectID str
 		if notUUID(projectID) {
 			return nil
 		}
-		var engine, mode string
+		var engine, mode, review string
 		var minVer *string
 		err := db.QueryRow(ctx, `
-			SELECT tenant_id::text, project_id::text, solution_engine, openspec_min_version, solution_agent, execution_mode, plan_auto_generate, updated_by::text, updated_at, version
+			SELECT tenant_id::text, project_id::text, solution_engine, openspec_min_version, solution_agent, execution_mode, plan_auto_generate, outcome_review, updated_by::text, updated_at, version
 			FROM request.project_engine_settings
 			WHERE tenant_id = $1 AND project_id = $2`, tenantID, projectID).Scan(
-			&s.TenantID, &s.ProjectID, &engine, &minVer, &s.SolutionAgent, &mode, &s.PlanAutoGenerate, &s.UpdatedBy, &s.UpdatedAt, &s.Version,
+			&s.TenantID, &s.ProjectID, &engine, &minVer, &s.SolutionAgent, &mode, &s.PlanAutoGenerate, &review, &s.UpdatedBy, &s.UpdatedAt, &s.Version,
 		)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -43,6 +43,7 @@ func (r *ProjectEngineSettingsRepository) Get(ctx context.Context, projectID str
 		}
 		s.Engine = domain.EngineName(engine)
 		s.ExecutionMode = domain.ExecutionMode(mode)
+		s.OutcomeReview = domain.OutcomeReviewMode(review)
 		if minVer != nil {
 			s.MinVersion = *minVer
 		}
@@ -65,9 +66,9 @@ func (r *ProjectEngineSettingsRepository) Upsert(ctx context.Context, s domain.P
 		}
 		if expectedVersion == 0 {
 			tag, err := db.Exec(ctx, `
-				INSERT INTO request.project_engine_settings (tenant_id, project_id, solution_engine, openspec_min_version, solution_agent, execution_mode, plan_auto_generate, updated_by, updated_at, version)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1)
-				ON CONFLICT DO NOTHING`, tenantID, s.ProjectID, string(s.Engine), minVer, s.SolutionAgent, string(s.ExecutionMode.OrDefault()), s.PlanAutoGenerate, s.UpdatedBy, s.UpdatedAt)
+				INSERT INTO request.project_engine_settings (tenant_id, project_id, solution_engine, openspec_min_version, solution_agent, execution_mode, plan_auto_generate, outcome_review, updated_by, updated_at, version)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1)
+				ON CONFLICT DO NOTHING`, tenantID, s.ProjectID, string(s.Engine), minVer, s.SolutionAgent, string(s.ExecutionMode.OrDefault()), s.PlanAutoGenerate, string(s.OutcomeReview), s.UpdatedBy, s.UpdatedAt)
 			if err != nil {
 				return fmt.Errorf("postgres: insert engine settings: %w", err)
 			}
@@ -79,9 +80,9 @@ func (r *ProjectEngineSettingsRepository) Upsert(ctx context.Context, s domain.P
 		}
 		tag, err := db.Exec(ctx, `
 			UPDATE request.project_engine_settings
-			SET solution_engine = $4, openspec_min_version = $5, solution_agent = $6, execution_mode = $7, plan_auto_generate = $8, updated_by = $9, updated_at = $10, version = version + 1
+			SET solution_engine = $4, openspec_min_version = $5, solution_agent = $6, execution_mode = $7, plan_auto_generate = $8, outcome_review = $9, updated_by = $10, updated_at = $11, version = version + 1
 			WHERE tenant_id = $1 AND project_id = $2 AND version = $3`,
-			tenantID, s.ProjectID, expectedVersion, string(s.Engine), minVer, s.SolutionAgent, string(s.ExecutionMode.OrDefault()), s.PlanAutoGenerate, s.UpdatedBy, s.UpdatedAt)
+			tenantID, s.ProjectID, expectedVersion, string(s.Engine), minVer, s.SolutionAgent, string(s.ExecutionMode.OrDefault()), s.PlanAutoGenerate, string(s.OutcomeReview), s.UpdatedBy, s.UpdatedAt)
 		if err != nil {
 			return fmt.Errorf("postgres: update engine settings: %w", err)
 		}

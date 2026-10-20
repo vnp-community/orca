@@ -67,6 +67,8 @@ var ErasableColumns = []ErasableColumn{
 	{"task_run_outcomes", "error_message", "request_id", EraseClearText, ""},
 	{"request_checks", "summary", "request_id", EraseClearText, ""},
 	{"request_checks", "metrics", "request_id", EraseClearJSONObject, ""},
+	// The review model quotes acceptance criteria and plan task titles, so it is customer content.
+	{"outcome_reviews", "model", "request_id", EraseClearJSONObject, ""},
 }
 
 func exempt(reason string, columns ...string) map[string]string {
@@ -134,6 +136,12 @@ var ExemptTextColumns = mergeExempt(
 		"request_checks.kind", "request_checks.source", "request_checks.status", "task_run_outcomes.cause", "task_run_outcomes.outcome",
 		"execution_reconcile_state.lease_owner", "plan_auto_jobs.origin", "plan_auto_jobs.state", "plan_auto_jobs.reason_code",
 		"plan_auto_jobs.lease_owner"),
+	exempt("enum, key, digest or reference of an outcome review or its agent run; the content is in outcome_reviews.model",
+		"outcome_reviews.phase", "outcome_reviews.state", "outcome_reviews.head_key", "outcome_reviews.head_commit",
+		"outcome_reviews.base_commit", "outcome_reviews.inputs_digest", "outcome_reviews.kg_snapshot", "outcome_reviews.design_digest",
+		"outcome_reviews.context_digest", "outcome_review_runs.kind", "outcome_review_runs.status", "outcome_review_runs.scope",
+		"outcome_review_runs.agent_run_ref", "outcome_review_runs.cost_estimate", "outcome_review_runs.cost_actual",
+		"outcome_review_runs.error_code", "outcome_review_runs.active_key", "project_engine_settings.outcome_review"),
 	exempt("provenance has no content or credential (ParseProvenance refuses unknown members)", "solutions.provenance"),
 	exempt("tool names and counts and usage figures of an agent run; never what went into or came out of a tool", "analysis_runs.run_stats"),
 	exempt("event envelope; payloads carry ids and counts, never content (outbox payload golden tests)", "outbox_events.payload", "outbox_events.subject", "processed_events.subject"),

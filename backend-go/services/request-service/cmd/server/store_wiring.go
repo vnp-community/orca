@@ -64,7 +64,10 @@ type requestStores struct {
 	concurrency  usecase.ConcurrencyCounter
 	retention    usecase.RetentionStore
 	execution    executionStores
-	close        func()
+	// outcomeReviews and reviewRuns store the Outcome Review (CR-OR-001) and the agent runs that made it.
+	outcomeReviews usecase.OutcomeReviewRepository
+	reviewRuns     usecase.OutcomeReviewRunRepository
+	close          func()
 }
 
 func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, healthSrv *health.Server) (*requestStores, error) {
@@ -111,6 +114,8 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			concurrency:       postgresadapter.NewConcurrencyCountRepository(base),
 			retention:         postgresadapter.NewRetentionRepository(base),
 			execution:         postgresExecutionStores(base),
+			outcomeReviews:    postgresadapter.NewOutcomeReviewRepository(base),
+			reviewRuns:        postgresadapter.NewOutcomeReviewRunRepository(base),
 			close:             pool.Close,
 		}, nil
 	case dbcapability.DialectMySQL:
@@ -162,6 +167,8 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			concurrency:       mysqladapter.NewConcurrencyCountRepository(base),
 			retention:         mysqladapter.NewRetentionRepository(base),
 			execution:         mysqlExecutionStores(base),
+			outcomeReviews:    mysqladapter.NewOutcomeReviewRepository(base),
+			reviewRuns:        mysqladapter.NewOutcomeReviewRunRepository(base),
 			close:             func() { _ = db.Close() },
 		}, nil
 	default:

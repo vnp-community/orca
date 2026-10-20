@@ -48,34 +48,45 @@ Orca dựng một **brief** xác định từ tầng F: tiêu đề và mô tả
 { "schema": "outcome-review-context/1",
   "kg": { "available": true, "snapshot": "…", "read": ["FR-…", "ADR-…"], "gaps": ["…"], "conflicts": ["…"] },
   "items": [ ReviewItem ],                 // README 3.3; origin luôn "agent"
-  "design": { "available": true,           // kiến trúc/luồng ĐÃ THIẾT KẾ, trước code, đọc từ KG; false khi KG vắng hoặc SAD không mô tả kiến trúc
-              "sources": ["ADR-007", "COMP-12"],   // id phần tử đã đọc; snapshot ở kg.snapshot
-              "containers": [ { "kgId": "COMP-12", "label": "request-service", "kind": "service", "tech": "Go, gRPC" } ],
-              "edges": [ { "from": "COMP-12", "to": "COMP-03", "protocol": "grpc", "source": "ADR-007" } ],
-              "flows": [ { "name": "Start execution", "kgId": "…?", "source": "…",
-                           "messages": [ { "from": "COMP-01", "to": "COMP-03", "protocol": "ws", "label": "request.start", "order": 1 } ] } ] },
+  "design": { "available": true,           // kiến trúc/luồng ĐÃ THIẾT KẾ, trước code; false khi KG vắng hoặc SAD không mô tả kiến trúc
+              "docSha256": { "docs/SAD.md": "…" },    // khoá thiết kế (AM-4)
+              "elementsRead": [ { "id": "SVC-05", "class": "Component", "reviewState": "needs_review" },
+                                { "id": "CT-02", "class": "Constraint", "reviewState": "needs_review" },
+                                { "id": "ADR-09", "class": "Decision", "reviewState": "needs_review" } ],   // AM-1, AM-3
+              "containers": [ { "id": "SVC-05", "kgId": "SVC-05", "source": "kg", "label": "ms-bug-management", "kind": "service", "tech": "Go, gRPC", "reviewState": "needs_review" },
+                              { "id": "sad:DS-01", "kgId": null, "source": "sad-text", "label": "MySQL 8", "kind": "datastore", "tech": "SQL",
+                                "evidence": [ { "kind": "source", "doc": "docs/SAD.md", "section": "5.1", "line": 244 } ] } ],   // AM-2
+              "sourceBlocks": [ { "doc": "docs/SAD.md", "section": "8.1", "kind": "mermaid", "text": "sequenceDiagram …" } ],   // Orca parse xác định (AM-4)
+              "edges": [ { "from": "SVC-05", "to": "sad:DS-03", "protocol": "kafka", "source": "sad-text", "evidence": [ { "kind": "source", "doc": "docs/SAD.md", "section": "8.1" } ] } ],
+              "flows": [ { "name": "Bug status to Jira", "messages": [ { "from": "CT-02", "to": "SVC-05", "protocol": "http", "label": "update status", "order": 1 } ] } ] },
   "diagrams": [ DiagramModel ],            // 2.4
   "notes": "…≤800" }
 ```
 
-Orca kiểm: khớp lược đồ; mọi `items[].evidence[]` định dạng hợp lệ (id KG khớp `^[A-Z]{2,6}-[A-Za-z0-9._:-]+$` theo các tiền tố của skill: `FR`, `NFR`, `ENT`, `BRL`, `ADR`…; `file` phải nằm trong danh mục tệp đổi hoặc là tệp tồn tại ở `baseRef`; `rpc/channel` phải khớp tên trong diff hợp đồng); chuỗi tự do qua bộ che secret; trần số mục và độ dài. Lỗi lược đồ hoặc bằng chứng sai định dạng → **một** lần thử lại kèm danh sách vi phạm (mẫu `BundleViolation`); vẫn lỗi → `REQUEST_REVIEW_RESULT_INVALID`, review giữ tầng F và `warnings: ["context_failed"]`.
+Orca kiểm: khớp lược đồ; mọi `items[].evidence[]` định dạng hợp lệ (id KG khớp `^[A-Z]{2,6}-[A-Za-z0-9._:-]+$` theo các tiền tố của skill: `FR`, `NFR`, `ENT`, `BRL`, `ADR`…; `file` phải nằm trong danh mục tệp đổi hoặc là tệp tồn tại ở `baseRef`; `rpc/channel` phải khớp tên trong diff hợp đồng; `source` là `{doc, section, line}` với `doc` thuộc tài liệu agent khai đã đọc và `sha256` khớp `design.docSha256`); chuỗi tự do qua bộ che secret; trần số mục và độ dài. Lỗi lược đồ hoặc bằng chứng sai định dạng → **một** lần thử lại kèm danh sách vi phạm (mẫu `BundleViolation`); vẫn lỗi → `REQUEST_REVIEW_RESULT_INVALID`, review giữ tầng F và `warnings: ["context_failed"]`.
 
 Mục `origin=agent` không có bằng chứng hợp lệ vẫn lưu nhưng đánh `unverified=true`; **không** đi vào `verdict.architecture.withEvidence`.
+
+### 2.3a Khoá thiết kế, khối mermaid, trạng thái rà soát (AM-3, AM-4)
+
+- **Khoá thiết kế:** `design_digest = sha256(kg.snapshot, design.docSha256, promptVersion, schemaVersion)`. Bản `design.*` đã chấp nhận lưu theo khoá này và **tái dùng** giữa các lần sinh và giữa hai pha; chỉ trích lại khi snapshot hoặc SAD đổi hoặc khi người dùng sinh lại.
+- **Parser xác định:** agent trả nguyên văn các khối mermaid của SAD (`design.sourceBlocks[]`); Orca parse `flowchart` và `sequenceDiagram` thành cạnh/tin nhắn thiết kế bằng hàm thuần (`domain/outcome_review_sad_mermaid.go`). Agent chỉ bổ sung phần văn bản (bảng container, phụ thuộc). Khi agent và parser lệch, ưu tiên parser và ghi `warnings: ["design_edge_mismatch:<id>"]`.
+- **`reviewState`:** mỗi phần tử KG đã đọc kèm `needs_review|approved|unknown` (nếu công cụ MCP không trả thì `unknown`). Lệch (`deviation`, `missing`, `unplanned`) dựa trên phần tử không phải `approved` là `advisory`: **không** thành `needsDecision`; `verdict.*.reviewedRatio` báo tỉ lệ đã duyệt. Đo trên KG thật của `vnp-qa-platform` (2026-10-20): 912/935 phần tử đang `needs_review`.
 
 ### 2.4 Mô hình sơ đồ (`DiagramModel`): đầu vào của việc vẽ
 
 Chung: `{ section, type, variant, level?, nodes|lanes|states|tables, edges|messages|transitions, truncated }`. Quy tắc: id nút ổn định, sắp xếp xác định, **≤ 12 nút** mỗi sơ đồ (vượt → gộp theo nhóm, nút "+N more", `truncated=true`), nhãn ≤ 40 ký tự.
 
 **Architecture và Flow là mức container (C4 level 2), không phải component.** Với hai loại này:
-- `level` bắt buộc là `"container"`. Thành phần lấy từ KG: mỗi `nodes[]`/`lanes[]` có `kgId` (phần tử KG agent đã đọc, nằm trong `design.sources`/`design.containers`) hoặc, nếu thấy trong code mà KG không có, `kgId = null` với `state = unmapped` và id `code:<kebab(label)>` (README 3.9). Bộ kiểm từ chối nút nhìn như component (tên lớp, hàm, thư mục con), tin nhắn tự gọi, và `kgId` không có trong `design.sources`. Orca **không** kiểm được nội dung KG, chỉ kiểm định dạng id và việc id đã được khai là đọc.
+- `level` bắt buộc là `"container"`. Thành phần đến từ ba nguồn (AM-1): phần tử KG (`kg`), văn bản SAD (`sad-text`), hoặc chỉ thấy trong code (`code`) — AM-2. Mỗi `nodes[]`/`lanes[]` có `source`, `reviewState` (AM-3) và `id` = `kgId` | `sad:<mã>` | `code:<kebab(label)>`. `kgId` phải nằm trong `design.elementsRead`; `sad:<mã>` phải có bằng chứng `source` trỏ vào tài liệu đã khai đọc. `unmapped` chỉ cho `source=code`. `kind` và mức C4 do văn bản SAD/agent kết luận, **không** suy từ lớp KG (AM-5): `SVC-BUG-09`, `SVC-JIR-13` cùng lớp `Component` với service nhưng là thành phần bên trong (level 3); `CT-02` lớp `Constraint` là container. Bộ kiểm từ chối nút nhìn như component (tên lớp, hàm, thư mục con), tin nhắn tự gọi, `kgId` ngoài `elementsRead`. Orca **không** kiểm được nội dung KG, chỉ kiểm định dạng id và việc id đã được khai là đọc.
 - Trạng thái **do Orca suy ra, không do agent khai**: mỗi cạnh/tin nhắn mang `inBase`, `inHead` (đã quan sát ở `baseRef` / head qua code, có bằng chứng) và `inDesign` (`true|false|null`; `null` = không có thiết kế để đối chiếu). `added = !inBase ∧ inHead`, `removed = inBase ∧ !inHead`, `unchanged` nếu cả hai, `deviation` nếu `inHead ∧ inDesign=false`, `missing` nếu `inDesign=true ∧ !inHead`. Đây là phép so ba chiều **base / head / thiết kế**, nền tảng của việc kiểm soát kiến trúc và luồng.
-- Mỗi cạnh/tin nhắn `added`, `removed`, `deviation` hoặc `missing` phải có `evidence[]` (tệp và vị trí nơi gọi/khai báo client, hoặc id ADR/Requirement của KG); thiếu → `unverified`.
+- Mỗi cạnh/tin nhắn `added`, `removed`, `deviation` hoặc `missing` phải có `evidence[]` (tệp và vị trí nơi gọi/khai báo client, hoặc id ADR/Requirement của KG, hoặc `source` {tài liệu, mục, dòng} của SAD); thiếu → `unverified`.
 - Thay đổi bên trong container (level 3) **không** thành nút: `nodes[].componentsChanged` (đếm thành phần đổi) và `nodes[].drilldown` (`{ lens: "architecture", containerId }`) để UI mở lens v7.
 
 | `type` | Trường riêng |
 |---|---|
-| `architecture-delta` (`level=container`) | `nodes[{id,kgId,label,kind,tech,componentsChanged?,drilldown?,state}]` (`state` có thêm `unmapped`), `edges[{from,to,protocol,label?,inBase,inHead,inDesign,evidence[],state}]`; `kind ∈ service|app|datastore|queue|agent|external` |
-| `sequence` (`level=container`, dynamic) | `lanes[{id,label,kind}]` (≤ 6), `messages[{from,to,protocol,label,order,inBase,inHead,inDesign,evidence[],state}]`; `from ≠ to`; `order` toàn cục, `reordered` khi thứ tự đổi so với base |
+| `architecture-delta` (`level=container`) | `nodes[{id,kgId,source,reviewState,label,kind,tech,componentsChanged?,drilldown?,state}]` (`state` có thêm `unmapped`, chỉ khi `source=code`), `edges[{from,to,protocol,label?,inBase,inHead,inDesign,advisory,evidence[],state}]`; `kind ∈ service|app|datastore|queue|agent|external` |
+| `sequence` (`level=container`, dynamic) | `lanes[{id,label,kind}]` (≤ 6), `messages[{from,to,protocol,label,order,inBase,inHead,inDesign,advisory,evidence[],state}]`; `from ≠ to`; `order` toàn cục, `reordered` khi thứ tự đổi so với base |
 | `state-machine` | `states[{id,label,state}]`, `transitions[{from,to,label?,state}]` |
 | `database-schema` | `tables[{id,label,state,columns[{name,type,state}]}]`, `relations[{from,to}]` |
 
@@ -86,7 +97,7 @@ Chung: `{ section, type, variant, level?, nodes|lanes|states|tables, edges|messa
 #### Hai góc nhìn trước code và sau code (Architecture, Flow)
 
 - `variant = design`: kiến trúc/luồng **đã thiết kế, trước khi code**, dựng chỉ từ `design.*` (KG). Không phụ thuộc commit: cùng `design` thì cùng `inputDigest` và **tái dùng giữa các lần sinh** (CR-OR-011). Không có khi `design.available = false`.
-- `variant = delta` (chỉ có ở pha `delivered`): thay đổi **sau code**; mọi nút/cạnh/tin nhắn mang trạng thái so ba chiều base / head / thiết kế; thành phần có trong code mà KG không có là `unmapped` ("Not in design").
+- `variant = delta` (chỉ có ở pha `delivered`): thay đổi **sau code**; mọi nút/cạnh/tin nhắn mang trạng thái so ba chiều base / head / thiết kế; thành phần có trong code mà **không có ở cả KG lẫn SAD** là `unmapped` ("Not in design"); thành phần chỉ có trong văn bản SAD là `sad-text` ("In SAD text only").
 - UI cho xem riêng từng góc nhìn hoặc cạnh nhau để đối chiếu (CR-OR-021). Behavior và Data cũng có hai biến thể khi KG mô tả máy trạng thái hoặc thực thể; nếu không thì chỉ có `delta` ở pha `delivered`.
 
 Bảng, không sơ đồ: `requirements`, `contracts`, `config` chỉ có `items[]`.
@@ -124,7 +135,12 @@ Mở rộng hồ sơ khả năng dev server (đã báo `agent.execPrompt.knowled
 - [ ] Kết quả sai lược đồ hoặc có id sai định dạng → đúng một lần thử lại; lỗi lần hai → `REQUEST_REVIEW_RESULT_INVALID`, tầng F còn nguyên.
 - [ ] Mục `origin=agent` với `file` ngoài danh mục đổi (và không có ở `baseRef`) bị đánh `unverified`.
 - [ ] Mô hình sơ đồ có > 12 nút được gộp, `truncated=true`; cùng đầu vào cho cùng `inputDigest`.
-- [ ] Architecture/Flow: nút ở mức component, tin nhắn tự gọi, hay `kgId` không nằm trong `design.sources` bị từ chối và đưa vào lần thử lại; thành phần không có trong KG phải là `unmapped`, không được gán `kgId` bịa.
+- [ ] Architecture/Flow: nút ở mức component, tin nhắn tự gọi, `kgId` ngoài `design.elementsRead`, hay `sad:<mã>` không có bằng chứng `source` bị từ chối và đưa vào lần thử lại.
+- [ ] Datastore và hệ ngoài chỉ có trong SAD (`DS-01`, `EXT-01`) hiển thị `source=sad-text` ("In SAD text only"), **không** bị đánh `unmapped`/"Not in design"; `unmapped` chỉ cho thành phần không có ở KG lẫn SAD, và không được gán `kgId` bịa.
+- [ ] Lệch dựa trên phần tử `needs_review`/`unknown` là `advisory`, không có `needsDecision`; `reviewedRatio` đúng.
+- [ ] `kind` và mức C4 không lấy từ lớp KG: `SVC-BUG-09` không bị vẽ thành container ngang hàng service; `CT-02` (lớp `Constraint`) vẫn là container.
+- [ ] Parser mermaid xác định dựng đúng cạnh/tin nhắn từ SAD 5.5, 8.1, 8.4 của `vnp-qa-platform`; lệch với agent → ưu tiên parser, có `design_edge_mismatch`.
+- [ ] Hai lần sinh cùng `(kg.snapshot, docSha256)` không trích lại thiết kế (đếm lời gọi `kg_*`/`source_get`).
 - [ ] Trạng thái cạnh (`added|removed|deviation|missing`) do Orca suy từ `inBase/inHead/inDesign`; agent không thể đặt `state` trực tiếp.
 - [ ] Cạnh `added|removed|deviation|missing` thiếu bằng chứng hợp lệ bị đánh `unverified` và không vào `withEvidence`.
 - [ ] `mode=design` không mở diff, không đọc tệp mã nguồn ngoài những gì lời nhắc cho phép (kiểm bằng nhật ký công cụ của agent giả); kết quả có `design.*` và `variant=design` cho Architecture, Flow, Behavior, Data khi KG mô tả.
@@ -149,7 +165,7 @@ Mở rộng hồ sơ khả năng dev server (đã báo `agent.execPrompt.knowled
 - Chưa đọc usecase Solution agent và task run để tái dùng đường chạy; chi tiết khối nonce và tên tham số hồ sơ quyền phải lấy từ code.
 - **Thiết kế trong KG có thể không mô tả container, cạnh hay luồng.** Các lớp phần tử đã biết của skill là `Requirement`, `BusinessRule`, `Entity`, `Decision`, `Constraint`, `QualityTarget`, `Component`; cạnh giữa container và luồng chuẩn có thể chỉ nằm trong văn bản `Decision`/`Component`. Khi đó `design.edges/flows` rỗng và `designChecked=false` (đúng, nhưng làm yếu việc kiểm soát). Cần spike đọc SAD của dự án pilot để xem có bao nhiêu cạnh/luồng thiết kế trích được.
 - **`inBase` đòi đọc cả bản gốc.** Agent chỉ đọc `git show <base>:<path>` cho các tệp đổi; cạnh nằm ở tệp không đổi được coi là không đổi. Một cạnh mới sinh ra chỉ qua cấu hình triển khai (ví dụ biến môi trường trỏ service khác) có thể bị sót.
-- **Thành phần chỉ đến từ KG.** Nếu SAD của dự án không mô hình hoá container, cạnh hay luồng (hoặc mô hình hoá ở mức khác), góc nhìn *Design* trống và mọi nút thành `unmapped`; cần spike đọc SAD của dự án pilot. Phân biệt container với component dựa vào cách SAD mô hình hoá, chưa có quy tắc cứng. Id `code:<tên>` của nút unmapped có thể đổi khi tên đổi, làm hình `delta` trượt cache.
+- **KG không chứa đủ thành phần thiết kế (đã đo).** Trên `vnp-qa-platform`: chỉ 10 `Component` (8 service + 2 thành phần bên trong), gateway/SPA là `Constraint` (`CT-02`, `CT-01`), datastore và hệ ngoài (`DS-*`, `EXT-*`) không phải phần tử, cạnh giữa container và luồng chỉ có trong văn bản SAD. Vì vậy nguồn thiết kế gồm cả văn bản SAD qua `source_get` (AM-1) và `design.*` có thể do agent/parser rút từ văn bản (không phải cạnh KG). Nếu SAD của dự án khác không có sơ đồ/bảng tương tự, góc nhìn *Design* sẽ trống. Id `code:<tên>` của nút unmapped có thể đổi khi tên đổi, làm hình `delta` trượt cache.
 - Chất lượng mô hình sơ đồ do LLM đọc code là chưa biết; có thể sai cạnh. Vì vậy `unverified`, bằng chứng bắt buộc, và hình có nhãn "agent suy luận".
 - Chi phí một lượt chưa đo (một Plan thật 7–13 USD); trần đề xuất là phỏng đoán.
 - Hết hạn token CLI sau ~10 phút chỉ ảnh hưởng đường CLI; đường server-side chưa kiểm chứng.

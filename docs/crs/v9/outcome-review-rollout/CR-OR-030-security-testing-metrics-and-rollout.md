@@ -52,11 +52,15 @@ Chèn chuỗi canary giả (đúng định dạng token) vào: AC, tên tệp, d
 
 ### 2.3a Kiểm tra mức C4 (Architecture, Flow)
 
-Fixture xấu cho bộ kiểm của CR-OR-002: nút component (tên lớp/hàm), nút có `kgId` không nằm trong `design.sources`, nút unmapped được gán `kgId` bịa, tin nhắn tự gọi, `state` do agent tự đặt, cạnh `deviation` không bằng chứng, `inDesign=false` khi `design.available=false`, sơ đồ `variant=design` khi KG vắng. Kỳ vọng: bị từ chối hoặc `unverified`/`Unknown` đúng quy tắc. Fixture tốt: hai Request thật của đợt CR-REQ-037/038 (cạnh request-service → infra-fleet và thay đổi kênh gateway) để so mô hình với kỳ vọng do người viết tay.
+Fixture xấu cho bộ kiểm của CR-OR-002: nút component (tên lớp/hàm), nút có `kgId` không nằm trong `design.elementsRead`, nút `sad:<mã>` không có bằng chứng `source`, nút unmapped được gán `kgId` bịa, tin nhắn tự gọi, `state` do agent tự đặt, cạnh `deviation` không bằng chứng, `inDesign=false` khi `design.available=false`, sơ đồ `variant=design` khi KG vắng. Kỳ vọng: bị từ chối hoặc `unverified`/`Unknown` đúng quy tắc. Fixture tốt: hai Request thật của đợt CR-REQ-037/038 (cạnh request-service → infra-fleet và thay đổi kênh gateway) để so mô hình với kỳ vọng do người viết tay.
 
 ### 2.3b Kiểm tra hai pha
 
 Trạng thái Request × pha: trước `awaiting_plan_approval` → `REQUEST_REVIEW_NOT_READY`; `awaiting_plan_approval` và `executing` (Execution chưa xong) → chỉ review `design`, không có diff, không có quyết định/duyệt, tab hiện sau Execution với phần After code bị vô hiệu; Execution xong → review `delivered` mới, review `design` thành `superseded`, `design.*` và hình `design` tái dùng (đếm lời gọi `kg_*` và lượt vẽ). Fixture: Request ở từng trạng thái trên (native và OpenSpec).
+
+### 2.3c Kiểm tra theo AM (nguồn thành phần, rà soát, khoá thiết kế)
+
+Fixture lấy từ KG và SAD thật của `vnp-qa-platform` (snapshot `snap-000004`, SAD 5.1, 5.3, 5.5, 8.1, 8.4): (a) `DS-01`, `DS-03`, `EXT-01` → `source=sad-text`, không `unmapped` (AM-2); (b) `CT-02` (lớp `Constraint`) là container, `SVC-BUG-09` không vẽ ngang hàng service (AM-5); (c) phần tử `needs_review` → `advisory`, không `needsDecision`, `reviewedRatio` đúng (AM-3); (d) parser mermaid dựng đúng cạnh từ 5.5/8.1/8.4 và ưu tiên khi lệch agent (AM-4); (e) khoá `(kg.snapshot, sha256 SAD)` không đổi thì không trích lại (đếm lời gọi `kg_*`/`source_get`); (f) bằng chứng `source` trỏ vào tài liệu chưa khai đọc bị từ chối (AM-1).
 
 ### 2.4 Hợp đồng và fixture vàng
 

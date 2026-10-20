@@ -12,6 +12,9 @@ const (
 	AuditApprovalApprove     = "approval.approve"
 	// AuditEngineSettingsSet records a project switching the engine or the agent-written Solution on or off.
 	AuditEngineSettingsSet = "request.engine_settings.set"
+	// AuditReviewGenerate records a person building or rebuilding an Outcome Review (CR-OR-001). Best effort: it describes an
+	// action that writes a derived record, not a decision.
+	AuditReviewGenerate = "request.review.generate"
 )
 
 // DurableAuditActions must survive an auth-service outage: they are written to the audit outbox in the

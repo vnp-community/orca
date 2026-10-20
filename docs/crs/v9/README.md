@@ -46,7 +46,7 @@
 | D12 | **Tái dùng, không dựng lại những gì v7 đã có**: lối vào review code qua `openReviewFromEntryPoint`; bộ lọc/ý tưởng của `review-report-diagram-guard.ts` cho artifact; mẫu ETag + hạn mức của bộ đệm snapshot; lens Requirements của v7 vẫn là nơi xem truy vết mức worktree. v9 là cổng mức Request, khoá theo Request | Tránh hai hệ thống review song song; v7 đã có mã (mục 1) |
 | D13 | **Review tập trung vào kiểm soát kiến trúc và kiểm soát luồng ở mức C4 level 2 (container).** Architecture là sơ đồ container; Flow là sơ đồ động (dynamic) giữa các container. Thay đổi bên trong một container (level 3) **không** thành nút ở v9: hiện bằng huy hiệu "n components changed" kèm lối vào lens `architecture` của v7 | Người duyệt cần thấy ranh giới giữa service, giao thức, hướng phụ thuộc và thứ tự gọi; chi tiết component đã có ở v7 |
 | D14 | **Kiến trúc và luồng là hạng mục kiểm soát hạng nhất**: có thẻ kết luận riêng, được so với thiết kế (SAD/ADR trong KG) khi có, mỗi lệch là một mục `needsDecision` | Mục tiêu của người dùng; tránh chôn trong bảng chung |
-| D15 | **Thành phần của hệ thống (container, cạnh phụ thuộc, luồng thiết kế) được đọc từ tdd knowledge (SAD/ADR), Orca không giữ danh mục riêng.** Nút và làn của Architecture/Flow mang id phần tử KG (`kgId`); thành phần thấy trong code mà KG không có là `unmapped` và tự nó là một phát hiện ("Not in design") | Nguồn sự thật duy nhất là tài liệu thiết kế; KG vắng thì không đối chiếu được (nói rõ, không bịa) |
+| D15 | **Thành phần của hệ thống (container, cạnh phụ thuộc, luồng thiết kế) được đọc từ tdd knowledge, Orca không giữ danh mục riêng.** Nguồn gồm phần tử KG (`Component`, `Constraint` mã `CT-*`, `Decision`) **và** văn bản SAD qua `source_get` (AM-1). Mỗi nút/làn mang `source: kg\|sad-text\|code`; thành phần chỉ có trong văn bản SAD (datastore, hệ ngoài) là `sad-text`, chỉ thành phần không có ở KG lẫn SAD mới là `unmapped` và tự nó là một phát hiện ("Not in design") (AM-2) | Nguồn sự thật duy nhất là tài liệu thiết kế; KG vắng thì không đối chiếu được (nói rõ, không bịa); đo trên KG thật của `vnp-qa-platform` cho thấy KG không chứa datastore, hệ ngoài hay cạnh giữa container |
 | D16 | **Đối chiếu trước code và sau code**: Architecture và Flow có hai góc nhìn, *Design* (đã thiết kế trong KG, trước khi code) và *After code* (thay đổi do code gây ra, so với base và với thiết kế); UI cho xem riêng từng góc nhìn hoặc cạnh nhau | Mục tiêu của người duyệt: kiểm soát kiến trúc và luồng bằng cách so thiết kế với kết quả |
 | D17 | **Hai pha của review.** Pha `design` (trước code): có ngay khi Request có Plan, kể cả khi Execution chưa chạy hay chưa xong; chỉ hiện phần *Design* của Architecture, Flow, Behavior, Data và các yêu cầu/tiêu chí áp dụng, đọc từ KG, **không đọc diff**. Pha `delivered` (sau khi Execution xong): thêm phần *After code* (delta so với base và thiết kế), quyết định và duyệt. Hình `design` vẽ một lần ở pha thiết kế và **tái dùng** ở pha `delivered`; ngữ cảnh KG đã đọc cũng tái dùng | Yêu cầu của người dùng; phần Design rẻ vì không đọc code |
 | D18 | **Tab trong màn Request tên `Outcome review`** (giá trị `outcome-review`), đứng **ngay sau Execution**; khác tab `Review` mức code của v7 trong tab group của workspace | Tránh nhầm hai tab cùng tên; vị trí cố định |
@@ -86,9 +86,9 @@ Frontend (tab Outcome review của Request) ─WS request.review.*─▶ api-gat
   "verdict": {
     "requirements": { "delivered": 0, "partial": 0, "notCovered": 0, "unknown": 0 },       // F (+C nếu có KG, gắn nhãn)
     "architecture": { "containersChanged": 0, "newEdges": 0, "removedEdges": 0, "unplannedEdges": 0,
-                      "reportedDeviations": 0, "withEvidence": 0, "designChecked": false },   // C, không phải F; designChecked=true khi có KG/SAD để đối chiếu
+                      "reportedDeviations": 0, "withEvidence": 0, "advisory": 0, "designChecked": false, "reviewedRatio": 0.0 },   // C, không phải F; designChecked=true khi có KG/SAD để đối chiếu; reviewedRatio = tỉ lệ phần tử thiết kế đã duyệt (AM-3); advisory = lệch dựa trên phần tử chưa duyệt
     "flow":         { "newCalls": 0, "removedCalls": 0, "reordered": 0, "unplannedCalls": 0,
-                      "reportedDeviations": 0, "withEvidence": 0, "designChecked": false },   // C, không phải F
+                      "reportedDeviations": 0, "withEvidence": 0, "advisory": 0, "designChecked": false, "reviewedRatio": 0.0 },   // C, không phải F
     "quality":      { "gate": "pass|warn|fail|unknown|absent" },                              // v7 nếu có
     "release":      { "risk": "low|medium|high|critical|unknown", "flags": ["migration","breaking","config"] } },  // F
   "items": [ ReviewItem ],                  // mục theo từng tab; xem 3.3
@@ -104,18 +104,23 @@ Frontend (tab Outcome review của Request) ─WS request.review.*─▶ api-gat
 { "key": "<sha256(section|kind|subject)[:16], ổn định giữa các lần dựng>",
   "section": "architecture|flow|behavior|data|contracts|requirements|config",
   "change": "added|modified|removed|unchanged",
-  "containers": [ "COMP-12", "COMP-03" ],                 // id phần tử KG (`kgId`) của container mà mục nói tới, hoặc `code:<tên>` khi unmapped; bắt buộc ở section architecture|flow
+  "containers": [ "COMP-12", "COMP-03" ],                 // id phần tử KG (`kgId`) của container mà mục nói tới, `sad:<mã>` (chỉ có trong văn bản SAD, ví dụ `sad:DS-01`) hoặc `code:<tên>` (unmapped); bắt buộc ở section architecture|flow
   "protocol": "grpc|ws|http|sql|nats|mcp|fs|…",                 // giao thức của cạnh/tin nhắn (architecture|flow)
+  "source": "kg|sad-text|code",                                   // nguồn của thành phần/cạnh (AM-2); chỉ `code` mới là unmapped
+  "reviewState": "approved|needs_review|unknown",                 // trạng thái rà soát của phần tử KG làm căn cứ thiết kế (AM-3)
+  "advisory": false,                                             // true khi lệch chỉ dựa trên phần tử chưa duyệt: không thành needsDecision (AM-3)
   "expected": true,                                              // cạnh/lời gọi có trong thiết kế (SAD/ADR) không; null khi không có thiết kế để đối chiếu
   "origin": "fact|agent",                        // fact: Orca tính; agent: lời agent từ KG/đọc code
   "title": "…≤160", "detail": "…≤400",
   "severity": "info|warning|breaking|deviation|regression",
   "needsDecision": false,
-  "evidence": [ { "kind": "kg|file|rpc|channel|migration|check", "ref": "ADR-007 | path | …", "snapshot": "…?" } ],
+  "evidence": [ { "kind": "kg|source|file|rpc|channel|migration|check", "ref": "ADR-007 | path | …", "snapshot": "…?", "doc": "SAD?", "section": "5.3?", "line": 0 } ],
   "before": "…?", "after": "…?" }                // dùng cho mục "yêu cầu" (trạng thái trên base và trên head)
 ```
 
 Quy tắc: `origin=agent` mà `evidence[]` rỗng hoặc id không xác minh được → hiển thị "Chưa xác minh" và **không** tính vào `verdict.architecture.withEvidence`; Orca kiểm tra được phần `file` (tệp có trong diff) và định dạng id KG, không kiểm được nội dung KG.
+
+Loại bằng chứng `source` (AM-1) trỏ vào văn bản tài liệu nguồn của KG: `{doc, section, line}`, dùng cho cạnh, luồng, datastore và hệ ngoài mà KG không có thành phần/cạnh tương ứng. Orca kiểm định dạng và việc tài liệu/mục đã được agent khai là đọc, không kiểm được nội dung.
 
 ### 3.4 Bảng (request-service, hai dialect, mọi bảng có `tenant_id`, không FK chéo service)
 
@@ -165,11 +170,13 @@ Biến thể `minimal`, một accent cho 1–2 phần tử trọng tâm, ≤ 12 
 | Level 3 (component) | Huy hiệu "n components changed" trên container + lối vào lens `architecture` của v7 | v7 (CR-CV-033) |
 | Level 4 (code) | Ngoài phạm vi; diff dòng ở Changes/review code | v7 và diff |
 
-**Nguồn thành phần là tdd knowledge, không phải danh mục của Orca.** Container, cạnh phụ thuộc và luồng đã thiết kế được agent đọc từ KG trong context run (SAD: lớp `Component`, `Decision`, `Constraint`; quan hệ qua `kg_neighbors`), kèm `snapshot`. Orca không giữ danh mục container riêng và không đọc KG (D3). Quy tắc:
+**Nguồn thành phần là tdd knowledge (KG và tài liệu nguồn của nó), không phải danh mục của Orca.** Orca không giữ danh mục container và không đọc KG (D3). Trong context run agent đọc, kèm `snapshot`: (1) phần tử KG lớp `Component` (ví dụ `SVC-01…08`), lớp `Constraint` mã `CT-*` (ví dụ gateway `CT-02`, SPA `CT-01`) và `Decision` (ADR); (2) văn bản tài liệu nguồn qua `source_get` (SAD: bảng container, bảng phụ thuộc, khối mermaid), nơi có datastore (`DS-*`), hệ ngoài (`EXT-*`), cạnh giữa container và luồng mà KG không có thành phần/cạnh tương ứng (AM-1). Quy tắc:
 
-- Mỗi nút/làn có `kgId` (id phần tử KG). Thành phần thấy trong code mà KG không có: `kgId = null`, `state = unmapped`, hiển thị "Not in design"; id nút = `code:<kebab(label)>`. Id nút theo `kgId` nên ổn định giữa các lần sinh.
-- Container và component được phân biệt theo cách SAD của dự án mô hình hoá (ranh giới chạy: service, ứng dụng, kho dữ liệu). Chưa có quy tắc cứng; phải kiểm trên dự án pilot (mục 8).
-- KG vắng hoặc SAD không mô tả kiến trúc → chỉ có góc nhìn *After code* với mọi nút `unmapped` và nhãn "Design not available"; không có góc nhìn *Design* và không có số `unplanned`.
+- **Nguồn nút/làn (AM-2):** `source = kg` (có phần tử KG, `kgId`), `sad-text` (chỉ có trong văn bản SAD: `kgId = null`, id `sad:<mã>`, hiển thị "In SAD text only"), `code` (chỉ thấy trong code: `unmapped`, id `code:<kebab(label)>`, hiển thị "Not in design"). `unmapped` **chỉ** dành cho `code`, tức không có ở cả KG lẫn SAD. Id nút theo `kgId` hoặc `sad:<mã>` nên ổn định giữa các lần sinh.
+- **`kind` và mức C4 (AM-5)** do văn bản SAD/agent kết luận, không suy từ lớp KG: `SVC-BUG-09` và `SVC-JIR-13` cùng lớp `Component` với service nhưng là thành phần bên trong (level 3); `CT-02` thuộc lớp `Constraint` nhưng là container. Chưa có quy tắc cứng; kiểm trên dự án pilot (mục 8).
+- **Trạng thái rà soát (AM-3):** mỗi phần tử KG đã đọc mang `reviewState`. Cạnh/luồng/lệch dựa trên phần tử chưa duyệt (`needs_review` hoặc `unknown`) là `advisory`: không thành `needsDecision`; UI hiện "Design not reviewed". `verdict.architecture|flow.reviewedRatio` = tỉ lệ phần tử thiết kế đã duyệt.
+- **Khoá thiết kế (AM-4):** bản trích `design.*` được **khoá** theo `(kg.snapshot, sha256 tài liệu SAD)` và tái dùng giữa các lần sinh và giữa hai pha; khối mermaid trong SAD được **parse xác định ở Orca** (agent trả nguyên văn khối), agent chỉ bổ sung phần văn bản; khi hai bên lệch ưu tiên parser.
+- KG vắng hoặc SAD không mô tả kiến trúc → chỉ có góc nhìn *After code* với mọi nút `code` (unmapped) và nhãn "Design not available"; không có góc nhìn *Design* và không có số `unplanned`.
 - Brief chỉ gợi ý nhóm tệp đổi theo thư mục cấp một cho agent đọc; đó là gợi ý, không phải danh mục.
 
 **Hai góc nhìn:** `design` (trước code, chỉ dựa vào KG, không phụ thuộc commit nên tái dùng giữa các lần sinh) và `delta` (sau code, đánh dấu base / head / thiết kế). Behavior và Data cũng có hai biến thể khi KG mô tả (máy trạng thái, thực thể); không có thì chỉ `delta`.
@@ -240,7 +247,7 @@ CR-OR-030 chạy song song từ đợt 2 (bộ test hợp đồng với fixture 
 3. Handoff 2026-10-17 ghi migration 0098; repo đã có tới 0104 (mục 1).
 4. **Chưa đọc**: cách request-service chạy một lượt agent có kết quả có cấu trúc (các usecase của Solution agent và task run), `engine_settings.go` (chỗ thêm cờ), `approval_authorization.go` (tên hành động OPA), `outbox_subjects.go`, `ai_budget.go`, `dev_server_capability.go` (chỗ kiểm skill). Mỗi CR ghi rõ điều này ở mục rủi ro.
 5. **Spike bắt buộc trước CR-OR-010**: (a) chạy `diagram-design` không tương tác với hồ sơ cố định và vẽ được container kèm công nghệ/giao thức (ký hiệu gần C4); (b) xác nhận tạo được artifact dùng biến vai trò màu để điền token lúc hiển thị; (c) đo token và thời gian một sơ đồ ≤ 12 nút; (d) đọc `references/` về loại sơ đồ, `self_check.py` và cách ghi đè phông.
-6. **Spike trước CR-OR-002**: một lượt thật `tdd-knowledge` trên repo pilot `vnp-qa-platform` (cần `.tdd-agent/config.toml`) để xem hình dạng kết quả KG, tỉ lệ id xác minh được, và **SAD của dự án mô hình hoá container, cạnh phụ thuộc, luồng ra sao** (lớp `Component`/`Decision`); nếu không có thì Architecture và Flow chỉ còn góc nhìn After code với nút `unmapped`.
+6. **Spike trước CR-OR-002**: một lượt thật `tdd-knowledge` trên repo pilot `vnp-qa-platform` (cần `.tdd-agent/config.toml`) để xem hình dạng kết quả KG, tỉ lệ id xác minh được, và **SAD của dự án mô hình hoá container, cạnh phụ thuộc, luồng ra sao** (lớp `Component`/`Decision`); nếu không có thì Architecture và Flow chỉ còn góc nhìn After code với nút `code` (unmapped).
 7. Cách phân phối skill `diagram-design` (vendor vào `skills/` và cài bằng `npx skills add … --skill diagram-design`): lệnh cài của repo gốc chưa tìm thấy trong trang đọc được; theo mẫu của bốn skill tdd.
 
 ## 9. Điểm chưa ai chốt

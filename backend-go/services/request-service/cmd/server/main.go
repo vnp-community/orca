@@ -236,6 +236,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		WithLifecycle(requestgrpc.LifecycleUseCases{Flow: lifecycle.GetFlow, Return: lifecycle.Return, Reopen: lifecycle.Reopen, Cancel: lifecycle.Cancel, SpawnChild: lifecycle.SpawnChild, Links: lifecycle.ListLinks}).
 		WithSolution(solution.useCases()).
 		WithPlan(plan).
+		WithOutcomeReview(wireOutcomeReview(log, stores, execTasks, solution, usecase.EngineSettingsReviewReader{Repo: stores.engineSettings}, security.audit)).
 		WithEngineSettings(usecase.NewManageProjectEngineSettings(stores.engineSettings).WithReadiness(solution.gate).WithAudit(security.audit, stores.tx)).
 		WithCompliance(security.compliance))
 	if approval.Enabled {

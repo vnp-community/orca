@@ -146,6 +146,8 @@ var isolationFixtures = map[string]string{
 	"request_checks":            `INSERT INTO request.request_checks (id, tenant_id, request_id, kind, status, source) VALUES (gen_random_uuid(), {tenant}, {req}, 'tests_after', 'passed', 'manual')`,
 	"task_run_outcomes":         `INSERT INTO request.task_run_outcomes (id, tenant_id, request_id, task_id, outcome, event_id, occurred_at) VALUES (gen_random_uuid(), {tenant}, {req}, gen_random_uuid(), 'started', gen_random_uuid(), now())`,
 	"plan_auto_jobs":            `INSERT INTO request.plan_auto_jobs (tenant_id, request_id, anchor, origin, project_id, state) VALUES ({tenant}, {req}, 'sol', 'event', gen_random_uuid(), 'pending')`,
+	"outcome_reviews":           `INSERT INTO request.outcome_reviews (id, tenant_id, request_id, phase, head_key, inputs_digest, state, model) VALUES (gen_random_uuid(), {tenant}, {req}, 'design', 'design', 'd', 'ready', '{}')`,
+	"outcome_review_runs":       `INSERT INTO request.outcome_review_runs (id, tenant_id, review_id, request_id, kind, status) VALUES (gen_random_uuid(), {tenant}, gen_random_uuid(), {req}, 'context', 'succeeded')`,
 	"tenant_settings":           `INSERT INTO request.tenant_settings (tenant_id) VALUES ({tenant})`,
 	"tenant_security_settings":  `INSERT INTO request.tenant_security_settings (tenant_id) VALUES ({tenant})`,
 }

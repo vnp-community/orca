@@ -21,7 +21,9 @@ type SetProjectEngineSettingsInput struct {
 	// PlanAutoGenerate nil keeps the stored value (true for a project without a row), so an older client that does not
 	// send it never flips the switch.
 	PlanAutoGenerate *bool
-	ExpectedVersion  int64
+	// OutcomeReview is off or manual; empty keeps the stored choice and "default" clears it so the deployment default applies again.
+	OutcomeReview   string
+	ExpectedVersion int64
 }
 
 // EngineSettingsView is a project's settings and, when asked for, whether its dev server can run what is switched on.
@@ -110,7 +112,7 @@ func (uc *ManageProjectEngineSettings) SetProjectEngineSettings(ctx context.Cont
 		return EngineSettingsView{}, domain.ErrEngineSettingsInvalid(err.Error())
 	}
 	s.SolutionAgent = in.SolutionAgent
-	if in.ExecutionMode == "" || in.PlanAutoGenerate == nil {
+	if in.ExecutionMode == "" || in.PlanAutoGenerate == nil || in.OutcomeReview == "" {
 		// An older client that does not know a field must not flip a project back to its default.
 		cur, found, err := uc.repo.Get(ctx, in.ProjectID)
 		if err != nil {
@@ -122,6 +124,9 @@ func (uc *ManageProjectEngineSettings) SetProjectEngineSettings(ctx context.Cont
 		if found && in.PlanAutoGenerate == nil {
 			s.PlanAutoGenerate = cur.PlanAutoGenerate
 		}
+		if found && in.OutcomeReview == "" {
+			s.OutcomeReview = cur.OutcomeReview
+		}
 	}
 	if in.ExecutionMode != "" {
 		mode, err := domain.ParseExecutionMode(in.ExecutionMode)
@@ -132,6 +137,15 @@ func (uc *ManageProjectEngineSettings) SetProjectEngineSettings(ctx context.Cont
 	}
 	if in.PlanAutoGenerate != nil {
 		s.PlanAutoGenerate = *in.PlanAutoGenerate
+	}
+	switch in.OutcomeReview {
+	case "":
+	case "default":
+		s.OutcomeReview = ""
+	case string(domain.OutcomeReviewOff), string(domain.OutcomeReviewManual):
+		s.OutcomeReview = domain.OutcomeReviewMode(in.OutcomeReview)
+	default:
+		return EngineSettingsView{}, domain.ErrEngineSettingsInvalid(fmt.Sprintf("outcome_review must be off, manual or default, got %q", in.OutcomeReview))
 	}
 
 	write := func(ctx context.Context) error {
@@ -145,7 +159,7 @@ func (uc *ManageProjectEngineSettings) SetProjectEngineSettings(ctx context.Cont
 		}
 		return uc.audit.Record(ctx, AuditEvent{
 			Action: domain.AuditEngineSettingsSet, TargetType: "project", TargetID: s.ProjectID, Outcome: "allowed",
-			Metadata: map[string]any{"solution_engine": string(s.Engine), "solution_agent": s.SolutionAgent, "execution_mode": string(s.ExecutionMode.OrDefault()), "plan_auto_generate": s.PlanAutoGenerate, "version": s.Version},
+			Metadata: map[string]any{"solution_engine": string(s.Engine), "solution_agent": s.SolutionAgent, "execution_mode": string(s.ExecutionMode.OrDefault()), "plan_auto_generate": s.PlanAutoGenerate, "outcome_review": string(s.OutcomeReview), "version": s.Version},
 		})
 	}
 	if uc.tx != nil {

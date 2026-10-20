@@ -94,6 +94,10 @@ const (
 	RequestService_PreviewContextPack_FullMethodName               = "/orca.request.v1.RequestService/PreviewContextPack"
 	RequestService_GetEvidence_FullMethodName                      = "/orca.request.v1.RequestService/GetEvidence"
 	RequestService_ListEvidence_FullMethodName                     = "/orca.request.v1.RequestService/ListEvidence"
+	RequestService_EstimateOutcomeReview_FullMethodName            = "/orca.request.v1.RequestService/EstimateOutcomeReview"
+	RequestService_GenerateOutcomeReview_FullMethodName            = "/orca.request.v1.RequestService/GenerateOutcomeReview"
+	RequestService_GetOutcomeReview_FullMethodName                 = "/orca.request.v1.RequestService/GetOutcomeReview"
+	RequestService_ListOutcomeReviews_FullMethodName               = "/orca.request.v1.RequestService/ListOutcomeReviews"
 	RequestService_EraseRequest_FullMethodName                     = "/orca.request.v1.RequestService/EraseRequest"
 	RequestService_ExportRequest_FullMethodName                    = "/orca.request.v1.RequestService/ExportRequest"
 	RequestService_ExportTenantRequests_FullMethodName             = "/orca.request.v1.RequestService/ExportTenantRequests"
@@ -194,6 +198,11 @@ type RequestServiceClient interface {
 	PreviewContextPack(ctx context.Context, in *PreviewContextPackRequest, opts ...grpc.CallOption) (*PreviewContextPackResponse, error)
 	GetEvidence(ctx context.Context, in *GetEvidenceRequest, opts ...grpc.CallOption) (*GetEvidenceResponse, error)
 	ListEvidence(ctx context.Context, in *ListEvidenceRequest, opts ...grpc.CallOption) (*ListEvidenceResponse, error)
+	// Outcome Review (CR-OR-001).
+	EstimateOutcomeReview(ctx context.Context, in *EstimateOutcomeReviewRequest, opts ...grpc.CallOption) (*EstimateOutcomeReviewResponse, error)
+	GenerateOutcomeReview(ctx context.Context, in *GenerateOutcomeReviewRequest, opts ...grpc.CallOption) (*GenerateOutcomeReviewResponse, error)
+	GetOutcomeReview(ctx context.Context, in *GetOutcomeReviewRequest, opts ...grpc.CallOption) (*GetOutcomeReviewResponse, error)
+	ListOutcomeReviews(ctx context.Context, in *ListOutcomeReviewsRequest, opts ...grpc.CallOption) (*ListOutcomeReviewsResponse, error)
 	// Security and compliance (CR-REQ-035), admin only.
 	EraseRequest(ctx context.Context, in *EraseRequestRequest, opts ...grpc.CallOption) (*EraseRequestResponse, error)
 	ExportRequest(ctx context.Context, in *ExportRequestRequest, opts ...grpc.CallOption) (*ExportRequestResponse, error)
@@ -958,6 +967,46 @@ func (c *requestServiceClient) ListEvidence(ctx context.Context, in *ListEvidenc
 	return out, nil
 }
 
+func (c *requestServiceClient) EstimateOutcomeReview(ctx context.Context, in *EstimateOutcomeReviewRequest, opts ...grpc.CallOption) (*EstimateOutcomeReviewResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EstimateOutcomeReviewResponse)
+	err := c.cc.Invoke(ctx, RequestService_EstimateOutcomeReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) GenerateOutcomeReview(ctx context.Context, in *GenerateOutcomeReviewRequest, opts ...grpc.CallOption) (*GenerateOutcomeReviewResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateOutcomeReviewResponse)
+	err := c.cc.Invoke(ctx, RequestService_GenerateOutcomeReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) GetOutcomeReview(ctx context.Context, in *GetOutcomeReviewRequest, opts ...grpc.CallOption) (*GetOutcomeReviewResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOutcomeReviewResponse)
+	err := c.cc.Invoke(ctx, RequestService_GetOutcomeReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) ListOutcomeReviews(ctx context.Context, in *ListOutcomeReviewsRequest, opts ...grpc.CallOption) (*ListOutcomeReviewsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListOutcomeReviewsResponse)
+	err := c.cc.Invoke(ctx, RequestService_ListOutcomeReviews_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *requestServiceClient) EraseRequest(ctx context.Context, in *EraseRequestRequest, opts ...grpc.CallOption) (*EraseRequestResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EraseRequestResponse)
@@ -1092,6 +1141,11 @@ type RequestServiceServer interface {
 	PreviewContextPack(context.Context, *PreviewContextPackRequest) (*PreviewContextPackResponse, error)
 	GetEvidence(context.Context, *GetEvidenceRequest) (*GetEvidenceResponse, error)
 	ListEvidence(context.Context, *ListEvidenceRequest) (*ListEvidenceResponse, error)
+	// Outcome Review (CR-OR-001).
+	EstimateOutcomeReview(context.Context, *EstimateOutcomeReviewRequest) (*EstimateOutcomeReviewResponse, error)
+	GenerateOutcomeReview(context.Context, *GenerateOutcomeReviewRequest) (*GenerateOutcomeReviewResponse, error)
+	GetOutcomeReview(context.Context, *GetOutcomeReviewRequest) (*GetOutcomeReviewResponse, error)
+	ListOutcomeReviews(context.Context, *ListOutcomeReviewsRequest) (*ListOutcomeReviewsResponse, error)
 	// Security and compliance (CR-REQ-035), admin only.
 	EraseRequest(context.Context, *EraseRequestRequest) (*EraseRequestResponse, error)
 	ExportRequest(context.Context, *ExportRequestRequest) (*ExportRequestResponse, error)
@@ -1330,6 +1384,18 @@ func (UnimplementedRequestServiceServer) GetEvidence(context.Context, *GetEviden
 }
 func (UnimplementedRequestServiceServer) ListEvidence(context.Context, *ListEvidenceRequest) (*ListEvidenceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListEvidence not implemented")
+}
+func (UnimplementedRequestServiceServer) EstimateOutcomeReview(context.Context, *EstimateOutcomeReviewRequest) (*EstimateOutcomeReviewResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EstimateOutcomeReview not implemented")
+}
+func (UnimplementedRequestServiceServer) GenerateOutcomeReview(context.Context, *GenerateOutcomeReviewRequest) (*GenerateOutcomeReviewResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateOutcomeReview not implemented")
+}
+func (UnimplementedRequestServiceServer) GetOutcomeReview(context.Context, *GetOutcomeReviewRequest) (*GetOutcomeReviewResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOutcomeReview not implemented")
+}
+func (UnimplementedRequestServiceServer) ListOutcomeReviews(context.Context, *ListOutcomeReviewsRequest) (*ListOutcomeReviewsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOutcomeReviews not implemented")
 }
 func (UnimplementedRequestServiceServer) EraseRequest(context.Context, *EraseRequestRequest) (*EraseRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EraseRequest not implemented")
@@ -2711,6 +2777,78 @@ func _RequestService_ListEvidence_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RequestService_EstimateOutcomeReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EstimateOutcomeReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).EstimateOutcomeReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_EstimateOutcomeReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).EstimateOutcomeReview(ctx, req.(*EstimateOutcomeReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_GenerateOutcomeReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateOutcomeReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).GenerateOutcomeReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_GenerateOutcomeReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).GenerateOutcomeReview(ctx, req.(*GenerateOutcomeReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_GetOutcomeReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOutcomeReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).GetOutcomeReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_GetOutcomeReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).GetOutcomeReview(ctx, req.(*GetOutcomeReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_ListOutcomeReviews_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOutcomeReviewsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).ListOutcomeReviews(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_ListOutcomeReviews_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).ListOutcomeReviews(ctx, req.(*ListOutcomeReviewsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RequestService_EraseRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EraseRequestRequest)
 	if err := dec(in); err != nil {
@@ -3064,6 +3202,22 @@ var RequestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListEvidence",
 			Handler:    _RequestService_ListEvidence_Handler,
+		},
+		{
+			MethodName: "EstimateOutcomeReview",
+			Handler:    _RequestService_EstimateOutcomeReview_Handler,
+		},
+		{
+			MethodName: "GenerateOutcomeReview",
+			Handler:    _RequestService_GenerateOutcomeReview_Handler,
+		},
+		{
+			MethodName: "GetOutcomeReview",
+			Handler:    _RequestService_GetOutcomeReview_Handler,
+		},
+		{
+			MethodName: "ListOutcomeReviews",
+			Handler:    _RequestService_ListOutcomeReviews_Handler,
 		},
 		{
 			MethodName: "EraseRequest",
