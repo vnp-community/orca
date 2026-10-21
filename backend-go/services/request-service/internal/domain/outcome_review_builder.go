@@ -59,12 +59,14 @@ type Facts struct {
 
 // ReviewBuildInput adds what an agent reported (already validated) and the pieces computed from it.
 type ReviewBuildInput struct {
-	Facts       Facts
-	AgentItems  []ReviewItem
-	KG          KGInfo
-	Diagrams    []DiagramRef
-	Arch        DesignVerdict
-	FlowVerdict DesignVerdict
+	Facts      Facts
+	AgentItems []ReviewItem
+	// DiagramItems are rows Orca derived from the checked after-code diagrams (DiagramFindingItems); they keep their fact origin.
+	DiagramItems []ReviewItem
+	KG           KGInfo
+	Diagrams     []DiagramRef
+	Arch         DesignVerdict
+	FlowVerdict  DesignVerdict
 	// ExtraWarnings are warnings of the context run (a design block ignored, an edge that differed from the parser).
 	ExtraWarnings []string
 	// Redact removes secrets from free text; nil means no redaction, which only tests use.
@@ -100,6 +102,7 @@ func BuildOutcomeReview(requestID string, in ReviewBuildInput) (OutcomeReview, e
 		}
 		items = append(items, it)
 	}
+	items = append(items, in.DiagramItems...)
 	if !in.KG.Available {
 		warnings = append(warnings, "kg_unavailable")
 	}

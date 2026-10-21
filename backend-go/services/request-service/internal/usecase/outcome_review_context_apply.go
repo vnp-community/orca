@@ -17,7 +17,7 @@ func (s *OutcomeReviewService) ApplyContext(ctx context.Context, req domain.Requ
 		refs = append(refs, m.Ref())
 	}
 	built, err := domain.BuildOutcomeReview(req.ID, domain.ReviewBuildInput{
-		Facts: col.Facts, AgentItems: vc.Items, KG: vc.KG, Diagrams: refs, Arch: vc.Arch, FlowVerdict: vc.Flow,
+		Facts: col.Facts, AgentItems: vc.Items, DiagramItems: domain.DiagramFindingItems(vc.Diagrams), KG: vc.KG, Diagrams: refs, Arch: vc.Arch, FlowVerdict: vc.Flow,
 		ExtraWarnings: vc.Warnings, Redact: s.Redact,
 	})
 	if err != nil {

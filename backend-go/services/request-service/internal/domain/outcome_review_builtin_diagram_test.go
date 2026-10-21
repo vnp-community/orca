@@ -154,3 +154,52 @@ func TestBuiltinDiagram_SequenceLanesFollowTheFirstMessage(t *testing.T) {
 		t.Fatalf("lanes are not in the order of the first messages")
 	}
 }
+
+func TestDiagramFindingItems_AMissingOrDeviatingArrowIsARowAndAnAdvisoryOneAsksNothing(t *testing.T) {
+	items := DiagramFindingItems([]DiagramModel{archModel(), seqModel()})
+	byTitle := map[string]ReviewItem{}
+	for _, it := range items {
+		byTitle[it.Title] = it
+	}
+	dev, ok := byTitle["CI runner (Jenkins/GHA/GitLab) → ms-gateway (http)"]
+	if !ok || dev.Origin != OriginFact || dev.Severity != SeverityDeviation || !dev.Advisory || dev.NeedsDecision || dev.Change != ChangeAdded {
+		t.Fatalf("a deviation on unapproved elements is a visible advisory row: %+v", dev)
+	}
+	miss, ok := byTitle["ms-gateway → ms-notify (http)"]
+	if !ok || miss.Change != ChangeMissing || !miss.NeedsDecision {
+		t.Fatalf("an arrow the design has and the code lacks asks for a decision: %+v", miss)
+	}
+	for _, it := range items {
+		if it.Key == "" || it.Section == "" {
+			t.Fatalf("incomplete row: %+v", it)
+		}
+	}
+	if len(DiagramFindingItems([]DiagramModel{func() DiagramModel { m := archModel(); m.Variant = DiagramVariantDesign; return m }()})) != 0 {
+		t.Fatal("the design variant has no findings")
+	}
+}
+
+func TestBuildOutcomeReview_DiagramRowsKeepTheirFactOriginAndAreNotCountedTwice(t *testing.T) {
+	rows := DiagramFindingItems([]DiagramModel{archModel()})
+	f := Facts{Phase: ReviewPhaseDelivered}
+	f.Subject.BaseRef = "main"
+	built, err := BuildOutcomeReview("r1", ReviewBuildInput{Facts: f, DiagramItems: rows, KG: KGInfo{Available: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, it := range built.Items {
+		if it.Section == SectionArchitecture && it.Origin == OriginFact && it.Severity == SeverityDeviation {
+			n++
+			if it.Unverified && len(it.Evidence) > 0 {
+				t.Errorf("a row with evidence must not be marked unverified: %+v", it)
+			}
+		}
+	}
+	if n != len(rows) || n == 0 {
+		t.Fatalf("rows in the review: %d, derived: %d", n, len(rows))
+	}
+	if built.Verdict.Architecture.ReportedDeviations != 0 {
+		t.Fatalf("the verdict counts arrows from the models, not from these rows: %+v", built.Verdict.Architecture)
+	}
+}
