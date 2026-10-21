@@ -13935,7 +13935,8 @@
             "errorNotApplicable": "这类计划无法通过请求来修订。",
             "errorNoChange": "智能体没有修改任何文档。请更准确地说明需要修改什么。",
             "errorBaseRefGone": "此请求的起始分支已不存在，因此无法修订计划。您输入的内容已保留。"
-          }
+          },
+          "testSpecNotReady": "测试规格尚未完成。完成后将开始执行。"
         },
         "approval": {
           "ApprovalInboxTab": {

@@ -107,7 +107,7 @@ func TestStartingTwiceStartsOnce(t *testing.T) {
 	}
 }
 
-func TestNothingHappensWhenTheLaneIsOffOrTheRequestIsNotExecuting(t *testing.T) {
+func TestNothingHappensWhenTheLaneIsOffOrThePlanHasNotBegun(t *testing.T) {
 	l := newLane()
 	l.enabled = false
 	if started, err := l.start().Execute(tsCtx(), tsRequest); started || err != nil || len(l.runs.rows) != 0 || len(l.agent.calls) != 0 {
@@ -115,10 +115,10 @@ func TestNothingHappensWhenTheLaneIsOffOrTheRequestIsNotExecuting(t *testing.T) 
 	}
 	l = newLane()
 	r := l.reqs.reqs[tsRequest]
-	r.Status = domain.RequestStatusAwaitingPlanApproval
+	r.Status = domain.RequestStatusAnalyzing // the lane starts with Plan generation, not before
 	l.reqs.reqs[tsRequest] = r
 	if started, _ := l.start().Execute(tsCtx(), tsRequest); started || len(l.runs.rows) != 0 || len(l.agent.calls) != 0 {
-		t.Fatalf("not executing: rows %d calls %v", len(l.runs.rows), l.agent.calls)
+		t.Fatalf("before planning: rows %d calls %v", len(l.runs.rows), l.agent.calls)
 	}
 }
 

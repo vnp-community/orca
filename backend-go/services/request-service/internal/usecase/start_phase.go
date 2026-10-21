@@ -43,6 +43,8 @@ type StartPhase struct {
 	Access *ExecutionAccess
 	Tx     TxRunner
 	Outbox OutboxWriter
+	// Join refuses the first Start while the test specs generated beside the Plan are not finished; nil disables it.
+	Join *TestSpecJoin
 }
 
 func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPhaseResult, error) {
@@ -69,6 +71,12 @@ func (uc *StartPhase) Execute(ctx context.Context, in StartPhaseInput) (StartPha
 		return StartPhaseResult{}, err
 	}
 	tree := domain.BuildExecutionTreeOf(req.PlanTaskID, tasks)
+	if uc.Join != nil && !executionBegun(tree) {
+		// The person pressed Start: say why nothing starts yet, before the Phase is claimed (a refused press leaves no trace).
+		if err := uc.Join.Enforce(ctx, req); err != nil {
+			return StartPhaseResult{}, err
+		}
+	}
 
 	if in.PhaseTaskID == "" {
 		return uc.startWholePlan(ctx, req, tasks, tree, in, actor)

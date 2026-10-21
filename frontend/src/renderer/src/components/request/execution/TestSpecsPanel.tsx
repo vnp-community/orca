@@ -20,6 +20,7 @@ import type { UseTestSpecsResult } from '../../../hooks/useTestSpecs'
 import type {
   TestSpecDocumentName,
   TestSpecRun,
+  TestSpecs,
   TestSpecStatus
 } from '../../../../../shared/request-testspec-types'
 
@@ -205,6 +206,32 @@ function RunSummary({
   )
 }
 
+/** What execution will do about the lane: it starts only when the Plan and the test specs have both finished. */
+function JoinLine({ testSpecs }: { testSpecs: TestSpecs }): React.JSX.Element | null {
+  const run = testSpecs.current
+  if (!run) {
+    return null
+  }
+  let text: string | null = null
+  if (testSpecs.join === 'wait') {
+    text = translate(`${T}join.wait`, 'Execution starts when the Plan and the test specs are both finished.')
+  } else if (testSpecs.join === 'stop') {
+    text = translate(
+      `${T}join.stop`,
+      'Execution is held until the test specs run again (the project requires them). Use Re-run.'
+    )
+  } else if (testSpecs.joinWarn) {
+    text = translate(`${T}join.warn`, 'Execution goes on without usable test specs ({{cause}}).', {
+      cause: testSpecs.joinCause || run.status
+    })
+  }
+  return text ? (
+    <p className="text-xs" data-testid="testspec-join">
+      {text}
+    </p>
+  ) : null
+}
+
 export type TestSpecsPanelProps = {
   requestId: string
   testSpecs: UseTestSpecsResult
@@ -254,12 +281,13 @@ export function TestSpecsPanel({
       <p className="text-xs text-muted-foreground">
         {translate(
           `${T}advisory`,
-          'Generated next to the code by tdd-agent. Advisory: it never blocks this Request.'
+          'Generated beside the Plan by tdd-agent, from the moment Plan generation starts. It never changes the Request status.'
         )}
       </p>
+      <JoinLine testSpecs={data} />
       {!run && (
         <p className="text-xs text-muted-foreground" data-testid="testspec-none">
-          {translate(`${T}none`, 'Starts when the Request begins executing.')}
+          {translate(`${T}none`, 'Starts together with Plan generation.')}
         </p>
       )}
       {(error || restartError) && (

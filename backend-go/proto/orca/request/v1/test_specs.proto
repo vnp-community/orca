@@ -46,6 +46,13 @@ message GetTestSpecsResponse {
   TestSpecRun current = 3;
   // Earlier attempts, newest first.
   repeated TestSpecRun history = 4;
+  // The join before execution (docs/integrate): gate is wait, require, warn or off; join is go, wait or stop (what execution does
+  // about the lane right now); join_warn is set when execution goes on although the test specs are not usable; join_cause is the
+  // reason code behind a wait that ran out or a lane that ended without test specs.
+  string gate = 5;
+  string join = 6;
+  bool join_warn = 7;
+  string join_cause = 8;
 }
 
 message StartTestSpecsRequest {

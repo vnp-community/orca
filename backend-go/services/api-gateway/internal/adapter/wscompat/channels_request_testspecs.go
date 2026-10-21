@@ -66,7 +66,15 @@ func (c requestChannels) registerTestSpecs(r *Registry) {
 			Enabled   bool              `json:"enabled"`
 			Current   *TestSpecRunView  `json:"current"`
 			History   []TestSpecRunView `json:"history"`
-		}{RequestID: resp.GetRequestId(), Enabled: resp.GetEnabled(), History: history}
+			// The join before execution: what execution does about the lane right now.
+			Gate      string `json:"gate"`
+			Join      string `json:"join"`
+			JoinWarn  bool   `json:"joinWarn"`
+			JoinCause string `json:"joinCause,omitempty"`
+		}{
+			RequestID: resp.GetRequestId(), Enabled: resp.GetEnabled(), History: history,
+			Gate: resp.GetGate(), Join: resp.GetJoin(), JoinWarn: resp.GetJoinWarn(), JoinCause: resp.GetJoinCause(),
+		}
 		if resp.GetCurrent() != nil {
 			v := testSpecRunViewOf(resp.GetCurrent())
 			out.Current = &v

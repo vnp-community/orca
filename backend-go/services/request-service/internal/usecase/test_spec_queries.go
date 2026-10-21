@@ -14,6 +14,8 @@ type TestSpecsView struct {
 	Enabled   bool
 	Current   *domain.TestSpecRun
 	History   []domain.TestSpecRun
+	// Join is what execution does about the lane right now; nil when the gate is not wired.
+	Join *TestSpecJoinView
 }
 
 // GetTestSpecs reads the state of the test-spec lane. It reads only the lane's own table.
@@ -21,6 +23,7 @@ type GetTestSpecs struct {
 	Requests RequestReader
 	Runs     TestSpecRunRepository
 	Settings TestSpecSettings
+	Join     *TestSpecJoin
 }
 
 func (uc *GetTestSpecs) Execute(ctx context.Context, requestID string) (TestSpecsView, error) {
@@ -46,6 +49,13 @@ func (uc *GetTestSpecs) Execute(ctx context.Context, requestID string) (TestSpec
 			continue
 		}
 		view.History = append(view.History, all[i])
+	}
+	if uc.Join != nil && view.Enabled {
+		j, err := uc.Join.View(ctx, req)
+		if err != nil {
+			return TestSpecsView{}, err
+		}
+		view.Join = &j
 	}
 	return view, nil
 }

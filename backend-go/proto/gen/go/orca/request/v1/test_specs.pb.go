@@ -237,7 +237,14 @@ type GetTestSpecsResponse struct {
 	// The attempt the screen shows; unset when the Request never had one.
 	Current *TestSpecRun `protobuf:"bytes,3,opt,name=current,proto3" json:"current,omitempty"`
 	// Earlier attempts, newest first.
-	History       []*TestSpecRun `protobuf:"bytes,4,rep,name=history,proto3" json:"history,omitempty"`
+	History []*TestSpecRun `protobuf:"bytes,4,rep,name=history,proto3" json:"history,omitempty"`
+	// The join before execution (docs/integrate): gate is wait, require, warn or off; join is go, wait or stop (what execution does
+	// about the lane right now); join_warn is set when execution goes on although the test specs are not usable; join_cause is the
+	// reason code behind a wait that ran out or a lane that ended without test specs.
+	Gate          string `protobuf:"bytes,5,opt,name=gate,proto3" json:"gate,omitempty"`
+	Join          string `protobuf:"bytes,6,opt,name=join,proto3" json:"join,omitempty"`
+	JoinWarn      bool   `protobuf:"varint,7,opt,name=join_warn,json=joinWarn,proto3" json:"join_warn,omitempty"`
+	JoinCause     string `protobuf:"bytes,8,opt,name=join_cause,json=joinCause,proto3" json:"join_cause,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -298,6 +305,34 @@ func (x *GetTestSpecsResponse) GetHistory() []*TestSpecRun {
 		return x.History
 	}
 	return nil
+}
+
+func (x *GetTestSpecsResponse) GetGate() string {
+	if x != nil {
+		return x.Gate
+	}
+	return ""
+}
+
+func (x *GetTestSpecsResponse) GetJoin() string {
+	if x != nil {
+		return x.Join
+	}
+	return ""
+}
+
+func (x *GetTestSpecsResponse) GetJoinWarn() bool {
+	if x != nil {
+		return x.JoinWarn
+	}
+	return false
+}
+
+func (x *GetTestSpecsResponse) GetJoinCause() string {
+	if x != nil {
+		return x.JoinCause
+	}
+	return ""
 }
 
 type StartTestSpecsRequest struct {
@@ -575,13 +610,18 @@ const file_orca_request_v1_test_specs_proto_rawDesc = "" +
 	"updated_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"4\n" +
 	"\x13GetTestSpecsRequest\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"\xbf\x01\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\"\xa3\x02\n" +
 	"\x14GetTestSpecsResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x18\n" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x126\n" +
 	"\acurrent\x18\x03 \x01(\v2\x1c.orca.request.v1.TestSpecRunR\acurrent\x126\n" +
-	"\ahistory\x18\x04 \x03(\v2\x1c.orca.request.v1.TestSpecRunR\ahistory\"6\n" +
+	"\ahistory\x18\x04 \x03(\v2\x1c.orca.request.v1.TestSpecRunR\ahistory\x12\x12\n" +
+	"\x04gate\x18\x05 \x01(\tR\x04gate\x12\x12\n" +
+	"\x04join\x18\x06 \x01(\tR\x04join\x12\x1b\n" +
+	"\tjoin_warn\x18\a \x01(\bR\bjoinWarn\x12\x1d\n" +
+	"\n" +
+	"join_cause\x18\b \x01(\tR\tjoinCause\"6\n" +
 	"\x15StartTestSpecsRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\"H\n" +

@@ -13935,7 +13935,8 @@
             "errorNotApplicable": "This kind of plan cannot be revised with a request.",
             "errorNoChange": "The agent did not change any document. Say more precisely what to change.",
             "errorBaseRefGone": "The branch this request starts from no longer exists, so the plan cannot be revised. Your text is kept."
-          }
+          },
+          "testSpecNotReady": "The test specs are not finished. Execution starts once they are."
         },
         "approval": {
           "ApprovalInboxTab": {

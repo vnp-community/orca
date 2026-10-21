@@ -99,7 +99,11 @@ type executionWiring struct {
 	// taskSync is filled by wirePlan, which owns the workspace the sync writes in; until then a succeeded task is only recorded.
 	taskSync *taskSyncSlot
 	// Actors picks the user an unattended action runs as (the Phase's starter, else the approver of the Plan); the test-spec lane uses the same one.
-	Actors  usecase.ExecutionActors
+	Actors usecase.ExecutionActors
+	// StartExecution is shared with the test-spec lane: when the lane finishes, a Request the join held can start.
+	StartExecution *usecase.StartExecution
+	// Join is the gate execution passes before its first dispatch; the screen reads it next to the test-spec lane.
+	Join    *usecase.TestSpecJoin
 	closers []func()
 }
 
@@ -154,9 +158,15 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	}
 	actors := &usecase.ApprovalExecutionActors{Approvals: ex.gateApprovals, PhaseStarts: ex.phaseStarts, Access: access}
 	w.Actors = actors
+	// Plan generation and the test-spec lane start together; the first code task of a Request waits for the lane (docs/integrate).
+	gate, _ := domain.ParseTestSpecGate(cfg.TestSpecGate)
+	join := &usecase.TestSpecJoin{
+		Runs: stores.testSpecRuns, Gate: gate, Timeout: cfg.TestSpecGateTimeout,
+		Settings: usecase.TestSpecSettingsFunc(func(context.Context, string) bool { return cfg.TestSpecEnabled }),
+	}
 	advance := &usecase.AdvanceExecution{
 		Requests: stores.requests, Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Policies: policies,
-		Approvals: opener, Settings: settings, Contract: contractRuns, Log: log,
+		Approvals: opener, Settings: settings, Contract: contractRuns, Join: join, Log: log,
 	}
 	evaluate := &usecase.EvaluateExecution{
 		Tasks: tasks.client, Outcomes: ex.outcomes, PhaseStarts: ex.phaseStarts, Checks: ex.checks, Approvals: ex.gateApprovals, Open: opener,
@@ -171,6 +181,8 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 		Requests: stores.requests, Evaluate: evaluate, Pinner: stores.executionModes,
 		Modes: &usecase.ExecutionModeResolver{Settings: stores.engineSettings, Defaults: stores.engineDefaults},
 	}
+	w.StartExecution = startExecution
+	w.Join = join
 	resume := &usecase.ResumeAfterGate{Requests: stores.requests, Evaluate: evaluate}
 	host, _ := os.Hostname()
 	reconcile := &usecase.ReconcileExecutingRequests{
@@ -181,6 +193,7 @@ func wireExecution(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 		StartPhase: &usecase.StartPhase{
 			Requests: stores.requests, Tasks: tasks.client, PhaseStarts: ex.phaseStarts, Approvals: ex.gateApprovals,
 			Authorizer: &usecase.ApprovalStartPhaseAuthorizer{Approvals: authorizer}, Advance: advance, Access: access, Tx: stores.tx, Outbox: stores.outboxWriter,
+			Join: join,
 		},
 		ReportOutcome: report,
 		RecordCheck: &usecase.RecordRequestCheck{

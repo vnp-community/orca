@@ -36,9 +36,24 @@ describe('parseTestSpecs', () => {
       requestId: '',
       enabled: false,
       current: null,
-      history: []
+      history: [],
+      gate: '',
+      join: 'go',
+      joinWarn: false,
+      joinCause: ''
     })
     expect(parseTestSpecs({ current: { status: 'weird' } }).current?.status).toBe('unknown')
+  })
+
+  it('reads the join before execution and falls back to go for anything else', () => {
+    expect(parseTestSpecs({ gate: 'require', join: 'stop', joinWarn: true, joinCause: 'X' })).toMatchObject({
+      gate: 'require',
+      join: 'stop',
+      joinWarn: true,
+      joinCause: 'X'
+    })
+    expect(parseTestSpecs({ join: 'wait' }).join).toBe('wait')
+    expect(parseTestSpecs({ join: 'maybe' }).join).toBe('go')
   })
 
   it('reads a document page', () => {

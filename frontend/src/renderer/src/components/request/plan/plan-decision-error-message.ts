@@ -43,6 +43,13 @@ export function planDecisionErrorMessage(failure: PlanDecisionFailure): string {
       "Couldn't start the run this way. Approve it normally."
     )
   }
+  // Execution waits for the test specs generated beside the Plan; the panel above the Plan shows their state.
+  if (code === 'REQUEST_TESTSPEC_NOT_READY') {
+    return translate(
+      `${P}testSpecNotReady`,
+      'The test specs are not finished. Execution starts once they are.'
+    )
+  }
   if (failure.errorClass === 'notApprover' || failure.errorClass === 'forbidden') {
     return translate(`${P}PlanApprovalBar.notApprover`, 'You are not allowed to approve this.')
   }

@@ -491,6 +491,9 @@ services:
       REQUEST_REVIEW_CONFIRM_COST: ${REQUEST_REVIEW_CONFIRM_COST:-}
       # Generates test specs with tdd-agent next to the code of an executing Request (docs/integrate/TDD-REQ-TESTSPEC-001); advisory, never blocks the Request.
       REQUEST_TESTSPEC_ENABLED: ${REQUEST_TESTSPEC_ENABLED:-false}
+      # Starts with Plan generation; the first code task waits for it: wait (default), require, warn or off (docs/integrate).
+      REQUEST_TESTSPEC_GATE: ${REQUEST_TESTSPEC_GATE:-wait}
+      REQUEST_TESTSPEC_GATE_TIMEOUT: ${REQUEST_TESTSPEC_GATE_TIMEOUT:-60m}
       # Shared secret issue-status-sync presents for LookupRequestBySource; empty refuses the call.
       SERVICE_INTERNAL_TOKEN: ${REQUEST_SERVICE_INTERNAL_TOKEN:-}
       # Gateway presents the same value as REQUEST_INTERNAL_CALLER_TOKEN; empty makes every RPC refuse.
