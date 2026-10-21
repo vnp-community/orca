@@ -10,6 +10,7 @@ import { expect } from '@playwright/test'
 import type { LiveFlow } from './live-flow-harness'
 import type { RequestUnderTest } from './live-flow-steps'
 import { reloadAndReopen } from './live-request-ui-steps'
+import { drawingsShowInTheArchitectureAndFlowTabs } from './ci-cd-kit-review-drawings'
 import {
   detailTabNames,
   openOutcomeReviewTab,
@@ -223,6 +224,7 @@ export async function reviewTheDelivery(f: LiveFlow, r: RequestUnderTest): Promi
       expect(text).not.toMatch(/REQUEST_REVIEW_[A-Z_]+/)
       expect(text).not.toMatch(/safe to release|ready to ship/i)
       await f.shots.take('review-delivered-after-code')
+      decisionsMade.push(...(await drawingsShowInTheArchitectureAndFlowTabs(f)))
     }
   )
 
