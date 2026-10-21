@@ -162,13 +162,60 @@ export async function chooseAndApproveSolutionOption(page: Page): Promise<string
   let testId = ''
   if ((await options.count()) > 0) {
     const recommended = options.filter({ hasText: 'Recommended' })
-    const pick = (await recommended.count()) > 0 ? recommended.first() : options.first()
+    const others = options.filter({ hasNotText: 'Recommended' })
+    // Why: a demanding user does not take the recommendation; choosing another option must ask for a reason of 10 characters or more.
+    const against = process.env.ORCA_E2E_DEMANDING === '1' && (await others.count()) > 0
+    const pick = against
+      ? others.first()
+      : (await recommended.count()) > 0
+        ? recommended.first()
+        : options.first()
     testId = (await pick.getAttribute('data-testid')) ?? ''
     await pick.click()
     await expect(pick).toHaveAttribute('aria-checked', 'true')
+    if (against) {
+      const approve = solutionApproveButton(page)
+      await expect(approve, 'against the recommendation, Approve waits for a reason').toBeDisabled()
+      await pane.getByRole('textbox').last().fill('too short')
+      await expect(approve, 'nine characters are not a reason').toBeDisabled()
+      await pane
+        .getByRole('textbox')
+        .last()
+        .fill('Chống trùng ở tầng dữ liệu an toàn hơn cho 200 hàng và chạy lại nhiều lần.')
+      await expect(approve).toBeEnabled()
+    }
   }
   await solutionApproveButton(page).click()
+  await confirmHighRiskChoiceIfAsked(page)
   return testId
+}
+
+/**
+ * A high-risk option is confirmed a second time by typing its title. A careful person first types something else (the button must
+ * stay off), then the title. Returns whether the dialog was there.
+ */
+export async function confirmHighRiskChoiceIfAsked(page: Page): Promise<boolean> {
+  const dialog = page.getByTestId('high-risk-decision-dialog')
+  if (!(await dialog.isVisible({ timeout: 6_000 }).catch(() => false))) {
+    return false
+  }
+  const label = await dialog.locator('label').first().innerText()
+  const title = /Type "(.*)" to confirm/.exec(label)?.[1] ?? ''
+  expect(title, 'the dialog names the option to type').not.toBe('')
+  expect(
+    await dialog.getByRole('listitem').count(),
+    'the dialog says why the choice is high risk'
+  ).toBeGreaterThan(0)
+  const input = dialog.getByRole('textbox')
+  await input.fill('xác nhận')
+  await expect(
+    dialog.getByRole('button', { name: 'Confirm choice' }),
+    'a wrong text cannot confirm'
+  ).toBeDisabled()
+  await input.fill(title)
+  await dialog.getByRole('button', { name: 'Confirm choice' }).click()
+  await expect(dialog).toBeHidden({ timeout: 30_000 })
+  return true
 }
 
 /** In the approvals inbox: the row of this request whose subject label matches (e.g. "Plan"). */

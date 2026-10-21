@@ -152,8 +152,11 @@ export function SolutionDecisionBar({
       rationale,
       ...riskGate.approveExtras
     })
-    if (outcome.needsConfirmation && outcome.decision) {
-      setPendingDecision(outcome.decision)
+    if (outcome.needsConfirmation) {
+      // The Decision may not come with the answer to choose: the list is read again and the dialog opens when it has it.
+      if (outcome.decision) {
+        setPendingDecision(outcome.decision)
+      }
       setConfirmOpen(true)
       decisions.refetch()
     }

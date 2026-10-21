@@ -19,9 +19,19 @@ import { parseDecision } from '../../../../../shared/request-artifact-parsers'
 import type { Decision } from '../../../../../shared/request-artifact-types'
 
 export type SolutionDecisionActions = {
-  choose: (p: { solutionId: string; optionId: string; comment?: string; rationale?: string }) => Promise<Result<unknown>>
+  choose: (p: {
+    solutionId: string
+    optionId: string
+    comment?: string
+    rationale?: string
+  }) => Promise<Result<unknown>>
   generate: (p?: { feedback?: string; idempotencyKey?: string }) => Promise<Result<unknown>>
-  approve: (p: { approval: Approval; comment?: string; viewedImpactDigest?: string; acceptedFindingIds?: string[] }) => Promise<Result<unknown>>
+  approve: (p: {
+    approval: Approval
+    comment?: string
+    viewedImpactDigest?: string
+    acceptedFindingIds?: string[]
+  }) => Promise<Result<unknown>>
   reject: (p: { approval: Approval; comment: string }) => Promise<Result<unknown>>
 }
 
@@ -33,7 +43,11 @@ export type DecisionOutcome = {
   decision?: Decision
 }
 
-export type ApproveExtras = { rationale?: string; viewedImpactDigest?: string; acceptedFindingIds?: string[] }
+export type ApproveExtras = {
+  rationale?: string
+  viewedImpactDigest?: string
+  acceptedFindingIds?: string[]
+}
 
 export type SolutionDecisionError = { errorClass: SolutionErrorClass; error: RequestRpcError }
 
@@ -49,7 +63,12 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null
 }
 
-export function useSolutionDecision({ solution, approval, actions, onSettled }: UseSolutionDecisionParams) {
+export function useSolutionDecision({
+  solution,
+  approval,
+  actions,
+  onSettled
+}: UseSolutionDecisionParams) {
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState<SolutionDecisionError | null>(null)
   const [chosenButNotApproved, setChosenButNotApproved] = useState(false)
@@ -63,11 +82,19 @@ export function useSolutionDecision({ solution, approval, actions, onSettled }: 
     (error: RequestRpcError, forApproval?: Approval | null): DecisionOutcome => {
       const errorClass = classifySolutionError(error)
       setFailure({ errorClass, error })
-      if (errorClass === 'conflict') {setConflicted(true)}
+      if (errorClass === 'conflict') {
+        setConflicted(true)
+      }
       if (errorClass === 'notApprover' && forApproval) {
         setDeniedApprovalIds((prev) => new Set(prev).add(forApproval.id))
       }
-      if (errorClass === 'conflict' || errorClass === 'alreadyDecided' || errorClass === 'expired') {onSettled()}
+      if (
+        errorClass === 'conflict' ||
+        errorClass === 'alreadyDecided' ||
+        errorClass === 'expired'
+      ) {
+        onSettled()
+      }
       return { ok: false, error }
     },
     [onSettled]
@@ -75,7 +102,9 @@ export function useSolutionDecision({ solution, approval, actions, onSettled }: 
 
   const run = useCallback(async (fn: () => Promise<DecisionOutcome>): Promise<DecisionOutcome> => {
     // Why: block double submits synchronously; state alone lags a render behind.
-    if (busy.current) {return { ok: false }}
+    if (busy.current) {
+      return { ok: false }
+    }
     busy.current = true
     setSubmitting(true)
     setFailure(null)
@@ -90,26 +119,49 @@ export function useSolutionDecision({ solution, approval, actions, onSettled }: 
   const approveSelected = useCallback(
     (optionId?: string, comment?: string, extras?: ApproveExtras): Promise<DecisionOutcome> =>
       run(async () => {
-        if (!approval) {return { ok: false }}
+        if (!approval) {
+          return { ok: false }
+        }
         let digest = approval.subjectDigest
         if (solution.kind === 'solution') {
-          if (!optionId) {return { ok: false }}
+          if (!optionId) {
+            return { ok: false }
+          }
           const done = choseRef.current
           const alreadyChosen = solution.chosenOptionId === optionId
           if (done && done.solutionId === solution.id && done.optionId === optionId) {
             digest = done.digest ?? digest
           } else if (!alreadyChosen) {
             const rationale = extras?.rationale?.trim()
-            const res = await actions.choose({ solutionId: solution.id, optionId, ...(rationale ? { rationale } : {}) })
-            if (!res.ok) {return fail(res.error, approval)}
+            const res = await actions.choose({
+              solutionId: solution.id,
+              optionId,
+              ...(rationale ? { rationale } : {})
+            })
+            if (!res.ok) {
+              return fail(res.error, approval)
+            }
             // choose returns the fresh digest that approve must echo back.
-            const fresh = isRecord(res.value) && typeof res.value.approvalDigest === 'string' ? res.value.approvalDigest : undefined
+            const fresh =
+              isRecord(res.value) && typeof res.value.approvalDigest === 'string'
+                ? res.value.approvalDigest
+                : undefined
             choseRef.current = { solutionId: solution.id, optionId, digest: fresh }
             digest = fresh ?? digest
             // Why: the Decision is written by `choose`; a high-risk one must be confirmed before approve.
             const recorded = isRecord(res.value) ? parseDecision(res.value.decision) : null
-            if (recorded && recorded.riskLevel === 'high' && recorded.status !== 'effective') {
-              return { ok: true, needsConfirmation: true, decision: recorded }
+            // Why: the gateway says it with `requiresConfirmation` and sends no Decision object; without this the dialog never opened and
+            // the high-risk choice could not be approved.
+            const required = isRecord(res.value) && res.value.requiresConfirmation === true
+            if (
+              (recorded && recorded.riskLevel === 'high' && recorded.status !== 'effective') ||
+              required
+            ) {
+              return {
+                ok: true,
+                needsConfirmation: true,
+                ...(recorded ? { decision: recorded } : {})
+              }
             }
           }
         }
@@ -117,7 +169,9 @@ export function useSolutionDecision({ solution, approval, actions, onSettled }: 
           approval: { ...approval, subjectDigest: digest },
           comment,
           ...(extras?.viewedImpactDigest ? { viewedImpactDigest: extras.viewedImpactDigest } : {}),
-          ...(extras?.acceptedFindingIds?.length ? { acceptedFindingIds: extras.acceptedFindingIds } : {})
+          ...(extras?.acceptedFindingIds?.length
+            ? { acceptedFindingIds: extras.acceptedFindingIds }
+            : {})
         })
         if (!res.ok) {
           setChosenButNotApproved(solution.kind === 'solution')
@@ -135,9 +189,13 @@ export function useSolutionDecision({ solution, approval, actions, onSettled }: 
   const reject = useCallback(
     (comment: string, regenerate: boolean): Promise<DecisionOutcome> =>
       run(async () => {
-        if (!approval) {return { ok: false }}
+        if (!approval) {
+          return { ok: false }
+        }
         const res = await actions.reject({ approval, comment })
-        if (!res.ok) {return fail(res.error, approval)}
+        if (!res.ok) {
+          return fail(res.error, approval)
+        }
         if (regenerate) {
           const gen = await actions.generate({
             feedback: clampFeedback(comment),
@@ -158,7 +216,9 @@ export function useSolutionDecision({ solution, approval, actions, onSettled }: 
     (): Promise<DecisionOutcome> =>
       run(async () => {
         const res = await actions.generate({ idempotencyKey: crypto.randomUUID() })
-        if (!res.ok) {return fail(res.error)}
+        if (!res.ok) {
+          return fail(res.error)
+        }
         onSettled()
         return { ok: true }
       }),
@@ -171,7 +231,8 @@ export function useSolutionDecision({ solution, approval, actions, onSettled }: 
     chosenButNotApproved,
     conflicted,
     acknowledgeConflict: () => setConflicted(false),
-    isDenied: (approvalId: string | undefined) => (approvalId ? deniedApprovalIds.has(approvalId) : false),
+    isDenied: (approvalId: string | undefined) =>
+      approvalId ? deniedApprovalIds.has(approvalId) : false,
     approveSelected,
     reject,
     regenerate

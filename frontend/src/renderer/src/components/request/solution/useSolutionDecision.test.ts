@@ -5,10 +5,28 @@ import { useSolutionDecision } from './useSolutionDecision'
 import type { SolutionDecisionActions } from './useSolutionDecision'
 import type { Approval, Solution } from '../../../../../shared/request-types'
 
-const solution: Solution = { id: 's1', requestId: 'r1', kind: 'solution', status: 'ready', options: [{ id: 'o1', title: 'A' }, { id: 'o2', title: 'B' }] }
-const approval = { id: 'ap1', requestId: 'r1', version: 4, subjectDigest: 'old', status: 'pending' } as Approval
+const solution: Solution = {
+  id: 's1',
+  requestId: 'r1',
+  kind: 'solution',
+  status: 'ready',
+  options: [
+    { id: 'o1', title: 'A' },
+    { id: 'o2', title: 'B' }
+  ]
+}
+const approval = {
+  id: 'ap1',
+  requestId: 'r1',
+  version: 4,
+  subjectDigest: 'old',
+  status: 'pending'
+} as Approval
 const ok = (value: unknown = {}) => ({ ok: true as const, value })
-const err = (code: string, kind = 'unknown') => ({ ok: false as const, error: { kind, code, message: `${code}: x` } as never })
+const err = (code: string, kind = 'unknown') => ({
+  ok: false as const,
+  error: { kind, code, message: `${code}: x` } as never
+})
 
 function setup(over: Partial<SolutionDecisionActions> = {}, sol = solution) {
   const actions: SolutionDecisionActions = {
@@ -19,7 +37,9 @@ function setup(over: Partial<SolutionDecisionActions> = {}, sol = solution) {
     ...over
   }
   const onSettled = vi.fn()
-  const hook = renderHook(() => useSolutionDecision({ solution: sol, approval, actions, onSettled }))
+  const hook = renderHook(() =>
+    useSolutionDecision({ solution: sol, approval, actions, onSettled })
+  )
   return { actions, onSettled, ...hook }
 }
 
@@ -53,7 +73,10 @@ describe('useSolutionDecision', () => {
   })
 
   it('conflict refetches and flags; not-approver is remembered per approval', async () => {
-    const approve = vi.fn().mockResolvedValueOnce(err('APPROVAL_VERSION_CONFLICT', 'conflict')).mockResolvedValueOnce(err('APPROVAL_NOT_APPROVER', 'unknown'))
+    const approve = vi
+      .fn()
+      .mockResolvedValueOnce(err('APPROVAL_VERSION_CONFLICT', 'conflict'))
+      .mockResolvedValueOnce(err('APPROVAL_NOT_APPROVER', 'unknown'))
     const { result, onSettled } = setup({ approve })
     await act(() => result.current.approveSelected('o1'))
     expect(result.current.conflicted).toBe(true)
@@ -73,7 +96,9 @@ describe('useSolutionDecision', () => {
   })
 
   it('failed reject does not regenerate', async () => {
-    const { result, actions } = setup({ reject: vi.fn().mockResolvedValue(err('APPROVAL_COMMENT_REQUIRED', 'validation')) })
+    const { result, actions } = setup({
+      reject: vi.fn().mockResolvedValue(err('APPROVAL_COMMENT_REQUIRED', 'validation'))
+    })
     const out = await act(() => result.current.reject('long enough reason', true))
     expect(out.ok).toBe(false)
     expect(actions.generate).not.toHaveBeenCalled()
@@ -81,31 +106,81 @@ describe('useSolutionDecision', () => {
 
   it('ignores a second submit while one is in flight', async () => {
     let release: (v: unknown) => void = () => {}
-    const approve = vi.fn().mockReturnValue(new Promise((r) => { release = r }))
+    const approve = vi.fn().mockReturnValue(
+      new Promise((r) => {
+        release = r
+      })
+    )
     const { result } = setup({ approve }, { ...solution, kind: 'diagnosis' })
     let first: Promise<unknown>
-    act(() => { first = result.current.approveSelected() })
-    await act(async () => { await result.current.approveSelected() })
+    act(() => {
+      first = result.current.approveSelected()
+    })
+    await act(async () => {
+      await result.current.approveSelected()
+    })
     expect(approve).toHaveBeenCalledTimes(1)
-    await act(async () => { release(ok()); await first })
+    await act(async () => {
+      release(ok())
+      await first
+    })
   })
 
   it('forwards the rationale to choose and stops before approve for a high-risk Decision', async () => {
     const decision = { id: 'd1', status: 'chosen', risk_level: 'high', version: 2 }
-    const { result, actions } = setup({ choose: vi.fn().mockResolvedValue(ok({ approvalDigest: 'fresh', decision })) })
+    const { result, actions } = setup({
+      choose: vi.fn().mockResolvedValue(ok({ approvalDigest: 'fresh', decision }))
+    })
     let outcome: Awaited<ReturnType<typeof result.current.approveSelected>> | undefined
-    await act(async () => { outcome = await result.current.approveSelected('o2', undefined, { rationale: '  because reasons  ' }) })
-    expect(actions.choose).toHaveBeenCalledWith({ solutionId: 's1', optionId: 'o2', rationale: 'because reasons' })
-    expect(outcome).toMatchObject({ ok: true, needsConfirmation: true, decision: { id: 'd1', riskLevel: 'high' } })
+    await act(async () => {
+      outcome = await result.current.approveSelected('o2', undefined, {
+        rationale: '  because reasons  '
+      })
+    })
+    expect(actions.choose).toHaveBeenCalledWith({
+      solutionId: 's1',
+      optionId: 'o2',
+      rationale: 'because reasons'
+    })
+    expect(outcome).toMatchObject({
+      ok: true,
+      needsConfirmation: true,
+      decision: { id: 'd1', riskLevel: 'high' }
+    })
     expect(actions.approve).not.toHaveBeenCalled()
     // After confirmation the retry must not call choose again and uses the remembered digest.
     await act(() => result.current.approveSelected('o2'))
     expect(actions.choose).toHaveBeenCalledTimes(1)
-    expect((actions.approve as ReturnType<typeof vi.fn>).mock.calls[0][0].approval.subjectDigest).toBe('fresh')
+    expect(
+      (actions.approve as ReturnType<typeof vi.fn>).mock.calls[0][0].approval.subjectDigest
+    ).toBe('fresh')
+  })
+
+  it('stops before approve when the gateway only says requiresConfirmation (it sends no Decision object)', async () => {
+    const { result, actions } = setup({
+      choose: vi
+        .fn()
+        .mockResolvedValue(
+          ok({ approvalDigest: 'fresh', decisionStatus: 'chosen', requiresConfirmation: true })
+        )
+    })
+    let outcome: Awaited<ReturnType<typeof result.current.approveSelected>> | undefined
+    await act(async () => {
+      outcome = await result.current.approveSelected('o2', undefined, {
+        rationale: 'because reasons'
+      })
+    })
+    expect(outcome).toMatchObject({ ok: true, needsConfirmation: true })
+    expect(outcome).not.toHaveProperty('decision')
+    expect(actions.approve).not.toHaveBeenCalled()
   })
 
   it('approves straight away for a normal-risk Decision', async () => {
-    const { result, actions } = setup({ choose: vi.fn().mockResolvedValue(ok({ decision: { id: 'd', status: 'chosen', risk_level: 'normal' } })) })
+    const { result, actions } = setup({
+      choose: vi
+        .fn()
+        .mockResolvedValue(ok({ decision: { id: 'd', status: 'chosen', risk_level: 'normal' } }))
+    })
     await act(() => result.current.approveSelected('o2'))
     expect(actions.approve).toHaveBeenCalled()
   })
