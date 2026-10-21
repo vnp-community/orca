@@ -20,6 +20,7 @@ const (
 	CodeReviewBudgetExceeded    = "REQUEST_REVIEW_BUDGET_EXCEEDED"
 	CodeReviewStaleRevision     = "REQUEST_REVIEW_STALE_REVISION"
 	CodeReviewDecisionsOpen     = "REQUEST_REVIEW_DECISIONS_OPEN"
+	CodeReviewContextFailed     = "REQUEST_REVIEW_CONTEXT_FAILED"
 	CodeReviewDecisionInvalid   = "REQUEST_REVIEW_DECISION_INVALID"
 	CodeReviewArtifactNotFound  = "REQUEST_REVIEW_ARTIFACT_NOT_FOUND"
 	CodeReviewArtifactCorrupt   = "REQUEST_REVIEW_ARTIFACT_CORRUPT"
@@ -90,6 +91,11 @@ func ErrReviewStaleRevision() error {
 func ErrReviewDecisionsOpen(n int) error {
 	return apperrors.New(apperrors.KindFailedPrecondition, CodeReviewDecisionsOpen,
 		fmt.Sprintf("%d decision(s) still need an answer before the review can be approved", n), nil)
+}
+
+func ErrReviewContextFailed() error {
+	return apperrors.New(apperrors.KindFailedPrecondition, CodeReviewContextFailed,
+		"the agent run that reads the design and the code failed, so the review holds only measured facts; run it again before approving", nil)
 }
 
 func ErrReviewDecisionInvalid(reason string) error {

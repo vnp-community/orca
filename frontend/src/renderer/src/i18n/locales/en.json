@@ -14999,6 +14999,7 @@
             "agentTooOld": "The dev server's agent is too old for the review. Update it and try again.",
             "budgetExceeded": "The AI budget for reviews is used up.",
             "confirmCost": "This costs more than the limit. Confirm to go on.",
+            "contextFailed": "The agent run that reads the design and the code failed. Run it again before approving.",
             "decisionInvalid": "That decision cannot be recorded.",
             "decisionsOpen": "Some decisions are still open.",
             "disabled": "The Outcome review is turned off for this project.",

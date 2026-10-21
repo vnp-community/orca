@@ -14999,6 +14999,7 @@
             "agentTooOld": "开发服务器上的智能体版本过旧，无法进行评审。请更新后重试。",
             "budgetExceeded": "评审用的 AI 预算已用完。",
             "confirmCost": "成本超过上限。请确认后继续。",
+            "contextFailed": "读取设计和代码的智能体运行失败。请在批准前重新运行。",
             "decisionInvalid": "无法记录该决定。",
             "decisionsOpen": "仍有未决事项。",
             "disabled": "此项目已关闭成果评审。",

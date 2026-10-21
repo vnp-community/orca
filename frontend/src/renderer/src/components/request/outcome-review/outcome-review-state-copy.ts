@@ -94,6 +94,11 @@ export function errorText(code: string | undefined): string {
       )
     case 'REQUEST_REVIEW_DECISIONS_OPEN':
       return translate(`${T}error.decisionsOpen`, 'Some decisions are still open.')
+    case 'REQUEST_REVIEW_CONTEXT_FAILED':
+      return translate(
+        `${T}error.contextFailed`,
+        'The agent run that reads the design and the code failed. Run it again before approving.'
+      )
     case 'REQUEST_REVIEW_DECISION_INVALID':
       return translate(`${T}error.decisionInvalid`, 'That decision cannot be recorded.')
     case 'REQUEST_FORBIDDEN':

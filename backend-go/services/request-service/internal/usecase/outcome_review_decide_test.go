@@ -253,6 +253,39 @@ func TestApprove_OnlyWhenNothingIsOpenAndTheServerSaysSo(t *testing.T) {
 	}
 }
 
+// A review whose newest agent run failed holds only measured facts: it cannot be approved until a run succeeds.
+func TestApprove_RefusedWhileTheNewestContextRunFailed(t *testing.T) {
+	e := newDecideEnv(t)
+	e.svc.Runs = e.runs
+	if _, err := e.decide(t, e.breaking, domain.DecisionSendBack, ""); err != nil {
+		t.Fatal(err)
+	}
+	endRun := func(status ReviewRunStatus, code string) {
+		t.Helper()
+		run, err := e.svc.Runs.Start(e.ctx, ReviewRun{ID: uuid.NewString(), ReviewID: e.review.Stored.ID, RequestID: e.req.ID, Kind: ReviewRunContext, Status: ReviewRunRunning})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := e.svc.Runs.Finish(e.ctx, run.ID, status, code, ""); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	approve := func() error {
+		e.refresh(t)
+		_, err := e.decider.Approve(e.ctx, ApproveInput{RequestID: e.req.ID, ReviewID: e.review.Stored.ID, ExpectedVersion: e.review.Stored.Version, ApprovedBy: uuid.NewString()})
+		return err
+	}
+	endRun(ReviewRunFailed, domain.CodeReviewResultInvalid)
+	if err := approve(); !codeIs(err, domain.CodeReviewContextFailed) {
+		t.Fatalf("a failed agent run must block the approval: %v", err)
+	}
+	endRun(ReviewRunSucceeded, "")
+	if err := approve(); err != nil {
+		t.Fatalf("a later run that succeeded lifts the block: %v", err)
+	}
+}
+
 func TestDecideAndApprove_NotBeforeCodeAndNotOnAStaleReview(t *testing.T) {
 	d := newDrawEnv(t, domain.RequestStatusExecuting) // a design review
 	d.ctx = tenant.WithRole(tenant.WithUserID(d.ctx, uuid.NewString()), "admin")

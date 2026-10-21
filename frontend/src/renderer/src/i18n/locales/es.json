@@ -14999,6 +14999,7 @@
             "agentTooOld": "El agente del servidor de desarrollo es demasiado antiguo para la revisión. Actualízalo e inténtalo de nuevo.",
             "budgetExceeded": "Se agotó el presupuesto de IA para revisiones.",
             "confirmCost": "Esto cuesta más que el límite. Confirma para continuar.",
+            "contextFailed": "Falló la ejecución del agente que lee el diseño y el código. Ejecútala de nuevo antes de aprobar.",
             "decisionInvalid": "No se puede registrar esa decisión.",
             "decisionsOpen": "Aún hay decisiones abiertas.",
             "disabled": "La revisión de resultados está desactivada para este proyecto.",

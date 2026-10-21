@@ -146,6 +146,11 @@ func (d *ReviewDecider) Approve(ctx context.Context, in ApproveInput) (StoredRev
 	if open := domain.OpenDecisions(review, inForce); len(open) > 0 {
 		return StoredReview{}, domain.ErrReviewDecisionsOpen(len(open))
 	}
+	if failed, err := d.lastContextRunFailed(ctx, st.ID); err != nil {
+		return StoredReview{}, err
+	} else if failed {
+		return StoredReview{}, domain.ErrReviewContextFailed()
+	}
 	approved, err := d.Service.Reviews.Approve(ctx, st.ID, in.ApprovedBy, note, st.Version)
 	if err != nil {
 		return StoredReview{}, err
@@ -153,6 +158,25 @@ func (d *ReviewDecider) Approve(ctx context.Context, in ApproveInput) (StoredRev
 	d.Service.Events.Publish(ctx, domain.SubjectReviewDecided, ReviewEventPayload{RequestID: st.RequestID, ReviewID: st.ID, Phase: string(st.Phase), ActorID: in.ApprovedBy, Approved: true})
 	d.audit(ctx, domain.AuditReviewApprove, st, map[string]any{"has_note": note != "", "inputs_digest": st.InputsDigest})
 	return approved, nil
+}
+
+// lastContextRunFailed is true when the newest context run of the review ended in failure: what the person would approve is then
+// only the facts Orca measured, not what the agent was meant to read. A review that never ran the agent (no graph) is not blocked.
+func (d *ReviewDecider) lastContextRunFailed(ctx context.Context, reviewID string) (bool, error) {
+	if d.Service.Runs == nil {
+		return false, nil
+	}
+	runs, err := d.Service.Runs.ListByReview(ctx, reviewID)
+	if err != nil {
+		return false, err
+	}
+	var latest *ReviewRun
+	for i := range runs {
+		if runs[i].Kind == ReviewRunContext && (latest == nil || runs[i].StartedAt.After(latest.StartedAt)) {
+			latest = &runs[i]
+		}
+	}
+	return latest != nil && latest.Status == ReviewRunFailed, nil
 }
 
 // Decisions are the decisions in force for the review with the orphaned ones marked, and how many items still wait.
