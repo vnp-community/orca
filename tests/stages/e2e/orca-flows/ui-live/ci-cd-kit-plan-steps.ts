@@ -22,8 +22,8 @@ import { detailPane, openDetailTab } from './live-request-ui-steps'
 import { findSecrets, loadSecretCatalog } from './live-secret-leak-scan'
 import { expectScreenFollowsService } from './live-status-sync'
 
-const MAX_LEAF_TASKS = 16
-const PLAN_TASK_TYPES = ['plan', 'phase', 'task', 'bug', 'feature', 'epic']
+export const MAX_LEAF_TASKS = 16
+export const PLAN_TASK_TYPES = ['plan', 'phase', 'task', 'bug', 'feature', 'epic']
 
 export type AutoPlanSeen = {
   generateSeen: boolean

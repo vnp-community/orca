@@ -24,6 +24,7 @@ import {
 } from './live-request-ui-steps'
 import { outcomeReviewTab, reviewTab } from './live-outcome-review-steps'
 import { requestState } from './live-gateway-crosschecks'
+import { MAX_LEAF_TASKS, PLAN_TASK_TYPES } from './ci-cd-kit-plan-steps'
 
 export const demanding = (): boolean => process.env.ORCA_E2E_DEMANDING === '1'
 
@@ -101,6 +102,38 @@ export async function demandPlanChangesWhenPossible(
     return
   }
   await demandPlanChanges(f, r, record)
+  await demandSmallerPlanIfTooBig(f, r, record)
+}
+
+/** A demanding user also pushes back on a plan that has grown: too many tasks is not what was asked for. */
+export async function demandSmallerPlanIfTooBig(
+  f: LiveFlow,
+  r: RequestUnderTest,
+  record: DemandRecord[]
+): Promise<void> {
+  const res = await f.rpc.call<{ tasks?: { type?: string }[] }>('task.list', {
+    projectId: f.project.id,
+    requestId: r.requestId,
+    taskTypes: PLAN_TASK_TYPES,
+    pageSize: 100
+  })
+  const leaves = (res.tasks ?? []).filter(
+    (t) => !['plan', 'phase'].includes(String(t.type ?? ''))
+  ).length
+  if (leaves <= MAX_LEAF_TASKS) {
+    return
+  }
+  const text = [
+    `Bây giờ có ${leaves} task: quá nhiều cho một yêu cầu cỡ M. Gộp lại còn tối đa ${MAX_LEAF_TASKS} task.`,
+    'Vẫn giữ ba bước chống trùng khi nhập Sheet và task test cho 200 hàng; gộp các task tài liệu, cấu hình và kiểm thử nhỏ lại với nhau.'
+  ].join('\n')
+  const previous = await openPlanApprovals(f, r.requestId)
+  await revisePlan(f, r, { text, version: 3, previousApprovals: previous })
+  record.push({
+    what: 'plan demands (too many tasks)',
+    versions: 3,
+    note: `the plan had ${leaves} working tasks and was sent back to be merged`
+  })
 }
 
 /** The Plan is on screen and waiting: send it back once, open the first version (it must be read-only), come back. */
