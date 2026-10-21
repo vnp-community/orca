@@ -27,7 +27,8 @@ Thiếu KG thì review vẫn có phần dữ kiện của Orca và nói rõ `kg_
 | `REQUEST_DEFAULT_OUTCOME_REVIEW` | `off` | `off` hoặc `manual`, cho project chưa lưu lựa chọn. Lựa chọn đã lưu của project luôn thắng |
 | `REQUEST_REVIEW_KILL_SWITCH` | `false` | `true`: ẩn tab, mọi RPC review trả `REQUEST_REVIEW_DISABLED`; **không xoá dữ liệu** |
 | `REQUEST_REVIEW_DRAW_ENABLED` | `true` | `false`: chỉ chữ và bảng, không bao giờ khởi chạy lượt vẽ |
-| `REQUEST_REVIEW_DRAW_ENGINE` | `builtin` | Ai vẽ hình: `builtin` (Orca tự bố trí mô hình đã kiểm tra thành SVG: miễn phí, tức thì, không cần dev server hay skill), `agent` (agent chỉ-đọc dùng skill `diagram-design`, cần skill trên dev server), `auto` (agent khi chạy được, không thì `builtin`) |
+| `REQUEST_REVIEW_DRAW_ENGINE` | `auto` | Ai vẽ hình: `auto` (mặc định: skill `diagram-design` đã vendor khi dev server có skill, không thì Orca tự vẽ), `agent` (chỉ skill; không có skill thì không vẽ), `builtin` (chỉ Orca tự vẽ: miễn phí, tức thì, không cần dev server hay skill) |
+| `REQUEST_REVIEW_DRAW_SKILL_SHA` | rỗng | 16 ký tự đầu của sha256 `SKILL.md` mà dev server phải có. Rỗng = bản đã vendor (`1cad611bfe734dc9`); `any` = chấp nhận bản đang cài |
 | `REQUEST_REVIEW_CONTEXT_TTL` | 168h | thời gian dùng lại một kết quả context đã kiểm (1h–2160h) |
 | `REQUEST_REVIEW_CONTEXT_TIMEOUT` | 10m | một lượt context (1m–15m; agent tự dừng lượt ở 15 phút) |
 | `REQUEST_REVIEW_CONTEXT_MAX_FILES` | 60 | số tệp agent được mở trong một lượt (5–400) |
@@ -99,3 +100,15 @@ Ngưỡng số **chưa được đặt**: đo trên 10 Request thử trước kh
 Prometheus của `request-service`: `request_review_context_lookups_total{result}` (tỉ lệ trúng bộ nhớ đệm), `request_review_artifact_lookups_total{result}`, `request_review_run_duration_seconds{kind,result}`, `request_review_tokens_total{kind,direction}` (chỉ khi agent báo), `request_review_cost_estimate_error_ratio{kind}`, `request_review_diagrams_total{result}`, `request_review_draw_failures_total{error_code}`, `request_review_regenerations_total{reason}`, `request_review_time_to_first_facts_seconds`, `request_review_agent_items_total{verified}`, `request_review_design_reviewed_ratio`.
 
 Log có `audit=true` cho sinh, sinh lại, quyết định, duyệt, kèm `inputs_digest`, **không có nội dung**. Sự kiện outbox: `orca.request.review.generated|artifact_regenerated|decided|progress` (chỉ có id và enum); gateway đẩy `request.event` với `eventType` `review.changed` hoặc `review.progress`.
+
+## Skill `diagram-design` (bên thứ ba, đã vendor)
+
+Nguồn: `cathrynlavery/diagram-design` (MIT), commit `f2f4d49ea8d632f17cf196ba26599277a93f767b`, bản chép trong `skills/diagram-design/` (xem `NOTICE`: bỏ các script xuất/nhập cần chạy lệnh, thay bảng màu bằng hồ sơ `orca-default` để cổng style guide không hỏi người dùng). Kiểm nguyên vẹn: `cd skills/diagram-design && shasum -a 256 -c MANIFEST.sha256`.
+
+Cài lên dev server (một lần, trên máy chạy agent):
+
+```bash
+mkdir -p ~/.claude/skills && cp -R skills/diagram-design ~/.claude/skills/
+```
+
+Agent báo skill đã cài khi kết nối lại; không cài thì `REQUEST_REVIEW_DRAW_ENGINE=auto` tự vẽ bằng engine dựng sẵn của Orca. Cập nhật skill: chép lại bản upstream mới, làm lại các thay đổi trong `NOTICE`, tạo lại `MANIFEST.sha256`, cập nhật `VendoredDiagramDesignSHA` (hoặc đặt `REQUEST_REVIEW_DRAW_SKILL_SHA`).

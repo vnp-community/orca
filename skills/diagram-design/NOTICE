@@ -1,0 +1,14 @@
+# NOTICE
+
+`skills/diagram-design/` is a vendored copy of the **diagram-design** skill by Cathryn Lavery (MIT, see `LICENSE`, and `THIRD_PARTY_LICENSES.md` for the icon sets it bundles).
+
+- Upstream: https://github.com/cathrynlavery/diagram-design
+- Commit: `f2f4d49ea8d632f17cf196ba26599277a93f767b` (2026-10-20, plugin manifests 2.6.115, skill version 2.6)
+
+Changes made by Orca (everything else is byte-for-byte upstream; `MANIFEST.sha256` lists every file as vendored):
+
+- Removed: `scripts/export_png.py` (needs Playwright), `scripts/export_svg.py`, and the draw.io, Excalidraw and Mermaid importers (`scripts/*_extract.py`): the review draws read-only and never runs a script. `scripts/self_check.py` is kept.
+- Removed: the example gallery for the types Orca does not draw (about 5 MB). Kept: the templates and the examples of architecture-delta, sequence, state and db-schema.
+- `references/style-guide.md`: the semantic-role colours are Orca's neutral palette and a profile header (`orca-default`) is prepended, so the first-run style gate does not stop to ask a person. The viewer paints every colour from Orca's theme variables anyway.
+
+Refresh: re-clone upstream at the new commit, repeat these changes, regenerate `MANIFEST.sha256` and set `PinnedDiagramDesignSHA` (see docs/guides/request/outcome-review-setup.md).

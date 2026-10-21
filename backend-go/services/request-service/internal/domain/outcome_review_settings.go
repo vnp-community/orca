@@ -41,9 +41,13 @@ type OutcomeReviewConfig struct {
 	ConfirmCostUSD float64
 	// DrawDisabled turns drawing off for the whole deployment (REQUEST_REVIEW_DRAW_ENABLED=false): the review is text and tables only.
 	DrawDisabled bool
-	// DrawEngine says who draws the diagrams: "builtin" (Orca lays the checked model out itself: free, instant, needs no dev server or
-	// skill), "agent" (a read-only agent with the diagram-design skill) or "auto" (the agent when it can run, else builtin).
+	// DrawEngine says who draws the diagrams: "agent" (a read-only agent with the diagram-design skill), "builtin" (Orca lays the
+	// checked model out itself: free, instant, needs no dev server or skill) or "auto", the default (the agent when it can run, else
+	// builtin).
 	DrawEngine string
+	// DrawSkillSHA pins the diagram-design SKILL.md a dev server must have (REQUEST_REVIEW_DRAW_SKILL_SHA): empty is the vendored
+	// one, "any" accepts whatever is installed.
+	DrawSkillSHA string
 }
 
 const (
@@ -52,13 +56,30 @@ const (
 	DrawEngineAuto    = "auto"
 )
 
-// DrawEngineOrDefault is the engine in force; builtin when nothing valid was set, because it always works and never guesses.
+// DrawEngineOrDefault is the engine in force. The default is auto: the vendored diagram-design skill when a dev server has it, and
+// Orca's own drawing when no agent can draw, so a review always has its pictures.
 func (c OutcomeReviewConfig) DrawEngineOrDefault() string {
 	switch c.DrawEngine {
-	case DrawEngineAgent, DrawEngineAuto:
+	case DrawEngineBuiltin, DrawEngineAgent:
 		return c.DrawEngine
 	}
-	return DrawEngineBuiltin
+	return DrawEngineAuto
+}
+
+// VendoredDiagramDesignSHA is the hash prefix an agent reports for the SKILL.md vendored in skills/diagram-design (upstream
+// cathrynlavery/diagram-design, see its NOTICE). A dev server whose skill differs is treated as not having the skill.
+const VendoredDiagramDesignSHA = "1cad611bfe734dc9"
+
+// EffectiveDrawSkillSHA is the SKILL.md hash a draw run accepts: the vendored one, another one the deployment pins, or "" (any
+// installed version, REQUEST_REVIEW_DRAW_SKILL_SHA=any).
+func (c OutcomeReviewConfig) EffectiveDrawSkillSHA() string {
+	switch strings.ToLower(strings.TrimSpace(c.DrawSkillSHA)) {
+	case "":
+		return VendoredDiagramDesignSHA
+	case "any":
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(c.DrawSkillSHA))
 }
 
 const (
@@ -154,7 +175,15 @@ func OutcomeReviewConfigFromEnv(getenv func(string) string) (OutcomeReviewConfig
 	case DrawEngineBuiltin, DrawEngineAgent, DrawEngineAuto:
 		c.DrawEngine = raw
 	default:
-		warnings = append(warnings, "REQUEST_REVIEW_DRAW_ENGINE "+strconv.Quote(raw)+" is not builtin, agent or auto; builtin is used")
+		warnings = append(warnings, "REQUEST_REVIEW_DRAW_ENGINE "+strconv.Quote(raw)+" is not builtin, agent or auto; auto is used")
+	}
+	switch raw := strings.ToLower(strings.TrimSpace(getenv("REQUEST_REVIEW_DRAW_SKILL_SHA"))); {
+	case raw == "" || raw == "any":
+		c.DrawSkillSHA = raw
+	case len(raw) == 16 && strings.Trim(raw, "0123456789abcdef") == "":
+		c.DrawSkillSHA = raw
+	default:
+		warnings = append(warnings, "REQUEST_REVIEW_DRAW_SKILL_SHA "+strconv.Quote(raw)+" is not 16 hex characters or any; the vendored skill is pinned")
 	}
 	if d, ok, w := envDuration(getenv, "REQUEST_REVIEW_CONTEXT_TTL", time.Hour, 90*24*time.Hour); w != "" {
 		warnings = append(warnings, w)

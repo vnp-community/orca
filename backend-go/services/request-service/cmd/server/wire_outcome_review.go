@@ -18,6 +18,7 @@ func loadOutcomeReviewConfig(log *slog.Logger) domain.OutcomeReviewConfig {
 	for _, w := range warnings {
 		log.Warn(w)
 	}
+	domain.PinnedDiagramDesignSHA = cfg.EffectiveDrawSkillSHA()
 	return cfg
 }
 
