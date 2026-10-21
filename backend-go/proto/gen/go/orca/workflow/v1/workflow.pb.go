@@ -2687,6 +2687,452 @@ func (x *ListExecutionsResponse) GetNextCursor() string {
 	return ""
 }
 
+// StepApproval is one decision a workflow step waits for. subject_json and decision_json are the step's own JSON; decision_hash is
+// the hash of the decision the person was shown, and a resolve must send it back.
+type StepApproval struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ExecutionId   string                 `protobuf:"bytes,2,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	StepId        string                 `protobuf:"bytes,3,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
+	ProjectId     string                 `protobuf:"bytes,4,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	Kind          string                 `protobuf:"bytes,5,opt,name=kind,proto3" json:"kind,omitempty"`
+	SubjectJson   string                 `protobuf:"bytes,6,opt,name=subject_json,json=subjectJson,proto3" json:"subject_json,omitempty"`
+	DecisionJson  string                 `protobuf:"bytes,7,opt,name=decision_json,json=decisionJson,proto3" json:"decision_json,omitempty"`
+	DecisionHash  string                 `protobuf:"bytes,8,opt,name=decision_hash,json=decisionHash,proto3" json:"decision_hash,omitempty"`
+	Status        string                 `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"` // pending | approved | rejected | superseded
+	ResolvedBy    string                 `protobuf:"bytes,10,opt,name=resolved_by,json=resolvedBy,proto3" json:"resolved_by,omitempty"`
+	Rationale     string                 `protobuf:"bytes,11,opt,name=rationale,proto3" json:"rationale,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	ResolvedAt    *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=resolved_at,json=resolvedAt,proto3" json:"resolved_at,omitempty"` // unset while pending
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StepApproval) Reset() {
+	*x = StepApproval{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StepApproval) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StepApproval) ProtoMessage() {}
+
+func (x *StepApproval) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StepApproval.ProtoReflect.Descriptor instead.
+func (*StepApproval) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *StepApproval) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *StepApproval) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *StepApproval) GetStepId() string {
+	if x != nil {
+		return x.StepId
+	}
+	return ""
+}
+
+func (x *StepApproval) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *StepApproval) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *StepApproval) GetSubjectJson() string {
+	if x != nil {
+		return x.SubjectJson
+	}
+	return ""
+}
+
+func (x *StepApproval) GetDecisionJson() string {
+	if x != nil {
+		return x.DecisionJson
+	}
+	return ""
+}
+
+func (x *StepApproval) GetDecisionHash() string {
+	if x != nil {
+		return x.DecisionHash
+	}
+	return ""
+}
+
+func (x *StepApproval) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *StepApproval) GetResolvedBy() string {
+	if x != nil {
+		return x.ResolvedBy
+	}
+	return ""
+}
+
+func (x *StepApproval) GetRationale() string {
+	if x != nil {
+		return x.Rationale
+	}
+	return ""
+}
+
+func (x *StepApproval) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *StepApproval) GetResolvedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ResolvedAt
+	}
+	return nil
+}
+
+type ListStepApprovalsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	ExecutionId   string                 `protobuf:"bytes,2,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListStepApprovalsRequest) Reset() {
+	*x = ListStepApprovalsRequest{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListStepApprovalsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListStepApprovalsRequest) ProtoMessage() {}
+
+func (x *ListStepApprovalsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListStepApprovalsRequest.ProtoReflect.Descriptor instead.
+func (*ListStepApprovalsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ListStepApprovalsRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *ListStepApprovalsRequest) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+type ListStepApprovalsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Approvals     []*StepApproval        `protobuf:"bytes,1,rep,name=approvals,proto3" json:"approvals,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListStepApprovalsResponse) Reset() {
+	*x = ListStepApprovalsResponse{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListStepApprovalsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListStepApprovalsResponse) ProtoMessage() {}
+
+func (x *ListStepApprovalsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListStepApprovalsResponse.ProtoReflect.Descriptor instead.
+func (*ListStepApprovalsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ListStepApprovalsResponse) GetApprovals() []*StepApproval {
+	if x != nil {
+		return x.Approvals
+	}
+	return nil
+}
+
+type GetStepApprovalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetStepApprovalRequest) Reset() {
+	*x = GetStepApprovalRequest{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetStepApprovalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStepApprovalRequest) ProtoMessage() {}
+
+func (x *GetStepApprovalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStepApprovalRequest.ProtoReflect.Descriptor instead.
+func (*GetStepApprovalRequest) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *GetStepApprovalRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetStepApprovalResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Approval      *StepApproval          `protobuf:"bytes,1,opt,name=approval,proto3" json:"approval,omitempty"`
+	CanDecide     bool                   `protobuf:"varint,2,opt,name=can_decide,json=canDecide,proto3" json:"can_decide,omitempty"` // the caller's project role may approve or reject it
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetStepApprovalResponse) Reset() {
+	*x = GetStepApprovalResponse{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetStepApprovalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStepApprovalResponse) ProtoMessage() {}
+
+func (x *GetStepApprovalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStepApprovalResponse.ProtoReflect.Descriptor instead.
+func (*GetStepApprovalResponse) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *GetStepApprovalResponse) GetApproval() *StepApproval {
+	if x != nil {
+		return x.Approval
+	}
+	return nil
+}
+
+func (x *GetStepApprovalResponse) GetCanDecide() bool {
+	if x != nil {
+		return x.CanDecide
+	}
+	return false
+}
+
+type ResolveStepApprovalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Decision      string                 `protobuf:"bytes,2,opt,name=decision,proto3" json:"decision,omitempty"` // approved | rejected
+	DecisionHash  string                 `protobuf:"bytes,3,opt,name=decision_hash,json=decisionHash,proto3" json:"decision_hash,omitempty"`
+	Rationale     string                 `protobuf:"bytes,4,opt,name=rationale,proto3" json:"rationale,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveStepApprovalRequest) Reset() {
+	*x = ResolveStepApprovalRequest{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveStepApprovalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveStepApprovalRequest) ProtoMessage() {}
+
+func (x *ResolveStepApprovalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveStepApprovalRequest.ProtoReflect.Descriptor instead.
+func (*ResolveStepApprovalRequest) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *ResolveStepApprovalRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ResolveStepApprovalRequest) GetDecision() string {
+	if x != nil {
+		return x.Decision
+	}
+	return ""
+}
+
+func (x *ResolveStepApprovalRequest) GetDecisionHash() string {
+	if x != nil {
+		return x.DecisionHash
+	}
+	return ""
+}
+
+func (x *ResolveStepApprovalRequest) GetRationale() string {
+	if x != nil {
+		return x.Rationale
+	}
+	return ""
+}
+
+type ResolveStepApprovalResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Approval      *StepApproval          `protobuf:"bytes,1,opt,name=approval,proto3" json:"approval,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveStepApprovalResponse) Reset() {
+	*x = ResolveStepApprovalResponse{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveStepApprovalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveStepApprovalResponse) ProtoMessage() {}
+
+func (x *ResolveStepApprovalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveStepApprovalResponse.ProtoReflect.Descriptor instead.
+func (*ResolveStepApprovalResponse) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *ResolveStepApprovalResponse) GetApproval() *StepApproval {
+	if x != nil {
+		return x.Approval
+	}
+	return nil
+}
+
 var File_orca_workflow_v1_workflow_proto protoreflect.FileDescriptor
 
 const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
@@ -2899,7 +3345,45 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"executions\x18\x01 \x03(\v2#.orca.workflow.v1.WorkflowExecutionR\n" +
 	"executions\x12\x1f\n" +
 	"\vnext_cursor\x18\x02 \x01(\tR\n" +
-	"nextCursor*\x85\x02\n" +
+	"nextCursor\"\xc9\x03\n" +
+	"\fStepApproval\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12\x17\n" +
+	"\astep_id\x18\x03 \x01(\tR\x06stepId\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x04 \x01(\tR\tprojectId\x12\x12\n" +
+	"\x04kind\x18\x05 \x01(\tR\x04kind\x12!\n" +
+	"\fsubject_json\x18\x06 \x01(\tR\vsubjectJson\x12#\n" +
+	"\rdecision_json\x18\a \x01(\tR\fdecisionJson\x12#\n" +
+	"\rdecision_hash\x18\b \x01(\tR\fdecisionHash\x12\x16\n" +
+	"\x06status\x18\t \x01(\tR\x06status\x12\x1f\n" +
+	"\vresolved_by\x18\n" +
+	" \x01(\tR\n" +
+	"resolvedBy\x12\x1c\n" +
+	"\trationale\x18\v \x01(\tR\trationale\x129\n" +
+	"\n" +
+	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
+	"\vresolved_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"resolvedAt\"\\\n" +
+	"\x18ListStepApprovalsRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12!\n" +
+	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\"Y\n" +
+	"\x19ListStepApprovalsResponse\x12<\n" +
+	"\tapprovals\x18\x01 \x03(\v2\x1e.orca.workflow.v1.StepApprovalR\tapprovals\"(\n" +
+	"\x16GetStepApprovalRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"t\n" +
+	"\x17GetStepApprovalResponse\x12:\n" +
+	"\bapproval\x18\x01 \x01(\v2\x1e.orca.workflow.v1.StepApprovalR\bapproval\x12\x1d\n" +
+	"\n" +
+	"can_decide\x18\x02 \x01(\bR\tcanDecide\"\x8b\x01\n" +
+	"\x1aResolveStepApprovalRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
+	"\bdecision\x18\x02 \x01(\tR\bdecision\x12#\n" +
+	"\rdecision_hash\x18\x03 \x01(\tR\fdecisionHash\x12\x1c\n" +
+	"\trationale\x18\x04 \x01(\tR\trationale\"Y\n" +
+	"\x1bResolveStepApprovalResponse\x12:\n" +
+	"\bapproval\x18\x01 \x01(\v2\x1e.orca.workflow.v1.StepApprovalR\bapproval*\x85\x02\n" +
 	"\bStepType\x12\x19\n" +
 	"\x15STEP_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSTEP_TYPE_AGENT\x10\x01\x12\x13\n" +
@@ -2910,7 +3394,7 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\x1bSTEP_TYPE_CLEANUP_WORKTREES\x10\x06\x12\x14\n" +
 	"\x10STEP_TYPE_ACTION\x10\a\x12\x16\n" +
 	"\x12STEP_TYPE_PARALLEL\x10\b\x12\x19\n" +
-	"\x15STEP_TYPE_COMMIT_PUSH\x10\t2\xf7\x10\n" +
+	"\x15STEP_TYPE_COMMIT_PUSH\x10\t2\xc1\x13\n" +
 	"\x0fWorkflowService\x12c\n" +
 	"\x0eCreateTemplate\x12'.orca.workflow.v1.CreateTemplateRequest\x1a(.orca.workflow.v1.CreateTemplateResponse\x12c\n" +
 	"\x0eUpdateTemplate\x12'.orca.workflow.v1.UpdateTemplateRequest\x1a(.orca.workflow.v1.UpdateTemplateResponse\x12N\n" +
@@ -2932,7 +3416,10 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\x11GenerateShareLink\x12*.orca.workflow.v1.GenerateShareLinkRequest\x1a+.orca.workflow.v1.GenerateShareLinkResponse\x12p\n" +
 	"\x15PreviewSharedTemplate\x12..orca.workflow.v1.PreviewSharedTemplateRequest\x1a'.orca.workflow.v1.SharedTemplatePreview\x12i\n" +
 	"\x14ImportSharedTemplate\x12-.orca.workflow.v1.ImportSharedTemplateRequest\x1a\".orca.workflow.v1.WorkflowTemplate\x12]\n" +
-	"\fRateTemplate\x12%.orca.workflow.v1.RateTemplateRequest\x1a&.orca.workflow.v1.RateTemplateResponseBFZDgithub.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1;workflowv1b\x06proto3"
+	"\fRateTemplate\x12%.orca.workflow.v1.RateTemplateRequest\x1a&.orca.workflow.v1.RateTemplateResponse\x12l\n" +
+	"\x11ListStepApprovals\x12*.orca.workflow.v1.ListStepApprovalsRequest\x1a+.orca.workflow.v1.ListStepApprovalsResponse\x12f\n" +
+	"\x0fGetStepApproval\x12(.orca.workflow.v1.GetStepApprovalRequest\x1a).orca.workflow.v1.GetStepApprovalResponse\x12r\n" +
+	"\x13ResolveStepApproval\x12,.orca.workflow.v1.ResolveStepApprovalRequest\x1a-.orca.workflow.v1.ResolveStepApprovalResponseBFZDgithub.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1;workflowv1b\x06proto3"
 
 var (
 	file_orca_workflow_v1_workflow_proto_rawDescOnce sync.Once
@@ -2947,7 +3434,7 @@ func file_orca_workflow_v1_workflow_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_workflow_v1_workflow_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_workflow_v1_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
+var file_orca_workflow_v1_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_orca_workflow_v1_workflow_proto_goTypes = []any{
 	(StepType)(0),                        // 0: orca.workflow.v1.StepType
 	(*WorkflowTemplate)(nil),             // 1: orca.workflow.v1.WorkflowTemplate
@@ -2993,7 +3480,14 @@ var file_orca_workflow_v1_workflow_proto_goTypes = []any{
 	(*RateTemplateResponse)(nil),         // 41: orca.workflow.v1.RateTemplateResponse
 	(*ListExecutionsRequest)(nil),        // 42: orca.workflow.v1.ListExecutionsRequest
 	(*ListExecutionsResponse)(nil),       // 43: orca.workflow.v1.ListExecutionsResponse
-	(*timestamppb.Timestamp)(nil),        // 44: google.protobuf.Timestamp
+	(*StepApproval)(nil),                 // 44: orca.workflow.v1.StepApproval
+	(*ListStepApprovalsRequest)(nil),     // 45: orca.workflow.v1.ListStepApprovalsRequest
+	(*ListStepApprovalsResponse)(nil),    // 46: orca.workflow.v1.ListStepApprovalsResponse
+	(*GetStepApprovalRequest)(nil),       // 47: orca.workflow.v1.GetStepApprovalRequest
+	(*GetStepApprovalResponse)(nil),      // 48: orca.workflow.v1.GetStepApprovalResponse
+	(*ResolveStepApprovalRequest)(nil),   // 49: orca.workflow.v1.ResolveStepApprovalRequest
+	(*ResolveStepApprovalResponse)(nil),  // 50: orca.workflow.v1.ResolveStepApprovalResponse
+	(*timestamppb.Timestamp)(nil),        // 51: google.protobuf.Timestamp
 }
 var file_orca_workflow_v1_workflow_proto_depIdxs = []int32{
 	1,  // 0: orca.workflow.v1.CreateTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
@@ -3010,55 +3504,66 @@ var file_orca_workflow_v1_workflow_proto_depIdxs = []int32{
 	1,  // 11: orca.workflow.v1.ResolveTemplateResponse.chain:type_name -> orca.workflow.v1.WorkflowTemplate
 	1,  // 12: orca.workflow.v1.UpdateTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
 	33, // 13: orca.workflow.v1.ListPendingApprovalsResponse.approvals:type_name -> orca.workflow.v1.Approval
-	44, // 14: orca.workflow.v1.Approval.resolved_at:type_name -> google.protobuf.Timestamp
+	51, // 14: orca.workflow.v1.Approval.resolved_at:type_name -> google.protobuf.Timestamp
 	9,  // 15: orca.workflow.v1.ListExecutionsResponse.executions:type_name -> orca.workflow.v1.WorkflowExecution
-	2,  // 16: orca.workflow.v1.WorkflowService.CreateTemplate:input_type -> orca.workflow.v1.CreateTemplateRequest
-	28, // 17: orca.workflow.v1.WorkflowService.UpdateTemplate:input_type -> orca.workflow.v1.UpdateTemplateRequest
-	8,  // 18: orca.workflow.v1.WorkflowService.Execute:input_type -> orca.workflow.v1.ExecuteRequest
-	11, // 19: orca.workflow.v1.WorkflowService.GetExecution:input_type -> orca.workflow.v1.GetExecutionRequest
-	13, // 20: orca.workflow.v1.WorkflowService.PauseExecution:input_type -> orca.workflow.v1.PauseExecutionRequest
-	15, // 21: orca.workflow.v1.WorkflowService.ResumeExecution:input_type -> orca.workflow.v1.ResumeExecutionRequest
-	17, // 22: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:input_type -> orca.workflow.v1.ExecuteAdHocStepRequest
-	22, // 23: orca.workflow.v1.WorkflowService.CancelExecution:input_type -> orca.workflow.v1.CancelExecutionRequest
-	24, // 24: orca.workflow.v1.WorkflowService.ListTemplates:input_type -> orca.workflow.v1.ListTemplatesRequest
-	26, // 25: orca.workflow.v1.WorkflowService.ResolveTemplate:input_type -> orca.workflow.v1.ResolveTemplateRequest
-	20, // 26: orca.workflow.v1.WorkflowService.HasActiveExecutions:input_type -> orca.workflow.v1.HasActiveExecutionsRequest
-	42, // 27: orca.workflow.v1.WorkflowService.ListExecutions:input_type -> orca.workflow.v1.ListExecutionsRequest
-	4,  // 28: orca.workflow.v1.WorkflowService.CloneTemplate:input_type -> orca.workflow.v1.CloneTemplateRequest
-	6,  // 29: orca.workflow.v1.WorkflowService.StreamExecutionEvents:input_type -> orca.workflow.v1.StreamExecutionEventsRequest
-	30, // 30: orca.workflow.v1.WorkflowService.PublishTemplate:input_type -> orca.workflow.v1.PublishTemplateRequest
-	31, // 31: orca.workflow.v1.WorkflowService.ListPendingApprovals:input_type -> orca.workflow.v1.ListPendingApprovalsRequest
-	34, // 32: orca.workflow.v1.WorkflowService.ResolveApproval:input_type -> orca.workflow.v1.ResolveApprovalRequest
-	35, // 33: orca.workflow.v1.WorkflowService.GenerateShareLink:input_type -> orca.workflow.v1.GenerateShareLinkRequest
-	37, // 34: orca.workflow.v1.WorkflowService.PreviewSharedTemplate:input_type -> orca.workflow.v1.PreviewSharedTemplateRequest
-	39, // 35: orca.workflow.v1.WorkflowService.ImportSharedTemplate:input_type -> orca.workflow.v1.ImportSharedTemplateRequest
-	40, // 36: orca.workflow.v1.WorkflowService.RateTemplate:input_type -> orca.workflow.v1.RateTemplateRequest
-	3,  // 37: orca.workflow.v1.WorkflowService.CreateTemplate:output_type -> orca.workflow.v1.CreateTemplateResponse
-	29, // 38: orca.workflow.v1.WorkflowService.UpdateTemplate:output_type -> orca.workflow.v1.UpdateTemplateResponse
-	10, // 39: orca.workflow.v1.WorkflowService.Execute:output_type -> orca.workflow.v1.ExecuteResponse
-	12, // 40: orca.workflow.v1.WorkflowService.GetExecution:output_type -> orca.workflow.v1.GetExecutionResponse
-	14, // 41: orca.workflow.v1.WorkflowService.PauseExecution:output_type -> orca.workflow.v1.PauseExecutionResponse
-	16, // 42: orca.workflow.v1.WorkflowService.ResumeExecution:output_type -> orca.workflow.v1.ResumeExecutionResponse
-	19, // 43: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:output_type -> orca.workflow.v1.ExecuteAdHocStepResponse
-	23, // 44: orca.workflow.v1.WorkflowService.CancelExecution:output_type -> orca.workflow.v1.CancelExecutionResponse
-	25, // 45: orca.workflow.v1.WorkflowService.ListTemplates:output_type -> orca.workflow.v1.ListTemplatesResponse
-	27, // 46: orca.workflow.v1.WorkflowService.ResolveTemplate:output_type -> orca.workflow.v1.ResolveTemplateResponse
-	21, // 47: orca.workflow.v1.WorkflowService.HasActiveExecutions:output_type -> orca.workflow.v1.HasActiveExecutionsResponse
-	43, // 48: orca.workflow.v1.WorkflowService.ListExecutions:output_type -> orca.workflow.v1.ListExecutionsResponse
-	5,  // 49: orca.workflow.v1.WorkflowService.CloneTemplate:output_type -> orca.workflow.v1.CloneTemplateResponse
-	7,  // 50: orca.workflow.v1.WorkflowService.StreamExecutionEvents:output_type -> orca.workflow.v1.ExecutionEvent
-	1,  // 51: orca.workflow.v1.WorkflowService.PublishTemplate:output_type -> orca.workflow.v1.WorkflowTemplate
-	32, // 52: orca.workflow.v1.WorkflowService.ListPendingApprovals:output_type -> orca.workflow.v1.ListPendingApprovalsResponse
-	33, // 53: orca.workflow.v1.WorkflowService.ResolveApproval:output_type -> orca.workflow.v1.Approval
-	36, // 54: orca.workflow.v1.WorkflowService.GenerateShareLink:output_type -> orca.workflow.v1.GenerateShareLinkResponse
-	38, // 55: orca.workflow.v1.WorkflowService.PreviewSharedTemplate:output_type -> orca.workflow.v1.SharedTemplatePreview
-	1,  // 56: orca.workflow.v1.WorkflowService.ImportSharedTemplate:output_type -> orca.workflow.v1.WorkflowTemplate
-	41, // 57: orca.workflow.v1.WorkflowService.RateTemplate:output_type -> orca.workflow.v1.RateTemplateResponse
-	37, // [37:58] is the sub-list for method output_type
-	16, // [16:37] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	51, // 16: orca.workflow.v1.StepApproval.created_at:type_name -> google.protobuf.Timestamp
+	51, // 17: orca.workflow.v1.StepApproval.resolved_at:type_name -> google.protobuf.Timestamp
+	44, // 18: orca.workflow.v1.ListStepApprovalsResponse.approvals:type_name -> orca.workflow.v1.StepApproval
+	44, // 19: orca.workflow.v1.GetStepApprovalResponse.approval:type_name -> orca.workflow.v1.StepApproval
+	44, // 20: orca.workflow.v1.ResolveStepApprovalResponse.approval:type_name -> orca.workflow.v1.StepApproval
+	2,  // 21: orca.workflow.v1.WorkflowService.CreateTemplate:input_type -> orca.workflow.v1.CreateTemplateRequest
+	28, // 22: orca.workflow.v1.WorkflowService.UpdateTemplate:input_type -> orca.workflow.v1.UpdateTemplateRequest
+	8,  // 23: orca.workflow.v1.WorkflowService.Execute:input_type -> orca.workflow.v1.ExecuteRequest
+	11, // 24: orca.workflow.v1.WorkflowService.GetExecution:input_type -> orca.workflow.v1.GetExecutionRequest
+	13, // 25: orca.workflow.v1.WorkflowService.PauseExecution:input_type -> orca.workflow.v1.PauseExecutionRequest
+	15, // 26: orca.workflow.v1.WorkflowService.ResumeExecution:input_type -> orca.workflow.v1.ResumeExecutionRequest
+	17, // 27: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:input_type -> orca.workflow.v1.ExecuteAdHocStepRequest
+	22, // 28: orca.workflow.v1.WorkflowService.CancelExecution:input_type -> orca.workflow.v1.CancelExecutionRequest
+	24, // 29: orca.workflow.v1.WorkflowService.ListTemplates:input_type -> orca.workflow.v1.ListTemplatesRequest
+	26, // 30: orca.workflow.v1.WorkflowService.ResolveTemplate:input_type -> orca.workflow.v1.ResolveTemplateRequest
+	20, // 31: orca.workflow.v1.WorkflowService.HasActiveExecutions:input_type -> orca.workflow.v1.HasActiveExecutionsRequest
+	42, // 32: orca.workflow.v1.WorkflowService.ListExecutions:input_type -> orca.workflow.v1.ListExecutionsRequest
+	4,  // 33: orca.workflow.v1.WorkflowService.CloneTemplate:input_type -> orca.workflow.v1.CloneTemplateRequest
+	6,  // 34: orca.workflow.v1.WorkflowService.StreamExecutionEvents:input_type -> orca.workflow.v1.StreamExecutionEventsRequest
+	30, // 35: orca.workflow.v1.WorkflowService.PublishTemplate:input_type -> orca.workflow.v1.PublishTemplateRequest
+	31, // 36: orca.workflow.v1.WorkflowService.ListPendingApprovals:input_type -> orca.workflow.v1.ListPendingApprovalsRequest
+	34, // 37: orca.workflow.v1.WorkflowService.ResolveApproval:input_type -> orca.workflow.v1.ResolveApprovalRequest
+	35, // 38: orca.workflow.v1.WorkflowService.GenerateShareLink:input_type -> orca.workflow.v1.GenerateShareLinkRequest
+	37, // 39: orca.workflow.v1.WorkflowService.PreviewSharedTemplate:input_type -> orca.workflow.v1.PreviewSharedTemplateRequest
+	39, // 40: orca.workflow.v1.WorkflowService.ImportSharedTemplate:input_type -> orca.workflow.v1.ImportSharedTemplateRequest
+	40, // 41: orca.workflow.v1.WorkflowService.RateTemplate:input_type -> orca.workflow.v1.RateTemplateRequest
+	45, // 42: orca.workflow.v1.WorkflowService.ListStepApprovals:input_type -> orca.workflow.v1.ListStepApprovalsRequest
+	47, // 43: orca.workflow.v1.WorkflowService.GetStepApproval:input_type -> orca.workflow.v1.GetStepApprovalRequest
+	49, // 44: orca.workflow.v1.WorkflowService.ResolveStepApproval:input_type -> orca.workflow.v1.ResolveStepApprovalRequest
+	3,  // 45: orca.workflow.v1.WorkflowService.CreateTemplate:output_type -> orca.workflow.v1.CreateTemplateResponse
+	29, // 46: orca.workflow.v1.WorkflowService.UpdateTemplate:output_type -> orca.workflow.v1.UpdateTemplateResponse
+	10, // 47: orca.workflow.v1.WorkflowService.Execute:output_type -> orca.workflow.v1.ExecuteResponse
+	12, // 48: orca.workflow.v1.WorkflowService.GetExecution:output_type -> orca.workflow.v1.GetExecutionResponse
+	14, // 49: orca.workflow.v1.WorkflowService.PauseExecution:output_type -> orca.workflow.v1.PauseExecutionResponse
+	16, // 50: orca.workflow.v1.WorkflowService.ResumeExecution:output_type -> orca.workflow.v1.ResumeExecutionResponse
+	19, // 51: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:output_type -> orca.workflow.v1.ExecuteAdHocStepResponse
+	23, // 52: orca.workflow.v1.WorkflowService.CancelExecution:output_type -> orca.workflow.v1.CancelExecutionResponse
+	25, // 53: orca.workflow.v1.WorkflowService.ListTemplates:output_type -> orca.workflow.v1.ListTemplatesResponse
+	27, // 54: orca.workflow.v1.WorkflowService.ResolveTemplate:output_type -> orca.workflow.v1.ResolveTemplateResponse
+	21, // 55: orca.workflow.v1.WorkflowService.HasActiveExecutions:output_type -> orca.workflow.v1.HasActiveExecutionsResponse
+	43, // 56: orca.workflow.v1.WorkflowService.ListExecutions:output_type -> orca.workflow.v1.ListExecutionsResponse
+	5,  // 57: orca.workflow.v1.WorkflowService.CloneTemplate:output_type -> orca.workflow.v1.CloneTemplateResponse
+	7,  // 58: orca.workflow.v1.WorkflowService.StreamExecutionEvents:output_type -> orca.workflow.v1.ExecutionEvent
+	1,  // 59: orca.workflow.v1.WorkflowService.PublishTemplate:output_type -> orca.workflow.v1.WorkflowTemplate
+	32, // 60: orca.workflow.v1.WorkflowService.ListPendingApprovals:output_type -> orca.workflow.v1.ListPendingApprovalsResponse
+	33, // 61: orca.workflow.v1.WorkflowService.ResolveApproval:output_type -> orca.workflow.v1.Approval
+	36, // 62: orca.workflow.v1.WorkflowService.GenerateShareLink:output_type -> orca.workflow.v1.GenerateShareLinkResponse
+	38, // 63: orca.workflow.v1.WorkflowService.PreviewSharedTemplate:output_type -> orca.workflow.v1.SharedTemplatePreview
+	1,  // 64: orca.workflow.v1.WorkflowService.ImportSharedTemplate:output_type -> orca.workflow.v1.WorkflowTemplate
+	41, // 65: orca.workflow.v1.WorkflowService.RateTemplate:output_type -> orca.workflow.v1.RateTemplateResponse
+	46, // 66: orca.workflow.v1.WorkflowService.ListStepApprovals:output_type -> orca.workflow.v1.ListStepApprovalsResponse
+	48, // 67: orca.workflow.v1.WorkflowService.GetStepApproval:output_type -> orca.workflow.v1.GetStepApprovalResponse
+	50, // 68: orca.workflow.v1.WorkflowService.ResolveStepApproval:output_type -> orca.workflow.v1.ResolveStepApprovalResponse
+	45, // [45:69] is the sub-list for method output_type
+	21, // [21:45] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_orca_workflow_v1_workflow_proto_init() }
@@ -3072,7 +3577,7 @@ func file_orca_workflow_v1_workflow_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_workflow_v1_workflow_proto_rawDesc), len(file_orca_workflow_v1_workflow_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   43,
+			NumMessages:   50,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

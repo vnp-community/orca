@@ -40,6 +40,9 @@ const (
 	WorkflowService_PreviewSharedTemplate_FullMethodName = "/orca.workflow.v1.WorkflowService/PreviewSharedTemplate"
 	WorkflowService_ImportSharedTemplate_FullMethodName  = "/orca.workflow.v1.WorkflowService/ImportSharedTemplate"
 	WorkflowService_RateTemplate_FullMethodName          = "/orca.workflow.v1.WorkflowService/RateTemplate"
+	WorkflowService_ListStepApprovals_FullMethodName     = "/orca.workflow.v1.WorkflowService/ListStepApprovals"
+	WorkflowService_GetStepApproval_FullMethodName       = "/orca.workflow.v1.WorkflowService/GetStepApproval"
+	WorkflowService_ResolveStepApproval_FullMethodName   = "/orca.workflow.v1.WorkflowService/ResolveStepApproval"
 )
 
 // WorkflowServiceClient is the client API for WorkflowService service.
@@ -120,6 +123,11 @@ type WorkflowServiceClient interface {
 	ImportSharedTemplate(ctx context.Context, in *ImportSharedTemplateRequest, opts ...grpc.CallOption) (*WorkflowTemplate, error)
 	// RateTemplate records (or updates) the caller's 1-5 star rating.
 	RateTemplate(ctx context.Context, in *RateTemplateRequest, opts ...grpc.CallOption) (*RateTemplateResponse, error)
+	// Step approvals (docs/integrate/TDD-WF-AGENT-001 §7.5): a workflow step that waits for a person's decision (tdd_agent.approval)
+	// is listed, read and resolved here. Unimplemented until the deployment enables them.
+	ListStepApprovals(ctx context.Context, in *ListStepApprovalsRequest, opts ...grpc.CallOption) (*ListStepApprovalsResponse, error)
+	GetStepApproval(ctx context.Context, in *GetStepApprovalRequest, opts ...grpc.CallOption) (*GetStepApprovalResponse, error)
+	ResolveStepApproval(ctx context.Context, in *ResolveStepApprovalRequest, opts ...grpc.CallOption) (*ResolveStepApprovalResponse, error)
 }
 
 type workflowServiceClient struct {
@@ -349,6 +357,36 @@ func (c *workflowServiceClient) RateTemplate(ctx context.Context, in *RateTempla
 	return out, nil
 }
 
+func (c *workflowServiceClient) ListStepApprovals(ctx context.Context, in *ListStepApprovalsRequest, opts ...grpc.CallOption) (*ListStepApprovalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListStepApprovalsResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_ListStepApprovals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) GetStepApproval(ctx context.Context, in *GetStepApprovalRequest, opts ...grpc.CallOption) (*GetStepApprovalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetStepApprovalResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_GetStepApproval_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) ResolveStepApproval(ctx context.Context, in *ResolveStepApprovalRequest, opts ...grpc.CallOption) (*ResolveStepApprovalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveStepApprovalResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_ResolveStepApproval_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkflowServiceServer is the server API for WorkflowService service.
 // All implementations must embed UnimplementedWorkflowServiceServer
 // for forward compatibility.
@@ -427,6 +465,11 @@ type WorkflowServiceServer interface {
 	ImportSharedTemplate(context.Context, *ImportSharedTemplateRequest) (*WorkflowTemplate, error)
 	// RateTemplate records (or updates) the caller's 1-5 star rating.
 	RateTemplate(context.Context, *RateTemplateRequest) (*RateTemplateResponse, error)
+	// Step approvals (docs/integrate/TDD-WF-AGENT-001 §7.5): a workflow step that waits for a person's decision (tdd_agent.approval)
+	// is listed, read and resolved here. Unimplemented until the deployment enables them.
+	ListStepApprovals(context.Context, *ListStepApprovalsRequest) (*ListStepApprovalsResponse, error)
+	GetStepApproval(context.Context, *GetStepApprovalRequest) (*GetStepApprovalResponse, error)
+	ResolveStepApproval(context.Context, *ResolveStepApprovalRequest) (*ResolveStepApprovalResponse, error)
 	mustEmbedUnimplementedWorkflowServiceServer()
 }
 
@@ -499,6 +542,15 @@ func (UnimplementedWorkflowServiceServer) ImportSharedTemplate(context.Context, 
 }
 func (UnimplementedWorkflowServiceServer) RateTemplate(context.Context, *RateTemplateRequest) (*RateTemplateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RateTemplate not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ListStepApprovals(context.Context, *ListStepApprovalsRequest) (*ListStepApprovalsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListStepApprovals not implemented")
+}
+func (UnimplementedWorkflowServiceServer) GetStepApproval(context.Context, *GetStepApprovalRequest) (*GetStepApprovalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetStepApproval not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ResolveStepApproval(context.Context, *ResolveStepApprovalRequest) (*ResolveStepApprovalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveStepApproval not implemented")
 }
 func (UnimplementedWorkflowServiceServer) mustEmbedUnimplementedWorkflowServiceServer() {}
 func (UnimplementedWorkflowServiceServer) testEmbeddedByValue()                         {}
@@ -892,6 +944,60 @@ func _WorkflowService_RateTemplate_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkflowService_ListStepApprovals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListStepApprovalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ListStepApprovals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ListStepApprovals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ListStepApprovals(ctx, req.(*ListStepApprovalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_GetStepApproval_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStepApprovalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).GetStepApproval(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_GetStepApproval_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).GetStepApproval(ctx, req.(*GetStepApprovalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_ResolveStepApproval_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveStepApprovalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ResolveStepApproval(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ResolveStepApproval_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ResolveStepApproval(ctx, req.(*ResolveStepApprovalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WorkflowService_ServiceDesc is the grpc.ServiceDesc for WorkflowService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -978,6 +1084,18 @@ var WorkflowService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RateTemplate",
 			Handler:    _WorkflowService_RateTemplate_Handler,
+		},
+		{
+			MethodName: "ListStepApprovals",
+			Handler:    _WorkflowService_ListStepApprovals_Handler,
+		},
+		{
+			MethodName: "GetStepApproval",
+			Handler:    _WorkflowService_GetStepApproval_Handler,
+		},
+		{
+			MethodName: "ResolveStepApproval",
+			Handler:    _WorkflowService_ResolveStepApproval_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

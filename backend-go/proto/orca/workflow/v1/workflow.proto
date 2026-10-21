@@ -91,6 +91,12 @@ service WorkflowService {
   rpc ImportSharedTemplate(ImportSharedTemplateRequest) returns (WorkflowTemplate);
   // RateTemplate records (or updates) the caller's 1-5 star rating.
   rpc RateTemplate(RateTemplateRequest) returns (RateTemplateResponse);
+
+  // Step approvals (docs/integrate/TDD-WF-AGENT-001 §7.5): a workflow step that waits for a person's decision (tdd_agent.approval)
+  // is listed, read and resolved here. Unimplemented until the deployment enables them.
+  rpc ListStepApprovals(ListStepApprovalsRequest) returns (ListStepApprovalsResponse);
+  rpc GetStepApproval(GetStepApprovalRequest) returns (GetStepApprovalResponse);
+  rpc ResolveStepApproval(ResolveStepApprovalRequest) returns (ResolveStepApprovalResponse);
 }
 
 enum StepType {
@@ -386,4 +392,51 @@ message ListExecutionsRequest {
 message ListExecutionsResponse {
   repeated WorkflowExecution executions = 1;
   string next_cursor = 2; // empty = no further page
+}
+
+// StepApproval is one decision a workflow step waits for. subject_json and decision_json are the step's own JSON; decision_hash is
+// the hash of the decision the person was shown, and a resolve must send it back.
+message StepApproval {
+  string id = 1;
+  string execution_id = 2;
+  string step_id = 3;
+  string project_id = 4;
+  string kind = 5;
+  string subject_json = 6;
+  string decision_json = 7;
+  string decision_hash = 8;
+  string status = 9; // pending | approved | rejected | superseded
+  string resolved_by = 10;
+  string rationale = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp resolved_at = 13; // unset while pending
+}
+
+message ListStepApprovalsRequest {
+  string project_id = 1;
+  string execution_id = 2;
+}
+
+message ListStepApprovalsResponse {
+  repeated StepApproval approvals = 1;
+}
+
+message GetStepApprovalRequest {
+  string id = 1;
+}
+
+message GetStepApprovalResponse {
+  StepApproval approval = 1;
+  bool can_decide = 2; // the caller's project role may approve or reject it
+}
+
+message ResolveStepApprovalRequest {
+  string id = 1;
+  string decision = 2; // approved | rejected
+  string decision_hash = 3;
+  string rationale = 4;
+}
+
+message ResolveStepApprovalResponse {
+  StepApproval approval = 1;
 }
