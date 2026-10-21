@@ -11,9 +11,9 @@ Mode: {{.Mode}}.
 {{if .Design -}}
 Read the knowledge graph first (the architecture decisions, constraints, components and requirements this Request touches), then read with source_get the SAD sections that describe the containers, their dependencies and the flows. Do NOT read a diff and do NOT open source code. Return design.*, the items for requirements and constraints that apply, and diagrams only for behavior and data when the graph describes a state machine or an entity.
 {{- else if .Locked -}}
-The design was already extracted and is listed in <design>. Do NOT call any kg_ tool or source_get again, and leave design empty. Read the code at the base ref and at head with git show, git diff, git log and file reads, and report what the code does against that design: diagrams with variant "delta" for architecture, flow, behavior and data, and items for contracts, config, data and anything that needs a decision.
+The design was already extracted and is listed in <design>. Do NOT call any kg_ tool or source_get again, and leave design empty. Read the code at the base ref and at head with git show, git diff, git log and file reads. The tasks' work is often not committed: the head commit may equal the base ref while the changes sit in the worktree of the head branch. Find that worktree with `git worktree list`, then run `git -C <path> status --porcelain` and `git -C <path> diff <base_ref>`, and read untracked files directly. Report what the code does against that design: diagrams with variant "delta" for architecture, flow, behavior and data, and items for contracts, config, data and anything that needs a decision.
 {{- else -}}
-Read the knowledge graph and the SAD for the design, then read the code at the base ref and at head. Return design.*, diagrams with variant "delta", and the items.
+Read the knowledge graph and the SAD for the design, then read the code at the base ref and at head. The tasks' work is often not committed: the head commit may equal the base ref while the changes sit in the worktree of the head branch. Find that worktree with `git worktree list`, then run `git -C <path> status --porcelain` and `git -C <path> diff <base_ref>`, and read untracked files directly. Return design.*, diagrams with variant "delta", and the items.
 {{- end}}
 {{- if .Locked}}
 <design>

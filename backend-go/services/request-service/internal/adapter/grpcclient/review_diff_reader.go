@@ -49,5 +49,30 @@ func (r *GitReviewDiffReader) BranchCompare(ctx context.Context, worktreeID, bas
 	if out.Status != "ready" && resp.GetErrorMessage() != "" {
 		return out, errors.New(resp.GetErrorMessage())
 	}
+	if out.Status == "ready" {
+		out.Entries = r.withUncommitted(gctx, worktreeID, out.Entries)
+	}
 	return out, nil
+}
+
+// withUncommitted adds the files the worktree changed but did not commit. Orca's tasks leave their work uncommitted, so the
+// committed diff alone reads as "nothing changed" for a finished Request. Lines are unknown for these files (0), and a failed
+// status read leaves the committed diff as it was.
+func (r *GitReviewDiffReader) withUncommitted(ctx context.Context, worktreeID string, entries []domain.ChangedPath) []domain.ChangedPath {
+	st, err := r.git.GetStatus(ctx, &gitgatewayv1.GetStatusRequest{WorktreeId: worktreeID})
+	if err != nil {
+		return entries
+	}
+	seen := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		seen[e.Path] = true
+	}
+	for _, f := range st.GetFiles() {
+		if f.GetPath() == "" || seen[f.GetPath()] {
+			continue
+		}
+		seen[f.GetPath()] = true
+		entries = append(entries, domain.ChangedPath{Path: f.GetPath(), Status: f.GetState()})
+	}
+	return entries
 }
