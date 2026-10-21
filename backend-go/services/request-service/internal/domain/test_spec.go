@@ -7,8 +7,8 @@ import (
 	"github.com/stablyai/orca-go/common/apperrors"
 )
 
-// TestSpecStatus is where the test-spec lane of a Request is. The lane runs next to the code-execution lane and never
-// changes the status of the Request (docs/integrate/TDD-REQ-TESTSPEC-001, ORC-TS-ADR-11).
+// TestSpecStatus is where the test-spec lane of a Request is. The lane starts together with Plan generation, runs beside it and
+// the code-execution lane, and never changes the status of the Request (docs/integrate/TDD-REQ-TESTSPEC-001, ORC-TS-ADR-11).
 type TestSpecStatus string
 
 const (
@@ -126,5 +126,11 @@ func ErrTestSpecDocumentInvalid(name string) error {
 
 func ErrTestSpecWrongStatus(status RequestStatus) error {
 	return apperrors.New(apperrors.KindFailedPrecondition, "REQUEST_TESTSPEC_WRONG_STATUS",
-		"test specs run while a Request is executing or after it completed; this one is "+string(status), nil)
+		"test specs run from planning on, while a Request is planned, executing or after it completed; this one is "+string(status), nil)
+}
+
+// TestSpecLaneStatus is true for the statuses in which the lane may start: it starts with Plan generation (planning) and
+// stays available while the Plan is approved and executed.
+func TestSpecLaneStatus(s RequestStatus) bool {
+	return s == RequestStatusPlanning || s == RequestStatusAwaitingPlanApproval || s == RequestStatusExecuting
 }

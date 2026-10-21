@@ -37,6 +37,8 @@ import { usePlanRevision } from './revision/usePlanRevision'
 import { usePlanVersions } from './revision/usePlanVersions'
 import { formatRequestRelativeTime } from '@/lib/request-relative-time'
 import { PlanDriftSection } from '../readiness/PlanDriftSection'
+import { TestSpecsPanel } from '../execution/TestSpecsPanel'
+import { useTestSpecs } from '../../../hooks/useTestSpecs'
 import { useDecisions } from '../../../hooks/useDecisions'
 import { planBlockedByDecision } from '../decision/decision-rules'
 import { GraphSkeleton } from '../../graph/GraphStates'
@@ -78,6 +80,8 @@ export function RequestPlanTab({
   const auto = usePlanAutoGeneration(request, onSettled, decision.regeneratePlan)
   const requestDecisions = useDecisions(request.id)
   const versions = usePlanVersions(request)
+  // Test specs start with Plan generation, so they are shown here beside the Plan, not only once the Request executes.
+  const testSpecs = useTestSpecs(request.id)
 
   const approvalMap = useMemo(
     () => (tree ? attachApprovals(tree, approvals) : null),
@@ -153,6 +157,9 @@ export function RequestPlanTab({
     const generateFailure = decision.failure?.scope === 'plan' ? decision.failure : null
     return (
       <div className="h-full overflow-auto" data-testid="request-tab-plan">
+        <div className="px-4 pt-3 empty:hidden">
+          <TestSpecsPanel requestId={request.id} testSpecs={testSpecs} />
+        </div>
         <PlanStates
           state={state === 'ready' ? 'error' : state}
           currentStepLabel={current ? translate(current.labelKey, current.id) : undefined}

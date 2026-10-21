@@ -12,7 +12,7 @@ import (
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
 
-// StartTestSpecs is the lane that generates test specs while a Request executes. It runs next to StartExecution and shares
+// StartTestSpecs is the lane that generates test specs beside Plan generation, from the moment a Request enters planning. It shares
 // nothing with it: its own consumer, its own table, its own lease; it never calls the execution loop, never moves the
 // Request to another status and never holds the execution lock (docs/integrate/TDD-REQ-TESTSPEC-001, ORC-TS-ADR-11).
 type StartTestSpecs struct {
@@ -23,6 +23,9 @@ type StartTestSpecs struct {
 	Context  *TestSpecContextBuilder
 	Actors   ExecutionActors
 	Settings TestSpecSettings
+	// OnFinished is told when the lane of a Request reached a final state (completed, skipped, blocked, failed): execution may
+	// have been held at the join and can try again. It must not fail the lane.
+	OnFinished func(ctx context.Context, requestID string)
 	// Now and NewID are overridable for tests.
 	Now   func() time.Time
 	NewID func() string
@@ -50,7 +53,8 @@ func (uc *StartTestSpecs) log() *slog.Logger {
 	return slog.Default()
 }
 
-// Execute starts the lane for a Request that is executing. It is idempotent: a Request that already has a current attempt is
+// Execute starts the lane for a Request that is planning (Plan generation begins at the same moment), awaiting plan approval or
+// executing. It is idempotent: a Request that already has a current attempt is
 // left alone, so a repeated event or a reconcile pass changes nothing. started is true when this call created the attempt.
 func (uc *StartTestSpecs) Execute(ctx context.Context, requestID string) (started bool, err error) {
 	tenantID, err := tenant.RequireTenantID(ctx)
@@ -61,7 +65,7 @@ func (uc *StartTestSpecs) Execute(ctx context.Context, requestID string) (starte
 	if err != nil {
 		return false, err
 	}
-	if req.Status != domain.RequestStatusExecuting || !uc.Settings.Enabled(ctx, req.ProjectID) {
+	if !domain.TestSpecLaneStatus(req.Status) || !uc.Settings.Enabled(ctx, req.ProjectID) {
 		return false, nil
 	}
 	if _, found, err := uc.Runs.Current(ctx, req.ID); err != nil || found {
@@ -92,7 +96,7 @@ func (uc *StartTestSpecs) Restart(ctx context.Context, requestID string) (domain
 	if err != nil {
 		return domain.TestSpecRun{}, err
 	}
-	if req.Status != domain.RequestStatusExecuting && req.Status != domain.RequestStatusCompleted {
+	if !domain.TestSpecLaneStatus(req.Status) && req.Status != domain.RequestStatusCompleted {
 		return domain.TestSpecRun{}, domain.ErrTestSpecWrongStatus(req.Status)
 	}
 	if !uc.Settings.Enabled(ctx, req.ProjectID) {
@@ -141,6 +145,9 @@ func (uc *StartTestSpecs) drive(ctx context.Context, req domain.Request, run dom
 			run.FinishedAt = &t
 		}
 		uc.save(ctx, &run)
+		if status.Finished() {
+			uc.notifyFinished(ctx, run.RequestID)
+		}
 	}
 	// A consumer or the reconcile loop has no signed-in user, and project-service refuses the dev server lookup without one:
 	// every call below runs as the person who may run this Request's execution.
@@ -250,4 +257,17 @@ func (uc *StartTestSpecs) save(ctx context.Context, run *domain.TestSpecRun) {
 	if err := uc.Runs.Update(ctx, *run); err != nil {
 		uc.log().Warn("test specs: save failed", slog.String("run_id", run.ID), slog.String("request_id", run.RequestID), slog.Any("error", err))
 	}
+}
+
+// notifyFinished lets a Request that execution held at the join go on. A failure of the hook is the hook's own business.
+func (uc *StartTestSpecs) notifyFinished(ctx context.Context, requestID string) {
+	if uc.OnFinished == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			uc.log().Error("test specs: finished hook panicked", slog.String("request_id", requestID), slog.Any("panic", r))
+		}
+	}()
+	uc.OnFinished(ctx, requestID)
 }

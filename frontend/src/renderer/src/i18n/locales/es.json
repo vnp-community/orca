@@ -13935,7 +13935,8 @@
             "errorNotApplicable": "Este tipo de plan no se puede revisar con una petición.",
             "errorNoChange": "El agente no cambió ningún documento. Indique con más precisión qué debe cambiar.",
             "errorBaseRefGone": "La rama desde la que parte esta solicitud ya no existe, así que el plan no se puede revisar. Se conserva su texto."
-          }
+          },
+          "testSpecNotReady": "Las especificaciones de prueba no han terminado. La ejecución comienza cuando lo hagan."
         },
         "approval": {
           "ApprovalInboxTab": {

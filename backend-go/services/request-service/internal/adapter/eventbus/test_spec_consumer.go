@@ -22,8 +22,9 @@ type TestSpecStarter interface {
 
 var _ TestSpecStarter = (*usecase.StartTestSpecs)(nil)
 
-// TestSpecStatusConsumer starts the test-spec lane for a Request that enters executing. It listens to the same event as the
-// execution starter and shares nothing else with it.
+// TestSpecStatusConsumer starts the test-spec lane when a Request enters planning, the moment Plan generation begins, so both run
+// side by side. Entering executing starts it too for a Request that skipped planning or whose first event was lost (the start is
+// idempotent). It listens to the same event as the execution starter and shares nothing else with it.
 type TestSpecStatusConsumer struct {
 	bus     *commoneventbus.Consumer
 	starter TestSpecStarter
@@ -44,7 +45,7 @@ func (c *TestSpecStatusConsumer) Handle(ctx context.Context, ev commoneventbus.E
 	if err := json.Unmarshal(ev.Payload, &p); err != nil || p.RequestID == "" {
 		return nil
 	}
-	if p.To != string(domain.RequestStatusExecuting) || ev.TenantID == "" {
+	if !startsTestSpecLane(p.To) || ev.TenantID == "" {
 		return nil
 	}
 	defer func() {
@@ -57,4 +58,8 @@ func (c *TestSpecStatusConsumer) Handle(ctx context.Context, ev commoneventbus.E
 		slog.WarnContext(ctx, "test specs: start failed", slog.String("event_id", ev.ID), slog.String("request_id", p.RequestID), slog.Any("error", serr))
 	}
 	return nil
+}
+
+func startsTestSpecLane(to string) bool {
+	return to == string(domain.RequestStatusPlanning) || to == string(domain.RequestStatusExecuting)
 }

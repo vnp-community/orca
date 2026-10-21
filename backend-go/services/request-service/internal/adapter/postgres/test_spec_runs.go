@@ -212,7 +212,7 @@ func (r *TestSpecRunRepository) ListExecutingWithoutRun(ctx context.Context, qui
 	var refs []usecase.TestSpecRef
 	err := r.withRelayTx(ctx, func(ctx context.Context, db dbExecer) error {
 		rows, err := db.Query(ctx, `SELECT r.tenant_id::text, r.id::text FROM request.requests r
-			WHERE r.status = 'executing' AND r.updated_at < now() - make_interval(secs => $1)
+			WHERE r.status IN ('planning', 'awaiting_plan_approval', 'executing') AND r.updated_at < now() - make_interval(secs => $1)
 			  AND NOT EXISTS (SELECT 1 FROM request.request_test_spec_runs t WHERE t.tenant_id = r.tenant_id AND t.request_id = r.id)
 			ORDER BY r.updated_at LIMIT $2`, quiet.Seconds(), limit)
 		if err != nil {

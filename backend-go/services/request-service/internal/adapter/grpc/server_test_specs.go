@@ -37,6 +37,9 @@ func (s *Server) GetTestSpecs(ctx context.Context, req *requestv1.GetTestSpecsRe
 	for _, h := range view.History {
 		out.History = append(out.History, toProtoTestSpecRun(h))
 	}
+	if view.Join != nil {
+		out.Gate, out.Join, out.JoinWarn, out.JoinCause = string(view.Join.Gate), string(view.Join.Verdict), view.Join.Warn, view.Join.Cause
+	}
 	return out, nil
 }
 

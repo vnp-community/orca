@@ -31,7 +31,7 @@ describe('TestSpecsPanel', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('says it starts with the execution when there is no run yet', () => {
+  it('says it starts with Plan generation when there is no run yet', () => {
     render(<TestSpecsPanel requestId="r1" testSpecs={hook({ enabled: true })} />)
     expect(screen.getByTestId('testspec-none')).toBeTruthy()
   })
@@ -78,5 +78,50 @@ describe('TestSpecsPanel', () => {
       />
     )
     expect(screen.queryByRole('button', { name: /re-run/i })).toBeNull()
+  })
+
+  it('tells that execution waits for the test specs while they generate, and what happens when they stopped', () => {
+    const waiting = hook({
+      enabled: true,
+      gate: 'wait',
+      join: 'wait',
+      current: { id: 'a', attempt: 1, status: 'running' }
+    })
+    const { unmount } = render(<TestSpecsPanel requestId="r1" testSpecs={waiting} />)
+    expect(screen.getByTestId('testspec-join').textContent).toMatch(/both finished/i)
+    unmount()
+    const held = hook({
+      enabled: true,
+      gate: 'require',
+      join: 'stop',
+      current: { id: 'a', attempt: 1, status: 'blocked', reasonCode: 'REQUEST_TESTSPEC_LLM_NOT_CONFIGURED' }
+    })
+    const second = render(<TestSpecsPanel requestId="r1" testSpecs={held} />)
+    expect(screen.getByTestId('testspec-join').textContent).toMatch(/held until/i)
+    second.unmount()
+    render(
+      <TestSpecsPanel
+        requestId="r1"
+        testSpecs={hook({
+          enabled: true,
+          gate: 'wait',
+          join: 'go',
+          joinWarn: true,
+          joinCause: 'REQUEST_TESTSPEC_LLM_NOT_CONFIGURED',
+          current: { id: 'a', attempt: 1, status: 'blocked' }
+        })}
+      />
+    )
+    expect(screen.getByTestId('testspec-join').textContent).toContain('REQUEST_TESTSPEC_LLM_NOT_CONFIGURED')
+  })
+
+  it('shows no join line once the test specs are usable', () => {
+    render(
+      <TestSpecsPanel
+        requestId="r1"
+        testSpecs={hook({ enabled: true, join: 'go', current: { id: 'a', attempt: 1, status: 'completed' } })}
+      />
+    )
+    expect(screen.queryByTestId('testspec-join')).toBeNull()
   })
 })

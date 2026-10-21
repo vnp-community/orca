@@ -45,6 +45,12 @@ func wireTestSpecs(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	start := &usecase.StartTestSpecs{
 		Requests: stores.requests, Runs: stores.testSpecRuns, Agent: agent, Resolver: solution.conns, Context: builder,
 		Actors: execution.Actors, Settings: settings, Log: log,
+		// The join may be holding the Request's first dispatch; try it again now that the lane has finished.
+		OnFinished: func(ctx context.Context, requestID string) {
+			if _, err := execution.StartExecution.Execute(ctx, requestID); err != nil {
+				log.Warn("test specs: could not start execution after the lane finished", slog.String("request_id", requestID), slog.Any("error", err))
+			}
+		},
 	}
 	host, _ := os.Hostname()
 	reconcile := &usecase.ReconcileTestSpecs{
@@ -65,10 +71,10 @@ func wireTestSpecs(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 		} else {
 			log.Warn("eventbus unavailable: test specs start only from the reconcile loop")
 		}
-		log.Info("test specs enabled: generated next to the code of an executing Request")
+		log.Info("test specs enabled: generated beside Plan generation; execution waits for them (REQUEST_TESTSPEC_GATE)", slog.String("gate", cfg.TestSpecGate))
 	}
 	return requestgrpc.TestSpecUseCases{
-		Get:      &usecase.GetTestSpecs{Requests: stores.requests, Runs: stores.testSpecRuns, Settings: settings},
+		Get:      &usecase.GetTestSpecs{Requests: stores.requests, Runs: stores.testSpecRuns, Settings: settings, Join: execution.Join},
 		Start:    start,
 		Document: &usecase.GetTestSpecDocument{Requests: stores.requests, Runs: stores.testSpecRuns, Agent: agent, Resolver: solution.conns},
 	}

@@ -216,7 +216,7 @@ func (r *TestSpecRunRepository) ListExecutingWithoutRun(ctx context.Context, qui
 		limit = 20
 	}
 	rows, err := r.exec(ctx).QueryContext(ctx, `SELECT r.tenant_id, r.id FROM requests r
-		WHERE r.status = 'executing' AND r.updated_at < TIMESTAMPADD(MICROSECOND, -?, CURRENT_TIMESTAMP(6))
+		WHERE r.status IN ('planning', 'awaiting_plan_approval', 'executing') AND r.updated_at < TIMESTAMPADD(MICROSECOND, -?, CURRENT_TIMESTAMP(6))
 		  AND NOT EXISTS (SELECT 1 FROM request_test_spec_runs t WHERE t.tenant_id = r.tenant_id AND t.request_id = r.id)
 		ORDER BY r.updated_at LIMIT ?`, quiet.Microseconds(), limit)
 	if err != nil {

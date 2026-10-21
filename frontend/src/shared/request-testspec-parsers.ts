@@ -99,7 +99,11 @@ export function parseTestSpecs(raw: unknown): TestSpecs {
     requestId: str(r.requestId),
     enabled: r.enabled === true,
     current: r.current ? parseTestSpecRun(r.current) : null,
-    history: Array.isArray(r.history) ? r.history.map(parseTestSpecRun) : []
+    history: Array.isArray(r.history) ? r.history.map(parseTestSpecRun) : [],
+    gate: str(r.gate),
+    join: r.join === 'wait' || r.join === 'stop' ? r.join : 'go',
+    joinWarn: r.joinWarn === true,
+    joinCause: str(r.joinCause)
   }
 }
 

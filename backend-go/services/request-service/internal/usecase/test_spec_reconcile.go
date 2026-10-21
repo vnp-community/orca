@@ -37,7 +37,7 @@ func (t TestSpecTiming) normalized() TestSpecTiming {
 	return t
 }
 
-// ReconcileTestSpecs is the loop of the test-spec lane: it starts the lane for executing Requests whose event was lost, resumes an
+// ReconcileTestSpecs is the loop of the test-spec lane: it starts the lane for Requests (planning, awaiting plan approval, executing) whose event was lost, resumes an
 // attempt a crash left half way, and looks at the runs that are going on the dev server. It does not touch the execution loop.
 type ReconcileTestSpecs struct {
 	Runs     TestSpecRunRepository
@@ -198,7 +198,9 @@ func (uc *ReconcileTestSpecs) complete(ctx context.Context, conn AnalysisConnect
 	run.UpdatedAt = t
 	if err := uc.Runs.Update(ctx, run); err != nil {
 		uc.log().Warn("test specs: save failed", slog.String("run_id", run.ID), slog.Any("error", err))
+		return
 	}
+	uc.Start.notifyFinished(ctx, run.RequestID)
 }
 
 // featureOf is the feature that holds the Request's test specs: the first one the dev server lists (a project has one TDD today).
@@ -218,7 +220,9 @@ func (uc *ReconcileTestSpecs) endRun(ctx context.Context, req domain.Request, ru
 	run.State, run.ReasonCode, run.ReasonMessage, run.FinishedAt, run.UpdatedAt = status, code, truncateRunes(msg, 500), &t, t
 	if err := uc.Runs.Update(ctx, run); err != nil {
 		uc.log().Warn("test specs: save failed", slog.String("run_id", run.ID), slog.Any("error", err))
+		return
 	}
+	uc.Start.notifyFinished(ctx, run.RequestID)
 }
 
 // touch moves updated_at so the row waits its quiet time before the next look.

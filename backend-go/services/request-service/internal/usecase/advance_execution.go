@@ -24,6 +24,8 @@ type AdvanceInput struct {
 }
 
 type AdvanceResult struct {
+	// HeldBy is the status of the test-spec lane when the join kept this round from dispatching anything; empty otherwise.
+	HeldBy     domain.TestSpecStatus
 	Dispatched []string
 	// GatesOpened lists the tasks held back by a type-policy gate, whose Approval is now pending.
 	GatesOpened []string
@@ -43,8 +45,10 @@ type AdvanceExecution struct {
 	Settings  ExecutionSettings
 	// Contract, when set, puts the tasks of an OpenSpec plan on the contract path; nil keeps every task on the plain run.
 	Contract ContractRunPlanner
-	Log      *slog.Logger
-	Now      func() time.Time
+	// Join holds the first dispatch of a Request until the test specs generated beside its Plan have finished; nil disables it.
+	Join *TestSpecJoin
+	Log  *slog.Logger
+	Now  func() time.Time
 
 	locks keyedLock
 }
@@ -106,6 +110,17 @@ func (uc *AdvanceExecution) run(ctx context.Context, req domain.Request, tree do
 		}
 		if tree.InScope(l, started) {
 			scope = append(scope, l)
+		}
+	}
+	if uc.Join != nil && !executionBegun(tree) {
+		d, err := uc.Join.Decide(ctx, req)
+		if err != nil {
+			return AdvanceResult{}, err
+		}
+		if d.Verdict != domain.JoinGo {
+			// Not an error: the lane's OnFinished hook and the reconcile loop run this round again once the lane has finished.
+			uc.log().Info("execution held at the test-spec join", slog.String("request_id", req.ID), slog.String("verdict", string(d.Verdict)), slog.String("lane", string(d.Status)))
+			return AdvanceResult{HeldBy: d.Status}, nil
 		}
 	}
 	slots := settings.MaxParallelTasks - inProgress
@@ -238,4 +253,15 @@ func startedPhases(ctx context.Context, repo PhaseStartRepository, requestID str
 		out[s.PhaseTaskID] = true
 	}
 	return out, nil
+}
+
+// executionBegun is true once any working task has left open: the join only guards the very first dispatch, so a later Re-run of
+// the test specs never stops a Request that is already executing.
+func executionBegun(tree domain.ExecutionTree) bool {
+	for _, l := range tree.Leaves {
+		if l.Status != domain.TaskStatusOpen {
+			return true
+		}
+	}
+	return false
 }

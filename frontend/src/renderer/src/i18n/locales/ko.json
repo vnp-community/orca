@@ -13935,7 +13935,8 @@
             "errorNotApplicable": "이 유형의 계획은 요청으로 수정할 수 없습니다.",
             "errorNoChange": "에이전트가 어떤 문서도 변경하지 않았습니다. 바꿀 내용을 더 구체적으로 알려 주세요.",
             "errorBaseRefGone": "이 요청이 시작되는 브랜치가 더 이상 없어 계획을 수정할 수 없습니다. 입력한 내용은 유지됩니다."
-          }
+          },
+          "testSpecNotReady": "테스트 명세가 아직 끝나지 않았습니다. 끝나면 실행이 시작됩니다."
         },
         "approval": {
           "ApprovalInboxTab": {
