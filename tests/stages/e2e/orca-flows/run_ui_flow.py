@@ -70,19 +70,21 @@ REAL_SPECS = {
     "ci-cd-kit-review": ["ci-cd-kit-review-real"],
     # No AI, reads only: the drawings of the Outcome Review of a finished Request (ORCA_E2E_REVIEW_TITLE).
     "review-diagrams": ["outcome-review-diagrams"],
+    # Cost class C (a few cents: the AI classifies one child Request): sends an after-code finding back; needs ORCA_E2E_CICDKIT_REQUEST_ID.
+    "ci-cd-kit-sendback": ["outcome-review-sendback"],
 }
 # Why: the task and proposal worktrees of this repo sit next to it (vnp-qa-platform-task-<id>), outside the orca checkout the agent normally uses as its work dir,
 # and the relay refuses writes outside AGENT_WORK_DIR; the agent runs with the parent folder for this run only.
-AGENT_WORK_DIRS = {"ci-cd-kit": "/Users/datbeohbbh/Desktop/work/vnpay/agentic-app", "ci-cd-kit-review": "/Users/datbeohbbh/Desktop/work/vnpay/agentic-app"}
+AGENT_WORK_DIRS = {"ci-cd-kit": "/Users/datbeohbbh/Desktop/work/vnpay/agentic-app", "ci-cd-kit-review": "/Users/datbeohbbh/Desktop/work/vnpay/agentic-app", "ci-cd-kit-sendback": "/Users/datbeohbbh/Desktop/work/vnpay/agentic-app"}
 # Why: the whole spec, quiet-tree wait and cleanup excluded, must end within 2 hours (the owner's stop-loss); the harness reads it as the hard limit.
-REAL_TIMEOUT_MIN = {"ci-cd-kit": "110", "ci-cd-kit-review": "60"}
+REAL_TIMEOUT_MIN = {"ci-cd-kit": "110", "ci-cd-kit-review": "60", "ci-cd-kit-sendback": "30"}
 # Why: people edit specs/ and docs/ of this checkout while a two-hour run goes on, and the exact comparison would call that a leak (README, "Bảo vệ checkout"); nothing else is ignored.
-GUARD_IGNORE = {"ci-cd-kit": "specs/:docs/", "ci-cd-kit-review": "specs/:docs/"}
+GUARD_IGNORE = {"ci-cd-kit": "specs/:docs/", "ci-cd-kit-review": "specs/:docs/", "ci-cd-kit-sendback": "specs/:docs/"}
 # Why: no AI and no Request: UI-only regression specs of reported bugs; each prints BUG REPRODUCED and fails if the bug comes back.
 REPRO_SPECS = {"add-project-worktree": ["add-project-worktree-repro"]}
 # Why: these approve a Plan, which runs a real agent that WRITES to the throwaway repo; read-only analysis does not need the flag
 # (addproject only reads: it never approves the analysis).
-EXECUTING = ("execute", "continuous", "native-execute", "monitor", "all", "deepseek-execute", "deepseek-task", "deepseek", "ci-cd-kit", "ci-cd-kit-review")
+EXECUTING = ("execute", "continuous", "native-execute", "monitor", "all", "deepseek-execute", "deepseek-task", "deepseek", "ci-cd-kit", "ci-cd-kit-review", "ci-cd-kit-sendback")
 
 
 def run_playwright(env: dict[str, str], extra: list[str]) -> int:
