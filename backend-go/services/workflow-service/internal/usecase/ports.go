@@ -369,20 +369,3 @@ type ProjectContext struct {
 	ProjectID, ProjectName, Description     string
 	RepoURL, DevServerID, DevServerHostname string
 }
-
-// StepApprovalRepository stores decisions running steps wait for from people
-// (domain.StepApproval, TDD-WF-AGENT-001 §7.5). Lookups return
-// domain.ErrStepApprovalNotFound (wrapped) when no row matches.
-type StepApprovalRepository interface {
-	// UpsertPendingStepApproval returns the row for (execution, step, decision hash), creating it pending when
-	// absent; any other pending row of that step is superseded in the same transaction.
-	UpsertPendingStepApproval(ctx context.Context, a domain.StepApproval) (domain.StepApproval, error)
-	GetStepApproval(ctx context.Context, tenantID, id string) (domain.StepApproval, error)
-	// LatestStepApproval is the newest row of a step that is not superseded.
-	LatestStepApproval(ctx context.Context, tenantID, executionID, stepID string) (domain.StepApproval, error)
-	// ListPendingStepApprovals filters by project and/or execution when given (empty = any), newest first.
-	ListPendingStepApprovals(ctx context.Context, tenantID, projectID, executionID string, limit int) ([]domain.StepApproval, error)
-	// ResolveStepApproval writes a resolved row only if it is still pending; false when someone resolved it first.
-	ResolveStepApproval(ctx context.Context, a domain.StepApproval) (bool, error)
-	MarkStepApprovalSubmitted(ctx context.Context, tenantID, id string, at time.Time) error
-}

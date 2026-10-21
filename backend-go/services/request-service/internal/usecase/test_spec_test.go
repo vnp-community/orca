@@ -469,5 +469,3 @@ func TestTheLaneNeverChangesTheRequest(t *testing.T) {
 		t.Fatalf("the Request changed: %+v", after)
 	}
 }
-
-func ptr[T any](v T) *T { return &v }

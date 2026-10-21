@@ -11,7 +11,7 @@ import (
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 )
 
-// TestSpecRunRepository stores the attempts to generate the test specs of a Request (migration 0099). Its own table: the code
+// TestSpecRunRepository stores the attempts to generate the test specs of a Request (migration 0110). Its own table: the code
 // lane reads and writes none of it.
 type TestSpecRunRepository struct {
 	*Repository

@@ -339,7 +339,7 @@ func (f *fakeRequestClient) GetExecutionSummary(ctx context.Context, in *request
 	return &requestv1.GetExecutionSummaryResponse{Summary: &requestv1.ExecutionSummary{
 		RequestId: in.GetRequestId(), Status: "request_backlog", Engine: "openspec", ExecutionMode: "continuous", MaxAttempts: 2,
 		Progress: &requestv1.ExecutionProgress{PhasesTotal: 7, PhasesDone: 6, TasksTotal: 28, TasksDone: 27, TasksFailed: 1},
-		Failed: []*requestv1.ExecutionFailedTask{{TaskId: "t1", Title: "Run the e2e acceptance", Attempts: 2, MaxAttempts: 2, LastCause: "timed_out"}},
+		Failed:   []*requestv1.ExecutionFailedTask{{TaskId: "t1", Title: "Run the e2e acceptance", Attempts: 2, MaxAttempts: 2, LastCause: "timed_out"}},
 		NeedsYou: []*requestv1.ExecutionNeedsYou{{Kind: "failed_task", RefId: "t1", Title: "Run the e2e acceptance", Since: timestamppb.New(time.Date(2026, 10, 15, 10, 56, 29, 0, time.UTC))}},
 	}}, nil
 }
