@@ -47,8 +47,8 @@
   Verify: `python3 tests/stages/e2e/orca-flows/run_acceptance.py outcome-review`.
   Kết quả (2026-10-20): **viết nhưng chưa chạy được.** `tests/stages/e2e/orca-flows/suite_outcome_review.py` (ORV-01..09 miễn phí với `--ai-stub`, ORV-20 tốn tiền, chỉ khi `ORCA_E2E_REVIEW_REAL=1`) đã đăng ký ở `run_acceptance.py` (`--list` thấy `outcome_review`), có mục trong `README.md`, `py_compile` PASS. Không chạy được vì stack local đang chạy là bản cũ (không có `request.review.*`) và gateway ở HEAD không biên dịch nên không dựng lại được; suite tự báo BLOCKED khi kênh chưa có. Hệ quả: ORV-01..09 **chưa được chứng minh trên stack thật** và "0 orphaned" cuối lượt chưa kiểm.
 
-- [~] **BE-OR-T531** Lượt thật (tốn tiền): chỉ khi người dùng đồng ý; chạy `workspace_probe.py` trước; tuân thủ quiet-checkout 90 giây; đặt đúng engine dự án cho fixture; ghi chi phí và thời gian.
-  Kết quả (2026-10-20): **chưa làm**, đúng điều kiện của task: tốn tiền, cần người dùng đồng ý. `ORV-20` đã viết sẵn nhưng chưa chạy; chưa đo chi phí/thời gian nào.
+- [x] **BE-OR-T531** Lượt thật (tốn tiền): chỉ khi người dùng đồng ý; chạy `workspace_probe.py` trước; tuân thủ quiet-checkout 90 giây; đặt đúng engine dự án cho fixture; ghi chi phí và thời gian.
+  Kết quả (2026-10-21): Đã chạy lượt thật, xem FE-OR-T332: thiết kế 1,365 USD / 86 s, sau code 0,7584 USD, KG `snap-000004`, cache và tạo lại không thử trong lượt này. Suite `outcome_review` (ORV-01..09) PASS trên Postgres thật qua gateway (sau khi sửa hai ca test sai: trường `inputsDigest` không có trên wire, giá trị profile không hợp lệ). ORV-20 (`suite_outcome_review.py` với `ORCA_E2E_REVIEW_REAL=1`) vẫn chưa chạy; lượt thật được chạy qua `--real ci-cd-kit` thay thế.
 
 ## Tài liệu và cấu hình
 

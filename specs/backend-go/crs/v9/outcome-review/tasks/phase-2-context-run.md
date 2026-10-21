@@ -52,8 +52,9 @@
 
 ## Chạy thật (cần đồng ý chi phí)
 
-- [ ] **BE-OR-T290** *(chưa làm: cần bạn đồng ý chi phí chạy agent thật)* Chạy `workspace_probe.py` rồi một lượt context thật `mode=design` trên Request pilot của `vnp-qa-platform`; ghi chi phí, thời gian, tỉ lệ bằng chứng xác minh được, số cạnh thiết kế trích được.
+- [~] **BE-OR-T290** Chạy `workspace_probe.py` rồi một lượt context thật `mode=design` trên Request pilot của `vnp-qa-platform`; ghi chi phí, thời gian, tỉ lệ bằng chứng xác minh được, số cạnh thiết kế trích được.
   Verify: ghi vào `evidence/phase-2-real-run.md`; chốt trần lượt/tệp.
+  Kết quả (2026-10-21): Đã có một phần bằng chứng thật từ lượt BL-E07 (xem FE-OR-T332): agent thật + KG thật của `vnp-qa-platform` chạy hết, kết quả qua kiểm tra, 12 mục thiết kế ở `snap-000004`. `workspace_probe.py` chưa chạy riêng; spike S5 chưa đo recall.
 
 ## Kết quả chạy bộ kiểm của phase (2026-10-20)
 
