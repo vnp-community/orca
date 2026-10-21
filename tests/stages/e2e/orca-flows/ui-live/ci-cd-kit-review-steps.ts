@@ -172,6 +172,13 @@ export async function reviewTheDelivery(f: LiveFlow, r: RequestUnderTest): Promi
       timeout: 60_000
     })
     await f.shots.take('review-after-execution')
+    // Why: a re-run to try the decisions again must not pay for the same reading twice.
+    if (
+      process.env.ORCA_E2E_CICDKIT_REVIEW_KEEP === '1' &&
+      (await reviewTab(f.page).getAttribute('data-phase')) === 'delivered'
+    ) {
+      return
+    }
     const before = (await readRuns(f, r)).length
     // Why: no review yet shows the invitation; a design review shows the "Generate after-code review" banner; a review of the
     // delivered phase (facts only) is read again through the Regenerate panel.
@@ -229,7 +236,7 @@ export async function reviewTheDelivery(f: LiveFlow, r: RequestUnderTest): Promi
         const card = cards.first()
         await card.getByRole('button', { name: 'Accept as exception' }).click()
         await card
-          .getByLabel(/Reason/)
+          .getByLabel(/Why/)
           .fill('Accepted during the BL-E07 acceptance run: reviewed by the owner.')
         await card.getByTestId('outcome-decision-confirm').click()
         await expect(f.page.getByTestId('outcome-decision-made').nth(i)).toBeVisible({
