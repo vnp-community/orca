@@ -179,7 +179,11 @@ export async function reviewTheDelivery(f: LiveFlow, r: RequestUnderTest): Promi
     ) {
       return
     }
-    const before = (await readRuns(f, r)).length
+    // Why: the list holds the runs of the latest review only, so a new review's list can be shorter than the old one: a run is
+    // new when its start time was not seen before the click.
+    const seen = new Set((await readRuns(f, r)).map((x) => str(x.startedAt)))
+    const startedSince = async (): Promise<Raw[]> =>
+      (await readRuns(f, r)).filter((x) => !seen.has(str(x.startedAt)))
     // Why: no review yet shows the invitation; a design review shows the "Generate after-code review" banner; a review of the
     // delivered phase (facts only) is read again through the Regenerate panel.
     const banner = f.page.getByTestId('outcome-banner-generate')
@@ -194,12 +198,12 @@ export async function reviewTheDelivery(f: LiveFlow, r: RequestUnderTest): Promi
       await f.page.getByTestId('regenerate-submit').click()
     }
     await expect
-      .poll(async () => (await readRuns(f, r)).length, {
+      .poll(async () => (await startedSince()).length, {
         timeout: 60_000,
         message: 'the click started no run'
       })
-      .toBeGreaterThan(before)
-    await waitForRuns(f, r, 'delivered', 30 * MINUTE, before + 1)
+      .toBeGreaterThan(0)
+    await waitForRuns(f, r, 'delivered', 30 * MINUTE)
     await reloadAndReopen(f.page, r.title)
     await outcomeReviewTab(f.page).click()
     await expect(reviewTab(f.page)).toHaveAttribute('data-phase', 'delivered', { timeout: 60_000 })
