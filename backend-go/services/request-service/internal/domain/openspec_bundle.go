@@ -154,7 +154,7 @@ func descriptionLines(desc string) map[string]string {
 func checkCodeTargets(taskID, code string, created map[string]bool, probe PathProbe) ([]BundleViolation, error) {
 	matches := codeTargetRe.FindAllStringSubmatch(code, -1)
 	if len(matches) == 0 {
-		return []BundleViolation{{Code: BundleCodeTarget, Where: taskID, Message: "Code: must name `modify <path>::<symbol>` or `create <path>::<symbol>` targets in backticks"}}, nil
+		return []BundleViolation{{Code: BundleCodeTarget, Where: taskID, Message: "Code: must name targets as the word modify or create followed by `<path>::<symbol>` in backticks, for example modify `main.go::Handler`; the verb goes outside the backticks"}}, nil
 	}
 	var out []BundleViolation
 	bad := func(msg string) {

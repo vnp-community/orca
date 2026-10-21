@@ -5,6 +5,7 @@ Write the change ONLY under openspec/changes/req-142-cache-landing-page/ in the 
 Change id: req-142-cache-landing-page. In tasks.md the region marker must read: <!-- orca:begin plan request=REQ-142 schema=1 -->
 Group the tasks into phases (## PH-1, ## PH-2, ...) that can each be reviewed and released on their own, in dependency order.
 Limits: between 3 and 12 tasks in total, at most 8 phases, at most 20 tasks per phase, titles up to 200 characters.
+Every task has a Code: line that names its targets as the word modify or create followed by the file and symbol in backticks, for example: Code: modify `main.go::newMux`, create `main_test.go::TestDeleteNote`. The word modify or create stays OUTSIDE the backticks; `modify main.go::newMux` (verb inside the backticks) is rejected. Use modify for every file that already exists in the repository, even when the symbol is new (adding handleNote to main.go is modify `main.go::handleNote`); use create only for a file that does not exist yet.
 Give every acceptance criterion of the Request at least one scenario whose name starts with its id, and let ac= name only ids the Request lists.
 Run openspec validate --strict on the change and fix every error before you finish. Run one operation per Bash command; compound commands are refused.
 
