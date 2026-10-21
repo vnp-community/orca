@@ -372,6 +372,16 @@ describe('OutcomeSystemDiff', () => {
     ).toBeNull()
   })
 
+  it('a section whose only items did not change says so, with how many are hidden', () => {
+    const only = [
+      makeItem({ key: 'u1', section: 'architecture', change: 'unchanged', title: 'Gateway exists' })
+    ]
+    show({ review: makeReview({ model: { items: only, diagrams: [] } }) })
+    expect(screen.getByText('Nothing changed here (1 unchanged hidden).')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show unchanged' }))
+    expect(screen.getAllByTestId('outcome-diff-row')).toHaveLength(1)
+  })
+
   it('"Show unchanged" brings back the rows that did not change', () => {
     show()
     expect(screen.getAllByTestId('outcome-diff-row')).toHaveLength(1)

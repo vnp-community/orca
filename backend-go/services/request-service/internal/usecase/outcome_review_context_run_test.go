@@ -265,7 +265,7 @@ func newRunEnv(t *testing.T, status domain.RequestStatus) *runEnv {
 	e.runner = &ReviewContextRunner{
 		Service: base.svc, Runs: e.runs, Contexts: e.contexts, Agent: e.agent, Caps: e.caps, Files: e.files,
 		Conns:  fixedConns{conn: AnalysisConnection{ConnectionID: "c1", DevServerID: "d1", RepoPath: "/srv/repo", WorktreeID: "wt-main"}},
-		Config: domain.OutcomeReviewConfig{Default: domain.OutcomeReviewManual},
+		Config: domain.OutcomeReviewConfig{Default: domain.OutcomeReviewManual, DrawEngine: domain.DrawEngineAgent},
 		Spawn:  func(f func()) { e.spawned++; f() }, Nonce: func() string { return "nonce0123456789012345678901234567" },
 	}
 	return e

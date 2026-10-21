@@ -17,6 +17,7 @@ import { phaseOf } from '../outcome-review-view-model'
 import { ReviewArtifactFrame, type RegeneratePreset } from '../artifact/ReviewArtifactFrame'
 import {
   diagramLabelText,
+  emptyHiddenText,
   emptyText,
   laterText,
   modeReasonText,
@@ -133,6 +134,9 @@ export function OutcomeSystemDiff(props: Props): React.JSX.Element {
   const active = sectionOrDefault(section)
   const drawn = isDrawnSection(active)
   const rows = rowsOf(review, active, mode, showUnchanged)
+  const hiddenUnchanged = showUnchanged
+    ? 0
+    : sectionItems(review, active).filter((i) => i.change === 'unchanged').length
   const frameProps = { requestId, canRegenerate, onRegenerate, onChanged, section: active }
   const designColumn = (
     <DiagramColumn
@@ -153,11 +157,12 @@ export function OutcomeSystemDiff(props: Props): React.JSX.Element {
   return (
     <section className="flex flex-col gap-2" data-testid="outcome-system-diff">
       <Tabs value={active} onValueChange={(v) => onSectionChange(sectionOrDefault(v))}>
-        <TabsList className="flex-wrap">
+        <TabsList className="w-full flex-wrap justify-start gap-1 group-data-[orientation=horizontal]/tabs:h-auto">
           {tabs.map((t) => (
             <TabsTrigger
               key={t.section}
               value={t.section}
+              className="h-8 flex-none"
               data-testid={`outcome-subtab-${t.section}`}
             >
               {sectionText(t.section)}
@@ -214,7 +219,9 @@ export function OutcomeSystemDiff(props: Props): React.JSX.Element {
           ) : (
             <>
               {rows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{emptyText()}</p>
+                <p className="text-sm text-muted-foreground">
+                  {hiddenUnchanged > 0 ? emptyHiddenText(hiddenUnchanged) : emptyText()}
+                </p>
               ) : (
                 <ul className="flex flex-col gap-2" data-testid="outcome-diff-rows">
                   {rows.map((row) => (

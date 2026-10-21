@@ -95,6 +95,8 @@ type StartDrawResult struct {
 	Failed int
 	// Pending is the number of diagrams handed to the agent.
 	Pending int
+	// Drawn is the number of diagrams Orca drew itself (the builtin engine): they are ready when the call returns.
+	Drawn int
 	// Skipped is no_context when the review has no diagram models yet, or draw_disabled when the deployment draws nothing.
 	Skipped string
 }
@@ -140,28 +142,24 @@ func (r *ReviewDrawRunner) Start(ctx context.Context, in StartDrawInput) (StartD
 		return StartDrawResult{}, err
 	}
 
-	conn, err := r.Conns.ResolveForProject(ctx, req.ProjectID)
-	if err != nil {
-		if errors.Is(err, ErrNoDevServer) {
-			return StartDrawResult{}, domain.ErrReviewNoDevServer("no dev server is connected for this project")
+	engine := r.Config.DrawEngineOrDefault()
+	var conn AnalysisConnection
+	var skill string
+	if engine != domain.DrawEngineBuiltin {
+		c, sk, aerr := r.agentRoute(ctx, req)
+		switch {
+		case aerr == nil:
+			conn, skill = c, sk
+		case engine == domain.DrawEngineAgent:
+			return StartDrawResult{}, aerr
+		default:
+			engine = domain.DrawEngineBuiltin // auto: no agent can draw now, Orca draws it itself
 		}
-		return StartDrawResult{}, err
 	}
-	if conn.RepoPath == "" {
-		return StartDrawResult{}, domain.ErrReviewNoDevServer("the project's default repository has no folder path on its dev server")
-	}
-	caps := r.capability(ctx, conn)
-	if gaps := domain.ReviewDrawGaps(caps); len(gaps) > 0 {
-		for _, g := range gaps {
-			if g.Code == domain.CodeReviewSkillMissing {
-				return StartDrawResult{}, domain.ErrReviewSkillMissing(domain.ReviewDrawSkill)
-			}
-		}
-		return StartDrawResult{}, domain.ErrReviewAgentTooOld(gaps[0].Message)
-	}
-	skill := domain.ReviewDrawSkillVersion(caps)
-
 	models := selectModels(payload.Context.Diagrams, in.Sections)
+	if engine == domain.DrawEngineBuiltin {
+		return r.drawBuiltin(ctx, req, models, profile, in)
+	}
 	lookups, err := r.Artifacts.Resolve(ctx, req.ID, models, profile, skill)
 	if err != nil {
 		return StartDrawResult{}, err
@@ -200,6 +198,64 @@ func (r *ReviewDrawRunner) Start(ctx context.Context, in StartDrawInput) (StartD
 		spawn = func(f func()) { go f() }
 	}
 	spawn(func() { r.execute(detached, job, run) })
+	return res, nil
+}
+
+// agentRoute says whether an agent can draw now: a dev server with a repository, the read-only mode and the skill. The error is
+// the code a person would be told.
+func (r *ReviewDrawRunner) agentRoute(ctx context.Context, req domain.Request) (AnalysisConnection, string, error) {
+	conn, err := r.Conns.ResolveForProject(ctx, req.ProjectID)
+	if err != nil {
+		if errors.Is(err, ErrNoDevServer) {
+			return AnalysisConnection{}, "", domain.ErrReviewNoDevServer("no dev server is connected for this project")
+		}
+		return AnalysisConnection{}, "", err
+	}
+	if conn.RepoPath == "" {
+		return AnalysisConnection{}, "", domain.ErrReviewNoDevServer("the project's default repository has no folder path on its dev server")
+	}
+	caps := r.capability(ctx, conn)
+	if gaps := domain.ReviewDrawGaps(caps); len(gaps) > 0 {
+		for _, g := range gaps {
+			if g.Code == domain.CodeReviewSkillMissing {
+				return AnalysisConnection{}, "", domain.ErrReviewSkillMissing(domain.ReviewDrawSkill)
+			}
+		}
+		return AnalysisConnection{}, "", domain.ErrReviewAgentTooOld(gaps[0].Message)
+	}
+	return conn, domain.ReviewDrawSkillVersion(caps), nil
+}
+
+// drawBuiltin lays the checked models out itself. Nothing runs on a dev server and nothing costs anything, so it is done before
+// the call returns and there is no run to follow.
+func (r *ReviewDrawRunner) drawBuiltin(ctx context.Context, req domain.Request, models []domain.DiagramModel, profile domain.ResolvedProfile, in StartDrawInput) (StartDrawResult, error) {
+	lookups, err := r.Artifacts.Resolve(ctx, req.ID, models, profile, domain.BuiltinDrawSkillVersion)
+	if err != nil {
+		return StartDrawResult{}, err
+	}
+	res := StartDrawResult{}
+	for _, l := range lookups {
+		if !in.Force && l.Result == domain.CacheHit {
+			res.Cached++
+			continue
+		}
+		page, rerr := domain.RenderBuiltinDiagram(l.Model)
+		var info domain.ArtifactInfo
+		if rerr == nil {
+			info, rerr = domain.CheckArtifact(page, l.Model)
+		}
+		if rerr != nil {
+			if serr := r.Artifacts.StoreFailure(ctx, req.ID, l, appCodeOf(rerr, "REQUEST_REVIEW_ARTIFACT_UNSAFE"), rerr.Error(), in.CreatedBy); serr != nil {
+				r.logger().ErrorContext(ctx, "outcome review: could not keep a failed builtin drawing", slog.Any("error", serr))
+			}
+			res.Failed++
+			continue
+		}
+		if _, serr := r.Artifacts.Store(ctx, StoreInput{RequestID: req.ID, Lookup: l, Content: page, Info: info, Origin: in.Origin, Reason: in.Reason, CreatedBy: in.CreatedBy}); serr != nil {
+			return res, serr
+		}
+		res.Drawn++
+	}
 	return res, nil
 }
 

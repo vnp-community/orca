@@ -68,6 +68,8 @@ REAL_SPECS = {
     "ci-cd-kit": ["ci-cd-kit-real"],
     # Cost class C (one real context run): the Outcome Review of the Request that `ci-cd-kit` finished; needs ORCA_E2E_CICDKIT_REQUEST_ID.
     "ci-cd-kit-review": ["ci-cd-kit-review-real"],
+    # No AI, reads only: the drawings of the Outcome Review of a finished Request (ORCA_E2E_REVIEW_TITLE).
+    "review-diagrams": ["outcome-review-diagrams"],
 }
 # Why: the task and proposal worktrees of this repo sit next to it (vnp-qa-platform-task-<id>), outside the orca checkout the agent normally uses as its work dir,
 # and the relay refuses writes outside AGENT_WORK_DIR; the agent runs with the parent folder for this run only.

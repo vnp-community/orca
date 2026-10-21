@@ -14803,6 +14803,7 @@
             "disabled": "绘图已关闭，显示表格",
             "drawing": "绘制中…",
             "drawnByAgent": "由智能体根据上方模型绘制，可能有误。",
+            "drawnByOrca": "由 Orca 根据上方已检查的模型绘制：每个方框和箭头都来自该模型。",
             "estimate": {
               "cost": "按最近几次运行约 {{usd}} USD",
               "noCost": "尚未测得成本数据",
@@ -14944,6 +14945,7 @@
               "yes": "是"
             },
             "empty": "这里没有内容。",
+            "emptyHidden": "此处没有变化（已隐藏 {{count}} 项未变化）。",
             "evidence": {
               "kgSnapshot": "{{id}} · {{snapshot}}",
               "unknown": "未知"

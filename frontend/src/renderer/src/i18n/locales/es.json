@@ -14803,6 +14803,7 @@
             "disabled": "El dibujo está desactivado, se muestra la tabla",
             "drawing": "Dibujando…",
             "drawnByAgent": "Dibujado por un agente a partir del modelo de arriba. Puede ser incorrecto.",
+            "drawnByOrca": "Dibujado por Orca a partir del modelo comprobado de arriba: cada caja y flecha está en el modelo.",
             "estimate": {
               "cost": "Unos {{usd}} USD, según las últimas ejecuciones",
               "noCost": "Aún no se han medido cifras de coste",
@@ -14944,6 +14945,7 @@
               "yes": "sí"
             },
             "empty": "No hay nada aquí.",
+            "emptyHidden": "Nada cambió aquí ({{count}} sin cambios ocultos).",
             "evidence": {
               "kgSnapshot": "{{id}} · {{snapshot}}",
               "unknown": "Desconocido"

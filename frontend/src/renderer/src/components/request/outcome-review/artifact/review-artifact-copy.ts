@@ -28,8 +28,13 @@ export function notDrawnText(
   }
 }
 
-export function drawnByAgentText(): string {
-  return translate(`${T}drawnByAgent`, 'Drawn by an agent from the model above. It may be wrong.')
+export function drawnByAgentText(byOrca = false): string {
+  return byOrca
+    ? translate(
+        `${T}drawnByOrca`,
+        'Drawn by Orca from the checked model above: every box and arrow is in the model.'
+      )
+    : translate(`${T}drawnByAgent`, 'Drawn by an agent from the model above. It may be wrong.')
 }
 
 export function actionText(

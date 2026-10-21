@@ -39,6 +39,7 @@
 - [x] **FE-OR-T214** Hình `failed`/thiếu: bảng + "Drawing failed"/"No diagram for this change" + thử lại (đủ quyền).
   Verify: RTL.
   Kết quả (2026-10-21): Hình `failed`/thiếu → bảng + "Drawing failed"/"No diagram for this change" + thử lại khi đủ quyền.
+  Kết quả (2026-10-21): Trên stack thật (#2309): hình kiến trúc, luồng (sequence) hiện trong khung `sandbox=""`, sáng và tối (`ui-live/outcome-review-diagrams.web.e2e.ts`, `run_ui_flow.py --real review-diagrams`, PASS). Sửa thêm: thanh tab con không còn chồng lên hàng chế độ; câu "Drawn by Orca from the checked model above" cho hình dựng sẵn (không còn nói "agent, có thể sai"); mục chỉ có hàng `unchanged` nói "Nothing changed here (N unchanged hidden)" thay vì "Nothing here.".
 - [x] **FE-OR-T215** `RegeneratePanel`: phạm vi, lý do bắt buộc, Estimate ("chưa có số liệu" khi chưa đo), xác nhận chi phí; lỗi `BUDGET_EXCEEDED|RUN_IN_PROGRESS|STALE_REVISION`; `useReviewArtifact`.
   Verify: RTL; Estimate không gọi `regenerate`.
   Kết quả (2026-10-21): `RegeneratePanel`: phạm vi, lý do bắt buộc, Estimate ("chưa có số liệu" khi chưa đo), xác nhận chi phí; lỗi `BUDGET_EXCEEDED|RUN_IN_PROGRESS|STALE_REVISION` hiện đúng; Estimate không gọi `regenerate`. Test `RegeneratePanel.test.tsx`.

@@ -83,6 +83,23 @@ const show = (over: Record<string, unknown> = {}) =>
   )
 
 describe('ReviewArtifactFrame', () => {
+  it('says Orca drew it, not an agent that may be wrong, when the drawing came from the builtin engine', async () => {
+    rpc.mockImplementationOnce(async (_m: string, p: Record<string, unknown>) => ({
+      ok: true,
+      value: {
+        artifact: meta(String(p.artifactId), 1, { skillVersion: 'orca-builtin/1' }),
+        mediaType: 'text/html',
+        content: '<svg><text>hello</text></svg>'
+      }
+    }))
+    show()
+    await screen.findByTestId('review-artifact-iframe')
+    expect(screen.getByTestId('review-artifact-info')).toHaveTextContent(
+      'Drawn by Orca from the checked model above: every box and arrow is in the model.'
+    )
+    expect(screen.getByTestId('review-artifact-info')).not.toHaveTextContent('may be wrong')
+  })
+
   it('sizes the frame from the viewBox, names it by the stored title, and says an agent drew it', async () => {
     show()
     const frame = await screen.findByTestId('review-artifact-iframe')

@@ -27,6 +27,7 @@ Thiếu KG thì review vẫn có phần dữ kiện của Orca và nói rõ `kg_
 | `REQUEST_DEFAULT_OUTCOME_REVIEW` | `off` | `off` hoặc `manual`, cho project chưa lưu lựa chọn. Lựa chọn đã lưu của project luôn thắng |
 | `REQUEST_REVIEW_KILL_SWITCH` | `false` | `true`: ẩn tab, mọi RPC review trả `REQUEST_REVIEW_DISABLED`; **không xoá dữ liệu** |
 | `REQUEST_REVIEW_DRAW_ENABLED` | `true` | `false`: chỉ chữ và bảng, không bao giờ khởi chạy lượt vẽ |
+| `REQUEST_REVIEW_DRAW_ENGINE` | `builtin` | Ai vẽ hình: `builtin` (Orca tự bố trí mô hình đã kiểm tra thành SVG: miễn phí, tức thì, không cần dev server hay skill), `agent` (agent chỉ-đọc dùng skill `diagram-design`, cần skill trên dev server), `auto` (agent khi chạy được, không thì `builtin`) |
 | `REQUEST_REVIEW_CONTEXT_TTL` | 168h | thời gian dùng lại một kết quả context đã kiểm (1h–2160h) |
 | `REQUEST_REVIEW_CONTEXT_TIMEOUT` | 10m | một lượt context (1m–15m; agent tự dừng lượt ở 15 phút) |
 | `REQUEST_REVIEW_CONTEXT_MAX_FILES` | 60 | số tệp agent được mở trong một lượt (5–400) |

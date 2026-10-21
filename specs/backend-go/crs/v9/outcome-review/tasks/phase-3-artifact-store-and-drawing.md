@@ -4,10 +4,12 @@
 
 ## Skill ghim
 
-- [ ] **BE-OR-T301** Vendor `skills/diagram-design/` tại commit cố định (đã duyệt), thêm `LICENSE`, `NOTICE`, `MANIFEST.sha256`; vô hiệu/xoá `export_png.py` (Playwright) và các bộ trích xuất draw.io/Mermaid/Excalidraw.
+- [~] **BE-OR-T301** Vendor `skills/diagram-design/` tại commit cố định (đã duyệt), thêm `LICENSE`, `NOTICE`, `MANIFEST.sha256`; vô hiệu/xoá `export_png.py` (Playwright) và các bộ trích xuất draw.io/Mermaid/Excalidraw.
   Files: `skills/diagram-design/**`. Verify: `shasum -a 256 -c MANIFEST.sha256`; sửa 1 byte → lệch.
+  Kết quả (2026-10-21): **Đổi hướng, chưa vendor bản của bên thứ ba.** Việc tải `cathrynlavery/diagram-design` bị chặn trong phiên này (lệnh `git clone` bị từ chối), nên không có `skills/diagram-design/` của bên thứ ba. Thay bằng hai thứ: (1) engine vẽ **dựng sẵn của Orca** (`domain/outcome_review_builtin_*.go`, `REQUEST_REVIEW_DRAW_ENGINE=builtin`, mặc định): bố trí mô hình đã kiểm tra thành SVG, không cần agent, dev server hay skill, 0 USD, vẽ ngay khi lượt đọc xong, đi qua cùng `CheckArtifact` và cùng kho; (2) skill tự viết `skills/diagram-design/SKILL.md` cho engine `agent`/`auto`, **chưa cài** lên dev server (ghi vào `~/.claude/skills` bị chặn trong phiên này; cài bằng `mkdir -p ~/.claude/skills/diagram-design && cp skills/diagram-design/SKILL.md ~/.claude/skills/diagram-design/`). `PinnedDiagramDesignSHA` vẫn rỗng. Vendor bản bên thứ ba vẫn là việc chờ bạn cho phép tải.
 - [ ] **BE-OR-T302** Hồ sơ không tương tác (kết quả S1): tệp/hồ sơ style guide `orca-default` đặt cho skill; phông hệ thống (không Google Fonts).
   Verify: lượt chạy thật không hỏi lại; HTML không có URL ngoài.
+  Kết quả (2026-10-21): Với engine dựng sẵn không còn cổng style guide: không có skill để hỏi. Phông hệ thống, không URL ngoài, màu chỉ qua biến vai trò `--rv-*` (đổi sáng/tối không vẽ lại), trạng thái nói bằng ký hiệu `+ − ! ?` ngoài màu, chú giải ≤ 60 từ.
 - [x] **BE-OR-T303** Khả năng dev server `reviewDraw` (skill có mặt, manifest khớp, Python cho `self_check.py`); `REQUEST_REVIEW_SKILL_MISSING` chỉ chặn draw run.
   Files: `domain/dev_server_capability.go`. Verify: manifest lệch → báo thiếu skill, context run vẫn chạy.
 - [ ] **BE-OR-T304** Hướng dẫn cài `npx skills add https://github.com/vnp-community/orca --skill diagram-design --global` (xác nhận chạy được trên dev server thật).
@@ -16,6 +18,7 @@
   Trạng thái (2026-10-20): chưa làm được vì phụ thuộc T301. Phía Orca đã chặn trước: lời nhắc vẽ (`outcome_review_draw`) cấm hỏi người dùng, ép bản `minimal`, phông hệ thống, không URL; bộ kiểm artifact từ chối URL ngoài, `@import`, `<link>`, `<script>`. Việc còn lại là thay `references/style-guide.md` của bản vendor bằng hồ sơ `orca-default` để lượt chạy thật không dừng ở cổng onboarding.
   Kết quả (2026-10-20): `domain.ReviewDrawGaps`/`ReviewDrawSkillVersion` (skill `diagram-design` đã cài **và** băm `SKILL.md` khớp bản ghim khi đã ghim, cộng read-only được cưỡng chế); agent TS báo thêm `diagram-design` trong danh sách skill (`agent/src/relay/agent-capability-skills.ts`, test agent 3/3 PASS). **Lệch spec:** kiểm bằng băm `SKILL.md` do agent báo thay vì `MANIFEST.sha256` + Python `self_check.py`, vì lượt vẽ chạy chỉ-đọc (không được ghi tệp tạm cho `self_check.py`) và Orca có bộ kiểm riêng; thiếu skill chỉ chặn draw run (`REQUEST_REVIEW_SKILL_MISSING`), context run vẫn chạy (test `ASkillInstalledLaterIsEnough…`). Lưu ý: một test không liên quan của agent (`agent-session-capabilities-codeintel` kiểm khả năng `pty`) đang fail trong môi trường này, không do thay đổi.
   Trạng thái (2026-10-20): chưa làm: lệnh `npx skills add https://github.com/vnp-community/orca --skill diagram-design --global` chỉ có nghĩa sau khi skill được vendor vào repo (T301), nên hướng dẫn và việc xác nhận trên dev server thật để sang Phase 5 (tài liệu) cùng T399.
+  Kết quả (2026-10-21): Chưa cài skill lên dev server và chưa xác nhận `npx skills add ...` (không có skill của bên thứ ba để cài). `docs/guides/request/outcome-review-setup.md` đã ghi `REQUEST_REVIEW_DRAW_ENGINE`.
 
 ## Kho
 

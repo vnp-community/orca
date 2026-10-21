@@ -43,7 +43,7 @@ export function ReviewArtifactInfoBar({
       className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
       data-testid="review-artifact-info"
     >
-      <span>{drawnByAgentText()}</span>
+      <span>{drawnByAgentText(meta.skillVersion.startsWith('orca-builtin'))}</span>
       <span data-testid="review-artifact-meta">
         {infoText(meta, whenText(meta.createdAt), meta.origin)}
       </span>

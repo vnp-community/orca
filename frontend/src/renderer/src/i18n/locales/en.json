@@ -14803,6 +14803,7 @@
             "disabled": "Drawing is turned off, showing the table",
             "drawing": "Drawing…",
             "drawnByAgent": "Drawn by an agent from the model above. It may be wrong.",
+            "drawnByOrca": "Drawn by Orca from the checked model above: every box and arrow is in the model.",
             "estimate": {
               "cost": "About {{usd}} USD, from the last runs",
               "noCost": "No cost figures have been measured yet",
@@ -14944,6 +14945,7 @@
               "yes": "yes"
             },
             "empty": "Nothing here.",
+            "emptyHidden": "Nothing changed here ({{count}} unchanged hidden).",
             "evidence": {
               "kgSnapshot": "{{id}} · {{snapshot}}",
               "unknown": "Unknown"

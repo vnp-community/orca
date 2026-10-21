@@ -83,6 +83,12 @@ export function emptyText(): string {
   return translate(`${T}empty`, 'Nothing here.')
 }
 
+export function emptyHiddenText(count: number): string {
+  return translate(`${T}emptyHidden`, 'Nothing changed here ({{count}} unchanged hidden).', {
+    count
+  })
+}
+
 export function laterText(): string {
   return translate(`${T}later`, 'This appears after execution completes.')
 }

@@ -41,6 +41,24 @@ type OutcomeReviewConfig struct {
 	ConfirmCostUSD float64
 	// DrawDisabled turns drawing off for the whole deployment (REQUEST_REVIEW_DRAW_ENABLED=false): the review is text and tables only.
 	DrawDisabled bool
+	// DrawEngine says who draws the diagrams: "builtin" (Orca lays the checked model out itself: free, instant, needs no dev server or
+	// skill), "agent" (a read-only agent with the diagram-design skill) or "auto" (the agent when it can run, else builtin).
+	DrawEngine string
+}
+
+const (
+	DrawEngineBuiltin = "builtin"
+	DrawEngineAgent   = "agent"
+	DrawEngineAuto    = "auto"
+)
+
+// DrawEngineOrDefault is the engine in force; builtin when nothing valid was set, because it always works and never guesses.
+func (c OutcomeReviewConfig) DrawEngineOrDefault() string {
+	switch c.DrawEngine {
+	case DrawEngineAgent, DrawEngineAuto:
+		return c.DrawEngine
+	}
+	return DrawEngineBuiltin
 }
 
 const (
@@ -130,6 +148,13 @@ func OutcomeReviewConfigFromEnv(getenv func(string) string) (OutcomeReviewConfig
 		c.DrawDisabled = true
 	default:
 		warnings = append(warnings, "REQUEST_REVIEW_DRAW_ENABLED "+strconv.Quote(raw)+" is not true or false; drawing stays on")
+	}
+	switch raw := strings.ToLower(strings.TrimSpace(getenv("REQUEST_REVIEW_DRAW_ENGINE"))); raw {
+	case "":
+	case DrawEngineBuiltin, DrawEngineAgent, DrawEngineAuto:
+		c.DrawEngine = raw
+	default:
+		warnings = append(warnings, "REQUEST_REVIEW_DRAW_ENGINE "+strconv.Quote(raw)+" is not builtin, agent or auto; builtin is used")
 	}
 	if d, ok, w := envDuration(getenv, "REQUEST_REVIEW_CONTEXT_TTL", time.Hour, 90*24*time.Hour); w != "" {
 		warnings = append(warnings, w)
