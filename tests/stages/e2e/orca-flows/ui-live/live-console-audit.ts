@@ -71,6 +71,13 @@ const NOISE_RULES: NoiseRule[] = [
       'right after a worktree is created on a repo that has a GitHub remote, the work-items panel looks up the remote and git-gateway answers WORKTREE_REPO_NOT_FOUND (repo does not exist); the panel drops the error and shows nothing. Seen only on a repo with a real remote (TASK-FE-E2E-028); a backlog item to look at, not Request code'
   },
   {
+    id: 'trace-snapshot-script-in-sandboxed-frame',
+    match:
+      /^Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set/,
+    reason:
+      "Playwright's trace snapshotter (tracing.start with snapshots) injects a script into every frame; a review drawing is shown in an iframe with an empty sandbox on purpose, so the injection is refused. Reproduced with a bare sandboxed srcdoc: the message appears with snapshots on and not with snapshots off, and no drawing holds a script"
+  },
+  {
     id: 'decision-channel-not-served',
     match: /decision\.[a-zA-Z]+.*not yet implemented/,
     reason:
