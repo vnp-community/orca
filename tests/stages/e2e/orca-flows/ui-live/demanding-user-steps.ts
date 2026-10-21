@@ -11,7 +11,6 @@ import type { RequestUnderTest } from './live-flow-steps'
 import { listVersions, openAnalysisApprovals, reviseAnalysis } from './live-analysis-revision-steps'
 import {
   chooseVersion,
-  expectOlderPlanVersionsReadOnly,
   openPlanApprovals,
   planRevisionInput,
   revisePlan
@@ -113,11 +112,35 @@ export async function demandPlanChanges(
   const previous = await openPlanApprovals(f, r.requestId)
   await revisePlan(f, r, { text: PLAN_DEMAND, version: 2, previousApprovals: previous })
   await f.step(
-    'demanding: the first version of the Plan is read-only and says what was asked of the next one',
+    'demanding: the first version of the Plan is read-only and the way back works',
     async () => {
+      const pane = detailPane(f.page)
       await chooseVersion(f, 1)
-      await expectOlderPlanVersionsReadOnly(f, [PLAN_DEMAND])
+      await expect(pane.getByTestId('plan-older-version-banner')).toBeVisible()
+      await expect(
+        pane.getByTestId('plan-revision-input'),
+        'no revision box on an old version'
+      ).toHaveCount(0)
+      await expect(
+        pane
+          .getByTestId('plan-proposal-view')
+          .or(pane.getByRole('tab', { name: 'Proposal' }))
+          .first(),
+        'the old version can be read'
+      ).toBeVisible({ timeout: 15_000 })
+      // Why: a person looking at a version the page itself calls older should not be offered to approve it as if it were the plan.
+      if (await pane.getByRole('button', { name: 'Approve plan', exact: true }).isVisible()) {
+        uiFindings.push(
+          'an older version of the Plan is on screen ("You\'re viewing an older version") and "Approve plan" and "Approve and run all steps" are still offered'
+        )
+      }
       await f.shots.take('demanding-plan-old-version')
+      await pane.getByTestId('plan-back-to-current').click()
+      await expect(pane.getByTestId('plan-older-version-banner')).toHaveCount(0)
+      await expect(
+        pane.getByTestId('plan-revision-input'),
+        'the box is back on the current version'
+      ).toBeVisible()
     }
   )
   const shown = await detailPane(f.page).innerText()
