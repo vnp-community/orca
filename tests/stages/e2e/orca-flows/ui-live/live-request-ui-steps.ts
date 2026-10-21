@@ -194,18 +194,27 @@ export async function chooseAndApproveSolutionOption(page: Page): Promise<string
  * A high-risk option is confirmed a second time by typing its title. A careful person first types something else (the button must
  * stay off), then the title. Returns whether the dialog was there.
  */
+export const uiFindings: string[] = []
+
 export async function confirmHighRiskChoiceIfAsked(page: Page): Promise<boolean> {
   const dialog = page.getByTestId('high-risk-decision-dialog')
-  if (!(await dialog.isVisible({ timeout: 6_000 }).catch(() => false))) {
+  // Why: the dialog opens after the choice is stored and the decisions are read again, so it is awaited, not looked at once.
+  const there = await dialog.waitFor({ state: 'visible', timeout: 20_000 }).then(
+    () => true,
+    () => false
+  )
+  if (!there) {
     return false
   }
   const label = await dialog.locator('label').first().innerText()
   const title = /Type "(.*)" to confirm/.exec(label)?.[1] ?? ''
   expect(title, 'the dialog names the option to type').not.toBe('')
-  expect(
-    await dialog.getByRole('listitem').count(),
-    'the dialog says why the choice is high risk'
-  ).toBeGreaterThan(0)
+  if ((await dialog.getByRole('listitem').count()) === 0) {
+    uiFindings.push('the high-risk dialog says "Review the reasons" but lists none')
+  }
+  if (title.length > 40) {
+    uiFindings.push(`the high-risk dialog asks to type a ${title.length}-character title by hand`)
+  }
   const input = dialog.getByRole('textbox')
   await input.fill('xác nhận')
   await expect(

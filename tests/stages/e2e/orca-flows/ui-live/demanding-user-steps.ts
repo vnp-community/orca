@@ -16,7 +16,7 @@ import {
   planRevisionInput,
   revisePlan
 } from './live-plan-revision-steps'
-import { detailPane, openDetailTab } from './live-request-ui-steps'
+import { detailPane, openDetailTab, uiFindings } from './live-request-ui-steps'
 import {
   reloadAndReopen,
   cancelOpenRequestThroughTheUi,
@@ -201,6 +201,7 @@ export async function sendBackAsDemandingReviewer(
 
 export function demandLines(record: DemandRecord[], child: string): string[] {
   return [
+    ...uiFindings.map((x) => `phát hiện về giao diện: ${x}`),
     ...record.map((x) => `${x.what}: ${x.versions} phiên bản; ${x.note}`),
     child
       ? `gửi lại phát hiện sau code thành Request con "${child}" (đã huỷ qua giao diện)`

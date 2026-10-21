@@ -3,7 +3,7 @@
  * its control recognised and filled, the pointer sentence used only where no line of the item fits.
  */
 import { expect, type Locator } from '@playwright/test'
-import { pickOption, textAnswer, type BacklogItem } from './ci-cd-kit-backlog'
+import { POINTER_ANSWER, pickOption, textAnswer, type BacklogItem } from './ci-cd-kit-backlog'
 import type { Timeline } from './ci-cd-kit-report'
 import type { LiveFlow } from './live-flow-harness'
 import type { RequestUnderTest } from './live-flow-steps'
@@ -25,7 +25,12 @@ async function answerBlock(block: Locator, item: BacklogItem): Promise<QuestionA
   const reason = (await block.locator('p').allInnerTexts()).join(' ')
   const area = block.locator('textarea')
   if ((await area.count()) > 0) {
-    const answer = textAnswer(item, prompt, reason)
+    const written = textAnswer(item, prompt, reason)
+    // Why: a demanding user does not answer a real question with a pointer; the backlog is silent, so the answer is a decision.
+    const answer =
+      written === POINTER_ANSWER && process.env.ORCA_E2E_DEMANDING === '1'
+        ? 'Quyết định của tôi: chọn cách ít rủi ro nhất, dùng khoá ổn định (mã dòng tự sinh, không dùng số hàng) để chống trùng, không mở rộng phạm vi ngoài backlog, và nói rõ chỗ nào còn chưa xác minh.'
+        : written
     await area.first().fill(answer)
     return { prompt, control: 'text', answer }
   }
