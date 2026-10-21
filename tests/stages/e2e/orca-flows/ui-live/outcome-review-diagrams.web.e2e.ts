@@ -31,12 +31,18 @@ test.describe('the drawings of the Outcome Review (live stack)', () => {
     await openOutcomeReviewTab(page)
     const frames = page.getByTestId('review-artifact-iframe')
     let drawn = 0
+    let firstDrawn = ''
     // Why: the diff shows one section at a time, so each drawn section is opened in turn.
     for (const section of ['Architecture', 'Flow', 'Behavior', 'Data']) {
       await page
         .getByTestId('outcome-system-diff')
         .getByRole('tab', { name: new RegExp(`^${section}`) })
         .click()
+      // Why: the drawing is read after the tab opens; give it a moment before deciding the section has none.
+      await frames
+        .first()
+        .waitFor({ timeout: 6_000 })
+        .catch(() => undefined)
       await page.screenshot({ path: testInfo.outputPath(`tab-${section.toLowerCase()}.png`) })
       if ((await frames.count()) === 0) {
         continue
@@ -51,17 +57,21 @@ test.describe('the drawings of the Outcome Review (live stack)', () => {
       )
       await frame.screenshot({ path: testInfo.outputPath(`${section.toLowerCase()}-light.png`) })
       drawn += 1
+      firstDrawn ||= section
     }
     expect(drawn, 'the review shows at least one drawing').toBeGreaterThan(0)
     await page
       .getByTestId('outcome-system-diff')
-      .getByRole('tab', { name: /^Architecture/ })
+      .getByRole('tab', { name: new RegExp(`^${firstDrawn}`) })
       .click()
     await expect(page.getByTestId('review-artifact-notice')).toHaveCount(0)
+    await frames.first().waitFor({ timeout: 15_000 })
     await page.emulateMedia({ colorScheme: 'dark' })
     await page.evaluate(() => document.documentElement.classList.add('dark'))
     await frames.first().scrollIntoViewIfNeeded()
-    await frames.first().screenshot({ path: testInfo.outputPath('architecture-dark.png') })
+    await frames
+      .first()
+      .screenshot({ path: testInfo.outputPath(`${firstDrawn.toLowerCase()}-dark.png`) })
     await page.screenshot({ path: testInfo.outputPath('review-tab.png'), fullPage: false })
   })
 })
