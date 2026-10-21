@@ -282,7 +282,7 @@ sequenceDiagram
 
 ### 5.1 Bảng `request_test_spec_runs`
 
-Migration `0099_request_test_spec_runs` cho cả hai dialect (Postgres, MySQL), theo cùng quy ước các bảng `request-service` (có `tenant_id`, khóa ngoại tới `requests`).
+Migration `0110_request_test_spec_runs` cho cả hai dialect (Postgres, MySQL), theo cùng quy ước các bảng `request-service` (có `tenant_id`, khóa ngoại tới `requests`).
 
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
@@ -546,7 +546,7 @@ Danh sách kiểm; mở rộng `orca engine show --check` để báo từng mụ
 
 ### 9.3 Quay lại
 
-Tắt cờ project hoặc `REQUEST_TESTSPEC_ENABLED=false`: không còn run mới; run đang chạy vẫn tiếp tục trên dev server và hiển thị ở lần đọc tiếp theo. Không cần chạy `.down` của migration 0099 để quay về binary cũ (mã cũ bỏ qua cột/bảng mới); chỉ chạy `.down` khi chắc không còn dòng cần giữ.
+Tắt cờ project hoặc `REQUEST_TESTSPEC_ENABLED=false`: không còn run mới; run đang chạy vẫn tiếp tục trên dev server và hiển thị ở lần đọc tiếp theo. Không cần chạy `.down` của migration 0110 để quay về binary cũ (mã cũ bỏ qua cột/bảng mới); chỉ chạy `.down` khi chắc không còn dòng cần giữ.
 
 ---
 
