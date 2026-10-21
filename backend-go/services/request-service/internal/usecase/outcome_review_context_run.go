@@ -277,7 +277,7 @@ func (r *ReviewContextRunner) digestFor(p *contextPlan, codeOnly bool) (string, 
 	}
 	// Why: the delivered wording changed (uncommitted worktree work) without touching the design lock, so only its results are re-keyed.
 	if p.mode == domain.ContextModeDelivered {
-		version += "|delivered-2"
+		version += "|delivered-3"
 	}
 	return domain.ContextDigest(p.mode, p.stored.InputsDigest, lockedDigest, version)
 }
