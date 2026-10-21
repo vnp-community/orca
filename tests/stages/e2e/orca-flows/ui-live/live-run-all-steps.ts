@@ -49,13 +49,14 @@ export async function reachPlanApproval(
 
 /** Number of Phases the committed Plan has, from the service: the number the dialog has to name. */
 export async function phaseCount(f: LiveFlow, r: RequestUnderTest): Promise<number> {
-  const res = await f.rpc.call<{ tasks?: { type?: string }[] }>('task.list', {
+  const res = await f.rpc.call<{ tasks?: { type?: string; status?: string }[] }>('task.list', {
     projectId: f.project.id,
     requestId: r.requestId,
     taskTypes: ['phase'],
     pageSize: 100
   })
-  return (res.tasks ?? []).filter((t) => t.type === 'phase').length
+  // Why: a plan sent back keeps its older phases as cancelled rows; the dialog counts the live ones.
+  return (res.tasks ?? []).filter((t) => t.type === 'phase' && t.status !== 'cancelled').length
 }
 
 /** The approval bar of a step-by-step request: Approve, then the run-all choice, then Reject, in that Tab order. */

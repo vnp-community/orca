@@ -53,12 +53,15 @@ async function listRows(f: LiveFlow, r: RequestUnderTest): Promise<Row[]> {
     taskTypes: ['plan', 'phase', ...LEAF_TYPES],
     pageSize: 100
   })
-  return (res.tasks ?? []).map((t) => ({
-    id: String(t.id),
-    type: String(t.type ?? ''),
-    title: String(t.title ?? ''),
-    status: String(t.status ?? '')
-  }))
+  // Why: tasks of an older plan version are cancelled rows and are not part of the run.
+  return (res.tasks ?? [])
+    .filter((t) => String(t.status ?? '') !== 'cancelled')
+    .map((t) => ({
+      id: String(t.id),
+      type: String(t.type ?? ''),
+      title: String(t.title ?? ''),
+      status: String(t.status ?? '')
+    }))
 }
 
 /** Follows the run to `completed`; throws the stop-loss reasons. `workRoots` are where claude may be working (repo + new worktrees). */
