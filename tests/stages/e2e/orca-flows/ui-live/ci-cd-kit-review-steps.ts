@@ -236,7 +236,8 @@ export async function reviewTheDelivery(f: LiveFlow, r: RequestUnderTest): Promi
       }
       for (let i = 0; i < Math.min(open, 8); i += 1) {
         const already = await decided.count()
-        const card = cards.filter({ has: undecided }).first()
+        // Why: decisions go top-down, so the decided cards come first; a filter on the open button would stop matching once the form replaces it.
+        const card = cards.nth(already)
         await card.getByRole('button', { name: 'Accept as exception' }).click()
         await card
           .getByLabel(/Why/)
