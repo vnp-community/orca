@@ -10,10 +10,11 @@ export const CICDKIT_REPO =
   '/Users/datbeohbbh/Desktop/work/vnpay/agentic-app/vnp-qa-platform'
 export const CICDKIT_PROJECT_NAME = 'vnp-qa-platform'
 export const CICDKIT_BRANCH = 'claude/tms-bug-triage-report-09f310'
-export const CICDKIT_TITLE = '[TMS] CI-CD-KIT (BL-E07)'
-export const BACKLOG_FILE = 'docs/backlog/BL-E07_ci-cd-kit.md'
+// Why: the same flow serves any backlog item of the project; the defaults are the BL-E07 run.
+export const CICDKIT_TITLE = process.env.ORCA_E2E_REQUEST_TITLE || '[TMS] CI-CD-KIT (BL-E07)'
+export const BACKLOG_FILE = process.env.ORCA_E2E_BACKLOG_FILE || 'docs/backlog/BL-E07_ci-cd-kit.md'
 /** The unhurried pointer used where no sentence of the backlog answers a question. */
-export const POINTER_ANSWER = 'See BL-E07 acceptance criteria'
+export const POINTER_ANSWER = `See ${/(BL-[A-Z]\d+)/.exec(BACKLOG_FILE)?.[1] ?? 'the backlog item'} acceptance criteria`
 
 export type BacklogItem = {
   id: string

@@ -11,8 +11,6 @@
  *   python3 tests/stages/e2e/orca-flows/run_ui_flow.py --real ci-cd-kit
  *   ORCA_E2E_CICDKIT_STOP=dialog python3 .../run_ui_flow.py --real ci-cd-kit   # rehearsal: fills the dialog, creates nothing, no AI cost
  */
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import {
   CICDKIT_BRANCH,
@@ -23,6 +21,15 @@ import {
   requestBody
 } from './ci-cd-kit-backlog'
 import { ownRequestIds } from './ci-cd-kit-fixture'
+import {
+  demandAnalysisChanges,
+  demandLines,
+  demandPlanChangesWhenPossible,
+  demanding,
+  sendBackAsDemandingReviewer,
+  type DemandRecord
+} from './demanding-user-steps'
+import { reachAnalysisReady } from './live-analysis-revision-steps'
 import {
   enableReview,
   reviewEnabled,
@@ -41,7 +48,8 @@ import {
   type DocumentsSeen,
   type PlanTaskRow
 } from './ci-cd-kit-plan-steps'
-import { renderReportVi, Timeline, type ReportFacts, type WorktreeFact } from './ci-cd-kit-report'
+import { Timeline, type ReportFacts, type WorktreeFact } from './ci-cd-kit-report'
+import { writeReportFile } from './ci-cd-kit-report-file'
 import {
   answerAskBackFromBacklog,
   answerClarificationFromBacklog,
@@ -97,6 +105,8 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
       let worktrees: WorktreeFact[] = []
       const staticChecks: string[] = []
       let designReview: ReviewFacts | null = null
+      const demandRecord: DemandRecord[] = []
+      let sentBackChild = ''
       let deliveredReview: ReviewFacts | null = null
       let putReviewBack: (() => Promise<void>) | null = null
       let costLines: string[] = []
@@ -154,6 +164,10 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
           return
         }
         const askedBack: QuestionAnswered[] = []
+        if (demanding()) {
+          await reachAnalysisReady(f, r, questions.length > 0)
+          await demandAnalysisChanges(f, r, demandRecord)
+        }
         await approveAnalysis(f, r, {
           autoStarted: questions.length > 0,
           next: { api: 'planning', chip: /Planning/i },
@@ -171,6 +185,9 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
         await f.shots.take('analysis-language')
 
         plan = await waitForAutoPlan(f, r, timeline, 45 * MINUTE)
+        if (demanding()) {
+          await demandPlanChangesWhenPossible(f, r, demandRecord)
+        }
         docs = await readPlanDocuments(f)
         timeline.mark('plan documents read')
         tasks = await reviewPlanBeforeRunAll(f, r)
@@ -200,6 +217,9 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
         await recordFinishedScreens(f, r, findings)
         if (reviewEnabled()) {
           deliveredReview = await reviewTheDelivery(f, r)
+          if (demanding()) {
+            sentBackChild = await sendBackAsDemandingReviewer(f, r)
+          }
           timeline.mark('delivered review done')
         }
         expect(run.fx.headSha(), "the owner's checkout kept its commit").toBe(run.fx.baseTip)
@@ -254,60 +274,50 @@ test.describe("A change request from the owner's backlog item BL-E07, from the U
             finalStatus: String(state.status)
           })
         }
-        const dir = process.env.ORCA_E2E_REPORT_DIR || testInfo.outputDir
-        mkdirSync(dir, { recursive: true })
-        const report = renderReportVi({
-          requestNumber: null,
-          requestId: '',
-          finalStatus: 'chưa tạo',
-          baseBranch: CICDKIT_BRANCH,
-          baseTip: run.fx.baseTip,
-          aiProposed: classification,
-          questions,
-          language: language
-            ? {
-                isVietnamese: language.isVietnamese,
-                accentedPercent: language.service.accentedLetterRatio * 100,
-                sample: language.sample
-              }
-            : null,
-          planWrittenWithoutGenerate: plan ? !plan.generateSeen : null,
-          planWaitMs: plan?.waitMs ?? null,
-          documentTabs: docs.tabs,
-          secretsOnScreen: docs.leaks,
-          runAllUsed,
-          tasks: (
-            record?.timings ??
-            tasks.map((t) => ({ type: t.type, title: t.title, status: t.status }))
-          ).map((t) => ({ type: t.type, title: t.title, status: t.status })),
-          worktrees,
-          staticChecks,
-          costLines,
-          reviewLines: reviewEnabled()
-            ? [
-                ...reviewFactLines('thiết kế', designReview),
-                ...reviewFactLines('sau code', deliveredReview)
-              ]
-            : undefined,
-          findings: [...findings, ...f.lags.map((l) => `độ trễ màn hình: ${l}`)],
-          timeline: timeline.lines(),
-          screenshotsDir: testInfo.outputDir,
-          ...facts
-        })
-        writeFileSync(join(dir, 'ci-cd-kit-report.vi.md'), report)
-        if (dir !== testInfo.outputDir) {
-          copyFileSync(
-            join(dir, 'ci-cd-kit-report.vi.md'),
-            join(testInfo.outputDir, 'ci-cd-kit-report.vi.md')
-          )
-        }
-        console.log(
-          `[ci-cd-kit] report written to ${join(dir, 'ci-cd-kit-report.vi.md')}\n${report}`
+        writeReportFile(
+          testInfo,
+          {
+            requestNumber: null,
+            requestId: '',
+            finalStatus: 'chưa tạo',
+            baseBranch: CICDKIT_BRANCH,
+            baseTip: run.fx.baseTip,
+            aiProposed: classification,
+            questions,
+            language: language
+              ? {
+                  isVietnamese: language.isVietnamese,
+                  accentedPercent: language.service.accentedLetterRatio * 100,
+                  sample: language.sample
+                }
+              : null,
+            planWrittenWithoutGenerate: plan ? !plan.generateSeen : null,
+            planWaitMs: plan?.waitMs ?? null,
+            documentTabs: docs.tabs,
+            secretsOnScreen: docs.leaks,
+            runAllUsed,
+            tasks: (
+              record?.timings ??
+              tasks.map((t) => ({ type: t.type, title: t.title, status: t.status }))
+            ).map((t) => ({ type: t.type, title: t.title, status: t.status })),
+            worktrees,
+            staticChecks,
+            costLines,
+            reviewLines:
+              reviewEnabled() || demanding()
+                ? [
+                    ...reviewFactLines('thiết kế', designReview),
+                    ...reviewFactLines('sau code', deliveredReview),
+                    ...(demanding() ? demandLines(demandRecord, sentBackChild) : [])
+                  ]
+                : undefined,
+            findings: [...findings, ...f.lags.map((l) => `độ trễ màn hình: ${l}`)],
+            timeline: timeline.lines(),
+            screenshotsDir: testInfo.outputDir,
+            ...facts
+          },
+          worktrees
         )
-        testInfo.annotations.push({
-          type: 'new-worktrees',
-          description: worktrees.map((w) => `${w.path} [${w.branch}]`).join(' | ')
-        })
       }
       expect(findings, 'findings of the run (language, proposal base, screens)').toEqual([])
       for (const w of worktrees) {

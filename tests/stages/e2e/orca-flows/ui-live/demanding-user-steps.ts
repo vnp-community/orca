@@ -13,9 +13,10 @@ import {
   chooseVersion,
   expectOlderPlanVersionsReadOnly,
   openPlanApprovals,
+  planRevisionInput,
   revisePlan
 } from './live-plan-revision-steps'
-import { detailPane } from './live-request-ui-steps'
+import { detailPane, openDetailTab } from './live-request-ui-steps'
 import {
   reloadAndReopen,
   cancelOpenRequestThroughTheUi,
@@ -79,6 +80,28 @@ export async function demandAnalysisChanges(
       await f.shots.take('demanding-analysis-after-reload')
     }
   )
+}
+
+/** Sends the Plan back when the screen offers to; a Plan the screen cannot be sent back is itself a finding for the report. */
+export async function demandPlanChangesWhenPossible(
+  f: LiveFlow,
+  r: RequestUnderTest,
+  record: DemandRecord[]
+): Promise<void> {
+  await openDetailTab(f.page, 'Plan')
+  const offered = await planRevisionInput(f.page)
+    .isVisible({ timeout: 10_000 })
+    .catch(() => false)
+  if (!offered) {
+    record.push({
+      what: 'plan demands',
+      versions: 1,
+      note: 'the Plan tab offers no way to send the plan back (no revision box)'
+    })
+    await f.shots.take('demanding-plan-no-revision-box')
+    return
+  }
+  await demandPlanChanges(f, r, record)
 }
 
 /** The Plan is on screen and waiting: send it back once, open the first version (it must be read-only), come back. */
