@@ -53,18 +53,18 @@ async function readRuns(f: LiveFlow, r: RequestUnderTest): Promise<Raw[]> {
 
 const active = (run: Raw): boolean => ['queued', 'running'].includes(str(run.status))
 
-/** Waits until the agent has nothing running for this review, or the budget ends. Returns the runs seen. */
+/** Waits until at least `minRuns` runs exist and none is going, or the budget ends. Returns the runs seen. */
 async function waitForRuns(
   f: LiveFlow,
   r: RequestUnderTest,
   label: string,
-  ms: number
+  ms: number,
+  minRuns = 1
 ): Promise<Raw[]> {
   const until = Date.now() + ms
-  let runs = await readRuns(f, r)
   while (Date.now() < until) {
-    runs = await readRuns(f, r)
-    if (runs.length > 0 && !runs.some(active)) {
+    const runs = await readRuns(f, r)
+    if (runs.length >= minRuns && !runs.some(active)) {
       return runs
     }
     await f.page.waitForTimeout(10_000)
@@ -172,14 +172,27 @@ export async function reviewTheDelivery(f: LiveFlow, r: RequestUnderTest): Promi
       timeout: 60_000
     })
     await f.shots.take('review-after-execution')
-    // Why: a design review that exists says "execution finished" (rebuild); none says "invite_delivered" (generate).
-    const rebuild = f.page.getByTestId('outcome-banner-rebuild')
-    if (await rebuild.isVisible().catch(() => false)) {
-      await rebuild.click()
-    } else if ((await reviewInvite(f.page).count()) > 0) {
+    const before = (await readRuns(f, r)).length
+    // Why: no review yet shows the invitation; a design review shows the "Generate after-code review" banner; a review of the
+    // delivered phase (facts only) is read again through the Regenerate panel.
+    const banner = f.page.getByTestId('outcome-banner-generate')
+    if ((await reviewInvite(f.page).count()) > 0) {
       await f.page.getByTestId('outcome-review-generate').click()
+    } else if (await banner.isVisible().catch(() => false)) {
+      await banner.click()
+    } else {
+      await f.page.getByTestId('outcome-header-regenerate').click()
+      await f.page.getByLabel('What to do').selectOption('context')
+      await f.page.getByLabel('Why').selectOption('other')
+      await f.page.getByTestId('regenerate-submit').click()
     }
-    await waitForRuns(f, r, 'delivered', 30 * MINUTE)
+    await expect
+      .poll(async () => (await readRuns(f, r)).length, {
+        timeout: 60_000,
+        message: 'the click started no run'
+      })
+      .toBeGreaterThan(before)
+    await waitForRuns(f, r, 'delivered', 30 * MINUTE, before + 1)
     await reloadAndReopen(f.page, r.title)
     await outcomeReviewTab(f.page).click()
     await expect(reviewTab(f.page)).toHaveAttribute('data-phase', 'delivered', { timeout: 60_000 })

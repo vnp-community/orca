@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"time"
 
 	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 )
+
+// reviewDiffReadTimeout keeps one slow worktree from using the whole request deadline: a diff that does not come in time is a
+// partial fact (the review still opens), not an Internal error. A var so a test can shorten it.
+var reviewDiffReadTimeout = 20 * time.Second
 
 // ReviewDiff is what git-gateway says a task worktree changed against the Request's base ref.
 type ReviewDiff struct {
@@ -189,7 +194,9 @@ func (c *ReviewFactsCollector) collectDiff(ctx context.Context, req domain.Reque
 			continue
 		}
 		seenWorktree[leaf.WorktreeID] = true
-		d, err := c.Diff.BranchCompare(ctx, leaf.WorktreeID, req.BaseRef)
+		readCtx, cancel := context.WithTimeout(ctx, reviewDiffReadTimeout)
+		d, err := c.Diff.BranchCompare(readCtx, leaf.WorktreeID, req.BaseRef)
+		cancel()
 		if err != nil || d.Status != "ready" {
 			c.logger().WarnContext(ctx, "outcome review: diff unreadable", slog.String("request_id", req.ID), slog.String("task_id", leaf.ID),
 				slog.String("status", d.Status), slog.Any("error", err))
