@@ -456,6 +456,8 @@ func (r *ReviewContextRunner) runAgent(ctx context.Context, p *contextPlan) (dom
 			return vc, designDigest, costFigure(stats), ""
 		}
 		if v, ok := domain.AsContextViolations(verr); ok {
+			// Why: only the error code is stored, so without this a rejected agent answer cannot be diagnosed afterwards.
+			r.logger().WarnContext(ctx, "outcome review: agent result rejected", slog.Int("attempt", attempt+1), slog.Any("violations", v))
 			violations = v
 			continue
 		}
