@@ -226,22 +226,23 @@ export async function reviewTheDelivery(f: LiveFlow, r: RequestUnderTest): Promi
     'delivered review: Approve is refused while decisions are open, then each is decided',
     async () => {
       const cards = f.page.getByTestId('outcome-decision-card')
-      const open = await cards.count()
+      const undecided = f.page.getByRole('button', { name: 'Accept as exception' })
+      const decided = f.page.getByTestId('outcome-decision-made')
+      const open = await undecided.count()
       if (open > 0) {
         await f.page.getByTestId('outcome-approve').click()
         await expect(f.page.getByTestId('outcome-approve-error')).toBeVisible()
         await f.shots.take('review-approve-refused')
       }
       for (let i = 0; i < Math.min(open, 8); i += 1) {
-        const card = cards.first()
+        const already = await decided.count()
+        const card = cards.filter({ has: undecided }).first()
         await card.getByRole('button', { name: 'Accept as exception' }).click()
         await card
           .getByLabel(/Why/)
           .fill('Accepted during the BL-E07 acceptance run: reviewed by the owner.')
         await card.getByTestId('outcome-decision-confirm').click()
-        await expect(f.page.getByTestId('outcome-decision-made').nth(i)).toBeVisible({
-          timeout: 30_000
-        })
+        await expect(decided).toHaveCount(already + 1, { timeout: 30_000 })
         decisionsMade.push(`item ${i + 1}: accepted as exception`)
       }
       await f.shots.take('review-decisions-made')
@@ -250,7 +251,7 @@ export async function reviewTheDelivery(f: LiveFlow, r: RequestUnderTest): Promi
 
   let approvedText = ''
   await f.step('delivered review: approval keeps its words and survives a reload', async () => {
-    if ((await f.page.getByTestId('outcome-decision-card').count()) > 0) {
+    if ((await f.page.getByRole('button', { name: 'Accept as exception' }).count()) > 0) {
       approvedText = 'not approved: decisions remain'
       return
     }
