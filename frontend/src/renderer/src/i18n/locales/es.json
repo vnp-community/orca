@@ -14971,6 +14971,7 @@
               "executionNotFinished": "Disponible cuando termine la ejecución",
               "generateFirst": "Genera primero la revisión posterior al código"
             },
+            "noCodeDrawing": "El agente no dibujó nada del código para esta sección. El dibujo del diseño está en la vista Diseño; lo que encontró aparece abajo.",
             "openFile": "Abrir el diff de {{path}}",
             "req": {
               "after": "Después",

@@ -19,6 +19,7 @@ import {
   diagramLabelText,
   emptyHiddenText,
   emptyText,
+  noCodeDrawingText,
   laterText,
   modeReasonText,
   showUnchangedText,
@@ -69,10 +70,13 @@ type Props = {
 function DiagramColumn({
   title,
   diagrams,
+  emptyNote,
   props
 }: {
   title?: string
   diagrams: DiagramRef[]
+  /** Said instead of "Nothing here." when the column is empty but the section is not. */
+  emptyNote?: string
   props: Omit<React.ComponentProps<typeof ReviewArtifactFrame>, 'diagram' | 'label'> & {
     section: ReviewSection
   }
@@ -86,7 +90,7 @@ function DiagramColumn({
           className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground"
           data-testid="outcome-no-diagram"
         >
-          {emptyText()}
+          {emptyNote ?? emptyText()}
         </p>
       ) : (
         diagrams.map((d) => (
@@ -138,17 +142,21 @@ export function OutcomeSystemDiff(props: Props): React.JSX.Element {
     ? 0
     : sectionItems(review, active).filter((i) => i.change === 'unchanged').length
   const frameProps = { requestId, canRegenerate, onRegenerate, onChanged, section: active }
+  const designDrawings = diagramsOf(review, active, 'design')
+  const deltaDrawings = diagramsOf(review, active, 'delta')
   const designColumn = (
-    <DiagramColumn
-      title={sideText('design')}
-      diagrams={diagramsOf(review, active, 'design')}
-      props={frameProps}
-    />
+    <DiagramColumn title={sideText('design')} diagrams={designDrawings} props={frameProps} />
   )
+  // Why: an empty after-code tab next to a drawn design reads as "no change"; it means only that the agent drew none.
   const deltaColumn = (
     <DiagramColumn
       title={sideText('after_code')}
-      diagrams={diagramsOf(review, active, 'delta')}
+      diagrams={deltaDrawings}
+      emptyNote={
+        deltaDrawings.length === 0 && designDrawings.length > 0 && phase === 'delivered'
+          ? noCodeDrawingText()
+          : undefined
+      }
       props={frameProps}
     />
   )

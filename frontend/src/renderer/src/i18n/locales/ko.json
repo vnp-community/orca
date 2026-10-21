@@ -14971,6 +14971,7 @@
               "executionNotFinished": "실행이 끝나면 사용할 수 있음",
               "generateFirst": "먼저 코드 이후 리뷰를 생성하세요"
             },
+            "noCodeDrawing": "이 섹션에서는 에이전트가 코드로부터 그림을 그리지 않았습니다. 설계 그림은 설계 보기에 있으며, 찾은 내용은 아래에 나열됩니다.",
             "openFile": "{{path}}의 diff 열기",
             "req": {
               "after": "이후",

@@ -14971,6 +14971,7 @@
               "executionNotFinished": "Available when execution completes",
               "generateFirst": "Generate the after-code review first"
             },
+            "noCodeDrawing": "The agent drew nothing from the code for this section. The design drawing is in the Design view; what it found is listed below.",
             "openFile": "Open the diff of {{path}}",
             "req": {
               "after": "After",

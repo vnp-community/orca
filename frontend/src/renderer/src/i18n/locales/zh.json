@@ -14971,6 +14971,7 @@
               "executionNotFinished": "执行结束后可用",
               "generateFirst": "请先生成代码完成后的评审"
             },
+            "noCodeDrawing": "智能体没有为本节根据代码绘图。设计图在“设计”视图中；它的发现列在下方。",
             "openFile": "打开 {{path}} 的差异",
             "req": {
               "after": "之后",

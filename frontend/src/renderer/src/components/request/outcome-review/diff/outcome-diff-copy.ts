@@ -83,6 +83,13 @@ export function emptyText(): string {
   return translate(`${T}empty`, 'Nothing here.')
 }
 
+export function noCodeDrawingText(): string {
+  return translate(
+    `${T}noCodeDrawing`,
+    'The agent drew nothing from the code for this section. The design drawing is in the Design view; what it found is listed below.'
+  )
+}
+
 export function emptyHiddenText(count: number): string {
   return translate(`${T}emptyHidden`, 'Nothing changed here ({{count}} unchanged hidden).', {
     count
