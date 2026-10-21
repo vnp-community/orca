@@ -111,7 +111,7 @@ export async function demandSmallerPlanIfTooBig(
   r: RequestUnderTest,
   record: DemandRecord[]
 ): Promise<void> {
-  const res = await f.rpc.call<{ tasks?: { type?: string }[] }>('task.list', {
+  const res = await f.rpc.call<{ tasks?: { type?: string; status?: string }[] }>('task.list', {
     projectId: f.project.id,
     requestId: r.requestId,
     taskTypes: PLAN_TASK_TYPES,

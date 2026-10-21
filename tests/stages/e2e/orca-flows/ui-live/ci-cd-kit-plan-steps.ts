@@ -200,7 +200,8 @@ export async function reviewPlanBeforeRunAll(
       taskTypes: PLAN_TASK_TYPES,
       pageSize: 100
     })
-    const rows = res.tasks ?? []
+    // Why: a plan sent back keeps its older tasks as cancelled rows; only the live ones are the plan to approve.
+    const rows = (res.tasks ?? []).filter((t) => String(t.status ?? '') !== 'cancelled')
     tasks = rows.map((t) => ({
       id: String(t.id),
       type: String(t.type ?? ''),
