@@ -692,6 +692,38 @@ class McpTools:
         finally:
             db.close()
 
+    def testspec_tcir_get(self, feature: str, code: str | None = None, level: str | None = None, offset: int = 0) -> Paged:
+        """TCIR (tcir/v1) of a feature's test cases: the input of the test-script agent, read from the latest test-spec version.
+
+        Each test case carries its steps (ids <TC>.S<n>), expected results (ids <TC>.E<n>, operator, value, oracle), data value classes
+        (the script generates its own data), fixtures, stubs and trace. ``code``: one test case; else every case, optionally of one
+        ``level`` (L1 | L2 | L3); the list is cut by size, repeat with offset=next."""
+        from ..agents.testspec import runner as tsrunner
+        if level is not None and level not in ("L1", "L2", "L3"):
+            raise invalid("level must be one of L1, L2, L3", level=level)
+        offset = self._offset(offset)
+        c = tsrunner.tsagent_config(self.rt.config)
+        if not Path(c.db).is_file():
+            raise NotFound(f"feature {feature!r} has no test specs yet", code="TESTSPEC_NOT_FOUND")
+        from tsagent.errors import TsagentError
+        from tsagent.render import tcir
+        from tsagent.store import tso as store_tso
+        from tsagent.store.db import open_db
+        db = open_db(c)
+        try:
+            try:
+                g = store_tso.load_spec(db, feature)
+            except TsagentError as exc:
+                raise NotFound(str(exc), code="TESTSPEC_NOT_FOUND") from exc
+        finally:
+            db.close()
+        if code is not None:
+            tc = g.get(code)
+            if tc is None or tc.cls != "TestCase":
+                raise NotFound(f"feature {feature!r} has no test case {code!r}", code="TESTSPEC_NOT_FOUND")
+            return Paged({"testCase": tcir.test_case(g, tc)})
+        return Paged(tcir.bundle(g, level=level), parts=("testCases",), offset=offset)
+
     @staticmethod
     def _testspec_row(cfg, c, version: dict, feature: str) -> dict:
         d = Path(c.specs_root) / feature

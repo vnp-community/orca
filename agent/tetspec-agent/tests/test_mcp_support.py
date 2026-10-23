@@ -20,7 +20,7 @@ ACTORS = [{"id": "alice", "kind": "human", "roles": ["BA", "BA/owner"]}, {"id": 
           {"id": "limited", "kind": "coding_agent", "roles": ["BA"]}]
 
 READ_TOOLS = ["kg_get_element", "kg_elements", "kg_neighbors", "kg_resolve_scope", "kg_query", "kg_search", "kg_snapshots", "source_get", "impact_get",
-              "readiness_get", "run_list", "run_get", "trace_get", "metrics_get", "testspec_get"]
+              "readiness_get", "run_list", "run_get", "trace_get", "metrics_get", "testspec_get", "testspec_tcir_get"]
 WRITE_TOOLS = ["run_start", "run_resume", "run_dispatch", "run_cancel", "generate_start", "change_start", "testspec_start", "changeset_propose",
                "proposals_list"]
 

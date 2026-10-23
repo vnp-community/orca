@@ -204,6 +204,32 @@ def test_get_features_gaps_context_and_documents(tmp_path, repo):
     assert "token" not in json.dumps(listing).lower() and "api_key" not in json.dumps(listing).lower()   # only the mode name of the LLM is shown
 
 
+# ---------------------------------------------------------------- testspec_tcir_get: TCIR for the test-script agent
+def test_tcir_of_the_latest_version(tmp_path, repo):
+    o, _ops, tools = build(tmp_path, repo, context_mode="solution")
+    with pytest.raises(NotFound) as e:
+        tools.testspec_tcir_get("TDD-B")
+    assert e.value.code == "TESTSPEC_NOT_FOUND"
+    run_id = tools.testspec_start({"kind": "solution", "ref": "REQ-9", "document": SOLUTION}, tdd="TDD-B")["run_id"]
+    assert o.advance(run_id).status == "completed"
+    every = tools.testspec_tcir_get("TDD-B")
+    assert every.parts == ("testCases",) and every.result["schemaVersion"] == "tcir/v1" and every.result["specVersion"] == 1
+    cases = every.result["testCases"]
+    assert cases and all(c["data"]["policy"] == "generate" for c in cases)
+    for c in cases:
+        assert all(e["id"].startswith(c["id"] + ".E") for e in c["expected"]) and all(s["id"].startswith(c["id"] + ".S") for s in c["steps"])
+        assert all(not f["sensitive"] or "example" not in f for d in c["data"]["items"] for f in d["fields"])
+    one = tools.testspec_tcir_get("TDD-B", code=cases[0]["id"]).result["testCase"]
+    assert one == cases[0]
+    doc = tools.testspec_get("TDD-B", "cases").result["text"]
+    assert "TCIR:" in doc and f'"id": "{cases[0]["id"]}"' in doc
+    with pytest.raises(NotFound):
+        tools.testspec_tcir_get("TDD-B", code="TC-NOPE")
+    with pytest.raises(TddAgentError) as e:
+        tools.testspec_tcir_get("TDD-B", level="L9")
+    assert e.value.code == "INVALID_ARGUMENT"
+
+
 # ---------------------------------------------------------------- the Orca sequence (TC-74)
 def test_orca_sequence_over_the_server(tmp_path, repo):
     """testspec_get -> testspec_start -> run advance -> run_get -> testspec_get, through the same MCP server a bridge would call."""
