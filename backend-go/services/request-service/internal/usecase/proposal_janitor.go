@@ -182,8 +182,9 @@ func (j *ProposalJanitor) release(ctx context.Context, change domain.OpenSpecCha
 		if err != nil {
 			return out, err
 		}
-		if want := domain.ProposalBranch(req.Number); change.Branch != want {
-			return out, fmt.Errorf("the change names branch %q, not %q: its worktree is not removed", change.Branch, want)
+		if !domain.IsProposalBranch(change.Branch, req.Number, req.ID) {
+			return out, fmt.Errorf("the change names branch %q, not %q or %q: its worktree is not removed", change.Branch,
+				domain.ProposalBranch(req.Number), domain.ProposalBranchFor(req.Number, req.ID))
 		}
 		if err := j.Workspace.Remove(ctx, Workspace{WorktreeID: change.WorkspaceID, Branch: change.Branch}); err != nil {
 			return out, fmt.Errorf("remove the proposal worktree: %w", err)

@@ -34,14 +34,30 @@ func (w *ProposalWorkspace) Ensure(ctx context.Context, in usecase.EnsureWorkspa
 	if err != nil {
 		return usecase.Workspace{}, err
 	}
-	branch := proposalBranch(in.RequestNumber)
+	branch, err := w.branchFor(ctx, tctx, in, repoID)
+	if err != nil {
+		return usecase.Workspace{}, err
+	}
 	key := "request-proposal:" + in.RequestID
 	ws, err := w.create(tctx, in.ProjectID, repoID, branch, base, key)
 	if errors.Is(err, errProposalWorktreeExists) {
 		// A worktree made before the gateway stored the key with its record has nothing to find by key; the project's own
 		// records still say which worktree holds this Request's branch.
 		var found bool
-		if ws, found, err = w.existingFor(ctx, in.ProjectID, repoID, branch, base.ref); err == nil && !found {
+		ws, found, err = w.existingFor(ctx, in.ProjectID, repoID, branch, base.ref)
+		if err == nil && !found && branch == proposalBranch(in.RequestNumber) {
+			// The path belongs to something no record of this Request knows (left by an earlier database, or another project on
+			// the same repository): build on the Request's own name instead of failing the run.
+			own := domain.ProposalBranchFor(in.RequestNumber, in.RequestID)
+			slog.WarnContext(ctx, "the proposal worktree path is taken by a worktree no record knows; using the Request's own branch",
+				slog.String("request_id", in.RequestID), slog.String("taken", branch), slog.String("branch", own))
+			branch = own
+			ws, err = w.create(tctx, in.ProjectID, repoID, branch, base, key)
+			if errors.Is(err, errProposalWorktreeExists) {
+				ws, found, err = w.existingFor(ctx, in.ProjectID, repoID, branch, base.ref)
+			}
+		}
+		if err == nil && !found && ws.WorktreeID == "" {
 			err = fmt.Errorf("%w: could not create the proposal worktree: its path exists but no record of this Request's branch was found", domain.ErrOpenSpecAgentFailed)
 		}
 	}
@@ -57,6 +73,59 @@ func (w *ProposalWorkspace) Ensure(ctx context.Context, in usecase.EnsureWorkspa
 		}
 	}
 	return ws, nil
+}
+
+// branchFor picks the proposal branch. The usual name is request/<n>-proposal; when a branch of that name already exists and no
+// worktree record of this project holds it, it was left by something else (Request numbers start again after a database reset,
+// two projects can share a repository), and git-gateway would check it out and build the new change on its old commits. The
+// Request's own name avoids that. A failed lookup keeps the usual name: the create call is still the final judge.
+func (w *ProposalWorkspace) branchFor(ctx, tctx context.Context, in usecase.EnsureWorkspaceInput, repoID string) (string, error) {
+	branch := proposalBranch(in.RequestNumber)
+	own := domain.ProposalBranchFor(in.RequestNumber, in.RequestID)
+	refs, err := w.git.SearchRefs(tctx, &gitgatewayv1.SearchRefsRequest{RepoId: repoID, Query: branch})
+	if err != nil {
+		slog.WarnContext(ctx, "could not look up the proposal branch; keeping the usual name", slog.String("branch", branch), slog.Any("error", err))
+		return branch, nil
+	}
+	exists, ownExists := false, false
+	for _, r := range refs.GetRefs() {
+		switch strings.TrimPrefix(r, "heads/") {
+		case branch:
+			exists = true
+		case own:
+			ownExists = true
+		}
+	}
+	if ownExists {
+		return own, nil // an earlier run of this Request already moved to its own name
+	}
+	if !exists {
+		return branch, nil
+	}
+	if _, known, err := w.recordedFor(ctx, in.ProjectID, repoID, branch); err != nil || known {
+		return branch, err
+	}
+	slog.WarnContext(ctx, "the proposal branch exists but no worktree record of this project holds it; using the Request's own branch",
+		slog.String("request_id", in.RequestID), slog.String("taken", branch), slog.String("branch", own))
+	return own, nil
+}
+
+// recordedFor says whether project-service has any worktree record (active or not) of branch on this repo.
+func (w *ProposalWorkspace) recordedFor(ctx context.Context, projectID, repoID, branch string) (string, bool, error) {
+	pctx, err := withIdentityMetadata(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	resp, err := w.projects.ListWorktrees(pctx, &projectv1.ListWorktreesRequest{ProjectId: projectID})
+	if err != nil {
+		return "", false, mapWorkspaceError("list the project's worktrees", err)
+	}
+	for _, wt := range resp.GetWorktrees() {
+		if wt.GetBranch() == branch && (wt.GetRepoId() == repoID || wt.GetRepoId() == "") {
+			return wt.GetId(), true, nil
+		}
+	}
+	return "", false, nil
 }
 
 // startPoint is where the proposal branch starts. explicit marks a ref the person chose.

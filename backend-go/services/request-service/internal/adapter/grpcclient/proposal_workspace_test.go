@@ -9,6 +9,7 @@ import (
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	"github.com/stablyai/orca-go/services/request-service/internal/domain"
 	"github.com/stablyai/orca-go/services/request-service/internal/usecase"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -38,6 +39,21 @@ type fakeProposalGit struct {
 	statErr     error
 	dir         *gitgatewayv1.ReadDirResponse
 	dirErr      error
+	refs        []string // local refs SearchRefs knows
+	refsErr     error
+}
+
+func (f *fakeProposalGit) SearchRefs(_ context.Context, in *gitgatewayv1.SearchRefsRequest, _ ...grpc.CallOption) (*gitgatewayv1.SearchRefsResponse, error) {
+	if f.refsErr != nil {
+		return nil, f.refsErr
+	}
+	var out []string
+	for _, r := range f.refs {
+		if strings.Contains(r, in.GetQuery()) {
+			out = append(out, r)
+		}
+	}
+	return &gitgatewayv1.SearchRefsResponse{Refs: out}, nil
 }
 
 func newFakeProposalGit() *fakeProposalGit {
@@ -402,5 +418,46 @@ func TestProposalWorkspace_StatAndListDir(t *testing.T) {
 	g.dirErr = status.Error(codes.Unavailable, "down")
 	if _, err := w.ListDir(ctxWithIdentity(), ws1, "x"); err == nil || !strings.Contains(err.Error(), "REQUEST_ENGINE_NO_CONNECTION") {
 		t.Fatalf("%v", err)
+	}
+}
+
+func TestProposalWorkspace_BranchLeftByAnotherRequestIsNotReused(t *testing.T) {
+	w, g := wsKit(oneRepo)
+	g.refs = []string{"main", "request/42-proposal"} // no worktree record of this project holds it
+	ws, err := w.Ensure(ctxWithIdentity(), ensureIn())
+	if err != nil {
+		t.Fatal(err)
+	}
+	own := domain.ProposalBranchFor(42, "req-uuid")
+	if ws.Branch != own || g.created[len(g.created)-1].GetBranch() != own {
+		t.Fatalf("branch %q, want the Request's own %q", ws.Branch, own)
+	}
+}
+
+func TestProposalWorkspace_BranchOfThisProjectKeepsItsName(t *testing.T) {
+	w, g := wsKit(oneRepo)
+	g.refs = []string{"request/42-proposal"}
+	w.projects.(*fakeProjects).worktrees = []*projectv1.Worktree{{Id: "wt-old", Branch: "request/42-proposal", RepoId: "repo-1"}}
+	ws, err := w.Ensure(ctxWithIdentity(), ensureIn())
+	if err != nil || ws.Branch != "request/42-proposal" {
+		t.Fatalf("ws %+v err %v", ws, err)
+	}
+}
+
+func TestProposalWorkspace_OwnBranchFromAnEarlierRunWins(t *testing.T) {
+	w, g := wsKit(oneRepo)
+	g.refs = []string{"request/42-proposal", domain.ProposalBranchFor(42, "req-uuid")}
+	ws, err := w.Ensure(ctxWithIdentity(), ensureIn())
+	if err != nil || ws.Branch != domain.ProposalBranchFor(42, "req-uuid") {
+		t.Fatalf("ws %+v err %v", ws, err)
+	}
+}
+
+func TestProposalWorkspace_LookupFailureKeepsTheUsualName(t *testing.T) {
+	w, g := wsKit(oneRepo)
+	g.refsErr = errors.New("relay down")
+	ws, err := w.Ensure(ctxWithIdentity(), ensureIn())
+	if err != nil || ws.Branch != "request/42-proposal" {
+		t.Fatalf("ws %+v err %v", ws, err)
 	}
 }

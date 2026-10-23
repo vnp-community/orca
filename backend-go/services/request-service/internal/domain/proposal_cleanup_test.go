@@ -45,3 +45,23 @@ func TestOpenSpecChange_ReleaseWorkspaceKeepsEverythingElse(t *testing.T) {
 		t.Fatalf("%+v", c)
 	}
 }
+
+func TestProposalBranchNamesOfARequest(t *testing.T) {
+	id := "665542ee-cf81-49a6-ae16-fe1c9408c8cc"
+	if got := ProposalBranchFor(1, id); got != "request/1-proposal-665542ee" {
+		t.Fatalf("own branch %q", got)
+	}
+	for _, b := range []string{"request/1-proposal", "request/1-proposal-665542ee"} {
+		if !IsProposalBranch(b, 1, id) {
+			t.Fatalf("%q is a proposal branch of the Request", b)
+		}
+	}
+	for _, b := range []string{"request/2-proposal", "request/1-proposal-deadbeef", "main"} {
+		if IsProposalBranch(b, 1, id) {
+			t.Fatalf("%q is not a proposal branch of the Request", b)
+		}
+	}
+	if TestScriptBranch(1, id, "TDD NOTES", 2) != "tsa/REQ-1-665542ee-TDD-NOTES-v2" || RequestIDShort("ab-c") != "abc" {
+		t.Fatal("test-script branch or short id")
+	}
+}
