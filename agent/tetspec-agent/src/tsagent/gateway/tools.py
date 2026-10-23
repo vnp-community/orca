@@ -136,12 +136,13 @@ def get_testcase(ctx, a):
        "limit": {"type": "integer", "minimum": 1, "maximum": 200}, "offset": {"type": "integer", "minimum": 0}}, ["feature"])
 def get_tcir(ctx, a):
     g = _spec(ctx, a["feature"], a.get("version"))
+    pkg = cached(ctx, "source", (a["feature"], g.meta["baseline"]), lambda: source.load_source(ctx.db, a["feature"], g.meta["baseline"]))
     if a.get("code"):
         tc = g.get(a["code"])
         if tc is None or tc.cls != "TestCase":
             raise NotFound(f"no test case {a['code']}")
-        return tcir.test_case(g, tc)
-    b = tcir.bundle(g, level=a.get("level"))
+        return tcir.test_case(g, tc, pkg=pkg)
+    b = tcir.bundle(g, level=a.get("level"), pkg=pkg)
     off, lim = a.get("offset", 0), a.get("limit", 50)
     items = b.pop("testCases")
     return {**b, "total": len(items), "offset": off, "next": off + lim if off + lim < len(items) else None,

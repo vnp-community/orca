@@ -707,12 +707,14 @@ class McpTools:
             raise NotFound(f"feature {feature!r} has no test specs yet", code="TESTSPEC_NOT_FOUND")
         from tsagent.errors import TsagentError
         from tsagent.render import tcir
+        from tsagent.store import source as store_source
         from tsagent.store import tso as store_tso
         from tsagent.store.db import open_db
         db = open_db(c)
         try:
             try:
                 g = store_tso.load_spec(db, feature)
+                pkg = store_source.load_source(db, feature, g.meta["baseline"])
             except TsagentError as exc:
                 raise NotFound(str(exc), code="TESTSPEC_NOT_FOUND") from exc
         finally:
@@ -721,8 +723,8 @@ class McpTools:
             tc = g.get(code)
             if tc is None or tc.cls != "TestCase":
                 raise NotFound(f"feature {feature!r} has no test case {code!r}", code="TESTSPEC_NOT_FOUND")
-            return Paged({"testCase": tcir.test_case(g, tc)})
-        return Paged(tcir.bundle(g, level=level), parts=("testCases",), offset=offset)
+            return Paged({"testCase": tcir.test_case(g, tc, pkg=pkg)})
+        return Paged(tcir.bundle(g, level=level, pkg=pkg), parts=("testCases",), offset=offset)
 
     @staticmethod
     def _testspec_row(cfg, c, version: dict, feature: str) -> dict:

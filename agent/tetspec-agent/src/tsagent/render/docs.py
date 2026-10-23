@@ -249,7 +249,7 @@ def cases(v):
             out += table(["#", "Loại", "Toán tử", "Mong đợi", "Đơn vị", "Oracle"],
                          [(a.attrs["ordinal"], a.attrs["assertionKind"], a.attrs["operator"], a.attrs["expected"], a.attrs.get("unit"),
                            codes_cell(a.rel("oracle"))) for a in asserts]) + [""]
-            out += ["TCIR:", "", "```json", json.dumps(tcir.test_case(g, tc, ix), ensure_ascii=False, indent=1), "```", ""]
+            out += ["TCIR:", "", "```json", json.dumps(tcir.test_case(g, tc, ix, v.pkg), ensure_ascii=False, indent=1), "```", ""]
     out += history_section(v, 3)
     return "\n".join(out)
 

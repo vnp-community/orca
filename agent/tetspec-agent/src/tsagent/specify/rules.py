@@ -170,7 +170,7 @@ class Specifier:
             self._ent("TestData", data, {"entity": target, "lifecycle": "tạo trong test, xóa ở cleanup",
                                          "sensitivity": "secret" if sensitive else "none"}, based)
             self._ent("DataField", codes.data_field(code, pname),
-                      {"name": pname, "valueClass": "hợp lệ" if valid else "không hợp lệ",
+                      {"name": pname, "valueClass": {True: "hợp lệ", False: "không hợp lệ"}.get(valid, "chưa xác định"),
                        "example": f"secretRef:{codes.norm(pname).lower()}-test" if sensitive and valid else str(val),
                        "sensitive": sensitive}, based, {"data": data})
             tc.link("needsData", data)
