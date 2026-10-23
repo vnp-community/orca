@@ -30,6 +30,8 @@ type realGitGateway struct {
 	repoPath string
 	mu       sync.Mutex
 	byKey    map[string]*gitgatewayv1.CreateWorktreeResponse
+	// projects receives a worktree record for every worktree made, as git-gateway's saga writes one to project-service.
+	projects *fakeProjects
 }
 
 func (g *realGitGateway) git(args ...string) (string, error) {
@@ -60,6 +62,9 @@ func (g *realGitGateway) CreateWorktree(_ context.Context, in *gitgatewayv1.Crea
 		return prev, nil
 	}
 	target := g.repoPath + "-" + strings.ReplaceAll(in.GetBranch(), "/", "-")
+	if _, err := os.Stat(target); err == nil { // git-gateway's duplicate-path pre-check
+		return nil, status.Error(codes.AlreadyExists, "WORKTREE_PATH_EXISTS: path already exists")
+	}
 	args := []string{"worktree", "add", target, "-b", in.GetBranch(), in.GetBaseRef()}
 	if _, err := g.git("show-ref", "--verify", "--quiet", "refs/heads/"+in.GetBranch()); err == nil {
 		args = []string{"worktree", "add", target, in.GetBranch()}
@@ -77,7 +82,26 @@ func (g *realGitGateway) CreateWorktree(_ context.Context, in *gitgatewayv1.Crea
 		g.byKey = map[string]*gitgatewayv1.CreateWorktreeResponse{}
 	}
 	g.byKey[in.GetIdempotencyKey()] = resp
+	if g.projects != nil {
+		g.projects.worktrees = append(g.projects.worktrees, &projectv1.Worktree{Id: resp.WorktreeId, Path: target, Branch: in.GetBranch(),
+			RepoId: in.GetRepoId(), Active: true})
+	}
 	return resp, nil
+}
+
+// SearchRefs is localgit's: short ref names containing the query.
+func (g *realGitGateway) SearchRefs(_ context.Context, in *gitgatewayv1.SearchRefsRequest, _ ...grpc.CallOption) (*gitgatewayv1.SearchRefsResponse, error) {
+	out, err := g.git("for-each-ref", "--format=%(refname:short)")
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	var refs []string
+	for _, r := range strings.Split(out, "\n") {
+		if r != "" && strings.Contains(r, in.GetQuery()) {
+			refs = append(refs, r)
+		}
+	}
+	return &gitgatewayv1.SearchRefsResponse{Refs: refs}, nil
 }
 
 func (g *realGitGateway) GetStatus(_ context.Context, in *gitgatewayv1.GetStatusRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetStatusResponse, error) {
@@ -134,6 +158,7 @@ type realRepo struct {
 	clone                                       string
 	mainSHA, releaseXSHA, releaseYSHA, thirdSHA string
 	gw                                          *realGitGateway
+	projects                                    *fakeProjects
 }
 
 func newRealRepo(t *testing.T) *realRepo {
@@ -169,12 +194,13 @@ func newRealRepo(t *testing.T) *realRepo {
 	if r.thirdSHA == r.mainSHA || r.mainSHA == r.releaseXSHA || r.releaseXSHA == r.releaseYSHA {
 		t.Fatal("setup: the branches must differ")
 	}
-	r.gw = &realGitGateway{t: t, repoPath: r.clone}
+	r.projects = &fakeProjects{repos: []*projectv1.Repo{{Id: "repo-1"}}}
+	r.gw = &realGitGateway{t: t, repoPath: r.clone, projects: r.projects}
 	return r
 }
 
 func (r *realRepo) workspace() *ProposalWorkspace {
-	return NewProposalWorkspace(r.gw, &fakeProjects{repos: []*projectv1.Repo{{Id: "repo-1"}}})
+	return NewProposalWorkspace(r.gw, r.projects)
 }
 
 func headOf(t *testing.T, ws usecase.Workspace) string {
@@ -302,5 +328,42 @@ func TestRealGit_Checker_AgainstTheRealRepository(t *testing.T) {
 	}
 	if got, err := c.Check(ctxWithIdentity(), "proj", "release/x"); err != nil || got.Status != usecase.BaseRefFound {
 		t.Fatalf("a local branch is found even when the remote is down: %+v %v", got, err)
+	}
+}
+
+// A database reset starts Request numbers at 1 again, while the repository still holds request/42-proposal from an older Request
+// (its worktree and branch, at an old commit). The new Request must not fail and must not build on the old commits.
+func TestRealGit_StaleProposalWorktreeAndBranchOfAnotherRequest_UsesTheRequestsOwnBranch(t *testing.T) {
+	r := newRealRepo(t)
+	runGit(t, r.clone, "worktree", "add", r.clone+"-request-42-proposal", "-b", "request/42-proposal", "third")
+	in := ensureIn()
+	ws, err := r.workspace().Ensure(ctxWithIdentity(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	own := domain.ProposalBranchFor(in.RequestNumber, in.RequestID)
+	if ws.Branch != own || runGit(t, ws.Path, "rev-parse", "--abbrev-ref", "HEAD") != own {
+		t.Fatalf("branch %q, want the Request's own %q", ws.Branch, own)
+	}
+	if got := headOf(t, ws); got != r.mainSHA {
+		t.Fatalf("HEAD = %s, want the default branch %s, not the old Request's commit %s", got, r.mainSHA, r.thirdSHA)
+	}
+	again, err := r.workspace().Ensure(ctxWithIdentity(), in)
+	if err != nil || again.Path != ws.Path || again.Branch != own {
+		t.Fatalf("a second run must find the same worktree: %+v %v", again, err)
+	}
+}
+
+// Only the branch is left (its worktree was pruned): git-gateway would check it out, so the new change would start on old commits.
+func TestRealGit_StaleProposalBranchWithoutWorktree_UsesTheRequestsOwnBranch(t *testing.T) {
+	r := newRealRepo(t)
+	runGit(t, r.clone, "branch", "request/42-proposal", "third")
+	in := ensureIn()
+	ws, err := r.workspace().Ensure(ctxWithIdentity(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.Branch != domain.ProposalBranchFor(in.RequestNumber, in.RequestID) || headOf(t, ws) != r.mainSHA {
+		t.Fatalf("workspace %+v at %s, want the own branch at main %s", ws, headOf(t, ws), r.mainSHA)
 	}
 }

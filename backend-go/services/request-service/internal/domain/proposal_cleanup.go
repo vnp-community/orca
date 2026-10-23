@@ -45,6 +45,27 @@ func ProposalBranch(number int64) string {
 	return "request/" + strconv.FormatInt(number, 10) + "-proposal"
 }
 
+// ProposalBranchFor is the Request's own branch name, used when ProposalBranch is already taken by something no record of this
+// Request knows: Request numbers start again at 1 after a database reset, and two projects can share one repository, so the
+// number alone is not unique on disk. The first 8 hex digits of the Request id make it so.
+func ProposalBranchFor(number int64, requestID string) string {
+	return ProposalBranch(number) + "-" + RequestIDShort(requestID)
+}
+
+// IsProposalBranch says whether branch is one of the two names a Request's proposal can have.
+func IsProposalBranch(branch string, number int64, requestID string) bool {
+	return branch == ProposalBranch(number) || branch == ProposalBranchFor(number, requestID)
+}
+
+// RequestIDShort is the first 8 hex digits of a Request id (dashes dropped); the whole id when it is shorter.
+func RequestIDShort(requestID string) string {
+	hex := strings.ReplaceAll(requestID, "-", "")
+	if len(hex) > 8 {
+		return hex[:8]
+	}
+	return hex
+}
+
 // ProposalRetentionFromEnv reads REQUEST_PROPOSAL_RETENTION as a Go duration ("168h") or whole days ("7d"). A value that
 // cannot be read, or is not positive, keeps the default and says so in the warning.
 func ProposalRetentionFromEnv(getenv func(string) string) (time.Duration, string) {
