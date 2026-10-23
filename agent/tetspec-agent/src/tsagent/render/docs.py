@@ -4,6 +4,8 @@ All headings, labels and texts here are document content and stay Vietnamese."""
 import collections
 import json
 
+from . import tcir
+
 LEVEL_NAME = {"L1": "Nghiệp vụ đầu-cuối", "L2": "Nghiệp vụ", "L3": "Cô lập service"}
 KIND_TITLE = {"TestRequirements": "Test Requirements", "TestDesign": "Test Design", "TestCases": "Test Cases"}
 
@@ -213,8 +215,11 @@ def cases(v):
     g = v.g
     out = ["# Test Cases: " + g.feature, ""] + info(v, "TestCases")
     out += ["## 1. Quy ước", "", "- Bước: given (chuẩn bị), when (hành động), then (quan sát), cleanup (dọn).",
-            "- Kết quả mong đợi của assertion lấy từ oracle; dữ liệu nhạy cảm chỉ ghi `secretRef:<tên>`.", ""]
+            "- Kết quả mong đợi của assertion lấy từ oracle; dữ liệu nhạy cảm chỉ ghi `secretRef:<tên>`.",
+            f"- Mỗi test case kèm một khối TCIR (`{tcir.SCHEMA_VERSION}`) cho agent sinh test script: mã kết quả mong đợi `<TC>.E<n>`, "
+            "mã bước `<TC>.S<n>`; dữ liệu chỉ ghi lớp giá trị, test script tự sinh dữ liệu khi chạy.", ""]
     tcs = v.of("TestCase")
+    ix = tcir.Index(g)
     out += ["## 2. Test Cases theo mức", ""]
     for i, lv in enumerate(sorted({t.attrs["level"] for t in tcs}), 1):
         out += [f"### 2.{i} {lv}: {LEVEL_NAME[lv]}", ""]
@@ -244,6 +249,7 @@ def cases(v):
             out += table(["#", "Loại", "Toán tử", "Mong đợi", "Đơn vị", "Oracle"],
                          [(a.attrs["ordinal"], a.attrs["assertionKind"], a.attrs["operator"], a.attrs["expected"], a.attrs.get("unit"),
                            codes_cell(a.rel("oracle"))) for a in asserts]) + [""]
+            out += ["TCIR:", "", "```json", json.dumps(tcir.test_case(g, tc, ix), ensure_ascii=False, indent=1), "```", ""]
     out += history_section(v, 3)
     return "\n".join(out)
 

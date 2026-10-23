@@ -13,7 +13,7 @@ from ..errors import NotFound, TsagentError
 from ..ontology import ontology
 from ..orchestrator import Orchestrator
 from ..orchestrator.review import baseline_spec, gate_report, pending_summary, review
-from ..render import build
+from ..render import build, tcir
 from ..store import source
 from ..store import tso as store_tso
 from ..store.db import Database
@@ -128,6 +128,24 @@ def get_testcase(ctx, a):
             "faultInjections": [_entity(g.get(x)) for x in tc.rel("injects")],
             "coverage": [_entity(c) for c in cov if c], "conditions": [_entity(c) for c in conds if c],
             "lifecycle": g.meta["lifecycle"].get(tc.code)}
+
+
+@tool("get_tcir", "TCIR (tcir/v1) of the test cases: steps, expected results with ids <TC>.E<n>, data value classes, fixtures, stubs, "
+      "trace; the input of the test-script agent. One case with `code`, else all cases (filter by level), cut at limit",
+      {"feature": FEATURE, "code": {"type": ["string", "null"]}, "level": {"enum": ["L1", "L2", "L3", None]}, "version": VERSION,
+       "limit": {"type": "integer", "minimum": 1, "maximum": 200}, "offset": {"type": "integer", "minimum": 0}}, ["feature"])
+def get_tcir(ctx, a):
+    g = _spec(ctx, a["feature"], a.get("version"))
+    if a.get("code"):
+        tc = g.get(a["code"])
+        if tc is None or tc.cls != "TestCase":
+            raise NotFound(f"no test case {a['code']}")
+        return tcir.test_case(g, tc)
+    b = tcir.bundle(g, level=a.get("level"))
+    off, lim = a.get("offset", 0), a.get("limit", 50)
+    items = b.pop("testCases")
+    return {**b, "total": len(items), "offset": off, "next": off + lim if off + lim < len(items) else None,
+            "testCases": items[off:off + lim]}
 
 
 @tool("get_analysis", "Layer A: obligations, conditions with oracles, gaps; filter by source subject",

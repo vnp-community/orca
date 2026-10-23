@@ -18,7 +18,7 @@ pytestmark = pytest.mark.contract
 TOKEN = "test-token-123"
 OLD = {"list_specs", "get_spec", "get_testcase", "get_traceability", "get_coverage", "get_validation", "get_version_history",
        "diff_versions", "search", "get_neighbors", "start_run", "get_run_status", "list_pending_review"}
-NEW = {"get_analysis", "list_gaps", "sql_select"}
+NEW = {"get_analysis", "list_gaps", "sql_select", "get_tcir"}
 REVIEW = {"approve_nodes", "reject_nodes", "baseline_spec"}
 
 
@@ -148,6 +148,12 @@ def test_read_tools_shapes(server):
     code = next(x for x in full if x["testCases"])["testCases"][0]
     tc = c.ok("get_testcase", {"feature": "PAY", "code": code})
     assert tc["steps"] and tc["assertions"][0]["oracle"]
+    one = c.ok("get_tcir", {"feature": "PAY", "code": code})
+    assert one["schemaVersion"] == "tcir/v1" and one["id"] == code and one["data"]["policy"] == "generate"
+    assert [e["id"] for e in one["expected"]] == [f"{code}.E{a['ordinal']}" for a in tc["assertions"]]
+    assert all(e["oracle"]["code"] == a["rels"]["oracle"][0] for e, a in zip(one["expected"], tc["assertions"], strict=True))
+    page = c.ok("get_tcir", {"feature": "PAY", "limit": 1})
+    assert len(page["testCases"]) == 1 and page["total"] >= 1 and page["specVersion"] >= 1
     s = c.ok("search", {"feature": "PAY", "query": "INT-01"})
     assert s["total"] > 0
     nb = c.ok("get_neighbors", {"feature": "PAY", "code": "INT-01"})
