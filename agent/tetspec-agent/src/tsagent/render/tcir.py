@@ -2,11 +2,16 @@
 
 One TCIR per TestCase, built only from the test KG. Every expected result keeps a stable id `<TC>.E<n>` so a generated script can tag
 the assertion that checks it and a checker can match them one to one. Data fields are value classes, not fixed values: the test script
-generates its own data at run time (secret fields carry no example at all).
+generates its own data at run time (secret fields carry no example at all). `contract` says how the system is called as far as the
+TDD defines it and lists what it leaves `unknown`; `gaps` on a case or an expected result are the open TestGaps behind it: a value the
+spec does not give must never be asserted.
 """
 import collections
 
+from . import tcir_contract
+
 SCHEMA_VERSION = "tcir/v1"
+CLOSED_REVIEW = ("approved", "rejected")
 
 
 class Index:
@@ -38,8 +43,32 @@ def _field(f):
     return out
 
 
-def test_case(g, tc, ix=None):
-    """TCIR dict of one TestCase entity of graph `g`."""
+def _open_gaps(g, conds, wide: bool = False) -> list[dict]:
+    """TestGaps still open (not approved or rejected) behind `conds`. `link` says how: `condition` (the gap blocks the condition
+    itself), and with `wide` also `obligation` (it blocks the obligation the condition serves) and `subject` (it was raised on the
+    same TDD node). Only `condition` gaps make an expected result unknowable; the others are context for the test-script agent."""
+    codes = {c.code for c in conds}
+    obligations = {o for c in conds for o in c.rel("obligation")}
+    subjects = {b for c in conds for b in c.prov.based_on}
+    out = []
+    for gap in g.of("TestGap"):
+        if _review(g, gap.code) in CLOSED_REVIEW:
+            continue
+        if codes & set(gap.rel("blocks")):
+            link = "condition"
+        elif wide and obligations & set(gap.rel("blocksObligation")):
+            link = "obligation"
+        elif wide and subjects & set(gap.prov.based_on):
+            link = "subject"
+        else:
+            continue
+        out.append({"code": gap.code, "link": link, "missing": gap.attrs.get("missing"), "question": gap.attrs.get("askedQuestion")})
+    return out
+
+
+def test_case(g, tc, ix=None, pkg=None):
+    """TCIR dict of one TestCase entity of graph `g`. With the source package `pkg`, the case carries its `contract` (how the
+    system is called, as far as the TDD says) and every expected result names the open TestGaps behind it."""
     ix = ix or Index(g)
     cov = ix.all(tc.rel("covers"))
     conds = ix.all(sorted({c for cv in cov for c in cv.rel("realizes")}))
@@ -64,6 +93,10 @@ def test_case(g, tc, ix=None):
         if o is not None:
             item["oracle"] = {"code": o.code, "kind": o.attrs["oracleKind"], "expected": o.attrs["expected"],
                               **({"tolerance": o.attrs["tolerance"]} if o.attrs.get("tolerance") else {})}
+        behind = [c for c in conds if o is not None and o.code in c.rel("oracle")] or conds
+        gaps = _open_gaps(g, behind)
+        if gaps:
+            item["gaps"] = gaps
         expected.append(item)
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -91,13 +124,16 @@ def test_case(g, tc, ix=None):
         "expected": expected,
         "trace": {"coverageItems": [c.code for c in cov], "conditions": [c.code for c in conds], "requirements": trs, "basis": basis,
                   "testSet": tc.rel("inSet")},
+        "gaps": _open_gaps(g, conds, wide=True),
+        "contract": tcir_contract.build(pkg, set(basis) | {s.attrs["targetCode"] for s in steps if s.attrs.get("targetCode")}
+                                        | {b for c in conds for b in c.prov.based_on}),
     }
 
 
-def bundle(g, codes=None, level=None):
+def bundle(g, codes=None, level=None, pkg=None):
     """TCIR of every TestCase of `g` (or of `codes`, or of one `level`), in code order."""
     ix = Index(g)
     want = set(codes) if codes else None
     tcs = [tc for tc in g.of("TestCase") if (want is None or tc.code in want) and (level is None or tc.attrs["level"] == level)]
     return {"schemaVersion": SCHEMA_VERSION, "feature": g.feature, "specVersion": g.meta.get("version"), "status": g.meta.get("status"),
-            "baseline": g.meta.get("baseline"), "testCases": [test_case(g, tc, ix) for tc in tcs]}
+            "baseline": g.meta.get("baseline"), "testCases": [test_case(g, tc, ix, pkg) for tc in tcs]}

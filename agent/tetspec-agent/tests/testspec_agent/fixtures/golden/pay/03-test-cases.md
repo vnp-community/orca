@@ -9,7 +9,7 @@ baseline: b-c845d6c1c614
 changes: []
 llm: unknown
 llm_model: ""
-contentHash: 6635d0a1e24ad1e7c49916fb918f36de66ae9581c24a61b68ac41b892f50de87
+contentHash: 6da6ee291470a21f3f664440ea460b60f52ce20d537fb1f169b5b6dd5c84c622
 ---
 # Test Cases: PAY
 
@@ -129,6 +129,28 @@ TCIR:
   "testSet": [
    "TSET-PAY-L1-SCN-01"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "subject",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -226,6 +248,22 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L1-SCN-01"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-MOD-Payment-content-errorHandling-dep-MOD-Ledger",
+   "link": "subject",
+   "missing": "hành vi của Thanh toán khi Sổ cái lỗi",
+   "question": "Bổ sung vào TDD: hành vi của Thanh toán khi Sổ cái lỗi?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -326,6 +364,15 @@ TCIR:
   "testSet": [
    "TSET-PAY-L1-SCN-01"
   ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -424,6 +471,28 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L1-SCN-01"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "subject",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -525,6 +594,15 @@ TCIR:
   "testSet": [
    "TSET-PAY-L2-FR-001"
   ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -623,6 +701,15 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L2-NFR-001"
+  ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -731,6 +818,15 @@ TCIR:
   "testSet": [
    "TSET-PAY-L2-SM-001"
   ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -837,6 +933,15 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L2-SM-001"
+  ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -945,6 +1050,15 @@ TCIR:
   "testSet": [
    "TSET-PAY-L2-SM-001"
   ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -1052,6 +1166,15 @@ TCIR:
   "testSet": [
    "TSET-PAY-L2-SM-001"
   ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -1149,6 +1272,15 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L2-UR-001"
+  ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -1250,6 +1382,28 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-01"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "obligation",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -1348,6 +1502,28 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-01"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "obligation",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -1445,6 +1621,28 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-01"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "obligation",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -1567,6 +1765,28 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-01"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "obligation",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -1688,6 +1908,28 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-01"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "obligation",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -1808,6 +2050,28 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-01"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "obligation",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -1943,6 +2207,28 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-01"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "obligation",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -2064,6 +2350,15 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-02"
   ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -2184,6 +2479,15 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-02"
+  ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -2319,6 +2623,15 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-02"
   ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -2398,7 +2711,15 @@ TCIR:
     "code": "TORC-PAY-INT-01-idem",
     "kind": "invariant",
     "expected": "Cùng khóa idempotency không tạo hiệu ứng lặp"
-   }
+   },
+   "gaps": [
+    {
+     "code": "TGAP-PAY-INT-01-ASM-01",
+     "link": "condition",
+     "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+     "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+    }
+   ]
   }
  ],
  "trace": {
@@ -2416,6 +2737,28 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-01"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "condition",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -2496,7 +2839,21 @@ TCIR:
     "code": "TORC-PAY-INT-01-idem",
     "kind": "invariant",
     "expected": "Cùng khóa idempotency không tạo hiệu ứng lặp"
-   }
+   },
+   "gaps": [
+    {
+     "code": "TGAP-PAY-INT-01-ASM-01",
+     "link": "condition",
+     "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+     "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+    },
+    {
+     "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+     "link": "condition",
+     "missing": "chính sách khi cùng khóa khác payload",
+     "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+    }
+   ]
   }
  ],
  "trace": {
@@ -2514,6 +2871,28 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-01"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "condition",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "condition",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -2594,7 +2973,15 @@ TCIR:
     "code": "TORC-PAY-INT-01-idem",
     "kind": "invariant",
     "expected": "Cùng khóa idempotency không tạo hiệu ứng lặp"
-   }
+   },
+   "gaps": [
+    {
+     "code": "TGAP-PAY-INT-01-ASM-01",
+     "link": "condition",
+     "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+     "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+    }
+   ]
   }
  ],
  "trace": {
@@ -2612,6 +2999,28 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-01"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "condition",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -2693,7 +3102,15 @@ TCIR:
     "code": "TORC-PAY-INT-01-worst-INT-01",
     "kind": "threshold",
     "expected": "75000 ms ≤ 30000 ms (ngân sách của SCN-01)"
-   }
+   },
+   "gaps": [
+    {
+     "code": "TGAP-PAY-INT-01-ASM-01",
+     "link": "condition",
+     "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+     "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+    }
+   ]
   }
  ],
  "trace": {
@@ -2711,6 +3128,28 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-01"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "condition",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -2811,6 +3250,34 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-01"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "obligation",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  },
+  {
+   "code": "TGAP-PAY-LIM-01-content-performance-requestsPerSecond-over",
+   "link": "subject",
+   "missing": "hành vi khi vượt requestsPerSecond của Cổng thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt requestsPerSecond của Cổng thanh toán?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -2891,7 +3358,15 @@ TCIR:
     "code": "TORC-PAY-LIM-01-requestsPerSecond",
     "kind": "threshold",
     "expected": "requestsPerSecond ≤ 50 request/giây"
-   }
+   },
+   "gaps": [
+    {
+     "code": "TGAP-PAY-LIM-01-content-performance-requestsPerSecond-over",
+     "link": "condition",
+     "missing": "hành vi khi vượt requestsPerSecond của Cổng thanh toán",
+     "question": "Bổ sung vào TDD: hành vi khi vượt requestsPerSecond của Cổng thanh toán?"
+    }
+   ]
   }
  ],
  "trace": {
@@ -2909,6 +3384,34 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-01"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-INT-01-ASM-01",
+   "link": "obligation",
+   "missing": "ASM-01 chưa xác nhận: Cổng cho phép 50 kết nối",
+   "question": "Xác nhận ASM-01: Cổng cho phép 50 kết nối?"
+  },
+  {
+   "code": "TGAP-PAY-INT-01-content-idempotency-payload-mismatch",
+   "link": "subject",
+   "missing": "chính sách khi cùng khóa khác payload",
+   "question": "Bổ sung vào TDD: chính sách khi cùng khóa khác payload?"
+  },
+  {
+   "code": "TGAP-PAY-LIM-01-content-performance-requestsPerSecond-over",
+   "link": "condition",
+   "missing": "hành vi khi vượt requestsPerSecond của Cổng thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt requestsPerSecond của Cổng thanh toán?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -3009,6 +3512,28 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-02"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-LIM-02-content-inputValidation-maxPayloadKB-over",
+   "link": "subject",
+   "missing": "hành vi khi vượt maxPayloadKB của API thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt maxPayloadKB của API thanh toán?"
+  },
+  {
+   "code": "TGAP-PAY-LIM-02-content-performance-requestsPerSecond-over",
+   "link": "subject",
+   "missing": "hành vi khi vượt requestsPerSecond của API thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt requestsPerSecond của API thanh toán?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -3089,7 +3614,15 @@ TCIR:
     "code": "TORC-PAY-LIM-02-maxPayloadKB",
     "kind": "threshold",
     "expected": "maxPayloadKB ≤ 64 KB"
-   }
+   },
+   "gaps": [
+    {
+     "code": "TGAP-PAY-LIM-02-content-inputValidation-maxPayloadKB-over",
+     "link": "condition",
+     "missing": "hành vi khi vượt maxPayloadKB của API thanh toán",
+     "question": "Bổ sung vào TDD: hành vi khi vượt maxPayloadKB của API thanh toán?"
+    }
+   ]
   }
  ],
  "trace": {
@@ -3107,6 +3640,28 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-02"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-LIM-02-content-inputValidation-maxPayloadKB-over",
+   "link": "condition",
+   "missing": "hành vi khi vượt maxPayloadKB của API thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt maxPayloadKB của API thanh toán?"
+  },
+  {
+   "code": "TGAP-PAY-LIM-02-content-performance-requestsPerSecond-over",
+   "link": "subject",
+   "missing": "hành vi khi vượt requestsPerSecond của API thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt requestsPerSecond của API thanh toán?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -3207,6 +3762,28 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-02"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-LIM-02-content-inputValidation-maxPayloadKB-over",
+   "link": "subject",
+   "missing": "hành vi khi vượt maxPayloadKB của API thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt maxPayloadKB của API thanh toán?"
+  },
+  {
+   "code": "TGAP-PAY-LIM-02-content-performance-requestsPerSecond-over",
+   "link": "subject",
+   "missing": "hành vi khi vượt requestsPerSecond của API thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt requestsPerSecond của API thanh toán?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -3287,7 +3864,15 @@ TCIR:
     "code": "TORC-PAY-LIM-02-requestsPerSecond",
     "kind": "threshold",
     "expected": "requestsPerSecond ≤ 20 request/giây"
-   }
+   },
+   "gaps": [
+    {
+     "code": "TGAP-PAY-LIM-02-content-performance-requestsPerSecond-over",
+     "link": "condition",
+     "missing": "hành vi khi vượt requestsPerSecond của API thanh toán",
+     "question": "Bổ sung vào TDD: hành vi khi vượt requestsPerSecond của API thanh toán?"
+    }
+   ]
   }
  ],
  "trace": {
@@ -3305,6 +3890,28 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-02"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-LIM-02-content-inputValidation-maxPayloadKB-over",
+   "link": "subject",
+   "missing": "hành vi khi vượt maxPayloadKB của API thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt maxPayloadKB của API thanh toán?"
+  },
+  {
+   "code": "TGAP-PAY-LIM-02-content-performance-requestsPerSecond-over",
+   "link": "condition",
+   "missing": "hành vi khi vượt requestsPerSecond của API thanh toán",
+   "question": "Bổ sung vào TDD: hành vi khi vượt requestsPerSecond của API thanh toán?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -3403,6 +4010,15 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-MECH-01"
+  ]
+ },
+ "gaps": [],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -3510,7 +4126,15 @@ TCIR:
     "code": "TORC-PAY-MOD-Ledger-dep-MOD-Payment",
     "kind": "errorContract",
     "expected": "Thanh toán xử lý lỗi của Sổ cái theo thiết kế"
-   }
+   },
+   "gaps": [
+    {
+     "code": "TGAP-PAY-MOD-Payment-content-errorHandling-dep-MOD-Ledger",
+     "link": "condition",
+     "missing": "hành vi của Thanh toán khi Sổ cái lỗi",
+     "question": "Bổ sung vào TDD: hành vi của Thanh toán khi Sổ cái lỗi?"
+    }
+   ]
   }
  ],
  "trace": {
@@ -3528,6 +4152,22 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-MOD-Payment"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-MOD-Payment-content-errorHandling-dep-MOD-Ledger",
+   "link": "condition",
+   "missing": "hành vi của Thanh toán khi Sổ cái lỗi",
+   "question": "Bổ sung vào TDD: hành vi của Thanh toán khi Sổ cái lỗi?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
@@ -3627,6 +4267,22 @@ TCIR:
   "testSet": [
    "TSET-PAY-L3-INT-02"
   ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-SEC-02-content-access-deny",
+   "link": "subject",
+   "missing": "mã lỗi khi sai xác thực API thanh toán",
+   "question": "Bổ sung vào TDD: mã lỗi khi sai xác thực API thanh toán?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
+  ]
  }
 }
 ```
@@ -3706,7 +4362,15 @@ TCIR:
     "code": "TORC-PAY-SEC-02-access",
     "kind": "reference",
     "expected": "Chỉ yêu cầu xác thực đúng SEC-02 được phục vụ"
-   }
+   },
+   "gaps": [
+    {
+     "code": "TGAP-PAY-SEC-02-content-access-deny",
+     "link": "condition",
+     "missing": "mã lỗi khi sai xác thực API thanh toán",
+     "question": "Bổ sung vào TDD: mã lỗi khi sai xác thực API thanh toán?"
+    }
+   ]
   }
  ],
  "trace": {
@@ -3724,6 +4388,22 @@ TCIR:
   ],
   "testSet": [
    "TSET-PAY-L3-INT-02"
+  ]
+ },
+ "gaps": [
+  {
+   "code": "TGAP-PAY-SEC-02-content-access-deny",
+   "link": "condition",
+   "missing": "mã lỗi khi sai xác thực API thanh toán",
+   "question": "Bổ sung vào TDD: mã lỗi khi sai xác thực API thanh toán?"
+  }
+ ],
+ "contract": {
+  "endpoints": [],
+  "entities": [],
+  "statusCodes": [],
+  "unknown": [
+   "no endpoint is named anywhere in the TDD"
   ]
  }
 }
