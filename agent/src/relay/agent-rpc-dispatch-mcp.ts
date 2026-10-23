@@ -34,8 +34,12 @@ const TDD_AGENT_TOOLS = [
   'trace_get',
   'kg_snapshots',
   'testspec_start',
-  'testspec_get'
+  'testspec_get',
+  'testspec_tcir_get'
 ]
+
+// Test Script Agent (docs/integrate/TDD-REQ-TESTSCRIPT-001): its whole tool surface; it writes only to its own git worktree.
+const TSA_TOOLS = ['tsa_start', 'tsa_get', 'tsa_report', 'tsa_file', 'tsa_cancel']
 
 export function defaultBridgeConfig(workDir: string): McpBridgeConfig {
   return {
@@ -45,6 +49,11 @@ export function defaultBridgeConfig(workDir: string): McpBridgeConfig {
         command: 'tdd-agent',
         args: ['-C', '${projectDir}', 'mcp', 'serve', '--transport', 'stdio'],
         tools: TDD_AGENT_TOOLS
+      },
+      'test-script-agent': {
+        command: 'tsa',
+        args: ['-C', '${projectDir}', 'mcp', 'serve', '--transport', 'stdio'],
+        tools: TSA_TOOLS
       }
     }
   }

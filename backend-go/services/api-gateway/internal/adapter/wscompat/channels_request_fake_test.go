@@ -601,3 +601,38 @@ func (f *fakeRequestClient) GetTestSpecDocument(ctx context.Context, in *request
 	}
 	return &requestv1.GetTestSpecDocumentResponse{Document: in.GetDocument(), Version: 1, Status: "Draft", Length: 4, Text: "TC-1"}, nil
 }
+
+func (f *fakeRequestClient) GetTestScripts(ctx context.Context, in *requestv1.GetTestScriptsRequest, _ ...grpc.CallOption) (*requestv1.GetTestScriptsResponse, error) {
+	f.rec(ctx, "GetTestScripts", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetTestScriptsResponse{RequestId: in.GetRequestId(), Enabled: true, Current: &requestv1.TestScriptRun{
+		Id: "tsc1", Attempt: 1, Status: "completed", Feature: "TDD-NOTES", SpecVersion: 1, Branch: "tsa/REQ-1-TDD-NOTES-v1", CommitSha: "c1",
+		SummaryJson: `{"counts":{"generated":3}}`,
+	}}, nil
+}
+
+func (f *fakeRequestClient) StartTestScripts(ctx context.Context, in *requestv1.StartTestScriptsRequest, _ ...grpc.CallOption) (*requestv1.StartTestScriptsResponse, error) {
+	f.rec(ctx, "StartTestScripts", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.StartTestScriptsResponse{Run: &requestv1.TestScriptRun{Id: "tsc2", Attempt: 2, Status: "pending"}}, nil
+}
+
+func (f *fakeRequestClient) GetTestScriptReport(ctx context.Context, in *requestv1.GetTestScriptReportRequest, _ ...grpc.CallOption) (*requestv1.GetTestScriptReportResponse, error) {
+	f.rec(ctx, "GetTestScriptReport", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetTestScriptReportResponse{Path: "tests/tsa/x/tsa-report.md", Length: 5, Text: "# TSA"}, nil
+}
+
+func (f *fakeRequestClient) GetTestScriptFile(ctx context.Context, in *requestv1.GetTestScriptFileRequest, _ ...grpc.CallOption) (*requestv1.GetTestScriptFileResponse, error) {
+	f.rec(ctx, "GetTestScriptFile", in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &requestv1.GetTestScriptFileResponse{Path: in.GetPath(), Length: 13, Text: "import pytest"}, nil
+}

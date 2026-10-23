@@ -118,7 +118,12 @@ export const REQUEST_RPC_METHODS = {
   // Test specs generated next to the code (docs/integrate/TDD-REQ-TESTSPEC-001)
   TEST_SPECS: 'request.testSpecs',
   TEST_SPECS_START: 'request.testSpecsStart',
-  TEST_SPEC_DOCUMENT: 'request.testSpecDocument'
+  TEST_SPEC_DOCUMENT: 'request.testSpecDocument',
+  // Test scripts generated from the TCIR of the test specs (docs/integrate/TDD-REQ-TESTSCRIPT-001)
+  TEST_SCRIPTS: 'request.testScripts',
+  TEST_SCRIPTS_START: 'request.testScriptsStart',
+  TEST_SCRIPT_REPORT: 'request.testScriptReport',
+  TEST_SCRIPT_FILE: 'request.testScriptFile'
 } as const
 
 export type RequestRpcMethod = (typeof REQUEST_RPC_METHODS)[keyof typeof REQUEST_RPC_METHODS]

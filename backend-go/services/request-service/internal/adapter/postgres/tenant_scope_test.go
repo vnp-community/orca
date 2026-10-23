@@ -36,6 +36,7 @@ func TestTenantScope(t *testing.T) {
 		"audit_outbox.go:CountPending":                   relay,
 		"classification_run_repository.go:ClaimExpired":  relay,
 		"test_spec_runs.go:ListDue":                      relay,
+		"test_script_runs.go:ListDue":                    relay,
 		"outbox.go:FetchUnpublished":                     relay,
 		"outbox.go:MarkPublished":                        relay,
 		"processed_events.go:Prune":                      relay,

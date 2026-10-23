@@ -24,6 +24,7 @@ type Server struct {
 	compliance     ComplianceUseCases
 	execution      ExecutionUseCases
 	testSpecs      TestSpecUseCases
+	testScripts    TestScriptUseCases
 	plan           PlanUseCases
 	baseRef        BaseRefUseCases
 	outcomeReview  OutcomeReviewUseCases

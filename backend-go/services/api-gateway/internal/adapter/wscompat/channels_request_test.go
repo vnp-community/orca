@@ -371,6 +371,32 @@ func requestChannelCases() []requestChannelCase {
 				mustEqual(t, res["text"], "TC-1")
 				mustEqual(t, res["hasNext"], false)
 			}},
+		{channel: "request.testScripts", args: `{"id":"r1"}`, rpc: "GetTestScripts", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, _ proto.Message) {
+				mustEqual(t, res["enabled"], true)
+				cur := res["current"].(map[string]any)
+				mustEqual(t, cur["status"], "completed")
+				mustEqual(t, cur["branch"], "tsa/REQ-1-TDD-NOTES-v1")
+				mustEqual(t, cur["specVersion"], float64(1))
+				mustEqual(t, cur["summary"].(map[string]any)["counts"].(map[string]any)["generated"], float64(3))
+				mustEqual(t, len(res["history"].([]any)), 0)
+			}},
+		{channel: "request.testScriptsStart", args: `{"id":"r1"}`, rpc: "StartTestScripts", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, _ proto.Message) {
+				mustEqual(t, res["run"].(map[string]any)["status"], "pending")
+			}},
+		{channel: "request.testScriptReport", args: `{"id":"r1","offset":5}`, rpc: "GetTestScriptReport", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, in proto.Message) {
+				mustEqual(t, in.(*requestv1.GetTestScriptReportRequest).GetOffset(), int32(5))
+				mustEqual(t, res["text"], "# TSA")
+				mustEqual(t, res["hasNext"], false)
+			}},
+		{channel: "request.testScriptFile", args: `{"id":"r1","path":"tests/tsa/x/test_a.py"}`, rpc: "GetTestScriptFile", lo: short[0], hi: short[1],
+			check: func(t *testing.T, res map[string]any, in proto.Message) {
+				mustEqual(t, in.(*requestv1.GetTestScriptFileRequest).GetPath(), "tests/tsa/x/test_a.py")
+				mustEqual(t, res["text"], "import pytest")
+				mustEqual(t, res["path"], "tests/tsa/x/test_a.py")
+			}},
 		{channel: "request.flow", args: `{"type":"bug","size":"S"}`, rpc: "GetRequestFlow", lo: short[0], hi: short[1],
 			check: func(t *testing.T, res map[string]any, _ proto.Message) {
 				mustEqual(t, res["hasPhases"], true)
@@ -484,7 +510,7 @@ func TestRequestChannels_Inventory(t *testing.T) {
 		"approval.get", "approval.list", "approval.listPending", "approval.approve", "approval.reject", "approval.cancel",
 		"backlog.requests", "backlog.tasks", "backlog.execute",
 		// CONTRACT 2.5 and the plan proposal reader.
-		"request.links", "request.activity", "request.executionSummary", "request.testSpecs", "request.testSpecsStart", "request.testSpecDocument", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal", "request.retryPlan", "request.planRevisions", // CR-REQ-028: the channels useClarifications.ts calls.
+		"request.links", "request.activity", "request.executionSummary", "request.testSpecs", "request.testSpecsStart", "request.testSpecDocument", "request.testScripts", "request.testScriptsStart", "request.testScriptReport", "request.testScriptFile", "request.flow", "request.checks", "request.planProposal", "request.planBundleFile", "request.engineSettings", "request.engineSettingsSet", "request.cleanupProposal", "request.retryPlan", "request.planRevisions", // CR-REQ-028: the channels useClarifications.ts calls.
 		"clarification.list", "clarification.get", "clarification.answer", "clarification.cancel", "clarification.request",
 		// The decision log: reading it, and a person confirming a high risk choice.
 		"decision.list", "decision.confirm",

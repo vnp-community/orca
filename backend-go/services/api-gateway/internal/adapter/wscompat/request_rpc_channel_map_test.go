@@ -76,6 +76,10 @@ var requestServiceRPCChannels = map[string]rpcDisposition{
 	"GetTestSpecs":                   viaChannel("request.testSpecs"),
 	"StartTestSpecs":                 viaChannel("request.testSpecsStart"),
 	"GetTestSpecDocument":            viaChannel("request.testSpecDocument"),
+	"GetTestScripts":                 viaChannel("request.testScripts"),
+	"StartTestScripts":               viaChannel("request.testScriptsStart"),
+	"GetTestScriptReport":            viaChannel("request.testScriptReport"),
+	"GetTestScriptFile":              viaChannel("request.testScriptFile"),
 
 	"GetRequestReadiness":              deferredRPC("CR-REQ-028 readiness panel"),
 	"RequestClarification":             viaChannel("clarification.request"),

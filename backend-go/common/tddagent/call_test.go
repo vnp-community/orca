@@ -107,3 +107,17 @@ func TestCallReportsAResultItCannotDecode(t *testing.T) {
 		t.Fatalf("want a decode error, got %v", err)
 	}
 }
+
+func TestCallCanReachAnotherServerOfTheBridge(t *testing.T) {
+	r := &recorder{result: `{"ok":true,"isError":false,"result":{"job_id":"tsa-1"}}`}
+	if err := Call(context.Background(), r.relay, "/p", "tsa_get", map[string]any{"job_id": "tsa-1"}, nil, WithServer("test-script-agent")); err != nil {
+		t.Fatal(err)
+	}
+	var p map[string]any
+	if err := json.Unmarshal([]byte(r.params), &p); err != nil {
+		t.Fatal(err)
+	}
+	if p["server"] != "test-script-agent" || p["tool"] != "tsa_get" {
+		t.Fatalf("params %v", p)
+	}
+}

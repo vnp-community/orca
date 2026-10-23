@@ -55,6 +55,8 @@ type requestStores struct {
 	artifact          artifactStores
 	// testSpecRuns holds the attempts to generate test specs beside Plan generation (ORC-TS-T1); its own table.
 	testSpecRuns usecase.TestSpecRunRepository
+	// testScriptRuns holds the attempts to generate test scripts from the TCIR (TDD-REQ-TESTSCRIPT-001); its own table.
+	testScriptRuns usecase.TestScriptRunRepository
 	// Rollout (CR-REQ-024/025): flag row, active-source lookup, cross-tenant gauge counts.
 	flowSettings usecase.FlowSettingsRepository
 	sourceFinder usecase.ActiveSourceFinder
@@ -113,6 +115,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			processed:         postgresadapter.NewProcessedEventRepository(base),
 			planAutoJobs:      postgresadapter.NewPlanAutoJobRepository(base),
 			testSpecRuns:      postgresadapter.NewTestSpecRunRepository(base),
+			testScriptRuns:    postgresadapter.NewTestScriptRunRepository(base),
 			classRuns:         postgresadapter.NewClassificationRunRepository(base),
 			artifact:          postgresArtifactStores(base),
 			flowSettings:      postgresadapter.NewFlowSettingsRepository(base),
@@ -171,6 +174,7 @@ func openStores(ctx context.Context, dsn string, dialect dbcapability.Dialect, h
 			processed:         mysqladapter.NewProcessedEventRepository(base),
 			planAutoJobs:      mysqladapter.NewPlanAutoJobRepository(base),
 			testSpecRuns:      mysqladapter.NewTestSpecRunRepository(base),
+			testScriptRuns:    mysqladapter.NewTestScriptRunRepository(base),
 			classRuns:         mysqladapter.NewClassificationRunRepository(base),
 			artifact:          mysqlArtifactStores(base),
 			flowSettings:      mysqladapter.NewFlowSettingsRepository(base),
