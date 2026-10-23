@@ -677,6 +677,22 @@
   category: request_flow
   reason: "Reads one agent-written test-spec document for the screen's viewer; no MCP tool is decided yet."
 
+- pattern: "request.testScripts"
+  category: request_flow
+  reason: "Test scripts of the Execution tab (docs/integrate/TDD-REQ-TESTSCRIPT-001); no MCP tool is decided yet, add a ToolSpec and drop this line to expose it."
+
+- pattern: "request.testScriptsStart"
+  category: request_flow
+  reason: "Re-runs test-script generation on the dev server for the screen's Re-run button; no MCP tool is decided yet."
+
+- pattern: "request.testScriptReport"
+  category: request_flow
+  reason: "Reads the Test Script Agent's report for the screen's viewer; no MCP tool is decided yet."
+
+- pattern: "request.testScriptFile"
+  category: request_flow
+  reason: "Reads one generated test script or the assertion manifest for the screen's viewer; no MCP tool is decided yet."
+
 - pattern: "request.cleanupProposal"
   category: request_flow
   reason: "Removes a git worktree on a dev server; a person or the CLI does that, no MCP tool is decided yet."

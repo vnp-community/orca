@@ -24,6 +24,8 @@ import { ExecutionTaskSheet, useExecutionTaskSheet } from './ExecutionTaskSheet'
 import { HandoverRow } from './HandoverRow'
 import { TestSpecsPanel } from './TestSpecsPanel'
 import { useTestSpecs } from '../../../hooks/useTestSpecs'
+import { TestScriptsPanel } from './TestScriptsPanel'
+import { useTestScripts } from '../../../hooks/useTestScripts'
 import { buildExecutionSteps } from './execution-step-model'
 import { runModeLabelOf } from './execution-run-mode-model'
 import { listPlanWorkTasks } from '../plan/plan-approval-model'
@@ -80,6 +82,7 @@ export function ExecutionTab({
   const decision = usePlanDecision(request, onSettled)
   const sheet = useExecutionTaskSheet()
   const testSpecs = useTestSpecs(request.id)
+  const testScripts = useTestScripts(request.id)
 
   const steps = useMemo(
     () => (tree ? buildExecutionSteps(tree, summary?.currentPhaseId) : []),
@@ -191,6 +194,7 @@ export function ExecutionTab({
         </>
       )}
       <TestSpecsPanel requestId={request.id} testSpecs={testSpecs} />
+      <TestScriptsPanel requestId={request.id} testScripts={testScripts} />
       <ExecutionTaskSheet open={sheet.open} onOpenChange={sheet.onOpenChange} />
     </div>
   )

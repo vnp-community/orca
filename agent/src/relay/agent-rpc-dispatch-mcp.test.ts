@@ -221,6 +221,15 @@ describe('bridge config and helpers', () => {
       expect.arrayContaining(['testspec_start', 'testspec_get'])
     )
     expect(cfg.servers['tdd-agent'].tools).not.toContain('changeset_propose')
+    expect(cfg.servers['test-script-agent'].command).toBe('tsa')
+    expect(cfg.servers['test-script-agent'].args).toEqual(cfg.servers['tdd-agent'].args)
+    expect(cfg.servers['test-script-agent'].tools).toEqual([
+      'tsa_start',
+      'tsa_get',
+      'tsa_report',
+      'tsa_file',
+      'tsa_cancel'
+    ])
     expect(
       loadBridgeConfig({ ORCA_MCP_BRIDGE_ROOTS: ['/a', '/b'].join(path.delimiter) }, '/w').roots
     ).toEqual(['/a', '/b'])

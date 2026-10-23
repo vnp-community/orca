@@ -40,6 +40,10 @@ const (
 	RequestService_GetTestSpecs_FullMethodName                     = "/orca.request.v1.RequestService/GetTestSpecs"
 	RequestService_StartTestSpecs_FullMethodName                   = "/orca.request.v1.RequestService/StartTestSpecs"
 	RequestService_GetTestSpecDocument_FullMethodName              = "/orca.request.v1.RequestService/GetTestSpecDocument"
+	RequestService_GetTestScripts_FullMethodName                   = "/orca.request.v1.RequestService/GetTestScripts"
+	RequestService_StartTestScripts_FullMethodName                 = "/orca.request.v1.RequestService/StartTestScripts"
+	RequestService_GetTestScriptReport_FullMethodName              = "/orca.request.v1.RequestService/GetTestScriptReport"
+	RequestService_GetTestScriptFile_FullMethodName                = "/orca.request.v1.RequestService/GetTestScriptFile"
 	RequestService_GetRequestFlowSettings_FullMethodName           = "/orca.request.v1.RequestService/GetRequestFlowSettings"
 	RequestService_SetRequestFlowSettings_FullMethodName           = "/orca.request.v1.RequestService/SetRequestFlowSettings"
 	RequestService_GenerateSolution_FullMethodName                 = "/orca.request.v1.RequestService/GenerateSolution"
@@ -151,6 +155,10 @@ type RequestServiceClient interface {
 	GetTestSpecs(ctx context.Context, in *GetTestSpecsRequest, opts ...grpc.CallOption) (*GetTestSpecsResponse, error)
 	StartTestSpecs(ctx context.Context, in *StartTestSpecsRequest, opts ...grpc.CallOption) (*StartTestSpecsResponse, error)
 	GetTestSpecDocument(ctx context.Context, in *GetTestSpecDocumentRequest, opts ...grpc.CallOption) (*GetTestSpecDocumentResponse, error)
+	GetTestScripts(ctx context.Context, in *GetTestScriptsRequest, opts ...grpc.CallOption) (*GetTestScriptsResponse, error)
+	StartTestScripts(ctx context.Context, in *StartTestScriptsRequest, opts ...grpc.CallOption) (*StartTestScriptsResponse, error)
+	GetTestScriptReport(ctx context.Context, in *GetTestScriptReportRequest, opts ...grpc.CallOption) (*GetTestScriptReportResponse, error)
+	GetTestScriptFile(ctx context.Context, in *GetTestScriptFileRequest, opts ...grpc.CallOption) (*GetTestScriptFileResponse, error)
 	GetRequestFlowSettings(ctx context.Context, in *GetRequestFlowSettingsRequest, opts ...grpc.CallOption) (*GetRequestFlowSettingsResponse, error)
 	SetRequestFlowSettings(ctx context.Context, in *SetRequestFlowSettingsRequest, opts ...grpc.CallOption) (*SetRequestFlowSettingsResponse, error)
 	// Solution and analysis (CR-REQ-007, 008, 026).
@@ -454,6 +462,46 @@ func (c *requestServiceClient) GetTestSpecDocument(ctx context.Context, in *GetT
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetTestSpecDocumentResponse)
 	err := c.cc.Invoke(ctx, RequestService_GetTestSpecDocument_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) GetTestScripts(ctx context.Context, in *GetTestScriptsRequest, opts ...grpc.CallOption) (*GetTestScriptsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTestScriptsResponse)
+	err := c.cc.Invoke(ctx, RequestService_GetTestScripts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) StartTestScripts(ctx context.Context, in *StartTestScriptsRequest, opts ...grpc.CallOption) (*StartTestScriptsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartTestScriptsResponse)
+	err := c.cc.Invoke(ctx, RequestService_StartTestScripts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) GetTestScriptReport(ctx context.Context, in *GetTestScriptReportRequest, opts ...grpc.CallOption) (*GetTestScriptReportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTestScriptReportResponse)
+	err := c.cc.Invoke(ctx, RequestService_GetTestScriptReport_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *requestServiceClient) GetTestScriptFile(ctx context.Context, in *GetTestScriptFileRequest, opts ...grpc.CallOption) (*GetTestScriptFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTestScriptFileResponse)
+	err := c.cc.Invoke(ctx, RequestService_GetTestScriptFile_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1271,6 +1319,10 @@ type RequestServiceServer interface {
 	GetTestSpecs(context.Context, *GetTestSpecsRequest) (*GetTestSpecsResponse, error)
 	StartTestSpecs(context.Context, *StartTestSpecsRequest) (*StartTestSpecsResponse, error)
 	GetTestSpecDocument(context.Context, *GetTestSpecDocumentRequest) (*GetTestSpecDocumentResponse, error)
+	GetTestScripts(context.Context, *GetTestScriptsRequest) (*GetTestScriptsResponse, error)
+	StartTestScripts(context.Context, *StartTestScriptsRequest) (*StartTestScriptsResponse, error)
+	GetTestScriptReport(context.Context, *GetTestScriptReportRequest) (*GetTestScriptReportResponse, error)
+	GetTestScriptFile(context.Context, *GetTestScriptFileRequest) (*GetTestScriptFileResponse, error)
 	GetRequestFlowSettings(context.Context, *GetRequestFlowSettingsRequest) (*GetRequestFlowSettingsResponse, error)
 	SetRequestFlowSettings(context.Context, *SetRequestFlowSettingsRequest) (*SetRequestFlowSettingsResponse, error)
 	// Solution and analysis (CR-REQ-007, 008, 026).
@@ -1432,6 +1484,18 @@ func (UnimplementedRequestServiceServer) StartTestSpecs(context.Context, *StartT
 }
 func (UnimplementedRequestServiceServer) GetTestSpecDocument(context.Context, *GetTestSpecDocumentRequest) (*GetTestSpecDocumentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTestSpecDocument not implemented")
+}
+func (UnimplementedRequestServiceServer) GetTestScripts(context.Context, *GetTestScriptsRequest) (*GetTestScriptsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTestScripts not implemented")
+}
+func (UnimplementedRequestServiceServer) StartTestScripts(context.Context, *StartTestScriptsRequest) (*StartTestScriptsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartTestScripts not implemented")
+}
+func (UnimplementedRequestServiceServer) GetTestScriptReport(context.Context, *GetTestScriptReportRequest) (*GetTestScriptReportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTestScriptReport not implemented")
+}
+func (UnimplementedRequestServiceServer) GetTestScriptFile(context.Context, *GetTestScriptFileRequest) (*GetTestScriptFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTestScriptFile not implemented")
 }
 func (UnimplementedRequestServiceServer) GetRequestFlowSettings(context.Context, *GetRequestFlowSettingsRequest) (*GetRequestFlowSettingsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRequestFlowSettings not implemented")
@@ -2059,6 +2123,78 @@ func _RequestService_GetTestSpecDocument_Handler(srv interface{}, ctx context.Co
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RequestServiceServer).GetTestSpecDocument(ctx, req.(*GetTestSpecDocumentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_GetTestScripts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTestScriptsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).GetTestScripts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_GetTestScripts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).GetTestScripts(ctx, req.(*GetTestScriptsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_StartTestScripts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartTestScriptsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).StartTestScripts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_StartTestScripts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).StartTestScripts(ctx, req.(*StartTestScriptsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_GetTestScriptReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTestScriptReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).GetTestScriptReport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_GetTestScriptReport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).GetTestScriptReport(ctx, req.(*GetTestScriptReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RequestService_GetTestScriptFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTestScriptFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RequestServiceServer).GetTestScriptFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RequestService_GetTestScriptFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RequestServiceServer).GetTestScriptFile(ctx, req.(*GetTestScriptFileRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -3532,6 +3668,22 @@ var RequestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTestSpecDocument",
 			Handler:    _RequestService_GetTestSpecDocument_Handler,
+		},
+		{
+			MethodName: "GetTestScripts",
+			Handler:    _RequestService_GetTestScripts_Handler,
+		},
+		{
+			MethodName: "StartTestScripts",
+			Handler:    _RequestService_StartTestScripts_Handler,
+		},
+		{
+			MethodName: "GetTestScriptReport",
+			Handler:    _RequestService_GetTestScriptReport_Handler,
+		},
+		{
+			MethodName: "GetTestScriptFile",
+			Handler:    _RequestService_GetTestScriptFile_Handler,
 		},
 		{
 			MethodName: "GetRequestFlowSettings",

@@ -2766,7 +2766,7 @@ var File_orca_request_v1_request_proto protoreflect.FileDescriptor
 
 const file_orca_request_v1_request_proto_rawDesc = "" +
 	"\n" +
-	"\x1dorca/request/v1/request.proto\x12\x0forca.request.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eorca/request/v1/activity.proto\x1a\x1eorca/request/v1/artifact.proto\x1a#orca/request/v1/clarification.proto\x1a orca/request/v1/compliance.proto\x1a\x1dorca/request/v1/context.proto\x1a\x1eorca/request/v1/decision.proto\x1a)orca/request/v1/execution_readiness.proto\x1a\x1corca/request/v1/impact.proto\x1a$orca/request/v1/outcome_review.proto\x1a\x1aorca/request/v1/plan.proto\x1a%orca/request/v1/request_backlog.proto\x1a\x1eorca/request/v1/solution.proto\x1a orca/request/v1/test_specs.proto\"\xd4\n" +
+	"\x1dorca/request/v1/request.proto\x12\x0forca.request.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eorca/request/v1/activity.proto\x1a\x1eorca/request/v1/artifact.proto\x1a#orca/request/v1/clarification.proto\x1a orca/request/v1/compliance.proto\x1a\x1dorca/request/v1/context.proto\x1a\x1eorca/request/v1/decision.proto\x1a)orca/request/v1/execution_readiness.proto\x1a\x1corca/request/v1/impact.proto\x1a$orca/request/v1/outcome_review.proto\x1a\x1aorca/request/v1/plan.proto\x1a%orca/request/v1/request_backlog.proto\x1a\x1eorca/request/v1/solution.proto\x1a orca/request/v1/test_specs.proto\x1a\"orca/request/v1/test_scripts.proto\"\xd4\n" +
 	"\n" +
 	"\aRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
@@ -3000,7 +3000,7 @@ const file_orca_request_v1_request_proto_rawDesc = "" +
 	"\x18acceptance_criteria_json\x18\x05 \x01(\tR\x16acceptanceCriteriaJson\x12(\n" +
 	"\x10type_fields_json\x18\x06 \x01(\tR\x0etypeFieldsJson\"P\n" +
 	"\x1aEditRequestContentResponse\x122\n" +
-	"\arequest\x18\x01 \x01(\v2\x18.orca.request.v1.RequestR\arequest2\xc3T\n" +
+	"\arequest\x18\x01 \x01(\v2\x18.orca.request.v1.RequestR\arequest2\xedW\n" +
 	"\x0eRequestService\x12U\n" +
 	"\n" +
 	"GetRequest\x12\".orca.request.v1.GetRequestRequest\x1a#.orca.request.v1.GetRequestResponse\x12[\n" +
@@ -3023,7 +3023,11 @@ const file_orca_request_v1_request_proto_rawDesc = "" +
 	"\x13GetExecutionSummary\x12+.orca.request.v1.GetExecutionSummaryRequest\x1a,.orca.request.v1.GetExecutionSummaryResponse\x12[\n" +
 	"\fGetTestSpecs\x12$.orca.request.v1.GetTestSpecsRequest\x1a%.orca.request.v1.GetTestSpecsResponse\x12a\n" +
 	"\x0eStartTestSpecs\x12&.orca.request.v1.StartTestSpecsRequest\x1a'.orca.request.v1.StartTestSpecsResponse\x12p\n" +
-	"\x13GetTestSpecDocument\x12+.orca.request.v1.GetTestSpecDocumentRequest\x1a,.orca.request.v1.GetTestSpecDocumentResponse\x12y\n" +
+	"\x13GetTestSpecDocument\x12+.orca.request.v1.GetTestSpecDocumentRequest\x1a,.orca.request.v1.GetTestSpecDocumentResponse\x12a\n" +
+	"\x0eGetTestScripts\x12&.orca.request.v1.GetTestScriptsRequest\x1a'.orca.request.v1.GetTestScriptsResponse\x12g\n" +
+	"\x10StartTestScripts\x12(.orca.request.v1.StartTestScriptsRequest\x1a).orca.request.v1.StartTestScriptsResponse\x12p\n" +
+	"\x13GetTestScriptReport\x12+.orca.request.v1.GetTestScriptReportRequest\x1a,.orca.request.v1.GetTestScriptReportResponse\x12j\n" +
+	"\x11GetTestScriptFile\x12).orca.request.v1.GetTestScriptFileRequest\x1a*.orca.request.v1.GetTestScriptFileResponse\x12y\n" +
 	"\x16GetRequestFlowSettings\x12..orca.request.v1.GetRequestFlowSettingsRequest\x1a/.orca.request.v1.GetRequestFlowSettingsResponse\x12y\n" +
 	"\x16SetRequestFlowSettings\x12..orca.request.v1.SetRequestFlowSettingsRequest\x1a/.orca.request.v1.SetRequestFlowSettingsResponse\x12g\n" +
 	"\x10GenerateSolution\x12(.orca.request.v1.GenerateSolutionRequest\x1a).orca.request.v1.GenerateSolutionResponse\x12^\n" +
@@ -3167,160 +3171,168 @@ var file_orca_request_v1_request_proto_goTypes = []any{
 	(*GetTestSpecsRequest)(nil),                      // 45: orca.request.v1.GetTestSpecsRequest
 	(*StartTestSpecsRequest)(nil),                    // 46: orca.request.v1.StartTestSpecsRequest
 	(*GetTestSpecDocumentRequest)(nil),               // 47: orca.request.v1.GetTestSpecDocumentRequest
-	(*GenerateSolutionRequest)(nil),                  // 48: orca.request.v1.GenerateSolutionRequest
-	(*ListSolutionsRequest)(nil),                     // 49: orca.request.v1.ListSolutionsRequest
-	(*ChooseSolutionOptionRequest)(nil),              // 50: orca.request.v1.ChooseSolutionOptionRequest
-	(*GetProjectEngineSettingsRequest)(nil),          // 51: orca.request.v1.GetProjectEngineSettingsRequest
-	(*SetProjectEngineSettingsRequest)(nil),          // 52: orca.request.v1.SetProjectEngineSettingsRequest
-	(*GeneratePlanRequest)(nil),                      // 53: orca.request.v1.GeneratePlanRequest
-	(*GetPlanProposalRequest)(nil),                   // 54: orca.request.v1.GetPlanProposalRequest
-	(*GetPlanBundleFileRequest)(nil),                 // 55: orca.request.v1.GetPlanBundleFileRequest
-	(*CleanupRequestProposalRequest)(nil),            // 56: orca.request.v1.CleanupRequestProposalRequest
-	(*CommitPlanRequest)(nil),                        // 57: orca.request.v1.CommitPlanRequest
-	(*RetryPlanGenerationRequest)(nil),               // 58: orca.request.v1.RetryPlanGenerationRequest
-	(*ListPlanRevisionsRequest)(nil),                 // 59: orca.request.v1.ListPlanRevisionsRequest
-	(*StartPhaseRequest)(nil),                        // 60: orca.request.v1.StartPhaseRequest
-	(*ReportTaskOutcomeRequest)(nil),                 // 61: orca.request.v1.ReportTaskOutcomeRequest
-	(*RecordRequestCheckRequest)(nil),                // 62: orca.request.v1.RecordRequestCheckRequest
-	(*ListRequestChecksRequest)(nil),                 // 63: orca.request.v1.ListRequestChecksRequest
-	(*GetRequestReadinessRequest)(nil),               // 64: orca.request.v1.GetRequestReadinessRequest
-	(*RequestClarificationRequest)(nil),              // 65: orca.request.v1.RequestClarificationRequest
-	(*ListClarificationsRequest)(nil),                // 66: orca.request.v1.ListClarificationsRequest
-	(*GetClarificationRequest)(nil),                  // 67: orca.request.v1.GetClarificationRequest
-	(*AnswerClarificationRequest)(nil),               // 68: orca.request.v1.AnswerClarificationRequest
-	(*CancelClarificationRequest)(nil),               // 69: orca.request.v1.CancelClarificationRequest
-	(*ListPendingClarificationsForUserRequest)(nil),  // 70: orca.request.v1.ListPendingClarificationsForUserRequest
-	(*WaiveReadinessRequest)(nil),                    // 71: orca.request.v1.WaiveReadinessRequest
-	(*ListDecisionsRequest)(nil),                     // 72: orca.request.v1.ListDecisionsRequest
-	(*GetDecisionRequest)(nil),                       // 73: orca.request.v1.GetDecisionRequest
-	(*ConfirmDecisionRequest)(nil),                   // 74: orca.request.v1.ConfirmDecisionRequest
-	(*ListRequestRevisionsRequest)(nil),              // 75: orca.request.v1.ListRequestRevisionsRequest
-	(*GetRequestRevisionRequest)(nil),                // 76: orca.request.v1.GetRequestRevisionRequest
-	(*GetRequestCoverageRequest)(nil),                // 77: orca.request.v1.GetRequestCoverageRequest
-	(*GetArtifactGraphRequest)(nil),                  // 78: orca.request.v1.GetArtifactGraphRequest
-	(*ExportArtifactProjectionRequest)(nil),          // 79: orca.request.v1.ExportArtifactProjectionRequest
-	(*ResolveArtifactRefRequest)(nil),                // 80: orca.request.v1.ResolveArtifactRefRequest
-	(*RequestImpactAssessmentRequest)(nil),           // 81: orca.request.v1.RequestImpactAssessmentRequest
-	(*GetImpactAssessmentRequest)(nil),               // 82: orca.request.v1.GetImpactAssessmentRequest
-	(*GetImpactGraphRequest)(nil),                    // 83: orca.request.v1.GetImpactGraphRequest
-	(*CompareImpactRequest)(nil),                     // 84: orca.request.v1.CompareImpactRequest
-	(*ListImpactFindingsRequest)(nil),                // 85: orca.request.v1.ListImpactFindingsRequest
-	(*GetImpactEvidenceRequest)(nil),                 // 86: orca.request.v1.GetImpactEvidenceRequest
-	(*GetPlanRiskHeatmapRequest)(nil),                // 87: orca.request.v1.GetPlanRiskHeatmapRequest
-	(*GetImpactDriftRequest)(nil),                    // 88: orca.request.v1.GetImpactDriftRequest
-	(*AcceptRiskRequest)(nil),                        // 89: orca.request.v1.AcceptRiskRequest
-	(*OverrideRiskGateRequest)(nil),                  // 90: orca.request.v1.OverrideRiskGateRequest
-	(*GetRiskPolicyRequest)(nil),                     // 91: orca.request.v1.GetRiskPolicyRequest
-	(*SetRiskPolicyRequest)(nil),                     // 92: orca.request.v1.SetRiskPolicyRequest
-	(*CheckReadinessRequest)(nil),                    // 93: orca.request.v1.CheckReadinessRequest
-	(*GetReadinessReportRequest)(nil),                // 94: orca.request.v1.GetReadinessReportRequest
-	(*ListReadinessRequest)(nil),                     // 95: orca.request.v1.ListReadinessRequest
-	(*ListContextSourcesRequest)(nil),                // 96: orca.request.v1.ListContextSourcesRequest
-	(*UpsertContextSourceRequest)(nil),               // 97: orca.request.v1.UpsertContextSourceRequest
-	(*SetContextSourceStatusRequest)(nil),            // 98: orca.request.v1.SetContextSourceStatusRequest
-	(*PreviewContextPackRequest)(nil),                // 99: orca.request.v1.PreviewContextPackRequest
-	(*GetEvidenceRequest)(nil),                       // 100: orca.request.v1.GetEvidenceRequest
-	(*ListEvidenceRequest)(nil),                      // 101: orca.request.v1.ListEvidenceRequest
-	(*EstimateOutcomeReviewRequest)(nil),             // 102: orca.request.v1.EstimateOutcomeReviewRequest
-	(*GenerateOutcomeReviewRequest)(nil),             // 103: orca.request.v1.GenerateOutcomeReviewRequest
-	(*GetOutcomeReviewRequest)(nil),                  // 104: orca.request.v1.GetOutcomeReviewRequest
-	(*ListOutcomeReviewsRequest)(nil),                // 105: orca.request.v1.ListOutcomeReviewsRequest
-	(*ListOutcomeReviewRunsRequest)(nil),             // 106: orca.request.v1.ListOutcomeReviewRunsRequest
-	(*GetReviewArtifactRequest)(nil),                 // 107: orca.request.v1.GetReviewArtifactRequest
-	(*ListReviewArtifactRevisionsRequest)(nil),       // 108: orca.request.v1.ListReviewArtifactRevisionsRequest
-	(*DecideOutcomeReviewItemRequest)(nil),           // 109: orca.request.v1.DecideOutcomeReviewItemRequest
-	(*ApproveOutcomeReviewRequest)(nil),              // 110: orca.request.v1.ApproveOutcomeReviewRequest
-	(*ListOutcomeReviewDecisionsRequest)(nil),        // 111: orca.request.v1.ListOutcomeReviewDecisionsRequest
-	(*LinkOutcomeReviewChildRequest)(nil),            // 112: orca.request.v1.LinkOutcomeReviewChildRequest
-	(*RegenerateReviewArtifactsRequest)(nil),         // 113: orca.request.v1.RegenerateReviewArtifactsRequest
-	(*RestoreReviewArtifactRevisionRequest)(nil),     // 114: orca.request.v1.RestoreReviewArtifactRevisionRequest
-	(*CompareReviewArtifactRevisionsRequest)(nil),    // 115: orca.request.v1.CompareReviewArtifactRevisionsRequest
-	(*GetReviewDrawingProfileRequest)(nil),           // 116: orca.request.v1.GetReviewDrawingProfileRequest
-	(*SaveReviewDrawingProfileRequest)(nil),          // 117: orca.request.v1.SaveReviewDrawingProfileRequest
-	(*ResetReviewDrawingProfileRequest)(nil),         // 118: orca.request.v1.ResetReviewDrawingProfileRequest
-	(*EraseRequestRequest)(nil),                      // 119: orca.request.v1.EraseRequestRequest
-	(*ExportRequestRequest)(nil),                     // 120: orca.request.v1.ExportRequestRequest
-	(*ExportTenantRequestsRequest)(nil),              // 121: orca.request.v1.ExportTenantRequestsRequest
-	(*ListBacklogResponse)(nil),                      // 122: orca.request.v1.ListBacklogResponse
-	(*ListRequestActivityResponse)(nil),              // 123: orca.request.v1.ListRequestActivityResponse
-	(*GetExecutionSummaryResponse)(nil),              // 124: orca.request.v1.GetExecutionSummaryResponse
-	(*GetTestSpecsResponse)(nil),                     // 125: orca.request.v1.GetTestSpecsResponse
-	(*StartTestSpecsResponse)(nil),                   // 126: orca.request.v1.StartTestSpecsResponse
-	(*GetTestSpecDocumentResponse)(nil),              // 127: orca.request.v1.GetTestSpecDocumentResponse
-	(*GenerateSolutionResponse)(nil),                 // 128: orca.request.v1.GenerateSolutionResponse
-	(*ListSolutionsResponse)(nil),                    // 129: orca.request.v1.ListSolutionsResponse
-	(*ChooseSolutionOptionResponse)(nil),             // 130: orca.request.v1.ChooseSolutionOptionResponse
-	(*GetProjectEngineSettingsResponse)(nil),         // 131: orca.request.v1.GetProjectEngineSettingsResponse
-	(*SetProjectEngineSettingsResponse)(nil),         // 132: orca.request.v1.SetProjectEngineSettingsResponse
-	(*GeneratePlanResponse)(nil),                     // 133: orca.request.v1.GeneratePlanResponse
-	(*GetPlanProposalResponse)(nil),                  // 134: orca.request.v1.GetPlanProposalResponse
-	(*GetPlanBundleFileResponse)(nil),                // 135: orca.request.v1.GetPlanBundleFileResponse
-	(*CleanupRequestProposalResponse)(nil),           // 136: orca.request.v1.CleanupRequestProposalResponse
-	(*CommitPlanResponse)(nil),                       // 137: orca.request.v1.CommitPlanResponse
-	(*RetryPlanGenerationResponse)(nil),              // 138: orca.request.v1.RetryPlanGenerationResponse
-	(*ListPlanRevisionsResponse)(nil),                // 139: orca.request.v1.ListPlanRevisionsResponse
-	(*StartPhaseResponse)(nil),                       // 140: orca.request.v1.StartPhaseResponse
-	(*ReportTaskOutcomeResponse)(nil),                // 141: orca.request.v1.ReportTaskOutcomeResponse
-	(*RecordRequestCheckResponse)(nil),               // 142: orca.request.v1.RecordRequestCheckResponse
-	(*ListRequestChecksResponse)(nil),                // 143: orca.request.v1.ListRequestChecksResponse
-	(*GetRequestReadinessResponse)(nil),              // 144: orca.request.v1.GetRequestReadinessResponse
-	(*RequestClarificationResponse)(nil),             // 145: orca.request.v1.RequestClarificationResponse
-	(*ListClarificationsResponse)(nil),               // 146: orca.request.v1.ListClarificationsResponse
-	(*GetClarificationResponse)(nil),                 // 147: orca.request.v1.GetClarificationResponse
-	(*AnswerClarificationResponse)(nil),              // 148: orca.request.v1.AnswerClarificationResponse
-	(*CancelClarificationResponse)(nil),              // 149: orca.request.v1.CancelClarificationResponse
-	(*ListPendingClarificationsForUserResponse)(nil), // 150: orca.request.v1.ListPendingClarificationsForUserResponse
-	(*WaiveReadinessResponse)(nil),                   // 151: orca.request.v1.WaiveReadinessResponse
-	(*ListDecisionsResponse)(nil),                    // 152: orca.request.v1.ListDecisionsResponse
-	(*GetDecisionResponse)(nil),                      // 153: orca.request.v1.GetDecisionResponse
-	(*ConfirmDecisionResponse)(nil),                  // 154: orca.request.v1.ConfirmDecisionResponse
-	(*ListRequestRevisionsResponse)(nil),             // 155: orca.request.v1.ListRequestRevisionsResponse
-	(*GetRequestRevisionResponse)(nil),               // 156: orca.request.v1.GetRequestRevisionResponse
-	(*GetRequestCoverageResponse)(nil),               // 157: orca.request.v1.GetRequestCoverageResponse
-	(*GetArtifactGraphResponse)(nil),                 // 158: orca.request.v1.GetArtifactGraphResponse
-	(*ExportArtifactProjectionResponse)(nil),         // 159: orca.request.v1.ExportArtifactProjectionResponse
-	(*ResolveArtifactRefResponse)(nil),               // 160: orca.request.v1.ResolveArtifactRefResponse
-	(*RequestImpactAssessmentResponse)(nil),          // 161: orca.request.v1.RequestImpactAssessmentResponse
-	(*GetImpactAssessmentResponse)(nil),              // 162: orca.request.v1.GetImpactAssessmentResponse
-	(*GetImpactGraphResponse)(nil),                   // 163: orca.request.v1.GetImpactGraphResponse
-	(*CompareImpactResponse)(nil),                    // 164: orca.request.v1.CompareImpactResponse
-	(*ListImpactFindingsResponse)(nil),               // 165: orca.request.v1.ListImpactFindingsResponse
-	(*GetImpactEvidenceResponse)(nil),                // 166: orca.request.v1.GetImpactEvidenceResponse
-	(*GetPlanRiskHeatmapResponse)(nil),               // 167: orca.request.v1.GetPlanRiskHeatmapResponse
-	(*GetImpactDriftResponse)(nil),                   // 168: orca.request.v1.GetImpactDriftResponse
-	(*AcceptRiskResponse)(nil),                       // 169: orca.request.v1.AcceptRiskResponse
-	(*OverrideRiskGateResponse)(nil),                 // 170: orca.request.v1.OverrideRiskGateResponse
-	(*GetRiskPolicyResponse)(nil),                    // 171: orca.request.v1.GetRiskPolicyResponse
-	(*SetRiskPolicyResponse)(nil),                    // 172: orca.request.v1.SetRiskPolicyResponse
-	(*CheckReadinessResponse)(nil),                   // 173: orca.request.v1.CheckReadinessResponse
-	(*GetReadinessReportResponse)(nil),               // 174: orca.request.v1.GetReadinessReportResponse
-	(*ListReadinessResponse)(nil),                    // 175: orca.request.v1.ListReadinessResponse
-	(*ListContextSourcesResponse)(nil),               // 176: orca.request.v1.ListContextSourcesResponse
-	(*UpsertContextSourceResponse)(nil),              // 177: orca.request.v1.UpsertContextSourceResponse
-	(*SetContextSourceStatusResponse)(nil),           // 178: orca.request.v1.SetContextSourceStatusResponse
-	(*PreviewContextPackResponse)(nil),               // 179: orca.request.v1.PreviewContextPackResponse
-	(*GetEvidenceResponse)(nil),                      // 180: orca.request.v1.GetEvidenceResponse
-	(*ListEvidenceResponse)(nil),                     // 181: orca.request.v1.ListEvidenceResponse
-	(*EstimateOutcomeReviewResponse)(nil),            // 182: orca.request.v1.EstimateOutcomeReviewResponse
-	(*GenerateOutcomeReviewResponse)(nil),            // 183: orca.request.v1.GenerateOutcomeReviewResponse
-	(*GetOutcomeReviewResponse)(nil),                 // 184: orca.request.v1.GetOutcomeReviewResponse
-	(*ListOutcomeReviewsResponse)(nil),               // 185: orca.request.v1.ListOutcomeReviewsResponse
-	(*ListOutcomeReviewRunsResponse)(nil),            // 186: orca.request.v1.ListOutcomeReviewRunsResponse
-	(*GetReviewArtifactResponse)(nil),                // 187: orca.request.v1.GetReviewArtifactResponse
-	(*ListReviewArtifactRevisionsResponse)(nil),      // 188: orca.request.v1.ListReviewArtifactRevisionsResponse
-	(*DecideOutcomeReviewItemResponse)(nil),          // 189: orca.request.v1.DecideOutcomeReviewItemResponse
-	(*ApproveOutcomeReviewResponse)(nil),             // 190: orca.request.v1.ApproveOutcomeReviewResponse
-	(*ListOutcomeReviewDecisionsResponse)(nil),       // 191: orca.request.v1.ListOutcomeReviewDecisionsResponse
-	(*LinkOutcomeReviewChildResponse)(nil),           // 192: orca.request.v1.LinkOutcomeReviewChildResponse
-	(*RegenerateReviewArtifactsResponse)(nil),        // 193: orca.request.v1.RegenerateReviewArtifactsResponse
-	(*RestoreReviewArtifactRevisionResponse)(nil),    // 194: orca.request.v1.RestoreReviewArtifactRevisionResponse
-	(*CompareReviewArtifactRevisionsResponse)(nil),   // 195: orca.request.v1.CompareReviewArtifactRevisionsResponse
-	(*GetReviewDrawingProfileResponse)(nil),          // 196: orca.request.v1.GetReviewDrawingProfileResponse
-	(*SaveReviewDrawingProfileResponse)(nil),         // 197: orca.request.v1.SaveReviewDrawingProfileResponse
-	(*ResetReviewDrawingProfileResponse)(nil),        // 198: orca.request.v1.ResetReviewDrawingProfileResponse
-	(*EraseRequestResponse)(nil),                     // 199: orca.request.v1.EraseRequestResponse
-	(*ExportRequestResponse)(nil),                    // 200: orca.request.v1.ExportRequestResponse
-	(*ExportTenantRequestsResponse)(nil),             // 201: orca.request.v1.ExportTenantRequestsResponse
+	(*GetTestScriptsRequest)(nil),                    // 48: orca.request.v1.GetTestScriptsRequest
+	(*StartTestScriptsRequest)(nil),                  // 49: orca.request.v1.StartTestScriptsRequest
+	(*GetTestScriptReportRequest)(nil),               // 50: orca.request.v1.GetTestScriptReportRequest
+	(*GetTestScriptFileRequest)(nil),                 // 51: orca.request.v1.GetTestScriptFileRequest
+	(*GenerateSolutionRequest)(nil),                  // 52: orca.request.v1.GenerateSolutionRequest
+	(*ListSolutionsRequest)(nil),                     // 53: orca.request.v1.ListSolutionsRequest
+	(*ChooseSolutionOptionRequest)(nil),              // 54: orca.request.v1.ChooseSolutionOptionRequest
+	(*GetProjectEngineSettingsRequest)(nil),          // 55: orca.request.v1.GetProjectEngineSettingsRequest
+	(*SetProjectEngineSettingsRequest)(nil),          // 56: orca.request.v1.SetProjectEngineSettingsRequest
+	(*GeneratePlanRequest)(nil),                      // 57: orca.request.v1.GeneratePlanRequest
+	(*GetPlanProposalRequest)(nil),                   // 58: orca.request.v1.GetPlanProposalRequest
+	(*GetPlanBundleFileRequest)(nil),                 // 59: orca.request.v1.GetPlanBundleFileRequest
+	(*CleanupRequestProposalRequest)(nil),            // 60: orca.request.v1.CleanupRequestProposalRequest
+	(*CommitPlanRequest)(nil),                        // 61: orca.request.v1.CommitPlanRequest
+	(*RetryPlanGenerationRequest)(nil),               // 62: orca.request.v1.RetryPlanGenerationRequest
+	(*ListPlanRevisionsRequest)(nil),                 // 63: orca.request.v1.ListPlanRevisionsRequest
+	(*StartPhaseRequest)(nil),                        // 64: orca.request.v1.StartPhaseRequest
+	(*ReportTaskOutcomeRequest)(nil),                 // 65: orca.request.v1.ReportTaskOutcomeRequest
+	(*RecordRequestCheckRequest)(nil),                // 66: orca.request.v1.RecordRequestCheckRequest
+	(*ListRequestChecksRequest)(nil),                 // 67: orca.request.v1.ListRequestChecksRequest
+	(*GetRequestReadinessRequest)(nil),               // 68: orca.request.v1.GetRequestReadinessRequest
+	(*RequestClarificationRequest)(nil),              // 69: orca.request.v1.RequestClarificationRequest
+	(*ListClarificationsRequest)(nil),                // 70: orca.request.v1.ListClarificationsRequest
+	(*GetClarificationRequest)(nil),                  // 71: orca.request.v1.GetClarificationRequest
+	(*AnswerClarificationRequest)(nil),               // 72: orca.request.v1.AnswerClarificationRequest
+	(*CancelClarificationRequest)(nil),               // 73: orca.request.v1.CancelClarificationRequest
+	(*ListPendingClarificationsForUserRequest)(nil),  // 74: orca.request.v1.ListPendingClarificationsForUserRequest
+	(*WaiveReadinessRequest)(nil),                    // 75: orca.request.v1.WaiveReadinessRequest
+	(*ListDecisionsRequest)(nil),                     // 76: orca.request.v1.ListDecisionsRequest
+	(*GetDecisionRequest)(nil),                       // 77: orca.request.v1.GetDecisionRequest
+	(*ConfirmDecisionRequest)(nil),                   // 78: orca.request.v1.ConfirmDecisionRequest
+	(*ListRequestRevisionsRequest)(nil),              // 79: orca.request.v1.ListRequestRevisionsRequest
+	(*GetRequestRevisionRequest)(nil),                // 80: orca.request.v1.GetRequestRevisionRequest
+	(*GetRequestCoverageRequest)(nil),                // 81: orca.request.v1.GetRequestCoverageRequest
+	(*GetArtifactGraphRequest)(nil),                  // 82: orca.request.v1.GetArtifactGraphRequest
+	(*ExportArtifactProjectionRequest)(nil),          // 83: orca.request.v1.ExportArtifactProjectionRequest
+	(*ResolveArtifactRefRequest)(nil),                // 84: orca.request.v1.ResolveArtifactRefRequest
+	(*RequestImpactAssessmentRequest)(nil),           // 85: orca.request.v1.RequestImpactAssessmentRequest
+	(*GetImpactAssessmentRequest)(nil),               // 86: orca.request.v1.GetImpactAssessmentRequest
+	(*GetImpactGraphRequest)(nil),                    // 87: orca.request.v1.GetImpactGraphRequest
+	(*CompareImpactRequest)(nil),                     // 88: orca.request.v1.CompareImpactRequest
+	(*ListImpactFindingsRequest)(nil),                // 89: orca.request.v1.ListImpactFindingsRequest
+	(*GetImpactEvidenceRequest)(nil),                 // 90: orca.request.v1.GetImpactEvidenceRequest
+	(*GetPlanRiskHeatmapRequest)(nil),                // 91: orca.request.v1.GetPlanRiskHeatmapRequest
+	(*GetImpactDriftRequest)(nil),                    // 92: orca.request.v1.GetImpactDriftRequest
+	(*AcceptRiskRequest)(nil),                        // 93: orca.request.v1.AcceptRiskRequest
+	(*OverrideRiskGateRequest)(nil),                  // 94: orca.request.v1.OverrideRiskGateRequest
+	(*GetRiskPolicyRequest)(nil),                     // 95: orca.request.v1.GetRiskPolicyRequest
+	(*SetRiskPolicyRequest)(nil),                     // 96: orca.request.v1.SetRiskPolicyRequest
+	(*CheckReadinessRequest)(nil),                    // 97: orca.request.v1.CheckReadinessRequest
+	(*GetReadinessReportRequest)(nil),                // 98: orca.request.v1.GetReadinessReportRequest
+	(*ListReadinessRequest)(nil),                     // 99: orca.request.v1.ListReadinessRequest
+	(*ListContextSourcesRequest)(nil),                // 100: orca.request.v1.ListContextSourcesRequest
+	(*UpsertContextSourceRequest)(nil),               // 101: orca.request.v1.UpsertContextSourceRequest
+	(*SetContextSourceStatusRequest)(nil),            // 102: orca.request.v1.SetContextSourceStatusRequest
+	(*PreviewContextPackRequest)(nil),                // 103: orca.request.v1.PreviewContextPackRequest
+	(*GetEvidenceRequest)(nil),                       // 104: orca.request.v1.GetEvidenceRequest
+	(*ListEvidenceRequest)(nil),                      // 105: orca.request.v1.ListEvidenceRequest
+	(*EstimateOutcomeReviewRequest)(nil),             // 106: orca.request.v1.EstimateOutcomeReviewRequest
+	(*GenerateOutcomeReviewRequest)(nil),             // 107: orca.request.v1.GenerateOutcomeReviewRequest
+	(*GetOutcomeReviewRequest)(nil),                  // 108: orca.request.v1.GetOutcomeReviewRequest
+	(*ListOutcomeReviewsRequest)(nil),                // 109: orca.request.v1.ListOutcomeReviewsRequest
+	(*ListOutcomeReviewRunsRequest)(nil),             // 110: orca.request.v1.ListOutcomeReviewRunsRequest
+	(*GetReviewArtifactRequest)(nil),                 // 111: orca.request.v1.GetReviewArtifactRequest
+	(*ListReviewArtifactRevisionsRequest)(nil),       // 112: orca.request.v1.ListReviewArtifactRevisionsRequest
+	(*DecideOutcomeReviewItemRequest)(nil),           // 113: orca.request.v1.DecideOutcomeReviewItemRequest
+	(*ApproveOutcomeReviewRequest)(nil),              // 114: orca.request.v1.ApproveOutcomeReviewRequest
+	(*ListOutcomeReviewDecisionsRequest)(nil),        // 115: orca.request.v1.ListOutcomeReviewDecisionsRequest
+	(*LinkOutcomeReviewChildRequest)(nil),            // 116: orca.request.v1.LinkOutcomeReviewChildRequest
+	(*RegenerateReviewArtifactsRequest)(nil),         // 117: orca.request.v1.RegenerateReviewArtifactsRequest
+	(*RestoreReviewArtifactRevisionRequest)(nil),     // 118: orca.request.v1.RestoreReviewArtifactRevisionRequest
+	(*CompareReviewArtifactRevisionsRequest)(nil),    // 119: orca.request.v1.CompareReviewArtifactRevisionsRequest
+	(*GetReviewDrawingProfileRequest)(nil),           // 120: orca.request.v1.GetReviewDrawingProfileRequest
+	(*SaveReviewDrawingProfileRequest)(nil),          // 121: orca.request.v1.SaveReviewDrawingProfileRequest
+	(*ResetReviewDrawingProfileRequest)(nil),         // 122: orca.request.v1.ResetReviewDrawingProfileRequest
+	(*EraseRequestRequest)(nil),                      // 123: orca.request.v1.EraseRequestRequest
+	(*ExportRequestRequest)(nil),                     // 124: orca.request.v1.ExportRequestRequest
+	(*ExportTenantRequestsRequest)(nil),              // 125: orca.request.v1.ExportTenantRequestsRequest
+	(*ListBacklogResponse)(nil),                      // 126: orca.request.v1.ListBacklogResponse
+	(*ListRequestActivityResponse)(nil),              // 127: orca.request.v1.ListRequestActivityResponse
+	(*GetExecutionSummaryResponse)(nil),              // 128: orca.request.v1.GetExecutionSummaryResponse
+	(*GetTestSpecsResponse)(nil),                     // 129: orca.request.v1.GetTestSpecsResponse
+	(*StartTestSpecsResponse)(nil),                   // 130: orca.request.v1.StartTestSpecsResponse
+	(*GetTestSpecDocumentResponse)(nil),              // 131: orca.request.v1.GetTestSpecDocumentResponse
+	(*GetTestScriptsResponse)(nil),                   // 132: orca.request.v1.GetTestScriptsResponse
+	(*StartTestScriptsResponse)(nil),                 // 133: orca.request.v1.StartTestScriptsResponse
+	(*GetTestScriptReportResponse)(nil),              // 134: orca.request.v1.GetTestScriptReportResponse
+	(*GetTestScriptFileResponse)(nil),                // 135: orca.request.v1.GetTestScriptFileResponse
+	(*GenerateSolutionResponse)(nil),                 // 136: orca.request.v1.GenerateSolutionResponse
+	(*ListSolutionsResponse)(nil),                    // 137: orca.request.v1.ListSolutionsResponse
+	(*ChooseSolutionOptionResponse)(nil),             // 138: orca.request.v1.ChooseSolutionOptionResponse
+	(*GetProjectEngineSettingsResponse)(nil),         // 139: orca.request.v1.GetProjectEngineSettingsResponse
+	(*SetProjectEngineSettingsResponse)(nil),         // 140: orca.request.v1.SetProjectEngineSettingsResponse
+	(*GeneratePlanResponse)(nil),                     // 141: orca.request.v1.GeneratePlanResponse
+	(*GetPlanProposalResponse)(nil),                  // 142: orca.request.v1.GetPlanProposalResponse
+	(*GetPlanBundleFileResponse)(nil),                // 143: orca.request.v1.GetPlanBundleFileResponse
+	(*CleanupRequestProposalResponse)(nil),           // 144: orca.request.v1.CleanupRequestProposalResponse
+	(*CommitPlanResponse)(nil),                       // 145: orca.request.v1.CommitPlanResponse
+	(*RetryPlanGenerationResponse)(nil),              // 146: orca.request.v1.RetryPlanGenerationResponse
+	(*ListPlanRevisionsResponse)(nil),                // 147: orca.request.v1.ListPlanRevisionsResponse
+	(*StartPhaseResponse)(nil),                       // 148: orca.request.v1.StartPhaseResponse
+	(*ReportTaskOutcomeResponse)(nil),                // 149: orca.request.v1.ReportTaskOutcomeResponse
+	(*RecordRequestCheckResponse)(nil),               // 150: orca.request.v1.RecordRequestCheckResponse
+	(*ListRequestChecksResponse)(nil),                // 151: orca.request.v1.ListRequestChecksResponse
+	(*GetRequestReadinessResponse)(nil),              // 152: orca.request.v1.GetRequestReadinessResponse
+	(*RequestClarificationResponse)(nil),             // 153: orca.request.v1.RequestClarificationResponse
+	(*ListClarificationsResponse)(nil),               // 154: orca.request.v1.ListClarificationsResponse
+	(*GetClarificationResponse)(nil),                 // 155: orca.request.v1.GetClarificationResponse
+	(*AnswerClarificationResponse)(nil),              // 156: orca.request.v1.AnswerClarificationResponse
+	(*CancelClarificationResponse)(nil),              // 157: orca.request.v1.CancelClarificationResponse
+	(*ListPendingClarificationsForUserResponse)(nil), // 158: orca.request.v1.ListPendingClarificationsForUserResponse
+	(*WaiveReadinessResponse)(nil),                   // 159: orca.request.v1.WaiveReadinessResponse
+	(*ListDecisionsResponse)(nil),                    // 160: orca.request.v1.ListDecisionsResponse
+	(*GetDecisionResponse)(nil),                      // 161: orca.request.v1.GetDecisionResponse
+	(*ConfirmDecisionResponse)(nil),                  // 162: orca.request.v1.ConfirmDecisionResponse
+	(*ListRequestRevisionsResponse)(nil),             // 163: orca.request.v1.ListRequestRevisionsResponse
+	(*GetRequestRevisionResponse)(nil),               // 164: orca.request.v1.GetRequestRevisionResponse
+	(*GetRequestCoverageResponse)(nil),               // 165: orca.request.v1.GetRequestCoverageResponse
+	(*GetArtifactGraphResponse)(nil),                 // 166: orca.request.v1.GetArtifactGraphResponse
+	(*ExportArtifactProjectionResponse)(nil),         // 167: orca.request.v1.ExportArtifactProjectionResponse
+	(*ResolveArtifactRefResponse)(nil),               // 168: orca.request.v1.ResolveArtifactRefResponse
+	(*RequestImpactAssessmentResponse)(nil),          // 169: orca.request.v1.RequestImpactAssessmentResponse
+	(*GetImpactAssessmentResponse)(nil),              // 170: orca.request.v1.GetImpactAssessmentResponse
+	(*GetImpactGraphResponse)(nil),                   // 171: orca.request.v1.GetImpactGraphResponse
+	(*CompareImpactResponse)(nil),                    // 172: orca.request.v1.CompareImpactResponse
+	(*ListImpactFindingsResponse)(nil),               // 173: orca.request.v1.ListImpactFindingsResponse
+	(*GetImpactEvidenceResponse)(nil),                // 174: orca.request.v1.GetImpactEvidenceResponse
+	(*GetPlanRiskHeatmapResponse)(nil),               // 175: orca.request.v1.GetPlanRiskHeatmapResponse
+	(*GetImpactDriftResponse)(nil),                   // 176: orca.request.v1.GetImpactDriftResponse
+	(*AcceptRiskResponse)(nil),                       // 177: orca.request.v1.AcceptRiskResponse
+	(*OverrideRiskGateResponse)(nil),                 // 178: orca.request.v1.OverrideRiskGateResponse
+	(*GetRiskPolicyResponse)(nil),                    // 179: orca.request.v1.GetRiskPolicyResponse
+	(*SetRiskPolicyResponse)(nil),                    // 180: orca.request.v1.SetRiskPolicyResponse
+	(*CheckReadinessResponse)(nil),                   // 181: orca.request.v1.CheckReadinessResponse
+	(*GetReadinessReportResponse)(nil),               // 182: orca.request.v1.GetReadinessReportResponse
+	(*ListReadinessResponse)(nil),                    // 183: orca.request.v1.ListReadinessResponse
+	(*ListContextSourcesResponse)(nil),               // 184: orca.request.v1.ListContextSourcesResponse
+	(*UpsertContextSourceResponse)(nil),              // 185: orca.request.v1.UpsertContextSourceResponse
+	(*SetContextSourceStatusResponse)(nil),           // 186: orca.request.v1.SetContextSourceStatusResponse
+	(*PreviewContextPackResponse)(nil),               // 187: orca.request.v1.PreviewContextPackResponse
+	(*GetEvidenceResponse)(nil),                      // 188: orca.request.v1.GetEvidenceResponse
+	(*ListEvidenceResponse)(nil),                     // 189: orca.request.v1.ListEvidenceResponse
+	(*EstimateOutcomeReviewResponse)(nil),            // 190: orca.request.v1.EstimateOutcomeReviewResponse
+	(*GenerateOutcomeReviewResponse)(nil),            // 191: orca.request.v1.GenerateOutcomeReviewResponse
+	(*GetOutcomeReviewResponse)(nil),                 // 192: orca.request.v1.GetOutcomeReviewResponse
+	(*ListOutcomeReviewsResponse)(nil),               // 193: orca.request.v1.ListOutcomeReviewsResponse
+	(*ListOutcomeReviewRunsResponse)(nil),            // 194: orca.request.v1.ListOutcomeReviewRunsResponse
+	(*GetReviewArtifactResponse)(nil),                // 195: orca.request.v1.GetReviewArtifactResponse
+	(*ListReviewArtifactRevisionsResponse)(nil),      // 196: orca.request.v1.ListReviewArtifactRevisionsResponse
+	(*DecideOutcomeReviewItemResponse)(nil),          // 197: orca.request.v1.DecideOutcomeReviewItemResponse
+	(*ApproveOutcomeReviewResponse)(nil),             // 198: orca.request.v1.ApproveOutcomeReviewResponse
+	(*ListOutcomeReviewDecisionsResponse)(nil),       // 199: orca.request.v1.ListOutcomeReviewDecisionsResponse
+	(*LinkOutcomeReviewChildResponse)(nil),           // 200: orca.request.v1.LinkOutcomeReviewChildResponse
+	(*RegenerateReviewArtifactsResponse)(nil),        // 201: orca.request.v1.RegenerateReviewArtifactsResponse
+	(*RestoreReviewArtifactRevisionResponse)(nil),    // 202: orca.request.v1.RestoreReviewArtifactRevisionResponse
+	(*CompareReviewArtifactRevisionsResponse)(nil),   // 203: orca.request.v1.CompareReviewArtifactRevisionsResponse
+	(*GetReviewDrawingProfileResponse)(nil),          // 204: orca.request.v1.GetReviewDrawingProfileResponse
+	(*SaveReviewDrawingProfileResponse)(nil),         // 205: orca.request.v1.SaveReviewDrawingProfileResponse
+	(*ResetReviewDrawingProfileResponse)(nil),        // 206: orca.request.v1.ResetReviewDrawingProfileResponse
+	(*EraseRequestResponse)(nil),                     // 207: orca.request.v1.EraseRequestResponse
+	(*ExportRequestResponse)(nil),                    // 208: orca.request.v1.ExportRequestResponse
+	(*ExportTenantRequestsResponse)(nil),             // 209: orca.request.v1.ExportTenantRequestsResponse
 }
 var file_orca_request_v1_request_proto_depIdxs = []int32{
 	41,  // 0: orca.request.v1.Request.created_at:type_name -> google.protobuf.Timestamp
@@ -3366,183 +3378,191 @@ var file_orca_request_v1_request_proto_depIdxs = []int32{
 	45,  // 40: orca.request.v1.RequestService.GetTestSpecs:input_type -> orca.request.v1.GetTestSpecsRequest
 	46,  // 41: orca.request.v1.RequestService.StartTestSpecs:input_type -> orca.request.v1.StartTestSpecsRequest
 	47,  // 42: orca.request.v1.RequestService.GetTestSpecDocument:input_type -> orca.request.v1.GetTestSpecDocumentRequest
-	35,  // 43: orca.request.v1.RequestService.GetRequestFlowSettings:input_type -> orca.request.v1.GetRequestFlowSettingsRequest
-	37,  // 44: orca.request.v1.RequestService.SetRequestFlowSettings:input_type -> orca.request.v1.SetRequestFlowSettingsRequest
-	48,  // 45: orca.request.v1.RequestService.GenerateSolution:input_type -> orca.request.v1.GenerateSolutionRequest
-	49,  // 46: orca.request.v1.RequestService.ListSolutions:input_type -> orca.request.v1.ListSolutionsRequest
-	50,  // 47: orca.request.v1.RequestService.ChooseSolutionOption:input_type -> orca.request.v1.ChooseSolutionOptionRequest
-	51,  // 48: orca.request.v1.RequestService.GetProjectEngineSettings:input_type -> orca.request.v1.GetProjectEngineSettingsRequest
-	52,  // 49: orca.request.v1.RequestService.SetProjectEngineSettings:input_type -> orca.request.v1.SetProjectEngineSettingsRequest
-	53,  // 50: orca.request.v1.RequestService.GeneratePlan:input_type -> orca.request.v1.GeneratePlanRequest
-	54,  // 51: orca.request.v1.RequestService.GetPlanProposal:input_type -> orca.request.v1.GetPlanProposalRequest
-	55,  // 52: orca.request.v1.RequestService.GetPlanBundleFile:input_type -> orca.request.v1.GetPlanBundleFileRequest
-	56,  // 53: orca.request.v1.RequestService.CleanupRequestProposal:input_type -> orca.request.v1.CleanupRequestProposalRequest
-	57,  // 54: orca.request.v1.RequestService.CommitPlan:input_type -> orca.request.v1.CommitPlanRequest
-	58,  // 55: orca.request.v1.RequestService.RetryPlanGeneration:input_type -> orca.request.v1.RetryPlanGenerationRequest
-	59,  // 56: orca.request.v1.RequestService.ListPlanRevisions:input_type -> orca.request.v1.ListPlanRevisionsRequest
-	60,  // 57: orca.request.v1.RequestService.StartPhase:input_type -> orca.request.v1.StartPhaseRequest
-	61,  // 58: orca.request.v1.RequestService.ReportTaskOutcome:input_type -> orca.request.v1.ReportTaskOutcomeRequest
-	62,  // 59: orca.request.v1.RequestService.RecordRequestCheck:input_type -> orca.request.v1.RecordRequestCheckRequest
-	63,  // 60: orca.request.v1.RequestService.ListRequestChecks:input_type -> orca.request.v1.ListRequestChecksRequest
-	64,  // 61: orca.request.v1.RequestService.GetRequestReadiness:input_type -> orca.request.v1.GetRequestReadinessRequest
-	65,  // 62: orca.request.v1.RequestService.RequestClarification:input_type -> orca.request.v1.RequestClarificationRequest
-	66,  // 63: orca.request.v1.RequestService.ListClarifications:input_type -> orca.request.v1.ListClarificationsRequest
-	67,  // 64: orca.request.v1.RequestService.GetClarification:input_type -> orca.request.v1.GetClarificationRequest
-	68,  // 65: orca.request.v1.RequestService.AnswerClarification:input_type -> orca.request.v1.AnswerClarificationRequest
-	69,  // 66: orca.request.v1.RequestService.CancelClarification:input_type -> orca.request.v1.CancelClarificationRequest
-	70,  // 67: orca.request.v1.RequestService.ListPendingClarificationsForUser:input_type -> orca.request.v1.ListPendingClarificationsForUserRequest
-	71,  // 68: orca.request.v1.RequestService.WaiveReadiness:input_type -> orca.request.v1.WaiveReadinessRequest
-	72,  // 69: orca.request.v1.RequestService.ListDecisions:input_type -> orca.request.v1.ListDecisionsRequest
-	73,  // 70: orca.request.v1.RequestService.GetDecision:input_type -> orca.request.v1.GetDecisionRequest
-	74,  // 71: orca.request.v1.RequestService.ConfirmDecision:input_type -> orca.request.v1.ConfirmDecisionRequest
-	39,  // 72: orca.request.v1.RequestService.EditRequestContent:input_type -> orca.request.v1.EditRequestContentRequest
-	75,  // 73: orca.request.v1.RequestService.ListRequestRevisions:input_type -> orca.request.v1.ListRequestRevisionsRequest
-	76,  // 74: orca.request.v1.RequestService.GetRequestRevision:input_type -> orca.request.v1.GetRequestRevisionRequest
-	77,  // 75: orca.request.v1.RequestService.GetRequestCoverage:input_type -> orca.request.v1.GetRequestCoverageRequest
-	78,  // 76: orca.request.v1.RequestService.GetArtifactGraph:input_type -> orca.request.v1.GetArtifactGraphRequest
-	79,  // 77: orca.request.v1.RequestService.ExportArtifactProjection:input_type -> orca.request.v1.ExportArtifactProjectionRequest
-	80,  // 78: orca.request.v1.RequestService.ResolveArtifactRef:input_type -> orca.request.v1.ResolveArtifactRefRequest
-	81,  // 79: orca.request.v1.RequestService.RequestImpactAssessment:input_type -> orca.request.v1.RequestImpactAssessmentRequest
-	82,  // 80: orca.request.v1.RequestService.GetImpactAssessment:input_type -> orca.request.v1.GetImpactAssessmentRequest
-	83,  // 81: orca.request.v1.RequestService.GetImpactGraph:input_type -> orca.request.v1.GetImpactGraphRequest
-	84,  // 82: orca.request.v1.RequestService.CompareImpact:input_type -> orca.request.v1.CompareImpactRequest
-	85,  // 83: orca.request.v1.RequestService.ListImpactFindings:input_type -> orca.request.v1.ListImpactFindingsRequest
-	86,  // 84: orca.request.v1.RequestService.GetImpactEvidence:input_type -> orca.request.v1.GetImpactEvidenceRequest
-	87,  // 85: orca.request.v1.RequestService.GetPlanRiskHeatmap:input_type -> orca.request.v1.GetPlanRiskHeatmapRequest
-	88,  // 86: orca.request.v1.RequestService.GetImpactDrift:input_type -> orca.request.v1.GetImpactDriftRequest
-	89,  // 87: orca.request.v1.RequestService.AcceptRisk:input_type -> orca.request.v1.AcceptRiskRequest
-	90,  // 88: orca.request.v1.RequestService.OverrideRiskGate:input_type -> orca.request.v1.OverrideRiskGateRequest
-	91,  // 89: orca.request.v1.RequestService.GetRiskPolicy:input_type -> orca.request.v1.GetRiskPolicyRequest
-	92,  // 90: orca.request.v1.RequestService.SetRiskPolicy:input_type -> orca.request.v1.SetRiskPolicyRequest
-	93,  // 91: orca.request.v1.RequestService.CheckReadiness:input_type -> orca.request.v1.CheckReadinessRequest
-	94,  // 92: orca.request.v1.RequestService.GetReadinessReport:input_type -> orca.request.v1.GetReadinessReportRequest
-	95,  // 93: orca.request.v1.RequestService.ListReadiness:input_type -> orca.request.v1.ListReadinessRequest
-	96,  // 94: orca.request.v1.RequestService.ListContextSources:input_type -> orca.request.v1.ListContextSourcesRequest
-	97,  // 95: orca.request.v1.RequestService.UpsertContextSource:input_type -> orca.request.v1.UpsertContextSourceRequest
-	98,  // 96: orca.request.v1.RequestService.SetContextSourceStatus:input_type -> orca.request.v1.SetContextSourceStatusRequest
-	99,  // 97: orca.request.v1.RequestService.PreviewContextPack:input_type -> orca.request.v1.PreviewContextPackRequest
-	100, // 98: orca.request.v1.RequestService.GetEvidence:input_type -> orca.request.v1.GetEvidenceRequest
-	101, // 99: orca.request.v1.RequestService.ListEvidence:input_type -> orca.request.v1.ListEvidenceRequest
-	102, // 100: orca.request.v1.RequestService.EstimateOutcomeReview:input_type -> orca.request.v1.EstimateOutcomeReviewRequest
-	103, // 101: orca.request.v1.RequestService.GenerateOutcomeReview:input_type -> orca.request.v1.GenerateOutcomeReviewRequest
-	104, // 102: orca.request.v1.RequestService.GetOutcomeReview:input_type -> orca.request.v1.GetOutcomeReviewRequest
-	105, // 103: orca.request.v1.RequestService.ListOutcomeReviews:input_type -> orca.request.v1.ListOutcomeReviewsRequest
-	106, // 104: orca.request.v1.RequestService.ListOutcomeReviewRuns:input_type -> orca.request.v1.ListOutcomeReviewRunsRequest
-	107, // 105: orca.request.v1.RequestService.GetReviewArtifact:input_type -> orca.request.v1.GetReviewArtifactRequest
-	108, // 106: orca.request.v1.RequestService.ListReviewArtifactRevisions:input_type -> orca.request.v1.ListReviewArtifactRevisionsRequest
-	109, // 107: orca.request.v1.RequestService.DecideOutcomeReviewItem:input_type -> orca.request.v1.DecideOutcomeReviewItemRequest
-	110, // 108: orca.request.v1.RequestService.ApproveOutcomeReview:input_type -> orca.request.v1.ApproveOutcomeReviewRequest
-	111, // 109: orca.request.v1.RequestService.ListOutcomeReviewDecisions:input_type -> orca.request.v1.ListOutcomeReviewDecisionsRequest
-	112, // 110: orca.request.v1.RequestService.LinkOutcomeReviewChild:input_type -> orca.request.v1.LinkOutcomeReviewChildRequest
-	113, // 111: orca.request.v1.RequestService.RegenerateReviewArtifacts:input_type -> orca.request.v1.RegenerateReviewArtifactsRequest
-	114, // 112: orca.request.v1.RequestService.RestoreReviewArtifactRevision:input_type -> orca.request.v1.RestoreReviewArtifactRevisionRequest
-	115, // 113: orca.request.v1.RequestService.CompareReviewArtifactRevisions:input_type -> orca.request.v1.CompareReviewArtifactRevisionsRequest
-	116, // 114: orca.request.v1.RequestService.GetReviewDrawingProfile:input_type -> orca.request.v1.GetReviewDrawingProfileRequest
-	117, // 115: orca.request.v1.RequestService.SaveReviewDrawingProfile:input_type -> orca.request.v1.SaveReviewDrawingProfileRequest
-	118, // 116: orca.request.v1.RequestService.ResetReviewDrawingProfile:input_type -> orca.request.v1.ResetReviewDrawingProfileRequest
-	119, // 117: orca.request.v1.RequestService.EraseRequest:input_type -> orca.request.v1.EraseRequestRequest
-	120, // 118: orca.request.v1.RequestService.ExportRequest:input_type -> orca.request.v1.ExportRequestRequest
-	121, // 119: orca.request.v1.RequestService.ExportTenantRequests:input_type -> orca.request.v1.ExportTenantRequestsRequest
-	4,   // 120: orca.request.v1.RequestService.GetRequest:output_type -> orca.request.v1.GetRequestResponse
-	6,   // 121: orca.request.v1.RequestService.ListRequests:output_type -> orca.request.v1.ListRequestsResponse
-	122, // 122: orca.request.v1.RequestService.ListBacklog:output_type -> orca.request.v1.ListBacklogResponse
-	8,   // 123: orca.request.v1.RequestService.CreateRequest:output_type -> orca.request.v1.CreateRequestResponse
-	10,  // 124: orca.request.v1.RequestService.ClassifyRequest:output_type -> orca.request.v1.ClassifyRequestResponse
-	12,  // 125: orca.request.v1.RequestService.ConfirmRequestType:output_type -> orca.request.v1.ConfirmRequestTypeResponse
-	14,  // 126: orca.request.v1.RequestService.ChangeRequestType:output_type -> orca.request.v1.ChangeRequestTypeResponse
-	16,  // 127: orca.request.v1.RequestService.SetRequestBaseRef:output_type -> orca.request.v1.SetRequestBaseRefResponse
-	19,  // 128: orca.request.v1.RequestService.ListRequestTypeHistory:output_type -> orca.request.v1.ListRequestTypeHistoryResponse
-	21,  // 129: orca.request.v1.RequestService.ReturnToBacklog:output_type -> orca.request.v1.ReturnToBacklogResponse
-	23,  // 130: orca.request.v1.RequestService.ReopenRequest:output_type -> orca.request.v1.ReopenRequestResponse
-	25,  // 131: orca.request.v1.RequestService.CancelRequest:output_type -> orca.request.v1.CancelRequestResponse
-	27,  // 132: orca.request.v1.RequestService.SpawnChildRequest:output_type -> orca.request.v1.SpawnChildRequestResponse
-	30,  // 133: orca.request.v1.RequestService.ListRequestLinks:output_type -> orca.request.v1.ListRequestLinksResponse
-	32,  // 134: orca.request.v1.RequestService.GetRequestFlow:output_type -> orca.request.v1.GetRequestFlowResponse
-	34,  // 135: orca.request.v1.RequestService.LookupRequestBySource:output_type -> orca.request.v1.LookupRequestBySourceResponse
-	123, // 136: orca.request.v1.RequestService.ListRequestActivity:output_type -> orca.request.v1.ListRequestActivityResponse
-	124, // 137: orca.request.v1.RequestService.GetExecutionSummary:output_type -> orca.request.v1.GetExecutionSummaryResponse
-	125, // 138: orca.request.v1.RequestService.GetTestSpecs:output_type -> orca.request.v1.GetTestSpecsResponse
-	126, // 139: orca.request.v1.RequestService.StartTestSpecs:output_type -> orca.request.v1.StartTestSpecsResponse
-	127, // 140: orca.request.v1.RequestService.GetTestSpecDocument:output_type -> orca.request.v1.GetTestSpecDocumentResponse
-	36,  // 141: orca.request.v1.RequestService.GetRequestFlowSettings:output_type -> orca.request.v1.GetRequestFlowSettingsResponse
-	38,  // 142: orca.request.v1.RequestService.SetRequestFlowSettings:output_type -> orca.request.v1.SetRequestFlowSettingsResponse
-	128, // 143: orca.request.v1.RequestService.GenerateSolution:output_type -> orca.request.v1.GenerateSolutionResponse
-	129, // 144: orca.request.v1.RequestService.ListSolutions:output_type -> orca.request.v1.ListSolutionsResponse
-	130, // 145: orca.request.v1.RequestService.ChooseSolutionOption:output_type -> orca.request.v1.ChooseSolutionOptionResponse
-	131, // 146: orca.request.v1.RequestService.GetProjectEngineSettings:output_type -> orca.request.v1.GetProjectEngineSettingsResponse
-	132, // 147: orca.request.v1.RequestService.SetProjectEngineSettings:output_type -> orca.request.v1.SetProjectEngineSettingsResponse
-	133, // 148: orca.request.v1.RequestService.GeneratePlan:output_type -> orca.request.v1.GeneratePlanResponse
-	134, // 149: orca.request.v1.RequestService.GetPlanProposal:output_type -> orca.request.v1.GetPlanProposalResponse
-	135, // 150: orca.request.v1.RequestService.GetPlanBundleFile:output_type -> orca.request.v1.GetPlanBundleFileResponse
-	136, // 151: orca.request.v1.RequestService.CleanupRequestProposal:output_type -> orca.request.v1.CleanupRequestProposalResponse
-	137, // 152: orca.request.v1.RequestService.CommitPlan:output_type -> orca.request.v1.CommitPlanResponse
-	138, // 153: orca.request.v1.RequestService.RetryPlanGeneration:output_type -> orca.request.v1.RetryPlanGenerationResponse
-	139, // 154: orca.request.v1.RequestService.ListPlanRevisions:output_type -> orca.request.v1.ListPlanRevisionsResponse
-	140, // 155: orca.request.v1.RequestService.StartPhase:output_type -> orca.request.v1.StartPhaseResponse
-	141, // 156: orca.request.v1.RequestService.ReportTaskOutcome:output_type -> orca.request.v1.ReportTaskOutcomeResponse
-	142, // 157: orca.request.v1.RequestService.RecordRequestCheck:output_type -> orca.request.v1.RecordRequestCheckResponse
-	143, // 158: orca.request.v1.RequestService.ListRequestChecks:output_type -> orca.request.v1.ListRequestChecksResponse
-	144, // 159: orca.request.v1.RequestService.GetRequestReadiness:output_type -> orca.request.v1.GetRequestReadinessResponse
-	145, // 160: orca.request.v1.RequestService.RequestClarification:output_type -> orca.request.v1.RequestClarificationResponse
-	146, // 161: orca.request.v1.RequestService.ListClarifications:output_type -> orca.request.v1.ListClarificationsResponse
-	147, // 162: orca.request.v1.RequestService.GetClarification:output_type -> orca.request.v1.GetClarificationResponse
-	148, // 163: orca.request.v1.RequestService.AnswerClarification:output_type -> orca.request.v1.AnswerClarificationResponse
-	149, // 164: orca.request.v1.RequestService.CancelClarification:output_type -> orca.request.v1.CancelClarificationResponse
-	150, // 165: orca.request.v1.RequestService.ListPendingClarificationsForUser:output_type -> orca.request.v1.ListPendingClarificationsForUserResponse
-	151, // 166: orca.request.v1.RequestService.WaiveReadiness:output_type -> orca.request.v1.WaiveReadinessResponse
-	152, // 167: orca.request.v1.RequestService.ListDecisions:output_type -> orca.request.v1.ListDecisionsResponse
-	153, // 168: orca.request.v1.RequestService.GetDecision:output_type -> orca.request.v1.GetDecisionResponse
-	154, // 169: orca.request.v1.RequestService.ConfirmDecision:output_type -> orca.request.v1.ConfirmDecisionResponse
-	40,  // 170: orca.request.v1.RequestService.EditRequestContent:output_type -> orca.request.v1.EditRequestContentResponse
-	155, // 171: orca.request.v1.RequestService.ListRequestRevisions:output_type -> orca.request.v1.ListRequestRevisionsResponse
-	156, // 172: orca.request.v1.RequestService.GetRequestRevision:output_type -> orca.request.v1.GetRequestRevisionResponse
-	157, // 173: orca.request.v1.RequestService.GetRequestCoverage:output_type -> orca.request.v1.GetRequestCoverageResponse
-	158, // 174: orca.request.v1.RequestService.GetArtifactGraph:output_type -> orca.request.v1.GetArtifactGraphResponse
-	159, // 175: orca.request.v1.RequestService.ExportArtifactProjection:output_type -> orca.request.v1.ExportArtifactProjectionResponse
-	160, // 176: orca.request.v1.RequestService.ResolveArtifactRef:output_type -> orca.request.v1.ResolveArtifactRefResponse
-	161, // 177: orca.request.v1.RequestService.RequestImpactAssessment:output_type -> orca.request.v1.RequestImpactAssessmentResponse
-	162, // 178: orca.request.v1.RequestService.GetImpactAssessment:output_type -> orca.request.v1.GetImpactAssessmentResponse
-	163, // 179: orca.request.v1.RequestService.GetImpactGraph:output_type -> orca.request.v1.GetImpactGraphResponse
-	164, // 180: orca.request.v1.RequestService.CompareImpact:output_type -> orca.request.v1.CompareImpactResponse
-	165, // 181: orca.request.v1.RequestService.ListImpactFindings:output_type -> orca.request.v1.ListImpactFindingsResponse
-	166, // 182: orca.request.v1.RequestService.GetImpactEvidence:output_type -> orca.request.v1.GetImpactEvidenceResponse
-	167, // 183: orca.request.v1.RequestService.GetPlanRiskHeatmap:output_type -> orca.request.v1.GetPlanRiskHeatmapResponse
-	168, // 184: orca.request.v1.RequestService.GetImpactDrift:output_type -> orca.request.v1.GetImpactDriftResponse
-	169, // 185: orca.request.v1.RequestService.AcceptRisk:output_type -> orca.request.v1.AcceptRiskResponse
-	170, // 186: orca.request.v1.RequestService.OverrideRiskGate:output_type -> orca.request.v1.OverrideRiskGateResponse
-	171, // 187: orca.request.v1.RequestService.GetRiskPolicy:output_type -> orca.request.v1.GetRiskPolicyResponse
-	172, // 188: orca.request.v1.RequestService.SetRiskPolicy:output_type -> orca.request.v1.SetRiskPolicyResponse
-	173, // 189: orca.request.v1.RequestService.CheckReadiness:output_type -> orca.request.v1.CheckReadinessResponse
-	174, // 190: orca.request.v1.RequestService.GetReadinessReport:output_type -> orca.request.v1.GetReadinessReportResponse
-	175, // 191: orca.request.v1.RequestService.ListReadiness:output_type -> orca.request.v1.ListReadinessResponse
-	176, // 192: orca.request.v1.RequestService.ListContextSources:output_type -> orca.request.v1.ListContextSourcesResponse
-	177, // 193: orca.request.v1.RequestService.UpsertContextSource:output_type -> orca.request.v1.UpsertContextSourceResponse
-	178, // 194: orca.request.v1.RequestService.SetContextSourceStatus:output_type -> orca.request.v1.SetContextSourceStatusResponse
-	179, // 195: orca.request.v1.RequestService.PreviewContextPack:output_type -> orca.request.v1.PreviewContextPackResponse
-	180, // 196: orca.request.v1.RequestService.GetEvidence:output_type -> orca.request.v1.GetEvidenceResponse
-	181, // 197: orca.request.v1.RequestService.ListEvidence:output_type -> orca.request.v1.ListEvidenceResponse
-	182, // 198: orca.request.v1.RequestService.EstimateOutcomeReview:output_type -> orca.request.v1.EstimateOutcomeReviewResponse
-	183, // 199: orca.request.v1.RequestService.GenerateOutcomeReview:output_type -> orca.request.v1.GenerateOutcomeReviewResponse
-	184, // 200: orca.request.v1.RequestService.GetOutcomeReview:output_type -> orca.request.v1.GetOutcomeReviewResponse
-	185, // 201: orca.request.v1.RequestService.ListOutcomeReviews:output_type -> orca.request.v1.ListOutcomeReviewsResponse
-	186, // 202: orca.request.v1.RequestService.ListOutcomeReviewRuns:output_type -> orca.request.v1.ListOutcomeReviewRunsResponse
-	187, // 203: orca.request.v1.RequestService.GetReviewArtifact:output_type -> orca.request.v1.GetReviewArtifactResponse
-	188, // 204: orca.request.v1.RequestService.ListReviewArtifactRevisions:output_type -> orca.request.v1.ListReviewArtifactRevisionsResponse
-	189, // 205: orca.request.v1.RequestService.DecideOutcomeReviewItem:output_type -> orca.request.v1.DecideOutcomeReviewItemResponse
-	190, // 206: orca.request.v1.RequestService.ApproveOutcomeReview:output_type -> orca.request.v1.ApproveOutcomeReviewResponse
-	191, // 207: orca.request.v1.RequestService.ListOutcomeReviewDecisions:output_type -> orca.request.v1.ListOutcomeReviewDecisionsResponse
-	192, // 208: orca.request.v1.RequestService.LinkOutcomeReviewChild:output_type -> orca.request.v1.LinkOutcomeReviewChildResponse
-	193, // 209: orca.request.v1.RequestService.RegenerateReviewArtifacts:output_type -> orca.request.v1.RegenerateReviewArtifactsResponse
-	194, // 210: orca.request.v1.RequestService.RestoreReviewArtifactRevision:output_type -> orca.request.v1.RestoreReviewArtifactRevisionResponse
-	195, // 211: orca.request.v1.RequestService.CompareReviewArtifactRevisions:output_type -> orca.request.v1.CompareReviewArtifactRevisionsResponse
-	196, // 212: orca.request.v1.RequestService.GetReviewDrawingProfile:output_type -> orca.request.v1.GetReviewDrawingProfileResponse
-	197, // 213: orca.request.v1.RequestService.SaveReviewDrawingProfile:output_type -> orca.request.v1.SaveReviewDrawingProfileResponse
-	198, // 214: orca.request.v1.RequestService.ResetReviewDrawingProfile:output_type -> orca.request.v1.ResetReviewDrawingProfileResponse
-	199, // 215: orca.request.v1.RequestService.EraseRequest:output_type -> orca.request.v1.EraseRequestResponse
-	200, // 216: orca.request.v1.RequestService.ExportRequest:output_type -> orca.request.v1.ExportRequestResponse
-	201, // 217: orca.request.v1.RequestService.ExportTenantRequests:output_type -> orca.request.v1.ExportTenantRequestsResponse
-	120, // [120:218] is the sub-list for method output_type
-	22,  // [22:120] is the sub-list for method input_type
+	48,  // 43: orca.request.v1.RequestService.GetTestScripts:input_type -> orca.request.v1.GetTestScriptsRequest
+	49,  // 44: orca.request.v1.RequestService.StartTestScripts:input_type -> orca.request.v1.StartTestScriptsRequest
+	50,  // 45: orca.request.v1.RequestService.GetTestScriptReport:input_type -> orca.request.v1.GetTestScriptReportRequest
+	51,  // 46: orca.request.v1.RequestService.GetTestScriptFile:input_type -> orca.request.v1.GetTestScriptFileRequest
+	35,  // 47: orca.request.v1.RequestService.GetRequestFlowSettings:input_type -> orca.request.v1.GetRequestFlowSettingsRequest
+	37,  // 48: orca.request.v1.RequestService.SetRequestFlowSettings:input_type -> orca.request.v1.SetRequestFlowSettingsRequest
+	52,  // 49: orca.request.v1.RequestService.GenerateSolution:input_type -> orca.request.v1.GenerateSolutionRequest
+	53,  // 50: orca.request.v1.RequestService.ListSolutions:input_type -> orca.request.v1.ListSolutionsRequest
+	54,  // 51: orca.request.v1.RequestService.ChooseSolutionOption:input_type -> orca.request.v1.ChooseSolutionOptionRequest
+	55,  // 52: orca.request.v1.RequestService.GetProjectEngineSettings:input_type -> orca.request.v1.GetProjectEngineSettingsRequest
+	56,  // 53: orca.request.v1.RequestService.SetProjectEngineSettings:input_type -> orca.request.v1.SetProjectEngineSettingsRequest
+	57,  // 54: orca.request.v1.RequestService.GeneratePlan:input_type -> orca.request.v1.GeneratePlanRequest
+	58,  // 55: orca.request.v1.RequestService.GetPlanProposal:input_type -> orca.request.v1.GetPlanProposalRequest
+	59,  // 56: orca.request.v1.RequestService.GetPlanBundleFile:input_type -> orca.request.v1.GetPlanBundleFileRequest
+	60,  // 57: orca.request.v1.RequestService.CleanupRequestProposal:input_type -> orca.request.v1.CleanupRequestProposalRequest
+	61,  // 58: orca.request.v1.RequestService.CommitPlan:input_type -> orca.request.v1.CommitPlanRequest
+	62,  // 59: orca.request.v1.RequestService.RetryPlanGeneration:input_type -> orca.request.v1.RetryPlanGenerationRequest
+	63,  // 60: orca.request.v1.RequestService.ListPlanRevisions:input_type -> orca.request.v1.ListPlanRevisionsRequest
+	64,  // 61: orca.request.v1.RequestService.StartPhase:input_type -> orca.request.v1.StartPhaseRequest
+	65,  // 62: orca.request.v1.RequestService.ReportTaskOutcome:input_type -> orca.request.v1.ReportTaskOutcomeRequest
+	66,  // 63: orca.request.v1.RequestService.RecordRequestCheck:input_type -> orca.request.v1.RecordRequestCheckRequest
+	67,  // 64: orca.request.v1.RequestService.ListRequestChecks:input_type -> orca.request.v1.ListRequestChecksRequest
+	68,  // 65: orca.request.v1.RequestService.GetRequestReadiness:input_type -> orca.request.v1.GetRequestReadinessRequest
+	69,  // 66: orca.request.v1.RequestService.RequestClarification:input_type -> orca.request.v1.RequestClarificationRequest
+	70,  // 67: orca.request.v1.RequestService.ListClarifications:input_type -> orca.request.v1.ListClarificationsRequest
+	71,  // 68: orca.request.v1.RequestService.GetClarification:input_type -> orca.request.v1.GetClarificationRequest
+	72,  // 69: orca.request.v1.RequestService.AnswerClarification:input_type -> orca.request.v1.AnswerClarificationRequest
+	73,  // 70: orca.request.v1.RequestService.CancelClarification:input_type -> orca.request.v1.CancelClarificationRequest
+	74,  // 71: orca.request.v1.RequestService.ListPendingClarificationsForUser:input_type -> orca.request.v1.ListPendingClarificationsForUserRequest
+	75,  // 72: orca.request.v1.RequestService.WaiveReadiness:input_type -> orca.request.v1.WaiveReadinessRequest
+	76,  // 73: orca.request.v1.RequestService.ListDecisions:input_type -> orca.request.v1.ListDecisionsRequest
+	77,  // 74: orca.request.v1.RequestService.GetDecision:input_type -> orca.request.v1.GetDecisionRequest
+	78,  // 75: orca.request.v1.RequestService.ConfirmDecision:input_type -> orca.request.v1.ConfirmDecisionRequest
+	39,  // 76: orca.request.v1.RequestService.EditRequestContent:input_type -> orca.request.v1.EditRequestContentRequest
+	79,  // 77: orca.request.v1.RequestService.ListRequestRevisions:input_type -> orca.request.v1.ListRequestRevisionsRequest
+	80,  // 78: orca.request.v1.RequestService.GetRequestRevision:input_type -> orca.request.v1.GetRequestRevisionRequest
+	81,  // 79: orca.request.v1.RequestService.GetRequestCoverage:input_type -> orca.request.v1.GetRequestCoverageRequest
+	82,  // 80: orca.request.v1.RequestService.GetArtifactGraph:input_type -> orca.request.v1.GetArtifactGraphRequest
+	83,  // 81: orca.request.v1.RequestService.ExportArtifactProjection:input_type -> orca.request.v1.ExportArtifactProjectionRequest
+	84,  // 82: orca.request.v1.RequestService.ResolveArtifactRef:input_type -> orca.request.v1.ResolveArtifactRefRequest
+	85,  // 83: orca.request.v1.RequestService.RequestImpactAssessment:input_type -> orca.request.v1.RequestImpactAssessmentRequest
+	86,  // 84: orca.request.v1.RequestService.GetImpactAssessment:input_type -> orca.request.v1.GetImpactAssessmentRequest
+	87,  // 85: orca.request.v1.RequestService.GetImpactGraph:input_type -> orca.request.v1.GetImpactGraphRequest
+	88,  // 86: orca.request.v1.RequestService.CompareImpact:input_type -> orca.request.v1.CompareImpactRequest
+	89,  // 87: orca.request.v1.RequestService.ListImpactFindings:input_type -> orca.request.v1.ListImpactFindingsRequest
+	90,  // 88: orca.request.v1.RequestService.GetImpactEvidence:input_type -> orca.request.v1.GetImpactEvidenceRequest
+	91,  // 89: orca.request.v1.RequestService.GetPlanRiskHeatmap:input_type -> orca.request.v1.GetPlanRiskHeatmapRequest
+	92,  // 90: orca.request.v1.RequestService.GetImpactDrift:input_type -> orca.request.v1.GetImpactDriftRequest
+	93,  // 91: orca.request.v1.RequestService.AcceptRisk:input_type -> orca.request.v1.AcceptRiskRequest
+	94,  // 92: orca.request.v1.RequestService.OverrideRiskGate:input_type -> orca.request.v1.OverrideRiskGateRequest
+	95,  // 93: orca.request.v1.RequestService.GetRiskPolicy:input_type -> orca.request.v1.GetRiskPolicyRequest
+	96,  // 94: orca.request.v1.RequestService.SetRiskPolicy:input_type -> orca.request.v1.SetRiskPolicyRequest
+	97,  // 95: orca.request.v1.RequestService.CheckReadiness:input_type -> orca.request.v1.CheckReadinessRequest
+	98,  // 96: orca.request.v1.RequestService.GetReadinessReport:input_type -> orca.request.v1.GetReadinessReportRequest
+	99,  // 97: orca.request.v1.RequestService.ListReadiness:input_type -> orca.request.v1.ListReadinessRequest
+	100, // 98: orca.request.v1.RequestService.ListContextSources:input_type -> orca.request.v1.ListContextSourcesRequest
+	101, // 99: orca.request.v1.RequestService.UpsertContextSource:input_type -> orca.request.v1.UpsertContextSourceRequest
+	102, // 100: orca.request.v1.RequestService.SetContextSourceStatus:input_type -> orca.request.v1.SetContextSourceStatusRequest
+	103, // 101: orca.request.v1.RequestService.PreviewContextPack:input_type -> orca.request.v1.PreviewContextPackRequest
+	104, // 102: orca.request.v1.RequestService.GetEvidence:input_type -> orca.request.v1.GetEvidenceRequest
+	105, // 103: orca.request.v1.RequestService.ListEvidence:input_type -> orca.request.v1.ListEvidenceRequest
+	106, // 104: orca.request.v1.RequestService.EstimateOutcomeReview:input_type -> orca.request.v1.EstimateOutcomeReviewRequest
+	107, // 105: orca.request.v1.RequestService.GenerateOutcomeReview:input_type -> orca.request.v1.GenerateOutcomeReviewRequest
+	108, // 106: orca.request.v1.RequestService.GetOutcomeReview:input_type -> orca.request.v1.GetOutcomeReviewRequest
+	109, // 107: orca.request.v1.RequestService.ListOutcomeReviews:input_type -> orca.request.v1.ListOutcomeReviewsRequest
+	110, // 108: orca.request.v1.RequestService.ListOutcomeReviewRuns:input_type -> orca.request.v1.ListOutcomeReviewRunsRequest
+	111, // 109: orca.request.v1.RequestService.GetReviewArtifact:input_type -> orca.request.v1.GetReviewArtifactRequest
+	112, // 110: orca.request.v1.RequestService.ListReviewArtifactRevisions:input_type -> orca.request.v1.ListReviewArtifactRevisionsRequest
+	113, // 111: orca.request.v1.RequestService.DecideOutcomeReviewItem:input_type -> orca.request.v1.DecideOutcomeReviewItemRequest
+	114, // 112: orca.request.v1.RequestService.ApproveOutcomeReview:input_type -> orca.request.v1.ApproveOutcomeReviewRequest
+	115, // 113: orca.request.v1.RequestService.ListOutcomeReviewDecisions:input_type -> orca.request.v1.ListOutcomeReviewDecisionsRequest
+	116, // 114: orca.request.v1.RequestService.LinkOutcomeReviewChild:input_type -> orca.request.v1.LinkOutcomeReviewChildRequest
+	117, // 115: orca.request.v1.RequestService.RegenerateReviewArtifacts:input_type -> orca.request.v1.RegenerateReviewArtifactsRequest
+	118, // 116: orca.request.v1.RequestService.RestoreReviewArtifactRevision:input_type -> orca.request.v1.RestoreReviewArtifactRevisionRequest
+	119, // 117: orca.request.v1.RequestService.CompareReviewArtifactRevisions:input_type -> orca.request.v1.CompareReviewArtifactRevisionsRequest
+	120, // 118: orca.request.v1.RequestService.GetReviewDrawingProfile:input_type -> orca.request.v1.GetReviewDrawingProfileRequest
+	121, // 119: orca.request.v1.RequestService.SaveReviewDrawingProfile:input_type -> orca.request.v1.SaveReviewDrawingProfileRequest
+	122, // 120: orca.request.v1.RequestService.ResetReviewDrawingProfile:input_type -> orca.request.v1.ResetReviewDrawingProfileRequest
+	123, // 121: orca.request.v1.RequestService.EraseRequest:input_type -> orca.request.v1.EraseRequestRequest
+	124, // 122: orca.request.v1.RequestService.ExportRequest:input_type -> orca.request.v1.ExportRequestRequest
+	125, // 123: orca.request.v1.RequestService.ExportTenantRequests:input_type -> orca.request.v1.ExportTenantRequestsRequest
+	4,   // 124: orca.request.v1.RequestService.GetRequest:output_type -> orca.request.v1.GetRequestResponse
+	6,   // 125: orca.request.v1.RequestService.ListRequests:output_type -> orca.request.v1.ListRequestsResponse
+	126, // 126: orca.request.v1.RequestService.ListBacklog:output_type -> orca.request.v1.ListBacklogResponse
+	8,   // 127: orca.request.v1.RequestService.CreateRequest:output_type -> orca.request.v1.CreateRequestResponse
+	10,  // 128: orca.request.v1.RequestService.ClassifyRequest:output_type -> orca.request.v1.ClassifyRequestResponse
+	12,  // 129: orca.request.v1.RequestService.ConfirmRequestType:output_type -> orca.request.v1.ConfirmRequestTypeResponse
+	14,  // 130: orca.request.v1.RequestService.ChangeRequestType:output_type -> orca.request.v1.ChangeRequestTypeResponse
+	16,  // 131: orca.request.v1.RequestService.SetRequestBaseRef:output_type -> orca.request.v1.SetRequestBaseRefResponse
+	19,  // 132: orca.request.v1.RequestService.ListRequestTypeHistory:output_type -> orca.request.v1.ListRequestTypeHistoryResponse
+	21,  // 133: orca.request.v1.RequestService.ReturnToBacklog:output_type -> orca.request.v1.ReturnToBacklogResponse
+	23,  // 134: orca.request.v1.RequestService.ReopenRequest:output_type -> orca.request.v1.ReopenRequestResponse
+	25,  // 135: orca.request.v1.RequestService.CancelRequest:output_type -> orca.request.v1.CancelRequestResponse
+	27,  // 136: orca.request.v1.RequestService.SpawnChildRequest:output_type -> orca.request.v1.SpawnChildRequestResponse
+	30,  // 137: orca.request.v1.RequestService.ListRequestLinks:output_type -> orca.request.v1.ListRequestLinksResponse
+	32,  // 138: orca.request.v1.RequestService.GetRequestFlow:output_type -> orca.request.v1.GetRequestFlowResponse
+	34,  // 139: orca.request.v1.RequestService.LookupRequestBySource:output_type -> orca.request.v1.LookupRequestBySourceResponse
+	127, // 140: orca.request.v1.RequestService.ListRequestActivity:output_type -> orca.request.v1.ListRequestActivityResponse
+	128, // 141: orca.request.v1.RequestService.GetExecutionSummary:output_type -> orca.request.v1.GetExecutionSummaryResponse
+	129, // 142: orca.request.v1.RequestService.GetTestSpecs:output_type -> orca.request.v1.GetTestSpecsResponse
+	130, // 143: orca.request.v1.RequestService.StartTestSpecs:output_type -> orca.request.v1.StartTestSpecsResponse
+	131, // 144: orca.request.v1.RequestService.GetTestSpecDocument:output_type -> orca.request.v1.GetTestSpecDocumentResponse
+	132, // 145: orca.request.v1.RequestService.GetTestScripts:output_type -> orca.request.v1.GetTestScriptsResponse
+	133, // 146: orca.request.v1.RequestService.StartTestScripts:output_type -> orca.request.v1.StartTestScriptsResponse
+	134, // 147: orca.request.v1.RequestService.GetTestScriptReport:output_type -> orca.request.v1.GetTestScriptReportResponse
+	135, // 148: orca.request.v1.RequestService.GetTestScriptFile:output_type -> orca.request.v1.GetTestScriptFileResponse
+	36,  // 149: orca.request.v1.RequestService.GetRequestFlowSettings:output_type -> orca.request.v1.GetRequestFlowSettingsResponse
+	38,  // 150: orca.request.v1.RequestService.SetRequestFlowSettings:output_type -> orca.request.v1.SetRequestFlowSettingsResponse
+	136, // 151: orca.request.v1.RequestService.GenerateSolution:output_type -> orca.request.v1.GenerateSolutionResponse
+	137, // 152: orca.request.v1.RequestService.ListSolutions:output_type -> orca.request.v1.ListSolutionsResponse
+	138, // 153: orca.request.v1.RequestService.ChooseSolutionOption:output_type -> orca.request.v1.ChooseSolutionOptionResponse
+	139, // 154: orca.request.v1.RequestService.GetProjectEngineSettings:output_type -> orca.request.v1.GetProjectEngineSettingsResponse
+	140, // 155: orca.request.v1.RequestService.SetProjectEngineSettings:output_type -> orca.request.v1.SetProjectEngineSettingsResponse
+	141, // 156: orca.request.v1.RequestService.GeneratePlan:output_type -> orca.request.v1.GeneratePlanResponse
+	142, // 157: orca.request.v1.RequestService.GetPlanProposal:output_type -> orca.request.v1.GetPlanProposalResponse
+	143, // 158: orca.request.v1.RequestService.GetPlanBundleFile:output_type -> orca.request.v1.GetPlanBundleFileResponse
+	144, // 159: orca.request.v1.RequestService.CleanupRequestProposal:output_type -> orca.request.v1.CleanupRequestProposalResponse
+	145, // 160: orca.request.v1.RequestService.CommitPlan:output_type -> orca.request.v1.CommitPlanResponse
+	146, // 161: orca.request.v1.RequestService.RetryPlanGeneration:output_type -> orca.request.v1.RetryPlanGenerationResponse
+	147, // 162: orca.request.v1.RequestService.ListPlanRevisions:output_type -> orca.request.v1.ListPlanRevisionsResponse
+	148, // 163: orca.request.v1.RequestService.StartPhase:output_type -> orca.request.v1.StartPhaseResponse
+	149, // 164: orca.request.v1.RequestService.ReportTaskOutcome:output_type -> orca.request.v1.ReportTaskOutcomeResponse
+	150, // 165: orca.request.v1.RequestService.RecordRequestCheck:output_type -> orca.request.v1.RecordRequestCheckResponse
+	151, // 166: orca.request.v1.RequestService.ListRequestChecks:output_type -> orca.request.v1.ListRequestChecksResponse
+	152, // 167: orca.request.v1.RequestService.GetRequestReadiness:output_type -> orca.request.v1.GetRequestReadinessResponse
+	153, // 168: orca.request.v1.RequestService.RequestClarification:output_type -> orca.request.v1.RequestClarificationResponse
+	154, // 169: orca.request.v1.RequestService.ListClarifications:output_type -> orca.request.v1.ListClarificationsResponse
+	155, // 170: orca.request.v1.RequestService.GetClarification:output_type -> orca.request.v1.GetClarificationResponse
+	156, // 171: orca.request.v1.RequestService.AnswerClarification:output_type -> orca.request.v1.AnswerClarificationResponse
+	157, // 172: orca.request.v1.RequestService.CancelClarification:output_type -> orca.request.v1.CancelClarificationResponse
+	158, // 173: orca.request.v1.RequestService.ListPendingClarificationsForUser:output_type -> orca.request.v1.ListPendingClarificationsForUserResponse
+	159, // 174: orca.request.v1.RequestService.WaiveReadiness:output_type -> orca.request.v1.WaiveReadinessResponse
+	160, // 175: orca.request.v1.RequestService.ListDecisions:output_type -> orca.request.v1.ListDecisionsResponse
+	161, // 176: orca.request.v1.RequestService.GetDecision:output_type -> orca.request.v1.GetDecisionResponse
+	162, // 177: orca.request.v1.RequestService.ConfirmDecision:output_type -> orca.request.v1.ConfirmDecisionResponse
+	40,  // 178: orca.request.v1.RequestService.EditRequestContent:output_type -> orca.request.v1.EditRequestContentResponse
+	163, // 179: orca.request.v1.RequestService.ListRequestRevisions:output_type -> orca.request.v1.ListRequestRevisionsResponse
+	164, // 180: orca.request.v1.RequestService.GetRequestRevision:output_type -> orca.request.v1.GetRequestRevisionResponse
+	165, // 181: orca.request.v1.RequestService.GetRequestCoverage:output_type -> orca.request.v1.GetRequestCoverageResponse
+	166, // 182: orca.request.v1.RequestService.GetArtifactGraph:output_type -> orca.request.v1.GetArtifactGraphResponse
+	167, // 183: orca.request.v1.RequestService.ExportArtifactProjection:output_type -> orca.request.v1.ExportArtifactProjectionResponse
+	168, // 184: orca.request.v1.RequestService.ResolveArtifactRef:output_type -> orca.request.v1.ResolveArtifactRefResponse
+	169, // 185: orca.request.v1.RequestService.RequestImpactAssessment:output_type -> orca.request.v1.RequestImpactAssessmentResponse
+	170, // 186: orca.request.v1.RequestService.GetImpactAssessment:output_type -> orca.request.v1.GetImpactAssessmentResponse
+	171, // 187: orca.request.v1.RequestService.GetImpactGraph:output_type -> orca.request.v1.GetImpactGraphResponse
+	172, // 188: orca.request.v1.RequestService.CompareImpact:output_type -> orca.request.v1.CompareImpactResponse
+	173, // 189: orca.request.v1.RequestService.ListImpactFindings:output_type -> orca.request.v1.ListImpactFindingsResponse
+	174, // 190: orca.request.v1.RequestService.GetImpactEvidence:output_type -> orca.request.v1.GetImpactEvidenceResponse
+	175, // 191: orca.request.v1.RequestService.GetPlanRiskHeatmap:output_type -> orca.request.v1.GetPlanRiskHeatmapResponse
+	176, // 192: orca.request.v1.RequestService.GetImpactDrift:output_type -> orca.request.v1.GetImpactDriftResponse
+	177, // 193: orca.request.v1.RequestService.AcceptRisk:output_type -> orca.request.v1.AcceptRiskResponse
+	178, // 194: orca.request.v1.RequestService.OverrideRiskGate:output_type -> orca.request.v1.OverrideRiskGateResponse
+	179, // 195: orca.request.v1.RequestService.GetRiskPolicy:output_type -> orca.request.v1.GetRiskPolicyResponse
+	180, // 196: orca.request.v1.RequestService.SetRiskPolicy:output_type -> orca.request.v1.SetRiskPolicyResponse
+	181, // 197: orca.request.v1.RequestService.CheckReadiness:output_type -> orca.request.v1.CheckReadinessResponse
+	182, // 198: orca.request.v1.RequestService.GetReadinessReport:output_type -> orca.request.v1.GetReadinessReportResponse
+	183, // 199: orca.request.v1.RequestService.ListReadiness:output_type -> orca.request.v1.ListReadinessResponse
+	184, // 200: orca.request.v1.RequestService.ListContextSources:output_type -> orca.request.v1.ListContextSourcesResponse
+	185, // 201: orca.request.v1.RequestService.UpsertContextSource:output_type -> orca.request.v1.UpsertContextSourceResponse
+	186, // 202: orca.request.v1.RequestService.SetContextSourceStatus:output_type -> orca.request.v1.SetContextSourceStatusResponse
+	187, // 203: orca.request.v1.RequestService.PreviewContextPack:output_type -> orca.request.v1.PreviewContextPackResponse
+	188, // 204: orca.request.v1.RequestService.GetEvidence:output_type -> orca.request.v1.GetEvidenceResponse
+	189, // 205: orca.request.v1.RequestService.ListEvidence:output_type -> orca.request.v1.ListEvidenceResponse
+	190, // 206: orca.request.v1.RequestService.EstimateOutcomeReview:output_type -> orca.request.v1.EstimateOutcomeReviewResponse
+	191, // 207: orca.request.v1.RequestService.GenerateOutcomeReview:output_type -> orca.request.v1.GenerateOutcomeReviewResponse
+	192, // 208: orca.request.v1.RequestService.GetOutcomeReview:output_type -> orca.request.v1.GetOutcomeReviewResponse
+	193, // 209: orca.request.v1.RequestService.ListOutcomeReviews:output_type -> orca.request.v1.ListOutcomeReviewsResponse
+	194, // 210: orca.request.v1.RequestService.ListOutcomeReviewRuns:output_type -> orca.request.v1.ListOutcomeReviewRunsResponse
+	195, // 211: orca.request.v1.RequestService.GetReviewArtifact:output_type -> orca.request.v1.GetReviewArtifactResponse
+	196, // 212: orca.request.v1.RequestService.ListReviewArtifactRevisions:output_type -> orca.request.v1.ListReviewArtifactRevisionsResponse
+	197, // 213: orca.request.v1.RequestService.DecideOutcomeReviewItem:output_type -> orca.request.v1.DecideOutcomeReviewItemResponse
+	198, // 214: orca.request.v1.RequestService.ApproveOutcomeReview:output_type -> orca.request.v1.ApproveOutcomeReviewResponse
+	199, // 215: orca.request.v1.RequestService.ListOutcomeReviewDecisions:output_type -> orca.request.v1.ListOutcomeReviewDecisionsResponse
+	200, // 216: orca.request.v1.RequestService.LinkOutcomeReviewChild:output_type -> orca.request.v1.LinkOutcomeReviewChildResponse
+	201, // 217: orca.request.v1.RequestService.RegenerateReviewArtifacts:output_type -> orca.request.v1.RegenerateReviewArtifactsResponse
+	202, // 218: orca.request.v1.RequestService.RestoreReviewArtifactRevision:output_type -> orca.request.v1.RestoreReviewArtifactRevisionResponse
+	203, // 219: orca.request.v1.RequestService.CompareReviewArtifactRevisions:output_type -> orca.request.v1.CompareReviewArtifactRevisionsResponse
+	204, // 220: orca.request.v1.RequestService.GetReviewDrawingProfile:output_type -> orca.request.v1.GetReviewDrawingProfileResponse
+	205, // 221: orca.request.v1.RequestService.SaveReviewDrawingProfile:output_type -> orca.request.v1.SaveReviewDrawingProfileResponse
+	206, // 222: orca.request.v1.RequestService.ResetReviewDrawingProfile:output_type -> orca.request.v1.ResetReviewDrawingProfileResponse
+	207, // 223: orca.request.v1.RequestService.EraseRequest:output_type -> orca.request.v1.EraseRequestResponse
+	208, // 224: orca.request.v1.RequestService.ExportRequest:output_type -> orca.request.v1.ExportRequestResponse
+	209, // 225: orca.request.v1.RequestService.ExportTenantRequests:output_type -> orca.request.v1.ExportTenantRequestsResponse
+	124, // [124:226] is the sub-list for method output_type
+	22,  // [22:124] is the sub-list for method input_type
 	22,  // [22:22] is the sub-list for extension type_name
 	22,  // [22:22] is the sub-list for extension extendee
 	0,   // [0:22] is the sub-list for field type_name
@@ -3566,6 +3586,7 @@ func file_orca_request_v1_request_proto_init() {
 	file_orca_request_v1_request_backlog_proto_init()
 	file_orca_request_v1_solution_proto_init()
 	file_orca_request_v1_test_specs_proto_init()
+	file_orca_request_v1_test_scripts_proto_init()
 	file_orca_request_v1_request_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

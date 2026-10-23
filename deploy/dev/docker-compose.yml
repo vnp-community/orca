@@ -494,6 +494,13 @@ services:
       # Starts with Plan generation; the first code task waits for it: wait (default), require, warn or off (docs/integrate).
       REQUEST_TESTSPEC_GATE: ${REQUEST_TESTSPEC_GATE:-wait}
       REQUEST_TESTSPEC_GATE_TIMEOUT: ${REQUEST_TESTSPEC_GATE_TIMEOUT:-60m}
+      # Generates test scripts from the TCIR of the test specs with the Test Script Agent, in its own worktree (docs/integrate/TDD-REQ-TESTSCRIPT-001).
+      REQUEST_TESTSCRIPT_ENABLED: ${REQUEST_TESTSCRIPT_ENABLED:-false}
+      REQUEST_TESTSCRIPT_DEADLINE: ${REQUEST_TESTSCRIPT_DEADLINE:-60m}
+      REQUEST_TESTSCRIPT_TESTS_PATHS: ${REQUEST_TESTSCRIPT_TESTS_PATHS:-}
+      REQUEST_TESTSCRIPT_TEST_REPO: ${REQUEST_TESTSCRIPT_TEST_REPO:-}
+      REQUEST_TESTSCRIPT_GENERATOR: ${REQUEST_TESTSCRIPT_GENERATOR:-}
+      REQUEST_TESTSCRIPT_MODEL: ${REQUEST_TESTSCRIPT_MODEL:-}
       # Shared secret issue-status-sync presents for LookupRequestBySource; empty refuses the call.
       SERVICE_INTERNAL_TOKEN: ${REQUEST_SERVICE_INTERNAL_TOKEN:-}
       # Gateway presents the same value as REQUEST_INTERNAL_CALLER_TOKEN; empty makes every RPC refuse.

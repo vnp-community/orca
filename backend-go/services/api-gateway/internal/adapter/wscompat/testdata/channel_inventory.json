@@ -1824,6 +1824,22 @@
     "kind": "stream"
   },
   {
+    "name": "request.testScriptFile",
+    "kind": "unary"
+  },
+  {
+    "name": "request.testScriptReport",
+    "kind": "unary"
+  },
+  {
+    "name": "request.testScripts",
+    "kind": "unary"
+  },
+  {
+    "name": "request.testScriptsStart",
+    "kind": "unary"
+  },
+  {
     "name": "request.testSpecDocument",
     "kind": "unary"
   },

@@ -256,8 +256,11 @@ Quản trị viên có thể tắt các phân hệ Code Intelligence hoặc Qual
 Workflow step `action tdd_agent.*` (workflow-service) gọi tool của MCP server cài trên dev server qua RPC `mcp.callTool`
 (xem `docs/integrate/TDD-WF-AGENT-001-workflow-agent-pipeline.md` §7.1, hợp đồng ở `docs/integrate/contracts/`).
 
-- Mặc định chỉ có server `tdd-agent` (`tdd-agent -C <projectDir> mcp serve --transport stdio`) với các tool
-  `run_start, run_get, run_list, run_dispatch, run_cancel, generate_start, change_start, approval_submit, trace_get, kg_snapshots, testspec_start, testspec_get`.
+- Mặc định có hai server:
+  - `tdd-agent` (`tdd-agent -C <projectDir> mcp serve --transport stdio`) với các tool
+    `run_start, run_get, run_list, run_dispatch, run_cancel, generate_start, change_start, approval_submit, trace_get, kg_snapshots, testspec_start, testspec_get, testspec_tcir_get`.
+  - `test-script-agent` (`tsa -C <projectDir> mcp serve --transport stdio`) với các tool `tsa_start, tsa_get, tsa_report, tsa_file, tsa_cancel`
+    (sinh test script từ TCIR, `docs/integrate/TDD-REQ-TESTSCRIPT-001-test-scripts-in-request-execution.md`). Cài: `uv tool install ./agent/test-script-agent`; cần `claude` đã đăng nhập.
 - `projectDir` phải là repo git nằm dưới `ORCA_MCP_BRIDGE_ROOTS` (mặc định `AGENT_WORK_DIR`).
 - Mỗi `(server, projectDir)` giữ một tiến trình MCP, đóng sau 10 phút rảnh và khi agent dừng. Một lời gọi tối đa 120 s.
 - Lỗi của cầu nối trả trong `result` (`ok: false`, `error.code` = `MCP_*`), lỗi của tool là `isError: true` kèm mã của tool.

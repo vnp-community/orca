@@ -70,6 +70,10 @@ type Option func(*params)
 // WithTimeoutMs bounds the tool call on the agent's side (the agent applies its own default and ceiling when it is 0).
 func WithTimeoutMs(ms int) Option { return func(p *params) { p.TimeoutMs = ms } }
 
+// WithServer calls another MCP server of the agent's allowlist (for example test-script-agent); the default is tdd-agent.
+// The wire shape and the error classes are the same for every server behind the bridge.
+func WithServer(name string) Option { return func(p *params) { p.Server = name } }
+
 // Call runs tool with args in projectDir and decodes its JSON result into out (when non-nil).
 // Errors: *ToolError, *BridgeError, or one wrapping ErrTransport.
 func Call(ctx context.Context, relay Relay, projectDir, tool string, args map[string]any, out any, opts ...Option) error {

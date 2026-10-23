@@ -30,7 +30,7 @@ func (secretRedactor) Apply(_ context.Context, text string) string {
 // event that starts it and the dev server. Its handlers are always returned (the screen asks whether the lane is on); the
 // consumer and the reconcile loop start only when REQUEST_TESTSPEC_ENABLED is true and the dev server clients exist.
 func wireTestSpecs(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, log *slog.Logger, stores *requestStores, solution *solutionWiring,
-	execution *executionWiring, bus *commoneventbus.Consumer) requestgrpc.TestSpecUseCases {
+	execution *executionWiring, bus *commoneventbus.Consumer, afterLane func(ctx context.Context, requestID string)) requestgrpc.TestSpecUseCases {
 	enabled := cfg.TestSpecEnabled
 	if enabled && solution.infra == nil {
 		log.Warn("REQUEST_TESTSPEC_ENABLED is true but INFRA_FLEET_SERVICE_ADDR or PROJECT_SERVICE_ADDR is unset: test specs stay off")
@@ -45,10 +45,16 @@ func wireTestSpecs(ctx context.Context, wg *sync.WaitGroup, cfg config.Config, l
 	start := &usecase.StartTestSpecs{
 		Requests: stores.requests, Runs: stores.testSpecRuns, Agent: agent, Resolver: solution.conns, Context: builder,
 		Actors: execution.Actors, Settings: settings, Log: log,
-		// The join may be holding the Request's first dispatch; try it again now that the lane has finished.
+		// The join may be holding the Request's first dispatch; try it again now that the lane has finished. Then the test-script lane,
+		// which reads these test specs; each hook is guarded alone so one cannot keep the other from running.
 		OnFinished: func(ctx context.Context, requestID string) {
-			if _, err := execution.StartExecution.Execute(ctx, requestID); err != nil {
-				log.Warn("test specs: could not start execution after the lane finished", slog.String("request_id", requestID), slog.Any("error", err))
+			runHook(log, "start execution", requestID, func() {
+				if _, err := execution.StartExecution.Execute(ctx, requestID); err != nil {
+					log.Warn("test specs: could not start execution after the lane finished", slog.String("request_id", requestID), slog.Any("error", err))
+				}
+			})
+			if afterLane != nil {
+				runHook(log, "start test scripts", requestID, func() { afterLane(ctx, requestID) })
 			}
 		},
 	}
@@ -108,4 +114,14 @@ func (unavailableTestSpecAgent) Document(context.Context, usecase.AnalysisConnec
 }
 func (unavailableTestSpecAgent) Cancel(context.Context, usecase.AnalysisConnection, string, string) error {
 	return errTestSpecAgentOff
+}
+
+// runHook runs one finished-hook of the test-spec lane and keeps its panic to itself.
+func runHook(log *slog.Logger, name, requestID string, fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("test specs: finished hook panicked", slog.String("hook", name), slog.String("request_id", requestID), slog.Any("panic", r))
+		}
+	}()
+	fn()
 }
